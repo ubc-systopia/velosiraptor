@@ -1,0 +1,8 @@
+/* comment */
+// comment2
+
+import otherunit.vtr;
+
+unit myunit {
+
+};
