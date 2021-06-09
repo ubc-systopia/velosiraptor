@@ -25,7 +25,7 @@ use log::{debug, error, info};
 use std::collections::HashMap;
 
 custom_error! {pub ParserError
-  ReadSourceFile{ file: String } = "Unknown vmxnet3 device/version",
+  ReadSourceFile{ file: String } = "Could not read the source file",
 }
 
 pub struct Parser {
