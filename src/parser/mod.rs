@@ -6,24 +6,17 @@ use std::fs;
 // the used nom componets
 use nom::{
     branch::alt,
-    bytes::complete::{is_a, is_not, tag, take_until},
+    bytes::complete::{is_a, tag},
     character::complete::multispace0,
     error::ParseError,
     multi::many0,
-    sequence::{delimited, pair, tuple},
+    sequence::{delimited},
     IResult,
 };
 
-fn comment(input: &str) -> IResult<&str, &str> {
-    // Matches a inline comment `//`
-    let (input, _) = pair(tag("//"), is_not("\n"))(input)?;
-    Ok((input, "asdf"))
-}
-
-fn blockcomment(input: &str) -> IResult<&str, &str> {
-    let (input, _) = tuple((tag("/*"), take_until("*/"), tag("*/")))(input)?;
-    Ok((input, "asdf"))
-}
+mod comments;
+mod tokens;
+use comments::{blockcomment, comment};
 
 fn whitespace(input: &str) -> IResult<&str, &str> {
     let (input, _) = is_a(" \t\n\r")(input)?;
