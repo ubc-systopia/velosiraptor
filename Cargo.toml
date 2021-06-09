@@ -9,8 +9,12 @@ readme = "README.md"
 
 
 [dependencies]
-# the argumetn parser
+# the argument parser
 clap = "2.33.3"
+
+# logging and errors
+log = { version = "0.4", features = ["max_level_trace", "release_max_level_warn"] }
+custom_error = "1.9.2"
 
 # the parser combinators
 [dependencies.nom]
