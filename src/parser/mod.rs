@@ -4,74 +4,103 @@
 use std::fs;
 
 // the used nom componets
-use nom::{
-    branch::alt,
-    bytes::complete::{is_a, tag},
-    character::complete::multispace0,
-    error::ParseError,
-    multi::many0,
-    sequence::{delimited},
-    IResult,
-};
+// use nom::{
+//     branch::alt,
+//     bytes::complete::{is_a, tag},
+//     character::complete::multispace0,
+//     error::ParseError,
+//     multi::many0,
+//     sequence::delimited,
+//     IResult,
+// };
 
 mod comments;
 mod tokens;
 use comments::{blockcomment, comment};
 
-fn whitespace(input: &str) -> IResult<&str, &str> {
-    let (input, _) = is_a(" \t\n\r")(input)?;
-    Ok((input, "asdf"))
+use custom_error::custom_error;
+
+use log::{debug, error, info};
+
+use std::collections::HashMap;
+
+custom_error! {pub ParserError
+  ReadSourceFile{ file: String } = "Unknown vmxnet3 device/version",
 }
 
-fn skip_white_space_and_comments(input: &str) -> IResult<&str, &str> {
-    // can be zero or one
-    let (input, _) = many0(alt((comment, whitespace, blockcomment)))(input)?;
-    Ok((input, "asdf"))
+pub struct Parser {
+    /// the filename that is being parser
+    filename: String,
+
+    /// the source code to be parser
+    contents: String,
+
+    /// the current parsing line
+    // line: u32,
+
+    /// the current cursor column
+    // column: u32,
+
+    /// represents the imports in the file
+    imports: HashMap<String, Parser>,
 }
 
-fn parse_unit(input: &str) -> IResult<&str, &str> {
-    let (input, _) = ws(tag("unit"))(input)?;
-    let (input, _) = ws(tag("{"))(input)?;
-    let (input, _) = ws(tag("}"))(input)?;
-    let (input, _) = ws(tag(";"))(input)?;
-    Ok((input, "asdf"))
-}
+/// represents a parser struct this includes the file
+impl Parser {
+    fn new(filename: &str, contents: String) -> Result<Parser, ParserError> {
+        let p = Parser {
+            filename: filename.to_string(),
+            contents: contents,
+            imports: HashMap::new(),
+            // line: 0,
+            // column: 0
+        };
 
-//fn ws<'a, F: 'a, O, E: ParseError<&'a str>>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
-fn ws<'a, F: 'a, O, E: ParseError<&'a str>>(
-    inner: F,
-) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
-where
-    F: Fn(&'a str) -> IResult<&'a str, O, E>,
-{
-    delimited(multispace0, inner, multispace0)
-}
+        info!("created parser ");
 
-fn parse(input: &str) -> IResult<&str, &str> {
-    println!("<parsing>");
-    println!("{}", input);
-    println!("</parsing>");
+        Ok(p)
+    }
 
-    let (input, _) = skip_white_space_and_comments(input)?;
-    println!("<parsing>");
-    println!("{}", input);
-    println!("</parsing>");
+    #[allow(dead_code)]
+    pub fn from_string(content: &str) -> Result<Parser, ParserError> {
+        info!("creating string parser");
+        Parser::new("<stdio>", content.to_string())
+    }
 
-    let (input, _) = many0(parse_unit)(input)?;
-    println!("<parsing>");
-    println!("{}", input);
-    println!("</parsing>");
+    pub fn from_file(filename: &str) -> Result<Parser, ParserError> {
+        info!("creating file parser for '{}'", filename);
+        let file_contents = fs::read_to_string(filename);
+        let contents = match file_contents {
+            Ok(s) => s,
+            _ => {
+                error!("could not read the file '{}'", filename);
+                return Err(ParserError::ReadSourceFile {
+                    file: filename.to_string(),
+                });
+            }
+        };
+        Parser::new(filename, contents)
+    }
 
-    let (input, _) = skip_white_space_and_comments(input)?;
-    println!("<parsing>");
-    println!("{}", input);
-    println!("</parsing>");
+    pub fn parse(&mut self) {
+        info!("parsing: {}", self.filename);
+        debug!("<contents>");
+        debug!("{}", self.contents);
+        debug!("<contents>");
 
-    Ok(("asdf", "asdf"))
-}
+        // so here we would parse the imports...
+        info!("imports: ");
+        for (k, _) in &self.imports {
+            info!(" - {}", k)
+        }
 
-pub fn parse_file(filename: &str) -> IResult<&str, &str> {
-    let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
-    let _ret = parse(&contents);
-    return Ok(("asdf", "asdf"));
+        let f = blockcomment(&self.contents);
+        match f {
+            _ => println!("todo"),
+        }
+        let f = comment(&self.contents);
+        match f {
+            _ => println!("todo"),
+        }
+    }
 }

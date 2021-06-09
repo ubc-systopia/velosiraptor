@@ -5,9 +5,11 @@ extern crate nom;
 
 // used for parsing
 use clap::{App, Arg};
+use log::{debug, info, trace};
 
 // get the parser module
 mod parser;
+use parser::Parser;
 
 fn parse_cmdline() -> clap::ArgMatches<'static> {
     App::new("vtrc")
@@ -20,6 +22,12 @@ fn parse_cmdline() -> clap::ArgMatches<'static> {
                 .long("output")
                 .takes_value(true)
                 .help("the output file"),
+        )
+        .arg(
+            Arg::with_name("v")
+                .short("v")
+                .multiple(true)
+                .help("Sets the level of verbosity"),
         )
         .arg(
             Arg::with_name("input")
@@ -35,16 +43,28 @@ fn main() {
     // get the command line argumentts
     let matches = parse_cmdline();
 
+    // setting the log level
+    match matches.occurrences_of("v") {
+        0 => log::set_max_level(log::LevelFilter::Warn),
+        1 => log::set_max_level(log::LevelFilter::Info),
+        2 => log::set_max_level(log::LevelFilter::Debug),
+        _ => log::set_max_level(log::LevelFilter::Trace),
+    };
+
+    info!("Velosiraptor Compiler (vrc)");
+
     let infile = matches.value_of("input").unwrap_or("none");
-    println!("Value for out: {}", infile);
+    info!("input file: {}", infile);
 
     let out = matches.value_of("output").unwrap_or("<stdout>");
-    println!("Value for out: {}", out);
+    info!("input file: {}", out);
 
-    // now let's try to parse the file
-    let res = parser::parse_file(infile);
-    match res {
-        Ok(_) => println!("Parsing successfule"),
-        Err(_) => println!("Parsing failed"),
-    }
+    debug!("Debug output enabled");
+    trace!("Tracing output enabled");
+
+    // let's try to create a file parser
+    let mut parser = Parser::from_file(infile).expect("failed to construct the parser");
+
+    // parse the file
+    parser.parse();
 }
