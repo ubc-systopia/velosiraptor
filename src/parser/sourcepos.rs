@@ -432,6 +432,21 @@ impl<'a, 'b> FindSubstring<Content<'b>> for SourcePos<'a> {
     }
 }
 
+use std::fmt;
+
+impl<'a> fmt::Display for SourcePos<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}:{}:{}\n{}",
+            self.filename,
+            self.line,
+            self.column,
+            String::from_utf8(Vec::from(self.content)).unwrap()
+        )
+    }
+}
+
 
 #[test]
 fn sourcepos_tests() {
