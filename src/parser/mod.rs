@@ -43,6 +43,11 @@ use comments::{blockcomment, comment};
 mod sourcepos;
 use sourcepos::SourcePos;
 
+mod ast;
+mod identifier;
+mod imports;
+mod whitespace;
+
 mod tokens;
 
 use custom_error::custom_error;
@@ -71,7 +76,7 @@ impl<'a> Parser<'a> {
     fn new(filename: &'a str, contents: &'a str) -> Result<Parser<'a>, ParserError> {
         let p = Parser {
             filename: filename.to_string(),
-            contents: SourcePos::new(filename, contents.as_bytes()),
+            contents: SourcePos::new(filename, contents),
             imports: HashMap::new(),
             // line: 0,
             // column: 0
