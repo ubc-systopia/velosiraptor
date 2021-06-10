@@ -38,6 +38,9 @@ fn parse_cmdline() -> clap::ArgMatches<'static> {
         .get_matches()
 }
 
+// for reading the file
+use std::fs;
+
 /// Main - entry point into the application
 fn main() {
     // get the command line argumentts
@@ -63,7 +66,8 @@ fn main() {
     trace!("Tracing output enabled");
 
     // let's try to create a file parser
-    let mut parser = Parser::from_file(infile).expect("failed to construct the parser");
+    let file_contents = fs::read_to_string(infile).expect("failed to construct the parser");
+    let mut parser = Parser::from_string(&file_contents).expect("failed to construct the parser");
 
     // parse the file
     parser.parse();

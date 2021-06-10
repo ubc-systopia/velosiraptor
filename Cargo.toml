@@ -16,6 +16,8 @@ clap = "2.33.3"
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_warn"] }
 custom_error = "1.9.2"
 
+memchr = "2.4.0"
+
 # the parser combinators
 [dependencies.nom]
 version = "6"
