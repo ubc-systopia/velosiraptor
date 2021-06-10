@@ -35,18 +35,16 @@ use super::tokens;
 use super::SourcePos;
 
 /// parses and consumes an end of line comment '// foo
-pub fn comment(input: SourcePos) -> IResult<SourcePos, SourcePos> {
+pub fn comment(input: SourcePos) -> IResult<SourcePos, ()> {
     // Matches a inline comment `//`, does not consume the `\n` character
-    let (input, (_, c)) = pair(tag(tokens::COMMENT), is_not(tokens::EOL))(input)?;
-    println!("{}", input);
-    println!("{}", c);
+    let (input, _) = pair(tag(tokens::COMMENT), is_not(tokens::EOL))(input)?;
     // return the remainder of the input, and the parsed comment value
-    Ok((input, c))
+    Ok((input, ()))
 }
 
 /// parses and consumes a block comment `/* bar */`
 /// TODO: this doesn't work with nested comments!
-pub fn blockcomment(input: SourcePos) -> IResult<SourcePos, SourcePos> {
+pub fn blockcomment(input: SourcePos) -> IResult<SourcePos, ()> {
     let (input, (_, c, _)) = tuple((
         // start with the block comment start token
         tag(tokens::COMMENT_BLOCK_START),
@@ -55,63 +53,52 @@ pub fn blockcomment(input: SourcePos) -> IResult<SourcePos, SourcePos> {
         // consume the end token
         tag(tokens::COMMENT_BLOCK_END),
     ))(input)?;
-    Ok((input, c))
+    Ok((input, ()))
 }
 
 #[test]
-fn parse_comment_tests() {
+fn parse_comment_tests_one_line() {
     assert_eq!(
-        comment(SourcePos::new("stdin", b"// foo bar")),
-        Ok((
-            SourcePos::new_at("stdin", b"", 10, 1, 11),
-            SourcePos::new_at("stdin", b" foo bar", 2, 1, 3),
-        ))
-    );
-
-    assert_eq!(
-        comment(SourcePos::new("stdin", b"// foo \nbar")),
-        Ok((
-            SourcePos::new_at("stdin", b"\nbar", 8, 1, 9),
-            SourcePos::new_at("stdin", b" foo", 2, 1, 1),
-        ))
-    );
-    assert_eq!(
-        comment(SourcePos::new("stdin", b"// foo bar\n\n")),
-        Ok((
-            SourcePos::new_at("stdin", b"bar", 11, 2, 4),
-            SourcePos::new_at("stdin", b" foo\n", 1, 1, 1),
-        ))
+        comment(SourcePos::new("stdin", "// foo bar")),
+        Ok((SourcePos::new_at("stdin", "", 10, 1, 11), (),))
     );
 }
 
 #[test]
-fn parse_blockcomment_tests() {
+fn parse_comment_tests_one_line_with_newline() {
     assert_eq!(
-        blockcomment(SourcePos::new("stdin", b"/* foo bar */")),
-        Ok((
-            SourcePos::new_at("stdin", b"bar", 11, 2, 4),
-            SourcePos::new_at("stdin", b" foo\n", 1, 1, 1),
-        ))
+        comment(SourcePos::new("stdin", "// foo bar\n")),
+        Ok((SourcePos::new_at("stdin", "\n", 10, 1, 11), (),))
     );
+}
+
+#[test]
+fn parse_comment_tests_twoline() {
     assert_eq!(
-        blockcomment(SourcePos::new("stdin", b"/* foo \nbar */")),
-        Ok((
-            SourcePos::new_at("stdin", b"", 11, 2, 1),
-            SourcePos::new_at("stdin", b" foo\nbar ", 1, 1, 1),
-        ))
+        comment(SourcePos::new("stdin", "// foo \nbar")),
+        Ok((SourcePos::new_at("stdin", "\nbar", 7, 1, 8), (),))
     );
+}
+
+#[test]
+fn parse_blockcomment_test_one() {
     assert_eq!(
-        blockcomment(SourcePos::new("stdin", b"/* foo  */bar")),
-        Ok((
-            SourcePos::new_at("stdin", b"bar", 11, 2, 4),
-            SourcePos::new_at("stdin", b" foo\n", 1, 1, 1),
-        ))
+        blockcomment(SourcePos::new("stdin", "/* foo bar */")),
+        Ok((SourcePos::new_at("stdin", "", 13, 1, 14), (),))
     );
+}
+#[test]
+fn parse_blockcomment_test_newline() {
     assert_eq!(
-        blockcomment(SourcePos::new("stdin", b"/* foo  */\nbar")),
-        Ok((
-            SourcePos::new_at("stdin", b"bar", 11, 2, 4),
-            SourcePos::new_at("stdin", b" foo\n", 1, 1, 1),
-        ))
+        blockcomment(SourcePos::new("stdin", "/* foo \nbar */")),
+        Ok((SourcePos::new_at("stdin", "", 14, 2, 7), ()))
+    );
+}
+
+#[test]
+fn parse_blockcomment_test_follow() {
+    assert_eq!(
+        blockcomment(SourcePos::new("stdin", "/* foo */ bar")),
+        Ok((SourcePos::new_at("stdin", " bar", 9, 1, 10), ()))
     );
 }
