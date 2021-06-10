@@ -50,10 +50,10 @@ use nom::error::{ErrorKind, ParseError};
 use memchr;
 
 /// Corresponds to a single byte of the source file
-pub type Element = u8;
+pub type Element = char;
 
 /// The source file type, as an array of bytes.
-pub type Content<'a> = &'a [Element];
+pub type Content<'a> = &'a str;
 
 /// SourcePos structure as input/output to parser combinators
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -84,8 +84,8 @@ impl<'a> SourcePos<'a> {
     }
 
     /// Constructs a new SourcePos from the supplied string
-    pub fn from_string(filename: &'a str, content: &'a String) -> Self {
-        SourcePos::new(filename, content.as_bytes())
+    pub fn from_string(filename: &'a str, content: &'a str) -> Self {
+        SourcePos::new(filename, content)
     }
 
     /// Constructor for a new SourcePos at a given position
@@ -113,12 +113,12 @@ impl<'a> SourcePos<'a> {
         line: u32,
         column: u32,
     ) -> Self {
-        Self::new_at(filename, content.as_bytes(), offset, line, column)
+        Self::new_at(filename, content, offset, line, column)
     }
 
     /// Create a new, empty SourcePos
     pub fn empty() -> Self {
-        Self::new("STDIO", b"")
+        Self::new("stdio", "")
     }
 
     pub fn is_empty(&self) -> bool {
@@ -139,54 +139,67 @@ impl<'a> InputLength for SourcePos<'a> {
     }
 }
 
+use std::str::CharIndices;
+use std::str::Chars;
+
 /// `Nomt::InputIter` implementation for SourcePos (Nom-parser compat)
 impl<'a> InputIter for SourcePos<'a> {
     /// The current input type is a sequence of that Item type.
     type Item = Element;
 
     /// An iterator over the input type, producing the item and its position for use with Slice.
-    type Iter = Enumerate<Self::IterElem>;
+    type Iter = CharIndices<'a>;
 
     /// An iterator over the input type, producing the item
-    type IterElem = Copied<Iter<'a, Element>>;
+    type IterElem = Chars<'a>;
 
     /// Returns an iterator over the elements and their byte offsets
     #[inline]
     fn iter_indices(&self) -> Self::Iter {
-        self.content.iter_elements().enumerate()
+        self.content.char_indices()
     }
 
     /// Returns an iterator over the elements
     #[inline]
     fn iter_elements(&self) -> Self::IterElem {
-        self.content.iter().copied()
+        self.content.chars()
     }
 
     /// Finds the byte position of the element
-    #[inline]
     fn position<P>(&self, predicate: P) -> Option<usize>
     where
         P: Fn(Self::Item) -> bool,
     {
-        self.content.iter().position(|b| predicate(*b))
+        for (o, c) in self.content.char_indices() {
+            if predicate(c) {
+                return Some(o);
+            }
+        }
+        None
     }
 
     /// Get the byte offset from the element's position in the stream
     #[inline]
     fn slice_index(&self, count: usize) -> Result<usize, Needed> {
-        if self.content.len() >= count {
-            Ok(count)
-        } else {
-            Err(Needed::new(count - self.content.len()))
+        let mut cnt = 0;
+        for (index, _) in self.content.char_indices() {
+            if cnt == count {
+                return Ok(index);
+            }
+            cnt += 1;
         }
+        if cnt == count {
+            return Ok(self.content.len());
+        }
+        Err(Needed::Unknown)
     }
 }
 
 fn update_line_column(content: Content, line: u32, column: u32) -> (u32, u32) {
     let mut new_line = line;
     let mut new_column = column;
-    for c in content {
-        if *c as char == '\n' {
+    for c in content.chars() {
+        if c as char == '\n' {
             new_line += 1;
             new_column = 1;
         } else {
@@ -240,7 +253,7 @@ impl<'a> InputTakeAtPosition for SourcePos<'a> {
     where
         P: Fn(Self::Item) -> bool,
     {
-        match (0..self.content.len()).find(|b| predicate(self.content[*b])) {
+        match self.content.find(predicate) {
             Some(i) => Ok(self.take_split(i)),
             None => Err(Err::Incomplete(Needed::new(1))),
         }
@@ -254,7 +267,7 @@ impl<'a> InputTakeAtPosition for SourcePos<'a> {
     where
         P: Fn(Self::Item) -> bool,
     {
-        match (0..self.content.len()).find(|b| predicate(self.content[*b])) {
+        match self.content.find(predicate) {
             Some(0) => Err(Err::Error(E::from_error_kind(*self, e))),
             Some(i) => Ok(self.take_split(i)),
             None => Err(Err::Incomplete(Needed::new(1))),
@@ -268,7 +281,7 @@ impl<'a> InputTakeAtPosition for SourcePos<'a> {
     where
         P: Fn(Self::Item) -> bool,
     {
-        match (0..self.content.len()).find(|b| predicate(self.content[*b])) {
+        match self.content.find(predicate) {
             Some(i) => Ok(self.take_split(i)),
             None => Ok(self.take_split(self.input_len())),
         }
@@ -282,7 +295,7 @@ impl<'a> InputTakeAtPosition for SourcePos<'a> {
     where
         P: Fn(Self::Item) -> bool,
     {
-        match (0..self.content.len()).find(|b| predicate(self.content[*b])) {
+        match self.content.find(predicate) {
             Some(0) => Err(Err::Error(E::from_error_kind(*self, e))),
             Some(i) => Ok(self.take_split(i)),
             None => {
@@ -364,8 +377,17 @@ fn lowercase_byte(c: u8) -> u8 {
 /// `Nom::Compare` implementation for SourcePos (Nom-parser compat)
 impl<'a, 'b> Compare<Content<'b>> for SourcePos<'a> {
     /// Compares self to another value for equality
-    fn compare(&self, t: Content<'b>) -> CompareResult {
-        let pos = self.content.iter().zip(t.iter()).position(|(a, b)| a != b);
+    fn compare(&self, t: &'b str) -> CompareResult {
+        self.content.as_bytes().compare(t.as_bytes())
+    }
+
+    /// Compares self to another value for equality independently of the case.
+    fn compare_no_case(&self, t: &'b str) -> CompareResult {
+        let pos = self
+            .content
+            .chars()
+            .zip(t.chars())
+            .position(|(a, b)| a.to_lowercase().ne(b.to_lowercase()));
 
         match pos {
             Some(_) => CompareResult::Error,
@@ -378,57 +400,13 @@ impl<'a, 'b> Compare<Content<'b>> for SourcePos<'a> {
             }
         }
     }
-
-    /// Compares self to another value for equality independently of the case.
-    fn compare_no_case(&self, t: Content<'b>) -> CompareResult {
-        if self
-            .content
-            .iter()
-            .zip(t)
-            .any(|(a, b)| lowercase_byte(*a) != lowercase_byte(*b))
-        {
-            CompareResult::Error
-        } else if self.content.len() < t.len() {
-            CompareResult::Incomplete
-        } else {
-            CompareResult::Ok
-        }
-    }
 }
 
 /// `Nom::FindSubstring` implementation for SourcePos (Nom-parser compat)
 impl<'a, 'b> FindSubstring<Content<'b>> for SourcePos<'a> {
     /// Returns the byte position of the substring if it is found
-    fn find_substring(&self, substr: &'b [u8]) -> Option<usize> {
-        if substr.len() > self.content.len() {
-            return None;
-        }
-
-        let (&substr_first, substr_rest) = match substr.split_first() {
-            Some(split) => split,
-            // an empty substring is found at position 0
-            // This matches the behavior of str.find("").
-            None => return Some(0),
-        };
-
-        if substr_rest.is_empty() {
-            return memchr::memchr(substr_first, self.content);
-        }
-
-        let mut offset = 0;
-        let haystack = &self.content[..self.content.len() - substr_rest.len()];
-
-        while let Some(position) = memchr::memchr(substr_first, &haystack[offset..]) {
-            offset += position;
-            let next_offset = offset + 1;
-            if &self.content[next_offset..][..substr_rest.len()] == substr_rest {
-                return Some(offset);
-            }
-
-            offset = next_offset;
-        }
-
-        None
+    fn find_substring(&self, substr: &'b str) -> Option<usize> {
+        self.content.find(substr)
     }
 }
 
@@ -447,12 +425,11 @@ impl<'a> fmt::Display for SourcePos<'a> {
     }
 }
 
-
 #[test]
 fn sourcepos_tests() {
-    let sp0 = SourcePos::new("stdin", b"foo\nbar\nfoobar");
-    let sp1 = SourcePos::new_at("stdin", b"bar\nfoobar", 4, 2, 1);
+    let sp0 = SourcePos::new("stdin", "foo\nbar\nfoobar");
+    let sp1 = SourcePos::new_at("stdin", "bar\nfoobar", 4, 2, 1);
     assert_eq!(sp0.slice(4..), sp1);
-    let sp2 = SourcePos::new_at("stdin", b"foo\n", 0, 1, 1);
+    let sp2 = SourcePos::new_at("stdin", "foo\n", 0, 1, 1);
     assert_eq!(sp0.slice(..4), sp2);
 }

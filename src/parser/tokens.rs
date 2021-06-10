@@ -26,13 +26,22 @@
 //! specifies special parsing tokens for velosiraptor.
 
 /// represents the end of line string.
-pub const EOL: &[u8] = b"\n";
+pub const EOL: &str = "\n";
 
 /// represents the start of a end of line comment
-pub const COMMENT: &[u8] = b"//";
+pub const COMMENT: &str = "//";
 
 /// represents the start of a block comment
-pub const COMMENT_BLOCK_START: &[u8] = b"/*";
+pub const COMMENT_BLOCK_START: &str = "/*";
 
 /// represents the end of a block comment
-pub const COMMENT_BLOCK_END: &[u8] = b"*/";
+pub const COMMENT_BLOCK_END: &str = "*/";
+
+/// represents the end of a block comment
+pub const WHITESPACE: &str = " \t\n\r";
+
+/// represents the import keyword
+pub const IMPORT: &str = "import";
+
+/// represents the import keyword
+pub const EOS: &str = ";";
