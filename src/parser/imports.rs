@@ -24,29 +24,37 @@
 // SOFTWARE.
 
 // the used nom componets
-use nom::{bytes::complete::tag, character::complete::multispace0, sequence::tuple, IResult};
+use nom::{
+    bytes::complete::tag,
+    character::complete::{multispace0, multispace1},
+    sequence::{preceded, terminated, tuple},
+    IResult,
+};
 
 // get the tokens
-use super::identifier::identifier;
+use super::identifier::parse_identifier;
 use super::tokens;
 use super::SourcePos;
 
 use super::ast::Ast;
 
-/// parses and consumes an end of line comment '// foo
+/// parses and consumes an import statement (`import foo;`) and any following whitespaces
 pub fn import(input: SourcePos) -> IResult<SourcePos, Ast> {
-    let ws = multispace0;
-    let import = tag(tokens::IMPORT);
-    let eos = tag(tokens::EOS);
+    // record the current position
+    let pos = input.get_pos();
 
-    // now parse the thing
-    let (input, (_, imp, _, ident, _, _)) = tuple((ws, import, ws, identifier, ws, eos))(input)?;
+    // the import block is an identifier, preceeded by the import keyword and whitespace
+    // we do not allow comments between the import keyword and the identifier
+    let import_block = preceded(tuple((tag(tokens::IMPORT), multispace1)), parse_identifier);
 
-    // return the remainder of the input, and the parsed import token
-    Ok((
-        input,
-        Ast::import_from_sourcepos(ident.as_slice().to_string(), (imp.line, imp.column)),
-    ))
+    // the end of statement is whitespace, the EOS token, followed by more whitespace
+    let end_of_statement = tuple((multispace0, tag(tokens::EOS), multispace0));
+
+    // now match the import statement that is an import block followed by an end of statement part
+    match terminated(import_block, end_of_statement)(input) {
+        Ok((input, ident)) => Ok((input, Ast::import_from_sourcepos(ident, pos))),
+        Err(x) => Err(x),
+    }
 }
 
 #[test]
