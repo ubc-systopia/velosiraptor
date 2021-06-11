@@ -7,6 +7,8 @@ extern crate nom;
 use clap::{App, Arg};
 use log::{debug, info, trace};
 
+use simplelog::{SimpleLogger, LevelFilter, Config};
+
 // get the parser module
 mod parser;
 use parser::Parser;
@@ -38,21 +40,21 @@ fn parse_cmdline() -> clap::ArgMatches<'static> {
         .get_matches()
 }
 
-// for reading the file
-use std::fs;
-
 /// Main - entry point into the application
 fn main() {
     // get the command line argumentts
     let matches = parse_cmdline();
 
     // setting the log level
-    match matches.occurrences_of("v") {
-        0 => log::set_max_level(log::LevelFilter::Warn),
-        1 => log::set_max_level(log::LevelFilter::Info),
-        2 => log::set_max_level(log::LevelFilter::Debug),
-        _ => log::set_max_level(log::LevelFilter::Trace),
+    let filter_level = match matches.occurrences_of("v") {
+        0 => LevelFilter::Warn,
+        1 => LevelFilter::Info,
+        2 => LevelFilter::Debug,
+        _ => LevelFilter::Trace,
     };
+
+    // initialize the logger
+    SimpleLogger::init(filter_level, Config::default()).unwrap();
 
     info!("Velosiraptor Compiler (vrc)");
 

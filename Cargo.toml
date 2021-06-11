@@ -13,10 +13,9 @@ readme = "README.md"
 clap = "2.33.3"
 
 # logging and errors
-log = { version = "0.4", features = ["max_level_trace", "release_max_level_warn"] }
+log = { version = "0.4.14", features = ["max_level_trace", "release_max_level_warn"] }
+simplelog = "^0.10.0"
 custom_error = "1.9.2"
-
-memchr = "2.4.0"
 
 # the parser combinators
 [dependencies.nom]
