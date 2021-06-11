@@ -38,15 +38,18 @@ use std::fs;
 // };
 
 mod comments;
-use comments::{blockcomment, comment};
 
 mod sourcepos;
 use sourcepos::SourcePos;
 
+mod file;
+use file::parse_file;
+
 mod ast;
+use ast::Ast;
 mod identifier;
 mod imports;
-mod whitespace;
+
 
 mod tokens;
 
@@ -60,73 +63,64 @@ custom_error! {pub ParserError
   ReadSourceFile{ file: String } = "Could not read the source file",
 }
 
-pub struct Parser<'a> {
+pub struct Parser {
     /// the filename that is being parser
     filename: String,
 
-    /// the source code to be parser
-    contents: SourcePos<'a>,
+    /// the contents of this file
+    filecontents: String,
 
     /// represents the imports in the file
-    imports: HashMap<String, Parser<'a>>,
+    imports: HashMap<String, Parser>,
+
+    parsetree: Ast,
 }
 
 /// represents a parser struct this includes the file
-impl<'a> Parser<'a> {
-    fn new(filename: &'a str, contents: &'a str) -> Result<Parser<'a>, ParserError> {
+impl Parser {
+    fn new(filename: String, contents: String) -> Result<Parser, ParserError> {
         let p = Parser {
             filename: filename.to_string(),
-            contents: SourcePos::new(filename, contents),
+            filecontents: contents,
             imports: HashMap::new(),
-            // line: 0,
-            // column: 0
+            parsetree: Ast::None,
         };
 
         info!("created parser ");
-
         Ok(p)
     }
 
     #[allow(dead_code)]
-    pub fn from_string(content: &str) -> Result<Parser, ParserError> {
+    pub fn from_string(contents: String) -> Result<Parser, ParserError> {
         info!("creating string parser");
-        Parser::new("<stdio>", content)
+        Parser::new("<stdio>".to_string(), contents)
     }
 
-    // pub fn from_file(filename: &str) -> Result<Parser, ParserError> {
-    //     info!("creating file parser for '{}'", filename);
-    //     let file_contents = fs::read_to_string(filename);
-    //     let contents = match file_contents {
-    //         Ok(s) => s,
-    //         _ => {
-    //             error!("could not read the file '{}'", filename);
-    //             return Err(ParserError::ReadSourceFile {
-    //                 file: filename.to_string(),
-    //             });
-    //         }
-    //     };
-    //     Parser::new(filename, &contents.as_bytes())
-    // }
+    pub fn from_file(filename: String) -> Result<Parser, ParserError> {
+        info!("creating file parser for '{}'", filename);
+        let file_contents = fs::read_to_string(&filename);
+        let contents = match file_contents {
+            Ok(s) => s,
+            _ => {
+                error!("could not read the file '{}'", filename);
+                return Err(ParserError::ReadSourceFile {
+                    file: filename.to_string(),
+                });
+            }
+        };
+        Parser::new(filename, contents)
+    }
 
     pub fn parse(&mut self) {
         info!("parsing: {}", self.filename);
         debug!("<contents>");
-        debug!("{}", self.contents);
+        debug!("{}", &self.filecontents);
         debug!("<contents>");
 
-        // so here we would parse the imports...
-        info!("imports: ");
-        for (k, _) in &self.imports {
-            info!(" - {}", k)
-        }
+        let sp = SourcePos::new(&self.filename, &self.filecontents);
+        let (rem, ast) = parse_file(sp).unwrap();
 
-        let f = blockcomment(self.contents);
-        // match f {
-        //     _ => println!("todo"),
-        // }
-        // let f = comment(&self.contents);
-        // match f {
-        //     _ => println!("todo"),
-        // }
+        println!("{}", ast);
+        println!("{}", rem);
     }
 }

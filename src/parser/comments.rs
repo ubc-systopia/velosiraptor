@@ -25,8 +25,11 @@
 
 // the used nom componets
 use nom::{
+    branch::alt,
     bytes::complete::{is_not, tag, take_until},
-    sequence::{pair, tuple},
+    character::complete::multispace0,
+    multi::many0,
+    sequence::{terminated, tuple},
     IResult,
 };
 
@@ -35,70 +38,120 @@ use super::tokens;
 use super::SourcePos;
 
 /// parses and consumes an end of line comment '// foo
-pub fn comment(input: SourcePos) -> IResult<SourcePos, ()> {
-    // Matches a inline comment `//`, does not consume the `\n` character
-    let (input, _) = pair(tag(tokens::COMMENT), is_not(tokens::EOL))(input)?;
-    // return the remainder of the input, and the parsed comment value
-    Ok((input, ()))
+pub fn parse_comment(input: SourcePos) -> IResult<SourcePos, SourcePos> {
+    // Matches a inline comment `//`, does not consume whitespace after
+    let comment = tuple((
+        // start with the comment
+        tag(tokens::COMMENT),
+        // until we hit end of line
+        is_not(tokens::EOL)
+    ));
+
+    // now match the end of line comment with possible multispace following
+    match terminated(comment, multispace0)(input) {
+        Ok((input, _)) => Ok((input, SourcePos::empty())),
+        Err(x) => Err(x),
+    }
 }
 
 /// parses and consumes a block comment `/* bar */`
 /// TODO: this doesn't work with nested comments!
-pub fn blockcomment(input: SourcePos) -> IResult<SourcePos, ()> {
-    let (input, (_, c, _)) = tuple((
+pub fn parse_blockcomment(input: SourcePos) -> IResult<SourcePos, SourcePos> {
+    // build the blockcomment parser, does not consume whitespace after
+    let blockcomment = tuple((
         // start with the block comment start token
         tag(tokens::COMMENT_BLOCK_START),
         // consume everything until we reach the end of token
         take_until(tokens::COMMENT_BLOCK_END),
         // consume the end token
         tag(tokens::COMMENT_BLOCK_END),
-    ))(input)?;
-    Ok((input, ()))
+    ));
+
+    // now match the block comment and discard following whitespace characters
+    match terminated(blockcomment, multispace0)(input) {
+        Ok((input, _)) => Ok((input, SourcePos::empty())),
+        Err(x) => Err(x),
+    }
+}
+
+/// parse zero or more of the possible comment types
+pub fn parse_comments(input: SourcePos) -> IResult<SourcePos, SourcePos> {
+    // match any of the comments above
+    match many0(alt((parse_blockcomment, parse_comment)))(input) {
+        Ok((input, _)) => Ok((input, SourcePos::empty())),
+        Err(x) => Err(x),
+    }
 }
 
 #[test]
 fn parse_comment_tests_one_line() {
     assert_eq!(
-        comment(SourcePos::new("stdin", "// foo bar")),
-        Ok((SourcePos::new_at("stdin", "", 10, 1, 11), (),))
+        parse_comment(SourcePos::new("stdin", "// foo bar")),
+        Ok((
+            SourcePos::new_at("stdin", "", 10, 1, 11),
+            SourcePos::empty()
+        ))
     );
 }
 
 #[test]
 fn parse_comment_tests_one_line_with_newline() {
     assert_eq!(
-        comment(SourcePos::new("stdin", "// foo bar\n")),
-        Ok((SourcePos::new_at("stdin", "\n", 10, 1, 11), (),))
+        parse_comment(SourcePos::new("stdin", "// foo bar\n")),
+        Ok((
+            SourcePos::new_at("stdin", "", 11, 2, 1),
+            SourcePos::empty()
+        ))
     );
 }
 
 #[test]
 fn parse_comment_tests_twoline() {
     assert_eq!(
-        comment(SourcePos::new("stdin", "// foo \nbar")),
-        Ok((SourcePos::new_at("stdin", "\nbar", 7, 1, 8), (),))
+        parse_comment(SourcePos::new("stdin", "// foo \nbar")),
+        Ok((
+            SourcePos::new_at("stdin", "bar", 8, 2, 1),
+            SourcePos::empty()
+        ))
     );
 }
 
 #[test]
 fn parse_blockcomment_test_one() {
     assert_eq!(
-        blockcomment(SourcePos::new("stdin", "/* foo bar */")),
-        Ok((SourcePos::new_at("stdin", "", 13, 1, 14), (),))
+        parse_blockcomment(SourcePos::new("stdin", "/* foo bar */")),
+        Ok((
+            SourcePos::new_at("stdin", "", 13, 1, 14),
+            SourcePos::empty()
+        ))
     );
 }
 #[test]
 fn parse_blockcomment_test_newline() {
     assert_eq!(
-        blockcomment(SourcePos::new("stdin", "/* foo \nbar */")),
-        Ok((SourcePos::new_at("stdin", "", 14, 2, 7), ()))
+        parse_blockcomment(SourcePos::new("stdin", "/* foo \nbar */")),
+        Ok((SourcePos::new_at("stdin", "", 14, 2, 7), SourcePos::empty()))
     );
 }
 
 #[test]
 fn parse_blockcomment_test_follow() {
     assert_eq!(
-        blockcomment(SourcePos::new("stdin", "/* foo */ bar")),
-        Ok((SourcePos::new_at("stdin", " bar", 9, 1, 10), ()))
+        parse_blockcomment(SourcePos::new("stdin", "/* foo */ bar")),
+        Ok((
+            SourcePos::new_at("stdin", "bar", 10, 1, 11),
+            SourcePos::empty()
+        ))
+    );
+}
+
+#[test]
+fn parse_any_comments_test() {
+    assert_eq!(
+        parse_comments(SourcePos::new("stdin", "// abc\n /* foo */ // more \n bar")),
+        Ok((
+            SourcePos::new_at("stdin", "bar", 28, 3, 2),
+            SourcePos::empty()
+        ))
     );
 }
