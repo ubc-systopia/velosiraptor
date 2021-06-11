@@ -66,8 +66,7 @@ fn main() {
     trace!("Tracing output enabled");
 
     // let's try to create a file parser
-    let file_contents = fs::read_to_string(infile).expect("failed to construct the parser");
-    let mut parser = Parser::from_string(&file_contents).expect("failed to construct the parser");
+    let mut parser = Parser::from_file(infile.to_string()).expect("failed to construct the parser");
 
     // parse the file
     parser.parse();
