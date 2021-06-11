@@ -40,7 +40,7 @@ use super::SourcePos;
 
 use super::ast::Ast;
 use super::comments::parse_comments;
-use super::imports::import;
+use super::imports::parse_import;
 
 ///
 pub fn parse_file(input: SourcePos) -> IResult<SourcePos, Ast> {
@@ -48,13 +48,13 @@ pub fn parse_file(input: SourcePos) -> IResult<SourcePos, Ast> {
     //let wscom = many0(alt((multispace1, blockcomment, comment)));
 
     // parsing imports, which may be proceeded by comments.
-    let parse_imports = many0(preceded(parse_comments, import));
+    let import_parser = many0(preceded(parse_comments, parse_import));
 
     // the file header is some white space, follwed by the imports
-    let mut parse_header = preceded(multispace0, parse_imports);
+    let mut parse_header = preceded(multispace0, import_parser);
 
     // parse the units
-    let parse_units = many0(preceded(parse_comments, import));
+    // let parse_units = many0(preceded(parse_comments, import));
 
     // let's parse the file header
     let (input, imports) = parse_header(input)?;
