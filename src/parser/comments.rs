@@ -57,10 +57,14 @@ pub fn parse_comment(input: SourcePos) -> IResult<SourcePos, SourcePos> {
 /// parses and consumes a block comment `/* bar */`
 /// TODO: this doesn't work with nested comments!
 pub fn parse_blockcomment(input: SourcePos) -> IResult<SourcePos, SourcePos> {
-    // build the blockcomment parser, does not consume whitespace after
+    // try to match the opening comment keyword, there is no match, return.
+    let input = match tag(tokens::COMMENT_BLOCK_START)(input) {
+        Ok((input, _)) => input,
+        Err(x) => return Err(x),
+    };
+
+    // we're in the block comment, build the end-of-comment parser
     let blockcomment = tuple((
-        // start with the block comment start token
-        tag(tokens::COMMENT_BLOCK_START),
         // consume everything until we reach the end of token
         take_until(tokens::COMMENT_BLOCK_END),
         // consume the end token
@@ -70,7 +74,11 @@ pub fn parse_blockcomment(input: SourcePos) -> IResult<SourcePos, SourcePos> {
     // now match the block comment and discard following whitespace characters
     match terminated(blockcomment, multispace0)(input) {
         Ok((input, _)) => Ok((input, SourcePos::empty())),
-        Err(x) => Err(x),
+        Err(x) => {
+            println!("parsing error: unclosed block comment");
+            println!("{}", input);
+            Err(x)
+        }
     }
 }
 
@@ -140,6 +148,11 @@ fn parse_blockcomment_test_follow() {
             SourcePos::empty()
         ))
     );
+}
+
+#[test]
+fn parse_blockcomment_test_unclosed() {
+    assert!(parse_blockcomment(SourcePos::new("stdin", "/* foo \n bar\n")).is_err());
 }
 
 #[test]
