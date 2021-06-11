@@ -39,28 +39,42 @@ use super::SourcePos;
 use super::ast::Ast;
 
 /// parses and consumes an import statement (`import foo;`) and any following whitespaces
-pub fn import(input: SourcePos) -> IResult<SourcePos, Ast> {
+pub fn parse_import(input: SourcePos) -> IResult<SourcePos, Ast> {
     // record the current position
     let pos = input.get_pos();
 
-    // the import block is an identifier, preceeded by the import keyword and whitespace
-    // we do not allow comments between the import keyword and the identifier
-    let import_block = preceded(tuple((tag(tokens::IMPORT), multispace1)), parse_identifier);
+    // try to match the input keyword, there is no match, return.
+    let input = match tag(tokens::IMPORT)(input) {
+        Ok((input, _)) => input,
+        Err(x) => return Err(x),
+    };
+
+    // ok, so we've seen the `import` keyword, so the next must be an identifier.
+    // there should be at least one whitespace before the identifier
+    let (input, ident) = match preceded(multispace1, parse_identifier)(input) {
+        Ok((remainder, ident)) => (remainder, ident),
+        Err(x) => {
+            println!("parsing error: identifier expected.");
+            println!("{}", input);
+            return Err(x);
+        }
+    };
 
     // the end of statement is whitespace, the EOS token, followed by more whitespace
-    let end_of_statement = tuple((multispace0, tag(tokens::EOS), multispace0));
-
-    // now match the import statement that is an import block followed by an end of statement part
-    match terminated(import_block, end_of_statement)(input) {
-        Ok((input, ident)) => Ok((input, Ast::import_from_sourcepos(ident, pos))),
-        Err(x) => Err(x),
+    match tuple((multispace0, tag(tokens::EOS), multispace0))(input) {
+        Ok((remainder, _)) => Ok((remainder, Ast::import_from_sourcepos(ident, pos))),
+        Err(x) => {
+            println!("parsing error: '{}' expected.", tokens::EOS);
+            println!("{}", input);
+            Err(x)
+        }
     }
 }
 
 #[test]
 fn parse_import_formatted() {
     assert_eq!(
-        import(SourcePos::new("stdin", "import foo;")),
+        parse_import(SourcePos::new("stdin", "import foo;")),
         Ok((
             SourcePos::new_at("stdin", "", 11, 1, 12),
             Ast::Import {
@@ -74,7 +88,7 @@ fn parse_import_formatted() {
 #[test]
 fn parse_import_newlines() {
     assert_eq!(
-        import(SourcePos::new("stdin", "import\nfoo\n;")),
+        parse_import(SourcePos::new("stdin", "import\nfoo\n;")),
         Ok((
             SourcePos::new_at("stdin", "", 12, 3, 2),
             Ast::Import {
@@ -83,4 +97,14 @@ fn parse_import_newlines() {
             }
         ))
     );
+}
+
+#[test]
+fn parse_import_syntax_error_eos() {
+    assert!(parse_import(SourcePos::new("stdin", "import foo bar")).is_err());
+}
+
+#[test]
+fn parse_import_syntax_error_ident() {
+    assert!(parse_import(SourcePos::new("stdin", "import ;")).is_err());
 }
