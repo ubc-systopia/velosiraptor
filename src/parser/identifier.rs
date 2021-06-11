@@ -42,42 +42,43 @@ use nom::{
 use super::SourcePos;
 
 /// parses an identifier from the input stream
-pub fn identifier(input: SourcePos) -> IResult<SourcePos, SourcePos> {
+pub fn parse_identifier(input: SourcePos) -> IResult<SourcePos, String> {
     // must start with with an alpha character
-    match peek(alpha1)(input) {
+    let parse = match peek(alpha1)(input) {
         // return the alpha numeric identifier
         Ok(_) => alphanumeric1(input),
+        // otherwise pass the error
+        Err(x) => Err(x),
+    };
+
+    match parse {
+        // parsing succeeded, construct the identifier result
+        Ok((input, ident)) => Ok((input, ident.to_string())),
         // otherwise pass the error
         Err(x) => Err(x),
     }
 }
 
 #[test]
-fn parse_identifier() {
+fn parse_identifier_test() {
     assert_eq!(
-        identifier(SourcePos::new("stdin", "foo")),
-        Ok((
-            SourcePos::new_at("stdin", "", 3, 1, 4),
-            SourcePos::new_at("stdin", "foo", 0, 1, 1),
-        ))
+        parse_identifier(SourcePos::new("stdin", "foo")),
+        Ok((SourcePos::new_at("stdin", "", 3, 1, 4), "foo".to_string()))
     );
 }
 
 #[test]
-fn parse_identifier_alnum() {
+fn parse_identifier_test_alnum() {
     assert_eq!(
-        identifier(SourcePos::new("stdin", "foo43")),
-        Ok((
-            SourcePos::new_at("stdin", "", 5, 1, 6),
-            SourcePos::new_at("stdin", "foo43", 0, 1, 1),
-        ))
+        parse_identifier(SourcePos::new("stdin", "foo43")),
+        Ok((SourcePos::new_at("stdin", "", 5, 1, 6), "foo43".to_string(),))
     );
 }
 
 #[test]
-fn parse_identifier_badbegin() {
+fn parse_identifier_test_badbegin() {
     assert_eq!(
-        identifier(SourcePos::new("stdin", "1foo43")),
+        parse_identifier(SourcePos::new("stdin", "1foo43")),
         Err(Err::Error(Error {
             input: SourcePos::new("stdin", "1foo43"),
             code: ErrorKind::Alpha
