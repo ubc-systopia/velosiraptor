@@ -27,8 +27,20 @@ use std::fmt;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Ast {
-    // File { name: String, units: Vec<Ast>, imports: Vec<String> },
-    Import { filename: String, pos: (u32, u32) },
+    File {
+        name: String,
+        units: Box<Ast>,
+        imports: Box<Ast>,
+    },
+    Import {
+        filename: String,
+        pos: (u32, u32),
+    },
+    Unit {
+        name: String,
+        pos: (u32, u32),
+    },
+    None,
 }
 
 impl Ast {
@@ -42,13 +54,22 @@ impl Ast {
 
 impl fmt::Display for Ast {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let s = match self {
+        match self {
+            Ast::File {
+                name,
+                units,
+                imports,
+            } => write!(
+                f,
+                "File {}\n  Imports:\n    {}\n  Units:\n     {}",
+                name, units, imports
+            ),
             Ast::Import {
                 filename,
                 pos: (l, c),
-            } => format!("Import {}  ({}, {})", filename, l, c),
-        };
-
-        write!(f, "{}", s)
+            } => write!(f, "Import {}  ({}, {})", filename, l, c),
+            Ast::Unit { name, pos: (l, c) } => write!(f, "Unit {}  ({}, {})", name, l, c),
+            Ast::None => write!(f, "None"),
+        }
     }
 }
