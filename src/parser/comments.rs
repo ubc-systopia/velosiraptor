@@ -44,7 +44,7 @@ pub fn parse_comment(input: SourcePos) -> IResult<SourcePos, SourcePos> {
         // start with the comment
         tag(tokens::COMMENT),
         // until we hit end of line
-        is_not(tokens::EOL)
+        is_not(tokens::EOL),
     ));
 
     // now match the end of line comment with possible multispace following
@@ -98,10 +98,7 @@ fn parse_comment_tests_one_line() {
 fn parse_comment_tests_one_line_with_newline() {
     assert_eq!(
         parse_comment(SourcePos::new("stdin", "// foo bar\n")),
-        Ok((
-            SourcePos::new_at("stdin", "", 11, 2, 1),
-            SourcePos::empty()
-        ))
+        Ok((SourcePos::new_at("stdin", "", 11, 2, 1), SourcePos::empty()))
     );
 }
 
