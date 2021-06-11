@@ -37,9 +37,6 @@ pub const COMMENT_BLOCK_START: &str = "/*";
 /// represents the end of a block comment
 pub const COMMENT_BLOCK_END: &str = "*/";
 
-/// represents the end of a block comment
-pub const WHITESPACE: &str = " \t\n\r";
-
 /// represents the import keyword
 pub const IMPORT: &str = "import";
 
