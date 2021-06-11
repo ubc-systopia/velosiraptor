@@ -375,13 +375,6 @@ impl<'a> Slice<RangeFrom<usize>> for SourcePos<'a> {
     }
 }
 
-fn lowercase_byte(c: u8) -> u8 {
-    match c {
-        b'A'..=b'Z' => c - b'A' + b'a',
-        _ => c,
-    }
-}
-
 /// `Nom::Compare` implementation for SourcePos (Nom-parser compat)
 impl<'a, 'b> Compare<Content<'b>> for SourcePos<'a> {
     /// Compares self to another value for equality
