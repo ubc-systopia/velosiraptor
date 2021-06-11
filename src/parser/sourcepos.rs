@@ -129,6 +129,14 @@ impl<'a> SourcePos<'a> {
     pub fn as_slice(&self) -> Content<'a> {
         self.content
     }
+
+    pub fn get_pos(&self) -> (u32, u32) {
+        (self.line, self.column)
+    }
+
+    pub fn to_string(&self) -> String {
+        self.content.to_string()
+    }
 }
 
 /// `Nom::InputLength` implementation for SourcePos (Nom-parser compat)
