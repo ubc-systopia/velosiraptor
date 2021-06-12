@@ -35,19 +35,14 @@
 // for reading the file
 //use std::fs;
 
-use std::iter::{Copied, Enumerate};
 use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
-use std::slice::Iter;
 
 use nom::{
     Compare, CompareResult, Err, FindSubstring, IResult, InputIter, InputLength, InputTake,
     InputTakeAtPosition, Needed, Slice,
 };
 
-use log::warn;
 use nom::error::{ErrorKind, ParseError};
-
-use memchr;
 
 /// Corresponds to a single byte of the source file
 pub type Element = char;
