@@ -26,50 +26,82 @@
 use std::fmt;
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Ast {
-    File {
-        name: String,
-        units: Box<Ast>,
-        imports: Box<Ast>,
-    },
-    Import {
-        filename: String,
-        pos: (u32, u32),
-    },
-    Unit {
-        name: String,
-        pos: (u32, u32),
-    },
-    None,
+pub struct Import {
+    pub filename: String,
+    pub pos: (u32, u32),
 }
 
-impl Ast {
-    pub fn import_from_sourcepos(ident: String, pos: (u32, u32)) -> Self {
-        Ast::Import {
-            filename: ident,
+impl Import {
+    pub fn new(filename: String, pos: (u32, u32)) -> Self {
+        Import {
+            filename: filename,
             pos: pos,
         }
     }
 }
 
-impl fmt::Display for Ast {
+impl fmt::Display for Import {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Ast::File {
-                name,
-                units,
-                imports,
-            } => write!(
-                f,
-                "File {}\n  Imports:\n    {}\n  Units:\n     {}",
-                name, units, imports
-            ),
-            Ast::Import {
-                filename,
-                pos: (l, c),
-            } => write!(f, "Import {}  ({}, {})", filename, l, c),
-            Ast::Unit { name, pos: (l, c) } => write!(f, "Unit {}  ({}, {})", name, l, c),
-            Ast::None => write!(f, "None"),
+        write!(
+            f,
+            "Import {}  ({}, {})",
+            self.filename, self.pos.0, self.pos.1
+        )
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Unit {
+    name: String,
+    pos: (u32, u32),
+}
+
+impl Unit {
+    pub fn new(name: String, pos: (u32, u32)) -> Self {
+        Unit {
+            name: name,
+            pos: pos,
         }
+    }
+}
+
+impl fmt::Display for Unit {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Unit {}  ({}, {})", self.name, self.pos.0, self.pos.1)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct File {
+    filename: String,
+    imports: Vec<Import>,
+    units: Vec<Unit>,
+}
+
+impl File {
+    pub fn new(name: String, imports: Vec<Import>, units: Vec<Unit>) -> Self {
+        File {
+            filename: name,
+            imports: imports,
+            units: units,
+        }
+    }
+}
+
+impl fmt::Display for File {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut imports = String::new();
+        imports.push_str("  Imports:\n");
+        for i in &self.imports {
+            imports.push_str(&format!("    {}\n", i))
+        }
+
+        let mut units = String::new();
+        units.push_str("  Units:");
+        for u in &self.units {
+            units.push_str(&format!("    {}\n", u))
+        }
+
+        write!(f, "File {}\n{}\n{}", self.filename, imports, units)
     }
 }

@@ -46,10 +46,8 @@ mod file;
 use file::parse_file;
 
 mod ast;
-use ast::Ast;
 mod identifier;
 mod imports;
-
 
 mod tokens;
 
@@ -73,7 +71,7 @@ pub struct Parser {
     /// represents the imports in the file
     imports: HashMap<String, Parser>,
 
-    parsetree: Ast,
+    parsetree: Option<ast::File>,
 }
 
 /// represents a parser struct this includes the file
@@ -83,7 +81,7 @@ impl Parser {
             filename: filename.to_string(),
             filecontents: contents,
             imports: HashMap::new(),
-            parsetree: Ast::None,
+            parsetree: None,
         };
 
         info!("created parser ");

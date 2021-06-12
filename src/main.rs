@@ -5,9 +5,9 @@ extern crate nom;
 
 // used for parsing
 use clap::{App, Arg};
-use log::{debug, info, trace};
+use log;
 
-use simplelog::{SimpleLogger, LevelFilter, Config};
+use simplelog::{Config, LevelFilter, SimpleLogger};
 
 // get the parser module
 mod parser;
@@ -56,16 +56,17 @@ fn main() {
     // initialize the logger
     SimpleLogger::init(filter_level, Config::default()).unwrap();
 
-    info!("Velosiraptor Compiler (vrc)");
+    // show the welcome message
+    log::info!("Velosiraptor Compiler (vrc)");
 
     let infile = matches.value_of("input").unwrap_or("none");
-    info!("input file: {}", infile);
+    log::info!("input file: {}", infile);
 
     let out = matches.value_of("output").unwrap_or("<stdout>");
-    info!("input file: {}", out);
+    log::info!("input file: {}", out);
 
-    debug!("Debug output enabled");
-    trace!("Tracing output enabled");
+    log::debug!("Debug output enabled");
+    log::trace!("Tracing output enabled");
 
     // let's try to create a file parser
     let mut parser = Parser::from_file(infile.to_string()).expect("failed to construct the parser");

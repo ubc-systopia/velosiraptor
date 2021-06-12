@@ -26,54 +26,31 @@
 //! parses a velosiraptor specification file
 
 // the used nom componets
-use nom::{
-    branch::alt,
-    bytes::complete::tag,
-    character::complete::multispace0,
-    multi::{many0, many_till},
-    sequence::{pair, preceded},
-    IResult,
-};
+use nom::{character::complete::multispace0, multi::many0, sequence::preceded, IResult};
 
 // get the tokens
 use super::SourcePos;
 
-use super::ast::Ast;
+use super::ast::File;
 use super::comments::parse_comments;
 use super::imports::parse_import;
 
 ///
-pub fn parse_file(input: SourcePos) -> IResult<SourcePos, Ast> {
-    // a parser for matching white space and comments
-    //let wscom = many0(alt((multispace1, blockcomment, comment)));
-
+pub fn parse_file(input: SourcePos) -> IResult<SourcePos, File> {
     // parsing imports, which may be proceeded by comments.
     let import_parser = many0(preceded(parse_comments, parse_import));
 
     // the file header is some white space, follwed by the imports
-    let mut parse_header = preceded(multispace0, import_parser);
-
-    // parse the units
-    // let parse_units = many0(preceded(parse_comments, import));
-
-    // let's parse the file header
-    let (input, imports) = parse_header(input)?;
-
-    println!("step 2");
-    println!("{}", input);
-    for i in imports {
-        println!("{}", i);
-    }
+    let (input, imports) = match preceded(multispace0, import_parser)(input) {
+        Ok((input, imports)) => (input, imports),
+        Err(x) => {
+            println!("error with parsing the header");
+            return Err(x);
+        }
+    };
 
     Ok((
         input,
-        Ast::File {
-            name: "fooo".to_string(),
-            imports: Box::new(Ast::None),
-            units: Box::new(Ast::Unit {
-                name: "bar".to_string(),
-                pos: (1, 1),
-            }),
-        },
+        File::new(input.filename.to_string(), imports, Vec::new()),
     ))
 }

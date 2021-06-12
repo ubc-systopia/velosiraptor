@@ -27,7 +27,7 @@
 use nom::{
     bytes::complete::tag,
     character::complete::{multispace0, multispace1},
-    sequence::{preceded, terminated, tuple},
+    sequence::{preceded, tuple},
     IResult,
 };
 
@@ -36,10 +36,10 @@ use super::identifier::parse_identifier;
 use super::tokens;
 use super::SourcePos;
 
-use super::ast::Ast;
+use super::ast::Import;
 
 /// parses and consumes an import statement (`import foo;`) and any following whitespaces
-pub fn parse_import(input: SourcePos) -> IResult<SourcePos, Ast> {
+pub fn parse_import(input: SourcePos) -> IResult<SourcePos, Import> {
     // record the current position
     let pos = input.get_pos();
 
@@ -62,7 +62,7 @@ pub fn parse_import(input: SourcePos) -> IResult<SourcePos, Ast> {
 
     // the end of statement is whitespace, the EOS token, followed by more whitespace
     match tuple((multispace0, tag(tokens::EOS), multispace0))(input) {
-        Ok((remainder, _)) => Ok((remainder, Ast::import_from_sourcepos(ident, pos))),
+        Ok((remainder, _)) => Ok((remainder, Import::new(ident, pos))),
         Err(x) => {
             println!("parsing error: '{}' expected.", tokens::EOS);
             println!("{}", input);
@@ -77,7 +77,7 @@ fn parse_import_formatted() {
         parse_import(SourcePos::new("stdin", "import foo;")),
         Ok((
             SourcePos::new_at("stdin", "", 11, 1, 12),
-            Ast::Import {
+            Import {
                 filename: "foo".to_string(),
                 pos: (1, 1)
             }
@@ -91,7 +91,7 @@ fn parse_import_newlines() {
         parse_import(SourcePos::new("stdin", "import\nfoo\n;")),
         Ok((
             SourcePos::new_at("stdin", "", 12, 3, 2),
-            Ast::Import {
+            Import {
                 filename: "foo".to_string(),
                 pos: (1, 1)
             }
