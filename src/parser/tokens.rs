@@ -41,4 +41,13 @@ pub const COMMENT_BLOCK_END: &str = "*/";
 pub const IMPORT: &str = "import";
 
 /// represents the import keyword
+pub const UNIT: &str = "unit";
+
+/// represents the end-of-statement token
 pub const EOS: &str = ";";
+
+/// start of block token
+pub const BLOCK_START: &str = "{";
+
+/// end of block token
+pub const BLOCK_END: &str = "}";
