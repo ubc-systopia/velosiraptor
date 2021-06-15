@@ -71,11 +71,44 @@ the types / definitions we are interested in.
 
 ## Unit Definitions
 
-The unit specifies a translation. It composes previously defined units.
+The unit specifies a translation. It composes previously defined units, or base types.
 
 ```
 unit L1Table {
     ...
-}
+};
+```
+
+## Extending Types (Inheritance)
+
+The VelosiRaptor specification language has two abstract, configurable base types:
+
+ * `Segment`
+ * `Assoc`
+
 
 ```
+unit L1TableEntry : Segment {
+    ...
+};
+```
+
+```
+unit BridgeWindow : Assoc {
+    ...
+};
+```
+
+
+Likewise, we can also extend previously defined types.
+
+## Static Maps
+
+
+## Expressing State
+
+
+## Translation Semantics
+
+
+## Adding Constraints
