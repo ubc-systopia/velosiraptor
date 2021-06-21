@@ -185,19 +185,22 @@ The layout of a page table entry is as follows:
 unit x86_pte : segment {
     // the state
     state = Memory(base) {
-         0   0 present
-         1   1 writable
-         2   2 usersmode
-         3   3 writethrough
-         4   4 nocache
-         5   5 accessed
-         6   6 dirty
-         7   7 pat
-         8   8 global
-         9  11 ignored
-        12  31 base
+        entry (base, 0, 32) {
+            0   0 present
+            1   1 writable
+            2   2 usersmode
+            3   3 writethrough
+            4   4 nocache
+            5   5 accessed
+            6   6 dirty
+            7   7 pat
+            8   8 global
+            9  11 ignored
+           12  31 base
+        }
     };
 
+    // the intderface is just a load/store
     interface = LoadStoreMemory();
 
     // the state is given by a external memory reference (we don't know where it's located at)
@@ -207,12 +210,12 @@ unit x86_pte : segment {
         assert(aligned(state, 4));
         assert(size(state, 4));
         //
-        st = state;
+        st = Memory(state);
     }
 
     // translation is  if (flags match) {addr + base} else {raise}
     get_base(st : state) {
-        return st.page << 12;
+        return st.entry.page << 12;
     }
 
     // here the size is fixed
@@ -222,15 +225,15 @@ unit x86_pte : segment {
 
     // matches a translation flags,
     match_flags(st, flags) {
-        if (st.present == 0) {
+        if (st.entry.present == 0) {
             return false;
         }
 
-        if (flags.write && !st.write) {
+        if (flags.write && !st.entry.write) {
             return false;
         }
 
-        if (flags.user && !st.user) {
+        if (flags.user && !st.entry.user) {
             return false;
         }
 
