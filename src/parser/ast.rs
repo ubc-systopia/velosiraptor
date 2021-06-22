@@ -34,8 +34,8 @@ pub struct Import {
 impl Import {
     pub fn new(filename: String, pos: (u32, u32)) -> Self {
         Import {
-            filename: filename,
-            pos: pos,
+            filename,
+            pos,
         }
     }
 }
@@ -59,8 +59,8 @@ pub struct Unit {
 impl Unit {
     pub fn new(name: String, pos: (u32, u32)) -> Self {
         Unit {
-            name: name,
-            pos: pos,
+            name,
+            pos,
         }
     }
 }
@@ -79,11 +79,11 @@ pub struct File {
 }
 
 impl File {
-    pub fn new(name: String, imports: Vec<Import>, units: Vec<Unit>) -> Self {
+    pub fn new(filename: String, imports: Vec<Import>, units: Vec<Unit>) -> Self {
         File {
-            filename: name,
-            imports: imports,
-            units: units,
+            filename,
+            imports,
+            units,
         }
     }
 }
