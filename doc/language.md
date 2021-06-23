@@ -137,7 +137,16 @@ unit L1TableEntry : Segment {
 
 ## Configurable Segments
 
-The configurable segment is an abstract, internal base unit.
+The configurable segment is an abstract, internal base unit. It basically defines a templated
+way how it translates addresses: If the address falls within the size and matches the flags or
+properties, then it translates it as `inaddr + base`. The wholes (or methods to be provided)
+are:
+
+ 1. get_base: obtains the base address of the segment from the state
+ 2. get_size: obtains the size of the segement from the state
+ 3. match_flags: checks whether the access flags of the request permit the translation.
+
+Conceptually, the abstract segment provides the following *abstract* unit definition:
 
 ```
 abstract unit Segment {
@@ -160,12 +169,53 @@ abstract unit Segment {
 };
 ```
 
+Note, strictly speaking this does not need to be used as a base type and a segment can
+be defined without the use of the `Segment` base type. However, it might be helpful for
+the synthesis / compiler / hardware backend to know that this is a segment.
+
+## Associative
+
+TODO: focus first on the segment and the maps
+
 ## Static Maps
 
-The static map divides the input address space
+A static map divides the input address space and maps ranges of addresses to other
+ranges, or units. The most flexible map is basically a non-overlapping list of
+base-limit pairs, and where they map to. The region shall be a power of two in size.
 
 ```
+[
+    0x0000..0x0fff  ->  UNIT
+    // here is a hole
+    0x2000..0x2fff  ->  UNIT
+    // here is another hole
+]
 ```
+
+Now this spans the address space with holes. However, often there are no holes and
+the entire address range is mapped. So we can leave out the limt part and the limit
+is given implicitly.
+
+```
+[
+    0x0000 -> UNIT
+    0x2000 -> UNIT
+]
+```
+
+Lastly, dividing the input address range into equal chunks is often used. For
+example, the page table divides the input range into equal chunks each of which
+maps onto an entry
+
+```
+    [ UNIT, UNIT, UNIT, UNIT  ]
+```
+
+Syntactic sugar:
+```
+[ i -> UNIT for i in 0..512 ]
+```
+
 
 
 ## Expressing State
