@@ -143,7 +143,7 @@ properties, then it translates it as `inaddr + base`. The wholes (or methods to 
 are:
 
  1. get_base: obtains the base address of the segment from the state
- 2. get_size: obtains the size of the segement from the state
+ 2. get_size: obtains the size of the segment from the state
  3. match_flags: checks whether the access flags of the request permit the translation.
 
 Conceptually, the abstract segment provides the following *abstract* unit definition:
@@ -312,10 +312,16 @@ Mackerel language.
 
     // direct memory reads writes to the entire state in mmio registers
     RegisterLoadStoreInterface(state, direct);
+```
 
+It could be that there are special ways to access the register, i.e., there is not just a load/store
+to an address backed by a register, but more of a thing
+
+```
     // direct special instruction access to the entire state in special registers
     RegisterInterface(state, direct);
 ```
+
 
 In the case that there is not a simple one-to-one correspondence, or there are multiple actions
 that are being triggered when writing to a register.
