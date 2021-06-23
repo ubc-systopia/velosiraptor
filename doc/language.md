@@ -231,6 +231,56 @@ Moreover, the state might be parameterized. That is, some length of the
 Finally, the state may or may not be fully observable by software. This means it can be
 that there are specific operations to modify the state. See Interfaces.
 
+We define the state as a bitmap with various fields. There are two types of state
+
+1. Memory: the state is at a particular address in memory (e.g., page tables)
+2. Registers: the state is a register residing on the translation hardware
+
+The state is a collection of contiguous regions, each having a set of fields at locations
+relative to the region. A field has bit slices with specific meaning.
+
+```
+STATE_ENTRY_FIELD = nat nat ident
+
+STATE_ENTRY = ident [ident, nat, nat ] {
+                [STATE_ENTRY_FIELD]+
+              };
+
+REGISTER_STATE = Registers {
+                    [STATE_ENTRY]+
+                };
+
+MEMORY_STATE =  Memory([ident]+) {
+                    [STATE_ENTRY]+
+                };
+
+STATE = MEMORY_STATE | REGISTER_STATE
+```
+
+Example:
+
+```
+    // a single memory region
+    Memory(base) {
+        // one entry named 'pte' at offset 0, length 4 bytes
+        pte [base, 0, 4] {
+            // the following fields at starting bit, ending bit, name
+            0   0 present
+            1   1 writable
+            2   2 usersmode
+            3   3 writethrough
+            4   4 nocache
+            5   5 accessed
+            6   6 dirty
+            7   7 pat
+            8   8 global
+            9  11 ignored
+           12  31 base
+        };
+```
+
+
+
 ## Expressing Interfaces
 
 The interface defines the way software can interact with the translation unit. This may be through
@@ -300,7 +350,7 @@ unit x86_pte : segment {
             8   8 global
             9  11 ignored
            12  31 base
-        }
+        };
     };
 
     // the intderface is just a load/store
