@@ -287,6 +287,44 @@ The interface defines the way software can interact with the translation unit. T
 reading/writing a specific or variable location in memory or registers, or using a more 'protocol'
 like way where the state cannot be fully observed by software.
 
+There are two basic types of interfaces:
+
+ 1. Load/Store Memory: software reads/writes a memory location using normal load/store instructions.
+                       This triggers an update to the memory location.
+
+ 2. Register: software accesses the register either through normal load/store instructions in the
+              case of a memory-mapped register, or through special instructions. In contrast to
+              loads/stores to a memory location, writing to a register may trigger multiple state
+              transitions (e.g., resetting the device)
+
+To some extent, there is a mapping from the interface to the state. This may cover the entire state,
+parts of it, or nothing at all. The latter is the case when there is a slightly more sophisticated
+protocol requires. For example, write base, write size, write index then triggers a transfer from
+the base and size registers to the internal state at index.
+
+The simplest forms of the interface is a direct mapping that exposes the full state. This will
+create an interface that maps the state description above. A good example here would be Barrelfish's
+Mackerel language.
+
+```
+    // direct memory reads/writes to the entire state in memory
+    MemoryLoadStoreInterface(state, direct);
+
+    // direct memory reads writes to the entire state in mmio registers
+    RegisterLoadStoreInterface(state, direct);
+
+    // direct special instruction access to the entire state in special registers
+    RegisterInterface(state, direct);
+```
+
+In the case that there is not a simple one-to-one correspondence, or there are multiple actions
+that are being triggered when writing to a register.
+
+TODO.
+
+
+
+
 ## Specifying Translation Semantics
 
 
