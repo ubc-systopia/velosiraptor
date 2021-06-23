@@ -74,21 +74,60 @@ the types / definitions we are interested in.
 
 ## Unit Definitions
 
-The unit specifies a translation. It composes previously defined units, or base types.
+The unit specifies a translation. It composes previously defined units, base types,
+or extends them (see Inheritance).
 
 ```
 unit L1Table {
-    ...
+    ... // TODO: add the constructs here
 };
 ```
 
+Conceptually, the `unit` translates between an *input* and *output* address space. We
+assume that the sizes of these address spaces have a specific amount of bits. Thus,
+the size of both input and output address spaces are a power of two.
+
+```
+              +----------+
+    ---32---> |   unit   | ---32--->
+              +----------+
+```
+
+A unit has the following components or features:
+ 1. defines a type
+ 2. translate: defines how addresses are translated by the unit
+
+
+Additionally, if the unit is configurable then the unit has two additional features.
+
+ 1. state: represents state of the unit and defines the translation behavior. State may be
+    one or more registers, memory locations (e.g., DRAM), internal storage. The translation
+    unit can access the entire state at will.
+ 2. interface: defines the software accessible/usable interface. This may be the full state,
+    part of it, or even some separate register/memory interface.
+
+Depending on its applicability, the following functions are being generated / synthesized.
+Note, this is not just limited to the configurable units, but also static ones that are
+composed of configurable units. Calling those functions on the composition will forward
+the request to the right configurable unit.
+
+ 1. map: installs a new mapping
+ 2. unmap: removes a mapping
+ 3. protect: changes the protection bits or properties
+ 4. get: returns the configurable unit at the address.
+
+ Finally, as part of future work the unit may also include some OS-specific functionality.
+ This may include storing meta-data information. We do not go further into these details.
+
+ TODO: abstract units as templates?
+
 ## Extending Types (Inheritance)
 
-The VelosiRaptor specification language has two abstract, configurable base types:
+The language supports extending existing types or inheritance. The new type will include
+possible components of the base type. Parts of it can be overridden or must be provided
+to achieve the desired functionality.
 
- * `Segment`
- * `Assoc`
-
+For example, a page table entry may be derived from the segment base type.
 
 ```
 unit L1TableEntry : Segment {
@@ -96,16 +135,9 @@ unit L1TableEntry : Segment {
 };
 ```
 
-```
-unit BridgeWindow : Assoc {
-    ...
-};
-```
-
-
-Likewise, we can also extend previously defined types.
-
 ## Configurable Segments
+
+The configurable segment is an abstract, internal base unit.
 
 ```
 abstract unit Segment {
@@ -130,11 +162,32 @@ abstract unit Segment {
 
 ## Static Maps
 
+The static map divides the input address space
+
+```
+```
+
 
 ## Expressing State
 
+The state of the translation unit defines how it translates incoming memory accesses.
+This can either one of, or a combination of registers or in-memory data structures.
+For example, a page table resides in DRAM, where the semantics of some bits in the page table
+entry may depend on certain register values (e.g., memory protection key attributes on
+x86)
 
-## Translation Semantics
+Moreover, the state might be parameterized. That is, some length of the
+
+Finally, the state may or may not be fully observable by software. This means it can be
+that there are specific operations to modify the state. See Interfaces.
+
+## Expressing Interfaces
+
+The interface defines the way software can interact with the translation unit. This may be through
+reading/writing a specific or variable location in memory or registers, or using a more 'protocol'
+like way where the state cannot be fully observed by software.
+
+## Specifying Translation Semantics
 
 
 ## Adding Constraints
@@ -176,8 +229,8 @@ The layout of a page table entry is as follows:
 ```
 
 
-**State:** a single entry is represented as a 32-bit, naturally-aligned location in memory.
-**Interface:** load/store interface to memory location, atomically updated.
+ * **State:** a single entry is represented as a 32-bit, naturally-aligned location in memory.
+ * **Interface:** load/store interface to memory location, atomically updated.
 
 ```
 
