@@ -183,9 +183,11 @@ A static map divides the input address space and maps ranges of addresses to oth
 ranges, or units. The most flexible map is basically a non-overlapping list of
 base-limit pairs, and where they map to. The region shall be a power of two in size.
 
+Constraint: destination unit size must be greater or equal to the region that is mapped.
+Constraint: no overlap.
 ```
 [
-    0x0000..0x0fff  ->  UNIT
+    0x0000..0x0fff  ->  UNIT @ 0x1000
     // here is a hole
     0x2000..0x2fff  ->  UNIT
     // here is another hole
@@ -193,7 +195,7 @@ base-limit pairs, and where they map to. The region shall be a power of two in s
 ```
 
 Now this spans the address space with holes. However, often there are no holes and
-the entire address range is mapped. So we can leave out the limt part and the limit
+the entire address range is mapped. So we can leave out the limit part and the limit
 is given implicitly.
 
 ```
@@ -207,16 +209,17 @@ Lastly, dividing the input address range into equal chunks is often used. For
 example, the page table divides the input range into equal chunks each of which
 maps onto an entry
 
+constraint: all units must have the same size ?
+constraint: sum of the sizes of all units must be a power of two.
+
 ```
     [ UNIT, UNIT, UNIT, UNIT  ]
 ```
 
 Syntactic sugar:
 ```
-[ i -> UNIT for i in 0..512 ]
+[ UNIT(base + i * 8) for i in 0..512 ]
 ```
-
-
 
 ## Expressing State
 
@@ -382,7 +385,9 @@ The layout of a page table entry is as follows:
 unit x86_pte : segment {
     // the state
     state = Memory(base) {
-        entry (base, 0, 32) {
+        // one entry named 'pte' at offset 0, length 4 bytes
+        pte [base, 0, 4] {
+            // the following fields at starting bit, ending bit, name
             0   0 present
             1   1 writable
             2   2 usersmode
@@ -395,7 +400,6 @@ unit x86_pte : segment {
             9  11 ignored
            12  31 base
         };
-    };
 
     // the intderface is just a load/store
     interface = LoadStoreMemory();
@@ -412,7 +416,7 @@ unit x86_pte : segment {
 
     // translation is  if (flags match) {addr + base} else {raise}
     get_base(st : state) {
-        return st.entry.page << 12;
+        return st.pte.page << 12;
     }
 
     // here the size is fixed
@@ -422,15 +426,15 @@ unit x86_pte : segment {
 
     // matches a translation flags,
     match_flags(st, flags) {
-        if (st.entry.present == 0) {
+        if (st.pte.present == 0) {
             return false;
         }
 
-        if (flags.write && !st.entry.write) {
+        if (flags.write && !st.pte.write) {
             return false;
         }
 
-        if (flags.user && !st.entry.user) {
+        if (flags.user && !st.pte.user) {
             return false;
         }
 
