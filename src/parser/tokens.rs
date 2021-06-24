@@ -51,3 +51,63 @@ pub const BLOCK_START: &str = "{";
 
 /// end of block token
 pub const BLOCK_END: &str = "}";
+
+use super::SourcePos;
+use nom::bytes::complete::tag;
+use nom::character::complete::multispace0;
+use nom::sequence::tuple;
+use nom::IResult;
+
+/// parse an opening bracket `[` surrounded by whitespace
+pub fn lbrack(input: SourcePos) -> IResult<SourcePos, SourcePos> {
+    // match any of the comments above
+    match tuple((multispace0, tag("["), multispace0))(input) {
+        Ok((input, _)) => Ok((input, SourcePos::empty())),
+        Err(x) => Err(x),
+    }
+}
+
+/// parse a closing bracket `]` surrounded by whitespace
+pub fn rbrack(input: SourcePos) -> IResult<SourcePos, SourcePos> {
+    // match any of the comments above
+    match tuple((multispace0, tag("]"), multispace0))(input) {
+        Ok((input, _)) => Ok((input, SourcePos::empty())),
+        Err(x) => Err(x),
+    }
+}
+
+/// parse an opening brace `{` surrounded by whitespace
+pub fn lbrace(input: SourcePos) -> IResult<SourcePos, SourcePos> {
+    // match any of the comments above
+    match tuple((multispace0, tag("{"), multispace0))(input) {
+        Ok((input, _)) => Ok((input, SourcePos::empty())),
+        Err(x) => Err(x),
+    }
+}
+
+/// parse a closing brace `}` surrounded by whitespace
+pub fn rbrace(input: SourcePos) -> IResult<SourcePos, SourcePos> {
+    // match any of the comments above
+    match tuple((multispace0, tag("}"), multispace0))(input) {
+        Ok((input, _)) => Ok((input, SourcePos::empty())),
+        Err(x) => Err(x),
+    }
+}
+
+/// parse a comma `,` surrounded by whitespace
+pub fn comma(input: SourcePos) -> IResult<SourcePos, SourcePos> {
+    // match any of the comments above
+    match tuple((multispace0, tag(","), multispace0))(input) {
+        Ok((input, _)) => Ok((input, SourcePos::empty())),
+        Err(x) => Err(x),
+    }
+}
+
+/// parse a comma `,` surrounded by whitespace, discards parsing output
+pub fn semicolon(input: SourcePos) -> IResult<SourcePos, SourcePos> {
+    // match any of the comments above
+    match tuple((multispace0, tag(";"), multispace0))(input) {
+        Ok((input, _)) => Ok((input, SourcePos::empty())),
+        Err(x) => Err(x),
+    }
+}
