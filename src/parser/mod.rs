@@ -48,6 +48,7 @@ use file::parse_file;
 mod ast;
 mod identifier;
 mod imports;
+mod state;
 mod tokens;
 mod unit;
 
