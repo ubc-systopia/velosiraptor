@@ -33,10 +33,7 @@ pub struct Import {
 
 impl Import {
     pub fn new(filename: String, pos: (u32, u32)) -> Self {
-        Import {
-            filename,
-            pos,
-        }
+        Import { filename, pos }
     }
 }
 
@@ -58,10 +55,7 @@ pub struct Unit {
 
 impl Unit {
     pub fn new(name: String, pos: (u32, u32)) -> Self {
-        Unit {
-            name,
-            pos,
-        }
+        Unit { name, pos }
     }
 }
 
