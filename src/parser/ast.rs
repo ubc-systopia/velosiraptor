@@ -99,3 +99,75 @@ impl fmt::Display for File {
         write!(f, "File {}\n{}\n{}", self.filename, imports, units)
     }
 }
+
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct BitMapEntry {
+    start: u16,
+    end: u16,
+    name: String,
+    pos: (u32, u32),
+}
+
+impl BitMapEntry {
+    pub fn new(start: u16, end: u16, name: String, pos: (u32, u32)) -> Self {
+        BitMapEntry {
+            start,
+            end,
+            name,
+            pos,
+        }
+    }
+}
+
+impl fmt::Display for BitMapEntry {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({:3}..{:3}, {})", self.start, self.end, &self.name)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct StateField {
+    name: String,
+    base: String,
+    offset: u64,
+    length: u64,
+    bitmap: Vec<BitMapEntry>,
+    pos: (u32, u32),
+}
+
+impl StateField {
+    pub fn new(
+        name: String,
+        base: String,
+        offset: u64,
+        length: u64,
+        bitmap: Vec<BitMapEntry>,
+        pos: (u32, u32),
+    ) -> Self {
+        StateField {
+            name,
+            base,
+            offset,
+            length,
+            bitmap,
+            pos,
+        }
+    }
+}
+
+impl fmt::Display for StateField {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut entries = String::new();
+
+        for b in &self.bitmap {
+            entries.push_str(&format!("    {}\n", b))
+        }
+
+        write!(
+            f,
+            "    {} [{}, {}, {}] {{\n {}    }};\n",
+            self.name, self.base, self.offset, self.length, entries
+        )
+    }
+}
