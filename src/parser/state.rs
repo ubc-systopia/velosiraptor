@@ -27,7 +27,7 @@
 use nom::{
     bytes::complete::tag,
     character::complete::{digit1, multispace0, multispace1},
-    multi::{separated_list1, many1},
+    multi::{many1, separated_list1},
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
@@ -35,15 +35,14 @@ use nom::{
 // get the tokens
 use super::comments::parse_comments;
 use super::identifier::parse_identifier;
-use super::tokens::{comma, lbrace, lbrack, rbrace, rbrack, semicolon, lparen, rparen};
+use super::tokens::{comma, lbrace, lbrack, lparen, rbrace, rbrack, rparen, semicolon};
 use super::SourcePos;
 
-use super::ast::{StateField, BitMapEntry, State};
-
-
+use super::ast::{BitMapEntry, State, StateField};
 
 fn parse_field_entry(input: SourcePos) -> IResult<SourcePos, BitMapEntry> {
     // an entry is basically two numbers followed by an identifier
+    // we do not allow any comments within the entry
     let mut p = tuple((
         // we start with a digit
         digit1,
@@ -87,6 +86,7 @@ fn parse_field(input: SourcePos) -> IResult<SourcePos, StateField> {
     ));
 
     // the entries are a comma separeted list entries, where each entry may have some comments before
+    // note, the comma token here parses any whitespace between then entries
     let field_entries = separated_list1(comma, preceded(parse_comments, parse_field_entry));
 
     // a field has the form //  IDENTIFIER [ IDENTIFIER, 0, 4 ] { <ENTRIES> };
@@ -126,9 +126,7 @@ fn parse_field(input: SourcePos) -> IResult<SourcePos, StateField> {
     ))
 }
 
-
 fn parse_state_memory(input: SourcePos) -> IResult<SourcePos, State> {
-
     let pos = input.get_pos();
 
     // the entries are a comma separeted list entries, where each entry may have some comments before
@@ -138,10 +136,10 @@ fn parse_state_memory(input: SourcePos) -> IResult<SourcePos, State> {
 
     let (input, bases, fields) = match tuple((header, many1(parse_field)))(input) {
         Ok((input, (bases, fields))) => (input, bases, fields),
-        Err(x) => return Err(x)
+        Err(x) => return Err(x),
     };
 
-    Ok((input, State::MemoryState{ bases, fields, pos}))
+    Ok((input, State::MemoryState { bases, fields, pos }))
 }
 
 // /// parses and consumes an import statement (`import foo;`) and any following whitespaces
@@ -177,6 +175,14 @@ fn parse_field_entry_test() {
             }
         ))
     );
+
+    // no comments allowed in the entry
+    assert!(parse_field_entry(SourcePos::new("stdin", "1 /* no comments */ 12 foo")).is_err());
+    assert!(parse_field_entry(SourcePos::new("stdin", "1 12 /* no comments */ foo")).is_err());
+
+    // no whitespace before it
+    assert!(parse_field_entry(SourcePos::new("stdin", " 1 12 foo")).is_err());
+    assert!(parse_field_entry(SourcePos::new("stdin", "\t1 12 foo")).is_err());
 }
 
 #[test]
@@ -222,7 +228,10 @@ fn parse_field_test() {
     );
 
     assert_eq!(
-        parse_field(SourcePos::new("stdin", "foo[bar,0,2] {// some comment \n 1 2 foobar\n};")),
+        parse_field(SourcePos::new(
+            "stdin",
+            "foo[bar,0,2] {// some comment \n 1 2 foobar\n};"
+        )),
         Ok((
             SourcePos::new_at("stdin", "", 45, 3, 3),
             StateField {
@@ -240,4 +249,44 @@ fn parse_field_test() {
             },
         ))
     );
+
+    // multiple entries in the list
+    assert!(parse_field(SourcePos::new(
+        "stdin",
+        "foo [ bar, 0, 2 ] { 1 2 foobar, 1 2 foobar };"
+    ))
+    .is_ok());
+    assert!(parse_field(SourcePos::new(
+        "stdin",
+        "foo [ bar, 0, 2 ] { 1 2 foobar,\n 1 2 foobar\n };"
+    ))
+    .is_ok());
+    assert!(parse_field(SourcePos::new(
+        "stdin",
+        "foo [ bar, 0, 2 ] { 1 2 foobar\n,\n 1 2 foobar\n };"
+    ))
+    .is_ok());
+
+    // adding comments to the entries
+    assert!(parse_field(SourcePos::new(
+        "stdin",
+        "foo [ bar, 0, 2 ] { // comment 1\n1 2 foobar,\n// comment 2\n 1 2 foobar\n };"
+    ))
+    .is_ok());
+    assert!(parse_field(SourcePos::new(
+        "stdin",
+        "foo [ bar, 0, 2 ] { // comment 1\n1 2 foobar };"
+    ))
+    .is_ok());
+    // no comments after the entry
+    assert!(parse_field(SourcePos::new(
+        "stdin",
+        "foo [ bar, 0, 2 ] { 1 2 foobar// no comment here\n };"
+    ))
+    .is_err());
+    assert!(parse_field(SourcePos::new(
+        "stdin",
+        "foo [ bar, 0, 2 ] { 1 2 foobar// no comment here\n, 1 2 foobar\n };"
+    ))
+    .is_err());
 }
