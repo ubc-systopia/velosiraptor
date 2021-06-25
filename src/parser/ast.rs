@@ -49,8 +49,8 @@ impl fmt::Display for Import {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Unit {
-    name: String,
-    pos: (u32, u32),
+    pub name: String,
+    pub pos: (u32, u32),
 }
 
 impl Unit {
@@ -67,9 +67,9 @@ impl fmt::Display for Unit {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct File {
-    filename: String,
-    imports: Vec<Import>,
-    units: Vec<Unit>,
+    pub filename: String,
+    pub imports: Vec<Import>,
+    pub units: Vec<Unit>,
 }
 
 impl File {
@@ -103,10 +103,10 @@ impl fmt::Display for File {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct BitMapEntry {
-    start: u16,
-    end: u16,
-    name: String,
-    pos: (u32, u32),
+    pub start: u16,
+    pub end: u16,
+    pub name: String,
+    pub pos: (u32, u32),
 }
 
 impl BitMapEntry {
@@ -128,12 +128,12 @@ impl fmt::Display for BitMapEntry {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct StateField {
-    name: String,
-    base: String,
-    offset: u64,
-    length: u64,
-    bitmap: Vec<BitMapEntry>,
-    pos: (u32, u32),
+    pub name: String,
+    pub base: String,
+    pub offset: u64,
+    pub length: u64,
+    pub bitmap: Vec<BitMapEntry>,
+    pub pos: (u32, u32),
 }
 
 impl StateField {
@@ -170,4 +170,19 @@ impl fmt::Display for StateField {
             self.name, self.base, self.offset, self.length, entries
         )
     }
+}
+
+
+
+pub enum State  {
+    MemoryState {
+        bases: Vec<String>,
+        fields: Vec<StateField>,
+        pos: (u32, u32)
+    },
+    RegisterState {
+        fields: Vec<StateField>,
+        pos: (u32, u32)
+    },
+    Dummy
 }

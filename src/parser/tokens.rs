@@ -94,6 +94,24 @@ pub fn rbrace(input: SourcePos) -> IResult<SourcePos, SourcePos> {
     }
 }
 
+/// parse an opening brace `{` surrounded by whitespace
+pub fn lparen(input: SourcePos) -> IResult<SourcePos, SourcePos> {
+    // match any of the comments above
+    match tuple((multispace0, tag("("), multispace0))(input) {
+        Ok((input, _)) => Ok((input, SourcePos::empty())),
+        Err(x) => Err(x),
+    }
+}
+
+/// parse a closing brace `}` surrounded by whitespace
+pub fn rparen(input: SourcePos) -> IResult<SourcePos, SourcePos> {
+    // match any of the comments above
+    match tuple((multispace0, tag(")"), multispace0))(input) {
+        Ok((input, _)) => Ok((input, SourcePos::empty())),
+        Err(x) => Err(x),
+    }
+}
+
 /// parse a comma `,` surrounded by whitespace
 pub fn comma(input: SourcePos) -> IResult<SourcePos, SourcePos> {
     // match any of the comments above

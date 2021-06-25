@@ -27,7 +27,7 @@
 use nom::{
     bytes::complete::tag,
     character::complete::{digit1, multispace0, multispace1},
-    multi::separated_list1,
+    multi::{separated_list1, many1},
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
@@ -35,10 +35,10 @@ use nom::{
 // get the tokens
 use super::comments::parse_comments;
 use super::identifier::parse_identifier;
-use super::tokens::{comma, lbrace, lbrack, rbrace, rbrack, semicolon};
+use super::tokens::{comma, lbrace, lbrack, rbrace, rbrack, semicolon, lparen, rparen};
 use super::SourcePos;
 
-use super::ast::{StateField, BitMapEntry};
+use super::ast::{StateField, BitMapEntry, State};
 
 
 
@@ -124,6 +124,24 @@ fn parse_field(input: SourcePos) -> IResult<SourcePos, StateField> {
         input,
         StateField::new(name, base, offset, length, bitmap, pos),
     ))
+}
+
+
+fn parse_state_memory(input: SourcePos) -> IResult<SourcePos, State> {
+
+    let pos = input.get_pos();
+
+    // the entries are a comma separeted list entries, where each entry may have some comments before
+    let bases = separated_list1(comma, parse_identifier);
+
+    let header = preceded(tag("MemoryBacked"), delimited(lparen, bases, rparen));
+
+    let (input, bases, fields) = match tuple((header, many1(parse_field)))(input) {
+        Ok((input, (bases, fields))) => (input, bases, fields),
+        Err(x) => return Err(x)
+    };
+
+    Ok((input, State::MemoryState{ bases, fields, pos}))
 }
 
 // /// parses and consumes an import statement (`import foo;`) and any following whitespaces
