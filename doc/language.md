@@ -16,16 +16,30 @@ First, we define the following basic sets of characters for expressing the
 language lexemes.
 
 ```
-    NUMERIC      := [ 0-9 ]
-    ALPHA        := [ a-zA-Z ]
-    ALPHANUMERIC := [ :ALPHA: | :NUMERIC: ]
+    DIGIT        := [[ 0-9 ]]
+    HEXDIGIT     := [[ 0123456789abcdf ]]
+    BINDIGIT     := [[ 01 ]]
+    ALPHA        := [[ a-zA-Z ]]
+    ALPHANUMERIC := [[ :ALPHA: | :DIGIT: ][]
 ```
 
 The identifier is then a letter, followed by zero or more alphanumeric
 characters.
 
 ```
-IDENTIFIER := [ :ALPHA: ]  [ :ALPHANUMERIC: ]*
+IDENTIFIER := [[ :ALPHA: ]]  [[ :ALPHANUMERIC: ]]*
+```
+
+We can have base-10 numbers, hex numbers or binary numbers. Furthermore, we have
+machine words that are architecture dependent and correspond to atomically accessible
+sizes.
+
+```
+    NUMBER := [[ :DIGIT: ]]+
+    HEXNUMBER   := [[ 0x ]] [[ :HEXDIGIT: ]]+
+    BINNUMBER   := [[ 0b ]] [[ :BINDIGIT ]]+
+    MACHINEWORD := [[ 1,2,4,8 ]]  // architecture specific
+
 ```
 
 ## Keywords
@@ -234,31 +248,58 @@ Moreover, the state might be parameterized. That is, some length of the
 Finally, the state may or may not be fully observable by software. This means it can be
 that there are specific operations to modify the state. See Interfaces.
 
-We define the state as a bitmap with various fields. There are two types of state
+We define the state as a bitmap with various fields. There are two types of state:
 
-1. Memory: the state is at a particular address in memory (e.g., page tables)
-2. Registers: the state is a register residing on the translation hardware
+1. Memory: the state is at a particular address in memory (e.g., DRAM). The device and software
+   uses the "same" address to access the state.
+2. Registers: the state is a register residing on the translation hardware. The device
+   and software may need to use different "addresses" to access the state.
+
+Note, in some sense this can be seen as "internal" and "external" state. The internal state
+resides with the translation hardware, whereas the external state resides outside the
+translation hardware.
 
 The state is a collection of contiguous regions, each having a set of fields at locations
 relative to the region. A field has bit slices with specific meaning.
 
+The grammar for expressing state is as follows:
+
 ```
-STATE_ENTRY_FIELD = nat nat ident
+BIT_SLICE := NUMBER NUMBER IDENTIFIER
 
-STATE_ENTRY = ident [ident, nat, nat ] {
-                [STATE_ENTRY_FIELD]+
-              };
+FIELD = :IDENTIFIER: [ :IDENTIFIER:, :NUMBER:, :MACHINEWORD: ] {
+           [[ :BIT_SLICE: ]]+
+        };
 
-REGISTER_STATE = Registers {
-                    [STATE_ENTRY]+
+REGISTER_STATE = Registers ( [[ :IDENTIFIER: ]]+) {
+                     [[ :FIELD: ]]+
                 };
 
-MEMORY_STATE =  Memory([ident]+) {
-                    [STATE_ENTRY]+
+MEMORY_STATE =  Memory( [[ :IDENTIFIER: ]]+) {
+                    [[ :FIELD: ]]+
                 };
 
 STATE = MEMORY_STATE | REGISTER_STATE
 ```
+
+The `BIT_SLICE` represents a slice of bits, starting from the first number, up to and including
+the second number. It assigns an identifier to the field. The slices must not overlap and not
+exceed the declared size of the field. The identifier must be unique within the field.
+
+TODO: be able to declare an enum, or constants of valid values of the `BIT_SLICE`.
+
+The `FIELD` represents an element of the state. It can be accessed atomically and has a size of
+1 byte up to machine word size (in power of two steps). The field parameters are the identifier
+of the field (its name). Then we have a tuple of an identifier referring to the region, and offset
+within that region, and the size of the field.
+
+
+
+TODO:
+ * take care of msb/lsb.
+ * express state that is a combination of registers and memory.
+ *
+
 
 Example:
 

@@ -25,6 +25,7 @@
 
 // the used nom componets
 use nom::{
+    branch::alt,
     bytes::complete::tag,
     character::complete::{digit1, multispace0, multispace1},
     multi::{many1, separated_list1},
@@ -40,7 +41,7 @@ use super::SourcePos;
 
 use super::ast::{BitMapEntry, State, StateField};
 
-fn parse_field_entry(input: SourcePos) -> IResult<SourcePos, BitMapEntry> {
+fn parse_bit_slice(input: SourcePos) -> IResult<SourcePos, BitMapEntry> {
     // an entry is basically two numbers followed by an identifier
     // we do not allow any comments within the entry
     let mut p = tuple((
@@ -75,7 +76,7 @@ fn parse_field(input: SourcePos) -> IResult<SourcePos, StateField> {
     // get the current position
     let pos = input.get_pos();
 
-    // the field location is `IDENTIFIER, 0, 4`
+    // the field location is `IDENTIFIER, 0, 4`, we do not allow comments here
     let field_location = tuple((
         // identifier ending in a comma
         terminated(parse_identifier, comma),
@@ -87,7 +88,7 @@ fn parse_field(input: SourcePos) -> IResult<SourcePos, StateField> {
 
     // the entries are a comma separeted list entries, where each entry may have some comments before
     // note, the comma token here parses any whitespace between then entries
-    let field_entries = separated_list1(comma, preceded(parse_comments, parse_field_entry));
+    let field_entries = separated_list1(comma, preceded(parse_comments, parse_bit_slice));
 
     // a field has the form //  IDENTIFIER [ IDENTIFIER, 0, 4 ] { <ENTRIES> };
     let mut field = terminated(
@@ -126,33 +127,40 @@ fn parse_field(input: SourcePos) -> IResult<SourcePos, StateField> {
     ))
 }
 
-fn parse_state_memory(input: SourcePos) -> IResult<SourcePos, State> {
+/// parses and consumes an import statement (`import foo;`) and any following whitespaces
+pub fn parse_state(input: SourcePos) -> IResult<SourcePos, State> {
+    // record the current position
     let pos = input.get_pos();
 
+    // get the type of the state
+    let (input, statetype) = match alt((tag("Memory"), tag("Register")))(input) {
+        Ok((input, statetype)) => (input, statetype),
+        Err(x) => return Err(x),
+    };
+
     // the entries are a comma separeted list entries, where each entry may have some comments before
-    let bases = separated_list1(comma, parse_identifier);
+    let baseslist = separated_list1(comma, parse_identifier);
 
-    let header = preceded(tag("MemoryBacked"), delimited(lparen, bases, rparen));
+    // the baseslist is enclosed in parenthesis
+    let header = preceded(multispace0, delimited(lparen, baseslist, rparen));
 
+    // parse the header of the state, and at least one field
     let (input, bases, fields) = match tuple((header, many1(parse_field)))(input) {
         Ok((input, (bases, fields))) => (input, bases, fields),
         Err(x) => return Err(x),
     };
 
-    Ok((input, State::MemoryState { bases, fields, pos }))
+    if statetype.as_slice() == "Memory" {
+        Ok((input, State::MemoryState { bases, fields, pos }))
+    } else {
+        Ok((input, State::RegisterState { bases, fields, pos }))
+    }
 }
 
-// /// parses and consumes an import statement (`import foo;`) and any following whitespaces
-// pub fn parse_state(input: SourcePos) -> IResult<SourcePos, Import> {
-//     // record the current position
-//     let pos = input.get_pos();
-
-// }
-
 #[test]
-fn parse_field_entry_test() {
+fn parse_bit_slice_test() {
     assert_eq!(
-        parse_field_entry(SourcePos::new("stdin", "0 12 foo")),
+        parse_bit_slice(SourcePos::new("stdin", "0 12 foo")),
         Ok((
             SourcePos::new_at("stdin", "", 8, 1, 9),
             BitMapEntry {
@@ -164,7 +172,7 @@ fn parse_field_entry_test() {
         ))
     );
     assert_eq!(
-        parse_field_entry(SourcePos::new("stdin", "13\n 12\t foo")),
+        parse_bit_slice(SourcePos::new("stdin", "13\n 12\t foo")),
         Ok((
             SourcePos::new_at("stdin", "", 11, 2, 9),
             BitMapEntry {
@@ -177,12 +185,12 @@ fn parse_field_entry_test() {
     );
 
     // no comments allowed in the entry
-    assert!(parse_field_entry(SourcePos::new("stdin", "1 /* no comments */ 12 foo")).is_err());
-    assert!(parse_field_entry(SourcePos::new("stdin", "1 12 /* no comments */ foo")).is_err());
+    assert!(parse_bit_slice(SourcePos::new("stdin", "1 /* no comments */ 12 foo")).is_err());
+    assert!(parse_bit_slice(SourcePos::new("stdin", "1 12 /* no comments */ foo")).is_err());
 
     // no whitespace before it
-    assert!(parse_field_entry(SourcePos::new("stdin", " 1 12 foo")).is_err());
-    assert!(parse_field_entry(SourcePos::new("stdin", "\t1 12 foo")).is_err());
+    assert!(parse_bit_slice(SourcePos::new("stdin", " 1 12 foo")).is_err());
+    assert!(parse_bit_slice(SourcePos::new("stdin", "\t1 12 foo")).is_err());
 }
 
 #[test]

@@ -100,7 +100,6 @@ impl fmt::Display for File {
     }
 }
 
-
 #[derive(Debug, PartialEq, Clone)]
 pub struct BitMapEntry {
     pub start: u16,
@@ -172,17 +171,16 @@ impl fmt::Display for StateField {
     }
 }
 
-
-
-pub enum State  {
+pub enum State {
     MemoryState {
         bases: Vec<String>,
         fields: Vec<StateField>,
-        pos: (u32, u32)
+        pos: (u32, u32),
     },
     RegisterState {
+        bases: Vec<String>,
         fields: Vec<StateField>,
-        pos: (u32, u32)
+        pos: (u32, u32),
     },
-    Dummy
+    Dummy,
 }
