@@ -42,6 +42,13 @@ To build the compiler
 $ cargo build
 ```
 
+## Documentation
+
+```
+$ cargo doc --no-deps
+```
+
+
 ## Testing
 
 ```
