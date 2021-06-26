@@ -49,4 +49,4 @@ $ cargo test
 ```
 
 ## TODO
-Add progress bar using the [inidicatif crate](https://docs.rs/indicatif/0.16.2/indicatif/)
+- Add progress bar using the [inidicatif crate](https://docs.rs/indicatif/0.16.2/indicatif/)
