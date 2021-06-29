@@ -26,5 +26,5 @@
 use super::sourcepos::SourcePos;
 
 pub enum Token {
-    Identifier(SourcePos)
+    Identifier(id: String, pos: SourcePos)
 }
