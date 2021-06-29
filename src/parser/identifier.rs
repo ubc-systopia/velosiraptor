@@ -53,7 +53,7 @@ pub fn parse_identifier(input: SourcePos) -> IResult<SourcePos, String> {
 
     match parse {
         // parsing succeeded, construct the identifier result
-        Ok((input, ident)) => Ok((input, ident.to_string())),
+        Ok((input, ident)) => Ok((input, ident.as_slice().to_string())),
         // otherwise pass the error
         Err(x) => Err(x),
     }
