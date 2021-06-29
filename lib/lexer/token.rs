@@ -26,7 +26,9 @@
 //! Velosiraptor Lexer Tokens
 //!
 
+use nom::{InputIter, InputLength, InputTake, InputTakeAtPosition};
 use std::fmt;
+use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 
 use super::sourcepos::SourcePos;
 
@@ -99,5 +101,13 @@ impl<'a> fmt::Display for TokenStream<'a> {
         }
 
         write!(f, "Tokens[{}..{}:\n{}", self.start, self.end, tok)
+    }
+}
+
+/// Implementation of `nom::InputLength` for `TokenStream`
+impl<'a> InputLength for TokenStream<'a> {
+    #[inline]
+    fn input_len(&self) -> usize {
+        self.tokens.len()
     }
 }
