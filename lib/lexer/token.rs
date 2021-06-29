@@ -32,16 +32,89 @@ use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 
 use super::sourcepos::SourcePos;
 
+/// Represents the content of a token
+#[derive(PartialEq, Debug, Clone)]
+pub enum TokenContent {
+    EOF,
+    Illegal,
+    // identifiers and literals
+    Identifier(String),
+    StringLiteral(String),
+    IntLiteral(i64),
+    BoolLiteral(bool),
+    // comments
+    Comment(String),
+    BlockComment(String),
+    // statements
+    Unit,
+    State,
+    Memory,
+    Registers,
+    // punctuations
+    Comma,
+    Colon,
+    SemiColon,
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
+    LBracket,
+    RBracket,
+    // operators
+    Plus,
+    Minus,
+    Multiply,
+    LShift,
+    RShift,
+    Equal,
+}
+
 /// Represents a token.
 #[derive(PartialEq, Debug, Clone)]
-pub enum Token<'a> {
-    Identifier { id: String, pos: SourcePos<'a> },
+pub struct Token<'a> {
+    pub content: TokenContent,
+    pub spos: SourcePos<'a>
+}
+
+impl<'a> Token<'a> {
+    fn new(content: TokenContent, spos: SourcePos<'a>) -> Self {
+        Token {
+            content,
+            spos,
+        }
+    }
 }
 
 impl<'a> fmt::Display for Token<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let tokstr = match self {
-            Token::Identifier { id, pos } => format!("Identifier({})", id),
+        let tokstr = match &self.content {
+            TokenContent::EOF => "End of File".to_string(),
+            TokenContent::Illegal => "Illegal Token".to_string(),
+            TokenContent::Identifier(id) => format!("Identifier({})", id),
+            TokenContent::StringLiteral(st) => format!("StringLiteral({})", st),
+            TokenContent::IntLiteral(n) => format!("IntLiteral({})", n),
+            TokenContent::BoolLiteral(bl) => format!("BoolLiteral({})", bl),
+            TokenContent::Comment(st) => format!("Comment({})", st),
+            TokenContent::BlockComment(st) => format!("BlockComment({})", st),
+            TokenContent::Unit => "Unit".to_string(),
+            TokenContent::State => "State".to_string(),
+            TokenContent::Memory => "Memory".to_string(),
+            TokenContent::Registers => "Registers".to_string(),
+            TokenContent::Comma => "Comma".to_string(),
+            TokenContent::Colon => "Colon".to_string(),
+            TokenContent::SemiColon => "SemiColon".to_string(),
+            TokenContent::LParen => "LParen".to_string(),
+            TokenContent::RParen => "RParen".to_string(),
+            TokenContent::LBrace => "LBrace".to_string(),
+            TokenContent::RBrace => "RBrace".to_string(),
+            TokenContent::LBracket => "LBracket".to_string(),
+            TokenContent::RBracket => "RBracket".to_string(),
+            TokenContent::Plus => "Plus".to_string(),
+            TokenContent::Minus => "Minus".to_string(),
+            TokenContent::Multiply => "Multiply".to_string(),
+            TokenContent::LShift => "LShift".to_string(),
+            TokenContent::RShift => "RShift".to_string(),
+            TokenContent::Equal => "Equal".to_string(),
         };
         write!(f, "{}", tokstr)
     }

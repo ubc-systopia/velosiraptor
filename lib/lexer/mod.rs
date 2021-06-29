@@ -96,14 +96,13 @@ impl<'a> Lexer<'a> {
         Ok(())
     }
 
-    pub fn filter_comments(&mut self) {
+    pub fn filter_comments(&mut self)  -> () {
         let mut i = 0;
         while i < self.tokens.len() {
-            match self.tokens[i] {
-                //Comment(_) => {self.tokens.remove(i);},
-                _ => {
-                    i = i + 1;
-                }
+            match self.tokens[i].content {
+                TokenContent::Comment(_) 
+                    | TokenContent::BlockComment(_) => { self.tokens.remove(i); },
+                _ => { i += 1; },
             };
         }
     }
