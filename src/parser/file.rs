@@ -26,7 +26,7 @@
 //! parses a velosiraptor specification file
 
 // the used nom componets
-use nom::{character::complete::multispace0, multi::many0, sequence::preceded, IResult};
+use nom::{character::complete::multispace0, multi::{many0, many1}, sequence::{preceded, delimited}, IResult};
 
 // get the tokens
 use super::SourcePos;
@@ -34,6 +34,7 @@ use super::SourcePos;
 use super::ast::File;
 use super::comments::parse_comments;
 use super::imports::parse_import;
+use super::unit::parse_unit;
 
 ///
 pub fn parse_file(input: SourcePos) -> IResult<SourcePos, File> {
@@ -49,8 +50,20 @@ pub fn parse_file(input: SourcePos) -> IResult<SourcePos, File> {
         }
     };
 
+    // the parser allows to have some comments, before every unit definition
+    let unit_parser = many1(preceded(parse_comments, parse_unit));
+
+    //
+    let (input, units) = match delimited(multispace0, unit_parser, parse_comments)(input) {
+        Ok((input, units)) => (input, units),
+        Err(x) => {
+            println!("error with parsing the header");
+            return Err(x);
+        }
+    };
+
     Ok((
         input,
-        File::new(input.filename.to_string(), imports, Vec::new()),
+        File::new(input.filename.to_string(), imports, units),
     ))
 }
