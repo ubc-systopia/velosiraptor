@@ -26,7 +26,7 @@
 //! Velosiraptor Lexer Tokens
 //!
 
-use nom::{InputIter, InputLength, InputTake, InputTakeAtPosition};
+use nom::{InputIter, InputLength, InputTake, Needed, Slice};
 use std::fmt;
 use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 
@@ -47,6 +47,15 @@ impl<'a> fmt::Display for Token<'a> {
     }
 }
 
+/// Implementation of `nom::InputLength` for `Token`
+impl<'a> InputLength for Token<'a> {
+    #[inline]
+    /// Calculates the input length, as indicated by its name, and the name of the trait itself
+    fn input_len(&self) -> usize {
+        1
+    }
+}
+
 /// A sequence of recognized tokens that is produced by the lexer
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct TokenStream<'a> {
@@ -54,26 +63,18 @@ pub struct TokenStream<'a> {
     tokens: &'a [Token<'a>],
 
     /// Holds the start position of the slice relative to the full slice
-    start: usize,
-
-    /// Holds the end position of the slice relative to the full slice
-    end: usize,
+    offset: usize,
 }
 
 impl<'a> TokenStream<'a> {
     pub fn from_slice(tokens: &'a [Token<'a>]) -> Self {
-        TokenStream {
-            tokens,
-            start: 0,
-            end: tokens.len(),
-        }
+        TokenStream { tokens, offset: 0 }
     }
 
     pub fn empty() -> Self {
         TokenStream {
             tokens: &[],
-            start: 0,
-            end: 0,
+            offset: 0,
         }
     }
 
@@ -100,14 +101,146 @@ impl<'a> fmt::Display for TokenStream<'a> {
             tok.push_str("<eof>\n")
         }
 
-        write!(f, "Tokens[{}..{}:\n{}", self.start, self.end, tok)
+        write!(
+            f,
+            "Tokens[{}..{}:\n{}",
+            self.offset,
+            self.offset + self.tokens.len(),
+            tok
+        )
     }
 }
 
 /// Implementation of `nom::InputLength` for `TokenStream`
 impl<'a> InputLength for TokenStream<'a> {
     #[inline]
+    /// Calculates the input length, as indicated by its name, and the name of the trait itself
     fn input_len(&self) -> usize {
         self.tokens.len()
+    }
+}
+
+/// Implementation of `nom::InputTake` for `TokenStream`
+impl<'a> InputTake for TokenStream<'a> {
+    #[inline]
+    /// Returns a slice of `count` bytes. panics if count > length
+    fn take(&self, count: usize) -> Self {
+        if count > self.tokens.len() {
+            panic!("count > length: {} > {}", count, self.tokens.len());
+        }
+        TokenStream {
+            tokens: &self.tokens[0..count],
+            offset: self.offset,
+        }
+    }
+
+    #[inline]
+    /// Split the stream at the `count` byte offset. panics if count > length
+    fn take_split(&self, count: usize) -> (Self, Self) {
+        if count > self.tokens.len() {
+            panic!("count > length: {} > {}", count, self.tokens.len());
+        }
+        // split the slice at position
+        let (prefix, suffix) = self.tokens.split_at(count);
+
+        // create the first half
+        let first = TokenStream {
+            tokens: prefix,
+            offset: self.offset,
+        };
+
+        // create the second half half
+        let second = TokenStream {
+            tokens: suffix,
+            offset: self.offset + prefix.len(),
+        };
+
+        // return
+        (second, first)
+    }
+}
+
+/// implementation of `nom::Slice<RangeFull>` for `TokenStream`
+impl<'a> Slice<RangeFull> for TokenStream<'a> {
+    fn slice(&self, _: RangeFull) -> Self {
+        // return a clone of our selves
+        self.clone()
+    }
+}
+
+/// implementation of `nom::Slice<Range<usize>>` for `TokenStream`
+impl<'a> Slice<Range<usize>> for TokenStream<'a> {
+    #[inline]
+    fn slice(&self, range: Range<usize>) -> Self {
+        let start = range.start;
+        let toks = &self.tokens[range];
+
+        TokenStream {
+            tokens: toks,
+            offset: self.offset + start,
+        }
+    }
+}
+
+/// implementation of `nom::Slice<RangeTo<usize>>` for `TokenStream`
+impl<'a> Slice<RangeTo<usize>> for TokenStream<'a> {
+    #[inline]
+    fn slice(&self, range: RangeTo<usize>) -> Self {
+        // just return the range from 0..end
+        self.slice(0..range.end)
+    }
+}
+
+/// implementation of `nom::Slice<RangeFrom<usize>>` for `TokenStream`
+impl<'a> Slice<RangeFrom<usize>> for TokenStream<'a> {
+    #[inline]
+    fn slice(&self, range: RangeFrom<usize>) -> Self {
+        // just return the range from start..end
+        self.slice(range.start..self.tokens.len())
+    }
+}
+
+use std::iter::Enumerate;
+
+/// implementation of `nom::InputIter` for `TokenStream`
+impl<'a> InputIter for TokenStream<'a> {
+    /// The current input type is a sequence of that Item type.
+    type Item = &'a Token<'a>;
+
+    /// An iterator over the input type, producing the item and its position for use with Slice.
+    type Iter = Enumerate<::std::slice::Iter<'a, Token<'a>>>;
+
+    /// An iterator over the input type, producing the item
+    type IterElem = ::std::slice::Iter<'a, Token<'a>>;
+
+    #[inline]
+    /// Returns an iterator over the elements and their byte offsets
+    fn iter_indices(&self) -> Self::Iter {
+        self.tokens.iter().enumerate()
+    }
+
+    #[inline]
+    /// Returns an iterator over the elements
+    fn iter_elements(&self) -> Self::IterElem {
+        self.tokens.iter()
+    }
+
+    #[inline]
+    /// Finds the byte position of the element
+    fn position<P>(&self, predicate: P) -> Option<usize>
+    where
+        P: Fn(Self::Item) -> bool,
+    {
+        self.tokens.iter().position(|b| predicate(b))
+    }
+
+    #[inline]
+    /// Get the byte offset from the element's position in the stream
+    fn slice_index(&self, count: usize) -> Result<usize, Needed> {
+        if self.tokens.len() >= count {
+            Ok(count)
+        } else {
+            Err(Needed::Unknown)
+        }
     }
 }
