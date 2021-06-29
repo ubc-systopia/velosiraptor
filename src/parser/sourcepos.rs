@@ -79,6 +79,7 @@ impl<'a> SourcePos<'a> {
     }
 
     /// Constructs a new SourcePos from the supplied string
+    #[allow(dead_code)]
     pub fn from_string(filename: &'a str, content: &'a str) -> Self {
         SourcePos::new(filename, content)
     }
@@ -92,15 +93,16 @@ impl<'a> SourcePos<'a> {
         column: u32,
     ) -> Self {
         SourcePos {
-            filename: filename,
-            offset: offset,
-            line: line,
-            column: column,
-            content: content,
+            filename,
+            offset,
+            line,
+            column,
+            content,
         }
     }
 
     /// Constructs a new SourcePos from the supplied string
+    #[allow(dead_code)]
     pub fn from_string_at(
         filename: &'a str,
         content: &'a String,
@@ -127,10 +129,6 @@ impl<'a> SourcePos<'a> {
 
     pub fn get_pos(&self) -> (u32, u32) {
         (self.line, self.column)
-    }
-
-    pub fn to_string(&self) -> String {
-        self.content.to_string()
     }
 }
 

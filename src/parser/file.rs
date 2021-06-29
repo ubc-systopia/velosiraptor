@@ -26,7 +26,12 @@
 //! parses a velosiraptor specification file
 
 // the used nom componets
-use nom::{character::complete::multispace0, multi::{many0, many1}, sequence::{preceded, delimited}, IResult};
+use nom::{
+    character::complete::multispace0,
+    multi::{many0, many1},
+    sequence::{delimited, preceded},
+    IResult,
+};
 
 // get the tokens
 use super::SourcePos;
@@ -62,8 +67,5 @@ pub fn parse_file(input: SourcePos) -> IResult<SourcePos, File> {
         }
     };
 
-    Ok((
-        input,
-        File::new(input.filename.to_string(), imports, units),
-    ))
+    Ok((input, File::new(input.filename.to_string(), imports, units)))
 }
