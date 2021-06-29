@@ -71,5 +71,15 @@ fn main() {
     let mut parser = Parser::from_file(infile.to_string()).expect("failed to construct the parser");
 
     // parse the file
-    parser.parse();
+    let err = parser.parse();
+    if err.is_err() {
+        log::error!("Parsing failed.");
+    }
+    // resolve the import statements
+    let err = parser.resolve_imports();
+    if err.is_err() {
+        log::error!("Failed to resolve imports.");
+    }
+
+    // perform checks
 }
