@@ -24,4 +24,4 @@
 // SOFTWARE.
 
 pub mod ast;
-use parser::ast::*;
+use self::ast::*;

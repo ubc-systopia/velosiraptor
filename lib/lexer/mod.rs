@@ -24,6 +24,6 @@
 // SOFTWARE.
 
 pub mod token;
-use lexer::token::*;
+use self::token::*;
 
 pub mod sourcepos;

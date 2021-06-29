@@ -7,6 +7,9 @@ authors = ["Reto Achermann <achreto@cs.ubc.ca>"]
 edition = "2018"
 readme = "README.md"
 
+[lib]
+name = "libvrc"
+path = "lib/lib.rs"
 
 [dependencies]
 # the argument parser
