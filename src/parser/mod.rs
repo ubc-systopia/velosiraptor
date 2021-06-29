@@ -54,8 +54,6 @@ mod unit;
 
 use custom_error::custom_error;
 
-use log::{debug, error, info, warn};
-
 use std::collections::HashMap;
 
 custom_error! {pub ParserError
@@ -64,6 +62,7 @@ custom_error! {pub ParserError
   ParserNotFinished = "There was unexpected chunk at the ned of input",
   SyntaxError = "Attempt to parse resulted in a syntax error.",
   NoParseTree = "There was not parse tree",
+  ResolveImports = "There was an error when resolving the imports"
 }
 
 pub struct Parser {
@@ -89,23 +88,23 @@ impl Parser {
             parsetree: None,
         };
 
-        info!("created parser ");
+        log::info!("created parser ");
         Ok(p)
     }
 
     #[allow(dead_code)]
     pub fn from_string(contents: String) -> Result<Parser, ParserError> {
-        info!("creating string parser");
+        log::info!("creating string parser");
         Parser::new("<stdio>".to_string(), contents)
     }
 
     pub fn from_file(filename: String) -> Result<Parser, ParserError> {
-        info!("creating file parser for '{}'", filename);
+        log::info!("creating file parser for '{}'", filename);
         let file_contents = fs::read_to_string(&filename);
         let contents = match file_contents {
             Ok(s) => s,
             _ => {
-                error!("could not read the file '{}'", filename);
+                log::error!("could not read the file '{}'", filename);
                 return Err(ParserError::ReadSourceFile { file: filename });
             }
         };
@@ -113,10 +112,10 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<(), ParserError> {
-        info!("parsing: {}", self.filename);
-        debug!("<contents>");
-        debug!("{}", &self.filecontents);
-        debug!("<contents>");
+        log::info!("parsing: {}", self.filename);
+        log::debug!("<contents>");
+        log::debug!("{}", &self.filecontents);
+        log::debug!("<contents>");
 
         // create the source position struct
         let sp = SourcePos::new(&self.filename, &self.filecontents);
@@ -135,28 +134,32 @@ impl Parser {
         // save the parse tree in the structure
         self.parsetree = Some(ast);
 
-        debug!("<parsetree>");
-        debug!("{}", self.parsetree.as_ref().unwrap());
-        debug!("<parsetree>");
+        log::debug!("<parsetree>");
+        log::debug!("{}", self.parsetree.as_ref().unwrap());
+        log::debug!("<parsetree>");
 
         Ok(())
     }
 
-    pub fn resolve_imports(&mut self) -> Result<(), ParserError> {
-        info!("resolving imports...");
-        if self.parsetree.is_none() {
-            warn!("there was no parse tree, parse first!");
-            return Err(ParserError::NoParseTree);
-        }
-
+    fn resolve_imports_recurively(
+        &mut self,
+        parsers: &mut HashMap<String, bool>,
+    ) -> Result<(), ParserError> {
         let parsetree = self.parsetree.as_ref().unwrap();
         for import in &parsetree.imports {
             let filename = &import.filename;
+
+            if parsers.contains_key(filename) {
+                // this may be a bit too aggressive...
+                log::error!("potential circular import dependency detected! aborting for now");
+                return Err(ParserError::ResolveImports);
+            }
+
             // todo: adjust path to be relative for this
             let mut import_parser = match Parser::from_file(filename.to_string()) {
                 Ok(p) => p,
                 Err(e) => {
-                    error!("could not resolve import {}", &import.filename);
+                    log::error!("could not resolve import {}", &import.filename);
                     return Err(e);
                 }
             };
@@ -164,9 +167,32 @@ impl Parser {
             if err.is_err() {
                 return err;
             }
+
+            // add the parser to the seen elements
+            parsers.insert(filename.to_string(), true);
+
+            let err = import_parser.resolve_imports_recurively(parsers);
+            if err.is_err() {
+                return err;
+            }
+
             self.imports.insert(filename.to_string(), import_parser);
         }
-
         Ok(())
+    }
+
+    pub fn resolve_imports(&mut self) -> Result<(), ParserError> {
+        log::info!("resolving imports...");
+        if self.parsetree.is_none() {
+            log::warn!("there was no parse tree, parse first!");
+            return Err(ParserError::NoParseTree);
+        }
+
+        // create a hashmap with the currently parsed files...
+        let mut parsers: HashMap<String, bool> = HashMap::new();
+        parsers.insert(self.filename.to_string(), true);
+
+        // recursively resolve the imports
+        self.resolve_imports_recurively(&mut parsers)
     }
 }
