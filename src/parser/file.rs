@@ -50,7 +50,7 @@ pub fn parse_file(input: SourcePos) -> IResult<SourcePos, File> {
     let (input, imports) = match preceded(multispace0, import_parser)(input) {
         Ok((input, imports)) => (input, imports),
         Err(x) => {
-            println!("error with parsing the header");
+            println!("error with parsing the imports");
             return Err(x);
         }
     };
@@ -62,7 +62,7 @@ pub fn parse_file(input: SourcePos) -> IResult<SourcePos, File> {
     let (input, units) = match delimited(multispace0, unit_parser, parse_comments)(input) {
         Ok((input, units)) => (input, units),
         Err(x) => {
-            println!("error with parsing the header");
+            println!("error with parsing the units {}", input);
             return Err(x);
         }
     };

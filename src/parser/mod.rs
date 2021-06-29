@@ -25,6 +25,7 @@
 
 // for reading the file
 use std::fs;
+use std::path::PathBuf;
 
 // the used nom componets
 // use nom::{
@@ -57,7 +58,7 @@ use custom_error::custom_error;
 use std::collections::HashMap;
 
 /// the file extension for velosiraptor files
-const FILE_EXTENSION: &str = ".vrs";
+const FILE_EXTENSION: &str = "vrs";
 
 custom_error! {pub ParserError
   ReadSourceFile{ file: String } = "Could not read the source file",
@@ -149,12 +150,17 @@ impl Parser {
         parsers: &mut HashMap<String, bool>,
     ) -> Result<(), ParserError> {
         let parsetree = self.parsetree.as_ref().unwrap();
-        for import in &parsetree.imports {
-            // todo: adjust path to be relative for this
-            let mut filename = import.filename.to_owned();
-            filename.push_str(FILE_EXTENSION);
 
-            if parsers.contains_key(&filename) {
+        let mut dir = PathBuf::from(&self.filename);
+
+        for import in &parsetree.imports {
+            dir.pop();
+
+            // todo: adjust path to be relative for this
+            dir.push(format!("{}.{}", &import.filename, FILE_EXTENSION));
+            let filename = dir.to_str().unwrap();
+
+            if parsers.contains_key(&format!("{}", dir.display())) {
                 // this may be a bit too aggressive...
                 log::error!("potential circular import dependency detected! aborting for now");
                 return Err(ParserError::ResolveImports);
@@ -163,7 +169,8 @@ impl Parser {
             let mut import_parser = match Parser::from_file(filename.to_string()) {
                 Ok(p) => p,
                 Err(e) => {
-                    log::error!("could not resolve import {}", &filename);
+                    log::error!("could not resolve import {}", filename);
+                    println!("could not resolve import {}", filename);
                     return Err(e);
                 }
             };
@@ -180,7 +187,7 @@ impl Parser {
                 return err;
             }
 
-            self.imports.insert(filename, import_parser);
+            self.imports.insert(filename.to_string(), import_parser);
         }
         Ok(())
     }
@@ -198,5 +205,35 @@ impl Parser {
 
         // recursively resolve the imports
         self.resolve_imports_recurively(&mut parsers)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn import_tests() {
+        // --snip--
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("tests/imports");
+
+        for f in vec!["basicimport.vrs", "multiimport.vrs", "recursiveimport.vrs"] {
+            d.push(f);
+            let filename = format!("{}", d.display());
+            println!("{}", filename);
+
+            let mut parser = Parser::from_file(filename).expect("failed to construct the parser");
+
+            // parse the file
+            let err = parser.parse();
+            assert!(err.is_ok());
+
+            // resolve the import statements
+            let err = parser.resolve_imports();
+            assert!(err.is_ok());
+
+            d.pop();
+        }
     }
 }
