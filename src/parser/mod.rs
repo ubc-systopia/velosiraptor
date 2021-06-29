@@ -56,6 +56,9 @@ use custom_error::custom_error;
 
 use std::collections::HashMap;
 
+/// the file extension for velosiraptor files
+const FILE_EXTENSION: &str = ".vrs";
+
 custom_error! {pub ParserError
   ReadSourceFile{ file: String } = "Could not read the source file",
   ParsingError = "The parser returned an error",
@@ -147,19 +150,20 @@ impl Parser {
     ) -> Result<(), ParserError> {
         let parsetree = self.parsetree.as_ref().unwrap();
         for import in &parsetree.imports {
-            let filename = &import.filename;
+            // todo: adjust path to be relative for this
+            let mut filename = import.filename.to_owned();
+            filename.push_str(FILE_EXTENSION);
 
-            if parsers.contains_key(filename) {
+            if parsers.contains_key(&filename) {
                 // this may be a bit too aggressive...
                 log::error!("potential circular import dependency detected! aborting for now");
                 return Err(ParserError::ResolveImports);
             }
 
-            // todo: adjust path to be relative for this
             let mut import_parser = match Parser::from_file(filename.to_string()) {
                 Ok(p) => p,
                 Err(e) => {
-                    log::error!("could not resolve import {}", &import.filename);
+                    log::error!("could not resolve import {}", &filename);
                     return Err(e);
                 }
             };
@@ -176,7 +180,7 @@ impl Parser {
                 return err;
             }
 
-            self.imports.insert(filename.to_string(), import_parser);
+            self.imports.insert(filename, import_parser);
         }
         Ok(())
     }
