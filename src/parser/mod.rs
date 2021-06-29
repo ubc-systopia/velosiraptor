@@ -60,7 +60,7 @@ use std::collections::HashMap;
 /// the file extension for velosiraptor files
 const FILE_EXTENSION: &str = "vrs";
 
-custom_error! {pub ParserError
+custom_error! {#[derive(PartialEq)] pub ParserError
   ReadSourceFile{ file: String } = "Could not read the source file",
   ParsingError = "The parser returned an error",
   ParserNotFinished = "There was unexpected chunk at the ned of input",
@@ -232,6 +232,25 @@ mod tests {
             // resolve the import statements
             let err = parser.resolve_imports();
             assert!(err.is_ok());
+
+            d.pop();
+        }
+
+        for f in vec!["circular1.vrs", "circular2.vrs"] {
+            d.push(f);
+            let filename = format!("{}", d.display());
+            println!("{}", filename);
+
+            let mut parser = Parser::from_file(filename).expect("failed to construct the parser");
+
+            // parse the file
+            let err = parser.parse();
+            assert!(err.is_ok());
+
+            // resolve the import statements
+            let err = parser.resolve_imports();
+            assert!(err.is_err());
+            assert_eq!(err.unwrap_err(), ParserError::ResolveImports);
 
             d.pop();
         }
