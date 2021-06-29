@@ -81,10 +81,10 @@ pub struct Parser {
 
 /// represents a parser struct this includes the file
 impl Parser {
-    fn new(filename: String, contents: String) -> Result<Parser, ParserError> {
+    fn new(filename: String, filecontents: String) -> Result<Parser, ParserError> {
         let p = Parser {
-            filename: filename,
-            filecontents: contents,
+            filename,
+            filecontents,
             imports: HashMap::new(),
             parsetree: None,
         };
@@ -106,9 +106,7 @@ impl Parser {
             Ok(s) => s,
             _ => {
                 error!("could not read the file '{}'", filename);
-                return Err(ParserError::ReadSourceFile {
-                    file: filename.to_string(),
-                });
+                return Err(ParserError::ReadSourceFile { file: filename });
             }
         };
         Parser::new(filename, contents)

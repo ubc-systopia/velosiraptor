@@ -5,7 +5,6 @@ extern crate nom;
 
 // used for parsing
 use clap::{App, Arg};
-use log;
 
 use simplelog::{Config, LevelFilter, SimpleLogger};
 

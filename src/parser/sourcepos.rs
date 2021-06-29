@@ -94,10 +94,10 @@ impl<'a> SourcePos<'a> {
     ) -> Self {
         SourcePos {
             filename,
+            content,
             offset,
             line,
             column,
-            content,
         }
     }
 
@@ -105,7 +105,7 @@ impl<'a> SourcePos<'a> {
     #[allow(dead_code)]
     pub fn from_string_at(
         filename: &'a str,
-        content: &'a String,
+        content: &'a str,
         offset: usize,
         line: u32,
         column: u32,
@@ -119,7 +119,7 @@ impl<'a> SourcePos<'a> {
     }
 
     pub fn is_empty(&self) -> bool {
-        return self.content.is_empty();
+        self.content.is_empty()
     }
 
     /// Obtain the full content of the SourcePos as a slice
