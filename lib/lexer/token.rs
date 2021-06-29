@@ -23,8 +23,81 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+//! Velosiraptor Lexer Tokens
+//!
+
+use std::fmt;
+
 use super::sourcepos::SourcePos;
 
+/// Represents a token.
+#[derive(PartialEq, Debug, Clone)]
 pub enum Token<'a> {
-    Identifier {id: String, pos: SourcePos<'a>}
+    Identifier { id: String, pos: SourcePos<'a> },
+}
+
+impl<'a> fmt::Display for Token<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let tokstr = match self {
+            Token::Identifier { id, pos } => format!("Identifier({})", id),
+        };
+        write!(f, "{}", tokstr)
+    }
+}
+
+/// A sequence of recognized tokens that is produced by the lexer
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct TokenStream<'a> {
+    /// a slice of tokens
+    tokens: &'a [Token<'a>],
+
+    /// Holds the start position of the slice relative to the full slice
+    start: usize,
+
+    /// Holds the end position of the slice relative to the full slice
+    end: usize,
+}
+
+impl<'a> TokenStream<'a> {
+    pub fn from_slice(tokens: &'a [Token<'a>]) -> Self {
+        TokenStream {
+            tokens,
+            start: 0,
+            end: tokens.len(),
+        }
+    }
+
+    pub fn empty() -> Self {
+        TokenStream {
+            tokens: &[],
+            start: 0,
+            end: 0,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.tokens.is_empty()
+    }
+
+    pub fn as_slice(&self) -> &'a [Token<'a>] {
+        self.tokens
+    }
+}
+
+/// support for printing the token
+impl<'a> fmt::Display for TokenStream<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut tok = String::new();
+        for i in &self.tokens[0..5] {
+            tok.push_str(&format!("    - {}\n", i))
+        }
+        if self.tokens.len() > 5 {
+            tok.push_str("...\n")
+        }
+        if self.tokens.len() <= 5 {
+            tok.push_str("<eof>\n")
+        }
+
+        write!(f, "Tokens[{}..{}:\n{}", self.start, self.end, tok)
+    }
 }
