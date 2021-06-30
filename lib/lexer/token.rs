@@ -40,7 +40,7 @@ pub enum TokenContent {
     // identifiers and literals
     Identifier(String),
     StringLiteral(String),
-    IntLiteral(i64),
+    IntLiteral(u64),
     BoolLiteral(bool),
     // comments
     Comment(String),
