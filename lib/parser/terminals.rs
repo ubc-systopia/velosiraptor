@@ -52,8 +52,8 @@ macro_rules! namedtag (
 );
 
 // keywords
-namedtag!(pub import, TokenContent::Import);
-namedtag!(pub unit, TokenContent::Unit);
+namedtag!(pub import_keyword, TokenContent::Import);
+namedtag!(pub unit_keyword, TokenContent::Unit);
 
 // punctuation
 namedtag!(pub comma, TokenContent::Comma);
@@ -76,7 +76,7 @@ namedtag!(pub lshift, TokenContent::LShift);
 namedtag!(pub rshift, TokenContent::RShift);
 namedtag!(pub equal, TokenContent::Equal);
 
-pub fn identifier(input: TokenStream) -> IResult<TokenStream, String> {
+pub fn ident(input: TokenStream) -> IResult<TokenStream, String> {
     let (rem, tok) = try_parse!(input, take!(1));
     // we need at least one token
     if tok.is_empty() {

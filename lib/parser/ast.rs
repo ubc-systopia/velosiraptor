@@ -29,6 +29,9 @@ pub struct Ast {}
 
 use crate::lexer::sourcepos::SourcePos;
 
+///
+/// Defines an import statement
+///
 #[derive(Debug, PartialEq, Clone)]
 pub struct Import<'a> {
     pub name: String,
@@ -45,4 +48,150 @@ impl<'a> fmt::Display for Import<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Import {}  ({:?})", self.name, self.pos.get_pos())
     }
+}
+
+///
+/// Defines a translation unit
+///
+#[derive(Debug, PartialEq, Clone)]
+pub struct Unit<'a> {
+    pub name: String,
+    pub derived: Option<String>,
+    pub pos: SourcePos<'a>,
+}
+
+impl<'a> Unit<'a> {
+    pub fn new(name: String, derived: Option<String>, pos: SourcePos<'a>) -> Self {
+        Unit { name, derived, pos }
+    }
+}
+
+impl<'a> fmt::Display for Unit<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self.derived {
+            Some(n) => write!(f, "Unit {} : {}  ({:?})", self.name, n, self.pos.get_pos()),
+            None    => write!(f, "Unit {}  ({:?})", self.name, self.pos.get_pos()),
+        }
+
+    }
+}
+
+// #[derive(Debug, PartialEq, Clone)]
+// pub struct File {
+//     pub filename: String,
+//     pub imports: Vec<Import>,
+//     pub units: Vec<Unit>,
+// }
+
+// impl File {
+//     pub fn new(filename: String, imports: Vec<Import>, units: Vec<Unit>) -> Self {
+//         File {
+//             filename,
+//             imports,
+//             units,
+//         }
+//     }
+// }
+
+// impl fmt::Display for File {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         let mut imports = String::new();
+//         imports.push_str("  Imports:\n");
+//         for i in &self.imports {
+//             imports.push_str(&format!("    {}\n", i))
+//         }
+
+//         let mut units = String::new();
+//         units.push_str("  Units:");
+//         for u in &self.units {
+//             units.push_str(&format!("    {}\n", u))
+//         }
+
+//         write!(f, "File {}\n{}\n{}", self.filename, imports, units)
+//     }
+// }
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct BitMapEntry {
+    pub start: u16,
+    pub end: u16,
+    pub name: String,
+    pub pos: (u32, u32),
+}
+
+impl BitMapEntry {
+    pub fn new(start: u16, end: u16, name: String, pos: (u32, u32)) -> Self {
+        BitMapEntry {
+            start,
+            end,
+            name,
+            pos,
+        }
+    }
+}
+
+impl fmt::Display for BitMapEntry {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({:3}..{:3}, {})", self.start, self.end, &self.name)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct StateField {
+    pub name: String,
+    pub base: String,
+    pub offset: u64,
+    pub length: u64,
+    pub bitmap: Vec<BitMapEntry>,
+    pub pos: (u32, u32),
+}
+
+impl StateField {
+    pub fn new(
+        name: String,
+        base: String,
+        offset: u64,
+        length: u64,
+        bitmap: Vec<BitMapEntry>,
+        pos: (u32, u32),
+    ) -> Self {
+        StateField {
+            name,
+            base,
+            offset,
+            length,
+            bitmap,
+            pos,
+        }
+    }
+}
+
+impl fmt::Display for StateField {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut entries = String::new();
+
+        for b in &self.bitmap {
+            entries.push_str(&format!("    {}\n", b))
+        }
+
+        write!(
+            f,
+            "    {} [{}, {}, {}] {{\n {}    }};\n",
+            self.name, self.base, self.offset, self.length, entries
+        )
+    }
+}
+
+pub enum State {
+    MemoryState {
+        bases: Vec<String>,
+        fields: Vec<StateField>,
+        pos: (u32, u32),
+    },
+    RegisterState {
+        bases: Vec<String>,
+        fields: Vec<StateField>,
+        pos: (u32, u32),
+    },
+    Dummy,
 }

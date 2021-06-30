@@ -29,7 +29,11 @@ pub mod ast;
 pub mod terminals;
 use ast::Ast;
 
-mod imports;
+mod import;
+use import::import;
+
+mod unit;
+use unit::unit;
 
 use super::lexer::token::{Token, TokenStream};
 use super::lexer::Lexer;
@@ -42,6 +46,9 @@ custom_error! {#[derive(PartialEq)] pub ParserError
 }
 
 pub struct Parser;
+
+use nom::multi::{many0, many1};
+
 
 impl Parser {
     pub fn parse_string<'a>(context: &str, string: &'a str) -> Result<Ast, ParserError> {
@@ -67,7 +74,26 @@ impl Parser {
     // }
 
     pub fn parse_tokens<'a>(tokens: &[Token<'a>]) -> Result<Ast, ParserError> {
-        let _tokstream = TokenStream::from_slice(&tokens);
+        // get the token stream
+        let tokstream = TokenStream::from_slice(&tokens);
+
+        // a parsing unit consists of zero or more imports
+        let (i1, _imports) = match many0(import)(tokstream) {
+            Ok((r, i)) => (r, i),
+            Err(_)     => return Err(ParserError::ParserFailure)
+        };
+
+        // there must be at least one unit definition
+        let (rem, _units) = match many1(unit)(i1) {
+            Ok((rem, p)) => (rem, p),
+            Err(_) => return Err(ParserError::ParserFailure),
+        };
+
+        // the input must be fully consumed
+        if !rem.is_empty() {
+            return Err(ParserError::ParserFailure);
+        }
+
         Err(ParserError::NotYetImplemented)
     }
 }
