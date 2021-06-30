@@ -89,3 +89,17 @@ pub fn ident(input: TokenStream) -> IResult<TokenStream, String> {
         }
     }
 }
+
+pub fn num(input: TokenStream) -> IResult<TokenStream, u64> {
+    let (rem, tok) = try_parse!(input, take!(1));
+    // we need at least one token
+    if tok.is_empty() {
+        Err(Err::Incomplete(Needed::new(1)))
+    } else {
+        let id = tok.peek();
+        match &id.content {
+            TokenContent::IntLiteral(s) => Ok((rem, *s)),
+            _ => Err(Err::Error(error_position!(input, ErrorKind::Digit))),
+        }
+    }
+}
