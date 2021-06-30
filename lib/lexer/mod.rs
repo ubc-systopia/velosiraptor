@@ -26,10 +26,11 @@
 //! Lexer Module of the Velosiraptor Compiler
 
 use custom_error::custom_error;
-use std::fs;
+
 #[cfg(test)]
 use std::path::PathBuf;
-
+#[cfg(test)]
+use std::fs;
 pub mod token;
 use self::token::*;
 
@@ -48,6 +49,7 @@ pub struct Lexer;
 impl Lexer {
     pub fn lex_string<'a>(context: &'a str, string: &'a str) -> Result<Vec<Token<'a>>, LexerError> {
         let sp = SourcePos::new(context, string);
+
         Ok(Vec::new())
     }
 
@@ -78,8 +80,10 @@ fn import_tests() {
         d.push(f);
         let filename = format!("{}", d.display());
 
+        let file_contents = fs::read_to_string(&filename).unwrap();
+
         // create the lexer
-        let err = Lexer::lex_file(&filename);
+        let err = Lexer::lex_string(&filename, &file_contents);
         assert!(err.is_ok());
 
         // lex the file

@@ -35,7 +35,7 @@ use super::sourcepos::SourcePos;
 /// Represents the content of a token
 #[derive(PartialEq, Debug, Clone)]
 pub enum TokenContent {
-    EOF,
+    Eof,
     Illegal,
     // identifiers and literals
     Identifier(String),
@@ -46,6 +46,7 @@ pub enum TokenContent {
     Comment(String),
     BlockComment(String),
     // statements
+    Import,
     Unit,
     State,
     Memory,
@@ -77,15 +78,58 @@ pub struct Token<'a> {
 }
 
 impl<'a> Token<'a> {
-    fn new(content: TokenContent, spos: SourcePos<'a>) -> Self {
+    pub fn new(content: TokenContent, spos: SourcePos<'a>) -> Self {
         Token { content, spos }
+    }
+
+    pub fn get_pos(&self) -> SourcePos {
+        self.spos
+    }
+
+    pub fn get_symbol(&self) -> &str {
+        match &self.content {
+            TokenContent::Eof => "<EOF>",
+            TokenContent::Illegal => "<ILLEGAL>",
+            TokenContent::Identifier(id) => &id,
+            TokenContent::StringLiteral(st) => &st,
+            TokenContent::IntLiteral(_) => "NUMBER",
+            TokenContent::BoolLiteral(bl) => {
+                if *bl {
+                    "true"
+                } else {
+                    "false"
+                }
+            }
+            TokenContent::Comment(_) => "<COMMENT>",
+            TokenContent::BlockComment(_) => "<COMMENT>",
+            TokenContent::Unit => "UNIT",
+            TokenContent::Import => "IMPORT",
+            TokenContent::State => "STATE",
+            TokenContent::Memory => "MEMORY",
+            TokenContent::Registers => "REGISTERS",
+            TokenContent::Comma => ",",
+            TokenContent::Colon => ":",
+            TokenContent::SemiColon => ";",
+            TokenContent::LParen => "(",
+            TokenContent::RParen => ")",
+            TokenContent::LBrace => "{",
+            TokenContent::RBrace => "}",
+            TokenContent::LBracket => "[",
+            TokenContent::RBracket => "]",
+            TokenContent::Plus => "+",
+            TokenContent::Minus => "-",
+            TokenContent::Multiply => "*",
+            TokenContent::LShift => "<<",
+            TokenContent::RShift => ">>",
+            TokenContent::Equal => "==",
+        }
     }
 }
 
 impl<'a> fmt::Display for Token<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let tokstr = match &self.content {
-            TokenContent::EOF => "End of File".to_string(),
+            TokenContent::Eof => "End of File".to_string(),
             TokenContent::Illegal => "Illegal Token".to_string(),
             TokenContent::Identifier(id) => format!("Identifier({})", id),
             TokenContent::StringLiteral(st) => format!("StringLiteral({})", st),
@@ -96,6 +140,7 @@ impl<'a> fmt::Display for Token<'a> {
             TokenContent::Unit => "Unit".to_string(),
             TokenContent::State => "State".to_string(),
             TokenContent::Memory => "Memory".to_string(),
+            TokenContent::Import => "Import".to_string(),
             TokenContent::Registers => "Registers".to_string(),
             TokenContent::Comma => "Comma".to_string(),
             TokenContent::Colon => "Colon".to_string(),
@@ -155,25 +200,34 @@ impl<'a> TokenStream<'a> {
     pub fn as_slice(&self) -> &'a [Token<'a>] {
         self.tokens
     }
+
+    pub fn peek(&self) -> &'a Token<'a> {
+        &self.tokens[0]
+    }
+
+    pub fn get_pos(&self) -> SourcePos<'a> {
+        self.tokens[0].spos
+    }
 }
 
 /// support for printing the token
 impl<'a> fmt::Display for TokenStream<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let len = std::cmp::min(self.tokens.len(), 5);
         let mut tok = String::new();
-        for i in &self.tokens[0..5] {
+        for i in &self.tokens[0..len] {
             tok.push_str(&format!("    - {}\n", i))
         }
         if self.tokens.len() > 5 {
-            tok.push_str("...\n")
+            tok.push_str("    - ...\n")
         }
         if self.tokens.len() <= 5 {
-            tok.push_str("<eof>\n")
+            tok.push_str("    - <eof>\n")
         }
 
         write!(
             f,
-            "Tokens[{}..{}:\n{}",
+            "Tokens[{}..{}]:\n{}",
             self.offset,
             self.offset + self.tokens.len(),
             tok
@@ -234,7 +288,7 @@ impl<'a> InputTake for TokenStream<'a> {
 impl<'a> Slice<RangeFull> for TokenStream<'a> {
     fn slice(&self, _: RangeFull) -> Self {
         // return a clone of our selves
-        self.clone()
+        *self
     }
 }
 
