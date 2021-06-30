@@ -23,4 +23,26 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-pub struct Ast;
+use std::fmt;
+
+pub struct Ast {}
+
+use crate::lexer::sourcepos::SourcePos;
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Import<'a> {
+    pub name: String,
+    pub pos: SourcePos<'a>,
+}
+
+impl<'a> Import<'a> {
+    pub fn new(name: String, pos: SourcePos<'a>) -> Self {
+        Import { name, pos }
+    }
+}
+
+impl<'a> fmt::Display for Import<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Import {}  ({:?})", self.name, self.pos.get_pos())
+    }
+}

@@ -26,7 +26,10 @@
 use custom_error::custom_error;
 
 pub mod ast;
-use self::ast::*;
+pub mod terminals;
+use ast::Ast;
+
+mod imports;
 
 use super::lexer::token::{Token, TokenStream};
 use super::lexer::Lexer;
