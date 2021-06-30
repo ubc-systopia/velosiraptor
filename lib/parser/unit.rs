@@ -27,14 +27,14 @@
 use nom::IResult;
 
 // get the tokens
-use crate::parser::terminals::{ident, colon, unit_keyword, lbrace, rbrace};
+use crate::parser::terminals::{colon, ident, lbrace, rbrace, unit_keyword};
 
 use crate::lexer::token::TokenStream;
 
-use nom::error::ErrorKind;
-use nom::{error_position, Err};
-use nom::sequence::{preceded, delimited};
 use nom::combinator::opt;
+use nom::error::ErrorKind;
+use nom::sequence::{delimited, preceded};
+use nom::{error_position, Err};
 
 use crate::parser::ast::Unit;
 
@@ -51,17 +51,19 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
     // ok, so we've seen the `unit` keyword, so the next must be an identifier.
     let (i1, unitname) = match ident(i1) {
         Ok((i, u)) => (i, u),
-        Err(_) => return Err(Err::Failure(error_position!(
-            input,
-            ErrorKind::AlphaNumeric
-        ))),
+        Err(_) => {
+            return Err(Err::Failure(error_position!(
+                input,
+                ErrorKind::AlphaNumeric
+            )))
+        }
     };
 
     // is it a derived type, then we may see a ` : type` clause
     let (i2, supertype) = match opt(preceded(colon, ident))(i1) {
         Ok((i, s)) => (i, s),
         // possibly check here for an error!
-        Err(_)   => (i1, None)
+        Err(_) => (i1, None),
     };
 
     // TODO: firmulate the body
@@ -70,10 +72,12 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
     // then we have the unit block, wrapped in curly braces
     let (i3, _) = match delimited(lbrace, unitbody, rbrace)(i2) {
         Ok((i, b)) => (i, b),
-        Err(_)     => return Err(Err::Failure(error_position!(
-            input,
-            ErrorKind::AlphaNumeric
-        ))),
+        Err(_) => {
+            return Err(Err::Failure(error_position!(
+                input,
+                ErrorKind::AlphaNumeric
+            )))
+        }
     };
 
     Ok((i3, Unit::new(unitname, supertype, input.get_pos())))

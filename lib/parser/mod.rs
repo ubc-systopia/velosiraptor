@@ -35,6 +35,8 @@ use import::import;
 mod unit;
 use unit::unit;
 
+mod state;
+
 use super::lexer::token::{Token, TokenStream};
 use super::lexer::Lexer;
 
@@ -48,7 +50,6 @@ custom_error! {#[derive(PartialEq)] pub ParserError
 pub struct Parser;
 
 use nom::multi::{many0, many1};
-
 
 impl Parser {
     pub fn parse_string<'a>(context: &str, string: &'a str) -> Result<Ast, ParserError> {
@@ -80,7 +81,7 @@ impl Parser {
         // a parsing unit consists of zero or more imports
         let (i1, _imports) = match many0(import)(tokstream) {
             Ok((r, i)) => (r, i),
-            Err(_)     => return Err(ParserError::ParserFailure)
+            Err(_) => return Err(ParserError::ParserFailure),
         };
 
         // there must be at least one unit definition

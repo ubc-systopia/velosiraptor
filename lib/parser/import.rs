@@ -23,21 +23,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// the used nom componets
-use nom::sequence::terminated;
+//! Import statement parsing
 
-// the result type
-use nom::IResult;
-
-// get the tokens
+// lexer, parser terminals and ast
+use crate::lexer::token::TokenStream;
+use crate::parser::ast::Import;
 use crate::parser::terminals::{ident, import_keyword, semicolon};
 
-use crate::lexer::token::TokenStream;
-
+// the used nom componets
 use nom::error::ErrorKind;
-use nom::{error_position, Err};
-
-use crate::parser::ast::Import;
+use nom::sequence::terminated;
+use nom::{error_position, Err, IResult};
 
 /// parses and consumes an import statement (`import foo;`) and any following whitespaces
 pub fn import(input: TokenStream) -> IResult<TokenStream, Import> {
