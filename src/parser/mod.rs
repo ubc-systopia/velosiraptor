@@ -38,20 +38,20 @@ use std::path::PathBuf;
 //     IResult,
 // };
 
-mod comments;
+// mod comments;
 
-mod sourcepos;
-use sourcepos::SourcePos;
+// mod sourcepos;
+// use sourcepos::SourcePos;
 
-mod file;
-use file::parse_file;
+// mod file;
+// use file::parse_file;
 
-mod ast;
-mod identifier;
-mod imports;
-mod state;
-mod tokens;
-mod unit;
+// mod ast;
+// mod identifier;
+// mod imports;
+// mod state;
+// mod tokens;
+// mod unit;
 
 use custom_error::custom_error;
 

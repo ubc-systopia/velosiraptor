@@ -9,8 +9,8 @@ use clap::{App, Arg};
 use simplelog::{Config, LevelFilter, SimpleLogger};
 
 // get the parser module
-mod parser;
-use parser::Parser;
+// mod parser;
+// use parser::Parser;
 
 fn parse_cmdline() -> clap::ArgMatches<'static> {
     App::new("vtrc")
@@ -68,18 +68,36 @@ fn main() {
     log::trace!("Tracing output enabled");
 
     // let's try to create a file parser
-    let mut parser = Parser::from_file(infile.to_string()).expect("failed to construct the parser");
+    // let mut parser = Parser::from_file(infile.to_string()).expect("failed to construct the parser");
 
-    // parse the file
-    let err = parser.parse();
-    if err.is_err() {
-        log::error!("Parsing failed.");
-    }
-    // resolve the import statements
-    let err = parser.resolve_imports();
-    if err.is_err() {
-        log::error!("Failed to resolve imports.");
-    }
+    // // parse the file
+    // let err = parser.parse();
+    // if err.is_err() {
+    //     log::error!("Parsing failed.");
+    // }
+    // // resolve the import statements
+    // let err = parser.resolve_imports();
+    // if err.is_err() {
+    //     log::error!("Failed to resolve imports.");
+    // }
 
     // perform checks
 }
+
+// use std::rc::Rc;
+// struct Foo {
+//     s : Rc<String>
+// }
+// struct Bar {
+//     s: Rc<String>,
+//     f: Foo,
+// }
+// impl Bar {
+//     fn new() -> Self {
+//         let s = Rc::new("test".to_string());
+//         Bar {
+//             s: s.clone(),
+//             f : Foo {s: s.clone()}
+//         }
+//     }
+// }

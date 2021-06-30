@@ -46,12 +46,15 @@ pub fn parse_unit(input: SourcePos) -> IResult<SourcePos, Unit> {
     // try to match the input keyword, there is no match, return.
     let input = match tag(tokens::UNIT)(input) {
         Ok((input, _)) => input,
-        Err(x) => return Err(x),
+        Err(x) => {
+            println!("unit key word expected: {}", input);
+            return Err(x);
+        }
     };
 
     // ok, so we've seen the `unit` keyword, so the next must be an identifier.
     // there should be at least one whitespace before the identifier
-    let (input, ident) = match preceded(multispace1, parse_identifier)(input) {
+    let (input, ident) = match delimited(multispace1, parse_identifier, multispace1)(input) {
         Ok((remainder, ident)) => (remainder, ident),
         Err(x) => {
             println!("parsing error: identifier expected.");
@@ -67,7 +70,10 @@ pub fn parse_unit(input: SourcePos) -> IResult<SourcePos, Unit> {
         tag(tokens::BLOCK_END),
     )(input)
     {
-        Ok((remainder, _)) => Ok((remainder, Unit::new(ident, pos))),
+        Ok((remainder, _)) => {
+            println!("parsed unit!");
+            Ok((remainder, Unit::new(ident, pos)))
+        }
         Err(x) => {
             println!("parsing error: '{}' expected.", tokens::EOS);
             println!("{}", input);
