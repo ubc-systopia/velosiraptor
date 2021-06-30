@@ -30,7 +30,7 @@ use nom::sequence::terminated;
 use nom::IResult;
 
 // get the tokens
-use crate::parser::terminals::{identifier, import, semicolon};
+use crate::parser::terminals::{ident, import_keyword, semicolon};
 
 use crate::lexer::token::TokenStream;
 
@@ -40,18 +40,16 @@ use nom::{error_position, Err};
 use crate::parser::ast::Import;
 
 /// parses and consumes an import statement (`import foo;`) and any following whitespaces
-pub fn parse_import(input: TokenStream) -> IResult<TokenStream, Import> {
-    // try to parse the
-
+pub fn import(input: TokenStream) -> IResult<TokenStream, Import> {
     // try to match the input keyword, there is no match, return.
-    let i1 = match import(input) {
+    let i1 = match import_keyword(input) {
         Ok((input, _)) => input,
         Err(x) => return Err(x),
     };
 
     // ok, so we've seen the `import` keyword, so the next must be an identifier.
     // there should be at least one whitespace before the identifier
-    match terminated(identifier, semicolon)(i1) {
+    match terminated(ident, semicolon)(i1) {
         Ok((r, ident)) => Ok((r, Import::new(ident, input.get_pos()))),
         Err(_) => Err(Err::Failure(error_position!(
             input,
@@ -84,7 +82,7 @@ fn test_ok() {
     let ts = TokenStream::from_slice(&tokens);
 
     assert_eq!(
-        parse_import(ts),
+        import(ts),
         Ok((
             ts.slice(3..),
             Import {
@@ -108,31 +106,7 @@ fn test_errors() {
     let ts = TokenStream::from_slice(&tokens);
 
     assert_eq!(
-        parse_import(ts),
+        import(ts),
         Err(Err::Failure(error_position!(ts, ErrorKind::AlphaNumeric)))
     );
 }
-
-// #[test]
-// fn parse_import_newlines() {
-//     assert_eq!(
-//         parse_import(SourcePos::new("stdin", "import\nfoo\n;")),
-//         Ok((
-//             SourcePos::new_at("stdin", "", 12, 3, 2),
-//             Import {
-//                 filename: "foo".to_string(),
-//                 pos: (1, 1)
-//             }
-//         ))
-//     );
-// }
-
-// #[test]
-// fn parse_import_syntax_error_eos() {
-//     assert!(parse_import(SourcePos::new("stdin", "import foo bar")).is_err());
-// }
-
-// #[test]
-// fn parse_import_syntax_error_ident() {
-//     assert!(parse_import(SourcePos::new("stdin", "import ;")).is_err());
-// }
