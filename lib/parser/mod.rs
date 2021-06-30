@@ -23,5 +23,48 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+use custom_error::custom_error;
+
 pub mod ast;
 use self::ast::*;
+
+use super::lexer::token::{Token, TokenStream};
+use super::lexer::Lexer;
+
+// custom error definitions
+custom_error! {#[derive(PartialEq)] pub ParserError
+  LexerFailure               = "The lexer failed on the file.",
+  ParserFailure              = "The parser has failed",
+  NotYetImplemented          = "Not Yet Implemented"
+}
+
+pub struct Parser;
+
+impl Parser {
+    pub fn parse_string<'a>(context: &str, string: &'a str) -> Result<Ast, ParserError> {
+        log::info!("creating string parser");
+        let tokens = match Lexer::lex_string(context, string) {
+            Ok(toks) => toks,
+            Err(_x) => return Err(ParserError::LexerFailure),
+        };
+        Parser::parse_tokens(&tokens)
+    }
+
+    // pub fn parse_file<'a>(filename: &'a str) -> Result<(Ast,  &'a str), ParserError> {
+    //     log::info!("creating file parser for '{}'", filename);
+    //     let (tokens, content) = match Lexer::lex_file(filename) {
+    //         Ok((tokens, content)) => (tokens, content),
+    //         Err(_x) => return Err(ParserError::LexerFailure)
+    //     };
+
+    //     match Parser::parse_tokens(&tokens) {
+    //         Ok(ast) => Ok((ast, &content)),
+    //         Err(x)  => Err(x)
+    //     }
+    // }
+
+    pub fn parse_tokens<'a>(tokens: &[Token<'a>]) -> Result<Ast, ParserError> {
+        let _tokstream = TokenStream::from_slice(&tokens);
+        Err(ParserError::NotYetImplemented)
+    }
+}

@@ -73,15 +73,12 @@ pub enum TokenContent {
 #[derive(PartialEq, Debug, Clone)]
 pub struct Token<'a> {
     pub content: TokenContent,
-    pub spos: SourcePos<'a>
+    pub spos: SourcePos<'a>,
 }
 
 impl<'a> Token<'a> {
     fn new(content: TokenContent, spos: SourcePos<'a>) -> Self {
-        Token {
-            content,
-            spos,
-        }
+        Token { content, spos }
     }
 }
 

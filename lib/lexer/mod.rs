@@ -27,6 +27,7 @@
 
 use custom_error::custom_error;
 use std::fs;
+#[cfg(test)]
 use std::path::PathBuf;
 
 pub mod token;
@@ -42,85 +43,29 @@ custom_error! {#[derive(PartialEq)] pub LexerError
 }
 
 /// represents the lexer state
-pub struct Lexer<'a> {
-    /// the filename that is being parser
-    filename: String,
+pub struct Lexer;
 
-    /// the contents of this file
-    filecontents: String,
-
-    ///
-    tokens: Vec<Token<'a>>,
-}
-
-impl<'a> Lexer<'a> {
-    ///
-    pub fn new(filename: String, filecontents: String) -> Result<Lexer<'a>, LexerError> {
-        Ok(Lexer {
-            filename,
-            filecontents,
-            tokens: Vec::new(),
-        })
+impl Lexer {
+    pub fn lex_string<'a>(context: &'a str, string: &'a str) -> Result<Vec<Token<'a>>, LexerError> {
+        let sp = SourcePos::new(context, string);
+        Ok(Vec::new())
     }
 
-    pub fn from_string(contents: String) -> Result<Lexer<'a>, LexerError> {
-        log::info!("creating string parser");
-        Lexer::new("<stdio>".to_string(), contents)
-    }
-
-    pub fn from_file(filename: String) -> Result<Lexer<'a>, LexerError> {
-        log::info!("creating file parser for '{}'", filename);
-        let file_contents = fs::read_to_string(&filename);
-        let contents = match file_contents {
-            Ok(s) => s,
-            _ => {
-                log::error!("could not read the file '{}'", filename);
-                return Err(LexerError::ReadSourceFile { file: filename });
-            }
-        };
-        Lexer::new(filename, contents)
-    }
-
-    /// performs the lexing of the tokens
-    pub fn lex_tokens(&mut self) -> Result<(), LexerError> {
-        log::info!("parsing: {}", self.filename);
-        log::debug!("<contents>");
-        log::debug!("{}", &self.filecontents);
-        log::debug!("<contents>");
-
-        // create the source position struct
-        let sp = SourcePos::new(&self.filename, &self.filecontents);
-
-        // call lexer here...
-
-        Ok(())
-    }
-
-    pub fn filter_comments(&mut self)  -> () {
-        let mut i = 0;
-        while i < self.tokens.len() {
-            match self.tokens[i].content {
-                TokenContent::Comment(_) 
-                    | TokenContent::BlockComment(_) => { self.tokens.remove(i); },
-                _ => { i += 1; },
-            };
-        }
-    }
-
-    pub fn get_tokens(&self) -> Result<&[Token<'a>], LexerError> {
-        if self.tokens.is_empty() {
-            Err(LexerError::NoTokens)
-        } else {
-            Ok(self.tokens.as_slice())
-        }
-    }
-
-    pub fn get_token_stream(&self) -> Result<TokenStream, LexerError> {
-        match self.get_tokens() {
-            Ok(t) => Ok(TokenStream::from_slice(t)),
-            Err(x) => Err(x),
-        }
-    }
+    // pub fn lex_file<'a>(filename: &'a str) -> Result<(Vec<Token<'a>>, &'a str), LexerError> {
+    //     log::info!("creating file parser for '{}'", filename);
+    //     let file_contents = fs::read_to_string(&filename);
+    //     let contents = match file_contents {
+    //         Ok(s) => s,
+    //         _ => {
+    //             log::error!("could not read the file '{}'", filename);
+    //             return Err(LexerError::ReadSourceFile { file: filename.to_string() });
+    //         }
+    //     };
+    //     match Lexer::lex_string(filename, &contents) {
+    //         Ok(toks) => Ok((toks, contents)),
+    //         Err(x) => Err(x),
+    //     }
+    // }
 }
 
 #[test]
@@ -134,11 +79,10 @@ fn import_tests() {
         let filename = format!("{}", d.display());
 
         // create the lexer
-        let mut lexer = Lexer::from_file(filename).expect("failed to construct the parser");
+        let err = Lexer::lex_file(&filename);
+        assert!(err.is_ok());
 
         // lex the file
-        let err = lexer.lex_tokens();
-        assert!(err.is_ok());
 
         d.pop();
     }
