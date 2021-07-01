@@ -32,10 +32,9 @@
 //! The SourcePos structure implements several traits used by Nom so we can simply pass
 //! the SourcePos struct as input/outputs.
 
-// for reading the file
-//use std::fs;
-
+use std::fmt;
 use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
+use std::rc::Rc;
 
 use nom::{
     Compare, CompareResult, Err, FindSubstring, IResult, InputIter, InputLength, InputTake,
@@ -47,123 +46,335 @@ use nom::error::{ErrorKind, ParseError};
 /// Corresponds to a single byte of the source file
 pub type Element = char;
 
-/// The source file type, as an array of bytes.
-pub type Content<'a> = &'a str;
+/// The SourcePos tracks the position and content of the string to be lexed
+///
+/// This structures keeps track of the context (e.g., file name) as well as the
+/// current range of the SourcePos within the lexing context as a range of bytes.
+/// Moreover, we keep track on the line and column.
+#[derive(Debug, PartialEq, Clone)]
+pub struct SourcePos {
+    /// The context of the SourcePos. This might be a file name or "STDIO"
+    context: Rc<String>,
 
-/// SourcePos structure as input/output to parser combinators
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub struct SourcePos<'a> {
-    /// The name of the file where the content of the source position comes from
-    /// or "STDIO" if it was supplied without a file.
-    pub filename: &'a str,
+    /// Holds a reference counted String objects holding the entire content
+    content: Rc<String>,
 
-    /// Holds the actual content of the that was parsed at this source position
-    content: Content<'a>,
+    /// Holds the valid range within the `content` string
+    range: Range<usize>,
 
-    /// The byte offset from the start of the file or supplied input string.
-    pub offset: usize,
+    /// The current line of this SourcePos relative to the context. Starting from 1.
+    line: u32,
 
-    /// Line offset into the file or supplied input string, starting from 1.
-    pub line: u32,
-
-    /// Column number into the starting line. First column is 1.
-    pub column: u32,
+    /// The current column within the current line. Starting from 1.
+    column: u32,
 }
 
-impl<'a> SourcePos<'a> {
-    /// Constructor of a new SourcePos with a given input and filename.
-    /// The meta data of the SourcePos is initialized with the default values
-    /// for the `offset`, `line`, and `column`
-    pub fn new(filename: &'a str, content: Content<'a>) -> Self {
-        Self::new_at(filename, content, 0, 1, 1)
+/// The SourcePos implemetation
+impl SourcePos {
+    /// Constructor of a new SourcePos with a given input and context.
+    ///
+    /// It will create new, reference-counted String objects for the context and
+    /// the content.
+    ///
+    /// The meta data of the SourcePos is initialized with the default values:
+    ///  - it will start at line 1, column 1
+    ///  - the range will cover the entire content
+    ///
+    /// # Panics
+    ///
+    /// Panics if the supplied string is non-ascii.
+    pub fn new(context: &str, content: &str) -> Self {
+        Self::new_at(context, content, 0..content.len(), 1, 1)
     }
 
-    /// Constructs a new SourcePos from the supplied string
-    #[allow(dead_code)]
-    pub fn from_string(filename: &'a str, content: &'a str) -> Self {
-        SourcePos::new(filename, content)
-    }
-
-    /// Constructor for a new SourcePos at a given position
+    /// Constructor of a new SourcePos with a given input, context, and position.
+    ///
+    /// It will create new, reference-counted String objects for the context and
+    /// the content.
+    ///
+    /// The meta data of the SourcePos is initialized based on the supplied values.
+    /// The range must be valid (i.e., start < end and fall within the content)
+    ///
+    /// # Panics
+    ///
+    /// Panics if the supplied string is non-ascii.
     pub fn new_at(
-        filename: &'a str,
-        content: Content<'a>,
-        offset: usize,
+        context: &str,
+        content: &str,
+        range: Range<usize>,
         line: u32,
         column: u32,
     ) -> Self {
+        assert!(range.end <= content.len() && range.start <= range.end);
+        assert!(content.is_ascii());
         SourcePos {
-            filename,
-            content,
-            offset,
+            context: Rc::new(context.to_string()),
+            content: Rc::new(content.to_string()),
+            range,
             line,
             column,
         }
     }
 
-    /// Constructs a new SourcePos from the supplied string
-    #[allow(dead_code)]
+    /// Constructs a new SourcePos from the supplied, reference counted String object
+    ///
+    /// This function doesn't create new copies of the supplied strings.
+    ///
+    /// The meta data of the SourcePos is initialized with the default values:
+    ///  - it will start at line 1, column 1
+    ///  - the range will cover the entire content
+    ///
+    /// # Panics
+    ///
+    /// Panics if the supplied string is non-ascii.///
+    pub fn from_string(context: Rc<String>, content: Rc<String>) -> Self {
+        let len = content.len();
+        SourcePos::from_string_at(context, content, 0..len, 1, 1)
+    }
+
+    /// Constructor of a new SourcePos from the supplied, reference counted String at position.
+    ///
+    /// It will create new, reference-counted String objects for the context and
+    /// the content.
+    ///
+    /// The meta data of the SourcePos is initialized based on the supplied values.
+    /// The range must be valid (i.e., start < end and fall within the content)
+    ///
+    /// # Panics
+    ///
+    /// Panics if the supplied string is non-ascii.
+    ///
     pub fn from_string_at(
-        filename: &'a str,
-        content: &'a str,
-        offset: usize,
+        context: Rc<String>,
+        content: Rc<String>,
+        range: Range<usize>,
         line: u32,
         column: u32,
     ) -> Self {
-        Self::new_at(filename, content, offset, line, column)
+        assert!(range.start <= range.end);
+        assert!(range.end <= content.len());
+        assert!(content.is_ascii());
+        SourcePos {
+            context,
+            content,
+            range,
+            line,
+            column,
+        }
     }
 
-    /// Create a new, empty SourcePos
+    /// Constructs a new SourcePos covering a subrange of [self]
+    ///
+    /// This will construct a new SourcePos object with updated range, columns and lines,
+    /// but with the same context and content.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the supplied range is outside of the covered range by the SourcePos
+    pub fn from_self(&self, range: Range<usize>) -> Self {
+        assert!(self.input_len() >= range.end - range.start);
+        assert!(self.range.start + range.end <= self.range.end);
+
+        // the prefix range are the elements that are skipped
+        let prefix = self.range.start..self.range.start + range.start;
+
+        // the new range is the supplied range, shifted by the current range
+        let range = self.range.start + range.start..self.range.start + range.end;
+
+        // process characters in prefix, update line and columns accordingly
+        let mut line = self.line;
+        let mut column = self.column;
+        for c in self.content[prefix].chars() {
+            // it's either \n or \r\n
+            if c as char == '\n' {
+                line += 1;
+                column = 1;
+            } else {
+                column += 1;
+            }
+        }
+
+        // finally construct new SourcePos object
+        Self::from_string_at(
+            self.context.clone(),
+            self.content.clone(),
+            range,
+            line,
+            column,
+        )
+    }
+
+    /// Creates a new, empty SourcePos object
+    ///
+    /// This is equivalent to `SourcePos::new("stdio", "")`
     pub fn empty() -> Self {
         Self::new("stdio", "")
     }
 
+    /// Returns true if this SourcePos is empty.
+    ///
+    /// This is the case when the SourcePos covers the empty range.
     pub fn is_empty(&self) -> bool {
-        self.content.is_empty()
+        self.range.is_empty()
     }
 
-    /// Obtain the full content of the SourcePos as a slice
-    pub fn as_slice(&self) -> Content<'a> {
-        self.content
+    /// Obtains the contents fo the current SourcePos as a `& str`
+    ///
+    /// This will return a slice into the content given by the current range.
+    pub fn as_str(&self) -> &str {
+        &self.content[self.range.clone()]
     }
 
-    pub fn get_pos(&self) -> (u32, u32) {
+    /// Obtains the current position of this SourcePos in the content
+    ///
+    /// This returns a (line, column)-tuple.
+    pub fn input_pos(&self) -> (u32, u32) {
         (self.line, self.column)
     }
-}
 
-/// `Nom::InputLength` implementation for SourcePos (Nom-parser compat)
-impl<'a> InputLength for SourcePos<'a> {
-    /// Calculates the input length, as indicated by its name, and the name of the trait itself
-    fn input_len(&self) -> usize {
-        self.content.len()
+    /// Returns the current range within the content for this SourcePos.
+    ///
+    /// The range defines the current slice of the input content this SourcePos represents.
+    pub fn input_range(&self) -> Range<usize> {
+        self.range.clone()
+    }
+
+    /// Returns a string reference corresponding to the full input content of this SourcePos.
+    pub fn input_content(&self) -> &str {
+        &self.content
+    }
+
+    /// Returns a string reference of the context for this SourcePos.
+    pub fn input_context(&self) -> &str {
+        &self.context
     }
 }
 
-use std::str::CharIndices;
-use std::str::Chars;
+/// Implements the [nom::InputLength] trait for [SourcePos]
+impl InputLength for SourcePos {
+    /// Calculates the input length, as indicated by its name, and the name of the trait itself
+    fn input_len(&self) -> usize {
+        self.range.end - self.range.start
+    }
+}
 
-/// `Nomt::InputIter` implementation for SourcePos (Nom-parser compat)
-impl<'a> InputIter for SourcePos<'a> {
+/// Represents an Iterator over the SourcePos elements
+pub struct SourcePosIter {
+    /// A reference to the string object corresponding to the SourcePos
+    content: Rc<String>,
+
+    /// The current valid range of the iterator, the next element is given by [range.start]
+    range: Range<usize>,
+}
+
+/// Implementation of the SourcePos iterator
+impl SourcePosIter {
+    /// Creates a new SourcePos iterator
+    ///
+    /// # Panic
+    ///
+    /// The function will panic if the supplied range is outside backing content
+    pub fn new(content: Rc<String>, range: Range<usize>) -> Self {
+        assert!(content.len() < range.end);
+        SourcePosIter { content, range }
+    }
+}
+
+/// Implementation of the [std::iter::Iterator] trait for SourcePosIter
+impl Iterator for SourcePosIter {
+    /// The type of the element is the same as the SourcePos element
+    type Item = Element;
+
+    /// Advances the iterator and returns the next value.
+    ///
+    /// Returns [`None`] when iteration is finished.
+    fn next(&mut self) -> Option<Self::Item> {
+        // range is empty <--> iterator is finished.
+        if !self.range.is_empty() {
+            // record start and bump start value
+            let s = self.range.start;
+            self.range.start += 1;
+            // construct the element by taking the char
+            Some(self.content[s..].chars().next().unwrap())
+        } else {
+            None
+        }
+    }
+}
+
+/// Represents an Iterator over the SourcePos indices
+pub struct SourcePosIndices {
+    /// A reference to the string object corresponding to the SourcePos
+    content: Rc<String>,
+
+    /// The current valid range of the iterator, the next element is given by [range.start]
+    range: Range<usize>,
+
+    /// records the start index of this iterator
+    start: usize,
+}
+
+/// Implementation of the SourcePosIndices iterator
+impl SourcePosIndices {
+    /// Creates a new SourcePosIndices iterator
+    ///
+    /// # Panic
+    ///
+    /// The function will panic if the supplied range is outside backing content
+    pub fn new(content: Rc<String>, range: Range<usize>) -> Self {
+        assert!(content.len() < range.end);
+        let start = range.start;
+        SourcePosIndices {
+            content,
+            range,
+            start,
+        }
+    }
+}
+
+/// Implementation of the [std::iter::Iterator] trait for SourcePosIndices
+impl Iterator for SourcePosIndices {
+    /// Item type is a tuple of the index and the element at this index
+    type Item = (usize, Element);
+
+    /// Advances the iterator and returns the next value.
+    ///
+    /// Returns [`None`] when iteration is finished.
+    fn next(&mut self) -> Option<Self::Item> {
+        // range is empty <--> iterator is finished.
+        if !self.range.is_empty() {
+            // record start and bump start value
+            let s = self.range.start;
+            self.range.start += 1;
+            // construct the index and the element
+            Some((s - self.start, self.content[s..].chars().next().unwrap()))
+        } else {
+            None
+        }
+    }
+}
+
+/// Implements the [nom::InputIter] trait for [SourcePos]
+impl InputIter for SourcePos {
     /// The current input type is a sequence of that Item type.
     type Item = Element;
 
     /// An iterator over the input type, producing the item and its position for use with Slice.
-    type Iter = CharIndices<'a>;
+    type Iter = SourcePosIndices;
 
     /// An iterator over the input type, producing the item
-    type IterElem = Chars<'a>;
+    type IterElem = SourcePosIter;
 
-    /// Returns an iterator over the elements and their byte offsets
+    /// Returns the [SourcePosIndices] iterator over the elements and their byte offsets
     #[inline]
     fn iter_indices(&self) -> Self::Iter {
-        self.content.char_indices()
+        SourcePosIndices::new(self.content.clone(), self.range.clone())
     }
 
-    /// Returns an iterator over the elements
+    /// Returns the [SourcePosIter] iterator over the elements
     #[inline]
     fn iter_elements(&self) -> Self::IterElem {
-        self.content.chars()
+        SourcePosIter::new(self.content.clone(), self.range.clone())
     }
 
     /// Finds the byte position of the element
@@ -171,7 +382,7 @@ impl<'a> InputIter for SourcePos<'a> {
     where
         P: Fn(Self::Item) -> bool,
     {
-        for (o, c) in self.content.char_indices() {
+        for (o, c) in self.content[self.range.clone()].char_indices() {
             if predicate(c) {
                 return Some(o);
             }
@@ -182,71 +393,51 @@ impl<'a> InputIter for SourcePos<'a> {
     /// Get the byte offset from the element's position in the stream
     #[inline]
     fn slice_index(&self, count: usize) -> Result<usize, Needed> {
-        let mut cnt = 0;
-        for (index, _) in self.content.char_indices() {
-            if cnt == count {
-                return Ok(index);
-            }
-            cnt += 1;
-        }
-        if cnt == count {
-            return Ok(self.content.len());
-        }
-        Err(Needed::Unknown)
-    }
-}
-
-fn update_line_column(content: Content, line: u32, column: u32) -> (u32, u32) {
-    let mut new_line = line;
-    let mut new_column = column;
-    for c in content.chars() {
-        if c as char == '\n' {
-            new_line += 1;
-            new_column = 1;
+        // in the ASCII string, every char is a byte thus we can just thake
+        // count if it falls within the length of the SourcePos
+        if self.input_len() >= count {
+            Ok(count)
         } else {
-            new_column += 1;
+            Err(Needed::Unknown)
         }
     }
-
-    (new_line, new_column)
 }
 
-/// `Nomt::InputTake` implementation for SourcePos (Nom-parser compat)
-impl<'a> InputTake for SourcePos<'a> {
-    /// Returns a slice of `count` bytes. panics if count > length
+/// Implementation of the [nom::InputTake] trait for [SourcePos]
+impl<'a> InputTake for SourcePos {
+    /// Returns a new [SourcePos] corresponding to the first [count] elements.
+    ///
+    /// # Panics
+    ///
+    /// The function panics if [count] > [self.input_len].
     #[inline]
     fn take(&self, count: usize) -> Self {
-        Self::new_at(
-            self.filename,
-            &self.content[0..count],
-            self.offset,
-            self.line,
-            self.column,
-        )
+        assert!(count <= self.input_len());
+        self.from_self(0..count)
     }
 
-    /// Split the stream at the `count` byte offset. panics if count > length
+    /// Splits the current SourcePos at [count] returning two new [SourcePos] objects.ErrorKind
+    ///
+    /// # Panics
+    ///
+    /// The function panics if [count] > [self.input_len].
     #[inline]
     fn take_split(&self, count: usize) -> (Self, Self) {
-        let (prefix, suffix) = self.content.split_at(count);
-        let p = Self::new_at(self.filename, prefix, self.offset, self.line, self.column);
+        assert!(count <= self.input_len());
+        // create the new SourcePos objects
+        let first = self.from_self(0..count);
+        let second = self.from_self(count..self.input_len());
 
-        let (line, column) = update_line_column(prefix, self.line, self.column);
+        // we sould not lose any data
+        assert_eq!(first.input_len() + second.input_len(), self.input_len());
 
-        let s = Self::new_at(
-            self.filename,
-            suffix,
-            self.offset + prefix.len(),
-            line,
-            column,
-        );
         // suffix goes first
-        (s, p)
+        (second, first)
     }
 }
 
-/// `Nomt::InputTakeAtPosition` implementation for SourcePos (Nom-parser compat)
-impl<'a> InputTakeAtPosition for SourcePos<'a> {
+/// Implementation of the [nom::InputTakeAtPosition] trait for [SourcePos]
+impl InputTakeAtPosition for SourcePos {
     /// The current input type is a sequence of that Item type.
     type Item = Element;
 
@@ -269,7 +460,7 @@ impl<'a> InputTakeAtPosition for SourcePos<'a> {
         P: Fn(Self::Item) -> bool,
     {
         match self.content.find(predicate) {
-            Some(0) => Err(Err::Error(E::from_error_kind(*self, e))),
+            Some(0) => Err(Err::Error(E::from_error_kind(self.clone(), e))),
             Some(i) => Ok(self.take_split(i)),
             None => Err(Err::Incomplete(Needed::new(1))),
         }
@@ -297,11 +488,11 @@ impl<'a> InputTakeAtPosition for SourcePos<'a> {
         P: Fn(Self::Item) -> bool,
     {
         match self.content.find(predicate) {
-            Some(0) => Err(Err::Error(E::from_error_kind(*self, e))),
+            Some(0) => Err(Err::Error(E::from_error_kind(self.clone(), e))),
             Some(i) => Ok(self.take_split(i)),
             None => {
                 if self.is_empty() {
-                    Err(Err::Error(E::from_error_kind(*self, e)))
+                    Err(Err::Error(E::from_error_kind(self.clone(), e)))
                 } else {
                     Ok(self.take_split(self.input_len()))
                 }
@@ -310,120 +501,105 @@ impl<'a> InputTakeAtPosition for SourcePos<'a> {
     }
 }
 
-/// `Nomt::InputTakeAtPosition` implementation for SourcePos (Nom-parser compat)
-impl<'a> Slice<RangeFull> for SourcePos<'a> {
+/// Implementation of the [nom::Slice] trait ([RangeFull]) for [SourcePos]
+impl<'a> Slice<RangeFull> for SourcePos {
+    /// Slices self according to the range argument
+    #[inline]
     fn slice(&self, _: RangeFull) -> Self {
         // the full range, just return self here
-        *self
+        self.clone()
     }
 }
 
-impl<'a> Slice<Range<usize>> for SourcePos<'a> {
+/// Implementation of the [nom::Slice] trait ([Range]) for [SourcePos]
+impl<'a> Slice<Range<usize>> for SourcePos {
+    /// Slices self according to the range argument
+    ///
+    /// # Panics
+    ///
+    /// The function panics if the supplied end range exceeds the current
+    /// input length of SourcePos.
+    #[inline]
     fn slice(&self, range: Range<usize>) -> Self {
-        // get the new range
-        let start = range.start;
-        let new_content = &self.content[range];
-
-        // no change in content, just return self
-        if new_content == self.content {
-            return *self;
-        }
-
-        // the start is 0, so we can just return the new span with the same offsets etc
-        if start == 0 {
-            return Self::new_at(
-                self.filename,
-                new_content,
-                self.offset,
-                self.line,
-                self.column,
-            );
-        }
-
-        // workout the new column and content index
-        let (line, column) = update_line_column(&self.content[..start], self.line, self.column);
-
-        // return the new SourcePos
-        Self::new_at(
-            self.filename,
-            new_content,
-            self.offset + start,
-            line,
-            column,
-        )
+        assert!(range.end <= self.input_len());
+        self.from_self(range)
     }
 }
 
-impl<'a> Slice<RangeTo<usize>> for SourcePos<'a> {
+/// Implementation of the [nom::Slice] trait ([RangeTo]) for [SourcePos]
+impl<'a> Slice<RangeTo<usize>> for SourcePos {
+    /// Slices self according to the range argument
+    ///
+    /// # Panics
+    ///
+    /// The function panics if the supplied end range exceeds the current
+    /// input length of SourcePos.
+    #[inline]
     fn slice(&self, range: RangeTo<usize>) -> Self {
-        // return the slice from 0..range.end
         self.slice(0..range.end)
     }
 }
 
-impl<'a> Slice<RangeFrom<usize>> for SourcePos<'a> {
+/// Implementation of the [nom::Slice] trait ([RangeFrom]) for [SourcePos]
+impl<'a> Slice<RangeFrom<usize>> for SourcePos {
+    /// Slices self according to the range argument
+    ///
+    /// # Panics
+    ///
+    /// The function panics if the supplied end range exceeds the current
+    /// input length of SourcePos.
+    #[inline]
     fn slice(&self, range: RangeFrom<usize>) -> Self {
-        // return the slice from range.start..content.len
-        self.slice(range.start..self.content.len())
+        self.slice(range.start..self.input_len())
     }
 }
 
-/// `Nom::Compare` implementation for SourcePos (Nom-parser compat)
-impl<'a, 'b> Compare<Content<'b>> for SourcePos<'a> {
+/// Implementation of the [nom::Compare] trait for [SourcePos]
+impl Compare<&str> for SourcePos {
     /// Compares self to another value for equality
-    fn compare(&self, t: &'b str) -> CompareResult {
-        self.content.as_bytes().compare(t.as_bytes())
+    fn compare(&self, t: &str) -> CompareResult {
+        let s: &str = self.as_str();
+        s.compare(t)
     }
 
     /// Compares self to another value for equality independently of the case.
-    fn compare_no_case(&self, t: &'b str) -> CompareResult {
-        let pos = self
-            .content
-            .chars()
-            .zip(t.chars())
-            .position(|(a, b)| a.to_lowercase().ne(b.to_lowercase()));
-
-        match pos {
-            Some(_) => CompareResult::Error,
-            None => {
-                if self.content.len() >= t.len() {
-                    CompareResult::Ok
-                } else {
-                    CompareResult::Incomplete
-                }
-            }
-        }
+    fn compare_no_case(&self, t: &str) -> CompareResult {
+        let s: &str = self.as_str();
+        s.compare_no_case(t)
     }
 }
 
-/// `Nom::FindSubstring` implementation for SourcePos (Nom-parser compat)
-impl<'a, 'b> FindSubstring<Content<'b>> for SourcePos<'a> {
+/// Implementation of the [nom::FindSubstring] trait for [SourcePos]
+impl FindSubstring<&str> for SourcePos {
     /// Returns the byte position of the substring if it is found
-    fn find_substring(&self, substr: &'b str) -> Option<usize> {
+    fn find_substring(&self, substr: &str) -> Option<usize> {
         self.content.find(substr)
     }
 }
 
-use std::fmt;
-
-impl<'a> fmt::Display for SourcePos<'a> {
+/// Implementation of the [std::fmt::Display] trait for [SourcePos]
+impl<'a> fmt::Display for SourcePos {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
             "{}:{}:{}\n{}",
-            self.filename,
+            self.context,
             self.line,
             self.column,
-            String::from_utf8(Vec::from(self.content)).unwrap()
+            self.content[self.range.clone()].to_string()
         )
     }
 }
 
 #[test]
 fn sourcepos_tests() {
-    let sp0 = SourcePos::new("stdin", "foo\nbar\nfoobar");
-    let sp1 = SourcePos::new_at("stdin", "bar\nfoobar", 4, 2, 1);
+    let content = "foo\nbar\nfoobar";
+    let sp0 = SourcePos::new("stdin", content);
+    let sp1 = SourcePos::new_at("stdin", content, 4..content.len(), 2, 1);
     assert_eq!(sp0.slice(4..), sp1);
-    let sp2 = SourcePos::new_at("stdin", "foo\n", 0, 1, 1);
-    assert_eq!(sp0.slice(..4), sp2);
+    assert_eq!(sp0.slice(4..).as_str(), &content[4..]);
+
+    //
+    let sp2 = SourcePos::new_at("stdin", content, 0..content.len(), 1, 1);
+    assert_eq!(sp0.slice(..4).as_str(), "foo\n");
 }

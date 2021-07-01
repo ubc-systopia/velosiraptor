@@ -26,19 +26,17 @@
 //! Lexer Module of the Velosiraptor Compiler
 
 use custom_error::custom_error;
-
-#[cfg(test)]
-use std::path::PathBuf;
-#[cfg(test)]
 use std::fs;
-pub mod token;
-use self::token::*;
+use std::rc::Rc;
 
 pub mod sourcepos;
+pub mod token;
+
 use self::sourcepos::SourcePos;
+use self::token::*;
 
 // custom error definitions
-custom_error! {#[derive(PartialEq)] pub LexerError
+custom_error! { #[derive(PartialEq)] pub LexerError
   ReadSourceFile{ file: String } = "Could not read the source file",
   NoTokens                       = "No tokens found. Need to lex first"
 }
@@ -47,31 +45,64 @@ custom_error! {#[derive(PartialEq)] pub LexerError
 pub struct Lexer;
 
 impl Lexer {
-    pub fn lex_string<'a>(context: &'a str, string: &'a str) -> Result<Vec<Token<'a>>, LexerError> {
-        let sp = SourcePos::new(context, string);
+    /// Constructs a vector of Tokens corresponding to Lexemes for the SourcePos
+    ///
+    /// During the lexing process, all whitespace wil be dropped. Comments remain
+    /// as Tokens.
+    pub fn lex_source_pos(sp: SourcePos) -> Result<Vec<Token>, LexerError> {
+        log::debug!("start lexing...");
 
+        log::debug!("lexing done.");
         Ok(Vec::new())
     }
 
-    // pub fn lex_file<'a>(filename: &'a str) -> Result<(Vec<Token<'a>>, &'a str), LexerError> {
-    //     log::info!("creating file parser for '{}'", filename);
-    //     let file_contents = fs::read_to_string(&filename);
-    //     let contents = match file_contents {
-    //         Ok(s) => s,
-    //         _ => {
-    //             log::error!("could not read the file '{}'", filename);
-    //             return Err(LexerError::ReadSourceFile { file: filename.to_string() });
-    //         }
-    //     };
-    //     match Lexer::lex_string(filename, &contents) {
-    //         Ok(toks) => Ok((toks, contents)),
-    //         Err(x) => Err(x),
-    //     }
-    // }
+    /// Performs lexing on a supplied string and context.
+    ///
+    /// This function will create a new `SourcePos` for the supplied string, and
+    /// hence create a copy of the supplied string.
+    pub fn lex_string(context: &str, string: &str) -> Result<Vec<Token>, LexerError> {
+        log::info!("lexing stirng wtih context '{}'", context);
+        let sp = SourcePos::new(context, string);
+        Lexer::lex_source_pos(sp)
+    }
+
+    /// Performs lexing on a file given by the filename.
+    ///
+    /// Opens and reads the file contents, and lexes it. Besides a vector of tokens,
+    /// it also returns a reference-counded String of the file contents.
+    pub fn lex_file(filename: &str) -> Result<(Vec<Token>, Rc<String>), LexerError> {
+        log::info!("creating file parser for '{}'", filename);
+
+        // read the file
+        let file_contents = fs::read_to_string(&filename);
+
+        // create a new reference counted String object
+        let contents = match file_contents {
+            Ok(s) => Rc::new(s),
+            _ => {
+                log::error!("could not read the file '{}'", filename);
+                return Err(LexerError::ReadSourceFile {
+                    file: filename.to_string(),
+                });
+            }
+        };
+
+        // Create the new source position
+        let sp = SourcePos::from_string(Rc::new(filename.to_string()), contents.clone());
+
+        // lex it and return the result along with the file contents
+        match Lexer::lex_source_pos(sp) {
+            Ok(toks) => Ok((toks, contents)),
+            Err(x) => Err(x),
+        }
+    }
 }
 
+#[cfg(test)]
+use std::path::PathBuf;
+
 #[test]
-/// tests lexing of files
+/// test lexing of files
 fn import_tests() {
     let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     d.push("tests/lexer");
@@ -80,13 +111,9 @@ fn import_tests() {
         d.push(f);
         let filename = format!("{}", d.display());
 
-        let file_contents = fs::read_to_string(&filename).unwrap();
-
-        // create the lexer
-        let err = Lexer::lex_string(&filename, &file_contents);
-        assert!(err.is_ok());
-
         // lex the file
+        let err = Lexer::lex_file(&filename);
+        assert!(err.is_ok());
 
         d.pop();
     }
