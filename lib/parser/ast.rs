@@ -33,20 +33,20 @@ use crate::lexer::sourcepos::SourcePos;
 /// Defines an import statement
 ///
 #[derive(Debug, PartialEq, Clone)]
-pub struct Import<'a> {
+pub struct Import {
     pub name: String,
-    pub pos: SourcePos<'a>,
+    pub pos: SourcePos,
 }
 
-impl<'a> Import<'a> {
-    pub fn new(name: String, pos: SourcePos<'a>) -> Self {
+impl Import {
+    pub fn new(name: String, pos: SourcePos) -> Self {
         Import { name, pos }
     }
 }
 
-impl<'a> fmt::Display for Import<'a> {
+impl fmt::Display for Import {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Import {}  ({:?})", self.name, self.pos.get_pos())
+        write!(f, "Import {}  ({:?})", self.name, self.pos.input_pos())
     }
 }
 
@@ -54,23 +54,29 @@ impl<'a> fmt::Display for Import<'a> {
 /// Defines a translation unit
 ///
 #[derive(Debug, PartialEq, Clone)]
-pub struct Unit<'a> {
+pub struct Unit {
     pub name: String,
     pub derived: Option<String>,
-    pub pos: SourcePos<'a>,
+    pub pos: SourcePos,
 }
 
-impl<'a> Unit<'a> {
-    pub fn new(name: String, derived: Option<String>, pos: SourcePos<'a>) -> Self {
+impl Unit {
+    pub fn new(name: String, derived: Option<String>, pos: SourcePos) -> Self {
         Unit { name, derived, pos }
     }
 }
 
-impl<'a> fmt::Display for Unit<'a> {
+impl fmt::Display for Unit {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.derived {
-            Some(n) => write!(f, "Unit {} : {}  ({:?})", self.name, n, self.pos.get_pos()),
-            None => write!(f, "Unit {}  ({:?})", self.name, self.pos.get_pos()),
+            Some(n) => write!(
+                f,
+                "Unit {} : {}  ({:?})",
+                self.name,
+                n,
+                self.pos.input_pos()
+            ),
+            None => write!(f, "Unit {}  ({:?})", self.name, self.pos.input_pos()),
         }
     }
 }
@@ -111,15 +117,15 @@ impl<'a> fmt::Display for Unit<'a> {
 // }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct BitSlice<'a> {
+pub struct BitSlice {
     pub start: u16,
     pub end: u16,
     pub name: String,
-    pub pos: SourcePos<'a>,
+    pub pos: SourcePos,
 }
 
-impl<'a> BitSlice<'a> {
-    pub fn new(start: u16, end: u16, name: String, pos: SourcePos<'a>) -> Self {
+impl BitSlice {
+    pub fn new(start: u16, end: u16, name: String, pos: SourcePos) -> Self {
         BitSlice {
             start,
             end,
@@ -129,30 +135,30 @@ impl<'a> BitSlice<'a> {
     }
 }
 
-impl<'a> fmt::Display for BitSlice<'a> {
+impl fmt::Display for BitSlice {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "({:3}..{:3}, {})", self.start, self.end, &self.name)
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Field<'a> {
+pub struct Field {
     pub name: String,
     pub base: String,
     pub offset: u64,
     pub length: u64,
-    pub slices: Vec<BitSlice<'a>>,
-    pub pos: SourcePos<'a>,
+    pub slices: Vec<BitSlice>,
+    pub pos: SourcePos,
 }
 
-impl<'a> Field<'a> {
+impl Field {
     pub fn new(
         name: String,
         base: String,
         offset: u64,
         length: u64,
-        slices: Vec<BitSlice<'a>>,
-        pos: SourcePos<'a>,
+        slices: Vec<BitSlice>,
+        pos: SourcePos,
     ) -> Self {
         Field {
             name,
@@ -165,7 +171,7 @@ impl<'a> Field<'a> {
     }
 }
 
-impl<'a> fmt::Display for Field<'a> {
+impl fmt::Display for Field {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut entries = String::new();
 
