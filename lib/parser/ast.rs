@@ -135,51 +135,51 @@ impl<'a> fmt::Display for BitSlice<'a> {
     }
 }
 
-// #[derive(Debug, PartialEq, Clone)]
-// pub struct StateField {
-//     pub name: String,
-//     pub base: String,
-//     pub offset: u64,
-//     pub length: u64,
-//     pub bitmap: Vec<BitSlice>,
-//     pub pos: (u32, u32),
-// }
+#[derive(Debug, PartialEq, Clone)]
+pub struct Field<'a> {
+    pub name: String,
+    pub base: String,
+    pub offset: u64,
+    pub length: u64,
+    pub slices: Vec<BitSlice<'a>>,
+    pub pos: SourcePos<'a>,
+}
 
-// impl StateField {
-//     pub fn new(
-//         name: String,
-//         base: String,
-//         offset: u64,
-//         length: u64,
-//         bitmap: Vec<BitSlice>,
-//         pos: (u32, u32),
-//     ) -> Self {
-//         StateField {
-//             name,
-//             base,
-//             offset,
-//             length,
-//             bitmap,
-//             pos,
-//         }
-//     }
-// }
+impl<'a> Field<'a> {
+    pub fn new(
+        name: String,
+        base: String,
+        offset: u64,
+        length: u64,
+        slices: Vec<BitSlice<'a>>,
+        pos: SourcePos<'a>,
+    ) -> Self {
+        Field {
+            name,
+            base,
+            offset,
+            length,
+            slices,
+            pos,
+        }
+    }
+}
 
-// impl fmt::Display for StateField {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         let mut entries = String::new();
+impl<'a> fmt::Display for Field<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut entries = String::new();
 
-//         for b in &self.bitmap {
-//             entries.push_str(&format!("    {}\n", b))
-//         }
+        for b in &self.slices {
+            entries.push_str(&format!("    {}\n", b))
+        }
 
-//         write!(
-//             f,
-//             "    {} [{}, {}, {}] {{\n {}    }};\n",
-//             self.name, self.base, self.offset, self.length, entries
-//         )
-//     }
-// }
+        write!(
+            f,
+            "    {} [{}, {}, {}] {{\n {}    }};\n",
+            self.name, self.base, self.offset, self.length, entries
+        )
+    }
+}
 
 // pub enum State {
 //     MemoryState {

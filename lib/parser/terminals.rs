@@ -65,8 +65,8 @@ namedtag!(pub lparen, TokenContent::LParen);
 namedtag!(pub rparen, TokenContent::RParen);
 namedtag!(pub lbrace, TokenContent::LBrace);
 namedtag!(pub rbrace, TokenContent::RBrace);
-namedtag!(pub lbracket, TokenContent::LBracket);
-namedtag!(pub rbracket, TokenContent::RBracket);
+namedtag!(pub lbrack, TokenContent::LBracket);
+namedtag!(pub rbrack, TokenContent::RBracket);
 
 // operators
 namedtag!(pub plus, TokenContent::Plus);
