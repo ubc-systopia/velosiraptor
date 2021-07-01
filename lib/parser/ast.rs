@@ -70,9 +70,8 @@ impl<'a> fmt::Display for Unit<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.derived {
             Some(n) => write!(f, "Unit {} : {}  ({:?})", self.name, n, self.pos.get_pos()),
-            None    => write!(f, "Unit {}  ({:?})", self.name, self.pos.get_pos()),
+            None => write!(f, "Unit {}  ({:?})", self.name, self.pos.get_pos()),
         }
-
     }
 }
 
@@ -112,16 +111,16 @@ impl<'a> fmt::Display for Unit<'a> {
 // }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct BitMapEntry {
+pub struct BitSlice<'a> {
     pub start: u16,
     pub end: u16,
     pub name: String,
-    pub pos: (u32, u32),
+    pub pos: SourcePos<'a>,
 }
 
-impl BitMapEntry {
-    pub fn new(start: u16, end: u16, name: String, pos: (u32, u32)) -> Self {
-        BitMapEntry {
+impl<'a> BitSlice<'a> {
+    pub fn new(start: u16, end: u16, name: String, pos: SourcePos<'a>) -> Self {
+        BitSlice {
             start,
             end,
             name,
@@ -130,68 +129,68 @@ impl BitMapEntry {
     }
 }
 
-impl fmt::Display for BitMapEntry {
+impl<'a> fmt::Display for BitSlice<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "({:3}..{:3}, {})", self.start, self.end, &self.name)
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct StateField {
-    pub name: String,
-    pub base: String,
-    pub offset: u64,
-    pub length: u64,
-    pub bitmap: Vec<BitMapEntry>,
-    pub pos: (u32, u32),
-}
+// #[derive(Debug, PartialEq, Clone)]
+// pub struct StateField {
+//     pub name: String,
+//     pub base: String,
+//     pub offset: u64,
+//     pub length: u64,
+//     pub bitmap: Vec<BitSlice>,
+//     pub pos: (u32, u32),
+// }
 
-impl StateField {
-    pub fn new(
-        name: String,
-        base: String,
-        offset: u64,
-        length: u64,
-        bitmap: Vec<BitMapEntry>,
-        pos: (u32, u32),
-    ) -> Self {
-        StateField {
-            name,
-            base,
-            offset,
-            length,
-            bitmap,
-            pos,
-        }
-    }
-}
+// impl StateField {
+//     pub fn new(
+//         name: String,
+//         base: String,
+//         offset: u64,
+//         length: u64,
+//         bitmap: Vec<BitSlice>,
+//         pos: (u32, u32),
+//     ) -> Self {
+//         StateField {
+//             name,
+//             base,
+//             offset,
+//             length,
+//             bitmap,
+//             pos,
+//         }
+//     }
+// }
 
-impl fmt::Display for StateField {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut entries = String::new();
+// impl fmt::Display for StateField {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         let mut entries = String::new();
 
-        for b in &self.bitmap {
-            entries.push_str(&format!("    {}\n", b))
-        }
+//         for b in &self.bitmap {
+//             entries.push_str(&format!("    {}\n", b))
+//         }
 
-        write!(
-            f,
-            "    {} [{}, {}, {}] {{\n {}    }};\n",
-            self.name, self.base, self.offset, self.length, entries
-        )
-    }
-}
+//         write!(
+//             f,
+//             "    {} [{}, {}, {}] {{\n {}    }};\n",
+//             self.name, self.base, self.offset, self.length, entries
+//         )
+//     }
+// }
 
-pub enum State {
-    MemoryState {
-        bases: Vec<String>,
-        fields: Vec<StateField>,
-        pos: (u32, u32),
-    },
-    RegisterState {
-        bases: Vec<String>,
-        fields: Vec<StateField>,
-        pos: (u32, u32),
-    },
-    Dummy,
-}
+// pub enum State {
+//     MemoryState {
+//         bases: Vec<String>,
+//         fields: Vec<StateField>,
+//         pos: (u32, u32),
+//     },
+//     RegisterState {
+//         bases: Vec<String>,
+//         fields: Vec<StateField>,
+//         pos: (u32, u32),
+//     },
+//     Dummy,
+// }

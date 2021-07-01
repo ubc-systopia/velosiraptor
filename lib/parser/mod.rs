@@ -35,7 +35,8 @@ use import::import;
 mod unit;
 use unit::unit;
 
-mod state;
+//mod state;
+mod bitslice;
 
 use super::lexer::token::{Token, TokenStream};
 use super::lexer::Lexer;
