@@ -43,49 +43,46 @@ use nom::{error_position, Err, IResult};
 ///  ident [ident, num, num] { FIELDS };
 ///
 pub fn field(input: TokenStream) -> IResult<TokenStream, Field> {
+    // record the position of the field
+    let pos = input.input_sourcepos();
+
     // we first start of with an identifier,
     let (i1, name) = match ident(input) {
         Ok((rem, s)) => (rem, s),
         Err(x) => return Err(x),
     };
 
-    println!("{}", i1);
-
     // next we have the `[ident, num, num]`
     let mut fieldhdr = delimited(lbrack, tuple((ident, comma, num, comma, num)), rbrack);
-    let (i2, base, offset, length) = match fieldhdr(i1) {
+    let (i2, base, offset, length) = match fieldhdr(i1.clone()) {
         Ok((i, (b, _, o, _, l))) => (i, b, o, l),
         Err(e) => {
             // if we have parser failure, indicate this!
             let (i, k) = match e {
                 Err::Error(e) => (e.input, e.code),
-                _ => (i1, ErrorKind::AlphaNumeric),
+                Err::Failure(e) => (e.input, e.code),
+                Err::Incomplete(_) => (i1, ErrorKind::Eof),
             };
             return Err(Err::Failure(error_position!(i, k)));
         }
     };
-
-    println!("{}", i2);
 
     // we match two numbers and an identifier
-    let (rem, entries) = match delimited(lbrace, separated_list1(comma, bitslice), rbrace)(i2) {
-        Ok((rem, e)) => (rem, e),
-        Err(e) => {
-            // if we have parser failure, indicate this!
-            let (i, k) = match e {
-                Err::Error(e) => (e.input, e.code),
-                _ => (i2, ErrorKind::AlphaNumeric),
-            };
-            return Err(Err::Failure(error_position!(i, k)));
-        }
-    };
+    let (rem, entries) =
+        match delimited(lbrace, separated_list1(comma, bitslice), rbrace)(i2.clone()) {
+            Ok((rem, e)) => (rem, e),
+            Err(e) => {
+                // if we have parser failure, indicate this!
+                let (i, k) = match e {
+                    Err::Error(e) => (e.input, e.code),
+                    Err::Failure(e) => (e.input, e.code),
+                    Err::Incomplete(_) => (i2, ErrorKind::Eof),
+                };
+                return Err(Err::Failure(error_position!(i, k)));
+            }
+        };
 
-    println!("{}", rem);
-
-    Ok((
-        rem,
-        Field::new(name, base, offset, length, entries, input.get_pos()),
-    ))
+    Ok((rem, Field::new(name, base, offset, length, entries, pos)))
 }
 
 #[cfg(test)]
@@ -99,42 +96,36 @@ use crate::parser::ast::BitSlice;
 
 #[test]
 fn test_ok() {
+    let content = "foo [ base, 0, 1 ] { 0 16 foobar }";
+    let sp = SourcePos::new("stdio", content);
+
     let tokens = vec![
-        Token::new(
-            TokenContent::Identifier("foo".to_string()),
-            SourcePos::new("stdio", "foo"),
-        ),
-        Token::new(TokenContent::LBracket, SourcePos::new("stdio", "[")),
-        Token::new(
-            TokenContent::Identifier("base".to_string()),
-            SourcePos::new("stdio", "base"),
-        ),
-        Token::new(TokenContent::Comma, SourcePos::new("stdio", ",")),
-        Token::new(TokenContent::IntLiteral(0), SourcePos::new("stdio", "0")),
-        Token::new(TokenContent::Comma, SourcePos::new("stdio", ",")),
-        Token::new(TokenContent::IntLiteral(32), SourcePos::new("stdio", "0")),
-        Token::new(TokenContent::RBracket, SourcePos::new("stdio", "]")),
-        Token::new(TokenContent::LBrace, SourcePos::new("stdio", "{")),
-        Token::new(TokenContent::IntLiteral(0), SourcePos::new("stdio", "0")),
-        Token::new(
-            TokenContent::IntLiteral(16),
-            SourcePos::new_at("stdio", "16", 2, 3, 1),
-        ),
+        Token::new(TokenContent::Identifier("foo".to_string()), sp.slice(0..3)),
+        Token::new(TokenContent::LBracket, sp.slice(0..3)),
+        Token::new(TokenContent::Identifier("base".to_string()), sp.slice(0..3)),
+        Token::new(TokenContent::Comma, sp.slice(0..3)),
+        Token::new(TokenContent::IntLiteral(0), sp.slice(0..3)),
+        Token::new(TokenContent::Comma, sp.slice(0..3)),
+        Token::new(TokenContent::IntLiteral(32), sp.slice(0..3)),
+        Token::new(TokenContent::RBracket, sp.slice(0..3)),
+        Token::new(TokenContent::LBrace, sp.slice(0..3)),
+        Token::new(TokenContent::IntLiteral(0), sp.slice(0..3)),
+        Token::new(TokenContent::IntLiteral(16), sp.slice(0..3)),
         Token::new(
             TokenContent::Identifier("foobar".to_string()),
-            SourcePos::new_at("stdio", "foobar", 5, 6, 1),
+            sp.slice(0..3),
         ),
-        Token::new(TokenContent::RBrace, SourcePos::new("stdio", "}")),
+        Token::new(TokenContent::RBrace, sp.slice(0..3)),
     ];
     let ts = TokenStream::from_slice(&tokens);
     let fields = BitSlice {
         start: 0,
         end: 16,
         name: "foobar".to_string(),
-        pos: ts.slice(9..).get_pos(),
+        pos: ts.slice(9..).input_sourcepos(),
     };
     assert_eq!(
-        field(ts),
+        field(ts.clone()),
         Ok((
             ts.slice(13..),
             Field {
@@ -143,7 +134,7 @@ fn test_ok() {
                 offset: 0,
                 length: 32,
                 slices: vec![fields],
-                pos: ts.get_pos()
+                pos: ts.input_sourcepos()
             }
         ))
     );
@@ -151,44 +142,21 @@ fn test_ok() {
 
 #[test]
 fn test_err() {
+    let content = "foo [ base, 0, 1 ] { }";
+    let sp = SourcePos::new("stdio", content);
+
     let tokens = vec![
-        Token::new(
-            TokenContent::Identifier("foo".to_string()),
-            SourcePos::new("stdio", "foo"),
-        ),
-        Token::new(TokenContent::LBracket, SourcePos::new("stdio", "[")),
-        Token::new(
-            TokenContent::Identifier("base".to_string()),
-            SourcePos::new("stdio", "base"),
-        ),
-        Token::new(TokenContent::Comma, SourcePos::new("stdio", ",")),
-        Token::new(TokenContent::IntLiteral(0), SourcePos::new("stdio", "0")),
-        Token::new(TokenContent::Comma, SourcePos::new("stdio", ",")),
-        Token::new(TokenContent::IntLiteral(32), SourcePos::new("stdio", "0")),
-        Token::new(TokenContent::RBracket, SourcePos::new("stdio", "]")),
-        Token::new(TokenContent::LBrace, SourcePos::new("stdio", "{")),
+        Token::new(TokenContent::Identifier("foo".to_string()), sp.slice(0..3)),
+        Token::new(TokenContent::LBracket, sp.slice(0..3)),
+        Token::new(TokenContent::Identifier("base".to_string()), sp.slice(0..3)),
+        Token::new(TokenContent::Comma, sp.slice(0..3)),
+        Token::new(TokenContent::IntLiteral(0), sp.slice(0..3)),
+        Token::new(TokenContent::Comma, sp.slice(0..3)),
+        Token::new(TokenContent::IntLiteral(32), sp.slice(0..3)),
+        Token::new(TokenContent::RBracket, sp.slice(0..3)),
+        Token::new(TokenContent::LBrace, sp.slice(0..3)),
+        Token::new(TokenContent::RBrace, sp.slice(0..3)),
     ];
-
-    let token2 = vec![
-        Token::new(TokenContent::IntLiteral(0), SourcePos::new("stdio", "0")),
-        Token::new(
-            TokenContent::IntLiteral(16),
-            SourcePos::new_at("stdio", "16", 2, 3, 1),
-        ),
-        Token::new(
-            TokenContent::Identifier("foobar".to_string()),
-            SourcePos::new_at("stdio", "foobar", 5, 6, 1),
-        ),
-    ];
-
-    let token3 = vec![Token::new(
-        TokenContent::RBrace,
-        SourcePos::new("stdio", "}"),
-    )];
-
-    let mut t: Vec<Token> = Vec::new();
-    t.extend(tokens);
-    t.extend(token3);
-    let ts = TokenStream::from_slice(&t);
+    let ts = TokenStream::from_slice(&tokens);
     assert!(field(ts).is_err());
 }

@@ -36,7 +36,7 @@ use nom::error::ErrorKind;
 macro_rules! namedtag (
     ($vis:vis $name:ident, $tag: expr) => (
         $vis fn $name(input: TokenStream) -> IResult<TokenStream, ()> {
-            let (rem, tok) = try_parse!(input, take!(1));
+            let (rem, tok) = try_parse!(input.clone(), take!(1));
             // we need at least one token
             if tok.is_empty() {
                 Err(Err::Incomplete(Needed::new(1)))
@@ -77,7 +77,7 @@ namedtag!(pub rshift, TokenContent::RShift);
 namedtag!(pub equal, TokenContent::Equal);
 
 pub fn ident(input: TokenStream) -> IResult<TokenStream, String> {
-    let (rem, tok) = try_parse!(input, take!(1));
+    let (rem, tok) = try_parse!(input.clone(), take!(1));
     // we need at least one token
     if tok.is_empty() {
         Err(Err::Incomplete(Needed::new(1)))
@@ -91,7 +91,7 @@ pub fn ident(input: TokenStream) -> IResult<TokenStream, String> {
 }
 
 pub fn num(input: TokenStream) -> IResult<TokenStream, u64> {
-    let (rem, tok) = try_parse!(input, take!(1));
+    let (rem, tok) = try_parse!(input.clone(), take!(1));
     // we need at least one token
     if tok.is_empty() {
         Err(Err::Incomplete(Needed::new(1)))

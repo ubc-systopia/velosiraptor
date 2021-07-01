@@ -32,7 +32,6 @@ use crate::parser::terminals::{colon, ident, lbrace, rbrace, unit_keyword};
 use crate::lexer::token::TokenStream;
 
 use nom::combinator::opt;
-use nom::error::ErrorKind;
 use nom::sequence::{delimited, preceded};
 use nom::{error_position, Err};
 
@@ -40,7 +39,8 @@ use crate::parser::ast::Unit;
 
 /// parses and consumes an import statement (`unit foo {};`) and any following whitespaces
 pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
-    // try to parse the
+    // get the current position
+    let pos = input.input_sourcepos();
 
     // try to match the input keyword, there is no match, return.
     let i1 = match unit_keyword(input) {
@@ -51,11 +51,13 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
     // ok, so we've seen the `unit` keyword, so the next must be an identifier.
     let (i1, unitname) = match ident(i1) {
         Ok((i, u)) => (i, u),
-        Err(_) => {
-            return Err(Err::Failure(error_position!(
-                input,
-                ErrorKind::AlphaNumeric
-            )))
+        Err(e) => {
+            // if we have parser failure, indicate this!
+            let (i, k) = match e {
+                Err::Error(e) => (e.input, e.code),
+                x => panic!("unkown condition: {:?}", x),
+            };
+            return Err(Err::Failure(error_position!(i, k)));
         }
     };
 
@@ -63,7 +65,14 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
     let (i2, supertype) = match opt(preceded(colon, ident))(i1) {
         Ok((i, s)) => (i, s),
         // possibly check here for an error!
-        Err(_) => (i1, None),
+        Err(e) => {
+            // if we have parser failure, indicate this!
+            let (i, k) = match e {
+                Err::Error(e) => (e.input, e.code),
+                x => panic!("unkown condition: {:?}", x),
+            };
+            return Err(Err::Failure(error_position!(i, k)));
+        }
     };
 
     // TODO: firmulate the body
@@ -72,13 +81,15 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
     // then we have the unit block, wrapped in curly braces
     let (i3, _) = match delimited(lbrace, unitbody, rbrace)(i2) {
         Ok((i, b)) => (i, b),
-        Err(_) => {
-            return Err(Err::Failure(error_position!(
-                input,
-                ErrorKind::AlphaNumeric
-            )))
+        Err(e) => {
+            // if we have parser failure, indicate this!
+            let (i, k) = match e {
+                Err::Error(e) => (e.input, e.code),
+                x => panic!("unkown condition: {:?}", x),
+            };
+            return Err(Err::Failure(error_position!(i, k)));
         }
     };
 
-    Ok((i3, Unit::new(unitname, supertype, input.get_pos())))
+    Ok((i3, Unit::new(unitname, supertype, pos)))
 }

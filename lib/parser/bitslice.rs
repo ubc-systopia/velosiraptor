@@ -31,7 +31,7 @@ use crate::parser::ast::BitSlice;
 use crate::parser::terminals::{ident, num};
 
 // the used nom componets
-use nom::error::ErrorKind;
+use crate::nom::error::ErrorKind;
 use nom::sequence::tuple;
 use nom::{error_position, Err, IResult};
 
@@ -39,8 +39,11 @@ use nom::{error_position, Err, IResult};
 ///
 ///
 pub fn bitslice(input: TokenStream) -> IResult<TokenStream, BitSlice> {
+    // record the position
+    let pos = input.input_sourcepos();
+
     // the first thing here shall be a number
-    let (i1, start) = match num(input) {
+    let (i1, start) = match num(input.clone()) {
         Ok((rem, s)) => (rem, s),
         Err(x) => return Err(x),
     };
@@ -52,16 +55,14 @@ pub fn bitslice(input: TokenStream) -> IResult<TokenStream, BitSlice> {
             // if we have parser failure, indicate this!
             let (i, k) = match e {
                 Err::Error(e) => (e.input, e.code),
-                _ => (i1, ErrorKind::AlphaNumeric),
+                Err::Failure(e) => (e.input, e.code),
+                Err::Incomplete(_) => (input, ErrorKind::Eof),
             };
             return Err(Err::Failure(error_position!(i, k)));
         }
     };
 
-    Ok((
-        rem,
-        BitSlice::new(start as u16, end as u16, name, input.get_pos()),
-    ))
+    Ok((rem, BitSlice::new(start as u16, end as u16, name, pos)))
 }
 
 #[cfg(test)]
@@ -74,67 +75,64 @@ use crate::nom::Slice;
 #[test]
 fn test_ok() {
     // corresponds to `0 16 foobar`
+    let content = "0 16 foobar";
+    let sp = SourcePos::new("stdio", content);
     let tokens = vec![
-        Token::new(TokenContent::IntLiteral(0), SourcePos::new("stdio", "0")),
-        Token::new(
-            TokenContent::IntLiteral(16),
-            SourcePos::new_at("stdio", "16", 2, 3, 1),
-        ),
+        Token::new(TokenContent::IntLiteral(0), sp.slice(0..1)),
+        Token::new(TokenContent::IntLiteral(16), sp.slice(2..4)),
         Token::new(
             TokenContent::Identifier("foobar".to_string()),
-            SourcePos::new_at("stdio", "foobar", 5, 6, 1),
+            sp.slice(4..11),
         ),
     ];
     let ts = TokenStream::from_slice(&tokens);
-
+    let pos = ts.input_sourcepos();
+    let ts2 = ts.slice(3..);
     assert_eq!(
         bitslice(ts),
         Ok((
-            ts.slice(3..),
+            ts2,
             BitSlice {
                 start: 0,
                 end: 16,
                 name: "foobar".to_string(),
-                pos: ts.get_pos()
+                pos
             }
         ))
     );
 }
+
 #[test]
 fn test_err() {
     // corresponds to `0 foobar` missing end bit
+    let content = "0 foobar";
+    let sp = SourcePos::new("stdio", content);
+
     let tokens = vec![
-        Token::new(TokenContent::IntLiteral(0), SourcePos::new("stdio", "0")),
+        Token::new(TokenContent::IntLiteral(0), sp.slice(0..1)),
         Token::new(
             TokenContent::Identifier("foobar".to_string()),
-            SourcePos::new_at("stdio", "foobar", 5, 6, 1),
+            sp.slice(2..8),
         ),
     ];
     let ts = TokenStream::from_slice(&tokens);
-
+    let ts2 = ts.slice(1..);
     assert_eq!(
         bitslice(ts),
-        Err(Err::Failure(error_position!(
-            ts.slice(1..),
-            ErrorKind::Digit
-        )))
+        Err(Err::Failure(error_position!(ts2, ErrorKind::Digit)))
     );
 
     // corresponds to `0 16`  missing identifier
+    let content = "0 16";
+    let sp = SourcePos::new("stdio", content);
     let tokens = vec![
-        Token::new(TokenContent::IntLiteral(0), SourcePos::new("stdio", "0")),
-        Token::new(
-            TokenContent::IntLiteral(16),
-            SourcePos::new_at("stdio", "16", 2, 3, 1),
-        ),
+        Token::new(TokenContent::IntLiteral(0), sp.slice(0..1)),
+        Token::new(TokenContent::IntLiteral(16), sp.slice(2..4)),
     ];
     let ts = TokenStream::from_slice(&tokens);
-
+    let ts2 = ts.slice(0..);
     assert_eq!(
         bitslice(ts),
-        Err(Err::Failure(error_position!(
-            ts.slice(1..),
-            ErrorKind::AlphaNumeric
-        )))
+        Err(Err::Failure(error_position!(ts2, ErrorKind::Eof)))
     );
 }
