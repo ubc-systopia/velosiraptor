@@ -29,9 +29,11 @@ use custom_error::custom_error;
 use std::fs;
 use std::rc::Rc;
 
+mod comments;
 pub mod sourcepos;
 pub mod token;
 
+use self::comments::*;
 use self::sourcepos::SourcePos;
 use self::token::*;
 
@@ -109,7 +111,7 @@ named!(singleops<SourcePos, Token>, alt!(
 fn tokens(input: SourcePos) -> IResult<SourcePos, Token> {
     delimited(
         multispace0,
-        alt((multiop, singleops, punctuations)),
+        alt((blockcomment, linecomment, multiop, singleops, punctuations)),
         multispace0,
     )(input)
 }
