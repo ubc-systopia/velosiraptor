@@ -24,6 +24,7 @@
 // SOFTWARE.
 
 use custom_error::custom_error;
+use std::rc::Rc;
 
 pub mod ast;
 pub mod terminals;
@@ -37,6 +38,7 @@ use unit::unit;
 
 //mod state;
 mod bitslice;
+mod field;
 
 use super::lexer::token::{Token, TokenStream};
 use super::lexer::Lexer;
@@ -53,31 +55,12 @@ pub struct Parser;
 use nom::multi::{many0, many1};
 
 impl Parser {
-    pub fn parse_string<'a>(context: &str, string: &'a str) -> Result<Ast, ParserError> {
-        log::info!("creating string parser");
-        let tokens = match Lexer::lex_string(context, string) {
-            Ok(toks) => toks,
-            Err(_x) => return Err(ParserError::LexerFailure),
-        };
-        Parser::parse_tokens(&tokens)
-    }
+    /// Parses a token vector and creates an [Ast]
+    pub fn parse(tokens: Vec<Token>) -> Result<Ast, ParserError> {
+        log::debug!("start parsing...");
 
-    // pub fn parse_file<'a>(filename: &'a str) -> Result<(Ast,  &'a str), ParserError> {
-    //     log::info!("creating file parser for '{}'", filename);
-    //     let (tokens, content) = match Lexer::lex_file(filename) {
-    //         Ok((tokens, content)) => (tokens, content),
-    //         Err(_x) => return Err(ParserError::LexerFailure)
-    //     };
-
-    //     match Parser::parse_tokens(&tokens) {
-    //         Ok(ast) => Ok((ast, &content)),
-    //         Err(x)  => Err(x)
-    //     }
-    // }
-
-    pub fn parse_tokens<'a>(tokens: &[Token<'a>]) -> Result<Ast, ParserError> {
         // get the token stream
-        let tokstream = TokenStream::from_slice(&tokens);
+        let tokstream = TokenStream::new(tokens);
 
         // a parsing unit consists of zero or more imports
         let (i1, _imports) = match many0(import)(tokstream) {
@@ -96,6 +79,38 @@ impl Parser {
             return Err(ParserError::ParserFailure);
         }
 
+        log::debug!("parsing done.");
         Err(ParserError::NotYetImplemented)
+    }
+
+    /// Parses a supplied string by lexing it first, create an Ast
+    pub fn parse_string(context: &str, string: &str) -> Result<Ast, ParserError> {
+        log::info!("creating string parser");
+        let tokens = match Lexer::lex_string(context, string) {
+            Ok(toks) => toks,
+            Err(_x) => return Err(ParserError::LexerFailure),
+        };
+        Parser::parse_tokens(&tokens)
+    }
+
+    /// Parses a file by lexing it first, create an Ast
+    pub fn parse_file(filename: &str) -> Result<(Ast,  Rc<String>), ParserError> {
+        log::info!("creating file parser for '{}'", filename);
+        let (tokens, content) = match Lexer::lex_file(filename) {
+            Ok((tokens, content)) => (tokens, content),
+            Err(_x) => return Err(ParserError::LexerFailure)
+        };
+
+        match Parser::parse_tokens(&tokens) {
+            Ok(ast) => Ok((ast, content)),
+            Err(x)  => Err(x)
+        }
+    }
+
+    /// Parses a slice of tokens
+    ///
+    /// This will create a new vector of the token slice
+    pub fn parse_tokens(tokens: &[Token]) -> Result<Ast, ParserError> {
+        Parser::parse(tokens.to_vec())
     }
 }
