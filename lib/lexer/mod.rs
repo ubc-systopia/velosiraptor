@@ -30,10 +30,12 @@ use std::fs;
 use std::rc::Rc;
 
 mod comments;
+mod identifier;
 pub mod sourcepos;
 pub mod token;
 
 use self::comments::*;
+use self::identifier::identifier;
 use self::sourcepos::SourcePos;
 use self::token::*;
 
@@ -111,7 +113,14 @@ named!(singleops<SourcePos, Token>, alt!(
 fn tokens(input: SourcePos) -> IResult<SourcePos, Token> {
     delimited(
         multispace0,
-        alt((blockcomment, linecomment, multiop, singleops, punctuations)),
+        alt((
+            identifier,
+            blockcomment,
+            linecomment,
+            multiop,
+            singleops,
+            punctuations,
+        )),
         multispace0,
     )(input)
 }
@@ -210,8 +219,8 @@ fn operator_tests() {
     );
 }
 
-#[test]
 /// test lexing of files
+#[test]
 fn empty_file_tests() {
     let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     d.push("tests/lexer");
@@ -226,4 +235,27 @@ fn empty_file_tests() {
 
         d.pop();
     }
+
+    for f in vec!["comments.vrs"] {
+        d.push(f);
+        let filename = format!("{}", d.display());
+
+        // lex the file
+        let err = Lexer::lex_file(&filename);
+        assert!(err.is_ok());
+
+        d.pop();
+    }
+}
+
+/// test lexing of files
+#[test]
+fn basic_tests() {
+    let content = "import foobar; /* comment */unit abc {}; // end of file";
+    let tok = match Lexer::lex_string("stdio", content) {
+        Ok(vec) => vec,
+        Err(_) => panic!("lexing failed"),
+    };
+    // there should be 10 tokens
+    assert_eq!(tok.len(), 10);
 }
