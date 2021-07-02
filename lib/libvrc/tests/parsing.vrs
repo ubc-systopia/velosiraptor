@@ -1,0 +1,19 @@
+// comment
+
+/* more comments */
+
+
+/*
+  multinline
+  comment
+*/
+
+import      fooo;
+
+
+/*
+  multinline
+  comment
+*/
+
+import      baar;

@@ -1,0 +1,20 @@
+[package]
+name = "libvrc"
+description = "The Velosiraptor Compiler support library"
+license = "MIT"
+version = "0.1.0"
+authors = ["Reto Achermann <achreto@cs.ubc.ca>"]
+edition = "2018"
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# logging and errors
+log = { version = "0.4.14", features = ["max_level_trace", "release_max_level_warn"] }
+simplelog = "^0.10.0"
+custom_error = "1.9.2"
+
+# the parser combinators
+[dependencies.nom]
+version = "6"
