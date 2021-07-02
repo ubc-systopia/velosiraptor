@@ -23,6 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+//! Parser Module of the Velosiraptor Compiler
+
 use custom_error::custom_error;
 use std::rc::Rc;
 
