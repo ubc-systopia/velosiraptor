@@ -7,19 +7,11 @@ authors = ["Reto Achermann <achreto@cs.ubc.ca>"]
 edition = "2018"
 readme = "README.md"
 
-[lib]
-name = "libvrc"
-path = "lib/lib.rs"
-
 [dependencies]
 # the argument parser
 clap = "2.33.3"
 
-# logging and errors
-log = { version = "0.4.14", features = ["max_level_trace", "release_max_level_warn"] }
-simplelog = "^0.10.0"
-custom_error = "1.9.2"
+# support library
+libvrc = { path = "lib/libvrc" }
 
-# the parser combinators
-[dependencies.nom]
-version = "6"
+
