@@ -382,7 +382,7 @@ impl InputIter for SourcePos {
     where
         P: Fn(Self::Item) -> bool,
     {
-        for (o, c) in self.content[self.range.clone()].char_indices() {
+        for (o, c) in self.as_str().char_indices() {
             if predicate(c) {
                 return Some(o);
             }
@@ -445,7 +445,7 @@ impl InputTakeAtPosition for SourcePos {
     where
         P: Fn(Self::Item) -> bool,
     {
-        match self.content.find(predicate) {
+        match self.as_str().find(predicate) {
             Some(i) => Ok(self.take_split(i)),
             None => Err(Err::Incomplete(Needed::new(1))),
         }
@@ -459,7 +459,7 @@ impl InputTakeAtPosition for SourcePos {
     where
         P: Fn(Self::Item) -> bool,
     {
-        match self.content.find(predicate) {
+        match self.as_str().find(predicate) {
             Some(0) => Err(Err::Error(E::from_error_kind(self.clone(), e))),
             Some(i) => Ok(self.take_split(i)),
             None => Err(Err::Incomplete(Needed::new(1))),
@@ -473,7 +473,7 @@ impl InputTakeAtPosition for SourcePos {
     where
         P: Fn(Self::Item) -> bool,
     {
-        match self.content.find(predicate) {
+        match self.as_str().find(predicate) {
             Some(i) => Ok(self.take_split(i)),
             None => Ok(self.take_split(self.input_len())),
         }
@@ -487,7 +487,7 @@ impl InputTakeAtPosition for SourcePos {
     where
         P: Fn(Self::Item) -> bool,
     {
-        match self.content.find(predicate) {
+        match self.as_str().find(predicate) {
             Some(0) => Err(Err::Error(E::from_error_kind(self.clone(), e))),
             Some(i) => Ok(self.take_split(i)),
             None => {
@@ -573,7 +573,7 @@ impl Compare<&str> for SourcePos {
 impl FindSubstring<&str> for SourcePos {
     /// Returns the byte position of the substring if it is found
     fn find_substring(&self, substr: &str) -> Option<usize> {
-        self.content.find(substr)
+        self.as_str().find(substr)
     }
 }
 
@@ -586,7 +586,7 @@ impl<'a> fmt::Display for SourcePos {
             self.context,
             self.line,
             self.column,
-            self.content[self.range.clone()].to_string()
+            self.as_str().to_string()
         )
     }
 }
@@ -598,6 +598,7 @@ fn sourcepos_tests() {
     let sp1 = SourcePos::new_at("stdin", content, 4..content.len(), 2, 1);
     assert_eq!(sp0.slice(4..), sp1);
     assert_eq!(sp0.slice(4..).as_str(), &content[4..]);
+    assert_eq!(sp0.slice(..4).as_str(), &content[..4]);
 
     //
     let sp2 = SourcePos::new_at("stdin", content, 0..content.len(), 1, 1);
