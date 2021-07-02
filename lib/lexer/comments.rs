@@ -26,15 +26,10 @@
 // the used nom componets
 use nom::{
     bytes::complete::{is_not, tag, take_until},
-    sequence::{preceded, terminated},
+    sequence::terminated,
     IResult,
 };
 
-use nom::error::Error;
-use nom::error::ErrorKind;
-use nom::{error_position, Err};
-
-// get the tokens
 use super::sourcepos::SourcePos;
 use super::token::{Token, TokenContent};
 
@@ -45,8 +40,6 @@ pub fn linecomment(input: SourcePos) -> IResult<SourcePos, Token> {
         Ok((input, _)) => input,
         Err(x) => return Err(x),
     };
-
-    println!("{}", input);
 
     // Matches a inline comment `// foobar`
     match is_not("\n")(input) {
