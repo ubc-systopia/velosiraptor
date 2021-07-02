@@ -25,8 +25,6 @@
 
 use std::fmt;
 
-pub struct Ast {}
-
 use crate::lexer::sourcepos::SourcePos;
 
 ///
@@ -187,6 +185,7 @@ impl fmt::Display for Field {
     }
 }
 
+
 // pub enum State {
 //     MemoryState {
 //         bases: Vec<String>,
@@ -200,3 +199,19 @@ impl fmt::Display for Field {
 //     },
 //     Dummy,
 // }
+
+
+/// represents the parsed Ast
+pub struct Ast {
+
+}
+
+impl fmt::Display for Ast {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+
+        write!(
+            f,
+            "Ast: TODO",
+        )
+    }
+}
