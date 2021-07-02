@@ -44,6 +44,76 @@ custom_error! { #[derive(PartialEq)] pub LexerError
 /// represents the lexer state
 pub struct Lexer;
 
+use nom::alt;
+use nom::branch::alt;
+use nom::bytes::complete::tag;
+use nom::character::complete::multispace0;
+use nom::multi::many1;
+use nom::named;
+use nom::sequence::delimited;
+use nom::IResult;
+
+macro_rules! namedtag (
+    ($vis:vis $name:ident, $tag: expr) => (
+        $vis fn $name(input: SourcePos) -> IResult<SourcePos, Token> {
+            match tag(TokenContent::to_symbol($tag))(input) {
+                Ok((i, s)) => Ok((i, Token::new($tag, s))),
+                Err(x) => Err(x)
+            }
+        }
+    )
+);
+
+// punctuations
+namedtag!(comma, TokenContent::Comma);
+namedtag!(colon, TokenContent::Colon);
+namedtag!(semicolon, TokenContent::SemiColon);
+namedtag!(lparen, TokenContent::LParen);
+namedtag!(rparen, TokenContent::RParen);
+namedtag!(lbrace, TokenContent::LBrace);
+namedtag!(rbrace, TokenContent::RBrace);
+namedtag!(lbracket, TokenContent::LBracket);
+namedtag!(rbracket, TokenContent::RBracket);
+
+named!(punctuations<SourcePos, Token>, alt!(
+   comma | colon | semicolon | lparen | rparen | lbrace | rbrace | lbracket | rbracket
+));
+
+// operators
+namedtag!(plus, TokenContent::Plus);
+namedtag!(minus, TokenContent::Minus);
+namedtag!(star, TokenContent::Star);
+namedtag!(lshift, TokenContent::LShift);
+namedtag!(rshift, TokenContent::RShift);
+namedtag!(not, TokenContent::Not);
+namedtag!(and, TokenContent::And);
+namedtag!(or, TokenContent::Or);
+
+// comparators
+namedtag!(equal, TokenContent::Equal);
+namedtag!(notequal, TokenContent::NotEqual);
+
+namedtag!(less, TokenContent::Less);
+namedtag!(greater, TokenContent::Greather);
+namedtag!(leq, TokenContent::LessEqual);
+namedtag!(geq, TokenContent::GreatherEqual);
+
+named!(multiop<SourcePos, Token>, alt!(
+   lshift | rshift | and | or | equal | notequal | leq | geq
+));
+
+named!(singleops<SourcePos, Token>, alt!(
+    plus | minus | star | not | less | greater
+));
+
+fn tokens(input: SourcePos) -> IResult<SourcePos, Token> {
+    delimited(
+        multispace0,
+        alt((multiop, singleops, punctuations)),
+        multispace0,
+    )(input)
+}
+
 impl Lexer {
     /// Constructs a vector of Tokens corresponding to Lexemes for the SourcePos
     ///
@@ -51,9 +121,12 @@ impl Lexer {
     /// as Tokens.
     pub fn lex_source_pos(sp: SourcePos) -> Result<Vec<Token>, LexerError> {
         log::debug!("start lexing...");
-
+        let (i, tok) = match many1(tokens)(sp) {
+            Ok((r, tok)) => (r, tok),
+            Err(x) => return Err(LexerError::NoTokens),
+        };
         log::debug!("lexing done.");
-        Ok(Vec::new())
+        Ok(tok)
     }
 
     /// Performs lexing on a supplied string and context.
@@ -101,19 +174,53 @@ impl Lexer {
 #[cfg(test)]
 use std::path::PathBuf;
 
+#[cfg(test)]
+use nom::Slice;
+
+/// Operator lexing tests
+#[test]
+fn operator_tests() {
+    let contents = "+++";
+    let sp = SourcePos::new("stdio", contents);
+    assert_eq!(
+        Lexer::lex_string("stdio", contents),
+        Lexer::lex_source_pos(sp.clone())
+    );
+    assert_eq!(
+        Lexer::lex_source_pos(sp.clone()),
+        Ok(vec![
+            Token::new(TokenContent::Plus, sp.slice(0..1)),
+            Token::new(TokenContent::Plus, sp.slice(1..2)),
+            Token::new(TokenContent::Plus, sp.slice(2..3)),
+        ])
+    );
+
+    let contents = "==+<<>";
+    let sp = SourcePos::new("stdio", contents);
+    assert_eq!(
+        Lexer::lex_source_pos(sp.clone()),
+        Ok(vec![
+            Token::new(TokenContent::Equal, sp.slice(0..2)),
+            Token::new(TokenContent::Plus, sp.slice(2..3)),
+            Token::new(TokenContent::LShift, sp.slice(3..5)),
+            Token::new(TokenContent::Greather, sp.slice(5..6)),
+        ])
+    );
+}
+
 #[test]
 /// test lexing of files
-fn import_tests() {
+fn empty_file_tests() {
     let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     d.push("tests/lexer");
 
-    for f in vec!["emptyfile.vrs", "comments.vrs", "whitespace.vrs"] {
+    for f in vec!["emptyfile.vrs", "whitespace.vrs"] {
         d.push(f);
         let filename = format!("{}", d.display());
 
         // lex the file
         let err = Lexer::lex_file(&filename);
-        assert!(err.is_ok());
+        assert!(err.is_err());
 
         d.pop();
     }

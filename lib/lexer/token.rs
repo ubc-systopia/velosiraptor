@@ -64,10 +64,51 @@ pub enum TokenContent {
     // operators
     Plus,
     Minus,
-    Multiply,
+    Star,
     LShift,
     RShift,
+    Not,
+    And,
+    Or,
+    // comparisons
     Equal,
+    NotEqual,
+    Less,
+    Greather,
+    LessEqual,
+    GreatherEqual,
+}
+
+/// Implementatin for TokenContent
+impl TokenContent {
+    pub fn to_symbol(tok: Self) -> &'static str {
+        match tok {
+            TokenContent::Comma => ",",
+            TokenContent::Colon => ":",
+            TokenContent::SemiColon => ";",
+            TokenContent::LParen => "(",
+            TokenContent::RParen => ")",
+            TokenContent::LBrace => "{",
+            TokenContent::RBrace => "}",
+            TokenContent::LBracket => "[",
+            TokenContent::RBracket => "]",
+            TokenContent::Plus => "+",
+            TokenContent::Minus => "-",
+            TokenContent::Star => "*",
+            TokenContent::LShift => "<<",
+            TokenContent::RShift => ">>",
+            TokenContent::Not => "!",
+            TokenContent::And => "&&",
+            TokenContent::Or => "||",
+            TokenContent::Equal => "==",
+            TokenContent::NotEqual => "!=",
+            TokenContent::Less => "<",
+            TokenContent::Greather => ">",
+            TokenContent::LessEqual => "<=",
+            TokenContent::GreatherEqual => ">=",
+            _ => panic!("unknown symbol for token {:?}", tok),
+        }
+    }
 }
 
 /// Represents a lexed token.
@@ -90,45 +131,6 @@ impl Token {
     /// Obtains the [SourcePos] of the token
     pub fn get_pos(&self) -> SourcePos {
         self.spos.clone()
-    }
-
-    pub fn get_symbol(&self) -> &str {
-        match &self.content {
-            TokenContent::Eof => "<EOF>",
-            TokenContent::Illegal => "<ILLEGAL>",
-            TokenContent::Identifier(id) => &id,
-            TokenContent::StringLiteral(st) => &st,
-            TokenContent::IntLiteral(_) => "NUMBER",
-            TokenContent::BoolLiteral(bl) => {
-                if *bl {
-                    "true"
-                } else {
-                    "false"
-                }
-            }
-            TokenContent::Comment(_) => "<COMMENT>",
-            TokenContent::BlockComment(_) => "<COMMENT>",
-            TokenContent::Unit => "UNIT",
-            TokenContent::Import => "IMPORT",
-            TokenContent::State => "STATE",
-            TokenContent::Memory => "MEMORY",
-            TokenContent::Registers => "REGISTERS",
-            TokenContent::Comma => ",",
-            TokenContent::Colon => ":",
-            TokenContent::SemiColon => ";",
-            TokenContent::LParen => "(",
-            TokenContent::RParen => ")",
-            TokenContent::LBrace => "{",
-            TokenContent::RBrace => "}",
-            TokenContent::LBracket => "[",
-            TokenContent::RBracket => "]",
-            TokenContent::Plus => "+",
-            TokenContent::Minus => "-",
-            TokenContent::Multiply => "*",
-            TokenContent::LShift => "<<",
-            TokenContent::RShift => ">>",
-            TokenContent::Equal => "==",
-        }
     }
 }
 
@@ -160,10 +162,18 @@ impl fmt::Display for Token {
             TokenContent::RBracket => "RBracket".to_string(),
             TokenContent::Plus => "Plus".to_string(),
             TokenContent::Minus => "Minus".to_string(),
-            TokenContent::Multiply => "Multiply".to_string(),
+            TokenContent::Star => "Star".to_string(),
             TokenContent::LShift => "LShift".to_string(),
             TokenContent::RShift => "RShift".to_string(),
             TokenContent::Equal => "Equal".to_string(),
+            TokenContent::Not => "!".to_string(),
+            TokenContent::And => "&&".to_string(),
+            TokenContent::Or => "||".to_string(),
+            TokenContent::NotEqual => "!=".to_string(),
+            TokenContent::Less => "<".to_string(),
+            TokenContent::Greather => ">".to_string(),
+            TokenContent::LessEqual => "<=".to_string(),
+            TokenContent::GreatherEqual => ">=".to_string(),
         };
         write!(f, "{}", tokstr)
     }
