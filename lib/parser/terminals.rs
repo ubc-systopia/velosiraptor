@@ -71,7 +71,7 @@ namedtag!(pub rbrack, TokenContent::RBracket);
 // operators
 namedtag!(pub plus, TokenContent::Plus);
 namedtag!(pub minus, TokenContent::Minus);
-namedtag!(pub multiply, TokenContent::Multiply);
+namedtag!(pub star, TokenContent::Star);
 namedtag!(pub lshift, TokenContent::LShift);
 namedtag!(pub rshift, TokenContent::RShift);
 namedtag!(pub equal, TokenContent::Equal);

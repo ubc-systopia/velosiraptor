@@ -96,16 +96,16 @@ impl Parser {
     }
 
     /// Parses a file by lexing it first, create an Ast
-    pub fn parse_file(filename: &str) -> Result<(Ast,  Rc<String>), ParserError> {
+    pub fn parse_file(filename: &str) -> Result<(Ast, Rc<String>), ParserError> {
         log::info!("creating file parser for '{}'", filename);
         let (tokens, content) = match Lexer::lex_file(filename) {
             Ok((tokens, content)) => (tokens, content),
-            Err(_x) => return Err(ParserError::LexerFailure)
+            Err(_x) => return Err(ParserError::LexerFailure),
         };
 
         match Parser::parse_tokens(&tokens) {
             Ok(ast) => Ok((ast, content)),
-            Err(x)  => Err(x)
+            Err(x) => Err(x),
         }
     }
 
