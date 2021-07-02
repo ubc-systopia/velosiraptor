@@ -38,7 +38,7 @@ use std::rc::Rc;
 
 use nom::{
     Compare, CompareResult, Err, FindSubstring, IResult, InputIter, InputLength, InputTake,
-    InputTakeAtPosition, Needed, Slice,
+    InputTakeAtPosition, Needed, Offset, Slice,
 };
 
 use nom::error::{ErrorKind, ParseError};
@@ -577,8 +577,19 @@ impl FindSubstring<&str> for SourcePos {
     }
 }
 
+/// Implementation of the [nom::Offset] trait for [SourcePos]
+impl Offset for SourcePos {
+    /// Offset between the first byte of self and the first byte of the argument
+    fn offset(&self, second: &Self) -> usize {
+        let r1 = self.input_range();
+        let r2 = second.input_range();
+
+        r2.start - r1.start
+    }
+}
+
 /// Implementation of the [std::fmt::Display] trait for [SourcePos]
-impl<'a> fmt::Display for SourcePos {
+impl fmt::Display for SourcePos {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
