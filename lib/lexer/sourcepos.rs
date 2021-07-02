@@ -405,22 +405,22 @@ impl InputIter for SourcePos {
 
 /// Implementation of the [nom::InputTake] trait for [SourcePos]
 impl<'a> InputTake for SourcePos {
-    /// Returns a new [SourcePos] corresponding to the first [count] elements.
+    /// Returns a new [SourcePos] corresponding to the first `count` elements.
     ///
     /// # Panics
     ///
-    /// The function panics if [count] > [self.input_len].
+    /// The function panics if `count` > [self.input_len].
     #[inline]
     fn take(&self, count: usize) -> Self {
         assert!(count <= self.input_len());
         self.from_self(0..count)
     }
 
-    /// Splits the current SourcePos at [count] returning two new [SourcePos] objects.ErrorKind
+    /// Splits the current SourcePos at `count` returning two new [SourcePos] objects.ErrorKind
     ///
     /// # Panics
     ///
-    /// The function panics if [count] > [self.input_len].
+    /// The function panics if `count` > [self.input_len].
     #[inline]
     fn take_split(&self, count: usize) -> (Self, Self) {
         assert!(count <= self.input_len());

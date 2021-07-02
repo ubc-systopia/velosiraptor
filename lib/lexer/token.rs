@@ -296,7 +296,7 @@ impl InputLength for TokenStream {
 /// Implementation of the [nom::InputTake] trait for [TokenStream]
 impl InputTake for TokenStream {
     #[inline]
-    /// Returns a new [TokenStream] covering the first [count] tokens.
+    /// Returns a new [TokenStream] covering the first `count` tokens.
     ///
     /// # Panics
     ///
@@ -307,7 +307,7 @@ impl InputTake for TokenStream {
     }
 
     #[inline]
-    /// Split the [TokenStream] at the [count] tokens.
+    /// Split the [TokenStream] at the `count` tokens.
     ///
     /// # Panics
     /// The function panics if count > self.input_len()
