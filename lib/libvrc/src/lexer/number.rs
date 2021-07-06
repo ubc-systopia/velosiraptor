@@ -25,76 +25,104 @@
 
 //! Parses numbers
 
-extern crate lexical;
-
-// the used nom components
+// the used nom componets
 use nom::{
-    character::complete::{hex_digit1},
-    IResult,
-    Slice,
     branch::alt,
+    bytes::complete::{is_a, tag},
+    character::complete::{alphanumeric1, digit1, hex_digit1, oct_digit1},
     combinator::recognize,
-    bytes::complete::tag,
-    //multi::many1,
+    error::ErrorKind,
+    error_position,
+    multi::many0,
+    sequence::pair,
+    Err, IResult, InputLength, Slice,
 };
-use nom::sequence::pair;
-use nom::character::complete::digit1;
 
-// num library
-//use std::num::from_str_radix;
-
-
-use super::token::{Token, TokenContent};
 use super::sourcepos::SourcePos;
+use super::token::{Token, TokenContent};
 
-/// Parses a rust-like number literal
+fn base10(input: SourcePos) -> IResult<SourcePos, Token> {
+    // match a digit followed by alphanumeric characters and the `_`
+    // this is needed to recognize patterns of: 1234asdf
+    let otherchar = alt((alphanumeric1, tag("_")));
+    let (rem, numsp) = match recognize(pair(digit1, many0(otherchar)))(input) {
+        Ok((rem, numsp)) => (rem, numsp),
+        // here we just return the error if we could not parse anything...
+        Err(x) => return Err(x),
+    };
+
+    // allow groups of digits 1234_5678
+    let otherdigits = alt((digit1, tag("_")));
+
+    // parse the numsp again, with restricted tokens
+    let rem1 = match recognize(pair(digit1, many0(otherdigits)))(numsp.clone()) {
+        Ok((rem, _)) => rem,
+        Err(e) => return Err(e),
+    };
+
+    if !rem1.is_empty() {
+        return Err(Err::Failure(error_position!(numsp, ErrorKind::Digit)));
+    }
+
+    let numstr = String::from(numsp.as_str()).replace("_", "");
+    let num = match u64::from_str_radix(&numstr, 10) {
+        Ok(i) => i,
+        Err(_) => return Err(Err::Failure(error_position!(numsp, ErrorKind::Digit))),
+    };
+    Ok((rem, Token::new(TokenContent::IntLiteral(num), numsp)))
+}
+
+macro_rules! namedbase (
+    ($name:ident, $radix:expr, $tag:expr, $pattern:expr) => (
+        fn $name(input: SourcePos) -> IResult<SourcePos, Token> {
+            // check if it's the right tag `0x`, otherwise return
+            let prefix = tag($tag);
+            let i1 = match prefix(input.clone()) {
+                Ok((rem, _)) => rem,
+                Err(x) => return Err(x)
+            };
+
+            // match alphanumeric groups separated by `_`
+            let otherchar = alt((alphanumeric1, tag("_")));
+            let (rem, numsp) = match recognize(pair(alphanumeric1, many0(otherchar)))(i1.clone()) {
+                Ok((rem, numsp)) => (rem, numsp),
+                // here we just return the error if we could not parse anything...
+                Err(x) => return Err(x)
+            };
+
+            // allow groups of hexdigits 1234_abcd
+            let otherdigits = alt(($pattern, tag("_")));
+
+            // parse the numsp again, with restricted tokens
+            let rem1 = match recognize(pair($pattern, many0(otherdigits)))(numsp.clone()) {
+                Ok((rem, _)) => rem,
+                // this will return Eof unfortunately...
+                Err(e) => return Err(e)
+            };
+
+            if ! rem1.is_empty() {
+                return Err(Err::Failure(error_position!(numsp, ErrorKind::Digit)));
+            }
+
+            let numstr = String::from(numsp.as_str()).replace("_", "");
+            let num = match u64::from_str_radix(&numstr, $radix) {
+                Ok(i) => i,
+                Err(_) => return Err(Err::Failure(error_position!(numsp, ErrorKind::Digit)))
+            };
+
+            Ok(( rem, Token::new(TokenContent::IntLiteral(num), input.slice(0..numsp.input_len() + 2))))
+        }
+    )
+);
+
+namedbase!(base16, 16, "0x", hex_digit1);
+namedbase!(base8, 8, "0o", oct_digit1);
+namedbase!(base2, 2, "0b", is_a("01"));
+
+/// parses a rust-like identifiers
 pub fn number(input: SourcePos) -> IResult<SourcePos, Token> {
-
-    let (rem, num) = match digit1(input) {
-        Ok((remainder, num)) => (remainder, num),
-        Err(x) => return Err(x),
-    };
-
-    // Create token
-    println!("{}", num.as_str().to_string());
-    let token = Token::new(TokenContent::IntLiteral(num.as_str().parse().unwrap()), num);
-
-    Ok((rem, token))
+    alt((base16, base8, base2, base10))(input)
 }
-
-// TODO: Add coverage for binary
-pub fn prefix_number(input: SourcePos) -> IResult<SourcePos, Token> {
-
-    // define option parsers
-    let decimal = pair(tag("0d"), digit1);
-    let hexadecimal = pair(tag("0x"), hex_digit1);
-    let binary = pair(tag("0b"), many1(alt((tag("0", tag("1")))));
-
-    let (rem, num) = match recognize(alt((decimal, hexadecimal)))(input) {
-        Ok((remainder, num)) => (remainder, num),
-        Err(x) => return Err(x),
-    };
-
-    // Create token
-    let value = &num.as_str();
-    println!("{}", value);
-    let token = Token::new(TokenContent::IntLiteral(parse_number_with_prefix(value).unwrap()), num);
-
-    Ok((rem, token))
-}
-
-fn parse_number_with_prefix(num: &str) -> Option<u64> {
-    let radix = match &num[1..1] {
-        "d" => 10,
-        "x" => 16,
-        "b" => 2,
-        _   => return None,
-    };
-
-    u64::from_str_radix(&str[2..], radix)
-}
-
-#[cfg(test)]
 
 #[test]
 fn decimal_test() {
@@ -103,37 +131,131 @@ fn decimal_test() {
     let num = sp.slice(0..5);
     assert_eq!(
         number(sp),
+        Ok((rem, Token::new(TokenContent::IntLiteral(12312), num)))
+    );
+
+    let sp = SourcePos::new("stdin", "12312213489654");
+    let rem = sp.slice(14..14);
+    let num = sp.slice(0..14);
+    assert_eq!(
+        number(sp),
         Ok((
             rem,
-            Token::new(TokenContent::IntLiteral(12312), num)
+            Token::new(TokenContent::IntLiteral(12312213489654), num)
         ))
     );
 
-    let sp = SourcePos::new("stdin", "0d12312");
-    let rem = sp.slice(7..7);
-    let num = sp.slice(0..7);
+    let sp = SourcePos::new("stdin", "123a12213489654");
+    let rem = sp.slice(3..15);
+    let num = sp.slice(0..3);
     assert_eq!(
-        prefix_number(sp),
-        Ok((
-            rem,
-            Token::new(TokenContent::IntLiteral(12312), num)
-        ))
+        number(sp.clone()),
+        Err(Err::Failure(error_position!(sp, ErrorKind::Digit)))
     );
 }
 
 #[test]
 fn hexadecimal_test() {
     let sp = SourcePos::new("stdin", "0xABCD");
-    let rem = sp.slice(4..4);
-    let num = sp.slice(0..4);
+    let rem = sp.slice(6..6);
+    let num = sp.slice(0..6);
     assert_eq!(
-        prefix_number(sp),
-        Ok((
-            rem,
-            Token::new(TokenContent::IntLiteral(0xABCD), num)
-        ))
+        number(sp),
+        Ok((rem, Token::new(TokenContent::IntLiteral(0xABCD), num)))
+    );
+
+    let sp = SourcePos::new("stdin", "0xabcd");
+    let rem = sp.slice(6..6);
+    let num = sp.slice(0..6);
+    assert_eq!(
+        number(sp),
+        Ok((rem, Token::new(TokenContent::IntLiteral(0xABCD), num)))
     );
 }
 
+#[test]
+fn octal_test() {
+    let sp = SourcePos::new("stdin", "0o1234");
+    let rem = sp.slice(6..6);
+    let num = sp.slice(0..6);
+    assert_eq!(
+        number(sp),
+        Ok((rem, Token::new(TokenContent::IntLiteral(0o1234), num)))
+    );
+}
 
+#[test]
+fn binary_test() {
+    let sp = SourcePos::new("stdin", "0b1000");
+    let rem = sp.slice(6..6);
+    let num = sp.slice(0..6);
+    assert_eq!(
+        number(sp),
+        Ok((rem, Token::new(TokenContent::IntLiteral(0b1000), num)))
+    );
+}
 
+#[test]
+fn separator_test() {
+    let sp = SourcePos::new("stdin", "0b1111_0000");
+    let rem = sp.slice(11..11);
+    let num = sp.slice(0..11);
+    assert_eq!(
+        number(sp),
+        Ok((rem, Token::new(TokenContent::IntLiteral(0b11110000), num)))
+    );
+
+    let sp = SourcePos::new("stdin", "0o4567_1234");
+    let rem = sp.slice(11..11);
+    let num = sp.slice(0..11);
+    assert_eq!(
+        number(sp),
+        Ok((rem, Token::new(TokenContent::IntLiteral(0o45671234), num)))
+    );
+
+    let sp = SourcePos::new("stdin", "0xabcd_1234");
+    let rem = sp.slice(11..11);
+    let num = sp.slice(0..11);
+    assert_eq!(
+        number(sp),
+        Ok((rem, Token::new(TokenContent::IntLiteral(0xabcd1234), num)))
+    );
+
+    let sp = SourcePos::new("stdin", "1_000_000");
+    let rem = sp.slice(9..9);
+    let num = sp.slice(0..9);
+    assert_eq!(
+        number(sp),
+        Ok((rem, Token::new(TokenContent::IntLiteral(1000000), num)))
+    );
+}
+
+#[test]
+fn not_a_number() {
+    let sp = SourcePos::new("stdin", "12354asdf");
+    assert!(number(sp).is_err());
+
+    let sp = SourcePos::new("stdin", "0x1234oiweu");
+    assert!(number(sp).is_err());
+
+    let sp = SourcePos::new("stdin", "0o123lajks");
+    assert!(number(sp).is_err());
+
+    let sp = SourcePos::new("stdin", "0b11123");
+    assert!(number(sp).is_err());
+
+    let sp = SourcePos::new("stdin", "0b");
+    assert!(number(sp).is_err());
+
+    let sp = SourcePos::new("stdin", "0x");
+    assert!(number(sp).is_err());
+
+    let sp = SourcePos::new("stdin", "0o");
+    assert!(number(sp).is_err());
+}
+
+#[test]
+fn out_of_range_test() {
+    let sp = SourcePos::new("stdin", "0x10000000000000000");
+    assert!(number(sp).is_err());
+}

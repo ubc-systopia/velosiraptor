@@ -31,6 +31,7 @@ use std::rc::Rc;
 
 mod comments;
 mod identifier;
+mod number;
 pub mod sourcepos;
 pub mod token;
 
