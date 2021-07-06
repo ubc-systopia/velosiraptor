@@ -57,7 +57,7 @@ pub fn import(input: TokenStream) -> IResult<TokenStream, Import> {
                 Err::Failure(e) => (e.input, e.code),
                 Err::Incomplete(_) => (input, ErrorKind::Eof),
             };
-            return Err(Err::Failure(error_position!(i, k)));
+            Err(Err::Failure(error_position!(i, k)))
         }
     }
 }
