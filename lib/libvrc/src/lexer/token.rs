@@ -206,7 +206,7 @@ impl TokenStream {
     /// Creates a new TokenStream from the supplied vector of tokens
     ///
     /// The TokenStream will cover the entire vector.
-    pub fn new(tokens: Vec<Token>) -> Self {
+    pub fn from_vec(tokens: Vec<Token>) -> Self {
         let len = tokens.len();
         TokenStream {
             tokens: Rc::new(tokens),
@@ -214,11 +214,24 @@ impl TokenStream {
         }
     }
 
+    pub fn from_vec_filtered(tokens: Vec<Token>) -> Self {
+        let tok: Vec<Token> = tokens
+            .iter()
+            .filter(|t| match t.content {
+                TokenContent::Comment(_) => false,
+                TokenContent::BlockComment(_) => false,
+                _ => true,
+            })
+            .cloned()
+            .collect();
+        Self::from_vec(tok)
+    }
+
     /// Creates a new [TokenStream] from the supplied [Token] slice.empty()
     ///
     /// This will create a new vector of Tokens from the supplied slice.
     pub fn from_slice(tokens: &[Token]) -> Self {
-        Self::new(tokens.to_vec())
+        Self::from_vec(tokens.to_vec())
     }
 
     /// Creates a new [TokenStream] covering a subrange of [self]

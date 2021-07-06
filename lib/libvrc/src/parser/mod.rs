@@ -62,7 +62,7 @@ impl Parser {
         log::debug!("start parsing...");
 
         // get the token stream
-        let tokstream = TokenStream::new(tokens);
+        let tokstream = TokenStream::from_vec(tokens);
 
         // a parsing unit consists of zero or more imports
         let (i1, _imports) = match many0(import)(tokstream) {
