@@ -185,6 +185,29 @@ impl fmt::Display for Field {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum Operation {
+    Plus,
+    Minus,
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum Expr {
+    Identifier {
+        ident: String,
+        pos: SourcePos,
+    },
+    Number {
+        value: u64,
+        pos: SourcePos,
+    },
+    BinOp {
+        op: Operation,
+        lhs: Box<Expr>,
+        rhs: Box<Expr>,
+        pos: SourcePos,
+    },
+}
+
 // pub enum State {
 //     MemoryState {
 //         bases: Vec<String>,

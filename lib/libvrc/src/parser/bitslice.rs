@@ -31,9 +31,7 @@ use crate::parser::ast::BitSlice;
 use crate::parser::terminals::{ident, num};
 
 // the used nom componets
-use crate::nom::error::ErrorKind;
-use nom::sequence::tuple;
-use nom::{error_position, Err, IResult};
+use nom::{error::ErrorKind, error_position, sequence::tuple, Err, IResult};
 
 /// Parses a bitslice definition
 ///
@@ -66,9 +64,10 @@ pub fn bitslice(input: TokenStream) -> IResult<TokenStream, BitSlice> {
 }
 
 #[cfg(test)]
-use crate::lexer::sourcepos::SourcePos;
-#[cfg(test)]
-use crate::lexer::token::{Token, TokenContent};
+use crate::lexer::{
+    sourcepos::SourcePos,
+    token::{Token, TokenContent},
+};
 #[cfg(test)]
 use crate::nom::Slice;
 
