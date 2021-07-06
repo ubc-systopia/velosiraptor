@@ -228,6 +228,18 @@ fn separator_test() {
         number(sp),
         Ok((rem, Token::new(TokenContent::IntLiteral(1000000), num)))
     );
+
+    let sp = SourcePos::new("stdin", "1234567890 asdf");
+    assert!(number(sp).is_ok());
+
+    let sp = SourcePos::new("stdin", "0x12345678 asdf");
+    assert!(number(sp).is_ok());
+
+    let sp = SourcePos::new("stdin", "0o11223344 asdf");
+    assert!(number(sp).is_ok());
+
+    let sp = SourcePos::new("stdin", "0b11001100 asdf");
+    assert!(number(sp).is_ok());
 }
 
 #[test]
