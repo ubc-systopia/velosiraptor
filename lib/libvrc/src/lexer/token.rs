@@ -70,6 +70,7 @@ pub enum TokenContent {
     Not,
     And,
     Or,
+    Arrow,
     // comparisons
     Equal,
     NotEqual,
@@ -100,6 +101,7 @@ impl TokenContent {
             TokenContent::Not => "!",
             TokenContent::And => "&&",
             TokenContent::Or => "||",
+            TokenContent::Arrow => "=>",
             TokenContent::Equal => "==",
             TokenContent::NotEqual => "!=",
             TokenContent::Less => "<",
@@ -166,6 +168,7 @@ impl fmt::Display for Token {
             TokenContent::LShift => "LShift".to_string(),
             TokenContent::RShift => "RShift".to_string(),
             TokenContent::Equal => "Equal".to_string(),
+            TokenContent::Arrow => "=>".to_string(),
             TokenContent::Not => "!".to_string(),
             TokenContent::And => "&&".to_string(),
             TokenContent::Or => "||".to_string(),

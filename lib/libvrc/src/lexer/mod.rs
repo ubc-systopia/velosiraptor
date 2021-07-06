@@ -49,14 +49,10 @@ custom_error! { #[derive(PartialEq)] pub LexerError
 /// represents the lexer state
 pub struct Lexer;
 
-use nom::alt;
-use nom::branch::alt;
-use nom::bytes::complete::tag;
-use nom::character::complete::multispace0;
-use nom::multi::many1;
-use nom::named;
-use nom::sequence::delimited;
-use nom::IResult;
+use nom::{
+    alt, branch::alt, bytes::complete::tag, character::complete::multispace0, multi::many1, named,
+    sequence::delimited, IResult,
+};
 
 macro_rules! namedtag (
     ($vis:vis $name:ident, $tag: expr) => (
@@ -93,7 +89,7 @@ namedtag!(rshift, TokenContent::RShift);
 namedtag!(not, TokenContent::Not);
 namedtag!(and, TokenContent::And);
 namedtag!(or, TokenContent::Or);
-
+namedtag!(arrow, TokenContent::Arrow);
 // comparators
 namedtag!(equal, TokenContent::Equal);
 namedtag!(notequal, TokenContent::NotEqual);
@@ -104,7 +100,7 @@ namedtag!(leq, TokenContent::LessEqual);
 namedtag!(geq, TokenContent::GreatherEqual);
 
 named!(multiop<SourcePos, Token>, alt!(
-   lshift | rshift | and | or | equal | notequal | leq | geq
+   lshift | rshift | and | or | equal | notequal | leq | geq | arrow
 ));
 
 named!(singleops<SourcePos, Token>, alt!(
