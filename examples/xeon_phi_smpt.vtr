@@ -1,0 +1,80 @@
+/*
+ * The Xeon Phi System Memory Page Table (SMPT) consists of 32 16-GB pages that translate
+ * from the Xeon Phi address space into the host address space.
+ *
+ * Each page in the SMPT is controlled by a single register, accessible from the host
+ * and the Xeon Phi (note the address may be different here)
+ *
+ * The translation can only be remapped, but not unmapepd nor are there any protection
+ * mechanisms.
+ */
+
+// This defines an SMPT Entry
+unit smpte : Segment {
+
+    // the size of the entry is 34 bits or 16G
+    size = 34;
+
+    // the state is given as a register
+    state = Register {
+        entry [_, 0, 4] {
+            0  0  snoop_disabled;
+            1  1  _;
+            2 31  host_address;
+        };
+    };
+
+    // the interface is given by the MMIO register
+    interface = MMIORegister(base) {
+        base[0..4] => state.entry;
+    };
+
+    // constructor
+    smpte( base : MemRef) {
+        assert aligned(base, 4);
+        assert size(base) == 4;
+    }
+
+    // the base address is the entry shifted by 34 (16 GB)
+    get_base() {
+        return state.entry.host_address << 34;
+    }
+
+    // the size is 16GB
+    get_size() {
+        return 16 << 30;
+    }
+
+    match_flags(flags) {
+        return true;
+    }
+
+    map(addr, flags) {
+        assert type(addr) == Memory || type(addr) == MMIO;
+        assert aligned(addr, 16G);
+        assert size(addr) == 16G;
+    }
+
+    // cant unmap or protect
+    unmap();
+    protect();
+ }
+
+
+unit smpt : StaticMap {
+    // the smpt constructur
+    smpt(base : MemRef) {
+        assert aligned(base, 4);
+        assert size(base) == 128;
+
+        // construct the map of entries, a slice of the incoming range
+        map = [ smpt(base[i*4..(i+1)*4])  for i in 0..32  ]
+    }
+
+    // other functions here will be initialized based on the `map`
+}
+
+
+
+
+
