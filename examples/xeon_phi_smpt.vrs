@@ -15,7 +15,7 @@ unit smpte : Segment {
     // the size of the entry is 34 bits or 16G
     size = 34;
 
-    // the state is given as a register
+    // the state is given as a register (interal)
     state = Register {
         entry [_, 0, 4] {
             0  0  snoop_disabled;
@@ -25,15 +25,18 @@ unit smpte : Segment {
     };
 
     // the interface is given by the MMIO register
-    interface = MMIORegister(base) {
+    interface = MMIORegisterInterface(base) {
+        // this is a direct pass through to the state, a slice of the address gets mapped
         base[0..4] => state.entry;
     };
 
-    // constructor
-    smpte( base : MemRef) {
+    // constructor equivalent taking the base address as an argument
+    smpte(base : Memory) {
         assert aligned(base, 4);
         assert size(base) == 4;
     }
+
+    /* segment specific elements */
 
     // the base address is the entry shifted by 34 (16 GB)
     get_base() {

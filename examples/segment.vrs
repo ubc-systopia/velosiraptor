@@ -1,0 +1,40 @@
+/*
+ * This defines a generic segment
+ */
+
+unit Segment {
+
+    // the size of the segment must be given
+    size = ??;
+
+    // the state of the segment
+    state = None;
+
+    // the software interface
+    interface = None;
+
+    // constructor equivalent
+    Segment { }
+
+    /* segment specific elements */
+
+    abstract get_base();
+    abstract get_size();
+    abstract match_flags(flags);
+
+    translate(va : Address, flags: Flags) -> Unit @ Address {
+        if (match_flags(flags)) {
+            raise;
+        }
+
+        if (va < get_size()) {
+            raise;
+        }
+
+        return va + get_base()
+    }
+
+    map(addr, flags);
+    unmap();
+    protect();
+ }
