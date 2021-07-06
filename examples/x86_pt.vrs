@@ -1,0 +1,112 @@
+/*
+ * 32-bit paging on the x86 architecture involves a two-level page table. For simplicity, we focus
+ * here on the leaf page table.
+ *
+ * A single page table is 4 KiB in total. It contains 1024 32-bit page-table entries.
+ * The page table as a whole must be naturally aligned (4 KiB).
+ * This also ensures that each entry is naturally aligned to 32-bits (or 4 bytes)
+ *
+ * The layout of a page table entry is as follows:
+ * ```
+ *     Bit(s)          Contents
+ *     0       (P)     Present; must be 1 to map a 4-KByte page
+ *     1       (R/W)   Read/write; if 0, writes may not be allowed to the 4-KByte page referenced
+ *                     by this entry
+ *     2       (U/S)   User/supervisor; if 0, user-mode accesses are not allowed to the 4-KByte
+ *                     page referenced by this entry
+ *     3       (PWT)   Page-level write-through; indirectly determines the memory type used to
+ *                     access the 4-KByte page referenced by this entry
+ *     4       (PCD)   Page-level cache disable; indirectly determines the memory type used to
+ *                     access the 4-KByte page referenced by this entry
+ *     5       (A)     Accessed; indicates whether software has accessed the 4-KByte page referenced
+ *                     by this entry
+ *     6       (D)     Dirty; indicates whether software has written to the 4-KByte page referenced by
+ *                     this entry
+ *     7       (PAT)   If the PAT is supported, indirectly determines the memory type used to access
+ *                     the 4-KByte page referenced by this entry; otherwise, reserved (must be 0) 1
+ *     8       (G)     Global; if CR4.PGE = 1, determines whether the translation is global;
+ *                     ignored otherwise
+ *     11:9    (IGN)   Ignored
+ *     31:12           Physical address of the 4-KByte page referenced by this entry
+ * ```
+ */
+
+// represents an x86 page table entry
+unit X86_pte : Segment {
+    // the state
+    state = Memory(base) {
+        // one entry named 'pte' at offset 0, length 4 bytes
+        pte [base, 0, 4] {
+            // the following fields at starting bit, ending bit, name
+            0   0 present
+            1   1 writable
+            2   2 usersmode
+            3   3 writethrough
+            4   4 nocache
+            5   5 accessed
+            6   6 dirty
+            7   7 pat
+            8   8 global
+            9  11 ignored
+           12  31 base
+        };
+
+    // the intderface is just a load/store
+    interface = MemoryInterface(base) {
+        base[0..4] => state.pte;
+    }
+
+    // the state is given by a external memory reference (we don't know where it's located at)
+    // so the state will be a memory reference
+    x86_pte(base : MemRef) {
+        // the state must be aligned properly
+        assert aligned(base, 4);
+        assert size(base) == 4;
+    }
+
+    // the base address where this entry translate to
+    get_base(st : state) {
+        return state.pte.page << 12;
+    }
+
+    // here the size is fixed
+    get_size(st : state) {
+        return 4096;
+    };
+
+    // matches a translation flags,
+    match_flags(flags) {
+        if (st.pte.present == 0) {
+            return false;
+        }
+
+        if (flags.write && !st.pte.write) {
+            return false;
+        }
+
+        if (flags.user && !st.pte.user) {
+            return false;
+        }
+
+        return true;
+    };
+
+    // constraints for the mapping
+    map(addr, flags) {
+        assert aligned(addr, 4096);
+        assert type(addr) == Memory || type(addr) == DevMemory;
+        assert type(addr) == DevMemory ==> flags & CACHE_DISABLED
+    }
+
+    // constraints for unmapping
+    unmap() {
+        // ensures: forall flags :: match_flags(flags) == False
+    }
+
+    // constraints for protecting
+    protect(flags) {
+        // update the entry
+        // ensures match_flags(flags) ==> translate(a) == translate(a)
+    }
+
+};
