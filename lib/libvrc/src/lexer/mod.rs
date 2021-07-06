@@ -37,6 +37,7 @@ pub mod token;
 
 use self::comments::*;
 use self::identifier::identifier;
+use self::number::number;
 use self::sourcepos::SourcePos;
 use self::token::*;
 
@@ -112,6 +113,7 @@ fn tokens(input: SourcePos) -> IResult<SourcePos, Token> {
         multispace0,
         alt((
             identifier,
+            number,
             blockcomment,
             linecomment,
             multiop,
