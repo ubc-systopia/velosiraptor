@@ -35,6 +35,7 @@ use super::sourcepos::SourcePos;
 /// Represents the keywords we have
 #[derive(PartialEq, Debug, Clone)]
 pub enum Keyword {
+    Const,
     Unit,
     If,
     Else,
@@ -46,6 +47,7 @@ pub enum Keyword {
 impl fmt::Display for Keyword {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let kwstr = match self {
+            Keyword::Const => "const",
             Keyword::Unit => "unit",
             Keyword::If => "if",
             Keyword::Else => "else",

@@ -66,7 +66,6 @@ macro_rules! namedtag (
     )
 );
 
-
 // delimiters
 namedtag!(lparen, TokenContent::LParen);
 namedtag!(rparen, TokenContent::RParen);
@@ -125,7 +124,6 @@ namedtag!(dotdot, TokenContent::DotDot);
 namedtag!(pathsep, TokenContent::PathSep);
 namedtag!(wildcard, TokenContent::Wildcard);
 
-
 named!(punctuation<SourcePos, Token>, alt!(
     // two symbols that make up this token
     dotdot | pathsep | lshift | rshift | rarrow | fatarrow |
@@ -139,17 +137,10 @@ named!(punctuation<SourcePos, Token>, alt!(
     dot | comma | colon | semicolon
 ));
 
-
 fn tokens(input: SourcePos) -> IResult<SourcePos, Token> {
     delimited(
         multispace0,
-        alt((
-            identifier,
-            number,
-            blockcomment,
-            linecomment,
-            punctuation
-        )),
+        alt((identifier, number, blockcomment, linecomment, punctuation)),
         multispace0,
     )(input)
 }
