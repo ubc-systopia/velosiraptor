@@ -24,7 +24,7 @@
 // SOFTWARE.
 
 // get the lexer tokens
-use crate::lexer::token::{TokenContent, TokenStream, Keyword};
+use crate::lexer::token::{Keyword, TokenContent, TokenStream};
 
 // NOM parsing constructs
 use nom::{take, try_parse};
@@ -109,7 +109,6 @@ terminalparser!(pub dotdot, TokenContent::DotDot);
 terminalparser!(pub pathsep, TokenContent::PathSep);
 terminalparser!(pub wildcard, TokenContent::Wildcard);
 
-
 pub fn ident(input: TokenStream) -> IResult<TokenStream, String> {
     let (rem, tok) = try_parse!(input.clone(), take!(1));
     // we need at least one token
@@ -158,3 +157,4 @@ macro_rules! keywordparser (
 
 keywordparser!(pub kw_unit, Keyword::Unit);
 keywordparser!(pub kw_import, Keyword::Import);
+keywordparser!(pub kw_const, Keyword::Const);

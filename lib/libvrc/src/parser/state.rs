@@ -54,7 +54,7 @@ use super::SourcePos;
 use super::ast::{BitMapEntry, State, StateField};
 
 /// parses and consumes an import statement (`import foo;`) and any following whitespaces
-pub fn parse_state(input: SourcePos) -> IResult<SourcePos, State> {
+pub fn state(input: SourcePos) -> IResult<SourcePos, State> {
     // record the current position
     let pos = input.get_pos();
 

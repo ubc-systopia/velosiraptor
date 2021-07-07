@@ -27,7 +27,7 @@
 use nom::IResult;
 
 // get the tokens
-use crate::parser::terminals::{colon, ident, lbrace, rbrace, kw_unit};
+use crate::parser::terminals::{colon, ident, kw_unit, lbrace, rbrace};
 
 use crate::lexer::token::TokenStream;
 
@@ -75,7 +75,7 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
         }
     };
 
-    // TODO: firmulate the body
+    // TODO: here we have ConstItem | InterfaceItem | StateItem | FunctionItem
     let unitbody = colon;
 
     // then we have the unit block, wrapped in curly braces

@@ -36,7 +36,9 @@ mod expression;
 mod field;
 mod import;
 
+mod constdef;
 mod unit;
+
 use ast::Ast;
 use import::import;
 use unit::unit;

@@ -65,7 +65,7 @@ pub fn import(input: TokenStream) -> IResult<TokenStream, Import> {
 #[cfg(test)]
 use crate::lexer::sourcepos::SourcePos;
 #[cfg(test)]
-use crate::lexer::token::{Token, TokenContent, Keyword};
+use crate::lexer::token::{Keyword, Token, TokenContent};
 #[cfg(test)]
 #[cfg(test)]
 use crate::nom::Slice;

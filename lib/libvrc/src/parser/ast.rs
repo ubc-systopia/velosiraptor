@@ -208,6 +208,29 @@ pub enum Expr {
     },
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct Stmt {
+    pos: SourcePos,
+}
+
+impl fmt::Display for Stmt {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "STATEMENT (TODO) @ {};\n", self.pos)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Const {
+    ident: String,
+    value: u64,
+    pos: SourcePos,
+}
+
+impl Const {
+    pub fn new(ident: String, value: u64, pos: SourcePos) -> Self {
+        Const { ident, value, pos }
+    }
+}
 // pub enum State {
 //     MemoryState {
 //         bases: Vec<String>,
