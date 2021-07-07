@@ -37,7 +37,7 @@ use nom::{
 };
 
 use super::sourcepos::SourcePos;
-use super::token::{Token, TokenContent};
+use super::token::{Token, TokenContent, Keyword};
 
 /// parses a rust-like identifiers
 pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
@@ -52,8 +52,10 @@ pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
 
     // now match the keywords
     let token = match ident.as_str() {
-        "unit" => Token::new(TokenContent::Unit, ident),
-        "import" => Token::new(TokenContent::Import, ident),
+        "true" => Token::new(TokenContent::BoolLiteral(true), ident),
+        "false" => Token::new(TokenContent::BoolLiteral(false), ident),
+        "unit" => Token::new(TokenContent::Keyword(Keyword::Unit), ident),
+        "import" => Token::new(TokenContent::Keyword(Keyword::Import), ident),
         x => Token::new(TokenContent::Identifier(x.to_string()), ident),
     };
 
@@ -196,7 +198,7 @@ fn identifier_test_keywords() {
     let ident = sp.slice(0..6);
     assert_eq!(
         identifier(sp),
-        Ok((rem, Token::new(TokenContent::Import, ident)))
+        Ok((rem, Token::new(TokenContent::Keyword(Keyword::Import), ident)))
     );
 
     let sp = SourcePos::new("stdin", "import2");
@@ -215,7 +217,7 @@ fn identifier_test_keywords() {
     let ident = sp.slice(0..4);
     assert_eq!(
         identifier(sp),
-        Ok((rem, Token::new(TokenContent::Unit, ident)))
+        Ok((rem, Token::new(TokenContent::Keyword(Keyword::Unit), ident)))
     );
 
     let sp = SourcePos::new("stdin", "unit_");
@@ -227,5 +229,24 @@ fn identifier_test_keywords() {
             rem,
             Token::new(TokenContent::Identifier("unit_".to_string()), ident)
         ))
+    );
+}
+
+#[test]
+fn identifier_test_boolean() {
+    let sp = SourcePos::new("stdin", "true");
+    let rem = sp.slice(4..4);
+    let ident = sp.slice(0..4);
+    assert_eq!(
+        identifier(sp),
+        Ok((rem, Token::new(TokenContent::BoolLiteral(true), ident)))
+    );
+
+    let sp = SourcePos::new("stdin", "false");
+    let rem = sp.slice(5..5);
+    let ident = sp.slice(0..5);
+    assert_eq!(
+        identifier(sp),
+        Ok((rem, Token::new(TokenContent::BoolLiteral(false), ident)))
     );
 }

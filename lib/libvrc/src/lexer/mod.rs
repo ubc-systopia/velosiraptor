@@ -58,7 +58,7 @@ use nom::{
 macro_rules! namedtag (
     ($vis:vis $name:ident, $tag: expr) => (
         $vis fn $name(input: SourcePos) -> IResult<SourcePos, Token> {
-            match tag(TokenContent::to_symbol($tag))(input) {
+            match tag(TokenContent::to_str($tag))(input) {
                 Ok((i, s)) => Ok((i, Token::new($tag, s))),
                 Err(x) => Err(x)
             }
@@ -66,47 +66,79 @@ macro_rules! namedtag (
     )
 );
 
-// punctuations
-namedtag!(comma, TokenContent::Comma);
-namedtag!(colon, TokenContent::Colon);
-namedtag!(semicolon, TokenContent::SemiColon);
+
+// delimiters
 namedtag!(lparen, TokenContent::LParen);
 namedtag!(rparen, TokenContent::RParen);
 namedtag!(lbrace, TokenContent::LBrace);
 namedtag!(rbrace, TokenContent::RBrace);
-namedtag!(lbracket, TokenContent::LBracket);
-namedtag!(rbracket, TokenContent::RBracket);
+namedtag!(lbrack, TokenContent::LBracket);
+namedtag!(rbrack, TokenContent::RBracket);
 
-named!(punctuations<SourcePos, Token>, alt!(
-   comma | colon | semicolon | lparen | rparen | lbrace | rbrace | lbracket | rbracket
-));
+// punctuations
+namedtag!(dot, TokenContent::Dot);
+namedtag!(comma, TokenContent::Comma);
+namedtag!(colon, TokenContent::Colon);
+namedtag!(semicolon, TokenContent::SemiColon);
 
 // operators
 namedtag!(plus, TokenContent::Plus);
 namedtag!(minus, TokenContent::Minus);
 namedtag!(star, TokenContent::Star);
+namedtag!(slash, TokenContent::Slash);
+namedtag!(percent, TokenContent::Percent);
+
+// shifts
 namedtag!(lshift, TokenContent::LShift);
 namedtag!(rshift, TokenContent::RShift);
+
+// bitwise operators
 namedtag!(not, TokenContent::Not);
 namedtag!(and, TokenContent::And);
 namedtag!(or, TokenContent::Or);
-namedtag!(arrow, TokenContent::Arrow);
+namedtag!(xor, TokenContent::Xor);
+
+// logical operators
+namedtag!(lnot, TokenContent::LNot);
+namedtag!(land, TokenContent::LAnd);
+namedtag!(lor, TokenContent::LOr);
+
 // comparators
-namedtag!(equal, TokenContent::Equal);
-namedtag!(notequal, TokenContent::NotEqual);
+namedtag!(eq, TokenContent::Eq);
+namedtag!(ne, TokenContent::Ne);
+namedtag!(le, TokenContent::Le);
+namedtag!(ge, TokenContent::Ge);
+namedtag!(lt, TokenContent::Lt);
+namedtag!(gt, TokenContent::Gt);
 
-namedtag!(less, TokenContent::Less);
-namedtag!(greater, TokenContent::Greather);
-namedtag!(leq, TokenContent::LessEqual);
-namedtag!(geq, TokenContent::GreatherEqual);
+// assignment
+namedtag!(assign, TokenContent::Assign);
 
-named!(multiop<SourcePos, Token>, alt!(
-   lshift | rshift | and | or | equal | notequal | leq | geq | arrow
+// arrows
+namedtag!(fatarrow, TokenContent::FatArrow);
+namedtag!(rarrow, TokenContent::RArrow);
+
+// comparators
+namedtag!(at, TokenContent::At);
+namedtag!(underscore, TokenContent::Underscore);
+namedtag!(dotdot, TokenContent::DotDot);
+namedtag!(pathsep, TokenContent::PathSep);
+namedtag!(wildcard, TokenContent::Wildcard);
+
+
+named!(punctuation<SourcePos, Token>, alt!(
+    // two symbols that make up this token
+    dotdot | pathsep | lshift | rshift | rarrow | fatarrow |
+    lnot | land | lor | eq | ne | le | ge |
+
+    // single symbol tokens
+    xor | not | and | or | lt | gt |
+    assign | at | underscore | wildcard |
+    plus | minus | star | slash | percent |
+    lparen | rparen | rbrace | lbrace | lbrack | rbrack |
+    dot | comma | colon | semicolon
 ));
 
-named!(singleops<SourcePos, Token>, alt!(
-    plus | minus | star | not | less | greater
-));
 
 fn tokens(input: SourcePos) -> IResult<SourcePos, Token> {
     delimited(
@@ -116,9 +148,7 @@ fn tokens(input: SourcePos) -> IResult<SourcePos, Token> {
             number,
             blockcomment,
             linecomment,
-            multiop,
-            singleops,
-            punctuations,
+            punctuation
         )),
         multispace0,
     )(input)
@@ -210,10 +240,10 @@ fn operator_tests() {
     assert_eq!(
         Lexer::lex_source_pos(sp.clone()),
         Ok(vec![
-            Token::new(TokenContent::Equal, sp.slice(0..2)),
+            Token::new(TokenContent::Eq, sp.slice(0..2)),
             Token::new(TokenContent::Plus, sp.slice(2..3)),
             Token::new(TokenContent::LShift, sp.slice(3..5)),
-            Token::new(TokenContent::Greather, sp.slice(5..6)),
+            Token::new(TokenContent::Gt, sp.slice(5..6)),
         ])
     );
 }

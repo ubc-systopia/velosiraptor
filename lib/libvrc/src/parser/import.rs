@@ -28,7 +28,7 @@
 // lexer, parser terminals and ast
 use crate::lexer::token::TokenStream;
 use crate::parser::ast::Import;
-use crate::parser::terminals::{ident, import_keyword, semicolon};
+use crate::parser::terminals::{ident, kw_import, semicolon};
 
 // the used nom componets
 use crate::nom::error::ErrorKind;
@@ -41,7 +41,7 @@ pub fn import(input: TokenStream) -> IResult<TokenStream, Import> {
     let pos = input.input_sourcepos();
 
     // try to match the input keyword, there is no match, return.
-    let i1 = match import_keyword(input.clone()) {
+    let i1 = match kw_import(input.clone()) {
         Ok((input, _)) => input,
         Err(x) => return Err(x),
     };
@@ -65,7 +65,7 @@ pub fn import(input: TokenStream) -> IResult<TokenStream, Import> {
 #[cfg(test)]
 use crate::lexer::sourcepos::SourcePos;
 #[cfg(test)]
-use crate::lexer::token::{Token, TokenContent};
+use crate::lexer::token::{Token, TokenContent, Keyword};
 #[cfg(test)]
 #[cfg(test)]
 use crate::nom::Slice;
@@ -77,7 +77,7 @@ fn test_ok() {
     let sp = SourcePos::new("stdio", content);
 
     let tokens = vec![
-        Token::new(TokenContent::Import, sp.slice(0..6)),
+        Token::new(TokenContent::Keyword(Keyword::Import), sp.slice(0..6)),
         Token::new(
             TokenContent::Identifier("foobar".to_string()),
             sp.slice(7..12),
@@ -106,7 +106,7 @@ fn test_errors() {
     let sp = SourcePos::new("stdio", content);
 
     let tokens = vec![
-        Token::new(TokenContent::Import, sp.slice(0..6)),
+        Token::new(TokenContent::Keyword(Keyword::Import), sp.slice(0..6)),
         Token::new(
             TokenContent::Identifier("foobar".to_string()),
             sp.slice(7..12),

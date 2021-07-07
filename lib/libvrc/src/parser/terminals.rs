@@ -24,7 +24,7 @@
 // SOFTWARE.
 
 // get the lexer tokens
-use crate::lexer::token::{TokenContent, TokenStream};
+use crate::lexer::token::{TokenContent, TokenStream, Keyword};
 
 // NOM parsing constructs
 use nom::{take, try_parse};
@@ -33,7 +33,7 @@ use nom::{error_position, Err, IResult, Needed};
 // NOM error kind
 use nom::error::ErrorKind;
 
-macro_rules! namedtag (
+macro_rules! terminalparser (
     ($vis:vis $name:ident, $tag: expr) => (
         $vis fn $name(input: TokenStream) -> IResult<TokenStream, ()> {
             let (rem, tok) = try_parse!(input.clone(), take!(1));
@@ -51,30 +51,64 @@ macro_rules! namedtag (
     )
 );
 
-// keywords
-namedtag!(pub import_keyword, TokenContent::Import);
-namedtag!(pub unit_keyword, TokenContent::Unit);
+// delimiters
+terminalparser!(pub lparen, TokenContent::LParen);
+terminalparser!(pub rparen, TokenContent::RParen);
+terminalparser!(pub lbrace, TokenContent::LBrace);
+terminalparser!(pub rbrace, TokenContent::RBrace);
+terminalparser!(pub lbrack, TokenContent::LBracket);
+terminalparser!(pub rbrack, TokenContent::RBracket);
 
-// punctuation
-namedtag!(pub comma, TokenContent::Comma);
-namedtag!(pub colon, TokenContent::Colon);
-namedtag!(pub semicolon, TokenContent::SemiColon);
-
-// parenthesis
-namedtag!(pub lparen, TokenContent::LParen);
-namedtag!(pub rparen, TokenContent::RParen);
-namedtag!(pub lbrace, TokenContent::LBrace);
-namedtag!(pub rbrace, TokenContent::RBrace);
-namedtag!(pub lbrack, TokenContent::LBracket);
-namedtag!(pub rbrack, TokenContent::RBracket);
+// punctuations
+terminalparser!(pub dot, TokenContent::Dot);
+terminalparser!(pub comma, TokenContent::Comma);
+terminalparser!(pub colon, TokenContent::Colon);
+terminalparser!(pub semicolon, TokenContent::SemiColon);
 
 // operators
-namedtag!(pub plus, TokenContent::Plus);
-namedtag!(pub minus, TokenContent::Minus);
-namedtag!(pub star, TokenContent::Star);
-namedtag!(pub lshift, TokenContent::LShift);
-namedtag!(pub rshift, TokenContent::RShift);
-namedtag!(pub equal, TokenContent::Equal);
+terminalparser!(pub plus, TokenContent::Plus);
+terminalparser!(pub minus, TokenContent::Minus);
+terminalparser!(pub star, TokenContent::Star);
+terminalparser!(pub slash, TokenContent::Slash);
+terminalparser!(pub percent, TokenContent::Percent);
+
+// shifts
+terminalparser!(pub lshift, TokenContent::LShift);
+terminalparser!(pub rshift, TokenContent::RShift);
+
+// bitwise operators
+terminalparser!(pub not, TokenContent::Not);
+terminalparser!(pub and, TokenContent::And);
+terminalparser!(pub or, TokenContent::Or);
+terminalparser!(pub xor, TokenContent::Xor);
+
+// logical operators
+terminalparser!(pub lnot, TokenContent::LNot);
+terminalparser!(pub land, TokenContent::LAnd);
+terminalparser!(pub lor, TokenContent::LOr);
+
+// comparators
+terminalparser!(pub eq, TokenContent::Eq);
+terminalparser!(pub ne, TokenContent::Ne);
+terminalparser!(pub le, TokenContent::Le);
+terminalparser!(pub ge, TokenContent::Ge);
+terminalparser!(pub lt, TokenContent::Lt);
+terminalparser!(pub gt, TokenContent::Gt);
+
+// assignment
+terminalparser!(pub assign, TokenContent::Assign);
+
+// arrows
+terminalparser!(pub fatarrow, TokenContent::FatArrow);
+terminalparser!(pub rarrow, TokenContent::RArrow);
+
+// comparators
+terminalparser!(pub at, TokenContent::At);
+terminalparser!(pub underscore, TokenContent::Underscore);
+terminalparser!(pub dotdot, TokenContent::DotDot);
+terminalparser!(pub pathsep, TokenContent::PathSep);
+terminalparser!(pub wildcard, TokenContent::Wildcard);
+
 
 pub fn ident(input: TokenStream) -> IResult<TokenStream, String> {
     let (rem, tok) = try_parse!(input.clone(), take!(1));
@@ -103,3 +137,24 @@ pub fn num(input: TokenStream) -> IResult<TokenStream, u64> {
         }
     }
 }
+
+macro_rules! keywordparser (
+    ($vis:vis $name:ident, $tag: expr) => (
+        $vis fn $name(input: TokenStream) -> IResult<TokenStream, ()> {
+            let (rem, tok) = try_parse!(input.clone(), take!(1));
+            // we need at least one token
+            if tok.is_empty() {
+                Err(Err::Incomplete(Needed::new(1)))
+            } else {
+                if tok.peek().content == TokenContent::Keyword($tag) {
+                    Ok((rem, ()))
+                } else {
+                    Err(Err::Error(error_position!(input, ErrorKind::Tag)))
+                }
+            }
+        }
+    )
+);
+
+keywordparser!(pub kw_unit, Keyword::Unit);
+keywordparser!(pub kw_import, Keyword::Import);

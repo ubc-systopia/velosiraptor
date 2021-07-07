@@ -27,23 +27,35 @@
 
 // lexer, parser terminals and ast
 use crate::lexer::token::TokenStream;
+use crate::parser::ast::Expr;
 use crate::parser::ast::Operation;
 use crate::parser::terminals::{ident, minus, num, plus};
-use crate::parser::ast::Expr;
 
 // the used nom componets
 use nom::{branch::alt, error::ErrorKind, error_position, sequence::tuple, Err, IResult};
 
 pub fn identexpr(input: TokenStream) -> IResult<TokenStream, Expr> {
     match ident(input.clone()) {
-        Ok((r, i)) => Ok((r, Expr::Identifier {ident: i, pos: input.input_sourcepos() })),
+        Ok((r, i)) => Ok((
+            r,
+            Expr::Identifier {
+                ident: i,
+                pos: input.input_sourcepos(),
+            },
+        )),
         Err(x) => Err(x),
     }
 }
 
 pub fn numexpr(input: TokenStream) -> IResult<TokenStream, Expr> {
     match num(input.clone()) {
-        Ok((r, i)) => Ok((r, Expr::Number {value: i, pos: input.input_sourcepos() })),
+        Ok((r, i)) => Ok((
+            r,
+            Expr::Number {
+                value: i,
+                pos: input.input_sourcepos(),
+            },
+        )),
         Err(x) => Err(x),
     }
 }
@@ -103,12 +115,10 @@ fn test_ok() {
 
     assert!(expression(ts).is_ok());
 
-
     let sp = SourcePos::new("stdio", " 1 + 2 + 2 + 4 + 5");
     let tokens = Lexer::lex_source_pos(sp).unwrap();
     let ts = TokenStream::from_vec(tokens);
     assert!(expression(ts).is_ok());
-
 
     let sp = SourcePos::new("stdio", " 1 + a + b + 4 + 5");
     let tokens = Lexer::lex_source_pos(sp).unwrap();

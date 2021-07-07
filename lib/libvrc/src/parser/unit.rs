@@ -27,7 +27,7 @@
 use nom::IResult;
 
 // get the tokens
-use crate::parser::terminals::{colon, ident, lbrace, rbrace, unit_keyword};
+use crate::parser::terminals::{colon, ident, lbrace, rbrace, kw_unit};
 
 use crate::lexer::token::TokenStream;
 
@@ -43,7 +43,7 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
     let pos = input.input_sourcepos();
 
     // try to match the input keyword, there is no match, return.
-    let i1 = match unit_keyword(input) {
+    let i1 = match kw_unit(input) {
         Ok((input, _)) => input,
         Err(x) => return Err(x),
     };

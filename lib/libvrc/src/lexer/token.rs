@@ -32,82 +32,169 @@ use std::rc::Rc;
 
 use super::sourcepos::SourcePos;
 
+/// Represents the keywords we have
+#[derive(PartialEq, Debug, Clone)]
+pub enum Keyword {
+    Unit,
+    If,
+    Else,
+    Import,
+    Let,
+}
+
+/// Implementation of the [std::fmt::Display] trait for [Token]
+impl fmt::Display for Keyword {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let kwstr = match self {
+            Keyword::Unit => "unit",
+            Keyword::If => "if",
+            Keyword::Else => "else",
+            Keyword::Import => "import",
+            Keyword::Let => "let",
+        };
+        write!(f, "{}", kwstr)
+    }
+}
+
 /// Represents the content of a token
 #[derive(PartialEq, Debug, Clone)]
 pub enum TokenContent {
+    // end of file
     Eof,
+
+    // illegal token
     Illegal,
-    // identifiers and literals
-    Identifier(String),
-    StringLiteral(String),
-    IntLiteral(u64),
-    BoolLiteral(bool),
+
+    // literals, integers of booleans
+    IntLiteral(u64),   // 1234 0x134 0o1234 0b1111
+    BoolLiteral(bool), // true | false
+
+    // identifier
+    Identifier(String), // abc ab_cd
+
+    // Keywords
+    Keyword(Keyword), // unit | import
+
     // comments
-    Comment(String),
-    BlockComment(String),
-    // statements
-    Import,
-    Unit,
-    State,
-    Memory,
-    Registers,
+    Comment(String),      // //
+    BlockComment(String), // /* */
+
     // punctuations
-    Comma,
-    Colon,
-    SemiColon,
-    LParen,
-    RParen,
-    LBrace,
-    RBrace,
-    LBracket,
-    RBracket,
+    Dot,       // .
+    Comma,     // ,
+    Colon,     // :
+    SemiColon, // ;
+
+    // delimiters
+    LParen,   // (
+    RParen,   // )
+    LBrace,   // {
+    RBrace,   // }
+    LBracket, // [
+    RBracket, // ]
+
     // operators
-    Plus,
-    Minus,
-    Star,
-    LShift,
-    RShift,
-    Not,
-    And,
-    Or,
-    Arrow,
+    Plus,    // +
+    Minus,   // -
+    Star,    // *
+    Slash,   // /
+    Percent, // %  (remainder)
+    LShift,  // <<
+    RShift,  // >>
+
+    // bitwise operators
+    Xor, // ^  (xor)
+    Not, // ~
+    And, // &
+    Or,  // |
+
+    // logical operators
+    LNot, // ! logical not
+    LAnd, // &&
+    LOr,  // ||
+
+    // assignments
+    Assign, // =
+
+    // arrows
+    RArrow,   // ->
+    FatArrow, // =>
+
     // comparisons
-    Equal,
-    NotEqual,
-    Less,
-    Greather,
-    LessEqual,
-    GreatherEqual,
+    Eq, // ==
+    Ne, // !=
+    Lt, // <
+    Gt, // >
+    Le, // <=
+    Ge, // >=
+
+    // others, maybe not used
+    At,         // @
+    Underscore, // _
+    DotDot,     // ..  for slices
+    PathSep,    // ::
+    Wildcard,   // ?
 }
 
 /// Implementatin for TokenContent
 impl TokenContent {
-    pub fn to_symbol(tok: Self) -> &'static str {
+    pub fn to_str(tok: TokenContent) -> &'static str {
         match tok {
+            // punctuations
+            TokenContent::Dot => ".",
             TokenContent::Comma => ",",
             TokenContent::Colon => ":",
             TokenContent::SemiColon => ";",
+
+            // delimiters
             TokenContent::LParen => "(",
             TokenContent::RParen => ")",
             TokenContent::LBrace => "{",
             TokenContent::RBrace => "}",
             TokenContent::LBracket => "[",
             TokenContent::RBracket => "]",
+
+            // operators
             TokenContent::Plus => "+",
             TokenContent::Minus => "-",
             TokenContent::Star => "*",
+            TokenContent::Slash => "/",
+            TokenContent::Percent => "%",
             TokenContent::LShift => "<<",
             TokenContent::RShift => ">>",
-            TokenContent::Not => "!",
-            TokenContent::And => "&&",
-            TokenContent::Or => "||",
-            TokenContent::Arrow => "=>",
-            TokenContent::Equal => "==",
-            TokenContent::NotEqual => "!=",
-            TokenContent::Less => "<",
-            TokenContent::Greather => ">",
-            TokenContent::LessEqual => "<=",
-            TokenContent::GreatherEqual => ">=",
+
+            // bitwise operators
+            TokenContent::Xor => "^",
+            TokenContent::Not => "~",
+            TokenContent::And => "&",
+            TokenContent::Or => "|",
+
+            // logical operators
+            TokenContent::LNot => "!",
+            TokenContent::LAnd => "&&",
+            TokenContent::LOr => "||",
+
+            // assignments
+            TokenContent::Assign => "=",
+
+            // arrows
+            TokenContent::RArrow => "->",
+            TokenContent::FatArrow => "=>",
+
+            // comparisons
+            TokenContent::Eq => "==",
+            TokenContent::Ne => "!=",
+            TokenContent::Lt => "<",
+            TokenContent::Gt => ">",
+            TokenContent::Le => "<=",
+            TokenContent::Ge => ">=",
+
+            // others, maybe not used
+            TokenContent::At => "@",
+            TokenContent::Underscore => "_",
+            TokenContent::DotDot => "..",
+            TokenContent::PathSep => "::",
+            TokenContent::Wildcard => "?",
             _ => panic!("unknown symbol for token {:?}", tok),
         }
     }
@@ -139,46 +226,15 @@ impl Token {
 /// Implementation of the [std::fmt::Display] trait for [Token]
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let tokstr = match &self.content {
-            TokenContent::Eof => "End of File".to_string(),
-            TokenContent::Illegal => "Illegal Token".to_string(),
-            TokenContent::Identifier(id) => format!("Identifier({})", id),
-            TokenContent::StringLiteral(st) => format!("StringLiteral({})", st),
-            TokenContent::IntLiteral(n) => format!("IntLiteral({})", n),
-            TokenContent::BoolLiteral(bl) => format!("BoolLiteral({})", bl),
-            TokenContent::Comment(st) => format!("Comment({})", st),
-            TokenContent::BlockComment(st) => format!("BlockComment({})", st),
-            TokenContent::Unit => "Unit".to_string(),
-            TokenContent::State => "State".to_string(),
-            TokenContent::Memory => "Memory".to_string(),
-            TokenContent::Import => "Import".to_string(),
-            TokenContent::Registers => "Registers".to_string(),
-            TokenContent::Comma => "Comma".to_string(),
-            TokenContent::Colon => "Colon".to_string(),
-            TokenContent::SemiColon => "SemiColon".to_string(),
-            TokenContent::LParen => "LParen".to_string(),
-            TokenContent::RParen => "RParen".to_string(),
-            TokenContent::LBrace => "LBrace".to_string(),
-            TokenContent::RBrace => "RBrace".to_string(),
-            TokenContent::LBracket => "LBracket".to_string(),
-            TokenContent::RBracket => "RBracket".to_string(),
-            TokenContent::Plus => "Plus".to_string(),
-            TokenContent::Minus => "Minus".to_string(),
-            TokenContent::Star => "Star".to_string(),
-            TokenContent::LShift => "LShift".to_string(),
-            TokenContent::RShift => "RShift".to_string(),
-            TokenContent::Equal => "Equal".to_string(),
-            TokenContent::Arrow => "=>".to_string(),
-            TokenContent::Not => "!".to_string(),
-            TokenContent::And => "&&".to_string(),
-            TokenContent::Or => "||".to_string(),
-            TokenContent::NotEqual => "!=".to_string(),
-            TokenContent::Less => "<".to_string(),
-            TokenContent::Greather => ">".to_string(),
-            TokenContent::LessEqual => "<=".to_string(),
-            TokenContent::GreatherEqual => ">=".to_string(),
-        };
-        write!(f, "{}", tokstr)
+        match &self.content {
+            TokenContent::Identifier(id) => write!(f, "{}", id),
+            TokenContent::IntLiteral(n) => write!(f, "{}", n),
+            TokenContent::BoolLiteral(bl) => write!(f, "{}", bl),
+            TokenContent::Comment(st) => write!(f, "Comment({})", st),
+            TokenContent::BlockComment(st) => write!(f, "BlockComment({})", st),
+            TokenContent::Keyword(k) => write!(f, "{}", k),
+            other => write!(f, "{}", TokenContent::to_str(other.clone())),
+        }
     }
 }
 
