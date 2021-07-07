@@ -31,7 +31,8 @@ unit MMU {
 
     }
 
-    // the base address is the entry shifted by 34 (16 GB)
+    // the translation function is basically forwarded to the next
+    // element.
     translate(vaddr) -> paddr {
         if state.cr0.paging_enabled {
             // here the translation actually moves forward

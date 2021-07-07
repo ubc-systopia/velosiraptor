@@ -1,0 +1,148 @@
+/*
+ * This describes the TLB of an MIPS R4700 TLB.
+ */
+
+// maps to a physical frame
+unit Entry : Segment {
+
+    size = state.pagesize;
+
+    Entry() {
+
+    }
+
+    get_base() {
+
+    }
+
+    get_size() {
+
+    }
+}
+
+// maps the entry pair to the entry
+unit EntryPair : StaticMap {
+
+    EntryPair() {
+
+    }
+
+
+}
+
+// the state of a
+state = Register {
+    mask [ _, _, 8 ] {
+        13 24 mask
+    };
+
+    EntryHi [ _, _, 8 ] {
+         0  7  asid
+        12 12  global
+        13 39  vppn2
+        60 61  region
+    };
+    EntryLo0 [ _, _, 8 ] {
+        1 1  valid
+        2 2  dirty
+        3 5  coherency
+        6 29 pfn
+    };
+    EntryLo1  [ _, _, 8 ] {
+        1 1  valid
+        2 2  dirty
+        3 5  coherency
+        6 29 pfn
+    };
+}
+
+interface = Register {
+    entrylo0
+    entrylo1
+    entryhi
+    mask
+    index
+    random
+    wired
+
+    tlbri ::
+        entrylo0 = state[index].entrylo0;
+        entrylo1 = state[index].entrylo1;
+        entryhi = state[index].entryhi
+        mask = state[index].mask
+
+
+    tlbwri ::
+        state[index].entrylo0 = entrylo0;
+        state[index].entrylo1 = entrylo1;
+        state[index].entryhi = entryhi;
+        state[index].mask = mask;
+}
+
+// maps two consecutive virtual pages to the entry pair
+unit VirtualPage : Assoc {
+    // the maximum size is 40 bits here
+    size = 40;
+
+    VirtualPage() {
+
+    }
+
+    get_base() {
+
+    }
+
+    get_size() {
+
+    }
+}
+
+
+// This defines an SMPT Entry
+unit R4700 {
+
+    // the MMU map 48 bits of internal address space
+    size = 64;
+
+    // the state is given as a register
+    state = Register {
+
+    };
+
+    // the interface is given by the MMIO register
+    interface = RegisterMove {
+        cr3 => state.cr3;
+        cr0 => state.cr0;
+    };
+
+    // constructor
+    MMU() {
+
+    }
+
+    // the translation function is basically forwarded to the next
+    // element.
+    translate(vaddr) -> paddr {
+        if state.cr0.paging_enabled {
+            // here the translation actually moves forward
+            return  addr @ PML4(state.cr3.base << 12)
+        } else {
+            return paddr;
+        }
+    }
+
+    map(addr, flags) {
+        assert type(addr) == PML4
+        assert aligned(addr, 4k);
+        assert size(addr) == 4k;
+    }
+
+    // can't unmap
+    unmap();
+
+    // can't protect
+    protect();
+ }
+
+
+

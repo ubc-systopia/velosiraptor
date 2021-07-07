@@ -22,7 +22,7 @@ unit Segment {
     abstract get_size();
     abstract match_flags(flags);
 
-    translate(va : Address, flags: Flags) -> Unit @ Address {
+    fn translate(va : Address, flags: Flags) -> Unit @ Address {
         if (match_flags(flags)) {
             raise;
         }
@@ -34,7 +34,7 @@ unit Segment {
         return va + get_base()
     }
 
-    map(addr, flags);
-    unmap();
-    protect();
+    fn map(addr, flags);
+    fn unmap();
+    fn protect();
  }

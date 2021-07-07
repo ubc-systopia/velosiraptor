@@ -65,12 +65,12 @@ unit X86_pte : Segment {
     }
 
     // the base address where this entry translate to
-    get_base(st : state) {
+    get_base() {
         return state.pte.page << 12;
     }
 
     // here the size is fixed
-    get_size(st : state) {
+    get_size() {
         return 4096;
     };
 
@@ -92,7 +92,7 @@ unit X86_pte : Segment {
     };
 
     // constraints for the mapping
-    map(addr, flags) {
+    map(inaddr, outaddr, flags) {
         assert aligned(addr, 4096);
         assert type(addr) == Memory || type(addr) == DevMemory;
         assert type(addr) == DevMemory ==> flags & CACHE_DISABLED
