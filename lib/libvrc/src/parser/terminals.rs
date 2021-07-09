@@ -137,6 +137,20 @@ pub fn num(input: TokenStream) -> IResult<TokenStream, u64> {
     }
 }
 
+pub fn boolean(input: TokenStream) -> IResult<TokenStream, bool> {
+    let (rem, tok) = try_parse!(input.clone(), take!(1));
+    // we need at least one token
+    if tok.is_empty() {
+        Err(Err::Incomplete(Needed::new(1)))
+    } else {
+        let id = tok.peek();
+        match &id.content {
+            TokenContent::BoolLiteral(s) => Ok((rem, *s)),
+            _ => Err(Err::Error(error_position!(input, ErrorKind::Digit))),
+        }
+    }
+}
+
 macro_rules! keywordparser (
     ($vis:vis $name:ident, $tag: expr) => (
         $vis fn $name(input: TokenStream) -> IResult<TokenStream, ()> {
