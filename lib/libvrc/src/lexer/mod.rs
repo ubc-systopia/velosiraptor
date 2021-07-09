@@ -152,11 +152,12 @@ impl Lexer {
     /// as Tokens.
     pub fn lex_source_pos(sp: SourcePos) -> Result<Vec<Token>, LexerError> {
         log::debug!("start lexing...");
-        let (i, tok) = match many1(tokens)(sp) {
+        let (i, mut tok) = match many1(tokens)(sp) {
             Ok((r, tok)) => (r, tok),
             Err(x) => return Err(LexerError::NoTokens),
         };
         log::debug!("lexing done.");
+        tok.push(Token::new(TokenContent::Eof, i));
         Ok(tok)
     }
 
@@ -223,6 +224,7 @@ fn operator_tests() {
             Token::new(TokenContent::Plus, sp.slice(0..1)),
             Token::new(TokenContent::Plus, sp.slice(1..2)),
             Token::new(TokenContent::Plus, sp.slice(2..3)),
+            Token::new(TokenContent::Eof, sp.slice(3..3))
         ])
     );
 
@@ -235,6 +237,7 @@ fn operator_tests() {
             Token::new(TokenContent::Plus, sp.slice(2..3)),
             Token::new(TokenContent::LShift, sp.slice(3..5)),
             Token::new(TokenContent::Gt, sp.slice(5..6)),
+            Token::new(TokenContent::Eof, sp.slice(6..6))
         ])
     );
 }
@@ -277,5 +280,5 @@ fn basic_tests() {
         Err(_) => panic!("lexing failed"),
     };
     // there should be 10 tokens
-    assert_eq!(tok.len(), 10);
+    assert_eq!(tok.len(), 11);
 }

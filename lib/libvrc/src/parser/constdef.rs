@@ -76,7 +76,7 @@ fn test_ok() {
     assert_eq!(
         constdef(ts.clone()),
         Ok((
-            ts.slice(5..5),
+            ts.slice(5..6),
             Const::new("FOO".to_string(), 1234, sp.slice(0..5))
         ))
     );

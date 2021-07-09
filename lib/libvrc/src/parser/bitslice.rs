@@ -35,16 +35,27 @@ use nom::{error::ErrorKind, error_position, sequence::tuple, Err, IResult};
 
 /// Parses a bitslice definition
 ///
+/// a [BitSlice] represents a slice of bits within a field.
+/// It lists the start, and end bits with an identifier.
+///
+/// # Requirements
+///
+/// The start bit shall be less or equal to the end bit number.
+/// The end bit shall be within the supported range of the field
+///
+/// Note: those requirements are NOT checked in the parsing part.
+///
+/// # Example
+///
+/// `0 15 foobar` -- represents bits 0 to 15 and associate the identifier "foobar":
+/// `0  0 bar`    -- represents bit 0 and associates the identifier "bar"
 ///
 pub fn bitslice(input: TokenStream) -> IResult<TokenStream, BitSlice> {
-    // record the position
+    // record the current position of the bit slice
     let pos = input.input_sourcepos();
 
-    // the first thing here shall be a number
-    let (i1, start) = match num(input.clone()) {
-        Ok((rem, s)) => (rem, s),
-        Err(x) => return Err(x),
-    };
+    // the first thing here shall be a number, just return the error here
+    let (i1, start) = num(input.clone())?;
 
     // we match two numbers and an identifier
     let (rem, end, name) = match tuple((num, ident))(i1) {
@@ -64,27 +75,18 @@ pub fn bitslice(input: TokenStream) -> IResult<TokenStream, BitSlice> {
 }
 
 #[cfg(test)]
-use crate::lexer::{
-    sourcepos::SourcePos,
-    token::{Token, TokenContent},
-};
+use crate::lexer::{sourcepos::SourcePos, Lexer};
+
 #[cfg(test)]
 use crate::nom::Slice;
 
 #[test]
 fn test_ok() {
     // corresponds to `0 16 foobar`
-    let content = "0 16 foobar";
-    let sp = SourcePos::new("stdio", content);
-    let tokens = vec![
-        Token::new(TokenContent::IntLiteral(0), sp.slice(0..1)),
-        Token::new(TokenContent::IntLiteral(16), sp.slice(2..4)),
-        Token::new(
-            TokenContent::Identifier("foobar".to_string()),
-            sp.slice(4..11),
-        ),
-    ];
-    let ts = TokenStream::from_slice(&tokens);
+    let sp = SourcePos::new("stdio", "0 16 foobar");
+    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
+    let ts = TokenStream::from_vec(tokens);
+
     let pos = ts.input_sourcepos();
     let ts2 = ts.slice(3..);
     assert_eq!(
@@ -104,17 +106,9 @@ fn test_ok() {
 #[test]
 fn test_err() {
     // corresponds to `0 foobar` missing end bit
-    let content = "0 foobar";
-    let sp = SourcePos::new("stdio", content);
-
-    let tokens = vec![
-        Token::new(TokenContent::IntLiteral(0), sp.slice(0..1)),
-        Token::new(
-            TokenContent::Identifier("foobar".to_string()),
-            sp.slice(2..8),
-        ),
-    ];
-    let ts = TokenStream::from_slice(&tokens);
+    let sp = SourcePos::new("stdio", "0 foobar");
+    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
+    let ts = TokenStream::from_vec(tokens);
     let ts2 = ts.slice(1..);
     assert_eq!(
         bitslice(ts),
@@ -122,16 +116,12 @@ fn test_err() {
     );
 
     // corresponds to `0 16`  missing identifier
-    let content = "0 16";
-    let sp = SourcePos::new("stdio", content);
-    let tokens = vec![
-        Token::new(TokenContent::IntLiteral(0), sp.slice(0..1)),
-        Token::new(TokenContent::IntLiteral(16), sp.slice(2..4)),
-    ];
-    let ts = TokenStream::from_slice(&tokens);
-    let ts2 = ts.slice(0..);
+    let sp = SourcePos::new("stdio", "0 16 1");
+    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    let ts2 = ts.slice(2..);
     assert_eq!(
         bitslice(ts),
-        Err(Err::Failure(error_position!(ts2, ErrorKind::Eof)))
+        Err(Err::Failure(error_position!(ts2, ErrorKind::AlphaNumeric)))
     );
 }
