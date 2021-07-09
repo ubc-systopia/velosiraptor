@@ -396,13 +396,13 @@ fn test_ok() {
         Ok((ts.slice(len - 1..len), String::from("(((a && b) || (c && d)) || (x > 9))")))
     );
 
-    let sp = SourcePos::new("stdio", "a.a && b.b || c.x && d.d.a || x > 9");
+    let sp = SourcePos::new("stdio", "a.a && b.b || c.x && d.d.a || x > 9 && !zyw");
     let tokens = Lexer::lex_source_pos(sp).unwrap();
     let len = tokens.len();
     let ts = TokenStream::from_vec(tokens);
     assert_eq!(
         expr(ts.clone()).map(|(i, x)| (i, format!("{}", x))),
-        Ok((ts.slice(len - 1..len), String::from("(((a.a && b.b) || (c.x && d.d.a)) || (x > 9))")))
+        Ok((ts.slice(len - 1..len), String::from("(((a.a && b.b) || (c.x && d.d.a)) || ((x > 9) && !(zyw)))")))
     );
 
     let sp = SourcePos::new("stdio", " 1 + 2 + 2 + 4 + 5");
