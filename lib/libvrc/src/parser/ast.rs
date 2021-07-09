@@ -185,27 +185,124 @@ impl fmt::Display for Field {
     }
 }
 
+/// Binary operations
 #[derive(Debug, PartialEq, Clone)]
-pub enum Operation {
+pub enum BinOp {
     Plus,
     Minus,
+    Multiply,
+    Divide,
+    Modulo,
+    LShift,
+    RShift,
+    And,
+    Xor,
+    Or,
+    Eq,
+    Ne,
+    Lt,
+    Gt,
+    Le,
+    Ge,
+    Land,
+    Lor,
 }
+
+impl fmt::Display for BinOp {
+    fn fmt(&self, format: &mut fmt::Formatter) -> fmt::Result {
+        use self::BinOp::*;
+        match self {
+            Plus => write!(format, "+"),
+            Minus => write!(format, "-"),
+            Multiply => write!(format, "*"),
+            Divide => write!(format, "/"),
+            Modulo => write!(format, "%"),
+            LShift => write!(format, "<<"),
+            RShift => write!(format, ">>"),
+            And => write!(format, "&"),
+            Xor => write!(format, "^"),
+            Or => write!(format, "|"),
+            Eq => write!(format, "=="),
+            Ne => write!(format, "!="),
+            Lt => write!(format, "<"),
+            Gt => write!(format, ">"),
+            Le => write!(format, "<="),
+            Ge => write!(format, ">="),
+            Land => write!(format, "&&"),
+            Lor => write!(format, "||"),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum UnOp {
+    Not,
+    LNot,
+    Ref,
+}
+
+impl fmt::Display for UnOp {
+    fn fmt(&self, format: &mut fmt::Formatter) -> fmt::Result {
+        use self::UnOp::*;
+        match self {
+            Not => write!(format, "~"),
+            LNot => write!(format, "!"),
+            Ref => write!(format, "&"),
+        }
+    }
+}
+
+use std::ops::Range;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
     Identifier {
-        ident: String,
+        path: Vec<String>,
         pos: SourcePos,
     },
     Number {
         value: u64,
         pos: SourcePos,
     },
-    BinOp {
-        op: Operation,
+    Boolean {
+        value: bool,
+        pos: SourcePos,
+    },
+    BinaryOperation {
+        op: BinOp,
         lhs: Box<Expr>,
         rhs: Box<Expr>,
         pos: SourcePos,
     },
+    UnaryOperation {
+        op: UnOp,
+        val: Box<Expr>,
+        pos: SourcePos,
+    },
+    FnCall {
+        path: Vec<String>,
+        pos: SourcePos,
+    },
+    Slice {
+        path: Vec<String>,
+        slice: Box<Expr>,
+        pos: SourcePos,
+    },
+}
+
+impl fmt::Display for Expr {
+    fn fmt(&self, format: &mut fmt::Formatter) -> fmt::Result {
+        use self::Expr::*;
+        match self {
+            Identifier { path, pos } => write!(format, "{}", path.join(".")),
+            Number { value, pos } => write!(format, "{}", value),
+            Boolean { value, pos } => write!(format, "{}", value),
+            BinaryOperation { op, lhs, rhs, pos } => write!(format, "({} {} {})", lhs, op, rhs),
+            UnaryOperation { op, val, pos } => write!(format, "{}({})", op, val),
+            FnCall { path, pos } => write!(format, "foo"),
+            Slice { path, slice, pos } => write!(format, "foo"),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
