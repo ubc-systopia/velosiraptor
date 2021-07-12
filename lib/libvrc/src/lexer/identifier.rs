@@ -57,6 +57,9 @@ pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
         "unit" => Token::new(TokenContent::Keyword(Keyword::Unit), ident),
         "import" => Token::new(TokenContent::Keyword(Keyword::Import), ident),
         "const" => Token::new(TokenContent::Keyword(Keyword::Const), ident),
+        "let" => Token::new(TokenContent::Keyword(Keyword::Let), ident),
+        "if" => Token::new(TokenContent::Keyword(Keyword::If), ident),
+        "else" => Token::new(TokenContent::Keyword(Keyword::Else), ident),
         x => Token::new(TokenContent::Identifier(x.to_string()), ident),
     };
 

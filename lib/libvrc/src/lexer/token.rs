@@ -197,6 +197,7 @@ impl TokenContent {
             TokenContent::DotDot => "..",
             TokenContent::PathSep => "::",
             TokenContent::Wildcard => "?",
+            TokenContent::Eof => "EOF",
             _ => panic!("unknown symbol for token {:?}", tok),
         }
     }
