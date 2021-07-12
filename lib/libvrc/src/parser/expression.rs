@@ -65,8 +65,19 @@ use nom::{
 use nom::multi::many0;
 use nom::sequence::{pair, preceded, terminated};
 
+/// parses expressions
 pub fn expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
+    lor_expr(input)
+}
+
+/// parses boolean expressions
+pub fn bool_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+    lor_expr(input)
+}
+
+/// parser arithmetic expressions
+pub fn arith_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     lor_expr(input)
 }
 
@@ -383,9 +394,11 @@ fn test_ok() {
     let ts = TokenStream::from_vec(tokens);
     assert_eq!(
         expr(ts.clone()).map(|(i, x)| (i, format!("{}", x))),
-        Ok((ts.slice(len - 1..len), String::from("(((1 + (2 * 3)) + 4) << (5 * 2))")))
+        Ok((
+            ts.slice(len - 1..len),
+            String::from("(((1 + (2 * 3)) + 4) << (5 * 2))")
+        ))
     );
-
 
     let sp = SourcePos::new("stdio", "a && b || c && d || x > 9");
     let tokens = Lexer::lex_source_pos(sp).unwrap();
@@ -393,7 +406,10 @@ fn test_ok() {
     let ts = TokenStream::from_vec(tokens);
     assert_eq!(
         expr(ts.clone()).map(|(i, x)| (i, format!("{}", x))),
-        Ok((ts.slice(len - 1..len), String::from("(((a && b) || (c && d)) || (x > 9))")))
+        Ok((
+            ts.slice(len - 1..len),
+            String::from("(((a && b) || (c && d)) || (x > 9))")
+        ))
     );
 
     let sp = SourcePos::new("stdio", "a.a && b.b || c.x && d.d.a || x > 9 && !zyw");
@@ -402,7 +418,10 @@ fn test_ok() {
     let ts = TokenStream::from_vec(tokens);
     assert_eq!(
         expr(ts.clone()).map(|(i, x)| (i, format!("{}", x))),
-        Ok((ts.slice(len - 1..len), String::from("(((a.a && b.b) || (c.x && d.d.a)) || ((x > 9) && !(zyw)))")))
+        Ok((
+            ts.slice(len - 1..len),
+            String::from("(((a.a && b.b) || (c.x && d.d.a)) || ((x > 9) && !(zyw)))")
+        ))
     );
 
     let sp = SourcePos::new("stdio", " 1 + 2 + 2 + 4 + 5");
@@ -414,6 +433,14 @@ fn test_ok() {
     let tokens = Lexer::lex_source_pos(sp).unwrap();
     let ts = TokenStream::from_vec(tokens);
     assert!(expr(ts).is_ok());
-
-
+}
+#[test]
+fn test_err() {
+    let sp = SourcePos::new("stdio", "a + b) && (c < 3) + 3");
+    let tokens = Lexer::lex_source_pos(sp).unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    let res = expr(ts.clone());
+    let (r1, r2) = res.unwrap();
+    println!("{}\n\n{}", r1, r2);
+    assert!(expr(ts.clone()).is_err());
 }
