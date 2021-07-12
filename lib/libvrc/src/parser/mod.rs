@@ -32,9 +32,9 @@ pub mod terminals;
 //mod state;
 mod bitslice;
 mod expression;
-mod statement;
 mod field;
 mod import;
+mod statement;
 
 mod constdef;
 mod unit;

@@ -26,8 +26,8 @@
 //! State Field parsing
 
 // lexer, parser terminals and ast
-use crate::lexer::token::TokenStream;
 use crate::ast::ast::Field;
+use crate::lexer::token::TokenStream;
 use crate::parser::bitslice::bitslice;
 use crate::parser::terminals::{comma, ident, lbrace, lbrack, num, rbrace, rbrack};
 
@@ -86,13 +86,13 @@ pub fn field(input: TokenStream) -> IResult<TokenStream, Field> {
 }
 
 #[cfg(test)]
+use crate::ast::ast::BitSlice;
+#[cfg(test)]
 use crate::lexer::sourcepos::SourcePos;
 #[cfg(test)]
 use crate::lexer::token::{Token, TokenContent};
 #[cfg(test)]
 use crate::nom::Slice;
-#[cfg(test)]
-use crate::ast::ast::BitSlice;
 
 #[test]
 fn test_ok() {

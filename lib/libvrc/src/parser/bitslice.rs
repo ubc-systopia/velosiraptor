@@ -26,8 +26,8 @@
 //! State definition parsing
 
 // lexer, parser terminals and ast
-use crate::lexer::token::TokenStream;
 use crate::ast::ast::BitSlice;
+use crate::lexer::token::TokenStream;
 use crate::parser::terminals::{ident, num};
 
 // the used nom componets

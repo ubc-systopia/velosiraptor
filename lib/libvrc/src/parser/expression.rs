@@ -26,10 +26,10 @@
 //! State definition parsing
 
 // lexer, parser terminals and ast
-use crate::lexer::sourcepos::SourcePos;
-use crate::lexer::token::TokenStream;
 use crate::ast::ast::Expr;
 use crate::ast::ast::{BinOp, UnOp};
+use crate::lexer::sourcepos::SourcePos;
+use crate::lexer::token::TokenStream;
 use crate::parser::terminals::*;
 
 // Precedence of Operators  (strong to weak)

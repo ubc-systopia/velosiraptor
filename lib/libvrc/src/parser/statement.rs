@@ -26,9 +26,9 @@
 //! State definition parsing
 
 // lexer, parser terminals and ast
-use crate::lexer::token::TokenStream;
 use crate::ast::ast::Expr;
 use crate::ast::ast::Stmt;
+use crate::lexer::token::TokenStream;
 use crate::parser::expression::expr;
 use crate::parser::terminals::{eq, ident, kw_else, kw_if, kw_let, lbrace, rbrace, semicolon};
 

@@ -26,14 +26,14 @@
 //! Import statement parsing
 
 // lexer, parser terminals and ast
-use crate::lexer::token::TokenStream;
 use crate::ast::ast::Import;
+use crate::lexer::token::TokenStream;
 use crate::parser::terminals::{ident, kw_import, semicolon};
 
 // the used nom componets
 use crate::nom::error::ErrorKind;
 use nom::sequence::terminated;
-use nom::{error_position, Err, IResult};
+use nom::{error_position, Err, IResult, Slice};
 
 /// parses and consumes an import statement (`import foo;`) and any following whitespaces
 pub fn import(input: TokenStream) -> IResult<TokenStream, Import> {
@@ -49,7 +49,7 @@ pub fn import(input: TokenStream) -> IResult<TokenStream, Import> {
     // ok, so we've seen the `import` keyword, so the next must be an identifier.
     // there should be at least one whitespace before the identifier
     match terminated(ident, semicolon)(i1) {
-        Ok((r, ident)) => Ok((r, Import::new(ident, pos))),
+        Ok((r, name)) => Ok((r, Import { name, pos : pos.slice(0..4)})),
         Err(e) => {
             // if we have parser failure, indicate this!
             let (i, k) = match e {

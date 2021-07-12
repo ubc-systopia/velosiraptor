@@ -33,7 +33,6 @@ use simplelog::{Config, LevelFilter, SimpleLogger};
 // get the parser module
 use libvrc::parser::Parser;
 
-
 fn parse_cmdline() -> clap::ArgMatches<'static> {
     App::new("vtrc")
         .version("0.1.0")
@@ -92,7 +91,7 @@ fn main() {
     // let's try to create a file parser
     let ast = match Parser::parse_file(infile) {
         Ok((ast, _)) => ast,
-        Err(x)       => {
+        Err(x) => {
             log::error!("file parsing failed");
             return;
         }
@@ -100,7 +99,6 @@ fn main() {
 
     println!("{}", ast);
     // let mut parser = Parser::from_file(infile.to_string()).expect("failed to construct the parser");
-
 
     // perform checks
 }

@@ -35,8 +35,8 @@ use nom::{
 use nom::{error::ErrorKind, error_position, Err};
 
 // lexer / parser imports
-use crate::lexer::token::TokenStream;
 use crate::ast::ast::Const;
+use crate::lexer::token::TokenStream;
 use crate::parser::terminals::{assign, ident, kw_const, num, semicolon};
 
 /// parses a constat item of a unit
@@ -50,7 +50,14 @@ pub fn constdef(input: TokenStream) -> IResult<TokenStream, Const> {
     let (i1, _) = kw_const(input)?;
 
     match pair(terminated(ident, assign), terminated(num, semicolon))(i1.clone()) {
-        Ok((rem, (ident, val))) => Ok((rem, Const::new(ident, val, pos.slice(0..5)))),
+        Ok((rem, (ident, value))) => Ok((
+            rem,
+            Const::Integer {
+                ident,
+                value,
+                pos: pos.slice(0..5),
+            },
+        )),
         Err(x) => {
             // if we have parser failure, indicate this!
             let (i, k) = match x {

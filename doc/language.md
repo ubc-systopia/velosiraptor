@@ -93,7 +93,7 @@ or extends them (see Inheritance).
 
 ```
 unit L1Table {
-    ... // TODO: add the constructs here
+    [ CONSTDEF | INTERFACEDEF | STATEDEF | FUNCTIONDEF | CONSTRUCTOR ]*
 };
 ```
 
