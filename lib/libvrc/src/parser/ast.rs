@@ -306,13 +306,42 @@ impl fmt::Display for Expr {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Stmt {
-    pos: SourcePos,
+pub enum Stmt {
+    Block {
+        stmts: Vec<Stmt>,
+        pos: SourcePos,
+    },
+    Assign {
+        lhs: String,
+        rhs: Expr,
+        pos: SourcePos,
+    },
+    IfElse {
+        cond: Expr,
+        then: Box<Stmt>,
+        other: Option<Box<Stmt>>,
+        pos: SourcePos,
+    },
 }
 
 impl fmt::Display for Stmt {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "STATEMENT (TODO) @ {};\n", self.pos)
+        use self::Stmt::*;
+        match self {
+            Block { stmts, pos } => {
+                write!(f, "{{ {} }} \n", "TODO")
+            }
+            Assign { lhs, rhs, pos } => write!(f, "let {} = {};\n", rhs, rhs),
+            IfElse {
+                cond,
+                then,
+                other,
+                pos,
+            } => match other {
+                None => write!(f, "if {} {} \n", cond, then),
+                Some(x) => write!(f, "if {} {} else {} \n", cond, then, x),
+            },
+        }
     }
 }
 

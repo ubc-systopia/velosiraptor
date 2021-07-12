@@ -35,6 +35,7 @@ mod bitslice;
 mod expression;
 mod field;
 mod import;
+mod statement;
 
 mod constdef;
 mod unit;
