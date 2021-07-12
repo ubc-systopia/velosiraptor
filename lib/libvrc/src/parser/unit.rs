@@ -35,7 +35,7 @@ use nom::combinator::opt;
 use nom::sequence::{delimited, preceded};
 use nom::{error_position, Err};
 
-use crate::parser::ast::Unit;
+use crate::ast::ast::Unit;
 
 /// parses and consumes an import statement (`unit foo {};`) and any following whitespaces
 pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {

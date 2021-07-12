@@ -27,7 +27,7 @@
 
 // lexer, parser terminals and ast
 use crate::lexer::token::TokenStream;
-use crate::parser::ast::State;
+use crate::ast::ast::State;
 use crate::parser::terminals::{ident, import_keyword, semicolon};
 
 // the used nom componets

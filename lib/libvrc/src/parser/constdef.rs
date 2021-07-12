@@ -36,7 +36,7 @@ use nom::{error::ErrorKind, error_position, Err};
 
 // lexer / parser imports
 use crate::lexer::token::TokenStream;
-use crate::parser::ast::Const;
+use crate::ast::ast::Const;
 use crate::parser::terminals::{assign, ident, kw_const, num, semicolon};
 
 /// parses a constat item of a unit

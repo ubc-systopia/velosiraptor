@@ -28,19 +28,18 @@
 use custom_error::custom_error;
 use std::rc::Rc;
 
-pub mod ast;
 pub mod terminals;
 //mod state;
 mod bitslice;
 mod expression;
+mod statement;
 mod field;
 mod import;
-mod statement;
 
 mod constdef;
 mod unit;
 
-use ast::Ast;
+use crate::ast::ast::Ast;
 use import::import;
 use unit::unit;
 

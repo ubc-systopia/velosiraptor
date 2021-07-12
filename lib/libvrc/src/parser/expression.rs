@@ -28,8 +28,8 @@
 // lexer, parser terminals and ast
 use crate::lexer::sourcepos::SourcePos;
 use crate::lexer::token::TokenStream;
-use crate::parser::ast::Expr;
-use crate::parser::ast::{BinOp, UnOp};
+use crate::ast::ast::Expr;
+use crate::ast::ast::{BinOp, UnOp};
 use crate::parser::terminals::*;
 
 // Precedence of Operators  (strong to weak)
@@ -42,11 +42,11 @@ use crate::parser::terminals::*;
 // Unary - * ! & &mut                                   !a
 // as                               left to right       as
 // * / %                            left to right       a * b, a / b, a % b
-// + -                              left to right
-// << >>                            left to right
-// &                                left to right
-// ^                                left to right
-// |                                left to right
+// + -                              left to right       a + b, a - b
+// << >>                            left to right       a << b, a >> b,
+// &                                left to right       a & b
+// ^                                left to right       a * b
+// |                                left to right       a | b
 // == != < > <= >=                  Require parentheses
 // &&                               left to right
 // ||                               left to right
@@ -72,11 +72,16 @@ pub fn expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 }
 
 /// parses boolean expressions
+///
+/// this is an expression that evaluates to a boolean value.
+///
 pub fn bool_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     lor_expr(input)
 }
 
 /// parser arithmetic expressions
+///
+/// an arithmetic expression evalutes to a number.
 pub fn arith_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     lor_expr(input)
 }

@@ -27,7 +27,7 @@
 
 // lexer, parser terminals and ast
 use crate::lexer::token::TokenStream;
-use crate::parser::ast::Field;
+use crate::ast::ast::Field;
 use crate::parser::bitslice::bitslice;
 use crate::parser::terminals::{comma, ident, lbrace, lbrack, num, rbrace, rbrack};
 
@@ -92,7 +92,7 @@ use crate::lexer::token::{Token, TokenContent};
 #[cfg(test)]
 use crate::nom::Slice;
 #[cfg(test)]
-use crate::parser::ast::BitSlice;
+use crate::ast::ast::BitSlice;
 
 #[test]
 fn test_ok() {
