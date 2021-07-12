@@ -35,24 +35,40 @@ use super::sourcepos::SourcePos;
 /// Represents the keywords we have
 #[derive(PartialEq, Debug, Clone)]
 pub enum Keyword {
+    /// constant values
     Const,
+    /// unit definitins
     Unit,
+    /// conditional statemt
     If,
+    /// conditional else branch
     Else,
+    /// import statements
     Import,
+    /// defines a local variable
     Let,
+    /// represents an address value
+    Addr,
+    /// represents a size value
+    Size,
+    /// represents a function
+    Fn,
 }
 
 /// Implementation of the [std::fmt::Display] trait for [Token]
 impl fmt::Display for Keyword {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::Keyword::*;
         let kwstr = match self {
-            Keyword::Const => "const",
-            Keyword::Unit => "unit",
-            Keyword::If => "if",
-            Keyword::Else => "else",
-            Keyword::Import => "import",
-            Keyword::Let => "let",
+            Const => "const",
+            Unit => "unit",
+            If => "if",
+            Else => "else",
+            Import => "import",
+            Let => "let",
+            Addr => "addr",
+            Size => "size",
+            Fn => "fn",
         };
         write!(f, "{}", kwstr)
     }
