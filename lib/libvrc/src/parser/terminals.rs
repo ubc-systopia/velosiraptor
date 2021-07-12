@@ -172,3 +172,6 @@ macro_rules! keywordparser (
 keywordparser!(pub kw_unit, Keyword::Unit);
 keywordparser!(pub kw_import, Keyword::Import);
 keywordparser!(pub kw_const, Keyword::Const);
+keywordparser!(pub kw_let, Keyword::Let);
+keywordparser!(pub kw_if, Keyword::If);
+keywordparser!(pub kw_else, Keyword::Else);
