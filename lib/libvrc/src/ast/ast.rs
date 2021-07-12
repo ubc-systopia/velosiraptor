@@ -23,32 +23,150 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+//! Ast representation of the VelosiRaptor Definitions
+
 use std::fmt;
 
+// we use the source position to tag the elements of the AST
 use crate::lexer::sourcepos::SourcePos;
 
+/// represents the known types.
 ///
-/// Defines an import statement
+/// The type of a an expression, parameter or value defines the set of
+/// operations that are allowed to be carried out with it.
+pub enum Type {
+    /// a boolean type (true / false)
+    Boolean,
+    /// An integer type
+    Integer,
+    /// Represents an address value
+    Address,
+    /// The size defines the number of addresses within a range
+    Size,
+}
+
+/// represents the ast of a parsed file.
 ///
-#[derive(Debug, PartialEq, Clone)]
+/// The parsed file consists of three possible directives:
+///   1. imports: references to other files
+///   2. constants: pre-defined values
+///   3. units: units defined in this file
+#[derive(PartialEq, Clone)]
+pub struct Ast {
+    /// the filename this ast represents
+    pub filename: String,
+    /// the import statements found in the Ast
+    pub imports: Vec<Import>,
+    /// the declared constants
+    pub consts: Vec<String>,
+    /// the defined units of in the AST
+    pub units: Vec<String>,
+}
+
+/// implementation of the [fmt::Display] trait for the [Ast].
+impl fmt::Display for Ast {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Ast: TODO",)
+    }
+}
+
+/// implementation of the [fmt::Debug] display trait for the [Ast].
+impl fmt::Debug for Ast {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Ast: TODO",)
+    }
+}
+
+/// Defines an [Import] statement node
+///
+/// The import statement declares that another file is imported
+/// and its definitions used by the current file.
+#[derive(PartialEq, Clone)]
 pub struct Import {
+    /// the filename to import
     pub name: String,
+    /// where in the current file there was this import statement
     pub pos: SourcePos,
 }
 
-impl Import {
-    pub fn new(name: String, pos: SourcePos) -> Self {
-        Import { name, pos }
-    }
-}
-
+/// implementation of the Display trait for the Ast
 impl fmt::Display for Import {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Import {}  ({:?})", self.name, self.pos.input_pos())
+        write!(f, "import {};", self.name)
     }
 }
 
+/// implementation of the [fmt::Debug] trait for the [Import]
+impl fmt::Debug for Import {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let (line, column) = self.pos.input_pos();
+        write!(f, "{:03}:{:03} | import {};", line, column, self.name)
+    }
+}
+
+/// Defines a [Constant] statement node
 ///
+/// The constants statement defines and delcares specific symbols
+/// with constant values to be used throughout the definitions.
+///
+/// The constant can be defined as part of the file global definitions
+/// or within a unit context.
+#[derive(PartialEq, Clone)]
+pub enum Const {
+    /// Represents an integer constant.
+    ///
+    /// This corresponds to an Integer literal
+    Integer {
+        ident: String,
+        value: u64,
+        pos: SourcePos,
+    },
+    /// Represents an boolean constant
+    ///
+    /// This corresponds to an Boolean literal
+    Boolean {
+        ident: String,
+        value: bool,
+        pos: SourcePos,
+    }, // TODO: add address / size constants here as well?
+}
+
+/// implementation of the Display trait for the Ast
+impl fmt::Display for Const {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::Const::*;
+        match self {
+            Integer { ident, value, pos } => write!(f, "const {} : int  = {};", ident, value),
+            Boolean { ident, value, pos } => write!(f, "const {} : bool = {};", ident, value),
+        }
+    }
+}
+
+/// implementation of the [fmt::Debug] trait for the [Import]
+impl fmt::Debug for Const {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::Const::*;
+        match self {
+            Integer { ident, value, pos } => {
+                let (line, column) = pos.input_pos();
+                write!(
+                    f,
+                    "{:03}:{:03} | const {} :  int = {};",
+                    line, column, ident, value
+                )
+            }
+            Boolean { ident, value, pos } => {
+                let (line, column) = pos.input_pos();
+                write!(
+                    f,
+                    "{:03}:{:03} | const {} : bool = {};",
+                    line, column, ident, value
+                )
+            }
+        }
+    }
+}
+
 /// Defines a translation unit
 ///
 #[derive(Debug, PartialEq, Clone)]
@@ -345,18 +463,6 @@ impl fmt::Display for Stmt {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Const {
-    ident: String,
-    value: u64,
-    pos: SourcePos,
-}
-
-impl Const {
-    pub fn new(ident: String, value: u64, pos: SourcePos) -> Self {
-        Const { ident, value, pos }
-    }
-}
 // pub enum State {
 //     MemoryState {
 //         bases: Vec<String>,
@@ -370,12 +476,3 @@ impl Const {
 //     },
 //     Dummy,
 // }
-
-/// represents the parsed Ast
-pub struct Ast {}
-
-impl fmt::Display for Ast {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Ast: TODO",)
-    }
-}
