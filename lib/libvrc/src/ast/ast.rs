@@ -34,6 +34,7 @@ use crate::lexer::sourcepos::SourcePos;
 ///
 /// The type of a an expression, parameter or value defines the set of
 /// operations that are allowed to be carried out with it.
+#[derive(PartialEq, Clone, Copy)]
 pub enum Type {
     /// a boolean type (true / false)
     Boolean,
@@ -89,7 +90,7 @@ pub struct Import {
     pub pos: SourcePos,
 }
 
-/// implementation of the Display trait for the Ast
+/// implementation of the [fmt::Display] trait for the [Import]
 impl fmt::Display for Import {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "import {};", self.name)
@@ -131,7 +132,7 @@ pub enum Const {
     }, // TODO: add address / size constants here as well?
 }
 
-/// implementation of the Display trait for the Ast
+/// implementation of the [fmt::Display] trait for the [Const]
 impl fmt::Display for Const {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::Const::*;
@@ -142,7 +143,7 @@ impl fmt::Display for Const {
     }
 }
 
-/// implementation of the [fmt::Debug] trait for the [Import]
+/// implementation of the [fmt::Debug] trait for the [Const]
 impl fmt::Debug for Const {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::Const::*;
@@ -169,19 +170,31 @@ impl fmt::Debug for Const {
 
 /// Defines a translation unit
 ///
-#[derive(Debug, PartialEq, Clone)]
+/// A translation unit describes a translation unit and consists of multiple
+/// components that from the personality of the translation unit.
+///
+/// Moreover, a translation unit may be derived from another unit, similar
+/// to inheritance in other languages.
+#[derive(PartialEq, Clone)]
 pub struct Unit {
+    /// the name of the unit (identifier)
     pub name: String,
+    /// the name of the derrived unit
     pub derived: Option<String>,
+    /// defined constants in this unit
+    pub consts: Vec<Const>,
+    /// the state of the unit
+    pub state: State,
+    /// the software visible interface of the unit
+    pub interface: Interface,
+    /// the methods defined by this unit
+    pub methods: Vec<Method>,
+    // TODO: maybe make the translate / constructors / map / ... explicit here?
+    /// the position in the source tree where this unit is defined
     pub pos: SourcePos,
 }
 
-impl Unit {
-    pub fn new(name: String, derived: Option<String>, pos: SourcePos) -> Self {
-        Unit { name, derived, pos }
-    }
-}
-
+/// implementation of the [fmt::Display] trait for the [Unit]
 impl fmt::Display for Unit {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.derived {
@@ -197,40 +210,97 @@ impl fmt::Display for Unit {
     }
 }
 
-// #[derive(Debug, PartialEq, Clone)]
-// pub struct File {
-//     pub filename: String,
-//     pub imports: Vec<Import>,
-//     pub units: Vec<Unit>,
-// }
+/// implementation of the [fmt::Debug] trait for the [Unit]
+impl fmt::Debug for Unit {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self.derived {
+            Some(n) => write!(
+                f,
+                "Unit {} : {}  ({:?})",
+                self.name,
+                n,
+                self.pos.input_pos()
+            ),
+            None => write!(f, "Unit {}  ({:?})", self.name, self.pos.input_pos()),
+        }
+    }
+}
 
-// impl File {
-//     pub fn new(filename: String, imports: Vec<Import>, units: Vec<Unit>) -> Self {
-//         File {
-//             filename,
-//             imports,
-//             units,
-//         }
-//     }
-// }
+/// Defines the state of a translation unit
+///
+/// The State defines how the translation unit will translate incoming addresses.
+/// There are three fundamental state types:
+///   - Memory: the state is *external* to the translation unit in some memory (e.g, RAM)
+///   - Register: the state is *internal* to the translation unit
+///   - None: there is no state associated with it.
+#[derive(PartialEq, Clone)]
+pub enum State {
+    /// defines a memory state (external to the unit)
+    MemoryState {
+        /// a list of identifiers referring to memory regions
+        bases: Vec<String>,
+        /// defines a list of fields within the memory regions, defined by the bases
+        fields: Vec<Field>,
+        /// position where this state was defined
+        pos: SourcePos,
+    },
+    /// defines a register state (internal to the unit)
+    RegisterState {
+        /// defines a list of fields that form the state
+        fields: Vec<Field>,
+        /// the position where the state is defined
+        pos: SourcePos,
+    },
+    // TODO state that may be combined
+    //CombinedState {  },
+    /// No state associated with this translation unit
+    None,
+}
 
-// impl fmt::Display for File {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         let mut imports = String::new();
-//         imports.push_str("  Imports:\n");
-//         for i in &self.imports {
-//             imports.push_str(&format!("    {}\n", i))
-//         }
+/// Defines the software-visible interface of a unit
+///
+/// Similar to the state, there are multiple options of the interface:
+///   - Memory: load/store to memory (normal DRAM)
+///   - MMIORegisters: load/store to memory-mapped device registers
+///   - CPURegisters: load/store to CPU registers
+///   - SpecialRegisters: use of special instructions (no load/store) to those
+#[derive(PartialEq, Clone)]
+pub enum Interface {
+    /// Defines a load/store interface to memory
+    Memory { pos: SourcePos },
+    /// Defines a memory-mapped interface to registers
+    MMIORegisters { pos: SourcePos },
+    /// Defines a load/store interface to CPU registers
+    CPURegisters { pos: SourcePos },
+    /// Defines a register interface using special instructions
+    SpecialRegisters { pos: SourcePos },
+    // TODO interface may be a combination: e.g., Memory + MMIORegisters
+    //CombinedState {  },
+    /// No software interface associated with this translation unit
+    None,
+}
 
-//         let mut units = String::new();
-//         units.push_str("  Units:");
-//         for u in &self.units {
-//             units.push_str(&format!("    {}\n", u))
-//         }
-
-//         write!(f, "File {}\n{}\n{}", self.filename, imports, units)
-//     }
-// }
+/// Defines a Method inside a unit
+///
+/// A method defines certain functionality of the translation unit.
+///
+/// # Examples
+///
+///  - Translate(): a method that translates an address (required)
+///  - get_size(): a method that extracts the
+#[derive(PartialEq, Clone)]
+pub struct Method {
+    /// the name of the method
+    pub name: String,
+    /// the return type of the method
+    pub rettype: Type,
+    /// A list of arguments with their types
+    pub args: Vec<(String, Type)>,
+    /// A sequence of statements
+    pub stmts: Vec<Stmt>,
+    /// the position where the method was defined
+    pub pos: SourcePos,
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct BitSlice {
@@ -462,17 +532,3 @@ impl fmt::Display for Stmt {
         }
     }
 }
-
-// pub enum State {
-//     MemoryState {
-//         bases: Vec<String>,
-//         fields: Vec<StateField>,
-//         pos: (u32, u32),
-//     },
-//     RegisterState {
-//         bases: Vec<String>,
-//         fields: Vec<StateField>,
-//         pos: (u32, u32),
-//     },
-//     Dummy,
-// }

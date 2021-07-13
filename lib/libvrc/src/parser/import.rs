@@ -49,7 +49,13 @@ pub fn import(input: TokenStream) -> IResult<TokenStream, Import> {
     // ok, so we've seen the `import` keyword, so the next must be an identifier.
     // there should be at least one whitespace before the identifier
     match terminated(ident, semicolon)(i1) {
-        Ok((r, name)) => Ok((r, Import { name, pos : pos.slice(0..4)})),
+        Ok((r, name)) => Ok((
+            r,
+            Import {
+                name,
+                pos: pos.slice(0..4),
+            },
+        )),
         Err(e) => {
             // if we have parser failure, indicate this!
             let (i, k) = match e {
