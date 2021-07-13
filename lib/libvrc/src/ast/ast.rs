@@ -46,6 +46,19 @@ pub enum Type {
     Size,
 }
 
+/// implementation of the [fmt::Display] trait for the [Type].
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::Type::*;
+        match self {
+            Boolean => write!(f, "bool"),
+            Integer => write!(f, "int"),
+            Address => write!(f, "addr"),
+            Size => write!(f, "size"),
+        }
+    }
+}
+
 /// represents the ast of a parsed file.
 ///
 /// The parsed file consists of three possible directives:
@@ -67,14 +80,14 @@ pub struct Ast {
 /// implementation of the [fmt::Display] trait for the [Ast].
 impl fmt::Display for Ast {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Ast: TODO",)
+        writeln!(f, "Ast: TODO",)
     }
 }
 
 /// implementation of the [fmt::Debug] display trait for the [Ast].
 impl fmt::Debug for Ast {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Ast: TODO",)
+        writeln!(f, "Ast: TODO",)
     }
 }
 
@@ -93,7 +106,7 @@ pub struct Import {
 /// implementation of the [fmt::Display] trait for the [Import]
 impl fmt::Display for Import {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "import {};", self.name)
+        writeln!(f, "import {};", self.name)
     }
 }
 
@@ -101,7 +114,7 @@ impl fmt::Display for Import {
 impl fmt::Debug for Import {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (line, column) = self.pos.input_pos();
-        write!(f, "{:03}:{:03} | import {};", line, column, self.name)
+        writeln!(f, "{:03}:{:03} | import {};", line, column, self.name)
     }
 }
 
@@ -137,8 +150,8 @@ impl fmt::Display for Const {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::Const::*;
         match self {
-            Integer { ident, value, pos } => write!(f, "const {} : int  = {};", ident, value),
-            Boolean { ident, value, pos } => write!(f, "const {} : bool = {};", ident, value),
+            Integer { ident, value, pos } => writeln!(f, "const {} : int  = {};", ident, value),
+            Boolean { ident, value, pos } => writeln!(f, "const {} : bool = {};", ident, value),
         }
     }
 }
@@ -150,7 +163,7 @@ impl fmt::Debug for Const {
         match self {
             Integer { ident, value, pos } => {
                 let (line, column) = pos.input_pos();
-                write!(
+                writeln!(
                     f,
                     "{:03}:{:03} | const {} :  int = {};",
                     line, column, ident, value
@@ -158,7 +171,7 @@ impl fmt::Debug for Const {
             }
             Boolean { ident, value, pos } => {
                 let (line, column) = pos.input_pos();
-                write!(
+                writeln!(
                     f,
                     "{:03}:{:03} | const {} : bool = {};",
                     line, column, ident, value
@@ -198,14 +211,8 @@ pub struct Unit {
 impl fmt::Display for Unit {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.derived {
-            Some(n) => write!(
-                f,
-                "Unit {} : {}  ({:?})",
-                self.name,
-                n,
-                self.pos.input_pos()
-            ),
-            None => write!(f, "Unit {}  ({:?})", self.name, self.pos.input_pos()),
+            Some(n) => writeln!(f, "Unit {} : {}  {{\n{}\n}}", self.name, n, "TODO"),
+            None => writeln!(f, "Unit {} {{\n{}\n}}", self.name, "TODO"),
         }
     }
 }
@@ -213,15 +220,18 @@ impl fmt::Display for Unit {
 /// implementation of the [fmt::Debug] trait for the [Unit]
 impl fmt::Debug for Unit {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let (line, column) = self.pos.input_pos();
         match &self.derived {
-            Some(n) => write!(
+            Some(n) => writeln!(
                 f,
-                "Unit {} : {}  ({:?})",
-                self.name,
-                n,
-                self.pos.input_pos()
+                "{:03}:{:03} | unit {} : {}  {{\n{}\n}}",
+                line, column, self.name, n, "TODO"
             ),
-            None => write!(f, "Unit {}  ({:?})", self.name, self.pos.input_pos()),
+            None => writeln!(
+                f,
+                "{:03}:{:03} | unit {} {{\n{}\n}}",
+                line, column, self.name, "TODO"
+            ),
         }
     }
 }
@@ -255,6 +265,69 @@ pub enum State {
     //CombinedState {  },
     /// No state associated with this translation unit
     None,
+}
+
+/// implementation of the [fmt::Display] trait for the [State]
+impl fmt::Display for State {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::State::*;
+        match self {
+            MemoryState { bases, fields, pos } => {
+                write!(f, "State(Memory) [")?;
+                bases
+                    .iter()
+                    .fold(Ok(()), |result, b| result.and_then(|_| write!(f, "{} ", b)))?;
+                writeln!(f, "] {{")?;
+
+                fields.iter().fold(Ok(()), |result, field| {
+                    result.and_then(|_| writeln!(f, "{}", field))
+                })?;
+                writeln!(f, "}}")
+            }
+            RegisterState { fields, pos } => {
+                let s = String::new();
+                writeln!(f, "State(Registers) {{")?;
+                fields.iter().fold(Ok(()), |result, field| {
+                    result.and_then(|_| writeln!(f, "{}", field))
+                })?;
+                writeln!(f, "}}")
+            }
+            None => writeln!(f, "State(None)"),
+        }
+    }
+}
+
+/// implementation of the [fmt::Debug] trait for the [State]
+impl fmt::Debug for State {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::State::*;
+        //let (line, column) = self.pos.input_pos();
+        match self {
+            MemoryState { bases, fields, pos } => {
+                let (line, column) = pos.input_pos();
+                write!(f, "{:03}:{:03} | State(Memory) [", line, column)?;
+                bases
+                    .iter()
+                    .fold(Ok(()), |result, b| result.and_then(|_| write!(f, "{} ", b)))?;
+                writeln!(f, "] {{")?;
+
+                fields.iter().fold(Ok(()), |result, field| {
+                    result.and_then(|_| writeln!(f, "{}", field))
+                })?;
+                writeln!(f, "}}")
+            }
+            RegisterState { fields, pos } => {
+                let (line, column) = pos.input_pos();
+                let s = String::new();
+                writeln!(f, "{:03}:{:03} | State(Registers) {{", line, column)?;
+                fields.iter().fold(Ok(()), |result, field| {
+                    result.and_then(|_| writeln!(f, "{}", field))
+                })?;
+                writeln!(f, "}}")
+            }
+            None => writeln!(f, "State(None)"),
+        }
+    }
 }
 
 /// Defines the software-visible interface of a unit
@@ -302,6 +375,84 @@ pub struct Method {
     pub pos: SourcePos,
 }
 
+/// Implementation of the [fmt::Display] trait for [Field]
+impl fmt::Display for Method {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "fn {}() -> {} {{", self.name, self.rettype)?;
+        self.stmts.iter().fold(Ok(()), |result, s| {
+            result.and_then(|_| writeln!(f, "  {}", s))
+        })?;
+        writeln!(f, "}}")
+    }
+}
+
+/// Implementation of the [fmt::Debug] trait for [Field]
+impl fmt::Debug for Method {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let (line, column) = self.pos.input_pos();
+        writeln!(
+            f,
+            "{:03}:{:03} | fn {}() -> {} {{",
+            line, column, self.name, self.rettype
+        )?;
+        self.stmts.iter().fold(Ok(()), |result, s| {
+            result.and_then(|_| writeln!(f, "  {:?}", s))
+        })?;
+        writeln!(f, "}}")
+    }
+}
+
+/// Defines an field in the state
+///
+/// A field may represent a 1,2,4, or 8 byte region in the state with a
+/// specific bit layout.
+#[derive(PartialEq, Clone)]
+pub struct Field {
+    /// the name of the field
+    pub name: String,
+    /// a reference to the state where the field is (base + offset)
+    pub stateref: Option<(String, u64)>,
+    /// the size of the field in bytes
+    pub length: u64,
+    /// a vector of [BitSlice] representing the bitlayout
+    pub layout: Vec<BitSlice>,
+    /// the position where this field was defined
+    pub pos: SourcePos,
+}
+
+/// Implementation of the [fmt::Display] trait for [Field]
+impl fmt::Display for Field {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self.stateref {
+            Some((s, o)) => writeln!(f, "{} [{}, {}, {}] {{", self.name, s, o, self.length)?,
+            None => writeln!(f, "{} [{}] {{", self.name, self.length)?,
+        };
+
+        self.layout.iter().fold(Ok(()), |result, field| {
+            result.and_then(|_| writeln!(f, "  {}", field))
+        })?;
+        writeln!(f, "}}")
+    }
+}
+
+/// Implementation of the [fmt::Debug] trait for [Field]
+impl fmt::Debug for Field {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let (line, column) = self.pos.input_pos();
+        write!(f, "{:03}:{:03} | ", line, column)?;
+        match &self.stateref {
+            Some((s, o)) => writeln!(f, "{} [{}, {}, {}] {{", self.name, s, o, self.length)?,
+            None => writeln!(f, "{} [{}] {{", self.name, self.length)?,
+        };
+
+        self.layout.iter().fold(Ok(()), |result, field| {
+            result.and_then(|_| writeln!(f, "  {:?}", field))
+        })?;
+        writeln!(f, "}}")
+    }
+}
+
+///
 #[derive(Debug, PartialEq, Clone)]
 pub struct BitSlice {
     pub start: u16,
@@ -324,52 +475,6 @@ impl BitSlice {
 impl fmt::Display for BitSlice {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "({:3}..{:3}, {})", self.start, self.end, &self.name)
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Field {
-    pub name: String,
-    pub base: String,
-    pub offset: u64,
-    pub length: u64,
-    pub slices: Vec<BitSlice>,
-    pub pos: SourcePos,
-}
-
-impl Field {
-    pub fn new(
-        name: String,
-        base: String,
-        offset: u64,
-        length: u64,
-        slices: Vec<BitSlice>,
-        pos: SourcePos,
-    ) -> Self {
-        Field {
-            name,
-            base,
-            offset,
-            length,
-            slices,
-            pos,
-        }
-    }
-}
-
-impl fmt::Display for Field {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut entries = String::new();
-
-        for b in &self.slices {
-            entries.push_str(&format!("    {}\n", b))
-        }
-
-        write!(
-            f,
-            "    {} [{}, {}, {}] {{\n {}    }};\n",
-            self.name, self.base, self.offset, self.length, entries
-        )
     }
 }
 

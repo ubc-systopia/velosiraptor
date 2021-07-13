@@ -68,7 +68,7 @@ pub fn field(input: TokenStream) -> IResult<TokenStream, Field> {
     };
 
     // we match two numbers and an identifier
-    let (rem, entries) =
+    let (rem, layout) =
         match delimited(lbrace, separated_list1(comma, bitslice), rbrace)(i2.clone()) {
             Ok((rem, e)) => (rem, e),
             Err(e) => {
@@ -81,8 +81,16 @@ pub fn field(input: TokenStream) -> IResult<TokenStream, Field> {
                 return Err(Err::Failure(error_position!(i, k)));
             }
         };
-
-    Ok((rem, Field::new(name, base, offset, length, entries, pos)))
+    Ok((
+        rem,
+        Field {
+            name,
+            stateref: Some((base, offset)),
+            length,
+            layout,
+            pos,
+        },
+    ))
 }
 
 #[cfg(test)]
