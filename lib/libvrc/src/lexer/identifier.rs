@@ -60,6 +60,7 @@ pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
         "let" => Token::new(TokenContent::Keyword(Keyword::Let), ident),
         "if" => Token::new(TokenContent::Keyword(Keyword::If), ident),
         "else" => Token::new(TokenContent::Keyword(Keyword::Else), ident),
+        "assert" => Token::new(TokenContent::Keyword(Keyword::Assert), ident),
         x => Token::new(TokenContent::Identifier(x.to_string()), ident),
     };
 

@@ -53,6 +53,8 @@ pub enum Keyword {
     Size,
     /// represents a function
     Fn,
+    /// An assert statement
+    Assert,
 }
 
 /// Implementation of the [std::fmt::Display] trait for [Token]
@@ -69,6 +71,7 @@ impl fmt::Display for Keyword {
             Addr => "addr",
             Size => "size",
             Fn => "fn",
+            Assert => "assert",
         };
         write!(f, "{}", kwstr)
     }
