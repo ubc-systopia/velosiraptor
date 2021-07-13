@@ -404,7 +404,7 @@ impl fmt::Debug for Method {
 
 /// Defines an field in the state
 ///
-/// A field may represent a 1,2,4, or 8 byte region in the state with a
+/// A field may represent a 8, 16, 32, or 64 bit region in the state with a
 /// specific bit layout.
 #[derive(PartialEq, Clone)]
 pub struct Field {
@@ -412,7 +412,7 @@ pub struct Field {
     pub name: String,
     /// a reference to the state where the field is (base + offset)
     pub stateref: Option<(String, u64)>,
-    /// the size of the field in bytes
+    /// the size of the field in bits
     pub length: u64,
     /// a vector of [BitSlice] representing the bitlayout
     pub layout: Vec<BitSlice>,
@@ -452,29 +452,36 @@ impl fmt::Debug for Field {
     }
 }
 
+/// Represents a bitslice of a [Field]
 ///
-#[derive(Debug, PartialEq, Clone)]
+/// The field corresponds to the slice `[start..end]` of the [Field]
+#[derive(PartialEq, Clone)]
 pub struct BitSlice {
+    /// the start bit
     pub start: u16,
+    /// the end bit
     pub end: u16,
+    /// the name of the slice
     pub name: String,
+    /// where it was defined
     pub pos: SourcePos,
 }
 
-impl BitSlice {
-    pub fn new(start: u16, end: u16, name: String, pos: SourcePos) -> Self {
-        BitSlice {
-            start,
-            end,
-            name,
-            pos,
-        }
-    }
-}
-
+/// Implementation of the [fmt::Display] trait for [BitSlice]
 impl fmt::Display for BitSlice {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "({:3}..{:3}, {})", self.start, self.end, &self.name)
+        write!(f, "[{:2}..{:2}]  {}", self.start, self.end, &self.name)
+    }
+}
+/// Implementation of the [fmt::Debug] trait for [BitSlice]
+impl fmt::Debug for BitSlice {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let (line, column) = self.pos.input_pos();
+        write!(
+            f,
+            "{:03}:{:03} | [{:2}..{:2}]  {}",
+            line, column, self.start, self.end, &self.name
+        )
     }
 }
 

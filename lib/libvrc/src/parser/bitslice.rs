@@ -56,10 +56,11 @@ pub fn bitslice(input: TokenStream) -> IResult<TokenStream, BitSlice> {
 
     // the first thing here shall be a number, just return the error here
     let (i1, start) = num(input.clone())?;
+    let start = start as u16;
 
     // we match two numbers and an identifier
     let (rem, end, name) = match tuple((num, ident))(i1) {
-        Ok((rem, (e, id))) => (rem, e, id),
+        Ok((rem, (e, id))) => (rem, e as u16, id),
         Err(e) => {
             // if we have parser failure, indicate this!
             let (i, k) = match e {
@@ -71,7 +72,15 @@ pub fn bitslice(input: TokenStream) -> IResult<TokenStream, BitSlice> {
         }
     };
 
-    Ok((rem, BitSlice::new(start as u16, end as u16, name, pos)))
+    Ok((
+        rem,
+        BitSlice {
+            start,
+            end,
+            name,
+            pos,
+        },
+    ))
 }
 
 #[cfg(test)]
