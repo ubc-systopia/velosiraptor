@@ -84,7 +84,11 @@ fn test_ok() {
         constdef(ts.clone()),
         Ok((
             ts.slice(5..6),
-            Const::new("FOO".to_string(), 1234, sp.slice(0..5))
+            Const::Integer {
+                ident: "FOO".to_string(),
+                value: 1234,
+                pos: sp.slice(0..5)
+            }
         ))
     );
 }

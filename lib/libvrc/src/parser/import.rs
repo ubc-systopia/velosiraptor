@@ -33,7 +33,7 @@ use crate::parser::terminals::{ident, kw_import, semicolon};
 // the used nom componets
 use crate::nom::error::ErrorKind;
 use nom::sequence::terminated;
-use nom::{error_position, Err, IResult, Slice};
+use nom::{error_position, Err, IResult, InputLength, Slice};
 
 /// parses and consumes an import statement (`import foo;`) and any following whitespaces
 pub fn import(input: TokenStream) -> IResult<TokenStream, Import> {
@@ -49,13 +49,7 @@ pub fn import(input: TokenStream) -> IResult<TokenStream, Import> {
     // ok, so we've seen the `import` keyword, so the next must be an identifier.
     // there should be at least one whitespace before the identifier
     match terminated(ident, semicolon)(i1) {
-        Ok((r, name)) => Ok((
-            r,
-            Import {
-                name,
-                pos: pos.slice(0..4),
-            },
-        )),
+        Ok((r, name)) => Ok((r, Import { name, pos })),
         Err(e) => {
             // if we have parser failure, indicate this!
             let (i, k) = match e {
@@ -73,9 +67,6 @@ use crate::lexer::sourcepos::SourcePos;
 #[cfg(test)]
 use crate::lexer::token::{Keyword, Token, TokenContent};
 #[cfg(test)]
-#[cfg(test)]
-use crate::nom::Slice;
-
 #[test]
 fn test_ok() {
     // corresponds to: `import foobar;`
@@ -89,10 +80,13 @@ fn test_ok() {
             sp.slice(7..12),
         ),
         Token::new(TokenContent::SemiColon, sp.slice(13..14)),
+        Token::new(TokenContent::Eof, sp.slice(14..14)),
     ];
     let ts = TokenStream::from_slice(&tokens);
-    let pos = ts.input_sourcepos();
+
+    let pos = ts.slice(0..3).input_sourcepos();
     let ts2 = ts.slice(3..);
+
     assert_eq!(
         import(ts),
         Ok((

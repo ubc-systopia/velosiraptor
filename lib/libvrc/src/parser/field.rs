@@ -138,10 +138,9 @@ fn test_ok() {
             ts.slice(13..),
             Field {
                 name: "foo".to_string(),
-                base: "base".to_string(),
-                offset: 0,
+                stateref: Some(("base".to_string(), 0)),
                 length: 32,
-                slices: vec![fields],
+                layout: vec![fields],
                 pos: ts.input_sourcepos()
             }
         ))

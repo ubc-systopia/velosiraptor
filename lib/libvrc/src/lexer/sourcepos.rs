@@ -204,6 +204,29 @@ impl SourcePos {
         )
     }
 
+    /// Builds a SourcPos by taking two source positions and forming the span.InputLength
+    ///
+    /// The new source position will have the same starting position as self.
+    /// but with an increased length up to but not including the other one.
+    ///
+    /// # Panics
+    ///
+    /// If the two source positions are not related
+    pub fn from_self_until(&self, other: &Self) -> Self {
+        assert!(self.context == other.context);
+        assert!(self.content == other.content);
+        assert!(self.range.start <= other.range.start);
+        let start = self.range.start;
+        let end = other.range.start;
+        Self::from_string_at(
+            self.context.clone(),
+            self.content.clone(),
+            start..end,
+            self.line,
+            self.column,
+        )
+    }
+
     /// Creates a new, empty SourcePos object
     ///
     /// This is equivalent to `SourcePos::new("stdio", "")`

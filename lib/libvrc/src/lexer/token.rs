@@ -359,6 +359,14 @@ impl TokenStream {
         self.peek().spos.clone()
     }
 
+    /// Calculates the sourcepos span between two tokenstreams
+    pub fn input_sourcepos_span(&self, other: &TokenStream) -> SourcePos {
+        assert!(self.tokens == other.tokens);
+        assert!(self.range.start <= other.range.start);
+        self.input_sourcepos()
+            .from_self_until(&other.input_sourcepos())
+    }
+
     /// Obtains the current range relative to the entire [TokenStream]
     pub fn input_range(&self) -> Range<usize> {
         self.range.clone()
