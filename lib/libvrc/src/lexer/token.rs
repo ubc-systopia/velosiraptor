@@ -295,10 +295,11 @@ impl TokenStream {
     pub fn from_vec_filtered(tokens: Vec<Token>) -> Self {
         let tok: Vec<Token> = tokens
             .iter()
-            .filter(|t| match t.content {
-                TokenContent::Comment(_) => false,
-                TokenContent::BlockComment(_) => false,
-                _ => true,
+            .filter(|t| {
+                !matches!(
+                    t.content,
+                    TokenContent::Comment(_) | TokenContent::BlockComment(_)
+                )
             })
             .cloned()
             .collect();

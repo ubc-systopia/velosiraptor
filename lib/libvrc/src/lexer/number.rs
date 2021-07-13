@@ -65,7 +65,7 @@ fn base10(input: SourcePos) -> IResult<SourcePos, Token> {
     }
 
     let numstr = String::from(numsp.as_str()).replace("_", "");
-    let num = match u64::from_str_radix(&numstr, 10) {
+    let num = match numstr.parse::<u64>() {
         Ok(i) => i,
         Err(_) => return Err(Err::Failure(error_position!(numsp, ErrorKind::Digit))),
     };

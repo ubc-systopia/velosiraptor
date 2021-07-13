@@ -150,8 +150,16 @@ impl fmt::Display for Const {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::Const::*;
         match self {
-            Integer { ident, value, pos } => writeln!(f, "const {} : int  = {};", ident, value),
-            Boolean { ident, value, pos } => writeln!(f, "const {} : bool = {};", ident, value),
+            Integer {
+                ident,
+                value,
+                pos: _,
+            } => writeln!(f, "const {} : int  = {};", ident, value),
+            Boolean {
+                ident,
+                value,
+                pos: _,
+            } => writeln!(f, "const {} : bool = {};", ident, value),
         }
     }
 }
@@ -211,8 +219,8 @@ pub struct Unit {
 impl fmt::Display for Unit {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.derived {
-            Some(n) => writeln!(f, "Unit {} : {}  {{\n{}\n}}", self.name, n, "TODO"),
-            None => writeln!(f, "Unit {} {{\n{}\n}}", self.name, "TODO"),
+            Some(n) => writeln!(f, "Unit {} : {}  {{\nTODO\n}}", self.name, n),
+            None => writeln!(f, "Unit {} {{\nTODO\n}}", self.name),
         }
     }
 }
@@ -224,13 +232,13 @@ impl fmt::Debug for Unit {
         match &self.derived {
             Some(n) => writeln!(
                 f,
-                "{:03}:{:03} | unit {} : {}  {{\n{}\n}}",
-                line, column, self.name, n, "TODO"
+                "{:03}:{:03} | unit {} : {}  {{\nTODO\n}}",
+                line, column, self.name, n
             ),
             None => writeln!(
                 f,
-                "{:03}:{:03} | unit {} {{\n{}\n}}",
-                line, column, self.name, "TODO"
+                "{:03}:{:03} | unit {} {{\nTODO\n}}",
+                line, column, self.name
             ),
         }
     }
@@ -552,8 +560,6 @@ impl fmt::Display for UnOp {
     }
 }
 
-use std::ops::Range;
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
     Identifier {
@@ -594,13 +600,22 @@ impl fmt::Display for Expr {
     fn fmt(&self, format: &mut fmt::Formatter) -> fmt::Result {
         use self::Expr::*;
         match self {
-            Identifier { path, pos } => write!(format, "{}", path.join(".")),
-            Number { value, pos } => write!(format, "{}", value),
-            Boolean { value, pos } => write!(format, "{}", value),
-            BinaryOperation { op, lhs, rhs, pos } => write!(format, "({} {} {})", lhs, op, rhs),
-            UnaryOperation { op, val, pos } => write!(format, "{}({})", op, val),
-            FnCall { path, pos } => write!(format, "foo"),
-            Slice { path, slice, pos } => write!(format, "foo"),
+            Identifier { path, pos: _ } => write!(format, "{}", path.join(".")),
+            Number { value, pos: _ } => write!(format, "{}", value),
+            Boolean { value, pos: _ } => write!(format, "{}", value),
+            BinaryOperation {
+                op,
+                lhs,
+                rhs,
+                pos: _,
+            } => write!(format, "({} {} {})", lhs, op, rhs),
+            UnaryOperation { op, val, pos: _ } => write!(format, "{}({})", op, val),
+            FnCall { path, pos: _ } => write!(format, "foo"),
+            Slice {
+                path,
+                slice,
+                pos: _,
+            } => write!(format, "foo"),
         }
     }
 }
@@ -628,15 +643,15 @@ impl fmt::Display for Stmt {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::Stmt::*;
         match self {
-            Block { stmts, pos } => {
-                write!(f, "{{ {} }} \n", "TODO")
+            Block { stmts, pos: _ } => {
+                write!(f, "{{ TODO }} \n")
             }
-            Assign { lhs, rhs, pos } => write!(f, "let {} = {};\n", rhs, rhs),
+            Assign { lhs, rhs, pos: _ } => write!(f, "let {} = {};\n", lhs, rhs),
             IfElse {
                 cond,
                 then,
                 other,
-                pos,
+                pos: _,
             } => match other {
                 None => write!(f, "if {} {} \n", cond, then),
                 Some(x) => write!(f, "if {} {} else {} \n", cond, then, x),

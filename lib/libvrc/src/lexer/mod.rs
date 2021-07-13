@@ -154,7 +154,7 @@ impl Lexer {
         log::debug!("start lexing...");
         let (i, mut tok) = match many1(tokens)(sp) {
             Ok((r, tok)) => (r, tok),
-            Err(x) => return Err(LexerError::NoTokens),
+            Err(_x) => return Err(LexerError::NoTokens),
         };
         log::debug!("lexing done.");
         tok.push(Token::new(TokenContent::Eof, i));

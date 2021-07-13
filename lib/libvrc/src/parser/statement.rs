@@ -50,7 +50,7 @@ fn let_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
     let pos = input.input_sourcepos();
 
     // try to parse the `let` keyword, return error otherwise
-    let (input, tok) = kw_let(input)?;
+    let (input, _tok) = kw_let(input)?;
 
     match pair(ident, delimited(eq, expr, semicolon))(input) {
         Ok((rem, (lhs, rhs))) => Ok((rem, Stmt::Assign { lhs, rhs, pos })),
@@ -60,7 +60,7 @@ fn let_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
                 Err::Error(e) => (e.input, e.code),
                 x => panic!("unkown condition: {:?}", x),
             };
-            return Err(Err::Failure(error_position!(i, k)));
+            Err(Err::Failure(error_position!(i, k)))
         }
     }
 }
@@ -69,7 +69,7 @@ fn let_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
 fn if_else_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
     let pos = input.input_sourcepos();
     // try to parse the `if` keyword, return error otherwise
-    let (input, tok) = kw_if(input)?;
+    let (input, _tok) = kw_if(input)?;
 
     let (input, cond, then) = match pair(expr, delimited(lbrace, stmt, rbrace))(input) {
         Ok((input, (cond, then))) => (input, cond, then),
@@ -85,7 +85,7 @@ fn if_else_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
 
     match kw_else(input.clone()) {
         Ok((input, _)) => {
-            match delimited(lbrace, stmt, rbrace)(input.clone()) {
+            match delimited(lbrace, stmt, rbrace)(input) {
                 Ok((rem, stmt)) => Ok((
                     rem,
                     Stmt::IfElse {
@@ -101,11 +101,11 @@ fn if_else_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
                         Err::Error(e) => (e.input, e.code),
                         x => panic!("unkown condition: {:?}", x),
                     };
-                    return Err(Err::Failure(error_position!(i, k)));
+                    Err(Err::Failure(error_position!(i, k)))
                 }
             }
         }
-        Err(x) => Ok((
+        Err(_) => Ok((
             input,
             Stmt::IfElse {
                 cond,
