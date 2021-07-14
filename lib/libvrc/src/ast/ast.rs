@@ -493,9 +493,54 @@ impl fmt::Debug for BitSlice {
     }
 }
 
-/// Binary operations
+/// Represents a statement
+#[derive(Debug, PartialEq, Clone)]
+pub enum Stmt {
+    /// a block is a sequence of statements
+    Block { stmts: Vec<Stmt>, pos: SourcePos },
+    /// the assign statements gives a name to a value
+    Assign {
+        lhs: String,
+        rhs: Expr,
+        pos: SourcePos,
+    },
+    /// the conditional with
+    IfElse {
+        cond: Expr,
+        then: Box<Stmt>,
+        other: Option<Box<Stmt>>,
+        pos: SourcePos,
+    },
+    /// assert statement
+    Assert { expr: Expr, pos: SourcePos },
+}
+
+impl fmt::Display for Stmt {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::Stmt::*;
+        match self {
+            Block { stmts, pos: _ } => {
+                write!(f, "{{ TODO }} \n")
+            }
+            Assign { lhs, rhs, pos: _ } => write!(f, "let {} = {};\n", lhs, rhs),
+            Assert { expr, pos: _ } => write!(f, "assert {};", expr),
+            IfElse {
+                cond,
+                then,
+                other,
+                pos: _,
+            } => match other {
+                None => write!(f, "if {} {} \n", cond, then),
+                Some(x) => write!(f, "if {} {} else {} \n", cond, then, x),
+            },
+        }
+    }
+}
+
+/// Binary operations for [Expr] <OP> [Expr]
 #[derive(Debug, PartialEq, Clone)]
 pub enum BinOp {
+    // arithmetic opreators
     Plus,
     Minus,
     Multiply,
@@ -506,6 +551,7 @@ pub enum BinOp {
     And,
     Xor,
     Or,
+    // boolean operators
     Eq,
     Ne,
     Lt,
@@ -544,9 +590,11 @@ impl fmt::Display for BinOp {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum UnOp {
+    // arithmetic operators
     Not,
-    LNot,
     Ref,
+    // boolean operator
+    LNot,
 }
 
 impl fmt::Display for UnOp {
@@ -616,46 +664,6 @@ impl fmt::Display for Expr {
                 slice,
                 pos: _,
             } => write!(format, "foo"),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Stmt {
-    Block {
-        stmts: Vec<Stmt>,
-        pos: SourcePos,
-    },
-    Assign {
-        lhs: String,
-        rhs: Expr,
-        pos: SourcePos,
-    },
-    IfElse {
-        cond: Expr,
-        then: Box<Stmt>,
-        other: Option<Box<Stmt>>,
-        pos: SourcePos,
-    },
-}
-
-impl fmt::Display for Stmt {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use self::Stmt::*;
-        match self {
-            Block { stmts, pos: _ } => {
-                write!(f, "{{ TODO }} \n")
-            }
-            Assign { lhs, rhs, pos: _ } => write!(f, "let {} = {};\n", lhs, rhs),
-            IfElse {
-                cond,
-                then,
-                other,
-                pos: _,
-            } => match other {
-                None => write!(f, "if {} {} \n", cond, then),
-                Some(x) => write!(f, "if {} {} else {} \n", cond, then, x),
-            },
         }
     }
 }
