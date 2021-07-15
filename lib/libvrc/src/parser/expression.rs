@@ -317,7 +317,7 @@ pub fn arith_add_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
         |i: TokenStream| {
             let pos = i.input_sourcepos();
             let (i, op) = preceded(minus, arit_mul_expr)(i)?;
-            Ok((i, (pos, BinOp::Plus, op)))
+            Ok((i, (pos, BinOp::Minus, op)))
         },
     )))(i)?;
 
@@ -469,7 +469,7 @@ fn arith_term_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 ///
 /// asdf
 pub fn slice_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    let (i, (p, e)) = pair(ident_expr, delimited(lbrack, expr, rbrack))(input)?;
+    let (i, (p, e)) = pair(ident_expr, delimited(lbrack, range_expr, rbrack))(input)?;
     match p {
         Expr::Identifier { path, pos } => Ok((
             i,
@@ -490,14 +490,14 @@ use crate::nom::Slice;
 
 #[cfg(test)]
 macro_rules! parse_equal (
-    ($lhs:expr, $rhs:expr) => (
+    ($parser:expr, $lhs:expr, $rhs:expr) => (
         let sp = SourcePos::new("stdio", $lhs);
         let tokens = Lexer::lex_source_pos(sp).unwrap();
         let len = tokens.len();
         let ts = TokenStream::from_vec(tokens);
-        let res = bool_expr(ts.clone());
+        let res = $parser(ts.clone());
         assert_eq!(
-            expr(ts.clone()).map(|(i, x)| (i, format!("{}", x))),
+            $parser(ts.clone()).map(|(i, x)| (i, format!("{}", x))),
             Ok((
                 ts.slice(len - 1..len),
                 String::from($rhs)
@@ -506,46 +506,103 @@ macro_rules! parse_equal (
     )
 );
 
+#[cfg(test)]
+macro_rules! parse_fail(
+    ($parser:expr, $lhs:expr, $rhs:expr) => (
+        let sp = SourcePos::new("stdio", $lhs);
+        let tokens = Lexer::lex_source_pos(sp).unwrap();
+        let len = tokens.len();
+        let ts = TokenStream::from_vec(tokens);
+        let res = $parser(ts.clone());
+        assert!(
+            $parser(ts.clone()).map(|(i, x)| (i, format!("{}", x))).is_err(),
+        );
+    )
+);
+
 #[test]
 fn test_literals() {
     // some literals
-    parse_equal!("1", "1");
-    parse_equal!("true", "true");
-    parse_equal!("ident", "ident");
-    parse_equal!("ident.path.expr", "ident.path.expr");
-    parse_equal!("(1)", "1");
-    parse_equal!("foo[3]", "foo[3]");
-    parse_equal!("bar()", "bar()");
-    parse_equal!("foo.bar[3]", "foo.bar[3]");
+    parse_equal!(expr, "1", "1");
+    parse_equal!(expr, "true", "true");
+    parse_equal!(expr, "ident", "ident");
+    parse_equal!(expr, "ident.path.expr", "ident.path.expr");
+    parse_equal!(expr, "(1)", "1");
+    parse_equal!(expr, "foo[3]", "foo[3]");
+    parse_equal!(expr, "bar()", "bar()");
+    parse_equal!(expr, "foo.bar[3]", "foo.bar[3]");
 }
 
 #[test]
 fn test_arithmetic() {
     // some arithmetic o
-    parse_equal!("1 + 2 * 3 + 4", "((1 + (2 * 3)) + 4)");
-    parse_equal!("1 + 2 * 3 + 4 << 5 * 2", "(((1 + (2 * 3)) + 4) << (5 * 2))");
-    parse_equal!("1 + a + b + 4 + 5", "((((1 + a) + b) + 4) + 5)");
+    parse_equal!(arith_expr, "1 + 2 * 3 + 4", "((1 + (2 * 3)) + 4)");
+    parse_equal!(arith_expr, "1 + 2 * 3 + 4 << 5 * 2", "(((1 + (2 * 3)) + 4) << (5 * 2))");
+    parse_equal!(arith_expr, "1 + a + b + 4 + 5", "((((1 + a) + b) + 4) + 5)");
+
+    parse_fail!(bool_expr, "1 + 2 * 3 + 4", "((1 + (2 * 3)) + 4)");
 }
 
 #[test]
 fn test_boolean() {
     parse_equal!(
+        bool_expr,
         "a && b || c && d || x > 9",
         "(((a && b) || (c && d)) || (x > 9))"
     );
     parse_equal!(
+        bool_expr,
         "a.a && b.b || c.x && d.d.a || x > 9 && !zyw",
         "(((a.a && b.b) || (c.x && d.d.a)) || ((x > 9) && !(zyw)))"
     );
-    parse_equal!("a && b == true", "(a && (b == true))");
-    parse_equal!(
+    parse_equal!(bool_expr,"a && b == true", "(a && (b == true))");
+    parse_equal!(bool_expr,
         "s.x || a() && b() || c[3]",
         "((s.x || (a() && b())) || c[3])"
     );
-    parse_equal!(
+    parse_equal!(bool_expr,
         "a && b && c || d || true",
         "((((a && b) && c) || d) || true)"
     );
-    parse_equal!("a < 123 && b > 432", "((a < 123) && (b > 432))");
-    parse_equal!("a == true", "(a == true)");
+    parse_equal!(bool_expr,"a < 123 && b > 432", "((a < 123) && (b > 432))");
+    parse_equal!(bool_expr,"a == true", "(a == true)");
+}
+
+#[test]
+fn test_range() {
+    parse_equal!(
+        range_expr,
+        "a..b",
+        "a..b"
+    );
+    parse_equal!(
+        range_expr,
+        "1..2",
+        "1..2"
+    );
+    parse_equal!{
+        range_expr,
+        "a+b..1+5",
+        "(a + b)..(1 + 5)"
+    }
+}
+
+
+#[test]
+fn test_slice() {
+    parse_equal!(
+        slice_expr,
+        "foo[1..2]",
+        "foo[1..2]"
+    );
+    parse_equal!(
+        slice_expr,
+        "foo[a..len]",
+        "foo[a..len]"
+    );
+    parse_equal!{
+        slice_expr,
+        "foo[a+4..len-1]",
+        "foo[(a + 4)..(len - 1)]"
+    }
 }

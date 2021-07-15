@@ -675,7 +675,7 @@ impl fmt::Display for Expr {
                 path,
                 slice,
                 pos: _,
-            } => write!(format, "foo"),
+            } => write!(format, "{}[{}]", path.join("."), slice),
             Element { path, idx, pos: _ } => {
                 write!(format, "{}[{}]", path.join("."), idx)
             }
