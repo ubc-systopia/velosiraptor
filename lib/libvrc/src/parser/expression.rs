@@ -117,7 +117,7 @@ pub fn range_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     ))
 }
 
-/// parser arithmetic expressions
+/// parse arithmetic expressions
 ///
 /// an arithmetic expression evalutes to a number a | b
 pub fn arith_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
@@ -537,7 +537,11 @@ fn test_literals() {
 fn test_arithmetic() {
     // some arithmetic o
     parse_equal!(arith_expr, "1 + 2 * 3 + 4", "((1 + (2 * 3)) + 4)");
-    parse_equal!(arith_expr, "1 + 2 * 3 + 4 << 5 * 2", "(((1 + (2 * 3)) + 4) << (5 * 2))");
+    parse_equal!(
+        arith_expr,
+        "1 + 2 * 3 + 4 << 5 * 2",
+        "(((1 + (2 * 3)) + 4) << (5 * 2))"
+    );
     parse_equal!(arith_expr, "1 + a + b + 4 + 5", "((((1 + a) + b) + 4) + 5)");
 
     parse_fail!(bool_expr, "1 + 2 * 3 + 4", "((1 + (2 * 3)) + 4)");
@@ -555,52 +559,37 @@ fn test_boolean() {
         "a.a && b.b || c.x && d.d.a || x > 9 && !zyw",
         "(((a.a && b.b) || (c.x && d.d.a)) || ((x > 9) && !(zyw)))"
     );
-    parse_equal!(bool_expr,"a && b == true", "(a && (b == true))");
-    parse_equal!(bool_expr,
+    parse_equal!(bool_expr, "a && b == true", "(a && (b == true))");
+    parse_equal!(
+        bool_expr,
         "s.x || a() && b() || c[3]",
         "((s.x || (a() && b())) || c[3])"
     );
-    parse_equal!(bool_expr,
+    parse_equal!(
+        bool_expr,
         "a && b && c || d || true",
         "((((a && b) && c) || d) || true)"
     );
-    parse_equal!(bool_expr,"a < 123 && b > 432", "((a < 123) && (b > 432))");
-    parse_equal!(bool_expr,"a == true", "(a == true)");
+    parse_equal!(bool_expr, "a < 123 && b > 432", "((a < 123) && (b > 432))");
+    parse_equal!(bool_expr, "a == true", "(a == true)");
 }
 
 #[test]
 fn test_range() {
-    parse_equal!(
-        range_expr,
-        "a..b",
-        "a..b"
-    );
-    parse_equal!(
-        range_expr,
-        "1..2",
-        "1..2"
-    );
-    parse_equal!{
+    parse_equal!(range_expr, "a..b", "a..b");
+    parse_equal!(range_expr, "1..2", "1..2");
+    parse_equal! {
         range_expr,
         "a+b..1+5",
         "(a + b)..(1 + 5)"
     }
 }
 
-
 #[test]
 fn test_slice() {
-    parse_equal!(
-        slice_expr,
-        "foo[1..2]",
-        "foo[1..2]"
-    );
-    parse_equal!(
-        slice_expr,
-        "foo[a..len]",
-        "foo[a..len]"
-    );
-    parse_equal!{
+    parse_equal!(slice_expr, "foo[1..2]", "foo[1..2]");
+    parse_equal!(slice_expr, "foo[a..len]", "foo[a..len]");
+    parse_equal! {
         slice_expr,
         "foo[a+4..len-1]",
         "foo[(a + 4)..(len - 1)]"
