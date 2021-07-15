@@ -30,7 +30,7 @@ use crate::ast::ast::Import;
 use crate::lexer::token::TokenStream;
 use crate::parser::terminals::{ident, kw_import, semicolon};
 
-// the used nom componets
+// the used nom components
 use crate::nom::error::ErrorKind;
 use nom::sequence::terminated;
 use nom::{error_position, Err, IResult, InputLength, Slice};

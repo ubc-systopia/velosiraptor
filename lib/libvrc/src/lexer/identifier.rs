@@ -25,6 +25,8 @@
 
 //! Parses identifiers
 
+use std::thread::__FastLocalKeyInner;
+
 // the used nom componets
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -37,7 +39,7 @@ use nom::{
 };
 
 use super::sourcepos::SourcePos;
-use super::token::{Keyword, Token, TokenContent};
+use super::token::{Keyword, Token, TokenContent, TokenStream};
 
 /// parses a rust-like identifiers
 pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
@@ -61,6 +63,8 @@ pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
         "if" => Token::new(TokenContent::Keyword(Keyword::If), ident),
         "else" => Token::new(TokenContent::Keyword(Keyword::Else), ident),
         "assert" => Token::new(TokenContent::Keyword(Keyword::Assert), ident),
+        "state" => Token::new(TokenContent::Keyword(Keyword::State), ident),
+        "interface" => Token::new(TokenContent::Keyword(Keyword::Interface), ident),
         x => Token::new(TokenContent::Identifier(x.to_string()), ident),
     };
 

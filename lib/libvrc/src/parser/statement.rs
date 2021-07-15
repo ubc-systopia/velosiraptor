@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! State definition parsing
+//! Statement parsing
 
 // lexer, parser terminals and ast
 use crate::ast::ast::Expr;

@@ -55,6 +55,10 @@ pub enum Keyword {
     Fn,
     /// An assert statement
     Assert,
+    /// defines state for a unit
+    State,
+    /// defines the interface of a unit
+    Interface
 }
 
 /// Implementation of the [std::fmt::Display] trait for [Token]
@@ -94,7 +98,7 @@ pub enum TokenContent {
     Identifier(String), // abc ab_cd
 
     // Keywords
-    Keyword(Keyword), // unit | import
+    Keyword(Keyword), // unit | import | state | interface
 
     // comments
     Comment(String),      // //

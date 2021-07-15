@@ -29,7 +29,7 @@ use custom_error::custom_error;
 use std::rc::Rc;
 
 pub mod terminals;
-//mod state;
+mod state;
 mod bitslice;
 mod expression;
 mod field;

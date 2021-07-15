@@ -26,37 +26,79 @@
 //! State definition parsing
 
 // lexer, parser terminals and ast
-use crate::lexer::token::TokenStream;
 use crate::ast::ast::State;
-use crate::parser::terminals::{ident, import_keyword, semicolon};
+use crate::lexer::token::TokenStream;
+use crate::parser::terminals::{ident, kw_state, eq, comma, lparen, rparen};
+//use crate::parser::field::field;
 
-// the used nom componets
-use nom::error::ErrorKind;
-use nom::sequence::terminated;
-use nom::{error_position, Err, IResult};
-
+use nom::multi::separated_list0;
 // the used nom componets
 use nom::{
-    branch::alt,
-    bytes::complete::tag,
-    character::complete::{digit1, multispace0, multispace1},
-    multi::{many1, separated_list1},
-    sequence::{delimited, preceded, terminated, tuple},
-    IResult,
+    error::ErrorKind, 
+    error_position, 
+    Err, 
+    IResult, 
 };
+use nom::sequence::{preceded, delimited};
 
-// get the tokens
-use super::comments::parse_comments;
-use super::identifier::parse_identifier;
-use super::tokens::{comma, lbrace, lbrack, lparen, rbrace, rbrack, rparen, semicolon};
-use super::SourcePos;
+/// parses and consumes the [State] of a unit
+pub fn state(input: TokenStream) -> IResult<TokenStream, State> {
+    // get the current position
+    let pos = input.input_sourcepos();
 
-use super::ast::{BitMapEntry, State, StateField};
+    // try to match the state keyword, if there is no match, return.
+    let i1: TokenStream = match kw_state(input.clone()) {
+        Ok((input, _)) => input,
+        Err(x) => return Err(x),
+    };
 
-/// parses and consumes an import statement (`import foo;`) and any following whitespaces
-pub fn state(input: SourcePos) -> IResult<SourcePos, State> {
+    // now that we've seen the 'state' keyword, it must next be followed by an = operator
+    // and following that we should have the list state itself.
+    let (i2, statetype) = match preceded(eq, ident)(i1) {
+        Ok((r, statetype )) => (r, statetype),
+        Err(e) => {
+            let (i, k) = match e {
+                Err::Error(e) => (e.input, e.code),
+                Err::Failure(e) => (e.input, e.code),
+                Err::Incomplete(_) => (input, ErrorKind::Eof),
+            };
+            return Err(Err::Failure(error_position!(i, k)))
+        },
+    };
+
+    match statetype.as_str() {
+        "Memory" => memory_state(i2),
+        "Register" => register_state(i2),
+        _ => Err(Err::Failure())
+    }
+}
+
+fn memory_state(input: TokenStream) -> IResult<TokenStream, MemoryState> {
+    // Parse state parameters (i.e bases)
+    let mem_params = delimited(lparen, separated_list0(comma, ident), rparen);
+    let (i1, bases) = match mem_params(input) {
+        Ok((i1, bases)) => (i1, bases),
+        Err(e) => {
+            let (i, k) = match e {
+                Err::Error(e) => (e.input, e.code),
+                Err::Failure(e) => (e.input, e.code),
+                Err::Incomplete(_) => (i1, ErrorKind::Eof),
+            };
+            return Err(Err::Failure(error_position!(i, k)));
+        }
+    };
+
+    
+
+    }
+}
+
+// parses and consumes an import statement (`import foo;`) and any following whitespaces
+/* pub fn state(input: SourcePos) -> IResult<SourcePos, State> {
     // record the current position
     let pos = input.get_pos();
+
+    let (input, _) = kw_state(input)?;
 
     // get the type of the state
     let (input, statetype) = match alt((tag("Memory"), tag("Register")))(input) {
@@ -81,8 +123,7 @@ pub fn state(input: SourcePos) -> IResult<SourcePos, State> {
     } else {
         Ok((input, State::RegisterState { bases, fields, pos }))
     }
-}
-
+} */
 
 #[test]
 fn parse_field_test() {
