@@ -134,6 +134,39 @@ pub fn arith_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     Ok((i, fold_exprs(initial, remainder)))
 }
 
+pub fn num_lit_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+    assert!(!input.is_empty());
+    let pos = input.input_sourcepos();
+    let (rem, value) = num(input)?;
+    Ok((rem, Expr::Number { value, pos }))
+}
+
+pub fn bool_lit_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+    assert!(!input.is_empty());
+    let pos = input.input_sourcepos();
+    let (rem, value) = boolean(input)?;
+    Ok((rem, Expr::Boolean { value, pos }))
+}
+
+/// parses a slice expression `foo[0..43]`
+///
+/// asdf
+pub fn slice_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+    let (i, (p, e)) = pair(ident_expr, delimited(lbrack, range_expr, rbrack))(input)?;
+    match p {
+        Expr::Identifier { path, pos } => Ok((
+            i,
+            Expr::Slice {
+                path,
+                slice: Box::new(e),
+                pos,
+            },
+        )),
+        _ => panic!("unexpected type"),
+    }
+}
+
+
 /// parses a logical and (&&) expression
 ///
 /// this expression evaluates to a boolean value
@@ -151,7 +184,7 @@ fn bool_land(input: TokenStream) -> IResult<TokenStream, Expr> {
     Ok((i, fold_exprs(initial, remainder)))
 }
 
-pub fn bool_unary_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+fn bool_unary_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     alt((
         bool_unary_lnot,
         bool_cmp_expr_arith,
@@ -256,7 +289,7 @@ fn bool_unary_lnot(input: TokenStream) -> IResult<TokenStream, Expr> {
 /// parses an xor expression
 ///
 /// an arithmetic expression that evaluates to a number (a ^ b)
-pub fn arith_xor_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+fn arith_xor_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
     let (i, initial) = arith_and_expr(input)?;
 
@@ -272,7 +305,7 @@ pub fn arith_xor_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 /// parses an xor expression
 ///
 /// an arithmetic expression that evaluates to a number (a & b)
-pub fn arith_and_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+fn arith_and_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
     let (i, initial) = arith_shift_expr(input)?;
 
@@ -285,7 +318,7 @@ pub fn arith_and_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     Ok((i, fold_exprs(initial, remainder)))
 }
 
-pub fn arith_shift_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+fn arith_shift_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
     let (i, initial) = arith_add_expr(input)?;
     let (i, remainder) = many0(alt((
@@ -305,7 +338,7 @@ pub fn arith_shift_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 }
 
 /// parses a + / -
-pub fn arith_add_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+fn arith_add_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
     let (i, initial) = arit_mul_expr(input)?;
     let (i, remainder) = many0(alt((
@@ -325,7 +358,7 @@ pub fn arith_add_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 }
 
 /// parses a * / %
-pub fn arit_mul_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+fn arit_mul_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
     let (i, initial) = arith_unary_expr(input)?;
     let (i, remainder) = many0(alt((
@@ -363,22 +396,8 @@ fn arith_unary_not(input: TokenStream) -> IResult<TokenStream, Expr> {
     ))
 }
 
-pub fn arith_unary_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+fn arith_unary_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     alt((arith_unary_not, arith_term_expr))(input)
-}
-
-pub fn num_lit_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    assert!(!input.is_empty());
-    let pos = input.input_sourcepos();
-    let (rem, value) = num(input)?;
-    Ok((rem, Expr::Number { value, pos }))
-}
-
-fn bool_lit_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    assert!(!input.is_empty());
-    let pos = input.input_sourcepos();
-    let (rem, value) = boolean(input)?;
-    Ok((rem, Expr::Boolean { value, pos }))
 }
 
 fn ident_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
@@ -463,24 +482,6 @@ fn arith_term_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
         // try to parse an `(arith_expr)`
         delimited(lparen, arith_expr, rparen),
     ))(input)
-}
-
-/// parses a slice expression `foo[0..43]`
-///
-/// asdf
-pub fn slice_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    let (i, (p, e)) = pair(ident_expr, delimited(lbrack, range_expr, rbrack))(input)?;
-    match p {
-        Expr::Identifier { path, pos } => Ok((
-            i,
-            Expr::Slice {
-                path,
-                slice: Box::new(e),
-                pos,
-            },
-        )),
-        _ => panic!("unexpected type"),
-    }
 }
 
 #[cfg(test)]
