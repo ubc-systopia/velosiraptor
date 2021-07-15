@@ -413,7 +413,7 @@ fn element_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
             i,
             Expr::Element {
                 path,
-                slice: Box::new(e),
+                idx: Box::new(e),
                 pos,
             },
         )),
@@ -537,36 +537,15 @@ fn test_boolean() {
         "a.a && b.b || c.x && d.d.a || x > 9 && !zyw",
         "(((a.a && b.b) || (c.x && d.d.a)) || ((x > 9) && !(zyw)))"
     );
-}
-
-#[test]
-fn test_err() {
-    let sp = SourcePos::new("stdio", "a + b) && (c < 3) + 3");
-    let tokens = Lexer::lex_source_pos(sp).unwrap();
-    let ts = TokenStream::from_vec(tokens);
-    let res = expr(ts.clone());
-    let (r1, r2) = res.unwrap();
-    println!("{}\n\n{}", r1, r2);
-    assert!(expr(ts.clone()).is_err());
-}
-
-#[test]
-fn test_bool_expr_ok() {
+    parse_equal!("a && b == true", "(a && (b == true))");
+    parse_equal!(
+        "s.x || a() && b() || c[3]",
+        "((s.x || (a() && b())) || c[3])"
+    );
     parse_equal!(
         "a && b && c || d || true",
         "((((a && b) && c) || d) || true)"
     );
-    parse_equal!(
-        "a && !b && !(c || d) || true",
-        "(((a && !(b)) && !((c || d))) || true)"
-    );
-
     parse_equal!("a < 123 && b > 432", "((a < 123) && (b > 432))");
     parse_equal!("a == true", "(a == true)");
-    parse_equal!("a && b == true", "(a && (b == true))");
-
-    parse_equal!("a && b + c", "(a && b)");
-
-    // that one here should not be possile
-    parse_equal!("a == b == c", "((a == b) == c)");
 }

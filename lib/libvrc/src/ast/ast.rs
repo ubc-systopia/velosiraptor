@@ -644,7 +644,7 @@ pub enum Expr {
     },
     Element {
         path: Vec<String>,
-        slice: Box<Expr>,
+        idx: Box<Expr>,
         pos: SourcePos,
     },
     Range {
@@ -668,17 +668,17 @@ impl fmt::Display for Expr {
                 pos: _,
             } => write!(format, "({} {} {})", lhs, op, rhs),
             UnaryOperation { op, val, pos: _ } => write!(format, "{}({})", op, val),
-            FnCall { path, pos: _ } => write!(format, "foo"),
+            FnCall { path, pos: _ } => {
+                write!(format, "{}()", path.join("."))
+            }
             Slice {
                 path,
                 slice,
                 pos: _,
             } => write!(format, "foo"),
-            Element {
-                path,
-                slice,
-                pos: _,
-            } => write!(format, "foo"),
+            Element { path, idx, pos: _ } => {
+                write!(format, "{}[{}]", path.join("."), idx)
+            }
             Range { start, end, pos: _ } => write!(format, "{}..{}", start, end),
         }
     }
