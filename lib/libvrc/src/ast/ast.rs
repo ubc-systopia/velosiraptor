@@ -34,7 +34,7 @@ use crate::lexer::sourcepos::SourcePos;
 ///
 /// The type of a an expression, parameter or value defines the set of
 /// operations that are allowed to be carried out with it.
-#[derive(PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Type {
     /// a boolean type (true / false)
     Boolean,
@@ -500,6 +500,7 @@ pub enum Stmt {
     Block { stmts: Vec<Stmt>, pos: SourcePos },
     /// the assign statements gives a name to a value
     Assign {
+        typeinfo: Type,
         lhs: String,
         rhs: Expr,
         pos: SourcePos,
@@ -522,7 +523,7 @@ impl fmt::Display for Stmt {
             Block { stmts, pos: _ } => {
                 write!(f, "{{ TODO }} \n")
             }
-            Assign { lhs, rhs, pos: _ } => write!(f, "let {} = {};\n", lhs, rhs),
+            Assign { typeinfo, lhs, rhs, pos: _ } => write!(f, "let {} : {} = {};\n", typeinfo, lhs, rhs),
             Assert { expr, pos: _ } => write!(f, "assert {};", expr),
             IfElse {
                 cond,
