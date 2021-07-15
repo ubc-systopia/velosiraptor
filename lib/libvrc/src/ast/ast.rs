@@ -642,6 +642,16 @@ pub enum Expr {
         slice: Box<Expr>,
         pos: SourcePos,
     },
+    Element {
+        path: Vec<String>,
+        slice: Box<Expr>,
+        pos: SourcePos,
+    },
+    Range {
+        start: Box<Expr>,
+        end: Box<Expr>,
+        pos: SourcePos,
+    },
 }
 
 impl fmt::Display for Expr {
@@ -664,6 +674,12 @@ impl fmt::Display for Expr {
                 slice,
                 pos: _,
             } => write!(format, "foo"),
+            Element {
+                path,
+                slice,
+                pos: _,
+            } => write!(format, "foo"),
+            Range { start, end, pos: _ } => write!(format, "{}..{}", start, end),
         }
     }
 }

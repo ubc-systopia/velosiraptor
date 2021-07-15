@@ -65,27 +65,6 @@ use nom::{
 use nom::multi::many0;
 use nom::sequence::{pair, preceded, terminated};
 
-/// parses expressions
-pub fn expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    assert!(!input.is_empty());
-    lor_expr(input)
-}
-
-/// parses boolean expressions
-///
-/// this is an expression that evaluates to a boolean value.
-///
-pub fn bool_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    lor_expr(input)
-}
-
-/// parser arithmetic expressions
-///
-/// an arithmetic expression evalutes to a number.
-pub fn arith_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    lor_expr(input)
-}
-
 /// folds expressions
 fn fold_exprs(initial: Expr, remainder: Vec<(SourcePos, BinOp, Expr)>) -> Expr {
     remainder.into_iter().fold(initial, |acc, tuple| {
@@ -99,122 +78,225 @@ fn fold_exprs(initial: Expr, remainder: Vec<(SourcePos, BinOp, Expr)>) -> Expr {
     })
 }
 
-pub fn lor_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+/// expression parsing: parses wither a boolean or arithmetic expression
+pub fn expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
-    let (i, initial) = land_expr(input)?;
+    alt((bool_expr, range_expr, arith_expr))(input)
+}
+
+/// parses boolean expressions
+///
+/// this is an expression that evaluates to a boolean value.
+pub fn bool_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+    // we start with a the logical or (||) as this has the weakest precedence
+    assert!(!input.is_empty());
+    let (i, initial) = bool_land(input)?;
 
     let (i, remainder) = many0(|i: TokenStream| {
         let pos = i.input_sourcepos();
-        let (i, add) = preceded(lor, land_expr)(i)?;
+        let (i, add) = preceded(lor, bool_land)(i)?;
         Ok((i, (pos, BinOp::Lor, add)))
     })(i)?;
 
     Ok((i, fold_exprs(initial, remainder)))
 }
 
-pub fn land_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+/// parses a range expression (a..b)
+///
+/// an arithmetic expression evalutes to a number a | b
+pub fn range_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+    let pos = input.input_sourcepos();
+    let (i, (s, _, e)) = tuple((arith_expr, dotdot, arith_expr))(input)?;
+    Ok((
+        i,
+        Expr::Range {
+            start: Box::new(s),
+            end: Box::new(e),
+            pos,
+        },
+    ))
+}
+
+/// parser arithmetic expressions
+///
+/// an arithmetic expression evalutes to a number a | b
+pub fn arith_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+    // we start with the or expression (|)
     assert!(!input.is_empty());
-    let (i, initial) = cmp_expr(input)?;
+    let (i, initial) = arith_xor_expr(input)?;
 
     let (i, remainder) = many0(|i: TokenStream| {
         let pos = i.input_sourcepos();
-        let (i, add) = preceded(land, cmp_expr)(i)?;
+        let (i, op) = preceded(or, arith_xor_expr)(i)?;
+        Ok((i, (pos, BinOp::Or, op)))
+    })(i)?;
+
+    Ok((i, fold_exprs(initial, remainder)))
+}
+
+/// parses a logical and (&&) expression
+///
+/// this expression evaluates to a boolean value
+fn bool_land(input: TokenStream) -> IResult<TokenStream, Expr> {
+    // we take the logical and (&&) of terms
+    assert!(!input.is_empty());
+    let (i, initial) = bool_unary_expr(input)?;
+
+    let (i, remainder) = many0(|i: TokenStream| {
+        let pos = i.input_sourcepos();
+        let (i, add) = preceded(land, bool_unary_expr)(i)?;
         Ok((i, (pos, BinOp::Land, add)))
     })(i)?;
 
     Ok((i, fold_exprs(initial, remainder)))
 }
 
-pub fn cmp_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+pub fn bool_unary_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+    alt((
+        bool_unary_lnot,
+        bool_cmp_expr_arith,
+        bool_cmp_expr_bool,
+        bool_term_expr,
+    ))(input)
+}
+
+/// parses a comparison expression
+///
+/// this expression evaluates to a boolean value
+fn bool_cmp_expr_arith(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
-    let (i, initial) = or_expr(input)?;
-    let (i, remainder) = many0(alt((
+    let (i, lhs) = arith_expr(input)?;
+    let (i, (pos, op, rhs)) = alt((
         |i: TokenStream| {
             let pos = i.input_sourcepos();
-            let (i, op) = preceded(eq, or_expr)(i)?;
+            let (i, op) = preceded(eq, arith_expr)(i)?;
             Ok((i, (pos, BinOp::Eq, op)))
         },
         |i: TokenStream| {
             let pos = i.input_sourcepos();
-            let (i, op) = preceded(ne, or_expr)(i)?;
+            let (i, op) = preceded(ne, arith_expr)(i)?;
             Ok((i, (pos, BinOp::Ne, op)))
         },
         |i: TokenStream| {
             let pos = i.input_sourcepos();
-            let (i, op) = preceded(gt, or_expr)(i)?;
+            let (i, op) = preceded(gt, arith_expr)(i)?;
             Ok((i, (pos, BinOp::Gt, op)))
         },
         |i: TokenStream| {
             let pos = i.input_sourcepos();
-            let (i, op) = preceded(lt, or_expr)(i)?;
+            let (i, op) = preceded(lt, arith_expr)(i)?;
             Ok((i, (pos, BinOp::Lt, op)))
         },
         |i: TokenStream| {
             let pos = i.input_sourcepos();
-            let (i, op) = preceded(le, or_expr)(i)?;
+            let (i, op) = preceded(le, arith_expr)(i)?;
             Ok((i, (pos, BinOp::Le, op)))
         },
         |i: TokenStream| {
             let pos = i.input_sourcepos();
-            let (i, op) = preceded(ge, or_expr)(i)?;
+            let (i, op) = preceded(ge, arith_expr)(i)?;
             Ok((i, (pos, BinOp::Ge, op)))
         },
-    )))(i)?;
-
-    Ok((i, fold_exprs(initial, remainder)))
+    ))(i)?;
+    Ok((
+        i,
+        Expr::BinaryOperation {
+            op,
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+            pos,
+        },
+    ))
 }
 
-pub fn or_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+/// parses a comparison expression
+///
+/// this expression evaluates to a boolean value
+fn bool_cmp_expr_bool(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
-    let (i, initial) = xor_expr(input)?;
+    let (i, lhs) = bool_term_expr(input)?;
+    let (i, (pos, op, rhs)) = alt((
+        |i: TokenStream| {
+            let pos = i.input_sourcepos();
+            let (i, op) = preceded(eq, bool_term_expr)(i)?;
+            Ok((i, (pos, BinOp::Eq, op)))
+        },
+        |i: TokenStream| {
+            let pos = i.input_sourcepos();
+            let (i, op) = preceded(ne, bool_term_expr)(i)?;
+            Ok((i, (pos, BinOp::Ne, op)))
+        },
+    ))(i)?;
+    Ok((
+        i,
+        Expr::BinaryOperation {
+            op,
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+            pos,
+        },
+    ))
+}
+
+/// parses a logical unary not (!) expression
+fn bool_unary_lnot(input: TokenStream) -> IResult<TokenStream, Expr> {
+    assert!(!input.is_empty());
+    let pos = input.input_sourcepos();
+    let (i, v) = preceded(lnot, bool_term_expr)(input)?;
+    Ok((
+        i,
+        Expr::UnaryOperation {
+            op: UnOp::LNot,
+            val: Box::new(v),
+            pos,
+        },
+    ))
+}
+
+/// parses an xor expression
+///
+/// an arithmetic expression that evaluates to a number (a ^ b)
+pub fn arith_xor_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+    assert!(!input.is_empty());
+    let (i, initial) = arith_and_expr(input)?;
 
     let (i, remainder) = many0(|i: TokenStream| {
         let pos = i.input_sourcepos();
-        let (i, op) = preceded(or, xor_expr)(i)?;
+        let (i, op) = preceded(xor, arith_and_expr)(i)?;
         Ok((i, (pos, BinOp::Or, op)))
     })(i)?;
 
     Ok((i, fold_exprs(initial, remainder)))
 }
 
-pub fn xor_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+/// parses an xor expression
+///
+/// an arithmetic expression that evaluates to a number (a & b)
+pub fn arith_and_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
-    let (i, initial) = and_expr(input)?;
+    let (i, initial) = arith_shift_expr(input)?;
 
     let (i, remainder) = many0(|i: TokenStream| {
         let pos = i.input_sourcepos();
-        let (i, op) = preceded(xor, and_expr)(i)?;
-        Ok((i, (pos, BinOp::Or, op)))
-    })(i)?;
-
-    Ok((i, fold_exprs(initial, remainder)))
-}
-
-pub fn and_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    assert!(!input.is_empty());
-    let (i, initial) = shift_expr(input)?;
-
-    let (i, remainder) = many0(|i: TokenStream| {
-        let pos = i.input_sourcepos();
-        let (i, op) = preceded(and, shift_expr)(i)?;
+        let (i, op) = preceded(and, arith_shift_expr)(i)?;
         Ok((i, (pos, BinOp::And, op)))
     })(i)?;
 
     Ok((i, fold_exprs(initial, remainder)))
 }
 
-pub fn shift_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+pub fn arith_shift_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
-    let (i, initial) = add_expr(input)?;
+    let (i, initial) = arith_add_expr(input)?;
     let (i, remainder) = many0(alt((
         |i: TokenStream| {
             let pos = i.input_sourcepos();
-            let (i, op) = preceded(lshift, add_expr)(i)?;
+            let (i, op) = preceded(lshift, arith_add_expr)(i)?;
             Ok((i, (pos, BinOp::LShift, op)))
         },
         |i: TokenStream| {
             let pos = i.input_sourcepos();
-            let (i, op) = preceded(rshift, add_expr)(i)?;
+            let (i, op) = preceded(rshift, arith_add_expr)(i)?;
             Ok((i, (pos, BinOp::RShift, op)))
         },
     )))(i)?;
@@ -223,18 +305,18 @@ pub fn shift_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 }
 
 /// parses a + / -
-pub fn add_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+pub fn arith_add_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
-    let (i, initial) = mul_expr(input)?;
+    let (i, initial) = arit_mul_expr(input)?;
     let (i, remainder) = many0(alt((
         |i: TokenStream| {
             let pos = i.input_sourcepos();
-            let (i, op) = preceded(plus, mul_expr)(i)?;
+            let (i, op) = preceded(plus, arit_mul_expr)(i)?;
             Ok((i, (pos, BinOp::Plus, op)))
         },
         |i: TokenStream| {
             let pos = i.input_sourcepos();
-            let (i, op) = preceded(minus, mul_expr)(i)?;
+            let (i, op) = preceded(minus, arit_mul_expr)(i)?;
             Ok((i, (pos, BinOp::Plus, op)))
         },
     )))(i)?;
@@ -243,23 +325,23 @@ pub fn add_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 }
 
 /// parses a * / %
-pub fn mul_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+pub fn arit_mul_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
-    let (i, initial) = unary_expr(input)?;
+    let (i, initial) = arith_unary_expr(input)?;
     let (i, remainder) = many0(alt((
         |i: TokenStream| {
             let pos = i.input_sourcepos();
-            let (i, op) = preceded(star, unary_expr)(i)?;
+            let (i, op) = preceded(star, arith_unary_expr)(i)?;
             Ok((i, (pos, BinOp::Multiply, op)))
         },
         |i: TokenStream| {
             let pos = i.input_sourcepos();
-            let (i, op) = preceded(slash, unary_expr)(i)?;
+            let (i, op) = preceded(slash, arith_unary_expr)(i)?;
             Ok((i, (pos, BinOp::Divide, op)))
         },
         |i: TokenStream| {
             let pos = i.input_sourcepos();
-            let (i, op) = preceded(percent, unary_expr)(i)?;
+            let (i, op) = preceded(percent, arith_unary_expr)(i)?;
             Ok((i, (pos, BinOp::Modulo, op)))
         },
     )))(i)?;
@@ -267,10 +349,10 @@ pub fn mul_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     Ok((i, fold_exprs(initial, remainder)))
 }
 
-fn unary_not(input: TokenStream) -> IResult<TokenStream, Expr> {
+fn arith_unary_not(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
     let pos = input.input_sourcepos();
-    let (i, val) = preceded(not, funcall_expr)(input)?;
+    let (i, val) = preceded(not, arith_term_expr)(input)?;
     Ok((
         i,
         Expr::UnaryOperation {
@@ -281,25 +363,39 @@ fn unary_not(input: TokenStream) -> IResult<TokenStream, Expr> {
     ))
 }
 
-fn unary_lnot(input: TokenStream) -> IResult<TokenStream, Expr> {
+pub fn arith_unary_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+    alt((arith_unary_not, arith_term_expr))(input)
+}
+
+pub fn num_lit_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
     let pos = input.input_sourcepos();
-    let (i, val) = preceded(lnot, funcall_expr)(input)?;
-    Ok((
-        i,
-        Expr::UnaryOperation {
-            op: UnOp::LNot,
-            val: Box::new(val),
-            pos,
-        },
-    ))
+    let (rem, value) = num(input)?;
+    Ok((rem, Expr::Number { value, pos }))
 }
 
-pub fn unary_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    alt((unary_not, unary_lnot, funcall_expr))(input)
+fn bool_lit_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+    assert!(!input.is_empty());
+    let pos = input.input_sourcepos();
+    let (rem, value) = boolean(input)?;
+    Ok((rem, Expr::Boolean { value, pos }))
 }
 
-pub fn fn_call_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+fn ident_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+    assert!(!input.is_empty());
+    let pos = input.input_sourcepos();
+    let (i, (fst, mut ot)) = pair(ident, many0(preceded(dot, ident)))(input)?;
+    let mut path = Vec::from([fst]);
+    path.append(&mut ot);
+    Ok((i, Expr::Identifier { path, pos }))
+}
+
+/// pares a function call expression `foo()`
+///
+/// This parses a function call without arguments
+///
+/// TODO: add support for arguments
+fn fn_call_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i, e) = terminated(ident_expr, pair(lparen, rparen))(input)?;
     match e {
         Expr::Identifier { path, pos } => Ok((i, Expr::FnCall { path, pos })),
@@ -307,6 +403,71 @@ pub fn fn_call_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     }
 }
 
+/// parses a slice element expression `foo[3]`
+///
+/// this returns a single element from a slice
+fn element_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+    let (i, (p, e)) = pair(ident_expr, delimited(lbrack, num_lit_expr, rbrack))(input)?;
+    match p {
+        Expr::Identifier { path, pos } => Ok((
+            i,
+            Expr::Element {
+                path,
+                slice: Box::new(e),
+                pos,
+            },
+        )),
+        _ => panic!("unexpected type"),
+    }
+}
+
+/// parses a logical term
+///
+/// This is either
+///  - a boolean `true`
+///  - a function call or element access `foo()` or `foo[1]`
+///  - an identifier `abc`
+///  - or another boolean expression in parentesis `(a && b)`
+fn bool_term_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+    alt((
+        // it can be a boolean literal (true | false)
+        bool_lit_expr,
+        // a function call expression returning a boolean
+        fn_call_expr,
+        // element expression returning a boolean
+        element_expr,
+        // it can be a identifier (variable)
+        ident_expr,
+        // its a term in parenthesis
+        delimited(lparen, bool_expr, rparen),
+    ))(input)
+}
+
+/// parses an arithmetic term expression
+///
+/// This is either
+///  - a number `123`
+///  - a function call or element access `foo()` or `foo[1]`
+///  - an identifier `abc`
+///  - or another arithmetic expression in parentesis `(a + b)`
+fn arith_term_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+    alt((
+        // try to parse a number
+        num_lit_expr,
+        // a function call expression returning an integer
+        fn_call_expr,
+        // element expression returning an integer
+        element_expr,
+        // try to parse an identifier
+        ident_expr,
+        // try to parse an `(arith_expr)`
+        delimited(lparen, arith_expr, rparen),
+    ))(input)
+}
+
+/// parses a slice expression `foo[0..43]`
+///
+/// asdf
 pub fn slice_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i, (p, e)) = pair(ident_expr, delimited(lbrack, expr, rbrack))(input)?;
     match p {
@@ -322,123 +483,62 @@ pub fn slice_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     }
 }
 
-pub fn funcall_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    alt((slice_expr, fn_call_expr, value_expr))(input)
-}
-
-//
-pub fn value_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    alt((paren_expr, literal_expr))(input)
-}
-
-pub fn num_lit_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    assert!(!input.is_empty());
-    let pos = input.input_sourcepos();
-    let (rem, value) = num(input)?;
-    Ok((rem, Expr::Number { value, pos }))
-}
-
-pub fn bool_lit_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    assert!(!input.is_empty());
-    let pos = input.input_sourcepos();
-    let (rem, value) = boolean(input)?;
-    Ok((rem, Expr::Boolean { value, pos }))
-}
-
-pub fn ident_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    assert!(!input.is_empty());
-    let pos = input.input_sourcepos();
-    let (i, (fst, mut ot)) = pair(ident, many0(preceded(dot, ident)))(input)?;
-    let mut path = Vec::from([fst]);
-    path.append(&mut ot);
-    Ok((i, Expr::Identifier { path, pos }))
-}
-
-pub fn literal_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    alt((num_lit_expr, bool_lit_expr, ident_expr))(input)
-}
-
-pub fn paren_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    delimited(lparen, expr, rparen)(input)
-}
-
 #[cfg(test)]
 use crate::lexer::Lexer;
 #[cfg(test)]
 use crate::nom::Slice;
 
+#[cfg(test)]
+macro_rules! parse_equal (
+    ($lhs:expr, $rhs:expr) => (
+        let sp = SourcePos::new("stdio", $lhs);
+        let tokens = Lexer::lex_source_pos(sp).unwrap();
+        let len = tokens.len();
+        let ts = TokenStream::from_vec(tokens);
+        let res = bool_expr(ts.clone());
+        assert_eq!(
+            expr(ts.clone()).map(|(i, x)| (i, format!("{}", x))),
+            Ok((
+                ts.slice(len - 1..len),
+                String::from($rhs)
+            ))
+        );
+    )
+);
+
 #[test]
-fn test_ok() {
-    // corresponds to `0 16 foobar`
-    let sp = SourcePos::new("stdio", "1");
-    let tokens = Lexer::lex_source_pos(sp).unwrap();
-    let ts = TokenStream::from_vec(tokens);
-    assert!(expr(ts).is_ok());
-
-    let sp = SourcePos::new("stdio", "true");
-    let tokens = Lexer::lex_source_pos(sp).unwrap();
-    let ts = TokenStream::from_vec(tokens);
-    assert!(expr(ts).is_ok());
-
-    let sp = SourcePos::new("stdio", "ident");
-    let tokens = Lexer::lex_source_pos(sp).unwrap();
-    let ts = TokenStream::from_vec(tokens);
-    assert!(expr(ts).is_ok());
-
-    let sp = SourcePos::new("stdio", " 1 + 2 * 3 + 4 ");
-    let tokens = Lexer::lex_source_pos(sp).unwrap();
-    let ts = TokenStream::from_vec(tokens);
-    assert_eq!(
-        expr(ts.clone()).map(|(i, x)| (i, format!("{}", x))),
-        Ok((ts.slice(7..8), String::from("((1 + (2 * 3)) + 4)")))
-    );
-
-    let sp = SourcePos::new("stdio", " 1 + 2 * 3 + 4 << 5 * 2");
-    let tokens = Lexer::lex_source_pos(sp).unwrap();
-    let len = tokens.len();
-    let ts = TokenStream::from_vec(tokens);
-    assert_eq!(
-        expr(ts.clone()).map(|(i, x)| (i, format!("{}", x))),
-        Ok((
-            ts.slice(len - 1..len),
-            String::from("(((1 + (2 * 3)) + 4) << (5 * 2))")
-        ))
-    );
-
-    let sp = SourcePos::new("stdio", "a && b || c && d || x > 9");
-    let tokens = Lexer::lex_source_pos(sp).unwrap();
-    let len = tokens.len();
-    let ts = TokenStream::from_vec(tokens);
-    assert_eq!(
-        expr(ts.clone()).map(|(i, x)| (i, format!("{}", x))),
-        Ok((
-            ts.slice(len - 1..len),
-            String::from("(((a && b) || (c && d)) || (x > 9))")
-        ))
-    );
-
-    let sp = SourcePos::new("stdio", "a.a && b.b || c.x && d.d.a || x > 9 && !zyw");
-    let tokens = Lexer::lex_source_pos(sp).unwrap();
-    let len = tokens.len();
-    let ts = TokenStream::from_vec(tokens);
-    assert_eq!(
-        expr(ts.clone()).map(|(i, x)| (i, format!("{}", x))),
-        Ok((
-            ts.slice(len - 1..len),
-            String::from("(((a.a && b.b) || (c.x && d.d.a)) || ((x > 9) && !(zyw)))")
-        ))
-    );
-
-    let sp = SourcePos::new("stdio", " 1 + 2 + 2 + 4 + 5");
-    let tokens = Lexer::lex_source_pos(sp).unwrap();
-    let ts = TokenStream::from_vec(tokens);
-    assert!(expr(ts).is_ok());
-
-    let sp = SourcePos::new("stdio", " 1 + a + b + 4 + 5");
-    let tokens = Lexer::lex_source_pos(sp).unwrap();
-    let ts = TokenStream::from_vec(tokens);
-    assert!(expr(ts).is_ok());
+fn test_literals() {
+    // some literals
+    parse_equal!("1", "1");
+    parse_equal!("true", "true");
+    parse_equal!("ident", "ident");
+    parse_equal!("ident.path.expr", "ident.path.expr");
+    parse_equal!("(1)", "1");
+    parse_equal!("foo[3]", "foo[3]");
+    parse_equal!("bar()", "bar()");
+    parse_equal!("foo.bar[3]", "foo.bar[3]");
 }
+
+#[test]
+fn test_arithmetic() {
+    // some arithmetic o
+    parse_equal!("1 + 2 * 3 + 4", "((1 + (2 * 3)) + 4)");
+    parse_equal!("1 + 2 * 3 + 4 << 5 * 2", "(((1 + (2 * 3)) + 4) << (5 * 2))");
+    parse_equal!("1 + a + b + 4 + 5", "((((1 + a) + b) + 4) + 5)");
+}
+
+#[test]
+fn test_boolean() {
+    parse_equal!(
+        "a && b || c && d || x > 9",
+        "(((a && b) || (c && d)) || (x > 9))"
+    );
+    parse_equal!(
+        "a.a && b.b || c.x && d.d.a || x > 9 && !zyw",
+        "(((a.a && b.b) || (c.x && d.d.a)) || ((x > 9) && !(zyw)))"
+    );
+}
+
 #[test]
 fn test_err() {
     let sp = SourcePos::new("stdio", "a + b) && (c < 3) + 3");
@@ -448,4 +548,25 @@ fn test_err() {
     let (r1, r2) = res.unwrap();
     println!("{}\n\n{}", r1, r2);
     assert!(expr(ts.clone()).is_err());
+}
+
+#[test]
+fn test_bool_expr_ok() {
+    parse_equal!(
+        "a && b && c || d || true",
+        "((((a && b) && c) || d) || true)"
+    );
+    parse_equal!(
+        "a && !b && !(c || d) || true",
+        "(((a && !(b)) && !((c || d))) || true)"
+    );
+
+    parse_equal!("a < 123 && b > 432", "((a < 123) && (b > 432))");
+    parse_equal!("a == true", "(a == true)");
+    parse_equal!("a && b == true", "(a && (b == true))");
+
+    parse_equal!("a && b + c", "(a && b)");
+
+    // that one here should not be possile
+    parse_equal!("a == b == c", "((a == b) == c)");
 }
