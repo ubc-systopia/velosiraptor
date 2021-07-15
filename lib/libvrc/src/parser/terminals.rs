@@ -26,12 +26,13 @@
 // get the lexer tokens
 use crate::lexer::token::{Keyword, TokenContent, TokenStream};
 
+// for the ast type information
+use crate::ast::ast::Type;
+
 // NOM parsing constructs
 use nom::{take, try_parse};
 // NOM results
-use nom::{error_position, Err, IResult, Needed};
-// NOM error kind
-use nom::error::ErrorKind;
+use nom::{error::ErrorKind, error_position, Err, IResult, Needed};
 
 macro_rules! terminalparser (
     ($vis:vis $name:ident, $tag: expr) => (
@@ -175,3 +176,22 @@ keywordparser!(pub kw_const, Keyword::Const);
 keywordparser!(pub kw_let, Keyword::Let);
 keywordparser!(pub kw_if, Keyword::If);
 keywordparser!(pub kw_else, Keyword::Else);
+
+/// parses a type expression
+///
+/// returns the type
+pub fn typeinfo(input: TokenStream) -> IResult<TokenStream, Type> {
+    // we start with the or expression (|)
+    let (rem, tok) = try_parse!(input.clone(), take!(1));
+    if tok.is_empty() {
+        return Err(Err::Incomplete(Needed::new(1)));
+    }
+
+    match tok.peek().content {
+        TokenContent::Keyword(Keyword::Size) => Ok((rem, Type::Size)),
+        TokenContent::Keyword(Keyword::Addr) => Ok((rem, Type::Address)),
+        TokenContent::Keyword(Keyword::Boolean) => Ok((rem, Type::Boolean)),
+        TokenContent::Keyword(Keyword::Integer) => Ok((rem, Type::Integer)),
+        _ => Err(Err::Error(error_position!(input, ErrorKind::Tag))),
+    }
+}
