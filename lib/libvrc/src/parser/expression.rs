@@ -166,7 +166,6 @@ pub fn slice_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     }
 }
 
-
 /// parses a logical and (&&) expression
 ///
 /// this expression evaluates to a boolean value

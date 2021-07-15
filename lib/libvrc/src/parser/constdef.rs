@@ -38,7 +38,7 @@ use nom::{error::ErrorKind, error_position, Err};
 // lexer / parser imports
 use crate::ast::ast::{Const, Expr, Type};
 use crate::lexer::token::TokenStream;
-use crate::parser::expression::{num_lit_expr, bool_lit_expr};
+use crate::parser::expression::{bool_lit_expr, num_lit_expr};
 use crate::parser::terminals::{assign, colon, ident, kw_const, num, semicolon, typeinfo};
 
 /// parses a constat item of a unit
@@ -77,7 +77,7 @@ pub fn constdef(input: TokenStream) -> IResult<TokenStream, Const> {
                 pos,
             },
         )),
-        (ti, value)  => panic!("unsupported expression type {} {:?}", ti, value),
+        (ti, value) => panic!("unsupported expression type {} {:?}", ti, value),
     }
 }
 
