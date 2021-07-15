@@ -495,7 +495,6 @@ macro_rules! parse_equal (
         let tokens = Lexer::lex_source_pos(sp).unwrap();
         let len = tokens.len();
         let ts = TokenStream::from_vec(tokens);
-        let res = $parser(ts.clone());
         assert_eq!(
             $parser(ts.clone()).map(|(i, x)| (i, format!("{}", x))),
             Ok((
@@ -511,9 +510,7 @@ macro_rules! parse_fail(
     ($parser:expr, $lhs:expr, $rhs:expr) => (
         let sp = SourcePos::new("stdio", $lhs);
         let tokens = Lexer::lex_source_pos(sp).unwrap();
-        let len = tokens.len();
         let ts = TokenStream::from_vec(tokens);
-        let res = $parser(ts.clone());
         assert!(
             $parser(ts.clone()).map(|(i, x)| (i, format!("{}", x))).is_err(),
         );
