@@ -65,6 +65,10 @@ pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
         "interface" => Token::new(TokenContent::Keyword(Keyword::Interface), ident),
         "Memory" => Token::new(TokenContent::Keyword(Keyword::Memory), ident),
         "Register" => Token::new(TokenContent::Keyword(Keyword::Register), ident),
+        "addr" => Token::new(TokenContent::Keyword(Keyword::Addr), ident),
+        "size" => Token::new(TokenContent::Keyword(Keyword::Size), ident),
+        "int" => Token::new(TokenContent::Keyword(Keyword::Integer), ident),
+        "bool" => Token::new(TokenContent::Keyword(Keyword::Boolean), ident),
         x => Token::new(TokenContent::Identifier(x.to_string()), ident),
     };
 

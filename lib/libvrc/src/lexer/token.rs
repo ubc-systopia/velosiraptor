@@ -47,10 +47,6 @@ pub enum Keyword {
     Import,
     /// defines a local variable
     Let,
-    /// represents an address value
-    Addr,
-    /// represents a size value
-    Size,
     /// represents a function
     Fn,
     /// An assert statement
@@ -63,6 +59,14 @@ pub enum Keyword {
     Memory,
     /// defines Register state
     Register,
+    /// represents an address value
+    Addr,
+    /// represents a size value
+    Size,
+    /// A boolean type
+    Boolean,
+    /// An integer value
+    Integer,
 }
 
 /// Implementation of the [std::fmt::Display] trait for [Token]
@@ -76,14 +80,17 @@ impl fmt::Display for Keyword {
             Else => "else",
             Import => "import",
             Let => "let",
-            Addr => "addr",
-            Size => "size",
             Fn => "fn",
             Assert => "assert",
             State => "state",
             Interface => "interface",
             Memory => "Memory",
             Register => "Register",
+            // types
+            Addr => "addr",
+            Size => "size",
+            Boolean => "bool",
+            Integer => "int",
         };
         write!(f, "{}", kwstr)
     }

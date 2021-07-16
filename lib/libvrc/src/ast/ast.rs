@@ -34,7 +34,7 @@ use crate::lexer::sourcepos::SourcePos;
 ///
 /// The type of a an expression, parameter or value defines the set of
 /// operations that are allowed to be carried out with it.
-#[derive(PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Type {
     /// a boolean type (true / false)
     Boolean,
@@ -500,6 +500,7 @@ pub enum Stmt {
     Block { stmts: Vec<Stmt>, pos: SourcePos },
     /// the assign statements gives a name to a value
     Assign {
+        typeinfo: Type,
         lhs: String,
         rhs: Expr,
         pos: SourcePos,
@@ -522,7 +523,7 @@ impl fmt::Display for Stmt {
             Block { stmts, pos: _ } => {
                 write!(f, "{{ TODO }} \n")
             }
-            Assign { lhs, rhs, pos: _ } => write!(f, "let {} = {};\n", lhs, rhs),
+            Assign { typeinfo, lhs, rhs, pos: _ } => write!(f, "let {} : {} = {};\n", typeinfo, lhs, rhs),
             Assert { expr, pos: _ } => write!(f, "assert {};", expr),
             IfElse {
                 cond,
@@ -642,6 +643,16 @@ pub enum Expr {
         slice: Box<Expr>,
         pos: SourcePos,
     },
+    Element {
+        path: Vec<String>,
+        idx: Box<Expr>,
+        pos: SourcePos,
+    },
+    Range {
+        start: Box<Expr>,
+        end: Box<Expr>,
+        pos: SourcePos,
+    },
 }
 
 impl fmt::Display for Expr {
@@ -658,12 +669,18 @@ impl fmt::Display for Expr {
                 pos: _,
             } => write!(format, "({} {} {})", lhs, op, rhs),
             UnaryOperation { op, val, pos: _ } => write!(format, "{}({})", op, val),
-            FnCall { path, pos: _ } => write!(format, "foo"),
+            FnCall { path, pos: _ } => {
+                write!(format, "{}()", path.join("."))
+            }
             Slice {
                 path,
                 slice,
                 pos: _,
-            } => write!(format, "foo"),
+            } => write!(format, "{}[{}]", path.join("."), slice),
+            Element { path, idx, pos: _ } => {
+                write!(format, "{}[{}]", path.join("."), idx)
+            }
+            Range { start, end, pos: _ } => write!(format, "{}..{}", start, end),
         }
     }
 }
