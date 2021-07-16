@@ -52,6 +52,7 @@ pub fn state(input: TokenStream) -> IResult<TokenStream, State> {
     delimited(eq, alt((register_state, memory_state)), semicolon)(i1)
 }
 
+/// parses and consumes [RegisterState] of a unit
 fn register_state(input: TokenStream) -> IResult<TokenStream, State> {
 
     let pos = input.input_sourcepos();
@@ -63,6 +64,7 @@ fn register_state(input: TokenStream) -> IResult<TokenStream, State> {
     //Ok((i1, State::RegisterState{ fields, pos }))
 }
 
+/// parses and consumes [MemoryState] of a unit
 fn memory_state(input: TokenStream) -> IResult<TokenStream, State> {
 
     let pos = input.input_sourcepos();
@@ -74,6 +76,7 @@ fn memory_state(input: TokenStream) -> IResult<TokenStream, State> {
     Ok((i3, State::MemoryState{ bases, fields, pos }))
 }
 
+/// Parses and consumes a comma separated list of identifiers of the form "(ident, ..., ident)"
 pub fn argument_parser(input: TokenStream) -> IResult<TokenStream, Vec<String>> {
     match delimited(lparen, separated_list0(comma, ident), rparen)(input.clone()) {
         Ok((i1, arguments)) => Ok((i1, arguments)),
@@ -88,8 +91,10 @@ pub fn argument_parser(input: TokenStream) -> IResult<TokenStream, Vec<String>> 
     }
 }
 
+/// Parses and consumes a semicolon separated list of fields of the form "{ FIELD; ...; FIELD; }"
+// TODO: test whether parser succesfully fails when last field does not have a semicolon at the end
 pub fn fields_parser(input: TokenStream) -> IResult<TokenStream, Vec<Field>> {
-    match delimited(lbrace, separated_list0(comma, field), rbrace)(input.clone()) {
+    match delimited(lbrace, separated_list0(semicolon, field), rbrace)(input.clone()) {
         Ok((i1, fields)) => Ok((i1, fields)),
         Err(e) => {
             let (i, k) = match e {
@@ -102,38 +107,7 @@ pub fn fields_parser(input: TokenStream) -> IResult<TokenStream, Vec<Field>> {
     }
 }
 
-// parses and consumes an import statement (`import foo;`) and any following whitespaces
-/* pub fn state(input: SourcePos) -> IResult<SourcePos, State> {
-    // record the current position
-    let pos = input.get_pos();
-
-    let (input, _) = kw_state(input)?;
-
-    // get the type of the state
-    let (input, statetype) = match alt((tag("Memory"), tag("Register")))(input) {
-        Ok((input, statetype)) => (input, statetype),
-        Err(x) => return Err(x),
-    };
-
-    // the entries are a comma separeted list entries, where each entry may have some comments before
-    let baseslist = separated_list1(comma, parse_identifier);
-
-    // the baseslist is enclosed in parenthesis
-    let header = preceded(multispace0, delimited(lparen, baseslist, rparen));
-
-    // parse the header of the state, and at least one field
-    let (input, bases, fields) = match tuple((header, many1(parse_field)))(input) {
-        Ok((input, (bases, fields))) => (input, bases, fields),
-        Err(x) => return Err(x),
-    };
-
-    if statetype.as_slice() == "Memory" {
-        Ok((input, State::MemoryState { bases, fields, pos }))
-    } else {
-        Ok((input, State::RegisterState { bases, fields, pos }))
-    }
-} */
-
+// TODO: write tests :)
 #[test]
 fn parse_field_test() {
     assert_eq!(
