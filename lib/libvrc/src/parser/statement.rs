@@ -27,16 +27,19 @@
 
 // lexer, parser terminals and ast
 use crate::ast::ast::Expr;
-use crate::ast::ast::Stmt;
+use crate::ast::ast::{Stmt, Type};
 use crate::lexer::token::TokenStream;
-use crate::parser::expression::expr;
-use crate::parser::terminals::{eq, ident, kw_else, kw_if, kw_let, lbrace, rbrace, semicolon};
+use crate::parser::expression::{arith_expr, bool_expr};
+use crate::parser::terminals::{
+    assign, colon, ident, kw_else, kw_if, kw_let, lbrace, rbrace, semicolon, typeinfo,
+};
 
 // the used nom componets
 use nom::{branch::alt, error::ErrorKind, error_position, sequence::tuple, Err, IResult};
 use nom::{
+    combinator::cut,
     multi::many1,
-    sequence::{delimited, pair},
+    sequence::{delimited, pair, terminated},
 };
 
 /// parses a let statement
@@ -50,19 +53,26 @@ fn let_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
     let pos = input.input_sourcepos();
 
     // try to parse the `let` keyword, return error otherwise
-    let (input, _tok) = kw_let(input)?;
+    let (i1, _) = kw_let(input)?;
 
-    match pair(ident, delimited(eq, expr, semicolon))(input) {
-        Ok((rem, (lhs, rhs))) => Ok((rem, Stmt::Assign { lhs, rhs, pos })),
-        Err(e) => {
-            // here we are having a parsing error!
-            let (i, k) = match e {
-                Err::Error(e) => (e.input, e.code),
-                x => panic!("unkown condition: {:?}", x),
-            };
-            Err(Err::Failure(error_position!(i, k)))
-        }
-    }
+    // parse tye type information `IDENT : TYPE =`
+    let (i2, (lhs, ti)) = cut(pair(ident, delimited(colon, typeinfo, assign)))(i1)?;
+
+    // parse the expression
+    let (i3, rhs) = match ti {
+        Type::Boolean => cut(terminated(bool_expr, semicolon))(i2),
+        _ => cut(terminated(arith_expr, semicolon))(i2),
+    }?;
+
+    Ok((
+        i3,
+        Stmt::Assign {
+            typeinfo: ti,
+            lhs,
+            rhs,
+            pos,
+        },
+    ))
 }
 
 /// parser the if/else statement
@@ -71,7 +81,7 @@ fn if_else_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
     // try to parse the `if` keyword, return error otherwise
     let (input, _tok) = kw_if(input)?;
 
-    let (input, cond, then) = match pair(expr, delimited(lbrace, stmt, rbrace))(input) {
+    let (input, cond, then) = match pair(bool_expr, delimited(lbrace, stmt, rbrace))(input) {
         Ok((input, (cond, then))) => (input, cond, then),
         Err(e) => {
             // here we are having a parsing error!

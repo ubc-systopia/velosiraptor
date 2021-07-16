@@ -27,7 +27,8 @@
 
 // nom parser combinators
 use nom::{
-    sequence::{pair, terminated},
+    combinator::cut,
+    sequence::{delimited, pair, terminated},
     IResult, Slice,
 };
 
@@ -35,13 +36,14 @@ use nom::{
 use nom::{error::ErrorKind, error_position, Err};
 
 // lexer / parser imports
-use crate::ast::ast::Const;
+use crate::ast::ast::{Const, Expr, Type};
 use crate::lexer::token::TokenStream;
-use crate::parser::terminals::{assign, ident, kw_const, num, semicolon};
+use crate::parser::expression::{bool_lit_expr, num_lit_expr};
+use crate::parser::terminals::{assign, colon, ident, kw_const, num, semicolon, typeinfo};
 
 /// parses a constat item of a unit
 ///
-/// `const IDENT = 123;`
+/// `const IDENT : TYPE = 123;`
 pub fn constdef(input: TokenStream) -> IResult<TokenStream, Const> {
     // obtain the current source position
     let pos = input.input_sourcepos();
@@ -49,24 +51,33 @@ pub fn constdef(input: TokenStream) -> IResult<TokenStream, Const> {
     // parse the `const` keyword, return otherwise
     let (i1, _) = kw_const(input)?;
 
-    match pair(terminated(ident, assign), terminated(num, semicolon))(i1.clone()) {
-        Ok((rem, (ident, value))) => Ok((
-            rem,
-            Const::Integer {
-                ident,
+    // parse tye type information `IDENT : TYPE =`
+    let (i2, (id, ti)) = cut(pair(ident, delimited(colon, typeinfo, assign)))(i1)?;
+
+    // parse a numeric literal for now. TODO: make this a constant expression
+    let (i3, value) = match ti {
+        Type::Boolean => cut(terminated(bool_lit_expr, semicolon))(i2),
+        _ => cut(terminated(num_lit_expr, semicolon))(i2),
+    }?;
+
+    match (ti, value) {
+        (Type::Boolean, Expr::Boolean { value, pos: _ }) => Ok((
+            i3,
+            Const::Boolean {
+                ident: id,
                 value,
-                pos: pos.slice(0..5),
+                pos,
             },
         )),
-        Err(x) => {
-            // if we have parser failure, indicate this!
-            let (i, k) = match x {
-                Err::Error(e) => (e.input, e.code),
-                Err::Failure(e) => (e.input, e.code),
-                Err::Incomplete(_) => (i1, ErrorKind::Eof),
-            };
-            Err(Err::Failure(error_position!(i, k)))
-        }
+        (_, Expr::Number { value, pos: _ }) => Ok((
+            i3,
+            Const::Integer {
+                ident: id,
+                value,
+                pos,
+            },
+        )),
+        (ti, value) => panic!("unsupported expression type {} {:?}", ti, value),
     }
 }
 
@@ -76,14 +87,14 @@ use crate::lexer::{sourcepos::SourcePos, Lexer};
 #[test]
 fn test_ok() {
     // corresponds to `0 16 foobar`
-    let sp = SourcePos::new("stdio", "const FOO = 1234;");
+    let sp = SourcePos::new("stdio", "const FOO : int = 1234;");
     let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
     let ts = TokenStream::from_vec(tokens);
 
     assert_eq!(
         constdef(ts.clone()),
         Ok((
-            ts.slice(5..6),
+            ts.slice(7..8),
             Const::Integer {
                 ident: "FOO".to_string(),
                 value: 1234,
@@ -91,26 +102,54 @@ fn test_ok() {
             }
         ))
     );
+
+    let sp = SourcePos::new("stdio", "const FOO : addr = 0x1200;");
+    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
+    assert!(constdef(TokenStream::from_vec(tokens)).is_ok());
+
+    let sp = SourcePos::new("stdio", "const FOO : size = 0x1200;");
+    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
+    assert!(constdef(TokenStream::from_vec(tokens)).is_ok());
+
+    let sp = SourcePos::new("stdio", "const FOO : bool = true;");
+    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
+    assert!(constdef(TokenStream::from_vec(tokens)).is_ok());
 }
 
 #[test]
 fn test_fails() {
-    // corresponds to `0 16 foobar`
-    let sp = SourcePos::new("stdio", "const FOO = 1234 asdf");
+    // no semicolon
+    let sp = SourcePos::new("stdio", "const FOO : int = 1234 asdf");
     let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
-    let ts = TokenStream::from_vec(tokens);
+    assert!(constdef(TokenStream::from_vec(tokens)).is_err());
 
-    assert!(constdef(ts).is_err());
-
-    let sp = SourcePos::new("stdio", "const FOO = asdf;");
+    // cannot use identifiers
+    let sp = SourcePos::new("stdio", "const FOO : int= asdf;");
     let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
-    let ts = TokenStream::from_vec(tokens);
+    assert!(constdef(TokenStream::from_vec(tokens)).is_err());
 
-    assert!(constdef(ts).is_err());
-
-    let sp = SourcePos::new("stdio", "FOO = asdf;");
+    // cannot use keywords
+    let sp = SourcePos::new("stdio", "const FOO : int = int;");
     let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
-    let ts = TokenStream::from_vec(tokens);
+    assert!(constdef(TokenStream::from_vec(tokens)).is_err());
 
-    assert!(constdef(ts).is_err());
+    // no type
+    let sp = SourcePos::new("stdio", "const FOO  = true;");
+    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
+    assert!(constdef(TokenStream::from_vec(tokens)).is_err());
+
+    // wrong type
+    let sp = SourcePos::new("stdio", "const FOO : size = true;");
+    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
+    assert!(constdef(TokenStream::from_vec(tokens)).is_err());
+
+    // wrong type
+    let sp = SourcePos::new("stdio", "const FOO : bool = 0x123;");
+    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
+    assert!(constdef(TokenStream::from_vec(tokens)).is_err());
+
+    // wrong type
+    let sp = SourcePos::new("stdio", "const FOO : addr = true;");
+    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
+    assert!(constdef(TokenStream::from_vec(tokens)).is_err());
 }
