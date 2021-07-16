@@ -25,8 +25,6 @@
 
 //! Parses identifiers
 
-use std::thread::__FastLocalKeyInner;
-
 // the used nom componets
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -65,6 +63,8 @@ pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
         "assert" => Token::new(TokenContent::Keyword(Keyword::Assert), ident),
         "state" => Token::new(TokenContent::Keyword(Keyword::State), ident),
         "interface" => Token::new(TokenContent::Keyword(Keyword::Interface), ident),
+        "Memory" => Token::new(TokenContent::Keyword(Keyword::Memory), ident),
+        "Register" => Token::new(TokenContent::Keyword(Keyword::Register), ident),
         x => Token::new(TokenContent::Identifier(x.to_string()), ident),
     };
 

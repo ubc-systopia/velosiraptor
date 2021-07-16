@@ -58,7 +58,11 @@ pub enum Keyword {
     /// defines state for a unit
     State,
     /// defines the interface of a unit
-    Interface
+    Interface,
+    /// defines Memory state
+    Memory,
+    /// defines Register state
+    Register,
 }
 
 /// Implementation of the [std::fmt::Display] trait for [Token]
@@ -76,6 +80,10 @@ impl fmt::Display for Keyword {
             Size => "size",
             Fn => "fn",
             Assert => "assert",
+            State => "state",
+            Interface => "interface",
+            Memory => "Memory",
+            Register => "Register",
         };
         write!(f, "{}", kwstr)
     }

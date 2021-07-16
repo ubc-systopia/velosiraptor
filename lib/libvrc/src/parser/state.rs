@@ -26,10 +26,12 @@
 //! State definition parsing
 
 // lexer, parser terminals and ast
-use crate::ast::ast::State;
-use crate::lexer::token::TokenStream;
-use crate::parser::terminals::{ident, kw_state, eq, comma, lparen, rparen};
+use crate::ast::ast::{Field, State};
+use crate::lexer::token::{TokenStream};
+use crate::parser::field::field;
+use crate::parser::terminals::{ident, kw_state, kw_register, kw_memory, eq, comma, lparen, rparen, lbrace, rbrace, semicolon};
 //use crate::parser::field::field;
+
 
 use nom::multi::separated_list0;
 // the used nom componets
@@ -37,59 +39,66 @@ use nom::{
     error::ErrorKind, 
     error_position, 
     Err, 
-    IResult, 
+    IResult,
 };
-use nom::sequence::{preceded, delimited};
+use nom::sequence::{delimited};
+use nom::branch::alt;
 
 /// parses and consumes the [State] of a unit
 pub fn state(input: TokenStream) -> IResult<TokenStream, State> {
-    // get the current position
+    // try to match the state keyword, if there is no match, return.
+    let (i1, _)= kw_state(input)?;
+    // Er now 
+    delimited(eq, alt((register_state, memory_state)), semicolon)(i1)
+}
+
+fn register_state(input: TokenStream) -> IResult<TokenStream, State> {
+
     let pos = input.input_sourcepos();
 
-    // try to match the state keyword, if there is no match, return.
-    let i1: TokenStream = match kw_state(input.clone()) {
-        Ok((input, _)) => input,
-        Err(x) => return Err(x),
-    };
+    let (i1, _) = kw_register(input)?;
+    let (i2, fields) = fields_parser(i1)?;
 
-    // now that we've seen the 'state' keyword, it must next be followed by an = operator
-    // and following that we should have the list state itself.
-    let (i2, statetype) = match preceded(eq, ident)(i1) {
-        Ok((r, statetype )) => (r, statetype),
+    Ok((i2, State::RegisterState{ fields, pos }))
+    //Ok((i1, State::RegisterState{ fields, pos }))
+}
+
+fn memory_state(input: TokenStream) -> IResult<TokenStream, State> {
+
+    let pos = input.input_sourcepos();
+
+    let (i1, _) = kw_memory(input)?;
+    let (i2, bases) = argument_parser(i1)?;
+    let (i3, fields) = fields_parser(i2)?;
+
+    Ok((i3, State::MemoryState{ bases, fields, pos }))
+}
+
+pub fn argument_parser(input: TokenStream) -> IResult<TokenStream, Vec<String>> {
+    match delimited(lparen, separated_list0(comma, ident), rparen)(input.clone()) {
+        Ok((i1, arguments)) => Ok((i1, arguments)),
         Err(e) => {
             let (i, k) = match e {
                 Err::Error(e) => (e.input, e.code),
                 Err::Failure(e) => (e.input, e.code),
                 Err::Incomplete(_) => (input, ErrorKind::Eof),
             };
-            return Err(Err::Failure(error_position!(i, k)))
-        },
-    };
-
-    match statetype.as_str() {
-        "Memory" => memory_state(i2),
-        "Register" => register_state(i2),
-        _ => Err(Err::Failure())
+            return Err(Err::Failure(error_position!(i, k)));
+        }
     }
 }
 
-fn memory_state(input: TokenStream) -> IResult<TokenStream, MemoryState> {
-    // Parse state parameters (i.e bases)
-    let mem_params = delimited(lparen, separated_list0(comma, ident), rparen);
-    let (i1, bases) = match mem_params(input) {
-        Ok((i1, bases)) => (i1, bases),
+pub fn fields_parser(input: TokenStream) -> IResult<TokenStream, Vec<Field>> {
+    match delimited(lbrace, separated_list0(comma, field), rbrace)(input.clone()) {
+        Ok((i1, fields)) => Ok((i1, fields)),
         Err(e) => {
             let (i, k) = match e {
                 Err::Error(e) => (e.input, e.code),
                 Err::Failure(e) => (e.input, e.code),
-                Err::Incomplete(_) => (i1, ErrorKind::Eof),
+                Err::Incomplete(_) => (input, ErrorKind::Eof),
             };
-            return Err(Err::Failure(error_position!(i, k)));
+            Err(Err::Failure(error_position!(i, k)))
         }
-    };
-
-    
-
     }
 }
 

@@ -177,3 +177,6 @@ keywordparser!(pub kw_if, Keyword::If);
 keywordparser!(pub kw_else, Keyword::Else);
 keywordparser!(pub kw_state, Keyword::State);
 keywordparser!(pub kw_interface, Keyword::Interface);
+keywordparser!(pub kw_memory, Keyword::Memory);
+keywordparser!(pub kw_register, Keyword::Register);
+
