@@ -25,6 +25,7 @@
 
 //! Ast representation of the VelosiRaptor Definitions
 
+use std::collections::HashMap;
 use std::fmt;
 
 // we use the source position to tag the elements of the AST
@@ -70,11 +71,116 @@ pub struct Ast {
     /// the filename this ast represents
     pub filename: String,
     /// the import statements found in the Ast
-    pub imports: Vec<Import>,
+    pub imports: HashMap<String, Import>,
     /// the declared constants
-    pub consts: Vec<String>,
+    pub consts: HashMap<String, Const>,
     /// the defined units of in the AST
-    pub units: Vec<String>,
+    pub units: HashMap<String, Unit>,
+}
+
+use crate::parser::Parser;
+use std::path::PathBuf;
+
+impl Ast {
+    pub fn merge(mut self, other: Ast) -> Self {
+        //
+        let mut other = other;
+        // try to insert other constants into this ast
+        for (key, val) in other.imports.drain() {
+            // check if the key is already there, that's an error
+            if !self.imports.contains_key(&key) {
+                self.imports.insert(key, val);
+            }
+        }
+
+        // try to insert other constants into this ast
+        for (key, val) in other.consts.drain() {
+            // check if the key is already there, that's an error
+            if self.consts.contains_key(&key) {
+                let c = self.consts.get(&key).unwrap();
+                let pos = c.pos();
+
+                panic!(
+                    "error in {} - double defined constant. '{}' already defined here {}",
+                    pos,
+                    key,
+                    val.pos()
+                );
+            }
+
+            self.consts.insert(key, val);
+        }
+
+        // try to insert the other units into this ast
+        for (key, val) in other.units.drain() {
+            // check if the key is already there, that's an error
+            if self.units.contains_key(&key) {
+                let c = self.consts.get(&key).unwrap();
+                let pos = c.pos();
+
+                panic!(
+                    "error in {} - double defined unit. '{}' already defined here {}",
+                    pos,
+                    key,
+                    val.pos()
+                );
+            }
+
+            self.units.insert(key, val);
+        }
+
+        // return self
+        self
+    }
+
+    /// resolves imports recursively
+    fn do_resolve_imports(&mut self, imports: &mut HashMap<String, bool>, path: &mut PathBuf) {
+        // adding ourselves to the imports
+        imports.insert(self.filename.clone(), true);
+
+        // add ourselves
+        path.push(&self.filename);
+        println!("resolving imports: ????");
+
+        // loop over the current imports
+        for (key, val) in self.imports.iter_mut() {
+            // check if we know about this import already
+            if !imports.contains_key(key) {
+                let mut ast = match Parser::parse_file(&val.name) {
+                    Ok((ast, _)) => ast,
+                    Err(x) => panic!("foobar"),
+                };
+                // resolve the imports
+                ast.do_resolve_imports(imports, path);
+                // update the ast
+
+                val.ast = Some(ast);
+            } else {
+                // check if we have a circular dependency...
+                let it = path.as_path().iter();
+                // skip over the elements that are not the key
+                let it = it.skip_while(|e| e.to_str().unwrap() != key);
+                // now convert to string
+                let s = it
+                    .map(|e| e.to_str().unwrap().to_string())
+                    .collect::<Vec<String>>()
+                    .join("->");
+                if !s.is_empty() {
+                    panic!("circular dependency detected: {}", s)
+                }
+            }
+        }
+        // remove from path
+        path.pop();
+    }
+
+    /// recursively resolves all the imports
+    pub fn resolve_imports(&mut self) {
+        // create the hashmap of the imports
+        let mut imports = HashMap::new();
+        let mut pb = PathBuf::new();
+        self.do_resolve_imports(&mut imports, &mut pb);
+    }
 }
 
 /// implementation of the [fmt::Display] trait for the [Ast].
@@ -99,6 +205,8 @@ impl fmt::Debug for Ast {
 pub struct Import {
     /// the filename to import
     pub name: String,
+    /// stores the ast at this import
+    pub ast: Option<Ast>,
     /// where in the current file there was this import statement
     pub pos: SourcePos,
 }
@@ -143,6 +251,24 @@ pub enum Const {
         value: bool,
         pos: SourcePos,
     }, // TODO: add address / size constants here as well?
+}
+
+impl Const {
+    pub fn pos(&self) -> &SourcePos {
+        use self::Const::*;
+        match self {
+            Integer {
+                ident: _,
+                value: _,
+                pos,
+            } => &pos,
+            Boolean {
+                ident: _,
+                value: _,
+                pos,
+            } => &pos,
+        }
+    }
 }
 
 /// implementation of the [fmt::Display] trait for the [Const]
@@ -213,6 +339,13 @@ pub struct Unit {
     // TODO: maybe make the translate / constructors / map / ... explicit here?
     /// the position in the source tree where this unit is defined
     pub pos: SourcePos,
+}
+
+/// Implementation of [Unit]
+impl Unit {
+    pub fn pos(&self) -> &SourcePos {
+        &self.pos
+    }
 }
 
 /// implementation of the [fmt::Display] trait for the [Unit]
@@ -523,7 +656,12 @@ impl fmt::Display for Stmt {
             Block { stmts, pos: _ } => {
                 write!(f, "{{ TODO }} \n")
             }
-            Assign { typeinfo, lhs, rhs, pos: _ } => write!(f, "let {} : {} = {};\n", typeinfo, lhs, rhs),
+            Assign {
+                typeinfo,
+                lhs,
+                rhs,
+                pos: _,
+            } => write!(f, "let {} : {} = {};\n", typeinfo, lhs, rhs),
             Assert { expr, pos: _ } => write!(f, "assert {};", expr),
             IfElse {
                 cond,
