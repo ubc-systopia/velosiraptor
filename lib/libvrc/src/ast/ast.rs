@@ -79,7 +79,6 @@ pub struct Ast {
 }
 
 use crate::parser::Parser;
-use std::path::PathBuf;
 
 impl Ast {
     pub fn merge(mut self, other: Ast) -> Self {
@@ -134,12 +133,12 @@ impl Ast {
     }
 
     /// resolves imports recursively
-    fn do_resolve_imports(&mut self, imports: &mut HashMap<String, bool>, path: &mut PathBuf) {
+    fn do_resolve_imports(&mut self, imports: &mut HashMap<String, bool>, path: &mut Vec<String>) {
         // adding ourselves to the imports
         imports.insert(self.filename.clone(), true);
 
         // add ourselves
-        path.push(&self.filename);
+        path.push(self.filename.clone());
         println!("resolving imports: ????");
 
         // loop over the current imports
@@ -157,12 +156,12 @@ impl Ast {
                 val.ast = Some(ast);
             } else {
                 // check if we have a circular dependency...
-                let it = path.as_path().iter();
+                let it = path.iter();
                 // skip over the elements that are not the key
-                let it = it.skip_while(|e| e.to_str().unwrap() != key);
+                let it = it.skip_while(|e| *e != key);
                 // now convert to string
                 let s = it
-                    .map(|e| e.to_str().unwrap().to_string())
+                    .map(|s| s.to_string())
                     .collect::<Vec<String>>()
                     .join("->");
                 if !s.is_empty() {
@@ -178,8 +177,8 @@ impl Ast {
     pub fn resolve_imports(&mut self) {
         // create the hashmap of the imports
         let mut imports = HashMap::new();
-        let mut pb = PathBuf::new();
-        self.do_resolve_imports(&mut imports, &mut pb);
+        let mut path = Vec::new();
+        self.do_resolve_imports(&mut imports, &mut path);
     }
 }
 
