@@ -81,7 +81,7 @@ pub struct Ast {
 use crate::parser::Parser;
 
 impl Ast {
-    pub fn merge(mut self, other: Ast) -> Self {
+    pub fn merge(&mut self, other: Ast)  {
         //
         let mut other = other;
         // try to insert other constants into this ast
@@ -127,9 +127,6 @@ impl Ast {
 
             self.units.insert(key, val);
         }
-
-        // return self
-        self
     }
 
     /// resolves imports recursively
@@ -173,12 +170,38 @@ impl Ast {
         path.pop();
     }
 
+    fn do_merge_imports(&mut self) {
+        let mut imports = Vec::new();
+        let mut newimports = HashMap::new();
+        for (key, mut import) in self.imports.drain() {
+            import.ast = match import.ast {
+                Some(mut ast) => {
+                    ast.do_merge_imports();
+                    imports.push(ast);
+                    None
+                },
+                None => None
+            };
+            newimports.insert(key, import);
+        }
+        // update the new imports
+        self.imports = newimports;
+
+
+        for import in imports.drain(..) {
+            self.merge(import);
+        }
+    }
+
     /// recursively resolves all the imports
     pub fn resolve_imports(&mut self) {
         // create the hashmap of the imports
         let mut imports = HashMap::new();
         let mut path = Vec::new();
         self.do_resolve_imports(&mut imports, &mut path);
+
+        // now we have all imports resolved, and we can start merging the asts
+        self.do_merge_imports();
     }
 }
 
