@@ -57,27 +57,47 @@ custom_error! {#[derive(PartialEq)] pub ParserError
 
 pub struct Parser;
 
-use nom::multi::{many0, many1};
+use nom::multi::many0;
 
 impl Parser {
     /// Parses a token vector and creates an [Ast]
-    pub fn parse(tokens: Vec<Token>) -> Result<Ast, ParserError> {
+    pub fn parse(context: &str, tokens: Vec<Token>) -> Result<Ast, ParserError> {
         log::debug!("start parsing...");
 
         // get the token stream
         let tokstream = TokenStream::from_vec(tokens);
 
         // a parsing unit consists of zero or more imports
-        let (i1, _imports) = match many0(import)(tokstream) {
+        let (i1, importlist) = match many0(import)(tokstream) {
+            Ok((r, i)) => (r, i),
+            Err(_) => return Err(ParserError::ParserFailure),
+        };
+        let mut imports = HashMap::new();
+        for i in importlist {
+            imports.insert(i.name.clone(), i);
+        }
+
+        // a parsing unit consists of zero or more imports
+        let (i2, constlist) = match many0(constdef)(i1) {
             Ok((r, i)) => (r, i),
             Err(_) => return Err(ParserError::ParserFailure),
         };
 
+        let mut consts = HashMap::new();
+        for i in constlist {
+            consts.insert(i.ident().to_string(), i);
+        }
+
         // there must be at least one unit definition
-        let (rem, _units) = match many1(unit)(i1) {
+        let (rem, unitlist) = match many0(unit)(i2) {
             Ok((rem, p)) => (rem, p),
             Err(_) => return Err(ParserError::ParserFailure),
         };
+
+        let mut units = HashMap::new();
+        for i in unitlist {
+            units.insert(i.name.clone(), i);
+        }
 
         // the input must be fully consumed
         if !rem.is_empty() {
@@ -85,7 +105,12 @@ impl Parser {
         }
 
         log::debug!("parsing done.");
-        Err(ParserError::NotYetImplemented)
+        Ok(Ast {
+            filename: context.to_string(),
+            imports,
+            consts,
+            units,
+        })
     }
 
     /// Parses a supplied string by lexing it first, create an Ast
@@ -95,7 +120,7 @@ impl Parser {
             Ok(toks) => toks,
             Err(_x) => return Err(ParserError::LexerFailure),
         };
-        Parser::parse_tokens(&tokens)
+        Parser::parse_tokens(context, &tokens)
     }
 
     /// Parses a file by lexing it first, create an Ast
@@ -106,7 +131,7 @@ impl Parser {
             Err(_x) => return Err(ParserError::LexerFailure),
         };
 
-        match Parser::parse_tokens(&tokens) {
+        match Parser::parse_tokens(filename, &tokens) {
             Ok(ast) => Ok((ast, content)),
             Err(x) => Err(x),
         }
@@ -115,7 +140,50 @@ impl Parser {
     /// Parses a slice of tokens
     ///
     /// This will create a new vector of the token slice
-    pub fn parse_tokens(tokens: &[Token]) -> Result<Ast, ParserError> {
-        Parser::parse(tokens.to_vec())
+    pub fn parse_tokens(context: &str, tokens: &[Token]) -> Result<Ast, ParserError> {
+        Parser::parse(context, tokens.to_vec())
+    }
+}
+
+#[cfg(test)]
+use std::path::PathBuf;
+
+/// test parsing of files
+#[test]
+fn parsing_imports() {
+    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    d.push("tests/imports");
+
+    for f in vec!["basicimport.vrs", "multiimport.vrs"] {
+        d.push(f);
+        let filename = format!("{}", d.display());
+
+        println!("filename: {}", filename);
+
+        // lex the file
+        let err = Parser::parse_file(&filename);
+        assert!(err.is_ok());
+
+        d.pop();
+    }
+}
+
+/// test parsing of files
+#[test]
+fn parsing_consts() {
+    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    d.push("tests/parser");
+
+    for f in vec!["consts.vrs", "consts2.vrs"] {
+        d.push(f);
+        let filename = format!("{}", d.display());
+
+        println!("filename: {}", filename);
+
+        // lex the file
+        let err = Parser::parse_file(&filename);
+        assert!(err.is_ok());
+
+        d.pop();
     }
 }

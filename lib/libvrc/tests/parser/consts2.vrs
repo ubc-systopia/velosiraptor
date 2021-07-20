@@ -1,0 +1,3 @@
+import consts;
+
+const FOOBAR: u32 = 1234;

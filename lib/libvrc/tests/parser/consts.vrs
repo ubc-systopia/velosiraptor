@@ -1,0 +1,2 @@
+const FOO: u32 = 1234;
+const BAR: bool = true;
