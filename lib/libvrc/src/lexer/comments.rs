@@ -26,6 +26,7 @@
 // the used nom componets
 use nom::{
     bytes::complete::{is_not, tag, take_until},
+    combinator::cut,
     sequence::terminated,
     IResult,
 };
@@ -36,38 +37,29 @@ use super::token::{Token, TokenContent};
 /// parses and consumes an end of line comment '// foo
 pub fn linecomment(input: SourcePos) -> IResult<SourcePos, Token> {
     // try to match the opening comment `//`, there is no match, return.
-    let input = match tag("//")(input) {
-        Ok((input, _)) => input,
-        Err(x) => return Err(x),
-    };
+    let (input, _) = tag("//")(input)?;
 
     // Matches a inline comment `// foobar`
-    match is_not("\n")(input) {
-        Ok((input, c)) => Ok((
-            input,
-            Token::new(TokenContent::Comment(c.as_str().trim().to_string()), c),
-        )),
-        Err(x) => Err(x),
-    }
+    let (input, c) = is_not("\n")(input)?;
+    Ok((
+        input,
+        Token::new(TokenContent::Comment(c.as_str().trim().to_string()), c),
+    ))
 }
 
 /// parses and consumes a block comment `/* bar */`
 /// TODO: this doesn't work with nested comments!
 pub fn blockcomment(input: SourcePos) -> IResult<SourcePos, Token> {
     // try to match the opening comment keyword, there is no match, return.
-    let input = match tag("/*")(input) {
-        Ok((input, _)) => input,
-        Err(x) => return Err(x),
-    };
+    let (i1, _) = tag("/*")(input.clone())?;
 
     // now match the block comment and discard following whitespace characters
-    match terminated(take_until("*/"), tag("*/"))(input) {
-        Ok((input, c)) => Ok((
-            input,
-            Token::new(TokenContent::Comment(c.as_str().trim().to_string()), c),
-        )),
-        Err(e) => Err(e),
-    }
+    let (input, c) = cut(terminated(take_until("*/"), tag("*/")))(i1)?;
+
+    Ok((
+        input,
+        Token::new(TokenContent::Comment(c.as_str().trim().to_string()), c),
+    ))
 }
 
 #[cfg(test)]

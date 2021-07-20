@@ -43,15 +43,17 @@ use self::token::*;
 
 // custom error definitions
 custom_error! { #[derive(PartialEq)] pub LexerError
-  ReadSourceFile{ file: String } = "Could not read the source file",
-  NoTokens                       = "No tokens found. Need to lex first"
+  ReadSourceFile { file: String } = "Could not read the source file",
+  EmptySource                     = "The source was empty",
+  NoTokens                        = "No tokens found. Need to lex first",
+  LexerFailure { sp: SourcePos, text: & 'static str}  = "Lexing failed."
 }
 
 /// represents the lexer state
 pub struct Lexer;
 
 use nom::{
-    alt, branch::alt, bytes::complete::tag, character::complete::multispace0, multi::many1, named,
+    alt, branch::alt, bytes::complete::tag, character::complete::multispace0, multi::many0, named,
     sequence::delimited, IResult,
 };
 
@@ -137,13 +139,29 @@ named!(punctuation<SourcePos, Token>, alt!(
     dot | comma | colon | semicolon
 ));
 
+use nom::bytes::complete::take;
+use nom::error::Error;
+fn any(input: SourcePos) -> IResult<SourcePos, Token> {
+    let (_, _) = take(1usize)(input.clone())?;
+    Err(Err::Failure(Error::new(input, ErrorKind::Tag)))
+}
+
 fn tokens(input: SourcePos) -> IResult<SourcePos, Token> {
     delimited(
         multispace0,
-        alt((identifier, number, blockcomment, linecomment, punctuation)),
+        alt((
+            identifier,
+            number,
+            blockcomment,
+            linecomment,
+            punctuation,
+            any,
+        )),
         multispace0,
     )(input)
 }
+
+use nom::{error::ErrorKind, Err};
 
 impl Lexer {
     /// Constructs a vector of Tokens corresponding to Lexemes for the SourcePos
@@ -152,11 +170,37 @@ impl Lexer {
     /// as Tokens.
     pub fn lex_source_pos(sp: SourcePos) -> Result<Vec<Token>, LexerError> {
         log::debug!("start lexing...");
-        let (i, mut tok) = match many1(tokens)(sp) {
+
+        // nothing to lex here, let's
+        if sp.is_empty() {
+            return Err(LexerError::EmptySource);
+        }
+        // check if the
+        let (i, mut tok) = match many0(tokens)(sp) {
             Ok((r, tok)) => (r, tok),
-            Err(_x) => return Err(LexerError::NoTokens),
+            Err(e) => {
+                // if we have parser failure, indicate this!
+                let (sp, k) = match e {
+                    Err::Error(e) => (e.input, e.code),
+                    Err::Failure(e) => (e.input, e.code),
+                    Err::Incomplete(_) => panic!("huh?"),
+                };
+                let text = match k {
+                    ErrorKind::TakeUntil => "Unclosed comment",
+                    ErrorKind::Tag => "Unrecognized token",
+                    x => panic!("huh: {:?}", x),
+                };
+                return Err(LexerError::LexerFailure { sp, text });
+            }
         };
+
+        // there were no tokens...
+        if tok.is_empty() {
+            return Err(LexerError::NoTokens);
+        }
+
         log::debug!("lexing done.");
+        // adding the end of
         tok.push(Token::new(TokenContent::Eof, i));
         Ok(tok)
     }
@@ -281,4 +325,45 @@ fn basic_tests() {
     };
     // there should be 10 tokens
     assert_eq!(tok.len(), 11);
+}
+
+/// test lexing of files
+#[test]
+fn failures_test() {
+    let contents = "foo /* bar";
+    let sp = SourcePos::new("stdio", contents);
+
+    let err = Lexer::lex_source_pos(sp.clone());
+    assert_eq!(
+        err,
+        Err(LexerError::LexerFailure {
+            sp: sp.slice(6..),
+            text: "Unclosed comment"
+        })
+    );
+
+    let contents = "foo ` bar";
+    let sp = SourcePos::new("stdio", contents);
+
+    let err = Lexer::lex_source_pos(sp.clone());
+    assert_eq!(
+        err,
+        Err(LexerError::LexerFailure {
+            sp: sp.slice(4..),
+            text: "Unrecognized token"
+        })
+    );
+
+    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    d.push("tests/lexer");
+
+    for f in vec!["commentsfail.vrs", "tokenfail.vrs"] {
+        d.push(f);
+        let filename = format!("{}", d.display());
+
+        // lex the file
+        let err = Lexer::lex_file(&filename);
+        assert!(err.is_err());
+        d.pop();
+    }
 }
