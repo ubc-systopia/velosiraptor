@@ -43,6 +43,7 @@ mod unit;
 use crate::ast::Ast;
 use constdef::constdef;
 use import::import;
+use terminals::eof;
 use unit::unit;
 
 use super::lexer::token::{Token, TokenStream};
@@ -52,6 +53,7 @@ use super::lexer::Lexer;
 custom_error! {#[derive(PartialEq)] pub ParserError
   LexerFailure               = "The lexer failed on the file.",
   ParserFailure              = "The parser has failed",
+  ParserIncomplete           = "The parser didn't finish",
   NotYetImplemented          = "Not Yet Implemented"
 }
 
@@ -89,28 +91,28 @@ impl Parser {
         }
 
         // there must be at least one unit definition
-        let (rem, unitlist) = match many0(unit)(i2) {
-            Ok((rem, p)) => (rem, p),
-            Err(_) => return Err(ParserError::ParserFailure),
-        };
+        let i3 = i2;
+        // let (rem, unitlist) = match many0(unit)(i2) {
+        //     Ok((rem, p)) => (rem, p),
+        //     Err(_) => return Err(ParserError::ParserFailure),
+        // };
 
         let mut units = HashMap::new();
-        for i in unitlist {
-            units.insert(i.name.clone(), i);
-        }
+        // for i in unitlist {
+        //     units.insert(i.name.clone(), i);
+        // }
 
-        // the input must be fully consumed
-        if !rem.is_empty() {
-            return Err(ParserError::ParserFailure);
-        }
-
+        // consume the end of file token
         log::debug!("parsing done.");
-        Ok(Ast {
-            filename: context.to_string(),
-            imports,
-            consts,
-            units,
-        })
+        match eof(i3) {
+            Ok(_) => Ok(Ast {
+                filename: context.to_string(),
+                imports,
+                consts,
+                units,
+            }),
+            Err(_) => Err(ParserError::ParserIncomplete),
+        }
     }
 
     /// Parses a supplied string by lexing it first, create an Ast

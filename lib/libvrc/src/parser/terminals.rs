@@ -109,6 +109,7 @@ terminalparser!(pub underscore, TokenContent::Underscore);
 terminalparser!(pub dotdot, TokenContent::DotDot);
 terminalparser!(pub pathsep, TokenContent::PathSep);
 terminalparser!(pub wildcard, TokenContent::Wildcard);
+terminalparser!(pub eof, TokenContent::Eof);
 
 pub fn ident(input: TokenStream) -> IResult<TokenStream, String> {
     let (rem, tok) = try_parse!(input.clone(), take!(1));
