@@ -32,14 +32,13 @@ use std::rc::Rc;
 mod comments;
 mod identifier;
 mod number;
-pub mod sourcepos;
 pub mod token;
 
 use self::comments::*;
 use self::identifier::identifier;
 use self::number::number;
-use self::sourcepos::SourcePos;
 use self::token::*;
+use crate::sourcepos::SourcePos;
 
 // custom error definitions
 custom_error! { #[derive(PartialEq)] pub LexerError

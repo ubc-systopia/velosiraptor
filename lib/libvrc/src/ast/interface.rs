@@ -1,4 +1,4 @@
-// Velosiraptor Lexer
+// Velosiraptor ParseTree
 //
 //
 // MIT License
@@ -25,44 +25,28 @@
 
 //! Ast Module of the Velosiraptor Compiler
 
-mod ast;
-mod consts;
-mod expression;
-mod import;
-mod interface;
-mod method;
-mod state;
-mod types;
-mod unit;
+use crate::sourcepos::SourcePos;
+use std::fmt;
 
-pub mod symboltable;
-pub mod transform;
-
-use custom_error::custom_error;
-
-use symboltable::SymbolTable;
-
-// custom error definitions
-custom_error! {#[derive(PartialEq)] pub AstError
-  SymTabInsertExists         = "The symbol could not be inserted, already exists",
-  SymTableNotExists          = "The symbol does not exist in the table",
-}
-
-// rexports
-pub use ast::Ast;
-pub use consts::Const;
-pub use expression::{BinOp, Expr, UnOp};
-pub use import::Import;
-pub use interface::Interface;
-pub use method::Method;
-pub use method::Stmt;
-pub use state::BitSlice;
-pub use state::Field;
-pub use state::State;
-pub use types::Type;
-pub use unit::Unit;
-
-/// Trait that checks the Ast nodes for consistency
-pub trait AstCheck {
-    fn check(&self, symtab: SymbolTable) -> bool;
+/// Defines the software-visible interface of a unit
+///
+/// Similar to the state, there are multiple options of the interface:
+///   - Memory: load/store to memory (normal DRAM)
+///   - MMIORegisters: load/store to memory-mapped device registers
+///   - CPURegisters: load/store to CPU registers
+///   - SpecialRegisters: use of special instructions (no load/store) to those
+#[derive(PartialEq, Clone)]
+pub enum Interface {
+    /// Defines a load/store interface to memory
+    Memory { pos: SourcePos },
+    /// Defines a memory-mapped interface to registers
+    MMIORegisters { pos: SourcePos },
+    /// Defines a load/store interface to CPU registers
+    CPURegisters { pos: SourcePos },
+    /// Defines a register interface using special instructions
+    SpecialRegisters { pos: SourcePos },
+    // TODO interface may be a combination: e.g., Memory + MMIORegisters
+    //CombinedState {  },
+    /// No software interface associated with this translation unit
+    None,
 }

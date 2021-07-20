@@ -27,7 +27,7 @@
 use crate::lexer::token::{Keyword, TokenContent, TokenStream};
 
 // for the ast type information
-use crate::ast::ast::Type;
+use crate::ast::Type;
 
 // NOM parsing constructs
 use nom::{take, try_parse};

@@ -29,17 +29,14 @@
 use nom::{
     combinator::cut,
     sequence::{delimited, pair, terminated},
-    IResult, Slice,
+    IResult,
 };
 
-// nom error handling
-use nom::{error::ErrorKind, error_position, Err};
-
 // lexer / parser imports
-use crate::ast::ast::{Const, Expr, Type};
+use crate::ast::{Const, Expr, Type};
 use crate::lexer::token::TokenStream;
 use crate::parser::expression::{bool_lit_expr, num_lit_expr};
-use crate::parser::terminals::{assign, colon, ident, kw_const, num, semicolon, typeinfo};
+use crate::parser::terminals::{assign, colon, ident, kw_const, semicolon, typeinfo};
 
 /// parses a constat item of a unit
 ///
@@ -82,7 +79,12 @@ pub fn constdef(input: TokenStream) -> IResult<TokenStream, Const> {
 }
 
 #[cfg(test)]
-use crate::lexer::{sourcepos::SourcePos, Lexer};
+use crate::lexer::Lexer;
+#[cfg(test)]
+use crate::sourcepos::SourcePos;
+
+#[cfg(test)]
+use nom::{error::ErrorKind, error_position, Err, Slice};
 
 #[test]
 fn test_ok() {

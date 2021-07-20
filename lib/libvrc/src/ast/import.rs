@@ -1,4 +1,4 @@
-// Velosiraptor Lexer
+// Velosiraptor ParseTree
 //
 //
 // MIT License
@@ -25,44 +25,35 @@
 
 //! Ast Module of the Velosiraptor Compiler
 
-mod ast;
-mod consts;
-mod expression;
-mod import;
-mod interface;
-mod method;
-mod state;
-mod types;
-mod unit;
+use crate::ast::Ast;
+use crate::sourcepos::SourcePos;
+use std::fmt;
 
-pub mod symboltable;
-pub mod transform;
-
-use custom_error::custom_error;
-
-use symboltable::SymbolTable;
-
-// custom error definitions
-custom_error! {#[derive(PartialEq)] pub AstError
-  SymTabInsertExists         = "The symbol could not be inserted, already exists",
-  SymTableNotExists          = "The symbol does not exist in the table",
+/// Defines an [Import] statement node
+///
+/// The import statement declares that another file is imported
+/// and its definitions used by the current file.
+#[derive(PartialEq, Clone)]
+pub struct Import {
+    /// the filename to import
+    pub name: String,
+    /// stores the ast at this import
+    pub ast: Option<Ast>,
+    /// where in the current file there was this import statement
+    pub pos: SourcePos,
 }
 
-// rexports
-pub use ast::Ast;
-pub use consts::Const;
-pub use expression::{BinOp, Expr, UnOp};
-pub use import::Import;
-pub use interface::Interface;
-pub use method::Method;
-pub use method::Stmt;
-pub use state::BitSlice;
-pub use state::Field;
-pub use state::State;
-pub use types::Type;
-pub use unit::Unit;
+/// implementation of the [fmt::Display] trait for the [Import]
+impl fmt::Display for Import {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "import {};", self.name)
+    }
+}
 
-/// Trait that checks the Ast nodes for consistency
-pub trait AstCheck {
-    fn check(&self, symtab: SymbolTable) -> bool;
+/// implementation of the [fmt::Debug] trait for the [Import]
+impl fmt::Debug for Import {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let (line, column) = self.pos.input_pos();
+        writeln!(f, "{:03}:{:03} | import {};", line, column, self.name)
+    }
 }

@@ -1,4 +1,4 @@
-// Velosiraptor Lexer
+// Velosiraptor ParseTree
 //
 //
 // MIT License
@@ -23,46 +23,36 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Ast Module of the Velosiraptor Compiler
+//! Ast representation of the VelosiRaptor Definitions
 
-mod ast;
-mod consts;
-mod expression;
-mod import;
-mod interface;
-mod method;
-mod state;
-mod types;
-mod unit;
+use std::collections::HashMap;
+use std::fmt;
 
-pub mod symboltable;
-pub mod transform;
-
-use custom_error::custom_error;
-
-use symboltable::SymbolTable;
-
-// custom error definitions
-custom_error! {#[derive(PartialEq)] pub AstError
-  SymTabInsertExists         = "The symbol could not be inserted, already exists",
-  SymTableNotExists          = "The symbol does not exist in the table",
+/// represents the known types.
+///
+/// The type of a an expression, parameter or value defines the set of
+/// operations that are allowed to be carried out with it.
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum Type {
+    /// a boolean type (true / false)
+    Boolean,
+    /// An integer type
+    Integer,
+    /// Represents an address value
+    Address,
+    /// The size defines the number of addresses within a range
+    Size,
 }
 
-// rexports
-pub use ast::Ast;
-pub use consts::Const;
-pub use expression::{BinOp, Expr, UnOp};
-pub use import::Import;
-pub use interface::Interface;
-pub use method::Method;
-pub use method::Stmt;
-pub use state::BitSlice;
-pub use state::Field;
-pub use state::State;
-pub use types::Type;
-pub use unit::Unit;
-
-/// Trait that checks the Ast nodes for consistency
-pub trait AstCheck {
-    fn check(&self, symtab: SymbolTable) -> bool;
+/// implementation of the [fmt::Display] trait for the [Type].
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::Type::*;
+        match self {
+            Boolean => write!(f, "bool"),
+            Integer => write!(f, "int"),
+            Address => write!(f, "addr"),
+            Size => write!(f, "size"),
+        }
+    }
 }

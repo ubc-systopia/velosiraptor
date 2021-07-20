@@ -26,8 +26,8 @@
 //! State definition parsing
 
 // lexer, parser terminals and ast
-use crate::ast::ast::Expr;
-use crate::ast::ast::{Stmt, Type};
+use crate::ast::Expr;
+use crate::ast::{Stmt, Type};
 use crate::lexer::token::TokenStream;
 use crate::parser::expression::{arith_expr, bool_expr};
 use crate::parser::terminals::{
@@ -35,7 +35,7 @@ use crate::parser::terminals::{
 };
 
 // the used nom componets
-use nom::{branch::alt, error::ErrorKind, error_position, sequence::tuple, Err, IResult};
+use nom::{branch::alt, error_position, Err, IResult};
 use nom::{
     combinator::cut,
     multi::many1,
@@ -137,9 +137,11 @@ pub fn stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
 }
 
 #[cfg(test)]
-use crate::lexer::{sourcepos::SourcePos, Lexer};
+use crate::lexer::Lexer;
 #[cfg(test)]
 use crate::nom::Slice;
+#[cfg(test)]
+use crate::sourcepos::SourcePos;
 
 #[test]
 fn test_ok() {}

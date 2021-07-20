@@ -38,8 +38,8 @@ use nom::{
     Err, IResult, InputLength, Slice,
 };
 
-use super::sourcepos::SourcePos;
 use super::token::{Token, TokenContent};
+use crate::sourcepos::SourcePos;
 
 fn base10(input: SourcePos) -> IResult<SourcePos, Token> {
     // match a digit followed by alphanumeric characters and the `_`

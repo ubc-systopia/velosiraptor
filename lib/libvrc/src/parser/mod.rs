@@ -26,6 +26,7 @@
 //! Parser Module of the Velosiraptor Compiler
 
 use custom_error::custom_error;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 pub mod terminals;
@@ -39,7 +40,8 @@ mod statement;
 mod constdef;
 mod unit;
 
-use crate::ast::ast::Ast;
+use crate::ast::Ast;
+use constdef::constdef;
 use import::import;
 use unit::unit;
 

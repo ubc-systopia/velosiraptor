@@ -30,7 +30,7 @@ use std::fmt;
 use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 use std::rc::Rc;
 
-use super::sourcepos::SourcePos;
+use crate::sourcepos::SourcePos;
 
 /// Represents the keywords we have
 #[derive(PartialEq, Debug, Clone)]

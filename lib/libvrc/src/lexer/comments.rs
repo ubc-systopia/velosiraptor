@@ -31,8 +31,8 @@ use nom::{
     IResult,
 };
 
-use super::sourcepos::SourcePos;
 use super::token::{Token, TokenContent};
+use crate::sourcepos::SourcePos;
 
 /// parses and consumes an end of line comment '// foo
 pub fn linecomment(input: SourcePos) -> IResult<SourcePos, Token> {

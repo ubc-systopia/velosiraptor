@@ -28,16 +28,16 @@
 use std::collections::HashMap;
 use std::fmt;
 
-use crate::ast::ast::Type;
 use crate::ast::AstError;
-use crate::lexer::sourcepos::SourcePos;
+use crate::ast::Type;
+use crate::sourcepos::SourcePos;
 
 /// defines the type of the key
 type SymbolKey = String;
 
 /// represents the kind of a symbol
 #[derive(Debug, Clone, Copy)]
-enum SymbolKind {
+pub enum SymbolKind {
     /// this symbol is a constant definition
     Const,
     /// this symbol is a function
@@ -52,7 +52,7 @@ enum SymbolKind {
 
 /// represents a defined symbol
 #[derive(Clone)]
-struct Symbol {
+pub struct Symbol {
     /// the kind of the symbol, constant, function, ...
     pub kind: SymbolKind,
     /// the name of the symbol, its identifier
@@ -91,7 +91,7 @@ impl fmt::Debug for Symbol {
 }
 
 /// Represents a symbol table
-struct SymbolTable {
+pub struct SymbolTable {
     /// represents the current context of the symbol table
     context: Vec<String>,
     /// the symbols of the table

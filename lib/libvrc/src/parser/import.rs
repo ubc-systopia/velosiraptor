@@ -26,14 +26,12 @@
 //! Import statement parsing
 
 // lexer, parser terminals and ast
-use crate::ast::ast::Import;
+use crate::ast::Import;
 use crate::lexer::token::TokenStream;
 use crate::parser::terminals::{ident, kw_import, semicolon};
 
 // the used nom componets
-use crate::nom::error::ErrorKind;
-use nom::sequence::terminated;
-use nom::{error_position, Err, IResult, InputLength, Slice};
+use nom::{combinator::cut, sequence::terminated, IResult};
 
 /// parses and consumes an import statement (`import foo;`) and any following whitespaces
 pub fn import(input: TokenStream) -> IResult<TokenStream, Import> {
@@ -41,39 +39,27 @@ pub fn import(input: TokenStream) -> IResult<TokenStream, Import> {
     let pos = input.input_sourcepos();
 
     // try to match the input keyword, there is no match, return.
-    let i1 = match kw_import(input.clone()) {
-        Ok((input, _)) => input,
-        Err(x) => return Err(x),
-    };
+    let (i1, _) = kw_import(input.clone())?;
 
     // ok, so we've seen the `import` keyword, so the next must be an identifier.
     // there should be at least one whitespace before the identifier
-    match terminated(ident, semicolon)(i1) {
-        Ok((r, name)) => Ok((
-            r,
-            Import {
-                name,
-                ast: None,
-                pos,
-            },
-        )),
-        Err(e) => {
-            // if we have parser failure, indicate this!
-            let (i, k) = match e {
-                Err::Error(e) => (e.input, e.code),
-                Err::Failure(e) => (e.input, e.code),
-                Err::Incomplete(_) => (input, ErrorKind::Eof),
-            };
-            Err(Err::Failure(error_position!(i, k)))
-        }
-    }
+    let (rem, name) = cut(terminated(ident, semicolon))(i1)?;
+    Ok((
+        rem,
+        Import {
+            name,
+            ast: None,
+            pos,
+        },
+    ))
 }
 
 #[cfg(test)]
-use crate::lexer::sourcepos::SourcePos;
-#[cfg(test)]
 use crate::lexer::token::{Keyword, Token, TokenContent};
 #[cfg(test)]
+use crate::sourcepos::SourcePos;
+#[cfg(test)]
+use nom::{error::ErrorKind, error_position, Err, Slice};
 #[test]
 fn test_ok() {
     // corresponds to: `import foobar;`
@@ -110,7 +96,7 @@ fn test_ok() {
 #[test]
 fn test_errors() {
     // corresponds to: `import foobar;`
-    let content = "import foobar";
+    let content = "import foobar import";
     let sp = SourcePos::new("stdio", content);
 
     let tokens = vec![
@@ -119,12 +105,16 @@ fn test_errors() {
             TokenContent::Identifier("foobar".to_string()),
             sp.slice(7..12),
         ),
+        Token::new(TokenContent::Keyword(Keyword::Import), sp.slice(13..20)),
     ];
 
     let ts = TokenStream::from_slice(&tokens);
 
     assert_eq!(
         import(ts.clone()),
-        Err(Err::Failure(error_position!(ts, ErrorKind::Eof)))
+        Err(Err::Failure(error_position!(
+            ts.slice(2..3),
+            ErrorKind::Tag
+        )))
     );
 }

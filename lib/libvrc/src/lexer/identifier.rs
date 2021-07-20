@@ -36,8 +36,8 @@ use nom::{
     IResult,
 };
 
-use super::sourcepos::SourcePos;
 use super::token::{Keyword, Token, TokenContent};
+use crate::sourcepos::SourcePos;
 
 /// parses a rust-like identifiers
 pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
