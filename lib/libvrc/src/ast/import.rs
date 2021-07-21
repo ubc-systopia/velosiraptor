@@ -43,6 +43,13 @@ pub struct Import {
     pub pos: SourcePos,
 }
 
+/// the implementation for the import struct
+impl Import {
+    pub fn to_filename(&self) -> String {
+        format!("{}.vrs", self.name)
+    }
+}
+
 /// implementation of the [fmt::Display] trait for the [Import]
 impl fmt::Display for Import {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
