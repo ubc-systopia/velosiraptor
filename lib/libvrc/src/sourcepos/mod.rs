@@ -637,6 +637,34 @@ impl fmt::Debug for SourcePos {
 impl ErrorLocation for SourcePos {
     /// the line number in the source file
     fn line(&self) -> u32 {
+        self.line()
+    }
+
+    /// the column number in the source file
+    fn column(&self) -> u32 {
+        self.column()
+    }
+
+    /// the length of the token
+    fn length(&self) -> usize {
+        self.length()
+    }
+
+    /// the context (stdin or filename)
+    fn context(&self) -> &str {
+        self.context()
+    }
+
+    /// the surrounding line context
+    fn linecontext(&self) -> &str {
+        self.linecontext()
+    }
+}
+
+/// Implementation of the [error::ErrorLocation] trait for [SourcePos]
+impl ErrorLocation for &SourcePos {
+    /// the line number in the source file
+    fn line(&self) -> u32 {
         self.line
     }
 
