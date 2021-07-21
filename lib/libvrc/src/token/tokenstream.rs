@@ -32,6 +32,7 @@ use std::rc::Rc;
 
 use crate::sourcepos::SourcePos;
 use crate::token::{Token, TokenContent};
+use crate::error::ErrorLocation;
 
 /// A sequence of recognized tokens that is produced by the lexer
 #[derive(Clone, PartialEq, Debug)]
@@ -388,7 +389,7 @@ impl InputIter for TokenStream {
     where
         P: Fn(Self::Item) -> bool,
     {
-        self.tokens.iter().position(|b| predicate(b.clone()))
+        self.tokens[self.range.clone()].iter().position(|b| predicate(b.clone()))
     }
 
     /// Get the byte offset from the element's position in the stream
@@ -399,5 +400,34 @@ impl InputIter for TokenStream {
         } else {
             Err(Needed::Unknown)
         }
+    }
+}
+
+/// Implementation of the [error::ErrorLocation] trait for [TokenStream]
+impl ErrorLocation for TokenStream {
+    /// the line number in the source file
+    fn line(&self) -> u32 {
+        self.peek().spos.line()
+    }
+
+    /// the column number in the source file
+    fn column(&self) -> u32 {
+        self.peek().spos.column()
+    }
+
+    /// the length of the token
+    fn length(&self) -> usize {
+        // TODO: figure out the right thing here!
+        self.peek().spos.length()
+    }
+
+    /// the context (stdin or filename)
+    fn context(&self) -> &str {
+        self.peek().spos.context()
+    }
+
+    /// the surrounding line context
+    fn linecontext(&self) -> &str {
+        self.peek().spos.linecontext()
     }
 }
