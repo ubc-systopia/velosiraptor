@@ -28,10 +28,11 @@ use nom::{
     bytes::complete::{is_not, tag, take_until},
     combinator::cut,
     sequence::terminated,
-    IResult,
+    Err,
 };
 
 use super::token::{Token, TokenContent};
+use crate::error::{IResult, VrsError};
 use crate::sourcepos::SourcePos;
 
 /// parses and consumes an end of line comment '// foo
@@ -48,18 +49,27 @@ pub fn linecomment(input: SourcePos) -> IResult<SourcePos, Token> {
 }
 
 /// parses and consumes a block comment `/* bar */`
-/// TODO: this doesn't work with nested comments!
+///
+/// The parser here currently does not support nested block comments.
+/// the block comment must be closed again
 pub fn blockcomment(input: SourcePos) -> IResult<SourcePos, Token> {
     // try to match the opening comment keyword, there is no match, return.
     let (i1, _) = tag("/*")(input.clone())?;
 
     // now match the block comment and discard following whitespace characters
-    let (input, c) = cut(terminated(take_until("*/"), tag("*/")))(i1)?;
-
-    Ok((
-        input,
-        Token::new(TokenContent::Comment(c.as_str().trim().to_string()), c),
-    ))
+    match cut(terminated(take_until("*/"), tag("*/")))(i1) {
+        Ok((input, c)) => Ok((
+            input,
+            Token::new(TokenContent::Comment(c.as_str().trim().to_string()), c),
+        )),
+        Err(e) => {
+            // somehow this needs type annotations here?
+            let _e: nom::Err<nom::error::Error<SourcePos>> = e;
+            let mut e = VrsError::from_str(input, "unclosed block comment.");
+            e.add_hint("insert `*/` here.".to_string());
+            return Err(Err::Failure(e));
+        }
+    }
 }
 
 #[cfg(test)]

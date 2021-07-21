@@ -25,8 +25,8 @@
 
 //! Lexer/Parser Error Implementation for Nom
 
-use std::fmt;
 use colored::*;
+use std::fmt;
 
 // get the NOM traits
 use nom::error::{ContextError, ErrorKind, FromExternalError, ParseError};
@@ -118,7 +118,6 @@ impl<I: ErrorLocation> VrsError<I> {
     }
 }
 
-
 /// Implementation of [std::fmt::Display] for [VrsError]
 impl<I: ErrorLocation> fmt::Display for VrsError<I> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -127,13 +126,7 @@ impl<I: ErrorLocation> fmt::Display for VrsError<I> {
             ErrorType::Warning => "error".bright_yellow().bold(),
         };
 
-        writeln!(
-            f,
-            "{}{} {}",
-            es,
-            ":".bold(),
-            self.message.bold()
-        )?;
+        writeln!(f, "{}{} {}", es, ":".bold(), self.message.bold())?;
 
         writeln!(
             f,
