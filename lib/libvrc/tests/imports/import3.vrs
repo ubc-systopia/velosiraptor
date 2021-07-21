@@ -1,6 +1,4 @@
 import      import1;
 import      import2;
 
-unit foo {
-
-}
+const FOOBAR : int = 12345;
