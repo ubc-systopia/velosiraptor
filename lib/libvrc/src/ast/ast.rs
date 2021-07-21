@@ -27,6 +27,7 @@
 
 use std::collections::HashMap;
 use std::fmt;
+use std::path::{Path, PathBuf};
 
 // impor the other Ast nodes
 use crate::ast::{Const, Import, Unit};
@@ -105,17 +106,29 @@ impl Ast {
         // adding ourselves to the imports
         imports.insert(self.filename.clone(), true);
 
+        let mut importfile = match Path::new(&self.filename).parent() {
+            Some(d) => PathBuf::from(d),
+            None => PathBuf::from("./"),
+        };
+
         // add ourselves
         path.push(self.filename.clone());
         println!("resolving imports: ????");
 
         // loop over the current imports
         for (key, val) in self.imports.iter_mut() {
+            println!("my file: {}", self.filename);
+            let filename = val.to_filename();
+            importfile.push(&filename);
+
+            let f = importfile.as_path().to_str().unwrap();
+
             // check if we know about this import already
-            if !imports.contains_key(key) {
-                let mut ast = match Parser::parse_file(&val.name) {
+            if !imports.contains_key(f) {
+                println!("parsing: {}", f);
+                let mut ast = match Parser::parse_file(f) {
                     Ok((ast, _)) => ast,
-                    Err(x) => panic!("foobar"),
+                    Err(x) => panic!("foobar {:?}", x),
                 };
                 // resolve the imports
                 ast.do_resolve_imports(imports, path);
@@ -136,6 +149,7 @@ impl Ast {
                     panic!("circular dependency detected: {}", s)
                 }
             }
+            importfile.pop();
         }
         // remove from path
         path.pop();
@@ -186,5 +200,77 @@ impl fmt::Display for Ast {
 impl fmt::Debug for Ast {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "Ast: TODO",)
+    }
+}
+
+#[test]
+fn import_test_ok() {
+    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    d.push("tests/imports");
+
+    for f in vec!["basicimport.vrs", "multiimport.vrs"] {
+        d.push(f);
+        let filename = format!("{}", d.display());
+
+        println!("filename: {}", filename);
+
+        // lex the file
+        let mut ast = match Parser::parse_file(&filename) {
+            Ok((ast, _)) => ast,
+            Err(x) => panic!("parsing failed:\n\n{}\n\n", x),
+        };
+
+        // now resolve the import
+        ast.resolve_imports();
+
+        d.pop();
+    }
+}
+
+#[test]
+fn import_test_recursive() {
+    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    d.push("tests/imports");
+
+    for f in vec!["recursiveimport.vrs"] {
+        d.push(f);
+        let filename = format!("{}", d.display());
+
+        println!("filename: {}", filename);
+
+        // lex the file
+        let mut ast = match Parser::parse_file(&filename) {
+            Ok((ast, _)) => ast,
+            Err(x) => panic!("parsing failed:\n\n{}\n\n", x),
+        };
+
+        // now resolve the import
+        ast.resolve_imports();
+
+        d.pop();
+    }
+}
+
+#[test]
+fn import_test_circular() {
+    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    d.push("tests/imports");
+
+    for f in vec!["circular1.vrs", "circular2.vrs"] {
+        d.push(f);
+        let filename = format!("{}", d.display());
+
+        println!("filename: {}", filename);
+
+        // lex the file
+        let mut ast = match Parser::parse_file(&filename) {
+            Ok((ast, _)) => ast,
+            Err(x) => panic!("parsing failed:\n\n{}\n\n", x),
+        };
+
+        // now resolve the import
+        ast.resolve_imports();
+
+        d.pop();
     }
 }
