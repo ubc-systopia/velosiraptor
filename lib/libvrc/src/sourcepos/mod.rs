@@ -41,6 +41,7 @@ use nom::{
     InputTakeAtPosition, Needed, Offset, Slice,
 };
 
+use crate::error::{ErrorLocation, VrsError};
 use nom::error::{ErrorKind, ParseError};
 
 /// Corresponds to a single byte of the source file
@@ -629,6 +630,57 @@ impl fmt::Debug for SourcePos {
             self.column,
             self.as_str().to_string()
         )
+    }
+}
+
+/// Implementation of the [error::ErrorLocation] trait for [SourcePos]
+impl ErrorLocation for SourcePos {
+    /// the line number in the source file
+    fn line(&self) -> u32 {
+        self.line
+    }
+
+    /// the column number in the source file
+    fn column(&self) -> u32 {
+        self.column
+    }
+
+    /// the length of the token
+    fn length(&self) -> usize {
+        self.input_len()
+    }
+
+    /// the context (stdin or filename)
+    fn context(&self) -> &str {
+        &self.context
+    }
+
+    /// the surrounding line context
+    fn linecontext(&self) -> &str {
+        let mut start = self.range.start;
+        let mut end = self.range.end;
+
+        // panic!("start = {}", start);
+
+        for c in self.content[0..start].chars().rev() {
+            if c as char == '\n' {
+                break;
+            }
+            start = start - 1;
+        }
+
+        if self.content[start..].chars().next().unwrap() == '\n' {
+            start = start + 1;
+        }
+
+        for c in self.content[end..].chars() {
+            if c as char == '\n' {
+                break;
+            }
+            end = end + 1;
+        }
+
+        &self.content[start..end]
     }
 }
 
