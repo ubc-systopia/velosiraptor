@@ -44,10 +44,8 @@ pub type LexErr = VrsError<SourcePos>;
 
 // custom error definitions
 custom_error! { #[derive(PartialEq)] pub LexerError
-  ReadSourceFile { file: String } = "Could not read the source file",
-  EmptySource                     = "The source was empty",
-  NoTokens                        = "No tokens found. Need to lex first",
-  LexerFailure { error: LexErr}   = "Lexing failed."
+    ReadSourceFile { file: String } = "Could not read the source file",
+    LexerFailure { error: LexErr}   = "Lexing failed."
 }
 
 /// represents the lexer state
@@ -196,21 +194,12 @@ impl Lexer {
     pub fn lex_source_pos(sp: SourcePos) -> Result<Vec<Token>, LexerError> {
         log::debug!("start lexing...");
 
-        // nothing to lex here, let's
-        if sp.is_empty() {
-            return Err(LexerError::EmptySource);
-        }
-        // check if the
+        // match the tokens
         let (i, mut tok) = match many0(tokens)(sp) {
             Ok((r, tok)) => (r, tok),
             Err(Err::Failure(error)) => return Err(LexerError::LexerFailure { error }),
             e => panic!("should not hit this branch: {:?}", e),
         };
-
-        // there were no tokens...
-        if tok.is_empty() {
-            return Err(LexerError::NoTokens);
-        }
 
         log::debug!("lexing done.");
         // adding the end of file token
@@ -323,7 +312,7 @@ fn empty_file_tests() {
 
         // lex the file
         let err = Lexer::lex_file(&filename);
-        assert!(err.is_err());
+        assert!(err.is_ok());
 
         d.pop();
     }
