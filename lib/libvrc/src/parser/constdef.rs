@@ -34,9 +34,9 @@ use nom::{
 
 // lexer / parser imports
 use crate::ast::{Const, Expr, Type};
-use crate::lexer::token::TokenStream;
 use crate::parser::expression::{bool_lit_expr, num_lit_expr};
 use crate::parser::terminals::{assign, colon, ident, kw_const, semicolon, typeinfo};
+use crate::token::TokenStream;
 
 /// parses a constat item of a unit
 ///

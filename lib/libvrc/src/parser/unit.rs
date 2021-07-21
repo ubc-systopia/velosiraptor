@@ -29,7 +29,7 @@ use nom::IResult;
 // get the tokens
 use crate::parser::terminals::{colon, ident, kw_unit, lbrace, rbrace};
 
-use crate::lexer::token::TokenStream;
+use crate::token::TokenStream;
 
 use nom::combinator::opt;
 use nom::sequence::{delimited, preceded};

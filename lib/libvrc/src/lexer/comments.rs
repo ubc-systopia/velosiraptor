@@ -31,9 +31,9 @@ use nom::{
     Err,
 };
 
-use super::token::{Token, TokenContent};
 use crate::error::{IResult, VrsError};
 use crate::sourcepos::SourcePos;
+use crate::token::{Token, TokenContent};
 
 /// parses and consumes an end of line comment '// foo
 pub fn linecomment(input: SourcePos) -> IResult<SourcePos, Token> {

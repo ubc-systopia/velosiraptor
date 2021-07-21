@@ -46,8 +46,8 @@ use import::import;
 use terminals::eof;
 use unit::unit;
 
-use super::lexer::token::{Token, TokenStream};
 use super::lexer::{LexErr, Lexer, LexerError};
+use super::token::{Token, TokenStream};
 
 // custom error definitions
 custom_error! {#[derive(PartialEq)] pub ParserError

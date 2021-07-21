@@ -32,13 +32,12 @@ use std::rc::Rc;
 mod comments;
 mod identifier;
 mod number;
-pub mod token;
 
 use self::comments::*;
 use self::identifier::identifier;
 use self::number::number;
-use self::token::*;
 use crate::sourcepos::SourcePos;
+use crate::token::*;
 
 /// define the lexer error type
 pub type LexErr = VrsError<SourcePos>;

@@ -27,8 +27,8 @@
 
 // lexer, parser terminals and ast
 use crate::ast::BitSlice;
-use crate::lexer::token::TokenStream;
 use crate::parser::terminals::{ident, num};
+use crate::token::TokenStream;
 
 // the used nom componets
 use nom::{error::ErrorKind, error_position, sequence::tuple, Err, IResult};

@@ -28,9 +28,9 @@
 // lexer, parser terminals and ast
 use crate::ast::Expr;
 use crate::ast::{BinOp, UnOp};
-use crate::lexer::token::TokenStream;
 use crate::parser::terminals::*;
 use crate::sourcepos::SourcePos;
+use crate::token::TokenStream;
 
 // Precedence of Operators  (strong to weak)
 // Operator                         Associativity       Example

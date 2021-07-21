@@ -35,8 +35,8 @@ use nom::sequence::pair;
 
 use crate::error::IResult;
 
-use super::token::{Keyword, Token, TokenContent};
 use crate::sourcepos::SourcePos;
+use crate::token::{Keyword, Token, TokenContent};
 
 /// parses a rust-like identifiers
 pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {

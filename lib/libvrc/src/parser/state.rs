@@ -26,7 +26,7 @@
 //! State definition parsing
 
 // lexer, parser terminals and ast
-use crate::lexer::token::TokenStream;
+use crate::token::TokenStream;
 use crate::ast::State;
 use crate::parser::terminals::{ident, import_keyword, semicolon};
 

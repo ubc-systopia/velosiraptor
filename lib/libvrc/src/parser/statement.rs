@@ -28,11 +28,11 @@
 // lexer, parser terminals and ast
 use crate::ast::Expr;
 use crate::ast::{Stmt, Type};
-use crate::lexer::token::TokenStream;
 use crate::parser::expression::{arith_expr, bool_expr};
 use crate::parser::terminals::{
     assign, colon, ident, kw_else, kw_if, kw_let, lbrace, rbrace, semicolon, typeinfo,
 };
+use crate::token::TokenStream;
 
 // the used nom componets
 use nom::{branch::alt, error_position, Err, IResult};

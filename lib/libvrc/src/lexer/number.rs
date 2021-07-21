@@ -36,9 +36,9 @@ use nom::{
     Err, InputLength, Slice,
 };
 
-use super::token::{Token, TokenContent};
 use crate::error::{IResult, VrsError};
 use crate::sourcepos::SourcePos;
+use crate::token::{Token, TokenContent};
 
 fn base10(input: SourcePos) -> IResult<SourcePos, Token> {
     // match a digit followed by alphanumeric characters and the `_`

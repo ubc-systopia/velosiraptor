@@ -27,8 +27,8 @@
 
 // lexer, parser terminals and ast
 use crate::ast::Import;
-use crate::lexer::token::TokenStream;
 use crate::parser::terminals::{ident, kw_import, semicolon};
+use crate::token::TokenStream;
 
 // the used nom componets
 use nom::{combinator::cut, sequence::terminated, IResult};
@@ -55,9 +55,9 @@ pub fn import(input: TokenStream) -> IResult<TokenStream, Import> {
 }
 
 #[cfg(test)]
-use crate::lexer::token::{Keyword, Token, TokenContent};
-#[cfg(test)]
 use crate::sourcepos::SourcePos;
+#[cfg(test)]
+use crate::token::{Keyword, Token, TokenContent};
 #[cfg(test)]
 use nom::{error::ErrorKind, error_position, Err, Slice};
 #[test]

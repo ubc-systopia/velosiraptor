@@ -24,7 +24,7 @@
 // SOFTWARE.
 
 // get the lexer tokens
-use crate::lexer::token::{Keyword, TokenContent, TokenStream};
+use crate::token::{Keyword, TokenContent, TokenStream};
 
 // for the ast type information
 use crate::ast::Type;

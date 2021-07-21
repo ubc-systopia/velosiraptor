@@ -30,4 +30,4 @@ mod tokenstream;
 
 // re-export
 pub use token::{Keyword, Token, TokenContent};
-pub use tokenstream::{TokenStream};
+pub use tokenstream::TokenStream;
