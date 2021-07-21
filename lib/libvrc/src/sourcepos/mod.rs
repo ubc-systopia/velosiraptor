@@ -41,7 +41,7 @@ use nom::{
     InputTakeAtPosition, Needed, Offset, Slice,
 };
 
-use crate::error::{ErrorLocation, VrsError};
+use crate::error::{ErrorLocation};
 use nom::error::{ErrorKind, ParseError};
 
 /// Corresponds to a single byte of the source file
