@@ -27,6 +27,7 @@
 
 use custom_error::custom_error;
 use std::collections::HashMap;
+use std::fmt;
 use std::rc::Rc;
 
 pub mod terminals;
@@ -48,15 +49,18 @@ use unit::unit;
 
 use super::lexer::{LexErr, Lexer, LexerError};
 use super::token::{Token, TokenStream};
+use crate::error::VrsError;
+
+/// define the lexer error type
+pub type ParsErr = VrsError<TokenStream>;
 
 // custom error definitions
 custom_error! {#[derive(PartialEq)] pub ParserError
-    IOError { file: String}       = "The input file could not be read.",
-    LexerFailure {error: LexErr } = "The lexer failed on the file.",
-    NothingToParse                = "There were no tokens to be parsed",
-    ParserFailure                 = "The parser has failed",
-    ParserIncomplete              = "The parser didn't finish",
-    NotYetImplemented             = "Not Yet Implemented"
+    IOError { file: String }       = "The input file could not be read.",
+    LexerFailure {error: LexErr }  = "The lexer failed on the file.",
+    ParserFailure                  = "The parser has failed",
+    ParserIncomplete               = "The parser didn't finish",
+    NotYetImplemented              = "Not Yet Implemented"
 }
 
 /// Implementation of [std::convert::From<LexerError>] for [VrsError]
@@ -67,8 +71,6 @@ impl From<LexerError> for ParserError {
         use LexerError::*;
         match e {
             ReadSourceFile { file } => ParserError::IOError { file },
-            EmptySource => ParserError::NothingToParse,
-            NoTokens => ParserError::NothingToParse,
             LexerFailure { error } => ParserError::LexerFailure { error },
         }
     }
