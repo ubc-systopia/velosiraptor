@@ -30,9 +30,9 @@ use std::fmt;
 use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 use std::rc::Rc;
 
+use crate::error::ErrorLocation;
 use crate::sourcepos::SourcePos;
 use crate::token::{Token, TokenContent};
-use crate::error::ErrorLocation;
 
 /// A sequence of recognized tokens that is produced by the lexer
 #[derive(Clone, PartialEq, Debug)]
@@ -389,7 +389,9 @@ impl InputIter for TokenStream {
     where
         P: Fn(Self::Item) -> bool,
     {
-        self.tokens[self.range.clone()].iter().position(|b| predicate(b.clone()))
+        self.tokens[self.range.clone()]
+            .iter()
+            .position(|b| predicate(b.clone()))
     }
 
     /// Get the byte offset from the element's position in the stream
