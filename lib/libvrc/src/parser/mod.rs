@@ -47,14 +47,31 @@ use terminals::eof;
 use unit::unit;
 
 use super::lexer::token::{Token, TokenStream};
-use super::lexer::Lexer;
+use super::lexer::{LexErr, Lexer, LexerError};
 
 // custom error definitions
 custom_error! {#[derive(PartialEq)] pub ParserError
-  LexerFailure               = "The lexer failed on the file.",
-  ParserFailure              = "The parser has failed",
-  ParserIncomplete           = "The parser didn't finish",
-  NotYetImplemented          = "Not Yet Implemented"
+    IOError { file: String}       = "The input file could not be read.",
+    LexerFailure {error: LexErr } = "The lexer failed on the file.",
+    NothingToParse                = "There were no tokens to be parsed",
+    ParserFailure                 = "The parser has failed",
+    ParserIncomplete              = "The parser didn't finish",
+    NotYetImplemented             = "Not Yet Implemented"
+}
+
+/// Implementation of [std::convert::From<LexerError>] for [VrsError]
+///
+/// This converts from a lexer error to a parser error
+impl From<LexerError> for ParserError {
+    fn from(e: LexerError) -> Self {
+        use LexerError::*;
+        match e {
+            ReadSourceFile { file } => ParserError::IOError { file },
+            EmptySource => ParserError::NothingToParse,
+            NoTokens => ParserError::NothingToParse,
+            LexerFailure { error } => ParserError::LexerFailure { error },
+        }
+    }
 }
 
 pub struct Parser;
@@ -118,25 +135,17 @@ impl Parser {
     /// Parses a supplied string by lexing it first, create an Ast
     pub fn parse_string(context: &str, string: &str) -> Result<Ast, ParserError> {
         log::info!("creating string parser");
-        let tokens = match Lexer::lex_string(context, string) {
-            Ok(toks) => toks,
-            Err(_x) => return Err(ParserError::LexerFailure),
-        };
+        let tokens = Lexer::lex_string(context, string)?;
         Parser::parse_tokens(context, &tokens)
     }
 
     /// Parses a file by lexing it first, create an Ast
     pub fn parse_file(filename: &str) -> Result<(Ast, Rc<String>), ParserError> {
         log::info!("creating file parser for '{}'", filename);
-        let (tokens, content) = match Lexer::lex_file(filename) {
-            Ok((tokens, content)) => (tokens, content),
-            Err(_x) => return Err(ParserError::LexerFailure),
-        };
+        let (tokens, content) = Lexer::lex_file(filename)?;
 
-        match Parser::parse_tokens(filename, &tokens) {
-            Ok(ast) => Ok((ast, content)),
-            Err(x) => Err(x),
-        }
+        let ast = Parser::parse_tokens(filename, &tokens)?;
+        Ok((ast, content))
     }
 
     /// Parses a slice of tokens

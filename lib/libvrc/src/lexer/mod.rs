@@ -40,12 +40,15 @@ use self::number::number;
 use self::token::*;
 use crate::sourcepos::SourcePos;
 
+/// define the lexer error type
+pub type LexErr = VrsError<SourcePos>;
+
 // custom error definitions
 custom_error! { #[derive(PartialEq)] pub LexerError
   ReadSourceFile { file: String } = "Could not read the source file",
   EmptySource                     = "The source was empty",
   NoTokens                        = "No tokens found. Need to lex first",
-  LexerFailure { error: VrsError<SourcePos>}  = "Lexing failed."
+  LexerFailure { error: LexErr}   = "Lexing failed."
 }
 
 /// represents the lexer state
