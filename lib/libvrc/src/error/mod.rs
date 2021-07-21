@@ -95,6 +95,17 @@ impl<I: ErrorLocation> VrsError<I> {
             path: None,
         }
     }
+
+    pub fn new_with_hint(etype: ErrorType, location: I, message: String, hint: String) -> Self {
+        VrsError {
+            etype,
+            message,
+            hint: Some(hint),
+            location,
+            path: None,
+        }
+    }
+
     /// creates a new VrsError struct as ErrorType::Error from a &str
     pub fn from_str(location: I, message: &str) -> Self {
         VrsError::new(location, message.to_string())
@@ -115,6 +126,14 @@ impl<I: ErrorLocation> VrsError<I> {
     /// sets the errory type for this error
     pub fn set_type(&mut self, etype: ErrorType) {
         self.etype = etype;
+    }
+
+    pub fn emit(etype: ErrorType, location: I, message: String, hint: String) {
+        VrsError::new_with_hint(etype, location, message, hint).print();
+    }
+
+    pub fn print(&self) {
+        eprintln!("{}", self)
     }
 }
 
