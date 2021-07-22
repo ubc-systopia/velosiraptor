@@ -1,0 +1,13 @@
+const FOO: int = 1234;
+const BAR: bool = true;
+
+// that one is a warning
+const foo: int = 1234;
+
+const FOOBAR: int = 1 + 4;
+const TEST: int = 1 + 4 * 4;
+
+const TEST2: int = 1 + 4 * abc;
+
+// that one should be fine
+const TEST3: int = 1 + 4 * TEST;

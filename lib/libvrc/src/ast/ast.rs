@@ -55,52 +55,52 @@ pub struct Ast {
 use crate::parser::Parser;
 
 impl Ast {
-    pub fn merge(&mut self, other: Ast) {
-        //
-        let mut other = other;
-        // try to insert other constants into this ast
-        for (key, val) in other.imports.drain() {
-            // check if the key is already there, that's an error
-            if !self.imports.contains_key(&key) {
-                self.imports.insert(key, val);
-            }
-        }
+    pub fn merge(&mut self, _other: Ast) {
+        // //
+        // let mut other = other;
+        // // try to insert other constants into this ast
+        // for (key, val) in other.imports.drain() {
+        //     // check if the key is already there, that's an error
+        //     if !self.imports.contains_key(&key) {
+        //         self.imports.insert(key, val);
+        //     }
+        // }
 
-        // try to insert other constants into this ast
-        for (key, val) in other.consts.drain() {
-            // check if the key is already there, that's an error
-            if self.consts.contains_key(&key) {
-                let c = self.consts.get(&key).unwrap();
-                let pos = c.pos();
+        // // try to insert other constants into this ast
+        // for (key, val) in other.consts.drain() {
+        //     // check if the key is already there, that's an error
+        //     if self.consts.contains_key(&key) {
+        //         let c = self.consts.get(&key).unwrap();
+        //         let pos = c.pos();
 
-                panic!(
-                    "error in {} - double defined constant. '{}' already defined here {}",
-                    pos,
-                    key,
-                    val.pos()
-                );
-            }
+        //         panic!(
+        //             "error in {} - double defined constant. '{}' already defined here {}",
+        //             pos,
+        //             key,
+        //             val.pos()
+        //         );
+        //     }
 
-            self.consts.insert(key, val);
-        }
+        //     self.consts.insert(key, val);
+        // }
 
-        // try to insert the other units into this ast
-        for (key, val) in other.units.drain() {
-            // check if the key is already there, that's an error
-            if self.units.contains_key(&key) {
-                let c = self.consts.get(&key).unwrap();
-                let pos = c.pos();
+        // // try to insert the other units into this ast
+        // for (key, val) in other.units.drain() {
+        //     // check if the key is already there, that's an error
+        //     if self.units.contains_key(&key) {
+        //         let c = self.consts.get(&key).unwrap();
+        //         let pos = c.pos();
 
-                panic!(
-                    "error in {} - double defined unit. '{}' already defined here {}",
-                    pos,
-                    key,
-                    val.pos()
-                );
-            }
+        //         panic!(
+        //             "error in {} - double defined unit. '{}' already defined here {}",
+        //             pos,
+        //             key,
+        //             val.pos()
+        //         );
+        //     }
 
-            self.units.insert(key, val);
-        }
+        //     self.units.insert(key, val);
+        // }
     }
 
     /// resolves imports recursively
@@ -121,7 +121,7 @@ impl Ast {
         path.push(self.filename.clone());
 
         // loop over the current imports
-        for (key, val) in self.imports.iter_mut() {
+        for (_key, val) in self.imports.iter_mut() {
             let filename = val.to_filename();
             importfile.push(&filename);
 
@@ -265,7 +265,7 @@ fn import_test_ok() {
         };
 
         // now resolve the import
-        ast.resolve_imports();
+        assert!(ast.resolve_imports().is_ok());
 
         d.pop();
     }
@@ -280,8 +280,6 @@ fn import_test_recursive() {
         d.push(f);
         let filename = format!("{}", d.display());
 
-        println!("filename: {}", filename);
-
         // lex the file
         let mut ast = match Parser::parse_file(&filename) {
             Ok((ast, _)) => ast,
@@ -289,7 +287,7 @@ fn import_test_recursive() {
         };
 
         // now resolve the import
-        ast.resolve_imports();
+        assert!(ast.resolve_imports().is_ok());
 
         d.pop();
     }
@@ -303,8 +301,6 @@ fn import_test_circular() {
     for f in vec!["circular21.vrs", "circular1.vrs"] {
         d.push(f);
         let filename = format!("{}", d.display());
-        println!("====================================");
-        println!("filename: {}", filename);
 
         // lex the file
         let mut ast = match Parser::parse_file(&filename) {
@@ -313,7 +309,7 @@ fn import_test_circular() {
         };
 
         // now resolve the import
-        ast.resolve_imports();
+        assert!(ast.resolve_imports().is_err());
 
         d.pop();
     }

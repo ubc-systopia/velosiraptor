@@ -25,7 +25,8 @@
 
 //! Ast Module of the Velosiraptor Compiler
 
-use crate::sourcepos::SourcePos;
+use crate::ast::Expr;
+use crate::token::TokenStream;
 use std::fmt;
 
 /// Defines a [Constant] statement node
@@ -42,21 +43,21 @@ pub enum Const {
     /// This corresponds to an Integer literal
     Integer {
         ident: String,
-        value: u64,
-        pos: SourcePos,
+        value: Expr,
+        pos: TokenStream,
     },
     /// Represents an boolean constant
     ///
     /// This corresponds to an Boolean literal
     Boolean {
         ident: String,
-        value: bool,
-        pos: SourcePos,
+        value: Expr,
+        pos: TokenStream,
     }, // TODO: add address / size constants here as well?
 }
 
 impl Const {
-    pub fn pos(&self) -> &SourcePos {
+    pub fn pos(&self) -> &TokenStream {
         use self::Const::*;
         match self {
             Integer {
@@ -87,6 +88,21 @@ impl Const {
             } => &ident,
         }
     }
+    pub fn value(&self) -> (&Expr, &TokenStream) {
+        use self::Const::*;
+        match self {
+            Integer {
+                ident: _,
+                value,
+                pos,
+            } => (&value, pos),
+            Boolean {
+                ident: _,
+                value,
+                pos,
+            } => (&value, pos),
+        }
+    }
 }
 
 /// implementation of the [fmt::Display] trait for the [Const]
@@ -114,7 +130,7 @@ impl fmt::Debug for Const {
         use self::Const::*;
         match self {
             Integer { ident, value, pos } => {
-                let (line, column) = pos.input_pos();
+                let (line, column) = pos.input_sourcepos().input_pos();
                 writeln!(
                     f,
                     "{:03}:{:03} | const {} :  int = {};",
@@ -122,7 +138,7 @@ impl fmt::Debug for Const {
                 )
             }
             Boolean { ident, value, pos } => {
-                let (line, column) = pos.input_pos();
+                let (line, column) = pos.input_sourcepos().input_pos();
                 writeln!(
                     f,
                     "{:03}:{:03} | const {} : bool = {};",
@@ -134,48 +150,46 @@ impl fmt::Debug for Const {
 }
 
 use crate::ast::AstCheck;
-use crate::error::{ErrorType, VrsError};
+use crate::error::VrsError;
 impl AstCheck for Const {
     fn check(&self) -> (u32, u32) {
-        use self::Const::*;
-        let (name, pos) = match &self {
-            Integer {
-                ident,
-                value: _,
-                pos,
-            } => (ident, pos),
-            Boolean {
-                ident,
-                value: _,
-                pos,
-            } => (ident, pos),
-        };
+        let mut res = (0, 0);
+
+        let name = self.ident();
+        let pos = self.pos();
+        let (val, epos) = self.value();
+        if !val.is_const_expr() {
+            let msg = String::from("not a constant expression");
+            let hint = String::from("convert the expression to a constant");
+            VrsError::new_err(epos, msg, Some(hint)).print();
+            res = (res.0, res.1 + 1);
+        }
 
         // issue warning
         if !name.is_ascii() {
             let msg = format!("constant `{}` should have an upper case name", name);
             let hint = format!(
-                "help: convert the identifier to upper case (notice the capitalization): `{}`",
+                "convert the identifier to upper case (notice the capitalization): `{}`",
                 name.to_ascii_uppercase()
             );
             VrsError::new_warn(pos, msg, Some(hint)).print();
-            return (1, 0);
+            res = (res.0, res.1 + 1);
         }
 
         let allupper = name
             .as_bytes()
             .iter()
-            .fold(true, |acc, x| acc & x.is_ascii_uppercase());
+            .fold(true, |acc, x| acc & !x.is_ascii_lowercase());
         if !allupper {
             let msg = format!("constant `{}` should have an upper case name", name);
             let hint = format!(
-                "help: convert the identifier to upper case (notice the capitalization): `{}`",
+                "convert the identifier to upper case (notice the capitalization): `{}`",
                 name.to_ascii_uppercase()
             );
             VrsError::new_warn(pos, msg, Some(hint)).print();
             // warning
-            return (0, 1);
+            res = (res.0, res.1 + 1);
         }
-        (0, 0)
+        res
     }
 }
