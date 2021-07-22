@@ -25,10 +25,8 @@
 
 //! Velosiraptor Lexer Tokens
 
-use nom::{InputIter, InputLength, InputTake, Needed, Slice};
+use nom::InputLength;
 use std::fmt;
-use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
-use std::rc::Rc;
 
 use crate::sourcepos::SourcePos;
 
@@ -85,7 +83,7 @@ impl fmt::Display for Keyword {
 }
 
 /// Represents the content of a token
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Clone)]
 pub enum TokenContent {
     // end of file
     Eof,
@@ -225,6 +223,18 @@ impl TokenContent {
             TokenContent::Wildcard => "?",
             TokenContent::Eof => "EOF",
             _ => panic!("unknown symbol for token {:?}", tok),
+        }
+    }
+}
+
+impl fmt::Debug for TokenContent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TokenContent::Keyword(_) => write!(f, "keyword"),
+            TokenContent::Identifier(_) => write!(f, "identifier"),
+            TokenContent::IntLiteral(_) => write!(f, "number"),
+            TokenContent::BoolLiteral(_) => write!(f, "true, false"),
+            t => write!(f, "{}", TokenContent::to_str(t.clone())),
         }
     }
 }

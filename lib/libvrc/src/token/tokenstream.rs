@@ -35,7 +35,7 @@ use crate::sourcepos::SourcePos;
 use crate::token::{Token, TokenContent};
 
 /// A sequence of recognized tokens that is produced by the lexer
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq)]
 pub struct TokenStream {
     /// a reference counted vector of tokens
     tokens: Rc<Vec<Token>>,
@@ -145,6 +145,13 @@ impl TokenStream {
 
 /// Implements the [std::fmt::Display] trait for [TokenStream]
 impl fmt::Display for TokenStream {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.tokens[self.range.start])
+    }
+}
+
+/// Implements the [std::fmt::Debug] trait for [TokenStream]
+impl fmt::Debug for TokenStream {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let len = std::cmp::min(self.input_len(), 5);
         let mut tok = String::new();
@@ -407,6 +414,35 @@ impl InputIter for TokenStream {
 
 /// Implementation of the [error::ErrorLocation] trait for [TokenStream]
 impl ErrorLocation for TokenStream {
+    /// the line number in the source file
+    fn line(&self) -> u32 {
+        self.peek().spos.line()
+    }
+
+    /// the column number in the source file
+    fn column(&self) -> u32 {
+        self.peek().spos.column()
+    }
+
+    /// the length of the token
+    fn length(&self) -> usize {
+        // TODO: figure out the right thing here!
+        self.peek().spos.length()
+    }
+
+    /// the context (stdin or filename)
+    fn context(&self) -> &str {
+        self.peek().spos.context()
+    }
+
+    /// the surrounding line context
+    fn linecontext(&self) -> &str {
+        self.peek().spos.linecontext()
+    }
+}
+
+/// Implementation of the [error::ErrorLocation] trait for [TokenStream]
+impl ErrorLocation for &TokenStream {
     /// the line number in the source file
     fn line(&self) -> u32 {
         self.peek().spos.line()
