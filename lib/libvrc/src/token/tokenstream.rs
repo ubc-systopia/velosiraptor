@@ -469,3 +469,18 @@ impl ErrorLocation for &TokenStream {
         self.peek().spos.linecontext()
     }
 }
+
+/// Implementation of [std::convert::From<LexerError>] for [VrsError]
+///
+/// This converts from a lexer error to a parser error
+impl From<SourcePos> for TokenStream {
+    fn from(spos: SourcePos) -> Self {
+        TokenStream {
+            tokens: Rc::new(vec![Token {
+                content: TokenContent::Illegal,
+                spos,
+            }]),
+            range: 0..0,
+        }
+    }
+}
