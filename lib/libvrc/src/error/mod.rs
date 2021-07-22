@@ -219,12 +219,20 @@ impl<I: ErrorLocation + fmt::Display> fmt::Display for VrsError<I> {
             }
             VrsError::Stack {
                 message,
-                location: _,
+                location: l,
                 next,
             } => {
-                writeln!(f, "{}", next)?;
+                write!(f, "{}", next)?;
                 writeln!(f, "      {}", pipe)?;
-                return writeln!(f, "      | {}", message);
+                return writeln!(
+                    f,
+                    "      {} {} {}:{}:{}",
+                    pipe,
+                    message,
+                    l.context(),
+                    l.line(),
+                    l.column()
+                );
             }
         };
 
@@ -265,7 +273,7 @@ impl<I: ErrorLocation + fmt::Display> ContextError<I> for VrsError<I> {
     /// This is used mainly in the context combinator, to add user friendly information
     /// to errors when backtracking through a parse tree
     fn add_context(input: I, ctx: &'static str, other: Self) -> Self {
-        VrsError::stack(input, ctx.to_string(), other)
+        panic!("adding context");
     }
 }
 
@@ -281,7 +289,6 @@ impl<I: ErrorLocation + fmt::Display> ParseError<I> for VrsError<I> {
     /// Combines the existing error with a new one created at position
     fn append(input: I, kind: ErrorKind, other: Self) -> Self {
         VrsError::from_error_kind(input, kind)
-        //println!("append: {:?}", kind);
     }
 
     fn or(self, other: Self) -> Self {
