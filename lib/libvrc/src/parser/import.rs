@@ -27,11 +27,12 @@
 
 // lexer, parser terminals and ast
 use crate::ast::Import;
+use crate::error::IResult;
 use crate::parser::terminals::{ident, kw_import, semicolon};
 use crate::token::TokenStream;
 
 // the used nom componets
-use nom::{combinator::cut, sequence::terminated, IResult};
+use nom::{combinator::cut, sequence::terminated};
 
 /// parses and consumes an import statement (`import foo;`) and any following whitespaces
 pub fn import(input: TokenStream) -> IResult<TokenStream, Import> {

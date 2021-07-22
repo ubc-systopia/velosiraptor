@@ -28,6 +28,7 @@
 // lexer, parser terminals and ast
 use crate::ast::Expr;
 use crate::ast::{BinOp, UnOp};
+use crate::error::IResult;
 use crate::parser::terminals::*;
 use crate::sourcepos::SourcePos;
 use crate::token::TokenStream;
@@ -57,7 +58,6 @@ use crate::token::TokenStream;
 use nom::{
     branch::alt,
     sequence::{delimited, tuple},
-    IResult,
 };
 
 use nom::multi::many0;

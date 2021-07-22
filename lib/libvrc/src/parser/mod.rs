@@ -26,26 +26,26 @@
 //! Parser Module of the Velosiraptor Compiler
 
 use custom_error::custom_error;
+use nom::Err;
 use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 
 pub mod terminals;
 //mod state;
-mod bitslice;
+// mod bitslice;
 mod expression;
-mod field;
+// mod field;
 mod import;
-mod statement;
-
+// mod statement;
 mod constdef;
-mod unit;
+//mod unit;
 
 use crate::ast::Ast;
 use constdef::constdef;
 use import::import;
 use terminals::eof;
-use unit::unit;
+//use unit::unit;
 
 use super::lexer::{LexErr, Lexer, LexerError};
 use super::token::{Token, TokenStream};
@@ -56,11 +56,11 @@ pub type ParsErr = VrsError<TokenStream>;
 
 // custom error definitions
 custom_error! {#[derive(PartialEq)] pub ParserError
-    IOError { file: String }       = "The input file could not be read.",
-    LexerFailure {error: LexErr }  = "The lexer failed on the file.",
-    ParserFailure                  = "The parser has failed",
-    ParserIncomplete               = "The parser didn't finish",
-    NotYetImplemented              = "Not Yet Implemented"
+    IOError { file: String }          = "The input file could not be read.",
+    LexerFailure {error: LexErr }     = "The lexer failed on the file.",
+    ParserFailure {error: ParsErr}    = "The parser has failed",
+    ParserIncomplete {error: ParsErr} = "The parser didn't finish",
+    NotYetImplemented                 = "Not Yet Implemented"
 }
 
 /// Implementation of [std::convert::From<LexerError>] for [VrsError]
@@ -86,12 +86,13 @@ impl Parser {
         log::debug!("start parsing...");
 
         // get the token stream
-        let tokstream = TokenStream::from_vec(tokens);
+        let tokstream = TokenStream::from_vec_filtered(tokens);
 
         // a parsing unit consists of zero or more imports
         let (i1, importlist) = match many0(import)(tokstream) {
             Ok((r, i)) => (r, i),
-            Err(_) => return Err(ParserError::ParserFailure),
+            Err(Err::Failure(error)) => return Err(ParserError::ParserFailure { error }),
+            e => panic!("unexpected error case: {:?}", e),
         };
         let mut imports = HashMap::new();
         for i in importlist {
@@ -101,7 +102,8 @@ impl Parser {
         // a parsing unit consists of zero or more imports
         let (i2, constlist) = match many0(constdef)(i1) {
             Ok((r, i)) => (r, i),
-            Err(_) => return Err(ParserError::ParserFailure),
+            Err(Err::Failure(error)) => return Err(ParserError::ParserFailure { error }),
+            e => panic!("unexpected error case: {:?}", e),
         };
 
         let mut consts = HashMap::new();
@@ -123,14 +125,19 @@ impl Parser {
 
         // consume the end of file token
         log::debug!("parsing done.");
-        match eof(i3) {
+        match eof(i3.clone()) {
             Ok(_) => Ok(Ast {
                 filename: context.to_string(),
                 imports,
                 consts,
                 units,
             }),
-            Err(_) => Err(ParserError::ParserIncomplete),
+            Err(_) => {
+                let msg = String::from("unexpected junk at the end of the file");
+                let hint = String::from("remove these characters");
+                let error = VrsError::new_err(i3, msg, Some(hint));
+                Err(ParserError::ParserIncomplete { error })
+            }
         }
     }
 

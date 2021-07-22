@@ -23,16 +23,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// get the lexer tokens
-use crate::token::{Keyword, TokenContent, TokenStream};
-
-// for the ast type information
-use crate::ast::Type;
-
 // NOM parsing constructs
 use nom::{take, try_parse};
 // NOM results
-use nom::{error::ErrorKind, error_position, Err, IResult, Needed};
+use nom::{error::ErrorKind, error::ParseError, error_position, Err, Needed};
+
+use crate::ast::Type;
+use crate::error::{IResult, VrsError};
+use crate::token::{Keyword, TokenContent, TokenStream};
 
 macro_rules! terminalparser (
     ($vis:vis $name:ident, $tag: expr) => (
@@ -45,7 +43,7 @@ macro_rules! terminalparser (
                 if tok.peek().content == $tag {
                     Ok((rem, ()))
                 } else {
-                    Err(Err::Error(error_position!(input, ErrorKind::Tag)))
+                    Err(Err::Error(VrsError::from_token(input, $tag)))
                 }
             }
         }
@@ -120,7 +118,10 @@ pub fn ident(input: TokenStream) -> IResult<TokenStream, String> {
         let id = tok.peek();
         match &id.content {
             TokenContent::Identifier(s) => Ok((rem, s.clone())),
-            _ => Err(Err::Error(error_position!(input, ErrorKind::AlphaNumeric))),
+            _ => Err(Err::Error(VrsError::from_token(
+                input,
+                TokenContent::Identifier(String::new()),
+            ))),
         }
     }
 }
@@ -134,7 +135,10 @@ pub fn num(input: TokenStream) -> IResult<TokenStream, u64> {
         let id = tok.peek();
         match &id.content {
             TokenContent::IntLiteral(s) => Ok((rem, *s)),
-            _ => Err(Err::Error(error_position!(input, ErrorKind::Digit))),
+            _ => Err(Err::Error(VrsError::from_token(
+                input,
+                TokenContent::IntLiteral(0),
+            ))),
         }
     }
 }
@@ -148,7 +152,10 @@ pub fn boolean(input: TokenStream) -> IResult<TokenStream, bool> {
         let id = tok.peek();
         match &id.content {
             TokenContent::BoolLiteral(s) => Ok((rem, *s)),
-            _ => Err(Err::Error(error_position!(input, ErrorKind::Digit))),
+            _ => Err(Err::Error(VrsError::from_token(
+                input,
+                TokenContent::BoolLiteral(false),
+            ))),
         }
     }
 }
@@ -164,7 +171,7 @@ macro_rules! keywordparser (
                 if tok.peek().content == TokenContent::Keyword($tag) {
                     Ok((rem, ()))
                 } else {
-                    Err(Err::Error(error_position!(input, ErrorKind::Tag)))
+                    Err(Err::Error(VrsError::from_token(input, TokenContent::Keyword($tag))))
                 }
             }
         }
@@ -193,6 +200,10 @@ pub fn typeinfo(input: TokenStream) -> IResult<TokenStream, Type> {
         TokenContent::Keyword(Keyword::Addr) => Ok((rem, Type::Address)),
         TokenContent::Keyword(Keyword::Boolean) => Ok((rem, Type::Boolean)),
         TokenContent::Keyword(Keyword::Integer) => Ok((rem, Type::Integer)),
-        _ => Err(Err::Error(error_position!(input, ErrorKind::Tag))),
+        // TODO: make this more type specifc
+        _ => Err(Err::Error(VrsError::from_token(
+            input,
+            TokenContent::Keyword(Keyword::Size),
+        ))),
     }
 }
