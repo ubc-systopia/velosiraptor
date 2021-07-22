@@ -165,8 +165,8 @@ use nom::bytes::complete::take;
 
 fn any(input: SourcePos) -> IResult<SourcePos, Token> {
     let (_, t) = take(1usize)(input.clone())?;
-    let mut err = VrsError::from_str(t, "Illegal token.");
-    err.add_hint("remove this character.".to_string());
+    let msg = format!("illegal token `{}` encountered.", t);
+    let err = VrsError::new_err(t, msg, Some(String::from("remove this character.")));
     Err(Err::Failure(err))
 }
 

@@ -65,9 +65,12 @@ pub fn blockcomment(input: SourcePos) -> IResult<SourcePos, Token> {
         Err(e) => {
             // somehow this needs type annotations here?
             let _e: nom::Err<nom::error::Error<SourcePos>> = e;
-            let mut e = VrsError::from_str(c, "unclosed block comment.");
-            e.add_hint("insert `*/` after here.".to_string());
-            return Err(Err::Failure(e));
+            let err = VrsError::new_err(
+                c,
+                String::from("unclosed block comment."),
+                Some(String::from("insert `*/` after here.")),
+            );
+            return Err(Err::Failure(err));
         }
     }
 }

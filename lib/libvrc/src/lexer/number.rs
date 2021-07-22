@@ -54,8 +54,11 @@ fn base10(input: SourcePos) -> IResult<SourcePos, Token> {
 
     // if it's not empty there will be some junk at the end of the number
     if !rem1.is_empty() {
-        let mut err = VrsError::from_str(rem1, "unsupported digit in number.");
-        err.add_hint("remove excess characters".to_string());
+        let err = VrsError::new_err(
+            rem1,
+            String::from("unsupported digit in number."),
+            Some(String::from("remove excess characters")),
+        );
         return Err(Err::Failure(err));
     }
 
@@ -64,10 +67,8 @@ fn base10(input: SourcePos) -> IResult<SourcePos, Token> {
     let num = match numstr.parse::<u64>() {
         Ok(i) => i,
         Err(_) => {
-            return Err(Err::Failure(VrsError::from_str(
-                numsp,
-                "number exceeds available bits.",
-            )))
+            let err = VrsError::new_err(rem1, String::from("number exceeds available bits"), None);
+            return Err(Err::Failure(err));
         }
     };
     Ok((rem, Token::new(TokenContent::IntLiteral(num), numsp)))
@@ -92,8 +93,9 @@ macro_rules! namedbase (
 
             // if it's not empty there will be some junk at the end of the number
             if ! rem1.is_empty() {
-                let mut err = VrsError::from_str(rem1,"unsupported digit in number.");
-                err.add_hint("remove excess characters".to_string());
+                let err = VrsError::new_err(rem1,
+                    String::from("unsupported digit in number."),
+                    Some(String::from("remove excess characters")));
                 return Err(Err::Failure(err));
             }
 
@@ -101,10 +103,12 @@ macro_rules! namedbase (
             let numstr = String::from(numsp.as_str()).replace("_", "");
             match u64::from_str_radix(&numstr, $radix) {
                 Ok(i) => Ok((rem, Token::new(TokenContent::IntLiteral(i), input.slice(0..numsp.input_len() + 2)))),
-                Err(_) => Err(Err::Failure(VrsError::from_str(
-                    numsp,
-                    "number exceeds available bits."
-                ))),
+                Err(_) => {
+                    let err = VrsError::new_err(rem1,
+                        String::from("number exceeds available bits"),
+                        None);
+                    Err(Err::Failure(err))
+                }
             }
         }
     )
