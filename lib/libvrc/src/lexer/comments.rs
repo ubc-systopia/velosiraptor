@@ -54,7 +54,7 @@ pub fn linecomment(input: SourcePos) -> IResult<SourcePos, Token> {
 /// the block comment must be closed again
 pub fn blockcomment(input: SourcePos) -> IResult<SourcePos, Token> {
     // try to match the opening comment keyword, there is no match, return.
-    let (i1, _) = tag("/*")(input.clone())?;
+    let (i1, c) = tag("/*")(input)?;
 
     // now match the block comment and discard following whitespace characters
     match cut(terminated(take_until("*/"), tag("*/")))(i1) {
@@ -65,8 +65,8 @@ pub fn blockcomment(input: SourcePos) -> IResult<SourcePos, Token> {
         Err(e) => {
             // somehow this needs type annotations here?
             let _e: nom::Err<nom::error::Error<SourcePos>> = e;
-            let mut e = VrsError::from_str(input, "unclosed block comment.");
-            e.add_hint("insert `*/` here.".to_string());
+            let mut e = VrsError::from_str(c, "unclosed block comment.");
+            e.add_hint("insert `*/` after here.".to_string());
             return Err(Err::Failure(e));
         }
     }
