@@ -31,6 +31,7 @@ use simplelog::{Config, LevelFilter, SimpleLogger};
 use std::process::exit;
 
 // get the parser module
+use libvrc::ast::AstError;
 use libvrc::parser::{Parser, ParserError};
 
 fn parse_cmdline() -> clap::ArgMatches<'static> {
@@ -60,8 +61,13 @@ fn parse_cmdline() -> clap::ArgMatches<'static> {
         .get_matches()
 }
 use libvrc::error::{ErrorLocation, VrsError};
-fn print_errors_and_exit<I: ErrorLocation>(err: VrsError<I>, target: &str) {
+fn print_errors_and_exit<I: ErrorLocation + std::fmt::Display>(
+    msg: &str,
+    err: VrsError<I>,
+    target: &str,
+) {
     err.print();
+    eprintln!("{}{}{}.\n", "error".bold().red(), ": ".bold(), msg.bold());
     abort(target)
 }
 
@@ -112,10 +118,18 @@ fn main() {
     eprintln!("{}: {}...\n", "parsing".bold().green(), infile);
 
     // let's try to create a file parser
-    let ast = match Parser::parse_file(infile) {
+    let mut ast = match Parser::parse_file(infile) {
         Ok((ast, _)) => ast,
         Err(ParserError::LexerFailure { error }) => {
-            print_errors_and_exit(error, infile);
+            print_errors_and_exit("during lexing of the file", error, infile);
+            return;
+        }
+        Err(ParserError::ParserFailure { error }) => {
+            print_errors_and_exit("during parsing of the file", error, infile);
+            return;
+        }
+        Err(ParserError::ParserIncomplete { error }) => {
+            print_errors_and_exit("unexpected junk at the end of the file", error, infile);
             return;
         }
         Err(_) => {
@@ -123,6 +137,38 @@ fn main() {
             return;
         }
     };
+
+    eprintln!(
+        "{}: {} {}...\n",
+        "resolve".bold().green(),
+        ast.imports.len(),
+        "imports"
+    );
+
+    match ast.resolve_imports() {
+        Ok(()) => (),
+        Err(AstError::ImportError { error }) => {
+            print_errors_and_exit("failed resolving the imports", error, infile);
+        }
+        _ => abort(infile),
+    };
+
+    eprintln!("{}: consistency...\n", "check".bold().green());
+    ast.check_consistency();
+
+    // ok we've got an ast, now resolve the imports
+    // match ast.resolve_imports() {
+    //     eprintln!(
+    //         "{}{}.\n",
+    //         "error".bold().red(),
+    //         ": during resolving of the imports".bold()
+    //     )?;
+    //     print_errors_and_exit(error, infile);
+    // }
+
+    // match ast.check() {
+
+    // }
 
     log::debug!("Printing ast:");
     log::debug!("{}", ast);
