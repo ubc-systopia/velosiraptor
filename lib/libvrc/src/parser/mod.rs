@@ -57,7 +57,7 @@ pub type ParsErr = VrsError<TokenStream>;
 // custom error definitions
 custom_error! {#[derive(PartialEq)] pub ParserError
     IOError { file: String }          = "The input file could not be read.",
-    LexerFailure {error: LexErr }     = "The lexer failed on the file.",
+    LexerFailure {error: ParsErr }     = "The lexer failed on the file.",
     ParserFailure {error: ParsErr}    = "The parser has failed",
     ParserIncomplete {error: ParsErr} = "The parser didn't finish",
     NotYetImplemented                 = "Not Yet Implemented"
@@ -71,7 +71,17 @@ impl From<LexerError> for ParserError {
         use LexerError::*;
         match e {
             ReadSourceFile { file } => ParserError::IOError { file },
-            LexerFailure { error } => ParserError::LexerFailure { error },
+            LexerFailure { error } => {
+                let error = match error {
+                    VrsError::Error {
+                        message,
+                        hint,
+                        location,
+                    } => VrsError::new_err(TokenStream::from(location), message, hint),
+                    _ => panic!("huh??"),
+                };
+                ParserError::LexerFailure { error }
+            }
         }
     }
 }
