@@ -96,6 +96,23 @@ impl TokenStream {
         }
     }
 
+    /// Creates a new [TokenStream] from self up until, not including the other
+    ///
+    /// The new range will start at current, and be set to the token just before
+    /// the start of the other TokenStream
+    ///
+    /// # Panics
+    ///
+    /// The function panics if the tokens are not matching, or the end is before the start
+    pub fn from_self_until(self, other: &Self) -> Self {
+        assert!(self.tokens == other.tokens);
+        assert!(self.range.start < other.range.start);
+        TokenStream {
+            tokens: self.tokens,
+            range: self.range.start..other.range.start,
+        }
+    }
+
     /// Creates an empty TokenStream.
     pub fn empty() -> Self {
         TokenStream {
