@@ -44,8 +44,8 @@ use symboltable::SymbolTable;
 
 // custom error definitions
 custom_error! {#[derive(PartialEq)] pub AstError
-  SymTabInsertExists         = "The symbol could not be inserted, already exists",
-  SymTableNotExists          = "The symbol does not exist in the table",
+    SymTabInsertExists         = "The symbol could not be inserted, already exists",
+    SymTableNotExists          = "The symbol does not exist in the table",
 }
 
 // rexports
@@ -62,7 +62,30 @@ pub use state::State;
 pub use types::Type;
 pub use unit::Unit;
 
+enum CheckResult {
+    Warning,
+    Error,
+    Ok,
+}
+
+impl std::ops::BitAnd for CheckResult {
+    type Output = CheckResult;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        use CheckResult::*;
+        match (self, rhs) {
+            (Error, _) => Error,
+            (_, Error) => Error,
+            (Warning, _) => Warning,
+            (_, Warning) => Warning,
+            (Ok, Ok) => Ok,
+        }
+    }
+}
+
 /// Trait that checks the Ast nodes for consistency
-pub trait AstCheck {
-    fn check(&self, symtab: SymbolTable) -> bool;
+///
+/// This trait has to be implemented by all the nodes
+trait AstCheck {
+    fn check(&self) -> CheckResult;
 }

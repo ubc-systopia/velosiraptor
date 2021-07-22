@@ -113,7 +113,6 @@ impl Ast {
 
         // add ourselves
         path.push(self.filename.clone());
-        println!("resolving imports: ????");
 
         // loop over the current imports
         for (key, val) in self.imports.iter_mut() {
@@ -139,7 +138,7 @@ impl Ast {
                 // check if we have a circular dependency...
                 let it = path.iter();
                 // skip over the elements that are not the key
-                let it = it.skip_while(|e| *e != key);
+                let it = it.skip_while(|e| *e != f);
                 // now convert to string
                 let s = it
                     .map(|s| s.to_string())
@@ -187,6 +186,11 @@ impl Ast {
         // now we have all imports resolved, and we can start merging the asts
         self.do_merge_imports();
     }
+
+    ///
+    pub fn check_consistency(&self) {
+        self.check();
+    }
 }
 
 /// implementation of the [fmt::Display] trait for the [Ast].
@@ -200,6 +204,18 @@ impl fmt::Display for Ast {
 impl fmt::Debug for Ast {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "Ast: TODO",)
+    }
+}
+
+use crate::ast::{AstCheck, CheckResult};
+impl AstCheck for Ast {
+    fn check(&self) -> CheckResult {
+        let mut res = CheckResult::Ok;
+        // try to insert other constants into this ast
+        for (_, val) in self.consts.iter() {
+            res = res & val.check();
+        }
+        res
     }
 }
 
@@ -256,10 +272,10 @@ fn import_test_circular() {
     let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     d.push("tests/imports");
 
-    for f in vec!["circular1.vrs", "circular2.vrs"] {
+    for f in vec!["circular21.vrs", "circular1.vrs"] {
         d.push(f);
         let filename = format!("{}", d.display());
-
+        println!("====================================");
         println!("filename: {}", filename);
 
         // lex the file

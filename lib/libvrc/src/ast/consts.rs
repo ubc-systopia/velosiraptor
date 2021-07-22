@@ -132,3 +132,50 @@ impl fmt::Debug for Const {
         }
     }
 }
+
+use crate::ast::{AstCheck, CheckResult};
+use crate::error::{ErrorType, VrsError};
+impl AstCheck for Const {
+    fn check(&self) -> CheckResult {
+        use self::Const::*;
+        let (name, pos) = match &self {
+            Integer {
+                ident,
+                value: _,
+                pos,
+            } => (ident, pos),
+            Boolean {
+                ident,
+                value: _,
+                pos,
+            } => (ident, pos),
+        };
+
+        // issue warning
+        if !name.is_ascii() {
+            let msg = format!("constant `{}` should have an upper case name", name);
+            let hint = format!(
+                "help: convert the identifier to upper case (notice the capitalization): `{}`",
+                name.to_ascii_uppercase()
+            );
+            VrsError::new_warn(pos, msg, Some(hint)).print();
+            return CheckResult::Error;
+        }
+
+        let allupper = name
+            .as_bytes()
+            .iter()
+            .fold(true, |acc, x| acc & x.is_ascii_uppercase());
+        if !allupper {
+            let msg = format!("constant `{}` should have an upper case name", name);
+            let hint = format!(
+                "help: convert the identifier to upper case (notice the capitalization): `{}`",
+                name.to_ascii_uppercase()
+            );
+            VrsError::new_warn(pos, msg, Some(hint)).print();
+            // warning
+            return CheckResult::Warning;
+        }
+        CheckResult::Ok
+    }
+}
