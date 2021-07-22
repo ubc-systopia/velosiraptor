@@ -26,7 +26,7 @@
 // NOM parsing constructs
 use nom::{take, try_parse};
 // NOM results
-use nom::{error::ErrorKind, error::ParseError, error_position, Err, Needed};
+use nom::{Err, Needed};
 
 use crate::ast::Type;
 use crate::error::{IResult, VrsError};

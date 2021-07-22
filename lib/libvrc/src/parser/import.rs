@@ -36,21 +36,22 @@ use nom::{combinator::cut, sequence::terminated};
 
 /// parses and consumes an import statement (`import foo;`) and any following whitespaces
 pub fn import(input: TokenStream) -> IResult<TokenStream, Import> {
-    // get the current position
-    let pos = input.input_sourcepos();
-
     // try to match the input keyword, there is no match, return.
     let (i1, _) = kw_import(input.clone())?;
 
     // ok, so we've seen the `import` keyword, so the next must be an identifier.
     // there should be at least one whitespace before the identifier
     let (rem, name) = cut(terminated(ident, semicolon))(i1)?;
+
+    // create the token stream covering the entire import
+    let pos = input.from_self_until(&rem);
+
     Ok((
         rem,
         Import {
             name,
             ast: None,
-            pos: input,
+            pos: pos,
         },
     ))
 }
@@ -78,7 +79,7 @@ fn test_ok() {
     ];
     let ts = TokenStream::from_slice(&tokens);
 
-    let pos = ts.slice(0..3).input_sourcepos();
+    let pos = ts.slice(0..3);
     let ts2 = ts.slice(3..);
 
     assert_eq!(
@@ -110,12 +111,5 @@ fn test_errors() {
     ];
 
     let ts = TokenStream::from_slice(&tokens);
-
-    assert_eq!(
-        import(ts.clone()),
-        Err(Err::Failure(error_position!(
-            ts.slice(2..3),
-            ErrorKind::Tag
-        )))
-    );
+    assert!(import(ts).is_err());
 }

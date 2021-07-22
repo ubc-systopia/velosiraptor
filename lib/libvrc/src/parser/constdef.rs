@@ -34,7 +34,7 @@ use nom::{
 // lexer / parser imports
 use crate::ast::{Const, Expr, Type};
 use crate::error::IResult;
-use crate::parser::expression::{bool_lit_expr, num_lit_expr};
+use crate::parser::expression::{arith_expr, bool_expr};
 use crate::parser::terminals::{assign, colon, ident, kw_const, semicolon, typeinfo};
 use crate::token::TokenStream;
 
@@ -42,23 +42,22 @@ use crate::token::TokenStream;
 ///
 /// `const IDENT : TYPE = 123;`
 pub fn constdef(input: TokenStream) -> IResult<TokenStream, Const> {
-    // obtain the current source position
-    let pos = input.input_sourcepos();
-
     // parse the `const` keyword, return otherwise
-    let (i1, _) = kw_const(input)?;
+    let (i1, _) = kw_const(input.clone())?;
 
     // parse tye type information `IDENT : TYPE =`
     let (i2, (id, ti)) = cut(pair(ident, delimited(colon, typeinfo, assign)))(i1)?;
 
     // parse a numeric literal for now. TODO: make this a constant expression
     let (i3, value) = match ti {
-        Type::Boolean => cut(terminated(bool_lit_expr, semicolon))(i2),
-        _ => cut(terminated(num_lit_expr, semicolon))(i2),
+        Type::Boolean => cut(terminated(bool_expr, semicolon))(i2),
+        _ => cut(terminated(arith_expr, semicolon))(i2),
     }?;
 
-    match (ti, value) {
-        (Type::Boolean, Expr::Boolean { value, pos: _ }) => Ok((
+    // create the token stream covering the entire const def
+    let pos = input.from_self_until(&i3);
+    match ti {
+        Type::Boolean => Ok((
             i3,
             Const::Boolean {
                 ident: id,
@@ -66,7 +65,7 @@ pub fn constdef(input: TokenStream) -> IResult<TokenStream, Const> {
                 pos,
             },
         )),
-        (_, Expr::Number { value, pos: _ }) => Ok((
+        _ => Ok((
             i3,
             Const::Integer {
                 ident: id,
@@ -74,7 +73,6 @@ pub fn constdef(input: TokenStream) -> IResult<TokenStream, Const> {
                 pos,
             },
         )),
-        (ti, value) => panic!("unsupported expression type {} {:?}", ti, value),
     }
 }
 
@@ -99,8 +97,11 @@ fn test_ok() {
             ts.slice(7..8),
             Const::Integer {
                 ident: "FOO".to_string(),
-                value: 1234,
-                pos: sp.slice(0..5)
+                value: Expr::Number {
+                    value: 1234,
+                    pos: ts.slice(5..6).input_sourcepos()
+                },
+                pos: ts.slice(0..7)
             }
         ))
     );
@@ -125,10 +126,10 @@ fn test_fails() {
     let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
     assert!(constdef(TokenStream::from_vec(tokens)).is_err());
 
-    // cannot use identifiers
-    let sp = SourcePos::new("stdio", "const FOO : int= asdf;");
-    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
-    assert!(constdef(TokenStream::from_vec(tokens)).is_err());
+    // cannot use identifiers, we can if the other is a constant
+    // let sp = SourcePos::new("stdio", "const FOO : int= asdf;");
+    // let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
+    // assert!(constdef(TokenStream::from_vec(tokens)).is_err());
 
     // cannot use keywords
     let sp = SourcePos::new("stdio", "const FOO : int = int;");

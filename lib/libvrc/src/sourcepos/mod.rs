@@ -741,8 +741,5 @@ fn sourcepos_tests() {
     assert_eq!(sp0.slice(4..), sp1);
     assert_eq!(sp0.slice(4..).as_str(), &content[4..]);
     assert_eq!(sp0.slice(..4).as_str(), &content[..4]);
-
-    //
-    let sp2 = SourcePos::new_at("stdin", content, 0..content.len(), 1, 1);
     assert_eq!(sp0.slice(..4).as_str(), "foo\n");
 }

@@ -28,7 +28,7 @@
 use custom_error::custom_error;
 use nom::Err;
 use std::collections::HashMap;
-use std::fmt;
+
 use std::rc::Rc;
 
 pub mod terminals;
@@ -47,7 +47,10 @@ use import::import;
 use terminals::eof;
 //use unit::unit;
 
-use super::lexer::{LexErr, Lexer, LexerError};
+// reexports
+pub use expression::{arith_expr, bool_expr, bool_lit_expr, num_lit_expr, range_expr, slice_expr};
+
+use super::lexer::{Lexer, LexerError};
 use super::token::{Token, TokenStream};
 use crate::error::VrsError;
 
