@@ -25,13 +25,13 @@
 
 //! Velosiraptor Compiler
 
-// used for parsing
 use clap::{App, Arg};
-
+use colored::*;
 use simplelog::{Config, LevelFilter, SimpleLogger};
+use std::process::exit;
 
 // get the parser module
-use libvrc::parser::Parser;
+use libvrc::parser::{Parser, ParserError};
 
 fn parse_cmdline() -> clap::ArgMatches<'static> {
     App::new("vtrc")
@@ -59,6 +59,25 @@ fn parse_cmdline() -> clap::ArgMatches<'static> {
         )
         .get_matches()
 }
+use libvrc::error::{ErrorLocation, VrsError};
+fn print_errors_and_exit<I: ErrorLocation>(err: VrsError<I>, target: &str) {
+    err.print();
+    abort(target)
+}
+
+fn abort(target: &str) {
+    eprintln!(
+        "{}{}.\n",
+        "error".bold().red(),
+        ": aborting due to previous error(s)".bold()
+    );
+    eprintln!(
+        "{}: could not compile `{}`.\n",
+        "error".bold().red(),
+        target
+    );
+    exit(-1);
+}
 
 /// Main - entry point into the application
 fn main() {
@@ -82,23 +101,31 @@ fn main() {
     let infile = matches.value_of("input").unwrap_or("none");
     log::info!("input file: {}", infile);
 
-    let out = matches.value_of("output").unwrap_or("<stdout>");
-    log::info!("input file: {}", out);
+    let outfile = matches.value_of("output").unwrap_or("<stdout>");
+    log::info!("output file: {}", outfile);
 
     log::debug!("Debug output enabled");
     log::trace!("Tracing output enabled");
 
+    log::info!("==== PARSING STAGE ====");
+
+    eprintln!("{}: {}...\n", "parsing".bold().green(), infile);
+
     // let's try to create a file parser
     let ast = match Parser::parse_file(infile) {
         Ok((ast, _)) => ast,
-        Err(x) => {
-            log::error!("file parsing failed");
+        Err(ParserError::LexerFailure { error }) => {
+            print_errors_and_exit(error, infile);
+            return;
+        }
+        Err(_) => {
+            abort(infile);
             return;
         }
     };
 
-    println!("{}", ast);
-    // let mut parser = Parser::from_file(infile.to_string()).expect("failed to construct the parser");
+    log::debug!("Printing ast:");
+    log::debug!("{}", ast);
 
     // perform checks
 }
