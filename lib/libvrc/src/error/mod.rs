@@ -33,6 +33,8 @@ use nom::error::{ContextError, Error, ErrorKind, FromExternalError, ParseError};
 
 use nom::Err;
 
+use crate::token::TokenContent;
+
 /// define the type of IResult
 pub type IResult<I, O> = std::result::Result<(I, O), Err<VrsError<I>>>;
 
@@ -65,6 +67,15 @@ pub enum ErrorType {
     Warning,
 }
 
+/// represents an error type
+#[derive(PartialEq)]
+pub enum Tokentypes {
+    /// this is an error
+    Error,
+    /// this is a warning
+    Warning,
+}
+
 /// Error representation
 ///
 /// This structure captuers the location of the error or warning occurred.
@@ -76,6 +87,10 @@ pub enum VrsError<I: ErrorLocation> {
     Nom {
         /// the encapsulated nom error
         error: Error<I>,
+    },
+    ExpectedToken {
+        location: I,
+        tokens: Vec<TokenContent>,
     },
     /// represents a custom error
     Error {
@@ -107,7 +122,7 @@ pub enum VrsError<I: ErrorLocation> {
 }
 
 /// Implementation of the VrsError
-impl<I: ErrorLocation> VrsError<I> {
+impl<I: ErrorLocation + fmt::Display> VrsError<I> {
     /// creates a new warning
     pub fn new_warn(location: I, message: String, hint: Option<String>) -> Self {
         VrsError::Warning {
@@ -133,13 +148,20 @@ impl<I: ErrorLocation> VrsError<I> {
         }
     }
 
+    pub fn from_token(input: I, c: TokenContent) -> Self {
+        VrsError::ExpectedToken {
+            location: input,
+            tokens: vec![c],
+        }
+    }
+
     pub fn print(&self) {
         eprintln!("{}", self)
     }
 }
 
 /// Implementation of [std::fmt::Display] for [VrsError]
-impl<I: ErrorLocation> fmt::Display for VrsError<I> {
+impl<I: ErrorLocation + fmt::Display> fmt::Display for VrsError<I> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         let pipe = "|".bold().blue();
 
@@ -152,9 +174,14 @@ impl<I: ErrorLocation> fmt::Display for VrsError<I> {
             }
         };
 
+        let extracthint = |h: &Option<String>| match h {
+            Some(s) => String::from(s),
+            None => String::new(),
+        };
+
         let (typ, msg, hint, loc, color) = match self {
-            VrsError::Nom { error: _ } => {
-                return writeln!(f, "      | NOM ERROR!!!!!!");
+            VrsError::Nom { error } => {
+                return writeln!(f, "      |  {} NOM ERROR!!!!!!", error);
             }
             VrsError::Error {
                 message,
@@ -162,7 +189,13 @@ impl<I: ErrorLocation> fmt::Display for VrsError<I> {
                 location,
             } => {
                 let typ = applycolor(false)("error");
-                (typ, message, hint, location, applycolor(false))
+                (
+                    typ,
+                    message.clone(),
+                    extracthint(hint),
+                    location,
+                    applycolor(false),
+                )
             }
             VrsError::Warning {
                 message,
@@ -170,7 +203,19 @@ impl<I: ErrorLocation> fmt::Display for VrsError<I> {
                 location,
             } => {
                 let typ = applycolor(true)("warning");
-                (typ, message, hint, location, applycolor(true))
+                (
+                    typ,
+                    message.clone(),
+                    extracthint(hint),
+                    location,
+                    applycolor(true),
+                )
+            }
+            VrsError::ExpectedToken { location, tokens } => {
+                let typ = applycolor(false)("error");
+                let message = format!("unexpected token encounteted: {}", location);
+                let hint = format!("expected one of {:?}", tokens);
+                (typ, message, hint, location, applycolor(false))
             }
             VrsError::Stack {
                 message,
@@ -190,39 +235,31 @@ impl<I: ErrorLocation> fmt::Display for VrsError<I> {
         let linectxt = loc.linecontext();
 
         let indent = (0..col - 1).map(|_| " ").collect::<String>();
-        let underline = (0..loc.length())
-            .map(|_| "^")
-            .collect::<String>()
-            .as_str()
-            .bold()
-            .red();
+        let underline = color((0..loc.length()).map(|_| "^").collect::<String>().as_str());
 
         // error: <message>
         writeln!(f, "{}{} {}", typ, ":".bold(), msg.bold())?;
         // --> src/error/mod.rs:112:62
         writeln!(f, "     {} {}:{}:{}", "-->".bold().blue(), ctxt, line, col)?;
-
+        writeln!(f, "      {}", pipe)?;
         // // the line context
         writeln!(f, " {:>4} {}         {}", lineblue, pipe, linectxt)?;
 
         // // the error message
         write!(f, "      {}         {}{}", pipe, indent, underline)?;
-        match hint {
-            Some(e) => writeln!(f, " {}{}", color("hint: "), color(e)),
-            None => writeln!(f, ""),
-        }
+        writeln!(f, " {}{}", color("hint: "), color(&hint))
     }
 }
 
 /// Implementation of [std::fmt::Debug] for [VrsError]
-impl<I: ErrorLocation> fmt::Debug for VrsError<I> {
+impl<I: ErrorLocation + fmt::Display> fmt::Debug for VrsError<I> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         fmt::Display::fmt(self, f)
     }
 }
 
 /// Implementation of [non::error::ContextError] for VrsError<I>
-impl<I: ErrorLocation> ContextError<I> for VrsError<I> {
+impl<I: ErrorLocation + fmt::Display> ContextError<I> for VrsError<I> {
     /// Creates a new error from an input position, a static string and an existing error.
     ///
     /// This is used mainly in the context combinator, to add user friendly information
@@ -233,7 +270,7 @@ impl<I: ErrorLocation> ContextError<I> for VrsError<I> {
 }
 
 /// Implementation of [nom:error::ParseError] for VrsError<I>
-impl<I: ErrorLocation> ParseError<I> for VrsError<I> {
+impl<I: ErrorLocation + fmt::Display> ParseError<I> for VrsError<I> {
     /// Creates an error from the input position and an ErrorKind
     fn from_error_kind(input: I, kind: ErrorKind) -> Self {
         VrsError::Nom {
@@ -242,13 +279,36 @@ impl<I: ErrorLocation> ParseError<I> for VrsError<I> {
     }
 
     /// Combines the existing error with a new one created at position
-    fn append(input: I, kind: ErrorKind, _other: Self) -> Self {
+    fn append(input: I, kind: ErrorKind, other: Self) -> Self {
         VrsError::from_error_kind(input, kind)
+        //println!("append: {:?}", kind);
+    }
+
+    fn or(self, other: Self) -> Self {
+        match (self, other) {
+            (
+                VrsError::ExpectedToken {
+                    location,
+                    tokens: mut t1,
+                },
+                VrsError::ExpectedToken {
+                    location: _,
+                    tokens: mut t2,
+                },
+            ) => {
+                t1.append(&mut t2);
+                VrsError::ExpectedToken {
+                    location,
+                    tokens: t1,
+                }
+            }
+            (s, _) => s,
+        }
     }
 }
 
 /// Implementation of [nom::FromExternalError] for [VrsError]
-impl<I: ErrorLocation, E> FromExternalError<I, E> for VrsError<I> {
+impl<I: ErrorLocation + fmt::Display, E> FromExternalError<I, E> for VrsError<I> {
     fn from_external_error(input: I, kind: ErrorKind, e: E) -> Self {
         VrsError::from_error_kind(input, kind)
     }
@@ -257,7 +317,7 @@ impl<I: ErrorLocation, E> FromExternalError<I, E> for VrsError<I> {
 /// Implementation of [std::convert::From] for [VrsError]
 ///
 /// This converts from a nom error to a VrsError.
-impl<I: ErrorLocation> From<Err<nom::error::Error<I>>> for VrsError<I> {
+impl<I: ErrorLocation + fmt::Display> From<Err<nom::error::Error<I>>> for VrsError<I> {
     fn from(e: nom::Err<nom::error::Error<I>>) -> Self {
         match e {
             nom::Err::Failure(e) => VrsError::from_error_kind(e.input, e.code),
