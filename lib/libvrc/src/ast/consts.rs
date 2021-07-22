@@ -133,10 +133,10 @@ impl fmt::Debug for Const {
     }
 }
 
-use crate::ast::{AstCheck, CheckResult};
+use crate::ast::AstCheck;
 use crate::error::{ErrorType, VrsError};
 impl AstCheck for Const {
-    fn check(&self) -> CheckResult {
+    fn check(&self) -> (u32, u32) {
         use self::Const::*;
         let (name, pos) = match &self {
             Integer {
@@ -159,7 +159,7 @@ impl AstCheck for Const {
                 name.to_ascii_uppercase()
             );
             VrsError::new_warn(pos, msg, Some(hint)).print();
-            return CheckResult::Error;
+            return (1, 0);
         }
 
         let allupper = name
@@ -174,8 +174,8 @@ impl AstCheck for Const {
             );
             VrsError::new_warn(pos, msg, Some(hint)).print();
             // warning
-            return CheckResult::Warning;
+            return (0, 1);
         }
-        CheckResult::Ok
+        (0, 0)
     }
 }

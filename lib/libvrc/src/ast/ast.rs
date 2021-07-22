@@ -29,8 +29,10 @@ use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-// impor the other Ast nodes
-use crate::ast::{Const, Import, Unit};
+use crate::ast::{AstError, Const, Import, Unit};
+use crate::error::VrsError;
+use crate::parser::ParserError;
+use crate::token::TokenStream;
 
 /// represents the ast of a parsed file.
 ///
@@ -102,7 +104,11 @@ impl Ast {
     }
 
     /// resolves imports recursively
-    fn do_resolve_imports(&mut self, imports: &mut HashMap<String, bool>, path: &mut Vec<String>) {
+    fn do_resolve_imports(
+        &mut self,
+        imports: &mut HashMap<String, bool>,
+        path: &mut Vec<String>,
+    ) -> Result<(), VrsError<TokenStream>> {
         // adding ourselves to the imports
         imports.insert(self.filename.clone(), true);
 
@@ -116,7 +122,6 @@ impl Ast {
 
         // loop over the current imports
         for (key, val) in self.imports.iter_mut() {
-            println!("my file: {}", self.filename);
             let filename = val.to_filename();
             importfile.push(&filename);
 
@@ -124,15 +129,33 @@ impl Ast {
 
             // check if we know about this import already
             if !imports.contains_key(f) {
-                println!("parsing: {}", f);
                 let mut ast = match Parser::parse_file(f) {
                     Ok((ast, _)) => ast,
+                    Err(ParserError::LexerFailure { error }) => {
+                        let msg = String::from("during lexing of the file");
+                        return Err(VrsError::stack(val.pos.clone(), msg, error));
+                    }
+                    Err(ParserError::ParserFailure { error }) => {
+                        let msg = String::from("during parsing of the file");
+                        return Err(VrsError::stack(val.pos.clone(), msg, error));
+                    }
+                    Err(ParserError::ParserIncomplete { error }) => {
+                        let msg = String::from("unexpected junk at the end of the file");
+                        return Err(VrsError::stack(val.pos.clone(), msg, error));
+                    }
+
                     Err(x) => panic!("foobar {:?}", x),
                 };
                 // resolve the imports
-                ast.do_resolve_imports(imports, path);
-                // update the ast
+                match ast.do_resolve_imports(imports, path) {
+                    Err(err) => {
+                        let msg = String::from("while processing imports from");
+                        return Err(VrsError::stack(val.pos.clone(), msg, err));
+                    }
+                    _ => (),
+                }
 
+                // update the ast
                 val.ast = Some(ast);
             } else {
                 // check if we have a circular dependency...
@@ -143,24 +166,39 @@ impl Ast {
                 let s = it
                     .map(|s| s.to_string())
                     .collect::<Vec<String>>()
-                    .join("->");
+                    .join(" -> ");
                 if !s.is_empty() {
-                    panic!("circular dependency detected: {}", s)
+                    let msg = format!("circular dependency detected:\n  {} -> {}", s, f);
+                    let hint = String::from("try removing the following import");
+                    return Err(VrsError::new_err(val.pos.clone(), msg, Some(hint)));
                 }
             }
             importfile.pop();
         }
         // remove from path
         path.pop();
+        Ok(())
     }
 
-    fn do_merge_imports(&mut self) {
+    /// recursively resolves all the imports
+    pub fn resolve_imports(&mut self) -> Result<(), AstError> {
+        // create the hashmap of the imports
+        let mut imports = HashMap::new();
+        let mut path = Vec::new();
+        match self.do_resolve_imports(&mut imports, &mut path) {
+            Ok(()) => Ok(()),
+            Err(error) => Err(AstError::ImportError { error }),
+        }
+    }
+
+    /// merges the imports together
+    fn merge_imports(&mut self) {
         let mut imports = Vec::new();
         let mut newimports = HashMap::new();
         for (key, mut import) in self.imports.drain() {
             import.ast = match import.ast {
                 Some(mut ast) => {
-                    ast.do_merge_imports();
+                    ast.merge_imports();
                     imports.push(ast);
                     None
                 }
@@ -174,17 +212,6 @@ impl Ast {
         for import in imports.drain(..) {
             self.merge(import);
         }
-    }
-
-    /// recursively resolves all the imports
-    pub fn resolve_imports(&mut self) {
-        // create the hashmap of the imports
-        let mut imports = HashMap::new();
-        let mut path = Vec::new();
-        self.do_resolve_imports(&mut imports, &mut path);
-
-        // now we have all imports resolved, and we can start merging the asts
-        self.do_merge_imports();
     }
 
     ///
@@ -207,13 +234,14 @@ impl fmt::Debug for Ast {
     }
 }
 
-use crate::ast::{AstCheck, CheckResult};
+use crate::ast::AstCheck;
 impl AstCheck for Ast {
-    fn check(&self) -> CheckResult {
-        let mut res = CheckResult::Ok;
+    fn check(&self) -> (u32, u32) {
+        let mut res = (0, 0);
         // try to insert other constants into this ast
-        for (_, val) in self.consts.iter() {
-            res = res & val.check();
+        for (_, c) in self.consts.iter() {
+            let val = c.check();
+            res = (res.0 + val.0, res.1 + val.1)
         }
         res
     }

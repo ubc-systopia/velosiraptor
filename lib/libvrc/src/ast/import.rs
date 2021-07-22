@@ -26,7 +26,7 @@
 //! Ast Module of the Velosiraptor Compiler
 
 use crate::ast::Ast;
-use crate::sourcepos::SourcePos;
+use crate::token::TokenStream;
 use std::fmt;
 
 /// Defines an [Import] statement node
@@ -40,7 +40,7 @@ pub struct Import {
     /// stores the ast at this import
     pub ast: Option<Ast>,
     /// where in the current file there was this import statement
-    pub pos: SourcePos,
+    pub pos: TokenStream,
 }
 
 /// the implementation for the import struct
@@ -60,7 +60,7 @@ impl fmt::Display for Import {
 /// implementation of the [fmt::Debug] trait for the [Import]
 impl fmt::Debug for Import {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let (line, column) = self.pos.input_pos();
+        let (line, column) = self.pos.peek().spos.input_pos();
         writeln!(f, "{:03}:{:03} | import {};", line, column, self.name)
     }
 }
