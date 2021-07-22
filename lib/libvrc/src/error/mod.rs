@@ -272,7 +272,7 @@ impl<I: ErrorLocation + fmt::Display> ContextError<I> for VrsError<I> {
     ///
     /// This is used mainly in the context combinator, to add user friendly information
     /// to errors when backtracking through a parse tree
-    fn add_context(input: I, ctx: &'static str, other: Self) -> Self {
+    fn add_context(_input: I, _ctx: &'static str, _other: Self) -> Self {
         panic!("adding context");
     }
 }
@@ -287,7 +287,7 @@ impl<I: ErrorLocation + fmt::Display> ParseError<I> for VrsError<I> {
     }
 
     /// Combines the existing error with a new one created at position
-    fn append(input: I, kind: ErrorKind, other: Self) -> Self {
+    fn append(input: I, kind: ErrorKind, _other: Self) -> Self {
         VrsError::from_error_kind(input, kind)
     }
 
@@ -316,7 +316,7 @@ impl<I: ErrorLocation + fmt::Display> ParseError<I> for VrsError<I> {
 
 /// Implementation of [nom::FromExternalError] for [VrsError]
 impl<I: ErrorLocation + fmt::Display, E> FromExternalError<I, E> for VrsError<I> {
-    fn from_external_error(input: I, kind: ErrorKind, e: E) -> Self {
+    fn from_external_error(input: I, kind: ErrorKind, _e: E) -> Self {
         VrsError::from_error_kind(input, kind)
     }
 }
