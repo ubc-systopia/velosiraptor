@@ -1,0 +1,7 @@
+import constdouble;
+
+const FOO: int = 1234;
+const BAR: bool = true;
+
+// now that's a double def
+const FOO: int = 35465;
