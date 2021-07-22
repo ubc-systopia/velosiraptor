@@ -637,27 +637,49 @@ impl fmt::Debug for SourcePos {
 impl ErrorLocation for SourcePos {
     /// the line number in the source file
     fn line(&self) -> u32 {
-        self.line()
+        self.line
     }
 
     /// the column number in the source file
     fn column(&self) -> u32 {
-        self.column()
+        self.column
     }
 
     /// the length of the token
     fn length(&self) -> usize {
-        self.length()
+        self.input_len()
     }
 
     /// the context (stdin or filename)
     fn context(&self) -> &str {
-        self.context()
+        &self.context
     }
 
     /// the surrounding line context
     fn linecontext(&self) -> &str {
-        self.linecontext()
+        let mut start = self.range.start;
+
+        // panic!("start = {}", start);
+
+        for c in self.content[0..start].chars().rev() {
+            if c as char == '\n' {
+                break;
+            }
+            start = start - 1;
+        }
+
+        if self.content[start..].chars().next().unwrap() == '\n' {
+            start = start + 1;
+        }
+
+        let mut end = self.range.start;
+        for c in self.content[end..].chars() {
+            if c as char == '\n' {
+                break;
+            }
+            end = end + 1;
+        }
+        &self.content[start..end]
     }
 }
 
@@ -686,7 +708,6 @@ impl ErrorLocation for &SourcePos {
     /// the surrounding line context
     fn linecontext(&self) -> &str {
         let mut start = self.range.start;
-        let mut end = self.range.end;
 
         // panic!("start = {}", start);
 
@@ -701,13 +722,13 @@ impl ErrorLocation for &SourcePos {
             start = start + 1;
         }
 
+        let mut end = self.range.start;
         for c in self.content[end..].chars() {
             if c as char == '\n' {
                 break;
             }
             end = end + 1;
         }
-
         &self.content[start..end]
     }
 }
