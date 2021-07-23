@@ -61,7 +61,7 @@ use crate::sourcepos::SourcePos;
 #[cfg(test)]
 use crate::token::{Keyword, Token, TokenContent};
 #[cfg(test)]
-use nom::{error::ErrorKind, error_position, Err, Slice};
+use nom::Slice;
 #[test]
 fn test_ok() {
     // corresponds to: `import foobar;`

@@ -63,12 +63,12 @@ impl Const {
             Integer {
                 ident: _,
                 value,
-                pos,
+                pos: _,
             } => &value,
             Boolean {
                 ident: _,
                 value,
-                pos,
+                pos: _,
             } => &value,
         }
     }
@@ -102,8 +102,8 @@ impl fmt::Debug for Const {
                 let (line, column) = pos.input_sourcepos().input_pos();
                 write!(
                     f,
-                    "{:03}:{:03} | const {} :  int = {};",
-                    line, column, ident, value
+                    "{:03}:{:03} | const {} :  int = {:?};, {:?}",
+                    line, column, ident, value, pos
                 )
             }
             Boolean { ident, value, pos } => {

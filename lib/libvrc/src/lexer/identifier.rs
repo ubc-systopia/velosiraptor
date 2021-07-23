@@ -68,10 +68,7 @@ pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
 }
 
 #[cfg(test)]
-use nom::{
-    error::{Error, ErrorKind},
-    Err, Slice,
-};
+use nom::Slice;
 
 #[test]
 fn identifier_test_alpha() {

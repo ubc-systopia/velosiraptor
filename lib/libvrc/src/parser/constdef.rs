@@ -77,12 +77,14 @@ pub fn constdef(input: TokenStream) -> IResult<TokenStream, Const> {
 }
 
 #[cfg(test)]
+use crate::ast::Expr;
+#[cfg(test)]
 use crate::lexer::Lexer;
 #[cfg(test)]
 use crate::sourcepos::SourcePos;
 
 #[cfg(test)]
-use nom::{error::ErrorKind, error_position, Err, Slice};
+use nom::Slice;
 
 #[test]
 fn test_ok() {
@@ -99,7 +101,7 @@ fn test_ok() {
                 ident: "FOO".to_string(),
                 value: Expr::Number {
                     value: 1234,
-                    pos: ts.slice(5..6).input_sourcepos()
+                    pos: ts.slice(5..6)
                 },
                 pos: ts.slice(0..7)
             }

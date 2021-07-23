@@ -55,11 +55,11 @@ use crate::token::TokenStream;
 // the used nom componets
 use nom::{
     branch::alt,
+    combinator::cut,
+    multi::many0,
     sequence::{delimited, tuple},
+    sequence::{pair, preceded, terminated},
 };
-
-use nom::multi::many0;
-use nom::sequence::{pair, preceded, terminated};
 
 /// folds expressions
 fn fold_exprs(initial: Expr, remainder: Vec<(BinOp, Expr)>) -> Expr {
@@ -67,7 +67,6 @@ fn fold_exprs(initial: Expr, remainder: Vec<(BinOp, Expr)>) -> Expr {
         let (op, expr) = tuple;
 
         let pos = acc.loc().clone().from_merged(&expr.loc());
-        println!("{:?}", pos);
         Expr::BinaryOperation {
             op,
             lhs: Box::new(acc),
@@ -385,7 +384,7 @@ fn ident_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i, (fst, mut ot)) = pair(ident, many0(preceded(dot, ident)))(input.clone())?;
     let mut path = Vec::from([fst]);
     path.append(&mut ot);
-    let pos = input.from_merged(&i);
+    let pos = input.from_self_until(&i);
     Ok((i, Expr::Identifier { path, pos }))
 }
 
@@ -438,7 +437,7 @@ fn bool_term_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
         // it can be a identifier (variable)
         ident_expr,
         // its a term in parenthesis
-        delimited(lparen, bool_expr, rparen),
+        preceded(lparen, cut(terminated(bool_expr, rparen)))
     ))(input)
 }
 
@@ -460,7 +459,7 @@ fn arith_term_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
         // try to parse an identifier
         ident_expr,
         // try to parse an `(arith_expr)`
-        delimited(lparen, arith_expr, rparen),
+        preceded(lparen, cut(terminated(arith_expr, rparen))),
     ))(input)
 }
 
@@ -468,6 +467,8 @@ fn arith_term_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 use crate::lexer::Lexer;
 #[cfg(test)]
 use crate::nom::Slice;
+#[cfg(test)]
+use crate::sourcepos::SourcePos;
 
 #[cfg(test)]
 macro_rules! parse_equal (

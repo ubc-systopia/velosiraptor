@@ -23,9 +23,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use crate::sourcepos::SourcePos;
 ///! Ast Module of the Velosiraptor Compiler
 use std::fmt;
+
+use crate::ast::AstNode;
+use crate::token::TokenStream;
 
 /// Binary operations for [Expr] <OP> [Expr]
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -340,9 +342,6 @@ impl fmt::Display for Expr {
     }
 }
 
-use crate::ast::{AstNode, Issues};
-use crate::error::VrsError;
-use crate::token::TokenStream;
 impl AstNode for Expr {
     fn name(&self) -> &str {
         "Expression"
@@ -387,7 +386,7 @@ use crate::lexer::Lexer;
 #[cfg(test)]
 use crate::parser::{arith_expr, bool_expr};
 #[cfg(test)]
-use crate::token::TokenStream;
+use crate::sourcepos::SourcePos;
 
 #[cfg(test)]
 macro_rules! parse_equal (
