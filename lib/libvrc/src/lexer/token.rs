@@ -59,6 +59,8 @@ pub enum Keyword {
     Memory,
     /// defines Register state
     Register,
+    /// Null like value used in cases where there is no State
+    None,
     /// represents an address value
     Addr,
     /// represents a size value
@@ -86,6 +88,7 @@ impl fmt::Display for Keyword {
             Interface => "interface",
             Memory => "Memory",
             Register => "Register",
+            None => "None",
             // types
             Addr => "addr",
             Size => "size",

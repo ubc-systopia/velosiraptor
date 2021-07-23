@@ -166,7 +166,7 @@ impl Lexer {
     /// This function will create a new `SourcePos` for the supplied string, and
     /// hence create a copy of the supplied string.
     pub fn lex_string(context: &str, string: &str) -> Result<Vec<Token>, LexerError> {
-        log::info!("lexing stirng wtih context '{}'", context);
+        log::info!("lexing string with context '{}'", context);
         let sp = SourcePos::new(context, string);
         Lexer::lex_source_pos(sp)
     }

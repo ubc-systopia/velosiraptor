@@ -58,7 +58,7 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
             // if we have parser failure, indicate this!
             let (i, k) = match e {
                 Err::Error(e) => (e.input, e.code),
-                x => panic!("unkown condition: {:?}", x),
+                x => panic!("unknown condition: {:?}", x),
             };
             return Err(Err::Failure(error_position!(i, k)));
         }
@@ -79,10 +79,10 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
     };
 
     // TODO: here we have ConstItem | InterfaceItem | StateItem | FunctionItem
-    let unitbody = colon;
+    let unit_body = state;
 
     // then we have the unit block, wrapped in curly braces
-    let (i3, _) = match delimited(lbrace, unitbody, rbrace)(i2) {
+    let (i3, _) = match delimited(lbrace, unit_body, rbrace)(i2) {
         Ok((i, b)) => (i, b),
         Err(e) => {
             // if we have parser failure, indicate this!
