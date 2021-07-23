@@ -31,7 +31,7 @@ use simplelog::{Config, LevelFilter, SimpleLogger};
 use std::process::exit;
 
 // get the parser module
-use libvrc::ast::AstError;
+use libvrc::ast::{AstError, Issues};
 use libvrc::parser::{Parser, ParserError};
 
 fn parse_cmdline() -> clap::ArgMatches<'static> {
@@ -53,6 +53,13 @@ fn parse_cmdline() -> clap::ArgMatches<'static> {
                 .help("Sets the level of verbosity"),
         )
         .arg(
+            Arg::with_name("error")
+                .short("e")
+                .long("Werror")
+                .takes_value(true)
+                .help("Treat warnings to errors."),
+        )
+        .arg(
             Arg::with_name("input")
                 .help("Sets the input file to use")
                 .required(true)
@@ -65,16 +72,22 @@ fn print_errors_and_exit<I: ErrorLocation + std::fmt::Display>(
     msg: &str,
     err: VrsError<I>,
     target: &str,
-    cnt: u32,
+    cnt: Issues,
 ) {
     err.print();
     eprintln!("{}{}{}.\n", "error".bold().red(), ": ".bold(), msg.bold());
     abort(target, cnt)
 }
 
-fn abort(target: &str, cnt: u32) {
-    let msg = format!(": aborting due to previous {} error(s).", cnt);
-    eprintln!("{}{}.\n", "error".bold().red(), msg.bold());
+fn abort(target: &str, cnt: Issues) {
+    let msg = format!(": aborting due to previous {} error(s)", cnt.errors);
+    eprint!("{}{}", "error".bold().red(), msg.bold());
+    if cnt.warnings > 0 {
+        let msg = format!(", and {} warnings emitted", cnt.warnings);
+        eprintln!("{}\n", msg.bold());
+    } else {
+        eprintln!("");
+    }
     eprintln!(
         "{}: could not compile `{}`.\n",
         "error".bold().red(),
@@ -123,19 +136,24 @@ fn main() {
     let mut ast = match Parser::parse_file(infile) {
         Ok((ast, _)) => ast,
         Err(ParserError::LexerFailure { error }) => {
-            print_errors_and_exit("during lexing of the file", error, infile, 1);
+            print_errors_and_exit("during lexing of the file", error, infile, Issues::err());
             return;
         }
         Err(ParserError::ParserFailure { error }) => {
-            print_errors_and_exit("during parsing of the file", error, infile, 1);
+            print_errors_and_exit("during parsing of the file", error, infile, Issues::err());
             return;
         }
         Err(ParserError::ParserIncomplete { error }) => {
-            print_errors_and_exit("unexpected junk at the end of the file", error, infile, 1);
+            print_errors_and_exit(
+                "unexpected junk at the end of the file",
+                error,
+                infile,
+                Issues::err(),
+            );
             return;
         }
         Err(_) => {
-            abort(infile, 1);
+            abort(infile, Issues::err());
             return;
         }
     };
@@ -155,20 +173,20 @@ fn main() {
     // now resolve the imports
     match ast.resolve_imports() {
         Ok(()) => (),
-        Err(AstError::ImportError { error }) => {
-            print_errors_and_exit("failed resolving the imports", error, infile, 1);
+        Err(AstError::ImportError { e }) => {
+            print_errors_and_exit("failed resolving the imports", e, infile, Issues::err());
             return;
         }
-        Err(AstError::MergeError { count }) => {
+        Err(AstError::MergeError { i }) => {
             eprintln!(
                 "{}{}.\n",
                 "error".bold().red(),
                 ": during merging of the ASTs".bold()
             );
-            abort(infile, count)
+            abort(infile, i)
         }
         _ => {
-            abort(infile, 1);
+            abort(infile, Issues::err());
             return;
         }
     };
@@ -178,40 +196,59 @@ fn main() {
     log::info!("{}", ast);
     log::info!("----------------------------");
 
-    // build the
+    // build the symbolt table
     eprintln!("{:>8}: {}...\n", "build".bold().green(), "symboltable");
 
     // now check the ast
+
+    let cnt = Issues::ok();
 
     eprintln!(
         "{:>8}: {}...\n",
         "check".bold().green(),
         "performing consistency check"
     );
-    // ast.check_consistency();
+
+    let cnt = match ast.check_consistency() {
+        Ok(i) => cnt + i,
+        Err(AstError::CheckError { i }) => {
+            //            matches.value_of("input").unwrap_or("none");
+            abort(infile, i);
+            return;
+        }
+        _ => {
+            abort(infile, Issues::err());
+            return;
+        }
+    };
 
     // so things should be fine, we can now go and generate stuff
 
     // generate the raw interface files: this is the "language" to interface
     eprintln!(
         "{:>8}: {}...\n",
-        "rust".bold().green(),
+        "generate".bold().green(),
         "generating interface files"
     );
 
     // generate the unit files that use the interface files
     eprintln!(
         "{:>8}: {}...\n",
-        "rust".bold().green(),
+        "generate".bold().green(),
         "generating unit files"
     );
 
     // we can generate some modules
     eprintln!(
         "{:>8}: {}...\n",
-        "arm".bold().green(),
+        "generate".bold().green(),
         "generating Arm FastModels modules"
     );
+
+    if cnt.warnings > 0 {
+        let msg = format!("{} warning(s) emitted", cnt.warnings);
+        eprintln!("{}{}.\n", "warning: ".bold().yellow(), msg.bold());
+    }
 
     // ok all done.
     eprintln!("{:>8}: {}...\n", "finished".bold().green(), "...");
