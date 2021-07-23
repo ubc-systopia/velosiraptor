@@ -145,33 +145,38 @@ fn main() {
         "imports"
     );
 
+    // now resolve the imports
     match ast.resolve_imports() {
         Ok(()) => (),
         Err(AstError::ImportError { error }) => {
             print_errors_and_exit("failed resolving the imports", error, infile);
+            return;
         }
-        _ => abort(infile),
+        _ => {
+            abort(infile);
+            return;
+        }
     };
 
-    eprintln!("{}: consistency...\n", "check".bold().green());
-    ast.check_consistency();
+    // eprintln!("{}: consistency...\n", "check".bold().green());
+    // ast.check_consistency();
 
-    // ok we've got an ast, now resolve the imports
-    // match ast.resolve_imports() {
-    //     eprintln!(
-    //         "{}{}.\n",
-    //         "error".bold().red(),
-    //         ": during resolving of the imports".bold()
-    //     )?;
-    //     print_errors_and_exit(error, infile);
-    // }
+    // // ok we've got an ast, now resolve the imports
+    // // match ast.resolve_imports() {
+    // //     eprintln!(
+    // //         "{}{}.\n",
+    // //         "error".bold().red(),
+    // //         ": during resolving of the imports".bold()
+    // //     )?;
+    // //     print_errors_and_exit(error, infile);
+    // // }
 
-    // match ast.check() {
+    // // match ast.check() {
 
-    // }
+    // // }
 
-    log::debug!("Printing ast:");
-    log::debug!("{}", ast);
+    // log::debug!("Printing ast:");
+    // log::debug!("{}", ast);
 
     // perform checks
 }
