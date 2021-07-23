@@ -26,11 +26,9 @@
 //! State definition parsing
 
 // lexer, parser terminals and ast
-use crate::ast::Expr;
-use crate::ast::{BinOp, UnOp};
+use crate::ast::{AstNode, BinOp, Expr, UnOp};
 use crate::error::IResult;
 use crate::parser::terminals::*;
-use crate::sourcepos::SourcePos;
 use crate::token::TokenStream;
 
 // Precedence of Operators  (strong to weak)
@@ -64,9 +62,12 @@ use nom::multi::many0;
 use nom::sequence::{pair, preceded, terminated};
 
 /// folds expressions
-fn fold_exprs(initial: Expr, remainder: Vec<(SourcePos, BinOp, Expr)>) -> Expr {
+fn fold_exprs(initial: Expr, remainder: Vec<(BinOp, Expr)>) -> Expr {
     remainder.into_iter().fold(initial, |acc, tuple| {
-        let (pos, op, expr) = tuple;
+        let (op, expr) = tuple;
+
+        let pos = acc.loc().clone().from_merged(&expr.loc());
+        println!("{:?}", pos);
         Expr::BinaryOperation {
             op,
             lhs: Box::new(acc),
@@ -91,9 +92,8 @@ pub fn bool_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i, initial) = bool_land(input)?;
 
     let (i, remainder) = many0(|i: TokenStream| {
-        let pos = i.input_sourcepos();
         let (i, add) = preceded(lor, bool_land)(i)?;
-        Ok((i, (pos, BinOp::Lor, add)))
+        Ok((i, (BinOp::Lor, add)))
     })(i)?;
 
     Ok((i, fold_exprs(initial, remainder)))
@@ -103,8 +103,8 @@ pub fn bool_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 ///
 /// an arithmetic expression evalutes to a number a | b
 pub fn range_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    let pos = input.input_sourcepos();
-    let (i, (s, _, e)) = tuple((arith_expr, dotdot, arith_expr))(input)?;
+    let (i, (s, _, e)) = tuple((arith_expr, dotdot, arith_expr))(input.clone())?;
+    let pos = input.from_merged(&i);
     Ok((
         i,
         Expr::Range {
@@ -124,9 +124,8 @@ pub fn arith_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i, initial) = arith_xor_expr(input)?;
 
     let (i, remainder) = many0(|i: TokenStream| {
-        let pos = i.input_sourcepos();
         let (i, op) = preceded(or, arith_xor_expr)(i)?;
-        Ok((i, (pos, BinOp::Or, op)))
+        Ok((i, (BinOp::Or, op)))
     })(i)?;
 
     Ok((i, fold_exprs(initial, remainder)))
@@ -134,16 +133,16 @@ pub fn arith_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 
 pub fn num_lit_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
-    let pos = input.input_sourcepos();
-    let (rem, value) = num(input)?;
-    Ok((rem, Expr::Number { value, pos }))
+    let (i, value) = num(input.clone())?;
+    let pos = input.from_merged(&i);
+    Ok((i, Expr::Number { value, pos }))
 }
 
 pub fn bool_lit_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
-    let pos = input.input_sourcepos();
-    let (rem, value) = boolean(input)?;
-    Ok((rem, Expr::Boolean { value, pos }))
+    let (i, value) = boolean(input.clone())?;
+    let pos = input.from_merged(&i);
+    Ok((i, Expr::Boolean { value, pos }))
 }
 
 /// parses a slice expression `foo[0..43]`
@@ -173,9 +172,8 @@ fn bool_land(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i, initial) = bool_unary_expr(input)?;
 
     let (i, remainder) = many0(|i: TokenStream| {
-        let pos = i.input_sourcepos();
         let (i, add) = preceded(land, bool_unary_expr)(i)?;
-        Ok((i, (pos, BinOp::Land, add)))
+        Ok((i, (BinOp::Land, add)))
     })(i)?;
 
     Ok((i, fold_exprs(initial, remainder)))
@@ -196,38 +194,33 @@ fn bool_unary_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 fn bool_cmp_expr_arith(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
     let (i, lhs) = arith_expr(input)?;
-    let (i, (pos, op, rhs)) = alt((
+    let (i, (op, rhs)) = alt((
         |i: TokenStream| {
-            let pos = i.input_sourcepos();
             let (i, op) = preceded(eq, arith_expr)(i)?;
-            Ok((i, (pos, BinOp::Eq, op)))
+            Ok((i, (BinOp::Eq, op)))
         },
         |i: TokenStream| {
-            let pos = i.input_sourcepos();
             let (i, op) = preceded(ne, arith_expr)(i)?;
-            Ok((i, (pos, BinOp::Ne, op)))
+            Ok((i, (BinOp::Ne, op)))
         },
         |i: TokenStream| {
-            let pos = i.input_sourcepos();
             let (i, op) = preceded(gt, arith_expr)(i)?;
-            Ok((i, (pos, BinOp::Gt, op)))
+            Ok((i, (BinOp::Gt, op)))
         },
         |i: TokenStream| {
-            let pos = i.input_sourcepos();
             let (i, op) = preceded(lt, arith_expr)(i)?;
-            Ok((i, (pos, BinOp::Lt, op)))
+            Ok((i, (BinOp::Lt, op)))
         },
         |i: TokenStream| {
-            let pos = i.input_sourcepos();
             let (i, op) = preceded(le, arith_expr)(i)?;
-            Ok((i, (pos, BinOp::Le, op)))
+            Ok((i, (BinOp::Le, op)))
         },
         |i: TokenStream| {
-            let pos = i.input_sourcepos();
             let (i, op) = preceded(ge, arith_expr)(i)?;
-            Ok((i, (pos, BinOp::Ge, op)))
+            Ok((i, (BinOp::Ge, op)))
         },
     ))(i)?;
+    let pos = lhs.loc().clone().from_merged(rhs.loc());
     Ok((
         i,
         Expr::BinaryOperation {
@@ -244,19 +237,18 @@ fn bool_cmp_expr_arith(input: TokenStream) -> IResult<TokenStream, Expr> {
 /// this expression evaluates to a boolean value
 fn bool_cmp_expr_bool(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
-    let (i, lhs) = bool_term_expr(input)?;
-    let (i, (pos, op, rhs)) = alt((
+    let (i, lhs) = bool_term_expr(input.clone())?;
+    let (i, (op, rhs)) = alt((
         |i: TokenStream| {
-            let pos = i.input_sourcepos();
             let (i, op) = preceded(eq, bool_term_expr)(i)?;
-            Ok((i, (pos, BinOp::Eq, op)))
+            Ok((i, (BinOp::Eq, op)))
         },
         |i: TokenStream| {
-            let pos = i.input_sourcepos();
             let (i, op) = preceded(ne, bool_term_expr)(i)?;
-            Ok((i, (pos, BinOp::Ne, op)))
+            Ok((i, (BinOp::Ne, op)))
         },
     ))(i)?;
+    let pos = lhs.loc().clone().from_merged(rhs.loc());
     Ok((
         i,
         Expr::BinaryOperation {
@@ -271,8 +263,8 @@ fn bool_cmp_expr_bool(input: TokenStream) -> IResult<TokenStream, Expr> {
 /// parses a logical unary not (!) expression
 fn bool_unary_lnot(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
-    let pos = input.input_sourcepos();
-    let (i, v) = preceded(lnot, bool_term_expr)(input)?;
+    let (i, v) = preceded(lnot, bool_term_expr)(input.clone())?;
+    let pos = input.from_merged(v.loc());
     Ok((
         i,
         Expr::UnaryOperation {
@@ -291,9 +283,8 @@ fn arith_xor_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i, initial) = arith_and_expr(input)?;
 
     let (i, remainder) = many0(|i: TokenStream| {
-        let pos = i.input_sourcepos();
         let (i, op) = preceded(xor, arith_and_expr)(i)?;
-        Ok((i, (pos, BinOp::Or, op)))
+        Ok((i, (BinOp::Or, op)))
     })(i)?;
 
     Ok((i, fold_exprs(initial, remainder)))
@@ -307,9 +298,8 @@ fn arith_and_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i, initial) = arith_shift_expr(input)?;
 
     let (i, remainder) = many0(|i: TokenStream| {
-        let pos = i.input_sourcepos();
         let (i, op) = preceded(and, arith_shift_expr)(i)?;
-        Ok((i, (pos, BinOp::And, op)))
+        Ok((i, (BinOp::And, op)))
     })(i)?;
 
     Ok((i, fold_exprs(initial, remainder)))
@@ -320,14 +310,12 @@ fn arith_shift_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i, initial) = arith_add_expr(input)?;
     let (i, remainder) = many0(alt((
         |i: TokenStream| {
-            let pos = i.input_sourcepos();
             let (i, op) = preceded(lshift, arith_add_expr)(i)?;
-            Ok((i, (pos, BinOp::LShift, op)))
+            Ok((i, (BinOp::LShift, op)))
         },
         |i: TokenStream| {
-            let pos = i.input_sourcepos();
             let (i, op) = preceded(rshift, arith_add_expr)(i)?;
-            Ok((i, (pos, BinOp::RShift, op)))
+            Ok((i, (BinOp::RShift, op)))
         },
     )))(i)?;
 
@@ -340,14 +328,12 @@ fn arith_add_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i, initial) = arit_mul_expr(input)?;
     let (i, remainder) = many0(alt((
         |i: TokenStream| {
-            let pos = i.input_sourcepos();
             let (i, op) = preceded(plus, arit_mul_expr)(i)?;
-            Ok((i, (pos, BinOp::Plus, op)))
+            Ok((i, (BinOp::Plus, op)))
         },
         |i: TokenStream| {
-            let pos = i.input_sourcepos();
             let (i, op) = preceded(minus, arit_mul_expr)(i)?;
-            Ok((i, (pos, BinOp::Minus, op)))
+            Ok((i, (BinOp::Minus, op)))
         },
     )))(i)?;
 
@@ -360,19 +346,16 @@ fn arit_mul_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i, initial) = arith_unary_expr(input)?;
     let (i, remainder) = many0(alt((
         |i: TokenStream| {
-            let pos = i.input_sourcepos();
             let (i, op) = preceded(star, arith_unary_expr)(i)?;
-            Ok((i, (pos, BinOp::Multiply, op)))
+            Ok((i, (BinOp::Multiply, op)))
         },
         |i: TokenStream| {
-            let pos = i.input_sourcepos();
             let (i, op) = preceded(slash, arith_unary_expr)(i)?;
-            Ok((i, (pos, BinOp::Divide, op)))
+            Ok((i, (BinOp::Divide, op)))
         },
         |i: TokenStream| {
-            let pos = i.input_sourcepos();
             let (i, op) = preceded(percent, arith_unary_expr)(i)?;
-            Ok((i, (pos, BinOp::Modulo, op)))
+            Ok((i, (BinOp::Modulo, op)))
         },
     )))(i)?;
 
@@ -381,8 +364,8 @@ fn arit_mul_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 
 fn arith_unary_not(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
-    let pos = input.input_sourcepos();
-    let (i, val) = preceded(not, arith_term_expr)(input)?;
+    let (i, val) = preceded(not, arith_term_expr)(input.clone())?;
+    let pos = input.from_merged(val.loc());
     Ok((
         i,
         Expr::UnaryOperation {
@@ -399,10 +382,10 @@ fn arith_unary_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 
 fn ident_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
-    let pos = input.input_sourcepos();
-    let (i, (fst, mut ot)) = pair(ident, many0(preceded(dot, ident)))(input)?;
+    let (i, (fst, mut ot)) = pair(ident, many0(preceded(dot, ident)))(input.clone())?;
     let mut path = Vec::from([fst]);
     path.append(&mut ot);
+    let pos = input.from_merged(&i);
     Ok((i, Expr::Identifier { path, pos }))
 }
 

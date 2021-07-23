@@ -32,7 +32,7 @@ use nom::{
 };
 
 // lexer / parser imports
-use crate::ast::{Const, Expr, Type};
+use crate::ast::{Const, Type};
 use crate::error::IResult;
 use crate::parser::expression::{arith_expr, bool_expr};
 use crate::parser::terminals::{assign, colon, ident, kw_const, semicolon, typeinfo};
