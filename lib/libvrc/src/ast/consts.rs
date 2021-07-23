@@ -149,9 +149,9 @@ impl fmt::Debug for Const {
     }
 }
 
-use crate::ast::AstCheck;
+use crate::ast::AstNode;
 use crate::error::VrsError;
-impl AstCheck for Const {
+impl AstNode for Const {
     fn check(&self) -> (u32, u32) {
         let mut res = (0, 0);
 

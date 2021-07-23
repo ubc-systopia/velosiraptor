@@ -45,91 +45,60 @@ pub struct Ast {
     /// the filename this ast represents
     pub filename: String,
     /// the import statements found in the Ast
-    pub imports: HashMap<String, Import>,
+    pub imports: Vec<Import>,
     /// the declared constants
-    pub consts: HashMap<String, Const>,
+    pub consts: Vec<Const>,
     /// the defined units of in the AST
-    pub units: HashMap<String, Unit>,
+    pub units: Vec<Unit>,
 }
 
 use crate::parser::Parser;
 
 impl Ast {
-    pub fn merge(&mut self, _other: Ast) {
-        // //
-        // let mut other = other;
-        // // try to insert other constants into this ast
-        // for (key, val) in other.imports.drain() {
-        //     // check if the key is already there, that's an error
-        //     if !self.imports.contains_key(&key) {
-        //         self.imports.insert(key, val);
-        //     }
-        // }
-
-        // // try to insert other constants into this ast
-        // for (key, val) in other.consts.drain() {
-        //     // check if the key is already there, that's an error
-        //     if self.consts.contains_key(&key) {
-        //         let c = self.consts.get(&key).unwrap();
-        //         let pos = c.pos();
-
-        //         panic!(
-        //             "error in {} - double defined constant. '{}' already defined here {}",
-        //             pos,
-        //             key,
-        //             val.pos()
-        //         );
-        //     }
-
-        //     self.consts.insert(key, val);
-        // }
-
-        // // try to insert the other units into this ast
-        // for (key, val) in other.units.drain() {
-        //     // check if the key is already there, that's an error
-        //     if self.units.contains_key(&key) {
-        //         let c = self.consts.get(&key).unwrap();
-        //         let pos = c.pos();
-
-        //         panic!(
-        //             "error in {} - double defined unit. '{}' already defined here {}",
-        //             pos,
-        //             key,
-        //             val.pos()
-        //         );
-        //     }
-
-        //     self.units.insert(key, val);
-        // }
-    }
-
     /// resolves imports recursively
-    fn do_resolve_imports(
-        &mut self,
-        imports: &mut HashMap<String, bool>,
-        path: &mut Vec<String>,
-    ) -> Result<(), VrsError<TokenStream>> {
+    ///
+    /// Walks the import tree and tries to parse each import individually
+    /// The function returns an error on the first parser error or when
+    /// a cyclic dependency was detected
+    fn do_parse_imports(&mut self, path: &mut Vec<String>) -> Result<(), VrsError<TokenStream>> {
         // adding ourselves to the imports
-        imports.insert(self.filename.clone(), true);
+        //        imports.insert(self.filename.clone(), true);
 
+        // get the import file, the parent directory of the current one
         let mut importfile = match Path::new(&self.filename).parent() {
             Some(d) => PathBuf::from(d),
             None => PathBuf::from("./"),
         };
 
-        // add ourselves
+        // add ourselves to the path
         path.push(self.filename.clone());
 
-        // loop over the current imports
-        for (_key, val) in self.imports.iter_mut() {
-            let filename = val.to_filename();
-            importfile.push(&filename);
+        // walk through the imports at this level and warn about double imports
+        let mut currentimports: HashMap<String, Import> = HashMap::new();
+        for i in self.imports.drain(..) {
+            match currentimports.get(&i.name) {
+                Some(imp) => {
+                    let msg = format!("{} is already imported ", i.name);
+                    let hint = format!("remove this import");
+                    VrsError::new_warn(imp.pos.clone(), msg, Some(hint)).print();
+                }
+                None => {
+                    currentimports.insert(i.name.clone(), i);
+                }
+            }
+        }
 
-            let f = importfile.as_path().to_str().unwrap();
+        // loop over the current imports
+        for (_, mut val) in currentimports.drain() {
+            // add the file to the current path
+            importfile.push(&val.to_filename().as_str());
+
+            // the file name to be imported
+            let filename = importfile.as_path().display().to_string();
 
             // check if we know about this import already
-            if !imports.contains_key(f) {
-                let mut ast = match Parser::parse_file(f) {
+            if !path.contains(&filename) {
+                let mut ast = match Parser::parse_file(filename.as_str()) {
                     Ok((ast, _)) => ast,
                     Err(ParserError::LexerFailure { error }) => {
                         let msg = String::from("during lexing of the file");
@@ -143,75 +112,148 @@ impl Ast {
                         let msg = String::from("unexpected junk at the end of the file");
                         return Err(VrsError::stack(val.pos.clone(), msg, error));
                     }
-
                     Err(x) => panic!("foobar {:?}", x),
                 };
-                // resolve the imports
-                match ast.do_resolve_imports(imports, path) {
+
+                // parsing succeeded, recurse abort if there is an error downstream
+                match ast.do_parse_imports(path) {
                     Err(err) => {
                         let msg = String::from("while processing imports from");
                         return Err(VrsError::stack(val.pos.clone(), msg, err));
                     }
                     _ => (),
                 }
-
-                // update the ast
+                // update the ast value
                 val.ast = Some(ast);
+                // add it back to the import list of the current ast
+                self.imports.push(val);
             } else {
-                // check if we have a circular dependency...
-                let it = path.iter();
-                // skip over the elements that are not the key
-                let it = it.skip_while(|e| *e != f);
+                // we have a circular dependency
+                let it = path.iter().skip_while(|e| *e != &filename);
                 // now convert to string
                 let s = it
                     .map(|s| s.to_string())
                     .collect::<Vec<String>>()
                     .join(" -> ");
                 if !s.is_empty() {
-                    let msg = format!("circular dependency detected:\n  {} -> {}", s, f);
+                    let msg = format!("circular dependency detected:\n  {} -> {}", s, filename);
                     let hint = String::from("try removing the following import");
                     return Err(VrsError::new_err(val.pos.clone(), msg, Some(hint)));
                 }
             }
+            // restore file path again
             importfile.pop();
         }
-        // remove from path
+
+        // remove us from the path and return
         path.pop();
         Ok(())
     }
 
     /// recursively resolves all the imports
-    pub fn resolve_imports(&mut self) -> Result<(), AstError> {
+    pub fn parse_imports(&mut self) -> Result<(), AstError> {
         // create the hashmap of the imports
-        let mut imports = HashMap::new();
+        //let mut imports = HashMap::new();
         let mut path = Vec::new();
-        match self.do_resolve_imports(&mut imports, &mut path) {
+        match self.do_parse_imports(&mut path) {
             Ok(()) => Ok(()),
             Err(error) => Err(AstError::ImportError { error }),
         }
     }
 
-    /// merges the imports together
-    fn merge_imports(&mut self) {
-        let mut imports = Vec::new();
-        let mut newimports = HashMap::new();
-        for (key, mut import) in self.imports.drain() {
-            import.ast = match import.ast {
+    fn do_collect_asts(&mut self, asts: &mut HashMap<String, Ast>) {
+        self.imports = self
+            .imports
+            .drain(..)
+            .map(|mut i| match i.ast {
                 Some(mut ast) => {
-                    ast.merge_imports();
-                    imports.push(ast);
-                    None
+                    ast.do_collect_asts(asts);
+                    asts.insert(ast.filename.clone(), ast);
+                    i.ast = None;
+                    i
                 }
-                None => None,
-            };
-            newimports.insert(key, import);
-        }
-        // update the new imports
-        self.imports = newimports;
+                None => i,
+            })
+            .collect();
+    }
 
-        for import in imports.drain(..) {
-            self.merge(import);
+    /// flattens and merges the import tree
+    pub fn merge_imports(&mut self) -> Result<(), AstError> {
+        // step one: collect the list of files
+        let mut asts = HashMap::new();
+        self.do_collect_asts(&mut asts);
+
+        // now we have all the asts read, we can start merging them
+        // let mut units = HashMap::new();
+        // for u in self.units.drain(..) {
+        //     match units.get(&u.name) {
+        //         Some(unit) => {
+        //             let msg = format!("duplicate unit definition with name {}", u.name);
+        //             let hint = format!("the previous position was here");
+        //             VrsError::new_err(unit.pos.clone(), msg, Some(hint)).print();
+        //         }
+        //         None => {
+        //             units.insert(u.name.clone(), u);
+        //         }
+        //     }
+        // }
+
+        //     error[E0201]: duplicate definitions with name `do_collect_asts`:
+        //     --> src/ast/ast.rs:176:5
+        //      |
+        //  164 | /     fn do_collect_asts(&mut self, asts : &mut HashMap<String, Ast>) {
+        //  165 | |         self.imports = self.imports.drain(..).map(|mut i| match i.ast {
+        //  166 | |                 Some(mut ast) => {
+        //  167 | |                     ast.do_collect_asts(asts);
+        //  ...   |
+        //  174 | |         ).collect();
+        //  175 | |     }
+        //      | |_____- previous definition of `do_collect_asts` here
+        //  176 | /     fn do_collect_asts(&mut self) {
+        //  177 | |
+        //  178 | |     }
+        //      | |_____^ duplicate definition
+
+        let mut consts: HashMap<String, Const> = HashMap::new();
+        for c in self.consts.drain(..) {
+            match consts.get(c.ident()) {
+                Some(co) => {
+                    let msg = format!("duplicate const definition with name {}", c.ident());
+                    let hint = format!("the previous position was here");
+                    VrsError::new_err(co.pos().clone(), msg, Some(hint)).print();
+                }
+                None => {
+                    consts.insert(String::from(c.ident()), c);
+                }
+            }
         }
+
+        for (_, mut ast) in asts.drain() {
+            for c in ast.consts.drain(..) {
+                match consts.get(c.ident()) {
+                    Some(co) => {
+                        let msg = format!("duplicate const definition with name {}", c.ident());
+                        let hint = format!("the previous position was here");
+                        VrsError::new_err(c.pos().clone(), msg, Some(hint)).print();
+                    }
+                    None => {
+                        consts.insert(String::from(c.ident()), c);
+                    }
+                }
+            }
+        }
+        //     for u in ast.units.drain(..) {
+
+        //     }
+        // }
+
+        Ok(())
+    }
+
+    /// parses and merges the imports
+    pub fn resolve_imports(&mut self) -> Result<(), AstError> {
+        self.parse_imports()?;
+        self.merge_imports()
     }
 
     ///
@@ -234,12 +276,12 @@ impl fmt::Debug for Ast {
     }
 }
 
-use crate::ast::AstCheck;
-impl AstCheck for Ast {
+use crate::ast::AstNode;
+impl AstNode for Ast {
     fn check(&self) -> (u32, u32) {
         let mut res = (0, 0);
         // try to insert other constants into this ast
-        for (_, c) in self.consts.iter() {
+        for c in self.consts.iter() {
             let val = c.check();
             res = (res.0 + val.0, res.1 + val.1)
         }

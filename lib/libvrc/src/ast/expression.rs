@@ -266,12 +266,13 @@ impl Expr {
         match self {
             Number { value: _, pos: _ } => true,
             Boolean { value: _, pos: _ } => true,
-            BinaryOperation { op:_, lhs, rhs, pos:_ } => {
-                lhs.is_const_expr() && rhs.is_const_expr()
-            }
-            UnaryOperation { op:_, val, pos:_ } => {
-                val.is_const_expr()
-            }
+            BinaryOperation {
+                op: _,
+                lhs,
+                rhs,
+                pos: _,
+            } => lhs.is_const_expr() && rhs.is_const_expr(),
+            UnaryOperation { op: _, val, pos: _ } => val.is_const_expr(),
             _ => false,
         }
     }

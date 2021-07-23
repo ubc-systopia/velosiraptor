@@ -48,7 +48,8 @@ use crate::parser::ParsErr;
 custom_error! {#[derive(PartialEq)] pub AstError
     SymTabInsertExists         = "The symbol could not be inserted, already exists",
     SymTableNotExists          = "The symbol does not exist in the table",
-    ImportError { error: ParsErr } = "The parser has failed"
+    ImportError { error: ParsErr } = "The parser has failed",
+    MergeError {  } = "Merging of the ast has failed"
 }
 
 // rexports
@@ -68,6 +69,6 @@ pub use unit::Unit;
 /// Trait that checks the Ast nodes for consistency
 ///
 /// This trait has to be implemented by all the nodes
-trait AstCheck {
+trait AstNode {
     fn check(&self) -> (u32, u32);
 }

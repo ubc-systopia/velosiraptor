@@ -102,27 +102,18 @@ impl Parser {
         let tokstream = TokenStream::from_vec_filtered(tokens);
 
         // a parsing unit consists of zero or more imports
-        let (i1, importlist) = match many0(import)(tokstream) {
+        let (i1, imports) = match many0(import)(tokstream) {
             Ok((r, i)) => (r, i),
             Err(Err::Failure(error)) => return Err(ParserError::ParserFailure { error }),
             e => panic!("unexpected error case: {:?}", e),
         };
-        let mut imports = HashMap::new();
-        for i in importlist {
-            imports.insert(i.name.clone(), i);
-        }
 
         // a parsing unit consists of zero or more imports
-        let (i2, constlist) = match many0(constdef)(i1) {
+        let (i2, consts) = match many0(constdef)(i1) {
             Ok((r, i)) => (r, i),
             Err(Err::Failure(error)) => return Err(ParserError::ParserFailure { error }),
             e => panic!("unexpected error case: {:?}", e),
         };
-
-        let mut consts = HashMap::new();
-        for i in constlist {
-            consts.insert(i.ident().to_string(), i);
-        }
 
         // there must be at least one unit definition
         let i3 = i2;
@@ -131,7 +122,7 @@ impl Parser {
         //     Err(_) => return Err(ParserError::ParserFailure),
         // };
 
-        let mut units = HashMap::new();
+        let mut units = Vec::new();
         // for i in unitlist {
         //     units.insert(i.name.clone(), i);
         // }
