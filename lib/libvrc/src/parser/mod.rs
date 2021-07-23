@@ -38,6 +38,7 @@ mod statement;
 
 mod constdef;
 mod unit;
+mod interface;
 
 use crate::ast::ast::Ast;
 use import::import;
