@@ -1,0 +1,5 @@
+const FOO: int = 1234;
+const BAR: bool = true;
+
+// that one is a warning
+const foo: int = 1234;

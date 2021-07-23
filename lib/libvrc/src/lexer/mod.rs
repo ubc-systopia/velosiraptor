@@ -32,36 +32,36 @@ use std::rc::Rc;
 mod comments;
 mod identifier;
 mod number;
-pub mod sourcepos;
-pub mod token;
 
 use self::comments::*;
 use self::identifier::identifier;
 use self::number::number;
-use self::sourcepos::SourcePos;
-use self::token::*;
+use crate::sourcepos::SourcePos;
+use crate::token::*;
+
+/// define the lexer error type
+pub type LexErr = VrsError<SourcePos>;
 
 // custom error definitions
 custom_error! { #[derive(PartialEq)] pub LexerError
-  ReadSourceFile{ file: String } = "Could not read the source file",
-  NoTokens                       = "No tokens found. Need to lex first"
+    ReadSourceFile { file: String } = "Could not read the source file",
+    LexerFailure { error: LexErr}   = "Lexing failed."
 }
 
 /// represents the lexer state
 pub struct Lexer;
 
+use crate::error::{IResult, VrsError};
 use nom::{
-    alt, branch::alt, bytes::complete::tag, character::complete::multispace0, multi::many1, named,
-    sequence::delimited, IResult,
+    branch::alt, bytes::complete::tag, character::complete::multispace0, multi::many0,
+    sequence::delimited, Err,
 };
 
 macro_rules! namedtag (
     ($vis:vis $name:ident, $tag: expr) => (
         $vis fn $name(input: SourcePos) -> IResult<SourcePos, Token> {
-            match tag(TokenContent::to_str($tag))(input) {
-                Ok((i, s)) => Ok((i, Token::new($tag, s))),
-                Err(x) => Err(x)
-            }
+            let (i, s) = tag(TokenContent::to_str($tag))(input)?;
+            Ok((i, Token::new($tag, s)))
         }
     )
 );
@@ -117,30 +117,71 @@ namedtag!(assign, TokenContent::Assign);
 namedtag!(fatarrow, TokenContent::FatArrow); 
 namedtag!(rarrow, TokenContent::RArrow);
 
-// comparators
+// misc
 namedtag!(at, TokenContent::At);
 namedtag!(underscore, TokenContent::Underscore);
 namedtag!(dotdot, TokenContent::DotDot);
 namedtag!(pathsep, TokenContent::PathSep);
 namedtag!(wildcard, TokenContent::Wildcard);
 
-named!(punctuation<SourcePos, Token>, alt!(
-    // two symbols that make up this token
-    dotdot | pathsep | lshift | rshift | rarrow | fatarrow |
-    lnot | land | lor | eq | ne | le | ge |
+/// symbols with two character width
+fn punctuation2(input: SourcePos) -> IResult<SourcePos, Token> {
+    alt((
+        // arrows etc
+        dotdot, pathsep, rarrow, fatarrow, // shifts
+        lshift, rshift, // logical combinations
+        land, lor, // comparisons
+        eq, ne, le, ge,
+    ))(input)
+}
 
-    // single symbol tokens
-    xor | not | and | or | lt | gt |
-    assign | at | underscore | wildcard |
-    plus | minus | star | slash | percent |
-    lparen | rparen | rbrace | lbrace | lbrack | rbrack |
-    dot | comma | colon | semicolon
-));
+/// parser for different parenthesis
+fn parens(input: SourcePos) -> IResult<SourcePos, Token> {
+    alt((lparen, rparen, rbrace, lbrace, lbrack, rbrack))(input)
+}
+
+/// parser for arithmetic operations
+fn arithop(input: SourcePos) -> IResult<SourcePos, Token> {
+    alt((plus, minus, star, slash, percent))(input)
+}
+
+/// parser for bitwise operators
+fn bitwiseop(input: SourcePos) -> IResult<SourcePos, Token> {
+    alt((xor, not, and, or))(input)
+}
+
+fn puncts(input: SourcePos) -> IResult<SourcePos, Token> {
+    alt((dot, comma, colon, semicolon))(input)
+}
+
+/// sybols with one caracter with
+fn punctuation1(input: SourcePos) -> IResult<SourcePos, Token> {
+    alt((
+        arithop, lnot, bitwiseop, lt, gt, parens, puncts, assign, wildcard, at, underscore,
+    ))(input)
+}
+
+use nom::bytes::complete::take;
+
+fn any(input: SourcePos) -> IResult<SourcePos, Token> {
+    let (_, t) = take(1usize)(input.clone())?;
+    let msg = format!("illegal token `{}` encountered.", t);
+    let err = VrsError::new_err(t, msg, Some(String::from("remove this character.")));
+    Err(Err::Failure(err))
+}
 
 fn tokens(input: SourcePos) -> IResult<SourcePos, Token> {
     delimited(
         multispace0,
-        alt((identifier, number, blockcomment, linecomment, punctuation)),
+        alt((
+            identifier,
+            number,
+            blockcomment,
+            linecomment,
+            punctuation2,
+            punctuation1,
+            any,
+        )),
         multispace0,
     )(input)
 }
@@ -152,11 +193,16 @@ impl Lexer {
     /// as Tokens.
     pub fn lex_source_pos(sp: SourcePos) -> Result<Vec<Token>, LexerError> {
         log::debug!("start lexing...");
-        let (i, mut tok) = match many1(tokens)(sp) {
+
+        // match the tokens
+        let (i, mut tok) = match many0(tokens)(sp) {
             Ok((r, tok)) => (r, tok),
-            Err(_x) => return Err(LexerError::NoTokens),
+            Err(Err::Failure(error)) => return Err(LexerError::LexerFailure { error }),
+            e => panic!("should not hit this branch: {:?}", e),
         };
+
         log::debug!("lexing done.");
+        // adding the end of file token
         tok.push(Token::new(TokenContent::Eof, i));
         Ok(tok)
     }
@@ -244,6 +290,18 @@ fn operator_tests() {
 
 /// test lexing of files
 #[test]
+fn basics() {
+    let content = "import foobar; /* comment */unit abc {}; // end of file";
+    let tok = match Lexer::lex_string("stdio", content) {
+        Ok(vec) => vec,
+        Err(_) => panic!("lexing failed"),
+    };
+    // there should be 10 tokens
+    assert_eq!(tok.len(), 11);
+}
+
+/// test lexing of files
+#[test]
 fn empty_file_tests() {
     let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     d.push("tests/lexer");
@@ -254,7 +312,7 @@ fn empty_file_tests() {
 
         // lex the file
         let err = Lexer::lex_file(&filename);
-        assert!(err.is_err());
+        assert!(err.is_ok());
 
         d.pop();
     }
@@ -273,12 +331,45 @@ fn empty_file_tests() {
 
 /// test lexing of files
 #[test]
-fn basic_tests() {
-    let content = "import foobar; /* comment */unit abc {}; // end of file";
-    let tok = match Lexer::lex_string("stdio", content) {
-        Ok(vec) => vec,
-        Err(_) => panic!("lexing failed"),
-    };
-    // there should be 10 tokens
-    assert_eq!(tok.len(), 11);
+fn files_tests() {
+    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    d.push("tests/lexer");
+
+    for f in vec!["sample.vrs"] {
+        d.push(f);
+        let filename = format!("{}", d.display());
+
+        // lex the file
+        let err = Lexer::lex_file(&filename);
+        assert!(err.is_ok());
+        d.pop();
+    }
+}
+
+/// test lexing of files
+#[test]
+fn basic_failure_tests() {
+    let contents = "foo /* bar";
+    assert!(Lexer::lex_source_pos(SourcePos::new("stdio", contents)).is_err());
+    let contents = "12344asdf";
+    assert!(Lexer::lex_source_pos(SourcePos::new("stdio", contents)).is_err());
+    let contents = "foo11`basr";
+    assert!(Lexer::lex_source_pos(SourcePos::new("stdio", contents)).is_err());
+}
+
+/// test lexing of files
+#[test]
+fn files_with_failures_tests() {
+    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    d.push("tests/lexer");
+
+    for f in vec!["commentsfail.vrs", "tokenfail.vrs"] {
+        d.push(f);
+        let filename = format!("{}", d.display());
+
+        // lex the file
+        let err = Lexer::lex_file(&filename);
+        assert!(err.is_err());
+        d.pop();
+    }
 }

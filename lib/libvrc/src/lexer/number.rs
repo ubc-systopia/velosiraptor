@@ -31,43 +31,45 @@ use nom::{
     bytes::complete::{is_a, tag},
     character::complete::{alphanumeric1, digit1, hex_digit1, oct_digit1},
     combinator::recognize,
-    error::ErrorKind,
-    error_position,
     multi::many0,
     sequence::pair,
-    Err, IResult, InputLength, Slice,
+    Err, InputLength, Slice,
 };
 
-use super::sourcepos::SourcePos;
-use super::token::{Token, TokenContent};
+use crate::error::{IResult, VrsError};
+use crate::sourcepos::SourcePos;
+use crate::token::{Token, TokenContent};
 
 fn base10(input: SourcePos) -> IResult<SourcePos, Token> {
     // match a digit followed by alphanumeric characters and the `_`
     // this is needed to recognize patterns of: 1234asdf
     let otherchar = alt((alphanumeric1, tag("_")));
-    let (rem, numsp) = match recognize(pair(digit1, many0(otherchar)))(input) {
-        Ok((rem, numsp)) => (rem, numsp),
-        // here we just return the error if we could not parse anything...
-        Err(x) => return Err(x),
-    };
+    let (rem, numsp) = recognize(pair(digit1, many0(otherchar)))(input.clone())?;
 
     // allow groups of digits 1234_5678
     let otherdigits = alt((digit1, tag("_")));
 
     // parse the numsp again, with restricted tokens
-    let rem1 = match recognize(pair(digit1, many0(otherdigits)))(numsp.clone()) {
-        Ok((rem, _)) => rem,
-        Err(e) => return Err(e),
-    };
+    let (rem1, _) = recognize(pair(digit1, many0(otherdigits)))(numsp.clone())?;
 
+    // if it's not empty there will be some junk at the end of the number
     if !rem1.is_empty() {
-        return Err(Err::Failure(error_position!(numsp, ErrorKind::Digit)));
+        let err = VrsError::new_err(
+            rem1,
+            String::from("unsupported digit in number."),
+            Some(String::from("remove excess characters")),
+        );
+        return Err(Err::Failure(err));
     }
 
+    // now convert the string to to a number
     let numstr = String::from(numsp.as_str()).replace("_", "");
     let num = match numstr.parse::<u64>() {
         Ok(i) => i,
-        Err(_) => return Err(Err::Failure(error_position!(numsp, ErrorKind::Digit))),
+        Err(_) => {
+            let err = VrsError::new_err(rem1, String::from("number exceeds available bits"), None);
+            return Err(Err::Failure(err));
+        }
     };
     Ok((rem, Token::new(TokenContent::IntLiteral(num), numsp)))
 }
@@ -77,40 +79,37 @@ macro_rules! namedbase (
         fn $name(input: SourcePos) -> IResult<SourcePos, Token> {
             // check if it's the right tag `0x`, otherwise return
             let prefix = tag($tag);
-            let i1 = match prefix(input.clone()) {
-                Ok((rem, _)) => rem,
-                Err(x) => return Err(x)
-            };
+            let (i1, _) = prefix(input.clone())?;
 
             // match alphanumeric groups separated by `_`
             let otherchar = alt((alphanumeric1, tag("_")));
-            let (rem, numsp) = match recognize(pair(alphanumeric1, many0(otherchar)))(i1.clone()) {
-                Ok((rem, numsp)) => (rem, numsp),
-                // here we just return the error if we could not parse anything...
-                Err(x) => return Err(x)
-            };
+            let (rem, numsp) = recognize(pair(alphanumeric1, many0(otherchar)))(i1.clone())?;
 
-            // allow groups of hexdigits 1234_abcd
+            // allow groups of digits 1234_abcd
             let otherdigits = alt(($pattern, tag("_")));
 
             // parse the numsp again, with restricted tokens
-            let rem1 = match recognize(pair($pattern, many0(otherdigits)))(numsp.clone()) {
-                Ok((rem, _)) => rem,
-                // this will return Eof unfortunately...
-                Err(e) => return Err(e)
-            };
+            let (rem1, _) = recognize(pair($pattern, many0(otherdigits)))(numsp.clone())?;
 
+            // if it's not empty there will be some junk at the end of the number
             if ! rem1.is_empty() {
-                return Err(Err::Failure(error_position!(numsp, ErrorKind::Digit)));
+                let err = VrsError::new_err(rem1,
+                    String::from("unsupported digit in number."),
+                    Some(String::from("remove excess characters")));
+                return Err(Err::Failure(err));
             }
 
+            // now convert the string to to a number
             let numstr = String::from(numsp.as_str()).replace("_", "");
-            let num = match u64::from_str_radix(&numstr, $radix) {
-                Ok(i) => i,
-                Err(_) => return Err(Err::Failure(error_position!(numsp, ErrorKind::Digit)))
-            };
-
-            Ok(( rem, Token::new(TokenContent::IntLiteral(num), input.slice(0..numsp.input_len() + 2))))
+            match u64::from_str_radix(&numstr, $radix) {
+                Ok(i) => Ok((rem, Token::new(TokenContent::IntLiteral(i), input.slice(0..numsp.input_len() + 2)))),
+                Err(_) => {
+                    let err = VrsError::new_err(rem1,
+                        String::from("number exceeds available bits"),
+                        None);
+                    Err(Err::Failure(err))
+                }
+            }
         }
     )
 );
@@ -143,14 +142,6 @@ fn decimal_test() {
             rem,
             Token::new(TokenContent::IntLiteral(12312213489654), num)
         ))
-    );
-
-    let sp = SourcePos::new("stdin", "123a12213489654");
-    let rem = sp.slice(3..15);
-    let num = sp.slice(0..3);
-    assert_eq!(
-        number(sp.clone()),
-        Err(Err::Failure(error_position!(sp, ErrorKind::Digit)))
     );
 }
 
@@ -228,12 +219,6 @@ fn separator_test() {
         number(sp),
         Ok((rem, Token::new(TokenContent::IntLiteral(1000000), num)))
     );
-
-    let sp = SourcePos::new("stdin", "1234567890 asdf");
-    assert!(number(sp).is_ok());
-
-    let sp = SourcePos::new("stdin", "0x12345678 asdf");
-    assert!(number(sp).is_ok());
 
     let sp = SourcePos::new("stdin", "0o11223344 asdf");
     assert!(number(sp).is_ok());

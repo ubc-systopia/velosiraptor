@@ -1,0 +1,81 @@
+/*
+ * This specification expresses a hypothetical direct segment. This is a single, contiguous
+ * region of memory that is translated using a segment-like approach.
+ *
+ * The segment has a given maximum size, but the actual size can be configured.
+ * Moreover, the translation functionality can be disabled.
+ *
+ * The state is given by two registers:
+ *   base: that defines the base address and the permissions
+ *   size: the active size of the segment
+ *
+ * The minimum translation size is 64 bytes.
+ * The translation size is a multiple of 64 bytes.
+ */
+
+// This defines an SMPT Entry
+unit DirectSegment : Segment {
+
+    // let's assume the maximum size of the segment is 40 bits.
+    size = 40;
+
+    // the state will be two registers:
+    state = Register {
+        base [_, 0, 8] {
+             0  0  enabled;
+             1  1  read;
+             2  2  write;
+             6 64  address;
+        };
+        size [_, 8, 8] {
+            0  5 _;
+            6 40 size
+        };
+    };
+
+    // the interface is a register interface, assume there are two registers
+    // called `base` and `size`. They can be updated using load/store instructions
+    interface = Register {
+        base => state.base;
+        size => state.size;
+    };
+
+    // No real need for a constructor
+    DirectSegment() { }
+
+    /* segment specific elements */
+
+    // the base address will be the address part shifted by 6
+    fn segbase() -> addr {
+        state.base.address << 6
+    }
+
+    // the size is given by the state
+    fn segsize() -> size {
+        state.size.size << 6
+    }
+
+    // match flags, returns true if we can translate
+    fn match_flags(flags) -> bool {
+        state.base.enabled && ((state.base.write && flags.write) || (state.base.read && flags.read))
+    }
+
+    map(inaddr, outaddr, length, flags) {
+        // must be a memory type
+        assert type(outaddr) == Memory;
+        // aligned to 64
+        assert aligned(outaddr, 64);
+        assert aligned(length, 64);
+        // input address must be 0
+        assert inaddr == 0;
+    }
+
+    // cant unmap or protect
+    unmap() {
+        true
+    }
+
+    protect(flags) {
+        true
+    }
+ }

@@ -30,269 +30,12 @@ use std::fmt;
 use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 use std::rc::Rc;
 
-use super::sourcepos::SourcePos;
-
-/// Represents the keywords we have
-#[derive(PartialEq, Debug, Clone)]
-pub enum Keyword {
-    /// constant values
-    Const,
-    /// unit definitins
-    Unit,
-    /// conditional statemt
-    If,
-    /// conditional else branch
-    Else,
-    /// import statements
-    Import,
-    /// defines a local variable
-    Let,
-    /// represents a function
-    Fn,
-    /// An assert statement
-    Assert,
-    /// defines state for a unit
-    State,
-    /// defines the interface of a unit
-    Interface,
-    /// defines Memory state
-    Memory,
-    /// defines Register state
-    Register,
-    /// Null like value used in cases where there is no State
-    None,
-    /// represents an address value
-    Addr,
-    /// represents a size value
-    Size,
-    /// A boolean type
-    Boolean,
-    /// An integer value
-    Integer,
-}
-
-/// Implementation of the [std::fmt::Display] trait for [Token]
-impl fmt::Display for Keyword {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use self::Keyword::*;
-        let kwstr = match self {
-            Const => "const",
-            Unit => "unit",
-            If => "if",
-            Else => "else",
-            Import => "import",
-            Let => "let",
-            Fn => "fn",
-            Assert => "assert",
-            State => "state",
-            Interface => "interface",
-            Memory => "Memory",
-            Register => "Register",
-            None => "None",
-            // types
-            Addr => "addr",
-            Size => "size",
-            Boolean => "bool",
-            Integer => "int",
-        };
-        write!(f, "{}", kwstr)
-    }
-}
-
-/// Represents the content of a token
-#[derive(PartialEq, Debug, Clone)]
-pub enum TokenContent {
-    // end of file
-    Eof,
-
-    // illegal token
-    Illegal,
-
-    // literals, integers of booleans
-    IntLiteral(u64),   // 1234 0x134 0o1234 0b1111
-    BoolLiteral(bool), // true | false
-
-    // identifier
-    Identifier(String), // abc ab_cd
-
-    // Keywords
-    Keyword(Keyword), // unit | import | state | interface
-
-    // comments
-    Comment(String),      // //
-    BlockComment(String), // /* */
-
-    // punctuations
-    Dot,       // .
-    Comma,     // ,
-    Colon,     // :
-    SemiColon, // ;
-
-    // delimiters
-    LParen,   // (
-    RParen,   // )
-    LBrace,   // {
-    RBrace,   // }
-    LBracket, // [
-    RBracket, // ]
-
-    // operators
-    Plus,    // +
-    Minus,   // -
-    Star,    // *
-    Slash,   // /
-    Percent, // %  (remainder)
-    LShift,  // <<
-    RShift,  // >>
-
-    // bitwise operators
-    Xor, // ^  (xor)
-    Not, // ~
-    And, // &
-    Or,  // |
-
-    // logical operators
-    LNot, // ! logical not
-    LAnd, // &&
-    LOr,  // ||
-
-    // assignments
-    Assign, // =
-
-    // arrows
-    RArrow,   // ->
-    FatArrow, // =>
-
-    // comparisons
-    Eq, // ==
-    Ne, // !=
-    Lt, // <
-    Gt, // >
-    Le, // <=
-    Ge, // >=
-
-    // others, maybe not used
-    At,         // @
-    Underscore, // _
-    DotDot,     // ..  for slices
-    PathSep,    // ::
-    Wildcard,   // ?
-}
-
-/// Implementatin for TokenContent
-impl TokenContent {
-    pub fn to_str(tok: TokenContent) -> &'static str {
-        match tok {
-            // punctuations
-            TokenContent::Dot => ".",
-            TokenContent::Comma => ",",
-            TokenContent::Colon => ":",
-            TokenContent::SemiColon => ";",
-
-            // delimiters
-            TokenContent::LParen => "(",
-            TokenContent::RParen => ")",
-            TokenContent::LBrace => "{",
-            TokenContent::RBrace => "}",
-            TokenContent::LBracket => "[",
-            TokenContent::RBracket => "]",
-
-            // operators
-            TokenContent::Plus => "+",
-            TokenContent::Minus => "-",
-            TokenContent::Star => "*",
-            TokenContent::Slash => "/",
-            TokenContent::Percent => "%",
-            TokenContent::LShift => "<<",
-            TokenContent::RShift => ">>",
-
-            // bitwise operators
-            TokenContent::Xor => "^",
-            TokenContent::Not => "~",
-            TokenContent::And => "&",
-            TokenContent::Or => "|",
-
-            // logical operators
-            TokenContent::LNot => "!",
-            TokenContent::LAnd => "&&",
-            TokenContent::LOr => "||",
-
-            // assignments
-            TokenContent::Assign => "=",
-
-            // arrows
-            TokenContent::RArrow => "->",
-            TokenContent::FatArrow => "=>",
-
-            // comparisons
-            TokenContent::Eq => "==",
-            TokenContent::Ne => "!=",
-            TokenContent::Lt => "<",
-            TokenContent::Gt => ">",
-            TokenContent::Le => "<=",
-            TokenContent::Ge => ">=",
-
-            // others, maybe not used
-            TokenContent::At => "@",
-            TokenContent::Underscore => "_",
-            TokenContent::DotDot => "..",
-            TokenContent::PathSep => "::",
-            TokenContent::Wildcard => "?",
-            TokenContent::Eof => "EOF",
-            _ => panic!("unknown symbol for token {:?}", tok),
-        }
-    }
-}
-
-/// Represents a lexed token.
-#[derive(PartialEq, Debug, Clone)]
-pub struct Token {
-    /// the content of the token, defining its type
-    pub content: TokenContent,
-
-    /// the source position of the toke
-    pub spos: SourcePos,
-}
-
-/// The Token Implementation
-impl Token {
-    /// Creats a new token with the given [TokenContent] at the [SourcePos].
-    pub fn new(content: TokenContent, spos: SourcePos) -> Self {
-        Token { content, spos }
-    }
-
-    /// Obtains the [SourcePos] of the token
-    pub fn get_pos(&self) -> SourcePos {
-        self.spos.clone()
-    }
-}
-
-/// Implementation of the [std::fmt::Display] trait for [Token]
-impl fmt::Display for Token {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match &self.content {
-            TokenContent::Identifier(id) => write!(f, "{}", id),
-            TokenContent::IntLiteral(n) => write!(f, "{}", n),
-            TokenContent::BoolLiteral(bl) => write!(f, "{}", bl),
-            TokenContent::Comment(st) => write!(f, "Comment({})", st),
-            TokenContent::BlockComment(st) => write!(f, "BlockComment({})", st),
-            TokenContent::Keyword(k) => write!(f, "{}", k),
-            other => write!(f, "{}", TokenContent::to_str(other.clone())),
-        }
-    }
-}
-
-/// Implementation of `nom::InputLength` for `Token`
-impl InputLength for Token {
-    #[inline]
-    /// Calculates the input length, as indicated by its name, and the name of the trait itself
-    fn input_len(&self) -> usize {
-        1
-    }
-}
+use crate::error::ErrorLocation;
+use crate::sourcepos::SourcePos;
+use crate::token::{Token, TokenContent};
 
 /// A sequence of recognized tokens that is produced by the lexer
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq)]
 pub struct TokenStream {
     /// a reference counted vector of tokens
     tokens: Rc<Vec<Token>>,
@@ -353,6 +96,23 @@ impl TokenStream {
         }
     }
 
+    /// Creates a new [TokenStream] from self up until, not including the other
+    ///
+    /// The new range will start at current, and be set to the token just before
+    /// the start of the other TokenStream
+    ///
+    /// # Panics
+    ///
+    /// The function panics if the tokens are not matching, or the end is before the start
+    pub fn from_self_until(self, other: &Self) -> Self {
+        assert!(self.tokens == other.tokens);
+        assert!(self.range.start < other.range.start);
+        TokenStream {
+            tokens: self.tokens,
+            range: self.range.start..other.range.start,
+        }
+    }
+
     /// Creates an empty TokenStream.
     pub fn empty() -> Self {
         TokenStream {
@@ -402,6 +162,13 @@ impl TokenStream {
 
 /// Implements the [std::fmt::Display] trait for [TokenStream]
 impl fmt::Display for TokenStream {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.tokens[self.range.start])
+    }
+}
+
+/// Implements the [std::fmt::Debug] trait for [TokenStream]
+impl fmt::Debug for TokenStream {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let len = std::cmp::min(self.input_len(), 5);
         let mut tok = String::new();
@@ -646,7 +413,9 @@ impl InputIter for TokenStream {
     where
         P: Fn(Self::Item) -> bool,
     {
-        self.tokens.iter().position(|b| predicate(b.clone()))
+        self.tokens[self.range.clone()]
+            .iter()
+            .position(|b| predicate(b.clone()))
     }
 
     /// Get the byte offset from the element's position in the stream
@@ -656,6 +425,79 @@ impl InputIter for TokenStream {
             Ok(count)
         } else {
             Err(Needed::Unknown)
+        }
+    }
+}
+
+/// Implementation of the [error::ErrorLocation] trait for [TokenStream]
+impl ErrorLocation for TokenStream {
+    /// the line number in the source file
+    fn line(&self) -> u32 {
+        self.peek().spos.line()
+    }
+
+    /// the column number in the source file
+    fn column(&self) -> u32 {
+        self.peek().spos.column()
+    }
+
+    /// the length of the token
+    fn length(&self) -> usize {
+        // TODO: figure out the right thing here!
+        self.peek().spos.length()
+    }
+
+    /// the context (stdin or filename)
+    fn context(&self) -> &str {
+        self.peek().spos.context()
+    }
+
+    /// the surrounding line context
+    fn linecontext(&self) -> &str {
+        self.peek().spos.linecontext()
+    }
+}
+
+/// Implementation of the [error::ErrorLocation] trait for [TokenStream]
+impl ErrorLocation for &TokenStream {
+    /// the line number in the source file
+    fn line(&self) -> u32 {
+        self.peek().spos.line()
+    }
+
+    /// the column number in the source file
+    fn column(&self) -> u32 {
+        self.peek().spos.column()
+    }
+
+    /// the length of the token
+    fn length(&self) -> usize {
+        // TODO: figure out the right thing here!
+        self.peek().spos.length()
+    }
+
+    /// the context (stdin or filename)
+    fn context(&self) -> &str {
+        self.peek().spos.context()
+    }
+
+    /// the surrounding line context
+    fn linecontext(&self) -> &str {
+        self.peek().spos.linecontext()
+    }
+}
+
+/// Implementation of [std::convert::From<LexerError>] for [VrsError]
+///
+/// This converts from a lexer error to a parser error
+impl From<SourcePos> for TokenStream {
+    fn from(spos: SourcePos) -> Self {
+        TokenStream {
+            tokens: Rc::new(vec![Token {
+                content: TokenContent::Illegal,
+                spos,
+            }]),
+            range: 0..0,
         }
     }
 }

@@ -25,50 +25,16 @@
 
 //! Ast Module of the Velosiraptor Compiler
 
-mod ast;
-mod consts;
-mod expression;
-mod import;
-mod interface;
-mod method;
-mod state;
-mod types;
-mod unit;
+use crate::ast::Expr;
 
-pub mod symboltable;
-pub mod transform;
-
-use custom_error::custom_error;
-
-use symboltable::SymbolTable;
-
-use crate::parser::ParsErr;
-
-// custom error definitions
-custom_error! {#[derive(PartialEq)] pub AstError
-    SymTabInsertExists         = "The symbol could not be inserted, already exists",
-    SymTableNotExists          = "The symbol does not exist in the table",
-    ImportError { error: ParsErr } = "The parser has failed",
-    MergeError {  } = "Merging of the ast has failed"
-}
-
-// rexports
-pub use ast::Ast;
-pub use consts::Const;
-pub use expression::{BinOp, Expr, UnOp};
-pub use import::Import;
-pub use interface::Interface;
-pub use method::Method;
-pub use method::Stmt;
-pub use state::BitSlice;
-pub use state::Field;
-pub use state::State;
-pub use types::Type;
-pub use unit::Unit;
-
-/// Trait that checks the Ast nodes for consistency
-///
-/// This trait has to be implemented by all the nodes
-trait AstNode {
-    fn check(&self) -> (u32, u32);
+/// Implements some transformation on expression nodes
+impl Expr {
+    /// performs type checking on a
+    pub fn typecheck(&self) -> bool {
+        true
+    }
+    /// performs constant folding
+    pub fn const_fold(self) -> Self {
+        self
+    }
 }

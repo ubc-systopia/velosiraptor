@@ -1,4 +1,4 @@
-// Velosiraptor Parser
+// Velosiraptor ParseTree
 //
 //
 // MIT License
@@ -25,39 +25,14 @@
 
 //! Ast representation of the VelosiRaptor Definitions
 
+use std::collections::HashMap;
 use std::fmt;
+use std::path::{Path, PathBuf};
 
-// we use the source position to tag the elements of the AST
-use crate::lexer::sourcepos::SourcePos;
-
-/// represents the known types.
-///
-/// The type of a an expression, parameter or value defines the set of
-/// operations that are allowed to be carried out with it.
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum Type {
-    /// a boolean type (true / false)
-    Boolean,
-    /// An integer type
-    Integer,
-    /// Represents an address value
-    Address,
-    /// The size defines the number of addresses within a range
-    Size,
-}
-
-/// implementation of the [fmt::Display] trait for the [Type].
-impl fmt::Display for Type {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use self::Type::*;
-        match self {
-            Boolean => write!(f, "bool"),
-            Integer => write!(f, "int"),
-            Address => write!(f, "addr"),
-            Size => write!(f, "size"),
-        }
-    }
-}
+use crate::ast::{AstError, Const, Import, Unit};
+use crate::error::VrsError;
+use crate::parser::ParserError;
+use crate::token::TokenStream;
 
 /// represents the ast of a parsed file.
 ///
@@ -72,9 +47,222 @@ pub struct Ast {
     /// the import statements found in the Ast
     pub imports: Vec<Import>,
     /// the declared constants
-    pub consts: Vec<String>,
+    pub consts: Vec<Const>,
     /// the defined units of in the AST
-    pub units: Vec<String>,
+    pub units: Vec<Unit>,
+}
+
+use crate::parser::Parser;
+
+impl Ast {
+    /// resolves imports recursively
+    ///
+    /// Walks the import tree and tries to parse each import individually
+    /// The function returns an error on the first parser error or when
+    /// a cyclic dependency was detected
+    fn do_parse_imports(&mut self, path: &mut Vec<String>) -> Result<(), VrsError<TokenStream>> {
+        // adding ourselves to the imports
+        //        imports.insert(self.filename.clone(), true);
+
+        // get the import file, the parent directory of the current one
+        let mut importfile = match Path::new(&self.filename).parent() {
+            Some(d) => PathBuf::from(d),
+            None => PathBuf::from("./"),
+        };
+
+        // add ourselves to the path
+        path.push(self.filename.clone());
+
+        // walk through the imports at this level and warn about double imports
+        let mut currentimports: HashMap<String, Import> = HashMap::new();
+        for i in self.imports.drain(..) {
+            match currentimports.get(&i.name) {
+                Some(imp) => {
+                    let msg = format!("{} is already imported ", i.name);
+                    let hint = format!("remove this import");
+                    VrsError::new_warn(imp.pos.clone(), msg, Some(hint)).print();
+                }
+                None => {
+                    currentimports.insert(i.name.clone(), i);
+                }
+            }
+        }
+
+        // loop over the current imports
+        for (_, mut val) in currentimports.drain() {
+            // add the file to the current path
+            importfile.push(&val.to_filename().as_str());
+
+            // the file name to be imported
+            let filename = importfile.as_path().display().to_string();
+
+            // check if we know about this import already
+            if !path.contains(&filename) {
+                let mut ast = match Parser::parse_file(filename.as_str()) {
+                    Ok((ast, _)) => ast,
+                    Err(ParserError::LexerFailure { error }) => {
+                        let msg = String::from("during lexing of the file");
+                        return Err(VrsError::stack(val.pos.clone(), msg, error));
+                    }
+                    Err(ParserError::ParserFailure { error }) => {
+                        let msg = String::from("during parsing of the file");
+                        return Err(VrsError::stack(val.pos.clone(), msg, error));
+                    }
+                    Err(ParserError::ParserIncomplete { error }) => {
+                        let msg = String::from("unexpected junk at the end of the file");
+                        return Err(VrsError::stack(val.pos.clone(), msg, error));
+                    }
+                    Err(x) => panic!("foobar {:?}", x),
+                };
+
+                // parsing succeeded, recurse abort if there is an error downstream
+                match ast.do_parse_imports(path) {
+                    Err(err) => {
+                        let msg = String::from("while processing imports from");
+                        return Err(VrsError::stack(val.pos.clone(), msg, err));
+                    }
+                    _ => (),
+                }
+                // update the ast value
+                val.ast = Some(ast);
+                // add it back to the import list of the current ast
+                self.imports.push(val);
+            } else {
+                // we have a circular dependency
+                let it = path.iter().skip_while(|e| *e != &filename);
+                // now convert to string
+                let s = it
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>()
+                    .join(" -> ");
+                if !s.is_empty() {
+                    let msg = format!("circular dependency detected:\n  {} -> {}", s, filename);
+                    let hint = String::from("try removing the following import");
+                    return Err(VrsError::new_err(val.pos.clone(), msg, Some(hint)));
+                }
+            }
+            // restore file path again
+            importfile.pop();
+        }
+
+        // remove us from the path and return
+        path.pop();
+        Ok(())
+    }
+
+    /// recursively resolves all the imports
+    pub fn parse_imports(&mut self) -> Result<(), AstError> {
+        // create the hashmap of the imports
+        //let mut imports = HashMap::new();
+        let mut path = Vec::new();
+        match self.do_parse_imports(&mut path) {
+            Ok(()) => Ok(()),
+            Err(error) => Err(AstError::ImportError { error }),
+        }
+    }
+
+    fn do_collect_asts(&mut self, asts: &mut HashMap<String, Ast>) {
+        self.imports = self
+            .imports
+            .drain(..)
+            .map(|mut i| match i.ast {
+                Some(mut ast) => {
+                    ast.do_collect_asts(asts);
+                    asts.insert(ast.filename.clone(), ast);
+                    i.ast = None;
+                    i
+                }
+                None => i,
+            })
+            .collect();
+    }
+
+    /// flattens and merges the import tree
+    pub fn merge_imports(&mut self) -> Result<(), AstError> {
+        // step one: collect the list of files
+        let mut asts = HashMap::new();
+        self.do_collect_asts(&mut asts);
+
+        // now we have all the asts read, we can start merging them
+        // let mut units = HashMap::new();
+        // for u in self.units.drain(..) {
+        //     match units.get(&u.name) {
+        //         Some(unit) => {
+        //             let msg = format!("duplicate unit definition with name {}", u.name);
+        //             let hint = format!("the previous position was here");
+        //             VrsError::new_err(unit.pos.clone(), msg, Some(hint)).print();
+        //         }
+        //         None => {
+        //             units.insert(u.name.clone(), u);
+        //         }
+        //     }
+        // }
+
+        //     error[E0201]: duplicate definitions with name `do_collect_asts`:
+        //     --> src/ast/ast.rs:176:5
+        //      |
+        //  164 | /     fn do_collect_asts(&mut self, asts : &mut HashMap<String, Ast>) {
+        //  165 | |         self.imports = self.imports.drain(..).map(|mut i| match i.ast {
+        //  166 | |                 Some(mut ast) => {
+        //  167 | |                     ast.do_collect_asts(asts);
+        //  ...   |
+        //  174 | |         ).collect();
+        //  175 | |     }
+        //      | |_____- previous definition of `do_collect_asts` here
+        //  176 | /     fn do_collect_asts(&mut self) {
+        //  177 | |
+        //  178 | |     }
+        //      | |_____^ duplicate definition
+
+        let mut consts: HashMap<String, Const> = HashMap::new();
+        for c in self.consts.drain(..) {
+            match consts.get(c.ident()) {
+                Some(co) => {
+                    let msg = format!("duplicate const definition with name {}", c.ident());
+                    let hint = format!("duplicate definition");
+                    VrsError::new_err(co.pos().clone(), msg, Some(hint)).print();
+                }
+                None => {
+                    consts.insert(String::from(c.ident()), c);
+                }
+            }
+        }
+
+        for (_, mut ast) in asts.drain() {
+            for c in ast.consts.drain(..) {
+                match consts.get(c.ident()) {
+                    Some(co) => {
+                        VrsError::new_double(
+                            c.ident().to_string(),
+                            c.pos().clone(),
+                            co.pos().clone(),
+                        )
+                        .print();
+                    }
+                    None => {
+                        consts.insert(String::from(c.ident()), c);
+                    }
+                }
+            }
+        }
+        //     for u in ast.units.drain(..) {
+
+        //     }
+        // }
+
+        Ok(())
+    }
+
+    /// parses and merges the imports
+    pub fn resolve_imports(&mut self) -> Result<(), AstError> {
+        self.parse_imports()?;
+        self.merge_imports()
+    }
+
+    ///
+    pub fn check_consistency(&self) {
+        self.check();
+    }
 }
 
 /// implementation of the [fmt::Display] trait for the [Ast].
@@ -91,596 +279,83 @@ impl fmt::Debug for Ast {
     }
 }
 
-/// Defines an [Import] statement node
-///
-/// The import statement declares that another file is imported
-/// and its definitions used by the current file.
-#[derive(PartialEq, Clone)]
-pub struct Import {
-    /// the filename to import
-    pub name: String,
-    /// where in the current file there was this import statement
-    pub pos: SourcePos,
-}
-
-/// implementation of the [fmt::Display] trait for the [Import]
-impl fmt::Display for Import {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "import {};", self.name)
-    }
-}
-
-/// implementation of the [fmt::Debug] trait for the [Import]
-impl fmt::Debug for Import {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let (line, column) = self.pos.input_pos();
-        writeln!(f, "{:03}:{:03} | import {};", line, column, self.name)
-    }
-}
-
-/// Defines a [Constant] statement node
-///
-/// The constants statement defines and delcares specific symbols
-/// with constant values to be used throughout the definitions.
-///
-/// The constant can be defined as part of the file global definitions
-/// or within a unit context.
-#[derive(PartialEq, Clone)]
-pub enum Const {
-    /// Represents an integer constant.
-    ///
-    /// This corresponds to an Integer literal
-    Integer {
-        ident: String,
-        value: u64,
-        pos: SourcePos,
-    },
-    /// Represents an boolean constant
-    ///
-    /// This corresponds to an Boolean literal
-    Boolean {
-        ident: String,
-        value: bool,
-        pos: SourcePos,
-    }, // TODO: add address / size constants here as well?
-}
-
-/// implementation of the [fmt::Display] trait for the [Const]
-impl fmt::Display for Const {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use self::Const::*;
-        match self {
-            Integer {
-                ident,
-                value,
-                pos: _,
-            } => writeln!(f, "const {} : int  = {};", ident, value),
-            Boolean {
-                ident,
-                value,
-                pos: _,
-            } => writeln!(f, "const {} : bool = {};", ident, value),
+use crate::ast::AstNode;
+impl AstNode for Ast {
+    fn check(&self) -> (u32, u32) {
+        let mut res = (0, 0);
+        // try to insert other constants into this ast
+        for c in self.consts.iter() {
+            let val = c.check();
+            res = (res.0 + val.0, res.1 + val.1)
         }
+        res
     }
 }
 
-/// implementation of the [fmt::Debug] trait for the [Const]
-impl fmt::Debug for Const {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use self::Const::*;
-        match self {
-            Integer { ident, value, pos } => {
-                let (line, column) = pos.input_pos();
-                writeln!(
-                    f,
-                    "{:03}:{:03} | const {} :  int = {};",
-                    line, column, ident, value
-                )
-            }
-            Boolean { ident, value, pos } => {
-                let (line, column) = pos.input_pos();
-                writeln!(
-                    f,
-                    "{:03}:{:03} | const {} : bool = {};",
-                    line, column, ident, value
-                )
-            }
-        }
-    }
-}
+#[test]
+fn import_test_ok() {
+    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    d.push("tests/imports");
 
-/// Defines a translation unit
-///
-/// A translation unit describes a translation unit and consists of multiple
-/// components that from the personality of the translation unit.
-///
-/// Moreover, a translation unit may be derived from another unit, similar
-/// to inheritance in other languages.
-#[derive(PartialEq, Clone)]
-pub struct Unit {
-    /// the name of the unit (identifier)
-    pub name: String,
-    /// the name of the derrived unit
-    pub derived: Option<String>,
-    /// defined constants in this unit
-    pub consts: Vec<Const>,
-    /// the state of the unit
-    pub state: State,
-    /// the software visible interface of the unit
-    pub interface: Interface,
-    /// the methods defined by this unit
-    pub methods: Vec<Method>,
-    // TODO: maybe make the translate / constructors / map / ... explicit here?
-    /// the position in the source tree where this unit is defined
-    pub pos: SourcePos,
-}
+    for f in vec!["basicimport.vrs", "multiimport.vrs"] {
+        d.push(f);
+        let filename = format!("{}", d.display());
 
-/// implementation of the [fmt::Display] trait for the [Unit]
-impl fmt::Display for Unit {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match &self.derived {
-            Some(n) => writeln!(f, "Unit {} : {}  {{\nTODO\n}}", self.name, n),
-            None => writeln!(f, "Unit {} {{\nTODO\n}}", self.name),
-        }
-    }
-}
+        println!("filename: {}", filename);
 
-/// implementation of the [fmt::Debug] trait for the [Unit]
-impl fmt::Debug for Unit {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let (line, column) = self.pos.input_pos();
-        match &self.derived {
-            Some(n) => writeln!(
-                f,
-                "{:03}:{:03} | unit {} : {}  {{\nTODO\n}}",
-                line, column, self.name, n
-            ),
-            None => writeln!(
-                f,
-                "{:03}:{:03} | unit {} {{\nTODO\n}}",
-                line, column, self.name
-            ),
-        }
-    }
-}
-
-/// Defines the state of a translation unit
-///
-/// The State defines how the translation unit will translate incoming addresses.
-/// There are three fundamental state types:
-///   - Memory: the state is *external* to the translation unit in some memory (e.g, RAM)
-///   - Register: the state is *internal* to the translation unit
-///   - None: there is no state associated with it.
-#[derive(PartialEq, Clone)]
-pub enum State {
-    /// defines a memory state (external to the unit)
-    MemoryState {
-        /// a list of identifiers referring to memory regions
-        bases: Vec<String>,
-        /// defines a list of fields within the memory regions, defined by the bases
-        fields: Vec<Field>,
-        /// position where this state was defined
-        pos: SourcePos,
-    },
-    /// defines a register state (internal to the unit)
-    RegisterState {
-        /// defines a list of fields that form the state
-        fields: Vec<Field>,
-        /// the position where the state is defined
-        pos: SourcePos,
-    },
-    // TODO state that may be combined
-    //CombinedState {  },
-    /// No state associated with this translation unit
-    None,
-}
-
-/// implementation of the [fmt::Display] trait for the [State]
-impl fmt::Display for State {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use self::State::*;
-        match self {
-            MemoryState { bases, fields, pos } => {
-                write!(f, "State(Memory) [")?;
-                bases
-                    .iter()
-                    .fold(Ok(()), |result, b| result.and_then(|_| write!(f, "{} ", b)))?;
-                writeln!(f, "] {{")?;
-
-                fields.iter().fold(Ok(()), |result, field| {
-                    result.and_then(|_| writeln!(f, "{}", field))
-                })?;
-                writeln!(f, "}}")
-            }
-            RegisterState { fields, pos } => {
-                let s = String::new();
-                writeln!(f, "State(Registers) {{")?;
-                fields.iter().fold(Ok(()), |result, field| {
-                    result.and_then(|_| writeln!(f, "{}", field))
-                })?;
-                writeln!(f, "}}")
-            }
-            None => writeln!(f, "State(None)"),
-        }
-    }
-}
-
-/// implementation of the [fmt::Debug] trait for the [State]
-impl fmt::Debug for State {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use self::State::*;
-        //let (line, column) = self.pos.input_pos();
-        match self {
-            MemoryState { bases, fields, pos } => {
-                let (line, column) = pos.input_pos();
-                write!(f, "{:03}:{:03} | State(Memory) [", line, column)?;
-                bases
-                    .iter()
-                    .fold(Ok(()), |result, b| result.and_then(|_| write!(f, "{} ", b)))?;
-                writeln!(f, "] {{")?;
-
-                fields.iter().fold(Ok(()), |result, field| {
-                    result.and_then(|_| writeln!(f, "{}", field))
-                })?;
-                writeln!(f, "}}")
-            }
-            RegisterState { fields, pos } => {
-                let (line, column) = pos.input_pos();
-                let s = String::new();
-                writeln!(f, "{:03}:{:03} | State(Registers) {{", line, column)?;
-                fields.iter().fold(Ok(()), |result, field| {
-                    result.and_then(|_| writeln!(f, "{}", field))
-                })?;
-                writeln!(f, "}}")
-            }
-            None => writeln!(f, "State(None)"),
-        }
-    }
-}
-
-/// Defines the software-visible interface of a unit
-///
-/// Similar to the state, there are multiple options of the interface:
-///   - Memory: load/store to memory (normal DRAM)
-///   - MMIORegisters: load/store to memory-mapped device registers
-///   - CPURegisters: load/store to CPU registers
-///   - SpecialRegisters: use of special instructions (no load/store) to those
-#[derive(PartialEq, Clone)]
-pub enum Interface {
-    /// Defines a load/store interface to memory
-    Memory { pos: SourcePos },
-    /// Defines a memory-mapped interface to registers
-    MMIORegisters { pos: SourcePos },
-    /// Defines a load/store interface to CPU registers
-    CPURegisters { pos: SourcePos },
-    /// Defines a register interface using special instructions
-    SpecialRegisters { pos: SourcePos },
-    // TODO interface may be a combination: e.g., Memory + MMIORegisters
-    //CombinedState {  },
-    /// No software interface associated with this translation unit
-    None,
-}
-
-/// Defines a Method inside a unit
-///
-/// A method defines certain functionality of the translation unit.
-///
-/// # Examples
-///
-///  - Translate(): a method that translates an address (required)
-///  - get_size(): a method that extracts the
-#[derive(PartialEq, Clone)]
-pub struct Method {
-    /// the name of the method
-    pub name: String,
-    /// the return type of the method
-    pub rettype: Type,
-    /// A list of arguments with their types
-    pub args: Vec<(String, Type)>,
-    /// A sequence of statements
-    pub stmts: Vec<Stmt>,
-    /// the position where the method was defined
-    pub pos: SourcePos,
-}
-
-/// Implementation of the [fmt::Display] trait for [Field]
-impl fmt::Display for Method {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "fn {}() -> {} {{", self.name, self.rettype)?;
-        self.stmts.iter().fold(Ok(()), |result, s| {
-            result.and_then(|_| writeln!(f, "  {}", s))
-        })?;
-        writeln!(f, "}}")
-    }
-}
-
-/// Implementation of the [fmt::Debug] trait for [Field]
-impl fmt::Debug for Method {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let (line, column) = self.pos.input_pos();
-        writeln!(
-            f,
-            "{:03}:{:03} | fn {}() -> {} {{",
-            line, column, self.name, self.rettype
-        )?;
-        self.stmts.iter().fold(Ok(()), |result, s| {
-            result.and_then(|_| writeln!(f, "  {:?}", s))
-        })?;
-        writeln!(f, "}}")
-    }
-}
-
-/// Defines an field in the state
-///
-/// A field may represent a 8, 16, 32, or 64 bit region in the state with a
-/// specific bit layout.
-#[derive(PartialEq, Clone)]
-pub struct Field {
-    /// the name of the field
-    pub name: String,
-    /// a reference to the state where the field is (base + offset)
-    pub stateref: Option<(String, u64)>,
-    /// the size of the field in bits
-    pub length: u64,
-    /// a vector of [BitSlice] representing the bitlayout
-    pub layout: Vec<BitSlice>,
-    /// the position where this field was defined
-    pub pos: SourcePos,
-}
-
-/// Implementation of the [fmt::Display] trait for [Field]
-impl fmt::Display for Field {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match &self.stateref {
-            Some((s, o)) => writeln!(f, "{} [{}, {}, {}] {{", self.name, s, o, self.length)?,
-            None => writeln!(f, "{} [{}] {{", self.name, self.length)?,
+        // lex the file
+        let mut ast = match Parser::parse_file(&filename) {
+            Ok((ast, _)) => ast,
+            Err(x) => panic!("parsing failed:\n\n{}\n\n", x),
         };
 
-        self.layout.iter().fold(Ok(()), |result, field| {
-            result.and_then(|_| writeln!(f, "  {}", field))
-        })?;
-        writeln!(f, "}}")
+        // now resolve the import
+        assert!(ast.resolve_imports().is_ok());
+
+        d.pop();
     }
 }
 
-/// Implementation of the [fmt::Debug] trait for [Field]
-impl fmt::Debug for Field {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let (line, column) = self.pos.input_pos();
-        write!(f, "{:03}:{:03} | ", line, column)?;
-        match &self.stateref {
-            Some((s, o)) => writeln!(f, "{} [{}, {}, {}] {{", self.name, s, o, self.length)?,
-            None => writeln!(f, "{} [{}] {{", self.name, self.length)?,
+#[test]
+fn import_test_recursive() {
+    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    d.push("tests/imports");
+
+    for f in vec!["recursiveimport.vrs"] {
+        d.push(f);
+        let filename = format!("{}", d.display());
+
+        // lex the file
+        let mut ast = match Parser::parse_file(&filename) {
+            Ok((ast, _)) => ast,
+            Err(x) => panic!("parsing failed:\n\n{}\n\n", x),
         };
 
-        self.layout.iter().fold(Ok(()), |result, field| {
-            result.and_then(|_| writeln!(f, "  {:?}", field))
-        })?;
-        writeln!(f, "}}")
+        // now resolve the import
+        assert!(ast.resolve_imports().is_ok());
+
+        d.pop();
     }
 }
 
-/// Represents a bitslice of a [Field]
-///
-/// The field corresponds to the slice `[start..end]` of the [Field]
-#[derive(PartialEq, Clone)]
-pub struct BitSlice {
-    /// the start bit
-    pub start: u16,
-    /// the end bit
-    pub end: u16,
-    /// the name of the slice
-    pub name: String,
-    /// where it was defined
-    pub pos: SourcePos,
-}
+#[test]
+fn import_test_circular() {
+    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    d.push("tests/imports");
 
-/// Implementation of the [fmt::Display] trait for [BitSlice]
-impl fmt::Display for BitSlice {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "[{:2}..{:2}]  {}", self.start, self.end, &self.name)
-    }
-}
-/// Implementation of the [fmt::Debug] trait for [BitSlice]
-impl fmt::Debug for BitSlice {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let (line, column) = self.pos.input_pos();
-        write!(
-            f,
-            "{:03}:{:03} | [{:2}..{:2}]  {}",
-            line, column, self.start, self.end, &self.name
-        )
-    }
-}
+    for f in vec!["circular21.vrs", "circular1.vrs"] {
+        d.push(f);
+        let filename = format!("{}", d.display());
 
-/// Represents a statement
-#[derive(Debug, PartialEq, Clone)]
-pub enum Stmt {
-    /// a block is a sequence of statements
-    Block { stmts: Vec<Stmt>, pos: SourcePos },
-    /// the assign statements gives a name to a value
-    Assign {
-        typeinfo: Type,
-        lhs: String,
-        rhs: Expr,
-        pos: SourcePos,
-    },
-    /// the conditional with
-    IfElse {
-        cond: Expr,
-        then: Box<Stmt>,
-        other: Option<Box<Stmt>>,
-        pos: SourcePos,
-    },
-    /// assert statement
-    Assert { expr: Expr, pos: SourcePos },
-}
+        // lex the file
+        let mut ast = match Parser::parse_file(&filename) {
+            Ok((ast, _)) => ast,
+            Err(x) => panic!("parsing failed:\n\n{}\n\n", x),
+        };
 
-impl fmt::Display for Stmt {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use self::Stmt::*;
-        match self {
-            Block { stmts, pos: _ } => {
-                write!(f, "{{ TODO }} \n")
-            }
-            Assign { typeinfo, lhs, rhs, pos: _ } => write!(f, "let {} : {} = {};\n", typeinfo, lhs, rhs),
-            Assert { expr, pos: _ } => write!(f, "assert {};", expr),
-            IfElse {
-                cond,
-                then,
-                other,
-                pos: _,
-            } => match other {
-                None => write!(f, "if {} {} \n", cond, then),
-                Some(x) => write!(f, "if {} {} else {} \n", cond, then, x),
-            },
-        }
-    }
-}
+        // now resolve the import
+        assert!(ast.resolve_imports().is_err());
 
-/// Binary operations for [Expr] <OP> [Expr]
-#[derive(Debug, PartialEq, Clone)]
-pub enum BinOp {
-    // arithmetic opreators
-    Plus,
-    Minus,
-    Multiply,
-    Divide,
-    Modulo,
-    LShift,
-    RShift,
-    And,
-    Xor,
-    Or,
-    // boolean operators
-    Eq,
-    Ne,
-    Lt,
-    Gt,
-    Le,
-    Ge,
-    Land,
-    Lor,
-}
-
-impl fmt::Display for BinOp {
-    fn fmt(&self, format: &mut fmt::Formatter) -> fmt::Result {
-        use self::BinOp::*;
-        match self {
-            Plus => write!(format, "+"),
-            Minus => write!(format, "-"),
-            Multiply => write!(format, "*"),
-            Divide => write!(format, "/"),
-            Modulo => write!(format, "%"),
-            LShift => write!(format, "<<"),
-            RShift => write!(format, ">>"),
-            And => write!(format, "&"),
-            Xor => write!(format, "^"),
-            Or => write!(format, "|"),
-            Eq => write!(format, "=="),
-            Ne => write!(format, "!="),
-            Lt => write!(format, "<"),
-            Gt => write!(format, ">"),
-            Le => write!(format, "<="),
-            Ge => write!(format, ">="),
-            Land => write!(format, "&&"),
-            Lor => write!(format, "||"),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum UnOp {
-    // arithmetic operators
-    Not,
-    Ref,
-    // boolean operator
-    LNot,
-}
-
-impl fmt::Display for UnOp {
-    fn fmt(&self, format: &mut fmt::Formatter) -> fmt::Result {
-        use self::UnOp::*;
-        match self {
-            Not => write!(format, "~"),
-            LNot => write!(format, "!"),
-            Ref => write!(format, "&"),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Expr {
-    Identifier {
-        path: Vec<String>,
-        pos: SourcePos,
-    },
-    Number {
-        value: u64,
-        pos: SourcePos,
-    },
-    Boolean {
-        value: bool,
-        pos: SourcePos,
-    },
-    BinaryOperation {
-        op: BinOp,
-        lhs: Box<Expr>,
-        rhs: Box<Expr>,
-        pos: SourcePos,
-    },
-    UnaryOperation {
-        op: UnOp,
-        val: Box<Expr>,
-        pos: SourcePos,
-    },
-    FnCall {
-        path: Vec<String>,
-        pos: SourcePos,
-    },
-    Slice {
-        path: Vec<String>,
-        slice: Box<Expr>,
-        pos: SourcePos,
-    },
-    Element {
-        path: Vec<String>,
-        idx: Box<Expr>,
-        pos: SourcePos,
-    },
-    Range {
-        start: Box<Expr>,
-        end: Box<Expr>,
-        pos: SourcePos,
-    },
-}
-
-impl fmt::Display for Expr {
-    fn fmt(&self, format: &mut fmt::Formatter) -> fmt::Result {
-        use self::Expr::*;
-        match self {
-            Identifier { path, pos: _ } => write!(format, "{}", path.join(".")),
-            Number { value, pos: _ } => write!(format, "{}", value),
-            Boolean { value, pos: _ } => write!(format, "{}", value),
-            BinaryOperation {
-                op,
-                lhs,
-                rhs,
-                pos: _,
-            } => write!(format, "({} {} {})", lhs, op, rhs),
-            UnaryOperation { op, val, pos: _ } => write!(format, "{}({})", op, val),
-            FnCall { path, pos: _ } => {
-                write!(format, "{}()", path.join("."))
-            }
-            Slice {
-                path,
-                slice,
-                pos: _,
-            } => write!(format, "{}[{}]", path.join("."), slice),
-            Element { path, idx, pos: _ } => {
-                write!(format, "{}[{}]", path.join("."), idx)
-            }
-            Range { start, end, pos: _ } => write!(format, "{}..{}", start, end),
-        }
+        d.pop();
     }
 }

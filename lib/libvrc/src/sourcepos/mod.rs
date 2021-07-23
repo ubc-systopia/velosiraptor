@@ -41,6 +41,7 @@ use nom::{
     InputTakeAtPosition, Needed, Offset, Slice,
 };
 
+use crate::error::ErrorLocation;
 use nom::error::{ErrorKind, ParseError};
 
 /// Corresponds to a single byte of the source file
@@ -51,7 +52,7 @@ pub type Element = char;
 /// This structures keeps track of the context (e.g., file name) as well as the
 /// current range of the SourcePos within the lexing context as a range of bytes.
 /// Moreover, we keep track on the line and column.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct SourcePos {
     /// The context of the SourcePos. This might be a file name or "STDIO"
     context: Rc<String>,
@@ -614,6 +615,13 @@ impl Offset for SourcePos {
 /// Implementation of the [std::fmt::Display] trait for [SourcePos]
 impl fmt::Display for SourcePos {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}:{}:{}", self.context, self.line, self.column)
+    }
+}
+
+/// Implementation of the [std::fmt::Debug] trait for [SourcePos]
+impl fmt::Debug for SourcePos {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
             "{}:{}:{}\n{}",
@@ -625,6 +633,106 @@ impl fmt::Display for SourcePos {
     }
 }
 
+/// Implementation of the [error::ErrorLocation] trait for [SourcePos]
+impl ErrorLocation for SourcePos {
+    /// the line number in the source file
+    fn line(&self) -> u32 {
+        self.line
+    }
+
+    /// the column number in the source file
+    fn column(&self) -> u32 {
+        self.column
+    }
+
+    /// the length of the token
+    fn length(&self) -> usize {
+        self.input_len()
+    }
+
+    /// the context (stdin or filename)
+    fn context(&self) -> &str {
+        &self.context
+    }
+
+    /// the surrounding line context
+    fn linecontext(&self) -> &str {
+        let mut start = self.range.start;
+
+        // panic!("start = {}", start);
+
+        for c in self.content[0..start].chars().rev() {
+            if c as char == '\n' {
+                break;
+            }
+            start = start - 1;
+        }
+
+        if self.content[start..].chars().next().unwrap() == '\n' {
+            start = start + 1;
+        }
+
+        let mut end = self.range.start;
+        for c in self.content[end..].chars() {
+            if c as char == '\n' {
+                break;
+            }
+            end = end + 1;
+        }
+        &self.content[start..end]
+    }
+}
+
+/// Implementation of the [error::ErrorLocation] trait for [SourcePos]
+impl ErrorLocation for &SourcePos {
+    /// the line number in the source file
+    fn line(&self) -> u32 {
+        self.line
+    }
+
+    /// the column number in the source file
+    fn column(&self) -> u32 {
+        self.column
+    }
+
+    /// the length of the token
+    fn length(&self) -> usize {
+        self.input_len()
+    }
+
+    /// the context (stdin or filename)
+    fn context(&self) -> &str {
+        &self.context
+    }
+
+    /// the surrounding line context
+    fn linecontext(&self) -> &str {
+        let mut start = self.range.start;
+
+        // panic!("start = {}", start);
+
+        for c in self.content[0..start].chars().rev() {
+            if c as char == '\n' {
+                break;
+            }
+            start = start - 1;
+        }
+
+        if self.content[start..].chars().next().unwrap() == '\n' {
+            start = start + 1;
+        }
+
+        let mut end = self.range.start;
+        for c in self.content[end..].chars() {
+            if c as char == '\n' {
+                break;
+            }
+            end = end + 1;
+        }
+        &self.content[start..end]
+    }
+}
+
 #[test]
 fn sourcepos_tests() {
     let content = "foo\nbar\nfoobar";
@@ -633,8 +741,5 @@ fn sourcepos_tests() {
     assert_eq!(sp0.slice(4..), sp1);
     assert_eq!(sp0.slice(4..).as_str(), &content[4..]);
     assert_eq!(sp0.slice(..4).as_str(), &content[..4]);
-
-    //
-    let sp2 = SourcePos::new_at("stdin", content, 0..content.len(), 1, 1);
     assert_eq!(sp0.slice(..4).as_str(), "foo\n");
 }

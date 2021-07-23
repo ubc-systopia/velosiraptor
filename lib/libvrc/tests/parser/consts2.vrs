@@ -1,0 +1,3 @@
+import consts;
+
+const FOOBAR: int = 1234;

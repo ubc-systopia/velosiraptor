@@ -1,4 +1,4 @@
-// Velosiraptor Lexer
+// Velosiraptor Compiler
 //
 //
 // MIT License
@@ -23,52 +23,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Ast Module of the Velosiraptor Compiler
+//! The Token module
 
-mod ast;
-mod consts;
-mod expression;
-mod import;
-mod interface;
-mod method;
-mod state;
-mod types;
-mod unit;
+mod token;
+mod tokenstream;
 
-pub mod symboltable;
-pub mod transform;
-
-use custom_error::custom_error;
-
-use symboltable::SymbolTable;
-
-use crate::parser::ParsErr;
-
-// custom error definitions
-custom_error! {#[derive(PartialEq)] pub AstError
-    SymTabInsertExists         = "The symbol could not be inserted, already exists",
-    SymTableNotExists          = "The symbol does not exist in the table",
-    ImportError { error: ParsErr } = "The parser has failed",
-    MergeError {  } = "Merging of the ast has failed"
-}
-
-// rexports
-pub use ast::Ast;
-pub use consts::Const;
-pub use expression::{BinOp, Expr, UnOp};
-pub use import::Import;
-pub use interface::Interface;
-pub use method::Method;
-pub use method::Stmt;
-pub use state::BitSlice;
-pub use state::Field;
-pub use state::State;
-pub use types::Type;
-pub use unit::Unit;
-
-/// Trait that checks the Ast nodes for consistency
-///
-/// This trait has to be implemented by all the nodes
-trait AstNode {
-    fn check(&self) -> (u32, u32);
-}
+// re-export
+pub use token::{Keyword, Token, TokenContent};
+pub use tokenstream::TokenStream;

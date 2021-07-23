@@ -26,11 +26,12 @@
 //! State definition parsing
 
 // lexer, parser terminals and ast
-use crate::ast::ast::Expr;
-use crate::ast::ast::{BinOp, UnOp};
-use crate::lexer::sourcepos::SourcePos;
-use crate::lexer::token::TokenStream;
+use crate::ast::Expr;
+use crate::ast::{BinOp, UnOp};
+use crate::error::IResult;
 use crate::parser::terminals::*;
+use crate::sourcepos::SourcePos;
+use crate::token::TokenStream;
 
 // Precedence of Operators  (strong to weak)
 // Operator                         Associativity       Example
@@ -56,10 +57,7 @@ use crate::parser::terminals::*;
 // the used nom componets
 use nom::{
     branch::alt,
-    error::ErrorKind,
-    error_position,
     sequence::{delimited, tuple},
-    Err, IResult,
 };
 
 use nom::multi::many0;

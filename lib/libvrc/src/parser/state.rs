@@ -31,6 +31,9 @@ use crate::lexer::token::{Token, TokenStream, TokenContent, Keyword};
 use crate::parser::field::field;
 use crate::parser::terminals::{ident, kw_state, kw_register, kw_memory, assign, comma, lparen, rparen, lbrace, rbrace, semicolon, kw_none};
 //use crate::parser::field::field;
+use crate::token::TokenStream;
+use crate::ast::State;
+use crate::parser::terminals::{ident, import_keyword, semicolon};
 
 
 use nom::multi::separated_list0;

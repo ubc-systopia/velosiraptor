@@ -26,9 +26,9 @@
 //! State definition parsing
 
 // lexer, parser terminals and ast
-use crate::ast::ast::BitSlice;
-use crate::lexer::token::TokenStream;
+use crate::ast::BitSlice;
 use crate::parser::terminals::{ident, num};
+use crate::token::TokenStream;
 
 // the used nom componets
 use nom::{error::ErrorKind, error_position, sequence::tuple, Err, IResult};
@@ -84,10 +84,11 @@ pub fn bitslice(input: TokenStream) -> IResult<TokenStream, BitSlice> {
 }
 
 #[cfg(test)]
-use crate::lexer::{sourcepos::SourcePos, Lexer};
-
+use crate::lexer::Lexer;
 #[cfg(test)]
 use crate::nom::Slice;
+#[cfg(test)]
+use crate::sourcepos::SourcePos;
 
 #[test]
 fn test_ok() {
