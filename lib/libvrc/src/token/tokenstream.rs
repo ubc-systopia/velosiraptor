@@ -163,7 +163,7 @@ impl TokenStream {
     pub fn input_sourcepos(&self) -> SourcePos {
         let start = self.peek().spos.clone();
         let end = &self.last().spos;
-        start.from_self_until(end)
+        start.from_self_merged(end)
     }
 
     /// Calculates the sourcepos span between two tokenstreams
