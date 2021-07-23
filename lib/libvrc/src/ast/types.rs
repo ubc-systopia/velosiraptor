@@ -25,7 +25,6 @@
 
 //! Ast representation of the VelosiRaptor Definitions
 
-use std::collections::HashMap;
 use std::fmt;
 
 /// represents the known types.
