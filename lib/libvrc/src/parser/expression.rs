@@ -437,7 +437,7 @@ fn bool_term_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
         // it can be a identifier (variable)
         ident_expr,
         // its a term in parenthesis
-        preceded(lparen, cut(terminated(bool_expr, rparen))),
+        preceded(lparen, terminated(bool_expr, cut(rparen))),
     ))(input)
 }
 
@@ -459,7 +459,7 @@ fn arith_term_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
         // try to parse an identifier
         ident_expr,
         // try to parse an `(arith_expr)`
-        preceded(lparen, cut(terminated(arith_expr, rparen))),
+        preceded(lparen, terminated(arith_expr, cut(rparen))),
     ))(input)
 }
 
@@ -489,12 +489,12 @@ macro_rules! parse_equal (
 
 #[cfg(test)]
 macro_rules! parse_fail(
-    ($parser:expr, $lhs:expr, $rhs:expr) => (
+    ($parser:expr, $lhs:expr) => (
         let sp = SourcePos::new("stdio", $lhs);
         let tokens = Lexer::lex_source_pos(sp).unwrap();
         let ts = TokenStream::from_vec(tokens);
         assert!(
-            $parser(ts.clone()).map(|(i, x)| (i, format!("{}", x))).is_err(),
+            $parser(ts.clone()).is_err(),
         );
     )
 );
@@ -510,6 +510,9 @@ fn test_literals() {
     parse_equal!(expr, "foo[3]", "foo[3]");
     parse_equal!(expr, "bar()", "bar()");
     parse_equal!(expr, "foo.bar[3]", "foo.bar[3]");
+    // unclosed
+    parse_fail!(expr, "(1");
+    parse_fail!(expr, "(1(");
 }
 
 #[test]
@@ -523,7 +526,7 @@ fn test_arithmetic() {
     );
     parse_equal!(arith_expr, "1 + a + b + 4 + 5", "((((1 + a) + b) + 4) + 5)");
 
-    parse_fail!(bool_expr, "1 + 2 * 3 + 4", "((1 + (2 * 3)) + 4)");
+    parse_fail!(bool_expr, "1 + 2 * 3 + 4");
 }
 
 #[test]
