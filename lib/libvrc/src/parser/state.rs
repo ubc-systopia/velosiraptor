@@ -35,7 +35,7 @@ use crate::parser::terminals::{ident, kw_state, kw_register, kw_memory, assign, 
 
 use nom::multi::separated_list0;
 // the used nom components
-use nom::{error::ErrorKind, error_position, Err, IResult, Slice};
+use nom::{error::ErrorKind, error_position, Err, IResult, Slice, combinator::cut};
 use nom::sequence::{delimited, terminated};
 use nom::branch::alt;
 use crate::lexer::Lexer;
@@ -46,19 +46,17 @@ pub fn state(input: TokenStream) -> IResult<TokenStream, State> {
     // try to match the state keyword, if there is no match, return.
     let (i1, _)= kw_state(input)?;
     // We now parse the different state types.
-    delimited(assign, alt((register_state, memory_state, none_state)), semicolon)(i1)
+    cut(delimited(assign, alt((register_state, memory_state, none_state)), semicolon))(i1)
 }
 
 /// parses and consumes [RegisterState] of a unit
 fn register_state(input: TokenStream) -> IResult<TokenStream, State> {
-
     let pos = input.input_sourcepos();
 
     let (i1, _) = kw_register(input)?;
     let (i2, fields) = fields_parser(i1)?;
 
     Ok((i2, State::RegisterState{ fields, pos }))
-    //Ok((i1, State::RegisterState{ fields, pos }))
 }
 
 /// parses and consumes [MemoryState] of a unit
@@ -79,39 +77,18 @@ fn none_state(input: TokenStream) -> IResult<TokenStream, State> {
     let pos = input.input_sourcepos();
 
     let (i1, _) = kw_none(input)?;
-    //println!("parsed None keyword");
 
     Ok((i1, State::None))
 }
 
 /// Parses and consumes a comma separated list of identifiers of the form "(ident, ..., ident)"
 pub fn argument_parser(input: TokenStream) -> IResult<TokenStream, Vec<String>> {
-    match delimited(lparen, separated_list0(comma, ident), rparen)(input.clone()) {
-        Ok((i1, arguments)) => Ok((i1, arguments)),
-        Err(e) => {
-            let (i, k) = match e {
-                Err::Error(e) => (e.input, e.code),
-                Err::Failure(e) => (e.input, e.code),
-                Err::Incomplete(_) => (input, ErrorKind::Eof),
-            };
-            return Err(Err::Failure(error_position!(i, k)));
-        }
-    }
+    cut(delimited(lparen, separated_list0(comma, ident), rparen))(input)
 }
 
 /// Parses and consumes a semicolon separated list of fields of the form "{ FIELD; ...; FIELD; }"
 pub fn fields_parser(input: TokenStream) -> IResult<TokenStream, Vec<Field>> {
-    match delimited(lbrace, terminated(separated_list0(semicolon, field), semicolon), rbrace)(input.clone()) {
-        Ok((i1, fields)) => Ok((i1, fields)),
-        Err(e) => {
-            let (i, k) = match e {
-                Err::Error(e) => (e.input, e.code),
-                Err::Failure(e) => (e.input, e.code),
-                Err::Incomplete(_) => (input, ErrorKind::Eof),
-            };
-            Err(Err::Failure(error_position!(i, k)))
-        }
-    }
+    cut(delimited(lbrace, terminated(separated_list0(semicolon, field), semicolon), rbrace))(input)
 }
 
 // TODO ask Reto about current source pos assignment.
@@ -146,7 +123,6 @@ fn memory_state_parser_test() {
         _ => panic!("Wrong type of State parsed"),
     };
 
-    //println!("{:?}", fields);
 
     // todo Do I need to test this when it's already being done in fields.rs
     /*assert_eq!(fields,
@@ -203,7 +179,6 @@ fn register_state_parser_test() {
         _ => panic!("Wrong type of State parsed"),
     };
 
-    //println!{"{:?}", pos}
     // todo Should we be testing fields???
     assert_eq!(pos, tok_stream.slice(2..4).input_sourcepos());
 }
