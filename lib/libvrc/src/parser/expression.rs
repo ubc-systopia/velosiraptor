@@ -133,14 +133,14 @@ pub fn arith_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 pub fn num_lit_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
     let (i, value) = num(input.clone())?;
-    let pos = input.from_merged(&i);
+    let pos = input.from_self_until(&i);
     Ok((i, Expr::Number { value, pos }))
 }
 
 pub fn bool_lit_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
     let (i, value) = boolean(input.clone())?;
-    let pos = input.from_merged(&i);
+    let pos = input.from_self_until(&i);
     Ok((i, Expr::Boolean { value, pos }))
 }
 
@@ -437,7 +437,7 @@ fn bool_term_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
         // it can be a identifier (variable)
         ident_expr,
         // its a term in parenthesis
-        preceded(lparen, cut(terminated(bool_expr, rparen)))
+        preceded(lparen, cut(terminated(bool_expr, rparen))),
     ))(input)
 }
 
