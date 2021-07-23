@@ -58,24 +58,6 @@ pub trait ErrorLocation {
     fn linecontext(&self) -> &str;
 }
 
-/// represents an error type
-#[derive(PartialEq)]
-pub enum ErrorType {
-    /// this is an error
-    Error,
-    /// this is a warning
-    Warning,
-}
-
-/// represents an error type
-#[derive(PartialEq)]
-pub enum Tokentypes {
-    /// this is an error
-    Error,
-    /// this is a warning
-    Warning,
-}
-
 /// Error representation
 ///
 /// This structure captuers the location of the error or warning occurred.
@@ -226,7 +208,7 @@ impl<I: ErrorLocation + fmt::Display> VrsError<I> {
         // // the error message
         write!(f, "      {}         {}{}", pipe, indent, underline)?;
         match hint {
-            Some(h) => writeln!(f, " {}{}", color(": "), color(h)),
+            Some(h) => writeln!(f, " {}", color(h)),
             None => writeln!(f, ""),
         }
     }
