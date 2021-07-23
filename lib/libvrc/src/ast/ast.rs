@@ -219,7 +219,7 @@ impl Ast {
             match consts.get(c.ident()) {
                 Some(co) => {
                     let msg = format!("duplicate const definition with name {}", c.ident());
-                    let hint = format!("the previous position was here");
+                    let hint = format!("duplicate definition");
                     VrsError::new_err(co.pos().clone(), msg, Some(hint)).print();
                 }
                 None => {
@@ -232,9 +232,12 @@ impl Ast {
             for c in ast.consts.drain(..) {
                 match consts.get(c.ident()) {
                     Some(co) => {
-                        let msg = format!("duplicate const definition with name {}", c.ident());
-                        let hint = format!("the previous position was here");
-                        VrsError::new_err(c.pos().clone(), msg, Some(hint)).print();
+                        VrsError::new_double(
+                            c.ident().to_string(),
+                            c.pos().clone(),
+                            co.pos().clone(),
+                        )
+                        .print();
                     }
                     None => {
                         consts.insert(String::from(c.ident()), c);

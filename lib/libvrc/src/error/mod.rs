@@ -101,6 +101,15 @@ pub enum VrsError<I: ErrorLocation> {
         /// the location where the error happened
         location: I,
     },
+    /// represents a custom error
+    DoubleDef {
+        /// error message
+        ident: String,
+        /// the location where the error happened
+        current: I,
+        /// site of the previous definition
+        previous: I,
+    },
     /// reprsents a custom warning
     Warning {
         /// error message
@@ -139,6 +148,14 @@ impl<I: ErrorLocation + fmt::Display> VrsError<I> {
             location,
         }
     }
+    /// creates a new warning
+    pub fn new_double(ident: String, current: I, previous: I) -> Self {
+        VrsError::DoubleDef {
+            ident,
+            current,
+            previous,
+        }
+    }
 
     pub fn stack(location: I, message: String, other: VrsError<I>) -> Self {
         VrsError::Stack {
@@ -158,6 +175,61 @@ impl<I: ErrorLocation + fmt::Display> VrsError<I> {
     pub fn print(&self) {
         eprintln!("{}", self)
     }
+
+    fn fmtloc(f: &mut fmt::Formatter<'_>, loc: &I) -> std::fmt::Result {
+        let line = loc.line();
+        let col = loc.column();
+        let ctxt = loc.context();
+        // --> src/error/mod.rs:112:62
+        writeln!(f, "     {} {}:{}:{}", "-->".bold().blue(), ctxt, line, col)
+    }
+
+    fn fmthdr(
+        f: &mut fmt::Formatter<'_>,
+        typ: colored::ColoredString,
+        loc: &I,
+        msg: &str,
+    ) -> std::fmt::Result {
+        // error: <message>
+        writeln!(f, "{}{} {}", typ, ":".bold(), msg.bold())?;
+        Self::fmtloc(f, loc)
+    }
+
+    fn fmtctx(
+        f: &mut fmt::Formatter<'_>,
+        warn: bool,
+        loc: &I,
+        hint: Option<&String>,
+    ) -> std::fmt::Result {
+        let pipe = "|".bold().blue();
+
+        let color = if warn {
+            |s: &str| s.bright_yellow().bold()
+        } else {
+            |s: &str| s.bright_red().bold()
+        };
+
+        let line = loc.line();
+        let lineblue = line.to_string().as_str().bold().blue();
+        let col = loc.column();
+        let linectxt = loc.linecontext();
+
+        let indent = (0..col - 1).map(|_| " ").collect::<String>();
+
+        let underline = color((0..loc.length()).map(|_| "^").collect::<String>().as_str());
+
+        // error: <message>
+        writeln!(f, "      {}", pipe)?;
+        // // the line context
+        writeln!(f, " {:>4} {}         {}", lineblue, pipe, linectxt)?;
+
+        // // the error message
+        write!(f, "      {}         {}{}", pipe, indent, underline)?;
+        match hint {
+            Some(h) => writeln!(f, " {}{}", color(": "), color(h)),
+            None => writeln!(f, ""),
+        }
+    }
 }
 
 /// Implementation of [std::fmt::Display] for [VrsError]
@@ -174,14 +246,9 @@ impl<I: ErrorLocation + fmt::Display> fmt::Display for VrsError<I> {
             }
         };
 
-        let extracthint = |h: &Option<String>| match h {
-            Some(s) => String::from(s),
-            None => String::new(),
-        };
-
-        let (typ, msg, hint, loc, color) = match self {
+        match self {
             VrsError::Nom { error } => {
-                return writeln!(f, "      |  {} NOM ERROR!!!!!!", error);
+                writeln!(f, "      |  {} NOM ERROR!!!!!!", error)
             }
             VrsError::Error {
                 message,
@@ -189,13 +256,8 @@ impl<I: ErrorLocation + fmt::Display> fmt::Display for VrsError<I> {
                 location,
             } => {
                 let typ = applycolor(false)("error");
-                (
-                    typ,
-                    message.clone(),
-                    extracthint(hint),
-                    location,
-                    applycolor(false),
-                )
+                Self::fmthdr(f, typ, location, message)?;
+                Self::fmtctx(f, false, location, hint.as_ref())
             }
             VrsError::Warning {
                 message,
@@ -203,19 +265,29 @@ impl<I: ErrorLocation + fmt::Display> fmt::Display for VrsError<I> {
                 location,
             } => {
                 let typ = applycolor(true)("warning");
-                (
-                    typ,
-                    message.clone(),
-                    extracthint(hint),
-                    location,
-                    applycolor(true),
-                )
+                Self::fmthdr(f, typ, location, message)?;
+                Self::fmtctx(f, true, location, hint.as_ref())
+            }
+            VrsError::DoubleDef {
+                ident,
+                current,
+                previous,
+            } => {
+                let typ = applycolor(false)("error");
+                let message = format!("duplicate definition with name {}", ident);
+                let hint = String::from("the second definition is here");
+                Self::fmthdr(f, typ, current, &message)?;
+                Self::fmtctx(f, false, current, Some(&hint))?;
+                Self::fmtloc(f, previous)?;
+                let hint = String::from("the previous definition was here");
+                Self::fmtctx(f, false, previous, Some(&hint))
             }
             VrsError::ExpectedToken { location, tokens } => {
                 let typ = applycolor(false)("error");
                 let message = format!("unexpected token encounteted: {}", location);
                 let hint = format!("expected one of {:?}", tokens);
-                (typ, message, hint, location, applycolor(false))
+                Self::fmthdr(f, typ, location, &message)?;
+                Self::fmtctx(f, false, location, Some(&hint))
             }
             VrsError::Stack {
                 message,
@@ -234,28 +306,7 @@ impl<I: ErrorLocation + fmt::Display> fmt::Display for VrsError<I> {
                     l.column()
                 );
             }
-        };
-
-        let line = loc.line();
-        let lineblue = line.to_string().as_str().bold().blue();
-        let col = loc.column();
-        let ctxt = loc.context();
-        let linectxt = loc.linecontext();
-
-        let indent = (0..col - 1).map(|_| " ").collect::<String>();
-        let underline = color((0..loc.length()).map(|_| "^").collect::<String>().as_str());
-
-        // error: <message>
-        writeln!(f, "{}{} {}", typ, ":".bold(), msg.bold())?;
-        // --> src/error/mod.rs:112:62
-        writeln!(f, "     {} {}:{}:{}", "-->".bold().blue(), ctxt, line, col)?;
-        writeln!(f, "      {}", pipe)?;
-        // // the line context
-        writeln!(f, " {:>4} {}         {}", lineblue, pipe, linectxt)?;
-
-        // // the error message
-        write!(f, "      {}         {}{}", pipe, indent, underline)?;
-        writeln!(f, " {}{}", color("hint: "), color(&hint))
+        }
     }
 }
 
