@@ -65,18 +65,16 @@ fn print_errors_and_exit<I: ErrorLocation + std::fmt::Display>(
     msg: &str,
     err: VrsError<I>,
     target: &str,
+    cnt: u32,
 ) {
     err.print();
     eprintln!("{}{}{}.\n", "error".bold().red(), ": ".bold(), msg.bold());
-    abort(target)
+    abort(target, cnt)
 }
 
-fn abort(target: &str) {
-    eprintln!(
-        "{}{}.\n",
-        "error".bold().red(),
-        ": aborting due to previous error(s)".bold()
-    );
+fn abort(target: &str, cnt: u32) {
+    let msg = format!(": aborting due to previous {} error(s).", cnt);
+    eprintln!("{}{}.\n", "error".bold().red(), msg.bold());
     eprintln!(
         "{}: could not compile `{}`.\n",
         "error".bold().red(),
@@ -101,8 +99,12 @@ fn main() {
     // initialize the logger
     SimpleLogger::init(filter_level, Config::default()).unwrap();
 
-    // show the welcome message
-    log::info!("Velosiraptor Compiler (vrc)");
+    // print the start message
+    eprintln!(
+        "{:>8}: {}...\n",
+        "start".bold().green(),
+        "Velosiraptor Compiler (vrc)"
+    );
 
     let infile = matches.value_of("input").unwrap_or("none");
     log::info!("input file: {}", infile);
@@ -115,31 +117,36 @@ fn main() {
 
     log::info!("==== PARSING STAGE ====");
 
-    eprintln!("{}: {}...\n", "parsing".bold().green(), infile);
+    eprintln!("{:>8}: {}...\n", "parse".bold().green(), infile);
 
     // let's try to create a file parser
     let mut ast = match Parser::parse_file(infile) {
         Ok((ast, _)) => ast,
         Err(ParserError::LexerFailure { error }) => {
-            print_errors_and_exit("during lexing of the file", error, infile);
+            print_errors_and_exit("during lexing of the file", error, infile, 1);
             return;
         }
         Err(ParserError::ParserFailure { error }) => {
-            print_errors_and_exit("during parsing of the file", error, infile);
+            print_errors_and_exit("during parsing of the file", error, infile, 1);
             return;
         }
         Err(ParserError::ParserIncomplete { error }) => {
-            print_errors_and_exit("unexpected junk at the end of the file", error, infile);
+            print_errors_and_exit("unexpected junk at the end of the file", error, infile, 1);
             return;
         }
         Err(_) => {
-            abort(infile);
+            abort(infile, 1);
             return;
         }
     };
 
+    log::info!("AST:");
+    log::info!("----------------------------");
+    log::info!("{}", ast);
+    log::info!("----------------------------");
+
     eprintln!(
-        "{}: {} {}...\n",
+        "{:>8}: {} {}...\n",
         "resolve".bold().green(),
         ast.imports.len(),
         "imports"
@@ -149,52 +156,63 @@ fn main() {
     match ast.resolve_imports() {
         Ok(()) => (),
         Err(AstError::ImportError { error }) => {
-            print_errors_and_exit("failed resolving the imports", error, infile);
+            print_errors_and_exit("failed resolving the imports", error, infile, 1);
             return;
         }
+        Err(AstError::MergeError { count }) => {
+            eprintln!(
+                "{}{}.\n",
+                "error".bold().red(),
+                ": during merging of the ASTs".bold()
+            );
+            abort(infile, count)
+        }
         _ => {
-            abort(infile);
+            abort(infile, 1);
             return;
         }
     };
 
-    // eprintln!("{}: consistency...\n", "check".bold().green());
+    log::info!("AST:");
+    log::info!("----------------------------");
+    log::info!("{}", ast);
+    log::info!("----------------------------");
+
+    // build the
+    eprintln!("{:>8}: {}...\n", "build".bold().green(), "symboltable");
+
+    // now check the ast
+
+    eprintln!(
+        "{:>8}: {}...\n",
+        "check".bold().green(),
+        "performing consistency check"
+    );
     // ast.check_consistency();
 
-    // // ok we've got an ast, now resolve the imports
-    // // match ast.resolve_imports() {
-    // //     eprintln!(
-    // //         "{}{}.\n",
-    // //         "error".bold().red(),
-    // //         ": during resolving of the imports".bold()
-    // //     )?;
-    // //     print_errors_and_exit(error, infile);
-    // // }
+    // so things should be fine, we can now go and generate stuff
 
-    // // match ast.check() {
+    // generate the raw interface files: this is the "language" to interface
+    eprintln!(
+        "{:>8}: {}...\n",
+        "rust".bold().green(),
+        "generating interface files"
+    );
 
-    // // }
+    // generate the unit files that use the interface files
+    eprintln!(
+        "{:>8}: {}...\n",
+        "rust".bold().green(),
+        "generating unit files"
+    );
 
-    // log::debug!("Printing ast:");
-    // log::debug!("{}", ast);
+    // we can generate some modules
+    eprintln!(
+        "{:>8}: {}...\n",
+        "arm".bold().green(),
+        "generating Arm FastModels modules"
+    );
 
-    // perform checks
+    // ok all done.
+    eprintln!("{:>8}: {}...\n", "finished".bold().green(), "...");
 }
-
-// use std::rc::Rc;
-// struct Foo {
-//     s : Rc<String>
-// }
-// struct Bar {
-//     s: Rc<String>,
-//     f: Foo,
-// }
-// impl Bar {
-//     fn new() -> Self {
-//         let s = Rc::new("test".to_string());
-//         Bar {
-//             s: s.clone(),
-//             f : Foo {s: s.clone()}
-//         }
-//     }
-// }
