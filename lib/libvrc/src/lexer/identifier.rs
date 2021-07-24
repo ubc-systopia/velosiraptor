@@ -36,7 +36,7 @@ use nom::sequence::pair;
 use crate::error::IResult;
 
 use crate::sourcepos::SourcePos;
-use crate::token::{Keyword, Token, TokenContent, TokenStream};
+use crate::token::{Keyword, Token, TokenContent};
 
 /// parses a rust-like identifiers
 pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
@@ -73,10 +73,7 @@ pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
 }
 
 #[cfg(test)]
-use nom::{
-    error::{Error, ErrorKind},
-    Err, Slice,
-};
+use nom::Slice;
 
 #[test]
 fn identifier_test_alpha() {

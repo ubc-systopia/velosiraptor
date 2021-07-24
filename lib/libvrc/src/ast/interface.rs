@@ -26,7 +26,6 @@
 //! Ast Module of the Velosiraptor Compiler
 
 use crate::sourcepos::SourcePos;
-use std::fmt;
 
 /// Defines the software-visible interface of a unit
 ///

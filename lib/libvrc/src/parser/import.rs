@@ -32,10 +32,6 @@ use crate::parser::terminals::{ident, kw_import, semicolon};
 use crate::token::TokenStream;
 
 // the used nom components
-use crate::nom::error::ErrorKind;
-use nom::sequence::terminated;
-use nom::{error_position, Err, IResult, InputLength, Slice};
-// the used nom componets
 use nom::{combinator::cut, sequence::terminated};
 
 /// parses and consumes an import statement (`import foo;`) and any following whitespaces
@@ -65,7 +61,7 @@ use crate::sourcepos::SourcePos;
 #[cfg(test)]
 use crate::token::{Keyword, Token, TokenContent};
 #[cfg(test)]
-use nom::{error::ErrorKind, error_position, Err, Slice};
+use nom::{Slice};
 #[test]
 fn test_ok() {
     // corresponds to: `import foobar;`

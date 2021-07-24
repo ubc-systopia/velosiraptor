@@ -43,6 +43,16 @@ pub enum Keyword {
     Else,
     /// import statements
     Import,
+    /// state statement
+    State,
+    /// interface statement
+    Interface,
+    /// Memory State statement
+    Memory,
+    /// Register State statement
+    Register,
+    /// Null-like value used for State and Interface
+    None,
     /// defines a local variable
     Let,
     /// represents a function
@@ -72,6 +82,11 @@ impl fmt::Display for Keyword {
             Let => "let",
             Fn => "fn",
             Assert => "assert",
+            State => "state",
+            Interface => "Interface",
+            Memory => "Memory",
+            Register => "Register",
+            None => "None",
             // types
             Addr => "addr",
             Size => "size",

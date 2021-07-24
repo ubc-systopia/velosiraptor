@@ -27,7 +27,6 @@
 
 use custom_error::custom_error;
 use nom::Err;
-use std::collections::HashMap;
 
 use std::rc::Rc;
 

@@ -40,8 +40,6 @@ pub mod transform;
 
 use custom_error::custom_error;
 
-use symboltable::SymbolTable;
-
 use crate::parser::ParsErr;
 
 // custom error definitions

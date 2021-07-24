@@ -26,23 +26,18 @@
 //! State definition parsing
 
 // lexer, parser terminals and ast
-use crate::ast::ast::{Field, State, BitSlice};
-use crate::lexer::token::{Token, TokenStream, TokenContent, Keyword};
+use crate::ast::{Field, State};
 use crate::parser::field::field;
 use crate::parser::terminals::{ident, kw_state, kw_register, kw_memory, assign, comma, lparen, rparen, lbrace, rbrace, semicolon, kw_none};
-//use crate::parser::field::field;
-use crate::token::TokenStream;
-use crate::ast::State;
-use crate::parser::terminals::{ident, import_keyword, semicolon};
-
+use crate::token::{TokenStream};
 
 use nom::multi::separated_list0;
 // the used nom components
-use nom::{error::ErrorKind, error_position, Err, IResult, Slice, combinator::cut};
+use crate::error::{IResult};
+use nom::{Slice, combinator::cut};
 use nom::sequence::{delimited, terminated};
 use nom::branch::alt;
 use crate::lexer::Lexer;
-use crate::ast::ast::State::MemoryState;
 
 /// parses and consumes the [State] of a unit
 pub fn state(input: TokenStream) -> IResult<TokenStream, State> {
