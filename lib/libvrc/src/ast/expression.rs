@@ -23,9 +23,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use crate::sourcepos::SourcePos;
 ///! Ast Module of the Velosiraptor Compiler
 use std::fmt;
+
+use crate::ast::AstNode;
+use crate::token::TokenStream;
 
 /// Binary operations for [Expr] <OP> [Expr]
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -53,7 +55,7 @@ pub enum BinOp {
 }
 
 impl BinOp {
-    pub fn eval(&self, lhs: Expr, rhs: Expr, pos: SourcePos) -> Expr {
+    pub fn eval(&self, lhs: Expr, rhs: Expr, pos: TokenStream) -> Expr {
         use BinOp::*;
         use Expr::*;
         match (self, lhs, rhs) {
@@ -187,7 +189,7 @@ pub enum UnOp {
 }
 
 impl UnOp {
-    pub fn eval(&self, val: Expr, pos: SourcePos) -> Expr {
+    pub fn eval(&self, val: Expr, pos: TokenStream) -> Expr {
         use Expr::*;
         use UnOp::*;
         match (self, val) {
@@ -217,45 +219,45 @@ impl fmt::Display for UnOp {
 pub enum Expr {
     Identifier {
         path: Vec<String>,
-        pos: SourcePos,
+        pos: TokenStream,
     },
     Number {
         value: u64,
-        pos: SourcePos,
+        pos: TokenStream,
     },
     Boolean {
         value: bool,
-        pos: SourcePos,
+        pos: TokenStream,
     },
     BinaryOperation {
         op: BinOp,
         lhs: Box<Expr>,
         rhs: Box<Expr>,
-        pos: SourcePos,
+        pos: TokenStream,
     },
     UnaryOperation {
         op: UnOp,
         val: Box<Expr>,
-        pos: SourcePos,
+        pos: TokenStream,
     },
     FnCall {
         path: Vec<String>,
-        pos: SourcePos,
+        pos: TokenStream,
     },
     Slice {
         path: Vec<String>,
         slice: Box<Expr>,
-        pos: SourcePos,
+        pos: TokenStream,
     },
     Element {
         path: Vec<String>,
         idx: Box<Expr>,
-        pos: SourcePos,
+        pos: TokenStream,
     },
     Range {
         start: Box<Expr>,
         end: Box<Expr>,
-        pos: SourcePos,
+        pos: TokenStream,
     },
 }
 
@@ -340,19 +342,57 @@ impl fmt::Display for Expr {
     }
 }
 
+impl AstNode for Expr {
+    fn name(&self) -> &str {
+        "Expression"
+    }
+
+    /// returns the location of the current
+    fn loc(&self) -> &TokenStream {
+        use self::Expr::*;
+        match &self {
+            Identifier { path: _, pos } => &pos,
+            Number { value: _, pos } => &pos,
+            Boolean { value: _, pos } => &pos,
+            BinaryOperation {
+                op: _,
+                lhs: _,
+                rhs: _,
+                pos,
+            } => &pos,
+            UnaryOperation { op: _, val: _, pos } => &pos,
+            FnCall { path: _, pos } => &pos,
+            Slice {
+                path: _,
+                slice: _,
+                pos,
+            } => &pos,
+            Element {
+                path: _,
+                idx: _,
+                pos,
+            } => &pos,
+            Range {
+                start: _,
+                end: _,
+                pos,
+            } => &pos,
+        }
+    }
+}
+
 #[cfg(test)]
 use crate::lexer::Lexer;
 #[cfg(test)]
 use crate::parser::{arith_expr, bool_expr};
 #[cfg(test)]
-use crate::token::TokenStream;
+use crate::sourcepos::SourcePos;
 
 #[cfg(test)]
 macro_rules! parse_equal (
     ($parser:expr, $lhs:expr, $rhs:expr) => (
         let sp = SourcePos::new("stdio", $lhs);
         let tokens = Lexer::lex_source_pos(sp).unwrap();
-        let len = tokens.len();
         let ts = TokenStream::from_vec(tokens);
         let (_, ex) = $parser(ts.clone()).unwrap();
         assert_eq!(

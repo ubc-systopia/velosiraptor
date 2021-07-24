@@ -29,7 +29,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-use crate::ast::{AstError, Const, Import, Unit};
+use crate::ast::{utils, AstError, AstNode, Const, Import, Issues, Unit};
 use crate::error::VrsError;
 use crate::parser::ParserError;
 use crate::token::TokenStream;
@@ -150,17 +150,18 @@ impl Ast {
         Ok(())
     }
 
-    /// recursively resolves all the imports
+    /// recursively resolves all the imports, stops on the first error encountered
     pub fn parse_imports(&mut self) -> Result<(), AstError> {
         // create the hashmap of the imports
         //let mut imports = HashMap::new();
         let mut path = Vec::new();
         match self.do_parse_imports(&mut path) {
             Ok(()) => Ok(()),
-            Err(error) => Err(AstError::ImportError { error }),
+            Err(e) => Err(AstError::ImportError { e }),
         }
     }
 
+    /// recursively collects all asts from the imports
     fn do_collect_asts(&mut self, asts: &mut HashMap<String, Ast>) {
         self.imports = self
             .imports
@@ -183,74 +184,40 @@ impl Ast {
         let mut asts = HashMap::new();
         self.do_collect_asts(&mut asts);
 
+        // cout the number of errors we've seen
+        let mut errors = 0;
+
         // now we have all the asts read, we can start merging them
-        // let mut units = HashMap::new();
-        // for u in self.units.drain(..) {
-        //     match units.get(&u.name) {
-        //         Some(unit) => {
-        //             let msg = format!("duplicate unit definition with name {}", u.name);
-        //             let hint = format!("the previous position was here");
-        //             VrsError::new_err(unit.pos.clone(), msg, Some(hint)).print();
-        //         }
-        //         None => {
-        //             units.insert(u.name.clone(), u);
-        //         }
-        //     }
-        // }
 
-        //     error[E0201]: duplicate definitions with name `do_collect_asts`:
-        //     --> src/ast/ast.rs:176:5
-        //      |
-        //  164 | /     fn do_collect_asts(&mut self, asts : &mut HashMap<String, Ast>) {
-        //  165 | |         self.imports = self.imports.drain(..).map(|mut i| match i.ast {
-        //  166 | |                 Some(mut ast) => {
-        //  167 | |                     ast.do_collect_asts(asts);
-        //  ...   |
-        //  174 | |         ).collect();
-        //  175 | |     }
-        //      | |_____- previous definition of `do_collect_asts` here
-        //  176 | /     fn do_collect_asts(&mut self) {
-        //  177 | |
-        //  178 | |     }
-        //      | |_____^ duplicate definition
+        // start with our own constant and unit definitions
+        let mut units = HashMap::new();
+        errors += utils::collect_list(&mut self.units, &mut units);
 
-        let mut consts: HashMap<String, Const> = HashMap::new();
-        for c in self.consts.drain(..) {
-            match consts.get(c.ident()) {
-                Some(co) => {
-                    let msg = format!("duplicate const definition with name {}", c.ident());
-                    let hint = format!("duplicate definition");
-                    VrsError::new_err(co.pos().clone(), msg, Some(hint)).print();
-                }
-                None => {
-                    consts.insert(String::from(c.ident()), c);
-                }
-            }
-        }
+        let mut consts = HashMap::new();
+        errors += utils::collect_list(&mut self.consts, &mut consts);
 
+        // now do the same for each AST
         for (_, mut ast) in asts.drain() {
-            for c in ast.consts.drain(..) {
-                match consts.get(c.ident()) {
-                    Some(co) => {
-                        VrsError::new_double(
-                            c.ident().to_string(),
-                            c.pos().clone(),
-                            co.pos().clone(),
-                        )
-                        .print();
-                    }
-                    None => {
-                        consts.insert(String::from(c.ident()), c);
-                    }
-                }
-            }
+            errors += utils::collect_list(&mut ast.units, &mut units);
+            errors += utils::collect_list(&mut ast.consts, &mut consts);
         }
-        //     for u in ast.units.drain(..) {
 
-        //     }
-        // }
+        // now we've collected all units and constants, so we can build the list again
+        for (_, u) in units.drain() {
+            self.units.push(u);
+        }
+        for (_, c) in consts.drain() {
+            self.consts.push(c);
+        }
 
-        Ok(())
+        // return the error count, if we encountered one
+        if errors == 0 {
+            Ok(())
+        } else {
+            Err(AstError::MergeError {
+                i: Issues::new(errors, 0),
+            })
+        }
     }
 
     /// parses and merges the imports
@@ -259,16 +226,38 @@ impl Ast {
         self.merge_imports()
     }
 
+    pub fn build_symboltable(&self) -> Result<(), AstError> {
+        Ok(())
+    }
+
     ///
-    pub fn check_consistency(&self) {
-        self.check();
+    pub fn check_consistency(&self) -> Result<Issues, AstError> {
+        let val = self.check();
+        if val.errors > 0 {
+            Err(AstError::CheckError { i: val })
+        } else {
+            Ok(val)
+        }
     }
 }
 
 /// implementation of the [fmt::Display] trait for the [Ast].
 impl fmt::Display for Ast {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "Ast: TODO",)
+        writeln!(f, "AST")?;
+        writeln!(f, " + Imports:")?;
+        for i in &self.imports {
+            writeln!(f, "   - {}", i.name())?;
+        }
+        writeln!(f, " + Constants:")?;
+        for c in &self.consts {
+            writeln!(f, "   - {}", c)?;
+        }
+        writeln!(f, " + Units:")?;
+        for u in &self.units {
+            writeln!(f, "   - {}", u.name())?;
+        }
+        Ok(())
     }
 }
 
@@ -279,16 +268,22 @@ impl fmt::Debug for Ast {
     }
 }
 
-use crate::ast::AstNode;
 impl AstNode for Ast {
-    fn check(&self) -> (u32, u32) {
-        let mut res = (0, 0);
+    fn check(&self) -> Issues {
+        let mut res = Issues::ok();
         // try to insert other constants into this ast
         for c in self.consts.iter() {
             let val = c.check();
-            res = (res.0 + val.0, res.1 + val.1)
+            res = res + val;
         }
         res
+    }
+    fn name(&self) -> &str {
+        "ast"
+    }
+    /// returns the location of the current
+    fn loc(&self) -> &TokenStream {
+        unimplemented!()
     }
 }
 

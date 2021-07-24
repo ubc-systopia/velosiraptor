@@ -25,7 +25,7 @@
 
 //! Ast Module of the Velosiraptor Compiler
 
-use crate::ast::Expr;
+use crate::ast::{Expr, Issues};
 use crate::token::TokenStream;
 use std::fmt;
 
@@ -57,50 +57,19 @@ pub enum Const {
 }
 
 impl Const {
-    pub fn pos(&self) -> &TokenStream {
-        use self::Const::*;
-        match self {
-            Integer {
-                ident: _,
-                value: _,
-                pos,
-            } => &pos,
-            Boolean {
-                ident: _,
-                value: _,
-                pos,
-            } => &pos,
-        }
-    }
-
-    pub fn ident(&self) -> &str {
-        use self::Const::*;
-        match self {
-            Integer {
-                ident,
-                value: _,
-                pos: _,
-            } => &ident,
-            Boolean {
-                ident,
-                value: _,
-                pos: _,
-            } => &ident,
-        }
-    }
-    pub fn value(&self) -> (&Expr, &TokenStream) {
+    pub fn value(&self) -> &Expr {
         use self::Const::*;
         match self {
             Integer {
                 ident: _,
                 value,
-                pos,
-            } => (&value, pos),
+                pos: _,
+            } => &value,
             Boolean {
                 ident: _,
                 value,
-                pos,
-            } => (&value, pos),
+                pos: _,
+            } => &value,
         }
     }
 }
@@ -114,12 +83,12 @@ impl fmt::Display for Const {
                 ident,
                 value,
                 pos: _,
-            } => writeln!(f, "const {} : int  = {};", ident, value),
+            } => write!(f, "const {} : int  = {};", ident, value),
             Boolean {
                 ident,
                 value,
                 pos: _,
-            } => writeln!(f, "const {} : bool = {};", ident, value),
+            } => write!(f, "const {} : bool = {};", ident, value),
         }
     }
 }
@@ -131,15 +100,15 @@ impl fmt::Debug for Const {
         match self {
             Integer { ident, value, pos } => {
                 let (line, column) = pos.input_sourcepos().input_pos();
-                writeln!(
+                write!(
                     f,
-                    "{:03}:{:03} | const {} :  int = {};",
-                    line, column, ident, value
+                    "{:03}:{:03} | const {} :  int = {:?};, {:?}",
+                    line, column, ident, value, pos
                 )
             }
             Boolean { ident, value, pos } => {
                 let (line, column) = pos.input_sourcepos().input_pos();
-                writeln!(
+                write!(
                     f,
                     "{:03}:{:03} | const {} : bool = {};",
                     line, column, ident, value
@@ -152,17 +121,18 @@ impl fmt::Debug for Const {
 use crate::ast::AstNode;
 use crate::error::VrsError;
 impl AstNode for Const {
-    fn check(&self) -> (u32, u32) {
-        let mut res = (0, 0);
+    fn check(&self) -> Issues {
+        let mut res = Issues::ok();
 
-        let name = self.ident();
-        let pos = self.pos();
-        let (val, epos) = self.value();
+        let name = self.name();
+        let pos = self.loc();
+        let val = self.value();
         if !val.is_const_expr() {
             let msg = String::from("not a constant expression");
             let hint = String::from("convert the expression to a constant");
-            VrsError::new_err(epos, msg, Some(hint)).print();
-            res = (res.0, res.1 + 1);
+            VrsError::new_err(val.loc(), msg, Some(hint)).print();
+
+            res = res + Issues::err();
         }
 
         // issue warning
@@ -172,8 +142,8 @@ impl AstNode for Const {
                 "convert the identifier to upper case (notice the capitalization): `{}`",
                 name.to_ascii_uppercase()
             );
-            VrsError::new_warn(pos, msg, Some(hint)).print();
-            res = (res.0, res.1 + 1);
+            VrsError::new_warn(pos.from_self(1..2), msg, Some(hint)).print();
+            res = res + Issues::warn();
         }
 
         let allupper = name
@@ -186,10 +156,43 @@ impl AstNode for Const {
                 "convert the identifier to upper case (notice the capitalization): `{}`",
                 name.to_ascii_uppercase()
             );
-            VrsError::new_warn(pos, msg, Some(hint)).print();
+            VrsError::new_warn(pos.from_self(1..2), msg, Some(hint)).print();
             // warning
-            res = (res.0, res.1 + 1);
+            res = res + Issues::warn();
         }
         res
+    }
+
+    fn name(&self) -> &str {
+        use self::Const::*;
+        match self {
+            Integer {
+                ident,
+                value: _,
+                pos: _,
+            } => &ident,
+            Boolean {
+                ident,
+                value: _,
+                pos: _,
+            } => &ident,
+        }
+    }
+
+    /// returns the location of the current
+    fn loc(&self) -> &TokenStream {
+        use self::Const::*;
+        match self {
+            Integer {
+                ident: _,
+                value: _,
+                pos,
+            } => &pos,
+            Boolean {
+                ident: _,
+                value: _,
+                pos,
+            } => &pos,
+        }
     }
 }

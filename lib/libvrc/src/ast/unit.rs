@@ -25,8 +25,9 @@
 
 //! Ast Module of the Velosiraptor Compiler
 
-use crate::ast::{Const, Interface, Method, State};
+use crate::ast::{AstNode, Const, Interface, Issues, Method, State};
 use crate::sourcepos::SourcePos;
+use crate::token::TokenStream;
 use std::fmt;
 
 /// Defines a translation unit
@@ -59,6 +60,22 @@ pub struct Unit {
 impl Unit {
     pub fn pos(&self) -> &SourcePos {
         &self.pos
+    }
+}
+
+/// Implemetation of the [AstNode] trait for [Unit]
+impl AstNode for Unit {
+    ///
+    fn check(&self) -> Issues {
+        unimplemented!();
+    }
+    ///
+    fn name(&self) -> &str {
+        &self.name
+    }
+    /// returns the location of the current
+    fn loc(&self) -> &TokenStream {
+        unimplemented!();
     }
 }
 

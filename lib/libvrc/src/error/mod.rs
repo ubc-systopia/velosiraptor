@@ -58,24 +58,6 @@ pub trait ErrorLocation {
     fn linecontext(&self) -> &str;
 }
 
-/// represents an error type
-#[derive(PartialEq)]
-pub enum ErrorType {
-    /// this is an error
-    Error,
-    /// this is a warning
-    Warning,
-}
-
-/// represents an error type
-#[derive(PartialEq)]
-pub enum Tokentypes {
-    /// this is an error
-    Error,
-    /// this is a warning
-    Warning,
-}
-
 /// Error representation
 ///
 /// This structure captuers the location of the error or warning occurred.
@@ -226,7 +208,7 @@ impl<I: ErrorLocation + fmt::Display> VrsError<I> {
         // // the error message
         write!(f, "      {}         {}{}", pipe, indent, underline)?;
         match hint {
-            Some(h) => writeln!(f, " {}{}", color(": "), color(h)),
+            Some(h) => writeln!(f, " {}", color(h)),
             None => writeln!(f, ""),
         }
     }
@@ -284,8 +266,9 @@ impl<I: ErrorLocation + fmt::Display> fmt::Display for VrsError<I> {
             }
             VrsError::ExpectedToken { location, tokens } => {
                 let typ = applycolor(false)("error");
-                let message = format!("unexpected token encounteted: {}", location);
-                let hint = format!("expected one of {:?}", tokens);
+                let message = format!("unexpected token encounteted: `{}`", location);
+                let s : Vec<String> = tokens.iter().map(|e| format!("{:?}", e)).collect();
+                let hint = format!("expected one of `{}`", s.join(" "));
                 Self::fmthdr(f, typ, location, &message)?;
                 Self::fmtctx(f, false, location, Some(&hint))
             }

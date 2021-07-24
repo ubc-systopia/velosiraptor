@@ -113,6 +113,23 @@ impl TokenStream {
         }
     }
 
+    /// Creates a new [TokenStream] from self up until, not including the other
+    ///
+    /// The new range will start at current, and be set to the token just before
+    /// the start of the other TokenStream
+    ///
+    /// # Panics
+    ///
+    /// The function panics if the tokens are not matching, or the end is before the start
+    pub fn from_merged(self, other: &Self) -> Self {
+        assert!(self.tokens == other.tokens);
+        assert!(self.range.start < other.range.end);
+        TokenStream {
+            tokens: self.tokens,
+            range: self.range.start..other.range.end,
+        }
+    }
+
     /// Creates an empty TokenStream.
     pub fn empty() -> Self {
         TokenStream {
@@ -133,12 +150,20 @@ impl TokenStream {
 
     /// Returns the first [Token] in the [TokenStream]
     pub fn peek(&self) -> &Token {
+        assert!(!self.is_empty());
         &self.tokens[self.range.start]
+    }
+
+    pub fn last(&self) -> &Token {
+        assert!(!self.is_empty());
+        &self.tokens[self.range.end - 1]
     }
 
     /// Obtains the [SourcePos] of the current [Token] in the [TokenStream]
     pub fn input_sourcepos(&self) -> SourcePos {
-        self.peek().spos.clone()
+        let start = self.peek().spos.clone();
+        let end = &self.last().spos;
+        start.from_self_merged(end)
     }
 
     /// Calculates the sourcepos span between two tokenstreams
@@ -473,7 +498,7 @@ impl ErrorLocation for &TokenStream {
     /// the length of the token
     fn length(&self) -> usize {
         // TODO: figure out the right thing here!
-        self.peek().spos.length()
+        self.input_sourcepos().length()
     }
 
     /// the context (stdin or filename)

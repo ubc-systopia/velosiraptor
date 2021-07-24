@@ -25,7 +25,7 @@
 
 //! Ast Module of the Velosiraptor Compiler
 
-use crate::ast::Ast;
+use crate::ast::{Ast, AstNode};
 use crate::token::TokenStream;
 use std::fmt;
 
@@ -62,5 +62,16 @@ impl fmt::Debug for Import {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (line, column) = self.pos.peek().spos.input_pos();
         writeln!(f, "{:03}:{:03} | import {};", line, column, self.name)
+    }
+}
+
+impl AstNode for Import {
+    // returns the name of the node
+    fn name(&self) -> &str {
+        &self.name
+    }
+    /// returns the location of the current
+    fn loc(&self) -> &TokenStream {
+        &self.pos
     }
 }

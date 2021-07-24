@@ -7,7 +7,7 @@ const foo: int = 1234;
 const FOOBAR: int = 1 + 4;
 const TEST: int = 1 + 4 * 4;
 
-const TEST2: int = 1 + 4 * abc;
+const TEST2: int = 1 * abc;
 
 // that one should be fine
-const TEST3: int = 1 + 4 * TEST;
+const TEST3: int = 1 + 4 * TEST;     //asdf
