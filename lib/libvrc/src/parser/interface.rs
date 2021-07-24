@@ -24,6 +24,37 @@
 // SOFTWARE.
 
 use crate::token::TokenStream;
+use crate::error::IResult;
+use crate::ast::Interface;
+use crate::parser::terminals::{kw_interface, assign, semicolon};
+use nom::combinator::cut;
+use nom::branch::alt;
+use nom::sequence::delimited;
 
-/// Interface definition parsing
-pub fn interface(input: TokenStream) -> () {}
+/// Parses and consumes the [Interface] of a Unit
+pub fn interface(input: TokenStream) -> IResult<TokenStream, Interface> {
+    // try to match the interface keyword
+    let (i1,_) = kw_interface(input)?;
+    // We can now parse the different interface types
+    cut(delimited(
+        assign,
+        alt((memory, mmio_registers, cpu_registers, special_registers)),
+        semicolon
+    ))(i1)
+}
+
+fn memory(input: TokenStream) -> IResult<TokenStream, Interface> {
+    todo!()
+}
+
+fn mmio_registers(input: TokenStream) -> IResult<TokenStream, Interface> {
+    todo!()
+}
+
+fn cpu_registers(input: TokenStream) -> IResult<TokenStream, Interface> {
+    todo!()
+}
+
+fn special_registers(input: TokenStream) -> IResult<TokenStream, Interface> {
+    todo!()
+}
