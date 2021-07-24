@@ -394,7 +394,10 @@ fn ident_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 ///
 /// TODO: test support for arguments
 fn fn_call_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    let (i, (e, args)) = pair(ident_expr, delimited(lparen, separated_list0(comma,ident) ,rparen))(input)?;
+    let (i, (e, args)) = pair(
+        ident_expr,
+        delimited(lparen, separated_list0(comma, ident), rparen),
+    )(input)?;
     match e {
         Expr::Identifier { path, pos } => Ok((i, Expr::FnCall { path, args, pos })),
         _ => panic!("unexpected type"),
@@ -581,6 +584,4 @@ fn test_slice() {
 
 #[test]
 // TODO: add function parser test
-fn test_functions() {
-
-}
+fn test_functions() {}
