@@ -1,0 +1,30 @@
+on:
+  push:
+    paths-ignore:
+      - 'doc/**'
+      - '**.md'
+  pull_request:
+    paths-ignore:
+      - 'doc/**'
+      - '**.md'
+
+name: Unit Tests
+jobs:
+  compile_and_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: App Tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all
+      - name: App Tests
+        uses: actions-rs/cargo@v1
+        working-directory: ./lib/libvrc
+        with:
+          command: test
+          args: --all
