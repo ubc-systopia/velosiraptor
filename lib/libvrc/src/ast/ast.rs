@@ -184,7 +184,7 @@ impl Ast {
         let mut asts = HashMap::new();
         self.do_collect_asts(&mut asts);
 
-        // cout the number of errors we've seen
+        // count the number of errors we've seen
         let mut errors = 0;
 
         // now we have all the asts read, we can start merging them
@@ -272,12 +272,20 @@ impl fmt::Debug for Ast {
     }
 }
 
+/// implementation of [AstNode] for [Ast]
 impl AstNode for Ast {
     fn check(&self) -> Issues {
+        // no issues found
         let mut res = Issues::ok();
-        // try to insert other constants into this ast
+
+        // check all constant definitions
         for c in self.consts.iter() {
             let val = c.check();
+            res = res + val;
+        }
+        // check the unit definitions
+        for u in self.units.iter() {
+            let val = u.check();
             res = res + val;
         }
         res
