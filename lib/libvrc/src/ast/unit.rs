@@ -23,12 +23,19 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Ast Module of the Velosiraptor Compiler
+//! Unit Ast Node
+//!
+//! This defines a unit node in the AST. The unit node represents a unit definition,
+//! and as such a type.
 
+// the used standard library functionality
+use std::cmp::Ordering;
+use std::fmt::{Debug, Display, Formatter, Result};
+
+// the used crate-internal functionality
 use crate::ast::{AstNode, Const, Interface, Issues, Method, State};
 use crate::sourcepos::SourcePos;
 use crate::token::TokenStream;
-use std::fmt;
 
 /// Defines a translation unit
 ///
@@ -80,8 +87,8 @@ impl AstNode for Unit {
 }
 
 /// implementation of the [fmt::Display] trait for the [Unit]
-impl fmt::Display for Unit {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Display for Unit {
+    fn fmt(&self, f: &mut Formatter) -> Result {
         match &self.derived {
             Some(n) => writeln!(f, "Unit {} : {}  {{\nTODO\n}}", self.name, n),
             None => writeln!(f, "Unit {} {{\nTODO\n}}", self.name),
@@ -90,8 +97,8 @@ impl fmt::Display for Unit {
 }
 
 /// implementation of the [fmt::Debug] trait for the [Unit]
-impl fmt::Debug for Unit {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Debug for Unit {
+    fn fmt(&self, f: &mut Formatter) -> Result {
         let (line, column) = self.pos.input_pos();
         match &self.derived {
             Some(n) => writeln!(
@@ -105,5 +112,14 @@ impl fmt::Debug for Unit {
                 line, column, self.name
             ),
         }
+    }
+}
+
+/// implementation of [PartialOrd] for [Import]
+impl PartialOrd for Unit {
+    /// This method returns an ordering between self and other values if one exists.
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        // we jus compare with the TokenStream position
+        self.loc().partial_cmp(&other.loc())
     }
 }

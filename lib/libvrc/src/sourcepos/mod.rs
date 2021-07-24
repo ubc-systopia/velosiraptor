@@ -32,17 +32,21 @@
 //! The SourcePos structure implements several traits used by Nom so we can simply pass
 //! the SourcePos struct as input/outputs.
 
+// used standard library functionality
+use std::cmp::Ordering;
 use std::fmt;
 use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 use std::rc::Rc;
 
+// used nom functionality
 use nom::{
+    error::{ErrorKind, ParseError},
     Compare, CompareResult, Err, FindSubstring, IResult, InputIter, InputLength, InputTake,
     InputTakeAtPosition, Needed, Offset, Slice,
 };
 
+// used crate-internal functionality
 use crate::error::ErrorLocation;
-use nom::error::{ErrorKind, ParseError};
 
 /// Corresponds to a single byte of the source file
 pub type Element = char;
@@ -732,8 +736,6 @@ impl ErrorLocation for &SourcePos {
     fn linecontext(&self) -> &str {
         let mut start = self.range.start;
 
-        // panic!("start = {}", start);
-
         for c in self.content[0..start].chars().rev() {
             if c as char == '\n' {
                 break;
@@ -753,6 +755,22 @@ impl ErrorLocation for &SourcePos {
             end = end + 1;
         }
         &self.content[start..end]
+    }
+}
+
+/// implementation of [std::cmp::PartialOrd] for [SourcePos]
+impl PartialOrd for SourcePos {
+    /// This method returns an ordering between self and other values if one exists.
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let c = self.context.cmp(&other.context);
+        if c != Ordering::Equal {
+            return Some(c);
+        }
+
+        match self.line.cmp(&other.line) {
+            Ordering::Equal => Some(self.column.cmp(&other.column)),
+            o => Some(o),
+        }
     }
 }
 

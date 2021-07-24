@@ -23,11 +23,19 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Ast Module of the Velosiraptor Compiler
+//! Constant Ast Node
+//!
+//! This defines a constant node in the AST. The constant node represents a
+//! defined constant either in the file or unit context
 
-use crate::ast::{Expr, Issues};
+// the used standard library functionality
+use std::cmp::Ordering;
+use std::fmt::{Debug, Display, Formatter, Result};
+
+// the used crate-internal functionality
+use crate::ast::{AstNode, Expr, Issues};
+use crate::error::VrsError;
 use crate::token::TokenStream;
-use std::fmt;
 
 /// Defines a [Constant] statement node
 ///
@@ -57,6 +65,7 @@ pub enum Const {
 }
 
 impl Const {
+    /// returns the expression that defines the value
     pub fn value(&self) -> &Expr {
         use self::Const::*;
         match self {
@@ -75,8 +84,8 @@ impl Const {
 }
 
 /// implementation of the [fmt::Display] trait for the [Const]
-impl fmt::Display for Const {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Display for Const {
+    fn fmt(&self, f: &mut Formatter) -> Result {
         use self::Const::*;
         match self {
             Integer {
@@ -94,8 +103,8 @@ impl fmt::Display for Const {
 }
 
 /// implementation of the [fmt::Debug] trait for the [Const]
-impl fmt::Debug for Const {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Debug for Const {
+    fn fmt(&self, f: &mut Formatter) -> Result {
         use self::Const::*;
         match self {
             Integer { ident, value, pos } => {
@@ -118,8 +127,16 @@ impl fmt::Debug for Const {
     }
 }
 
-use crate::ast::AstNode;
-use crate::error::VrsError;
+/// implementation of [PartialOrd] for [Import]
+impl PartialOrd for Const {
+    /// This method returns an ordering between self and other values if one exists.
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        // we jus compare with the TokenStream position
+        self.loc().partial_cmp(&other.loc())
+    }
+}
+
+/// implementation of [AstNode] for [Const]
 impl AstNode for Const {
     fn check(&self) -> Issues {
         let mut res = Issues::ok();

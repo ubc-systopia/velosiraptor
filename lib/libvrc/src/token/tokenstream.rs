@@ -23,13 +23,22 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Velosiraptor Lexer Tokens
+//! Velosiraptor TokenStream
+//!
+//! The TokenStream represents a sequence of tokens produced by the lexer.
+//! It does not contain any whitespace tokens, but may contain comment
+//! tokens. Comment tokens can be filtered using the provided functionality.
 
-use nom::{InputIter, InputLength, InputTake, Needed, Slice};
-use std::fmt;
+// used standard library functionality
+use std::cmp::Ordering;
+use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 use std::rc::Rc;
 
+// used nom functionality
+use nom::{InputIter, InputLength, InputTake, Needed, Slice};
+
+// used crate-internal functionality
 use crate::error::ErrorLocation;
 use crate::sourcepos::SourcePos;
 use crate::token::{Token, TokenContent};
@@ -185,16 +194,16 @@ impl TokenStream {
     }
 }
 
-/// Implements the [std::fmt::Display] trait for [TokenStream]
-impl fmt::Display for TokenStream {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+/// Implements the [Display] trait for [TokenStream]
+impl Display for TokenStream {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(f, "{}", self.tokens[self.range.start])
     }
 }
 
-/// Implements the [std::fmt::Debug] trait for [TokenStream]
-impl fmt::Debug for TokenStream {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+/// Implements the [Debug] trait for [TokenStream]
+impl Debug for TokenStream {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
         let len = std::cmp::min(self.input_len(), 5);
         let mut tok = String::new();
         for i in &self.tokens[self.range.start..self.range.start + len] {
@@ -524,5 +533,14 @@ impl From<SourcePos> for TokenStream {
             }]),
             range: 0..0,
         }
+    }
+}
+
+/// implementation of [PartialOrd] for [TokenStream]
+impl PartialOrd for TokenStream {
+    /// This method returns an ordering between self and other values if one exists.
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        // we jus compare with the head token position
+        self.peek().spos.partial_cmp(&other.peek().spos)
     }
 }

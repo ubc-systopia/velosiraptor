@@ -210,6 +210,10 @@ impl Ast {
             self.consts.push(c);
         }
 
+        // now sort the lists
+        self.units.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        self.consts.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
         // return the error count, if we encountered one
         if errors == 0 {
             Ok(())
