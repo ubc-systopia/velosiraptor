@@ -186,7 +186,7 @@ fn register_state_parser_test() {
     };
 
     // todo Should we be testing fields???
-    assert_eq!(pos, tok_stream.slice(2..4).input_sourcepos());
+    assert_eq!(pos, tok_stream.slice(2..).input_sourcepos());
 }
 
 #[test]
