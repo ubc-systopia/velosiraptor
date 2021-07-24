@@ -34,7 +34,7 @@ use nom::{
 };
 
 // the used library-internal functionaltity
-use crate::ast::{Interface, Unit, State};
+use crate::ast::{Interface, State, Unit};
 use crate::error::IResult;
 use crate::parser::{
     state::state,
