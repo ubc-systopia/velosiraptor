@@ -32,8 +32,7 @@ use crate::parser::bitslice::bitslice;
 use crate::parser::terminals::{comma, ident, lbrace, lbrack, num, rbrace, rbrack};
 use crate::token::TokenStream;
 
-// the used nom componets
-use nom::error::ErrorKind;
+// the used nom components
 use nom::multi::separated_list1;
 use nom::sequence::{delimited, tuple};
 
