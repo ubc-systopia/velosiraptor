@@ -392,11 +392,11 @@ fn ident_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 ///
 /// This parses a function call without arguments
 ///
-/// TODO: add support for arguments
+/// TODO: test support for arguments
 fn fn_call_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    let (i, e) = terminated(ident_expr, pair(lparen, rparen))(input)?;
+    let (i, (e, args)) = pair(ident_expr, delimited(lparen, separated_list0(comma,ident) ,rparen))(input)?;
     match e {
-        Expr::Identifier { path, pos } => Ok((i, Expr::FnCall { path, pos })),
+        Expr::Identifier { path, pos } => Ok((i, Expr::FnCall { path, args, pos })),
         _ => panic!("unexpected type"),
     }
 }
@@ -469,6 +469,7 @@ use crate::lexer::Lexer;
 use crate::nom::Slice;
 #[cfg(test)]
 use crate::sourcepos::SourcePos;
+use nom::multi::separated_list0;
 
 #[cfg(test)]
 macro_rules! parse_equal (
@@ -576,4 +577,10 @@ fn test_slice() {
         "foo[a+4..len-1]",
         "foo[(a + 4)..(len - 1)]"
     }
+}
+
+#[test]
+// TODO: add function parser test
+fn test_functions() {
+
 }
