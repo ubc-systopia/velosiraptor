@@ -30,12 +30,12 @@ use crate::ast::Field;
 use crate::parser::bitslice::bitslice;
 use crate::parser::terminals::{comma, ident, lbrace, lbrack, num, rbrace, rbrack};
 use crate::token::TokenStream;
+use crate::error::IResult;
 
 // the used nom componets
 use nom::error::ErrorKind;
 use nom::multi::separated_list1;
 use nom::sequence::{delimited, tuple};
-use nom::{error_position, Err, IResult};
 
 /// Parses a field definition
 ///
@@ -54,33 +54,10 @@ pub fn field(input: TokenStream) -> IResult<TokenStream, Field> {
 
     // next we have the `[ident, num, num]`
     let mut fieldhdr = delimited(lbrack, tuple((ident, comma, num, comma, num)), rbrack);
-    let (i2, base, offset, length) = match fieldhdr(i1.clone()) {
-        Ok((i, (b, _, o, _, l))) => (i, b, o, l),
-        Err(e) => {
-            // if we have parser failure, indicate this!
-            let (i, k) = match e {
-                Err::Error(e) => (e.input, e.code),
-                Err::Failure(e) => (e.input, e.code),
-                Err::Incomplete(_) => (i1, ErrorKind::Eof),
-            };
-            return Err(Err::Failure(error_position!(i, k)));
-        }
-    };
+    let (i2, (base, _, offset, _, length)) = fieldhdr(i1.clone())?;
 
     // we match two numbers and an identifier
-    let (rem, layout) =
-        match delimited(lbrace, separated_list1(comma, bitslice), rbrace)(i2.clone()) {
-            Ok((rem, e)) => (rem, e),
-            Err(e) => {
-                // if we have parser failure, indicate this!
-                let (i, k) = match e {
-                    Err::Error(e) => (e.input, e.code),
-                    Err::Failure(e) => (e.input, e.code),
-                    Err::Incomplete(_) => (i2, ErrorKind::Eof),
-                };
-                return Err(Err::Failure(error_position!(i, k)));
-            }
-        };
+    let (rem, layout) = delimited(lbrace, separated_list1(comma, bitslice), rbrace)(i2.clone())?;
     Ok((
         rem,
         Field {

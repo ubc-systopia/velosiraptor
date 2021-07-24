@@ -31,7 +31,7 @@ use crate::error::IResult;
 use crate::parser::terminals::{ident, kw_import, semicolon};
 use crate::token::TokenStream;
 
-// the used nom componets
+// the used nom components
 use nom::{combinator::cut, sequence::terminated};
 
 /// parses and consumes an import statement (`import foo;`) and any following whitespaces

@@ -23,19 +23,19 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! State definition parsing
+//! Statement parsing
 
 // lexer, parser terminals and ast
-use crate::ast::Expr;
 use crate::ast::{Stmt, Type};
 use crate::parser::expression::{arith_expr, bool_expr};
 use crate::parser::terminals::{
     assign, colon, ident, kw_else, kw_if, kw_let, lbrace, rbrace, semicolon, typeinfo,
 };
 use crate::token::TokenStream;
+use crate::error::IResult;
 
 // the used nom componets
-use nom::{branch::alt, error_position, Err, IResult};
+use nom::{branch::alt};
 use nom::{
     combinator::cut,
     multi::many1,
@@ -81,17 +81,7 @@ fn if_else_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
     // try to parse the `if` keyword, return error otherwise
     let (input, _tok) = kw_if(input)?;
 
-    let (input, cond, then) = match pair(bool_expr, delimited(lbrace, stmt, rbrace))(input) {
-        Ok((input, (cond, then))) => (input, cond, then),
-        Err(e) => {
-            // here we are having a parsing error!
-            let (i, k) = match e {
-                Err::Error(e) => (e.input, e.code),
-                x => panic!("unkown condition: {:?}", x),
-            };
-            return Err(Err::Failure(error_position!(i, k)));
-        }
-    };
+    let (input, (cond, then)) = pair(bool_expr, delimited(lbrace, stmt, rbrace))(input)?;
 
     match kw_else(input.clone()) {
         Ok((input, _)) => {
@@ -105,14 +95,7 @@ fn if_else_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
                         pos,
                     },
                 )),
-                Err(e) => {
-                    // here we are having a parsing error!
-                    let (i, k) = match e {
-                        Err::Error(e) => (e.input, e.code),
-                        x => panic!("unkown condition: {:?}", x),
-                    };
-                    Err(Err::Failure(error_position!(i, k)))
-                }
+                Err(e) => Err(e)
             }
         }
         Err(_) => Ok((

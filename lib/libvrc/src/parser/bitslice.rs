@@ -29,9 +29,10 @@
 use crate::ast::BitSlice;
 use crate::parser::terminals::{ident, num};
 use crate::token::TokenStream;
+use crate::error::IResult;
 
-// the used nom componets
-use nom::{error::ErrorKind, error_position, sequence::tuple, Err, IResult};
+// the used nom components
+use nom::{sequence::tuple, combinator::cut};
 
 /// Parses a bitslice definition
 ///
@@ -59,7 +60,7 @@ pub fn bitslice(input: TokenStream) -> IResult<TokenStream, BitSlice> {
     let start = start as u16;
 
     // we match two numbers and an identifier
-    let (rem, end, name) = match tuple((num, ident))(i1) {
+    let (rem, (end, name)) = cut(tuple((num, ident)))(i1)?;/* {
         Ok((rem, (e, id))) => (rem, e as u16, id),
         Err(e) => {
             // if we have parser failure, indicate this!
@@ -70,7 +71,9 @@ pub fn bitslice(input: TokenStream) -> IResult<TokenStream, BitSlice> {
             };
             return Err(Err::Failure(error_position!(i, k)));
         }
-    };
+    };*/
+    let end = end as u16;
+
 
     Ok((
         rem,
@@ -120,18 +123,20 @@ fn test_err() {
     let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
     let ts = TokenStream::from_vec(tokens);
     let ts2 = ts.slice(1..);
-    assert_eq!(
-        bitslice(ts),
-        Err(Err::Failure(error_position!(ts2, ErrorKind::Digit)))
-    );
+    assert!(bitslice(ts).is_err());
+    //assert_eq!(
+    //    bitslice(ts),
+    //    Err(Err::Failure(error_position!(ts2, ErrorKind::Digit)))
+    //);
 
     // corresponds to `0 16`  missing identifier
     let sp = SourcePos::new("stdio", "0 16 1");
     let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
     let ts = TokenStream::from_vec(tokens);
     let ts2 = ts.slice(2..);
-    assert_eq!(
-        bitslice(ts),
-        Err(Err::Failure(error_position!(ts2, ErrorKind::AlphaNumeric)))
-    );
+    assert!(bitslice(ts).is_err())
+    //assert_eq!(
+    //    bitslice(ts),
+    //    Err(Err::Failure(error_position!(ts2, ErrorKind::AlphaNumeric)))
+    //);
 }

@@ -31,14 +31,16 @@ use nom::Err;
 use std::rc::Rc;
 
 pub mod terminals;
-//mod state;
-// mod bitslice;
+mod state;
+mod bitslice;
 mod expression;
-// mod field;
+mod field;
 mod import;
-// mod statement;
+mod statement;
+
 mod constdef;
-//mod unit;
+mod unit;
+mod interface;
 
 use crate::ast::Ast;
 use constdef::constdef;

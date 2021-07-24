@@ -184,6 +184,12 @@ keywordparser!(pub kw_const, Keyword::Const);
 keywordparser!(pub kw_let, Keyword::Let);
 keywordparser!(pub kw_if, Keyword::If);
 keywordparser!(pub kw_else, Keyword::Else);
+keywordparser!(pub kw_state, Keyword::State);
+keywordparser!(pub kw_interface, Keyword::Interface);
+keywordparser!(pub kw_memory, Keyword::Memory);
+keywordparser!(pub kw_register, Keyword::Register);
+keywordparser!(pub kw_none, Keyword::None);
+
 
 /// parses a type expression
 ///

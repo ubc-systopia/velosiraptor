@@ -26,166 +26,201 @@
 //! State definition parsing
 
 // lexer, parser terminals and ast
-use crate::token::TokenStream;
-use crate::ast::State;
-use crate::parser::terminals::{ident, import_keyword, semicolon};
+use crate::ast::{Field, State};
+use crate::parser::field::field;
+use crate::parser::terminals::{ident, kw_state, kw_register, kw_memory, assign, comma, lparen, rparen, lbrace, rbrace, semicolon, kw_none};
+use crate::token::{TokenStream};
 
-// the used nom componets
-use nom::error::ErrorKind;
-use nom::sequence::terminated;
-use nom::{error_position, Err, IResult};
+use nom::multi::separated_list0;
+// the used nom components
+use crate::error::{IResult};
+use nom::{Slice, combinator::cut};
+use nom::sequence::{delimited, terminated};
+use nom::branch::alt;
+use crate::lexer::Lexer;
 
-// the used nom componets
-use nom::{
-    branch::alt,
-    bytes::complete::tag,
-    character::complete::{digit1, multispace0, multispace1},
-    multi::{many1, separated_list1},
-    sequence::{delimited, preceded, terminated, tuple},
-    IResult,
-};
-
-// get the tokens
-use super::comments::parse_comments;
-use super::identifier::parse_identifier;
-use super::tokens::{comma, lbrace, lbrack, lparen, rbrace, rbrack, rparen, semicolon};
-use super::SourcePos;
-
-use super::ast::{BitMapEntry, State, StateField};
-
-/// parses and consumes an import statement (`import foo;`) and any following whitespaces
-pub fn state(input: SourcePos) -> IResult<SourcePos, State> {
-    // record the current position
-    let pos = input.get_pos();
-
-    // get the type of the state
-    let (input, statetype) = match alt((tag("Memory"), tag("Register")))(input) {
-        Ok((input, statetype)) => (input, statetype),
-        Err(x) => return Err(x),
-    };
-
-    // the entries are a comma separeted list entries, where each entry may have some comments before
-    let baseslist = separated_list1(comma, parse_identifier);
-
-    // the baseslist is enclosed in parenthesis
-    let header = preceded(multispace0, delimited(lparen, baseslist, rparen));
-
-    // parse the header of the state, and at least one field
-    let (input, bases, fields) = match tuple((header, many1(parse_field)))(input) {
-        Ok((input, (bases, fields))) => (input, bases, fields),
-        Err(x) => return Err(x),
-    };
-
-    if statetype.as_slice() == "Memory" {
-        Ok((input, State::MemoryState { bases, fields, pos }))
-    } else {
-        Ok((input, State::RegisterState { bases, fields, pos }))
-    }
+/// parses and consumes the [State] of a unit
+pub fn state(input: TokenStream) -> IResult<TokenStream, State> {
+    // try to match the state keyword, if there is no match, return.
+    let (i1, _)= kw_state(input)?;
+    // We now parse the different state types.
+    cut(delimited(assign, alt((register_state, memory_state, none_state)), semicolon))(i1)
 }
 
+/// parses and consumes [RegisterState] of a unit
+fn register_state(input: TokenStream) -> IResult<TokenStream, State> {
+    let pos = input.input_sourcepos();
+
+    let (i1, _) = kw_register(input)?;
+    let (i2, fields) = fields_parser(i1)?;
+
+    Ok((i2, State::RegisterState{ fields, pos }))
+}
+
+/// parses and consumes [MemoryState] of a unit
+fn memory_state(input: TokenStream) -> IResult<TokenStream, State> {
+
+    let pos = input.input_sourcepos();
+
+    let (i1, _) = kw_memory(input)?;
+    let (i2, bases) = argument_parser(i1)?;
+    let (i3, fields) = fields_parser(i2)?;
+
+    Ok((i3, State::MemoryState{ bases, fields, pos }))
+}
+
+/// parses and consumes [None] state of a unit
+fn none_state(input: TokenStream) -> IResult<TokenStream, State> {
+
+    let pos = input.input_sourcepos();
+
+    let (i1, _) = kw_none(input)?;
+
+    Ok((i1, State::None))
+}
+
+/// Parses and consumes a comma separated list of identifiers of the form "(ident, ..., ident)"
+pub fn argument_parser(input: TokenStream) -> IResult<TokenStream, Vec<String>> {
+    cut(delimited(lparen, separated_list0(comma, ident), rparen))(input)
+}
+
+/// Parses and consumes a semicolon separated list of fields of the form "{ FIELD; ...; FIELD; }"
+pub fn fields_parser(input: TokenStream) -> IResult<TokenStream, Vec<Field>> {
+    cut(delimited(lbrace, terminated(separated_list0(semicolon, field), semicolon), rbrace))(input)
+}
+
+// TODO ask Reto about current source pos assignment.
+#[test]
+fn memory_state_parser_test() {
+    let state_string = "state = Memory(base) {\
+    pte [base, 0, 4] {\
+        0   0   present,\
+        1   1   writable,\
+        3   3   writethrough,\
+        4   4   nocache,\
+        5   5   accessed,\
+        6   6   dirty,\
+        7   7   pat,\
+        8   8   global,\
+        9  11   ignored,\
+        12  31  base\
+        };\
+    };";
+    let tok_vec = match Lexer::lex_string("stdin", state_string) {
+        Ok(tok_vec) => tok_vec,
+        Err(_) => panic!("Lexing failed"),
+    };
+    let tok_stream = TokenStream::from_vec_filtered(tok_vec);
+    let parsed_state = match state(tok_stream.clone()) {
+        Ok((_, parsed_state)) => parsed_state,
+        Err(_) => panic!("Parsing failed"),
+    };
+
+    let (bases, fields, pos) = match parsed_state {
+        State::MemoryState {bases, fields, pos} => (bases, fields, pos),
+        _ => panic!("Wrong type of State parsed"),
+    };
+
+
+    // todo Do I need to test this when it's already being done in fields.rs
+    /*assert_eq!(fields,
+               vec![Field { name: String::from("pte"),
+                   stateref: Some((String::from("base"), 0)),
+                   length: 4,
+                   layout: vec![],
+                   pos: tok_stream.slice(17..).input_sourcepos()
+               }]);*/
+    assert_eq!(bases, vec!["base"])
+    //assert_eq!(parsed_state , vec!["base"]);
+}
 
 #[test]
-fn parse_field_test() {
-    assert_eq!(
-        parse_field(SourcePos::new("stdin", "foo [ bar, 0, 2 ] { 1 2 foobar };")),
-        Ok((
-            SourcePos::new_at("stdin", "", 33, 1, 34),
-            StateField {
-                name: "foo".to_string(),
-                base: "bar".to_string(),
-                offset: 0,
-                length: 2,
-                bitmap: vec![BitMapEntry {
-                    start: 1,
-                    end: 2,
-                    name: "foobar".to_string(),
-                    pos: (1, 21)
-                }],
-                pos: (1, 1)
-            },
-        ))
-    );
+fn none_state_parser_test() {
+    let state_string = "state = None;";
+    let tok_vec = match Lexer::lex_string("stdin", state_string) {
+        Ok(tok_vec) => tok_vec,
+        Err(_) => panic!("Lexing failed"),
+    };
+    let tok_stream = TokenStream::from_vec_filtered(tok_vec);
+    let parsed_state = match state(tok_stream) {
+        Ok((_, parsed_state)) => parsed_state,
+        Err(_) => panic!("Parsing failed"),
+    };
 
-    assert_eq!(
-        parse_field(SourcePos::new("stdin", "foo[bar,0,2] {1 2 foobar};")),
-        Ok((
-            SourcePos::new_at("stdin", "", 26, 1, 27),
-            StateField {
-                name: "foo".to_string(),
-                base: "bar".to_string(),
-                offset: 0,
-                length: 2,
-                bitmap: vec![BitMapEntry {
-                    start: 1,
-                    end: 2,
-                    name: "foobar".to_string(),
-                    pos: (1, 15)
-                }],
-                pos: (1, 1)
-            },
-        ))
-    );
+    match parsed_state {
+        State::None => (),
+        _ => panic!("Wrong type of State parsed"),
+    };
+}
 
-    assert_eq!(
-        parse_field(SourcePos::new(
-            "stdin",
-            "foo[bar,0,2] {// some comment \n 1 2 foobar\n};"
-        )),
-        Ok((
-            SourcePos::new_at("stdin", "", 45, 3, 3),
-            StateField {
-                name: "foo".to_string(),
-                base: "bar".to_string(),
-                offset: 0,
-                length: 2,
-                bitmap: vec![BitMapEntry {
-                    start: 1,
-                    end: 2,
-                    name: "foobar".to_string(),
-                    pos: (2, 2)
-                }],
-                pos: (1, 1)
-            },
-        ))
-    );
+#[test]
+fn register_state_parser_test() {
+    let state_string = "state = Register {\
+        base [_, 0, 1] {\
+            0  0 enabled,\
+            1  1 read,\
+            2  2 write\
+        };
+    };";
+    let tok_vec = match Lexer::lex_string("stdin", state_string) {
+        Ok(tok_vec) => tok_vec,
+        Err(_) => panic!("Lexing failed"),
+    };
+    let tok_stream = TokenStream::from_vec_filtered(tok_vec);
+    let parsed_state = match state(tok_stream.clone()) {
+        Ok((_, parsed_state)) => parsed_state,
+        Err(_) => panic!("Parsing failed"),
+    };
 
-    // multiple entries in the list
-    assert!(parse_field(SourcePos::new(
-        "stdin",
-        "foo [ bar, 0, 2 ] { 1 2 foobar, 1 2 foobar };"
-    ))
-    .is_ok());
-    assert!(parse_field(SourcePos::new(
-        "stdin",
-        "foo [ bar, 0, 2 ] { 1 2 foobar,\n 1 2 foobar\n };"
-    ))
-    .is_ok());
-    assert!(parse_field(SourcePos::new(
-        "stdin",
-        "foo [ bar, 0, 2 ] { 1 2 foobar\n,\n 1 2 foobar\n };"
-    ))
-    .is_ok());
+    let (fields, pos) = match parsed_state {
+        State::RegisterState { fields, pos } => (fields, pos),
+        _ => panic!("Wrong type of State parsed"),
+    };
 
-    // adding comments to the entries
-    assert!(parse_field(SourcePos::new(
-        "stdin",
-        "foo [ bar, 0, 2 ] { // comment 1\n1 2 foobar,\n// comment 2\n 1 2 foobar\n };"
-    ))
-    .is_ok());
-    assert!(parse_field(SourcePos::new(
-        "stdin",
-        "foo [ bar, 0, 2 ] { // comment 1\n1 2 foobar };"
-    ))
-    .is_ok());
-    // no comments after the entry
-    assert!(parse_field(SourcePos::new(
-        "stdin",
-        "foo [ bar, 0, 2 ] { 1 2 foobar// no comment here\n };"
-    ))
-    .is_err());
-    assert!(parse_field(SourcePos::new(
-        "stdin",
-        "foo [ bar, 0, 2 ] { 1 2 foobar// no comment here\n, 1 2 foobar\n };"
-    ))
-    .is_err());
+    // todo Should we be testing fields???
+    assert_eq!(pos, tok_stream.slice(2..4).input_sourcepos());
+}
+
+#[test]
+fn fake_field_type_test() {
+    let state_string = "state = BadType;";
+    let tok_vec = match Lexer::lex_string("stdin", state_string) {
+        Ok(tok_vec) => tok_vec,
+        Err(_) => panic!("Lexing failed"),
+    };
+    let tok_stream = TokenStream::from_vec_filtered(tok_vec);
+    assert!(state(tok_stream).is_err());
+}
+
+#[test]
+fn missing_semicolon_test() {
+    let state_string = "state = Register {\
+        base [_, 0, 1] {\
+            0  0 enabled,\
+            1  1 read,\
+            2  2 write\
+        };
+    }";
+    let tok_vec = match Lexer::lex_string("stdin", state_string) {
+        Ok(tok_vec) => tok_vec,
+        Err(_) => panic!("Lexing failed"),
+    };
+    let tok_stream = TokenStream::from_vec_filtered(tok_vec);
+    assert!(state(tok_stream).is_err());
+}
+
+#[test]
+fn fields_parser_err_test() {
+    let fields_string = "\
+            0  0 enabled,\
+            1  1 read\
+            2  2 write,\
+            3  64 address\
+    ";
+    let tok_vec = match Lexer::lex_string("stdin", fields_string) {
+        Ok(tok_vec) => tok_vec,
+        Err(_) => panic!("Lexing failed"),
+    };
+    let tok_stream = TokenStream::from_vec_filtered(tok_vec);
+    assert!(fields_parser(tok_stream).is_err());
 }

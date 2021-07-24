@@ -23,17 +23,15 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// the result type
-use nom::IResult;
 
 // get the tokens
 use crate::parser::terminals::{colon, ident, kw_unit, lbrace, rbrace};
-
+use crate::parser::state::state;
 use crate::token::TokenStream;
+use crate::error::IResult;
 
 use nom::combinator::opt;
 use nom::sequence::{delimited, preceded};
-use nom::{error_position, Err};
 
 use crate::ast::{Interface, State, Unit};
 
@@ -51,44 +49,43 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
     // ok, so we've seen the `unit` keyword, so the next must be an identifier.
     let (i1, unitname) = match ident(i1) {
         Ok((i, u)) => (i, u),
-        Err(e) => {
+        Err(e) => return Err(e),
             // if we have parser failure, indicate this!
-            let (i, k) = match e {
-                Err::Error(e) => (e.input, e.code),
-                x => panic!("unkown condition: {:?}", x),
-            };
-            return Err(Err::Failure(error_position!(i, k)));
-        }
+            //let (i, k) = match e {
+            //    Err::Error(e) => (e.input, e.code),
+            //    x => panic!("unknown condition: {:?}", x),
+            //};
+            //return Err(Err::Failure(error_position!(i, k)))
     };
 
     // is it a derived type, then we may see a ` : type` clause
     let (i2, supertype) = match opt(preceded(colon, ident))(i1) {
         Ok((i, s)) => (i, s),
         // possibly check here for an error!
-        Err(e) => {
+        Err(e) => return Err(e)
             // if we have parser failure, indicate this!
-            let (i, k) = match e {
-                Err::Error(e) => (e.input, e.code),
-                x => panic!("unkown condition: {:?}", x),
-            };
-            return Err(Err::Failure(error_position!(i, k)));
-        }
+            //let (i, k) = match e {
+            //    Err::Error(e) => (e.input, e.code),
+            //    x => panic!("unkown condition: {:?}", x),
+            //};
+            //return Err(Err::Failure(error_position!(i, k)));
+        //}
     };
 
     // TODO: here we have ConstItem | InterfaceItem | StateItem | FunctionItem
-    let unitbody = colon;
+    let unit_body = state;
 
     // then we have the unit block, wrapped in curly braces
-    let (i3, _) = match delimited(lbrace, unitbody, rbrace)(i2) {
+    let (i3, _) = match delimited(lbrace, unit_body, rbrace)(i2) {
         Ok((i, b)) => (i, b),
-        Err(e) => {
-            // if we have parser failure, indicate this!
-            let (i, k) = match e {
-                Err::Error(e) => (e.input, e.code),
-                x => panic!("unkown condition: {:?}", x),
-            };
-            return Err(Err::Failure(error_position!(i, k)));
-        }
+        Err(e) => return Err(e),
+        //     // if we have parser failure, indicate this!
+        //     let (i, k) = match e {
+        //         Err::Error(e) => (e.input, e.code),
+        //         x => panic!("unkown condition: {:?}", x),
+        //     };
+        //     return Err(Err::Failure(error_position!(i, k)));
+        // }
     };
 
     Ok((
