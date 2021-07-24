@@ -266,8 +266,9 @@ impl<I: ErrorLocation + fmt::Display> fmt::Display for VrsError<I> {
             }
             VrsError::ExpectedToken { location, tokens } => {
                 let typ = applycolor(false)("error");
-                let message = format!("unexpected token encounteted: {}", location);
-                let hint = format!("expected one of {:?}", tokens);
+                let message = format!("unexpected token encounteted: `{}`", location);
+                let s : Vec<String> = tokens.iter().map(|e| format!("{:?}", e)).collect();
+                let hint = format!("expected one of `{}`", s.join(" "));
                 Self::fmthdr(f, typ, location, &message)?;
                 Self::fmtctx(f, false, location, Some(&hint))
             }
