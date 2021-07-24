@@ -393,7 +393,7 @@ impl AstNode for Expr {
 #[cfg(test)]
 use crate::lexer::Lexer;
 #[cfg(test)]
-use crate::parser::{arith_expr, bool_expr};
+use crate::parser::expression::{arith_expr, bool_expr};
 #[cfg(test)]
 use crate::sourcepos::SourcePos;
 

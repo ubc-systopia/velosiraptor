@@ -108,6 +108,14 @@ impl Issues {
             warnings: 0,
         }
     }
+
+    pub fn inc_err(&mut self, c: u32) {
+        self.errors += c;
+    }
+
+    pub fn inc_warn(&mut self, c: u32) {
+        self.warnings += c;
+    }
 }
 
 impl std::fmt::Display for Issues {

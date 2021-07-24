@@ -156,7 +156,7 @@ impl AstNode for Const {
         if !name.is_ascii() {
             let msg = format!("constant `{}` should have an upper case name", name);
             let hint = format!(
-                "convert the identifier to upper case (notice the capitalization): `{}`",
+                "convert the identifier to ASCII: `{}`",
                 name.to_ascii_uppercase()
             );
             VrsError::new_warn(pos.from_self(1..2), msg, Some(hint)).print();
