@@ -22,9 +22,3 @@ jobs:
         with:
           command: test
           args: --all
-      - name: App Tests
-        uses: actions-rs/cargo@v1
-        working-directory: ./lib/libvrc
-        with:
-          command: test
-          args: --all
