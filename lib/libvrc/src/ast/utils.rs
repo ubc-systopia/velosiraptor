@@ -49,3 +49,29 @@ pub fn collect_list<T: AstNode>(list: &mut Vec<T>, hmap: &mut HashMap<String, T>
     // return the errors
     errors
 }
+
+/// drains the list and merges it into the hashmap
+pub fn check_double_entries<T: AstNode>(nodelist: &Vec<T>) -> u32 {
+    let mut errors = 0;
+    let mut idx = 0usize;
+    let mut hmap = HashMap::new();
+
+    for elm in nodelist.iter() {
+        let key = elm.name();
+        match hmap.get(key) {
+            Some(previdx) => {
+                errors = errors + 1;
+                let prev: &T = nodelist.get(*previdx).unwrap();
+                VrsError::new_double(key.to_string(), elm.loc().clone(), prev.loc().clone())
+                    .print();
+            }
+            None => {
+                // insert the elemement into the hashmap
+                hmap.insert(String::from(key), idx);
+            }
+        }
+        idx += 1;
+    }
+    // return the errors
+    errors
+}
