@@ -26,7 +26,7 @@
 use crate::token::TokenStream;
 use crate::error::IResult;
 use crate::ast::Interface;
-use crate::parser::terminals::{kw_interface, assign, semicolon};
+use crate::parser::terminals::{kw_interface, assign, semicolon, kw_none};
 use nom::combinator::cut;
 use nom::branch::alt;
 use nom::sequence::delimited;
@@ -38,7 +38,7 @@ pub fn interface(input: TokenStream) -> IResult<TokenStream, Interface> {
     // We can now parse the different interface types
     cut(delimited(
         assign,
-        alt((memory, mmio_registers, cpu_registers, special_registers)),
+        alt((memory, mmio_registers, cpu_registers, special_registers, none)),
         semicolon
     ))(i1)
 }
@@ -57,4 +57,11 @@ fn cpu_registers(input: TokenStream) -> IResult<TokenStream, Interface> {
 
 fn special_registers(input: TokenStream) -> IResult<TokenStream, Interface> {
     todo!()
+}
+
+/// Parses and consumes a None interface.
+fn none(input: TokenStream) -> IResult<TokenStream, Interface> {
+    // try to match None keyword
+    let (i1,_) = kw_none(input)?;
+    Ok((i1, Interface::None))
 }
