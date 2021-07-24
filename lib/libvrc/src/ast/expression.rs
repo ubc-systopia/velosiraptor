@@ -327,7 +327,11 @@ impl fmt::Display for Expr {
                 pos: _,
             } => write!(format, "({} {} {})", lhs, op, rhs),
             UnaryOperation { op, val, pos: _ } => write!(format, "{}({})", op, val),
-            FnCall { path, pos: _ , args:_} => {
+            FnCall {
+                path,
+                pos: _,
+                args: _,
+            } => {
                 write!(format, "{}()", path.join("."))
             }
             Slice {
@@ -362,7 +366,11 @@ impl AstNode for Expr {
                 pos,
             } => &pos,
             UnaryOperation { op: _, val: _, pos } => &pos,
-            FnCall { path: _, pos, args:_ } => &pos,
+            FnCall {
+                path: _,
+                pos,
+                args: _,
+            } => &pos,
             Slice {
                 path: _,
                 slice: _,
