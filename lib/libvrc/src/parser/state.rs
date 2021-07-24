@@ -28,23 +28,30 @@
 // lexer, parser terminals and ast
 use crate::ast::{Field, State};
 use crate::parser::field::field;
-use crate::parser::terminals::{ident, kw_state, kw_register, kw_memory, assign, comma, lparen, rparen, lbrace, rbrace, semicolon, kw_none};
-use crate::token::{TokenStream};
+use crate::parser::terminals::{
+    assign, comma, ident, kw_memory, kw_none, kw_register, kw_state, lbrace, lparen, rbrace,
+    rparen, semicolon,
+};
+use crate::token::TokenStream;
 
 use nom::multi::separated_list0;
 // the used nom components
-use crate::error::{IResult};
-use nom::{Slice, combinator::cut};
-use nom::sequence::{delimited, terminated};
-use nom::branch::alt;
+use crate::error::IResult;
 use crate::lexer::Lexer;
+use nom::branch::alt;
+use nom::sequence::{delimited, terminated};
+use nom::{combinator::cut, Slice};
 
 /// parses and consumes the [State] of a unit
 pub fn state(input: TokenStream) -> IResult<TokenStream, State> {
     // try to match the state keyword, if there is no match, return.
-    let (i1, _)= kw_state(input)?;
+    let (i1, _) = kw_state(input)?;
     // We now parse the different state types.
-    cut(delimited(assign, alt((register_state, memory_state, none_state)), semicolon))(i1)
+    cut(delimited(
+        assign,
+        alt((register_state, memory_state, none_state)),
+        semicolon,
+    ))(i1)
 }
 
 /// parses and consumes [RegisterState] of a unit
@@ -54,24 +61,22 @@ fn register_state(input: TokenStream) -> IResult<TokenStream, State> {
     let (i1, _) = kw_register(input)?;
     let (i2, fields) = fields_parser(i1)?;
 
-    Ok((i2, State::RegisterState{ fields, pos }))
+    Ok((i2, State::RegisterState { fields, pos }))
 }
 
 /// parses and consumes [MemoryState] of a unit
 fn memory_state(input: TokenStream) -> IResult<TokenStream, State> {
-
     let pos = input.input_sourcepos();
 
     let (i1, _) = kw_memory(input)?;
     let (i2, bases) = argument_parser(i1)?;
     let (i3, fields) = fields_parser(i2)?;
 
-    Ok((i3, State::MemoryState{ bases, fields, pos }))
+    Ok((i3, State::MemoryState { bases, fields, pos }))
 }
 
 /// parses and consumes [None] state of a unit
 fn none_state(input: TokenStream) -> IResult<TokenStream, State> {
-
     let pos = input.input_sourcepos();
 
     let (i1, _) = kw_none(input)?;
@@ -86,7 +91,11 @@ pub fn argument_parser(input: TokenStream) -> IResult<TokenStream, Vec<String>> 
 
 /// Parses and consumes a semicolon separated list of fields of the form "{ FIELD; ...; FIELD; }"
 pub fn fields_parser(input: TokenStream) -> IResult<TokenStream, Vec<Field>> {
-    cut(delimited(lbrace, terminated(separated_list0(semicolon, field), semicolon), rbrace))(input)
+    cut(delimited(
+        lbrace,
+        terminated(separated_list0(semicolon, field), semicolon),
+        rbrace,
+    ))(input)
 }
 
 // TODO ask Reto about current source pos assignment.
@@ -117,19 +126,18 @@ fn memory_state_parser_test() {
     };
 
     let (bases, fields, pos) = match parsed_state {
-        State::MemoryState {bases, fields, pos} => (bases, fields, pos),
+        State::MemoryState { bases, fields, pos } => (bases, fields, pos),
         _ => panic!("Wrong type of State parsed"),
     };
 
-
     // todo Do I need to test this when it's already being done in fields.rs
     /*assert_eq!(fields,
-               vec![Field { name: String::from("pte"),
-                   stateref: Some((String::from("base"), 0)),
-                   length: 4,
-                   layout: vec![],
-                   pos: tok_stream.slice(17..).input_sourcepos()
-               }]);*/
+    vec![Field { name: String::from("pte"),
+        stateref: Some((String::from("base"), 0)),
+        length: 4,
+        layout: vec![],
+        pos: tok_stream.slice(17..).input_sourcepos()
+    }]);*/
     assert_eq!(bases, vec!["base"])
     //assert_eq!(parsed_state , vec!["base"]);
 }

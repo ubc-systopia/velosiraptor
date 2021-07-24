@@ -114,7 +114,7 @@ namedtag!(gt, TokenContent::Gt);
 namedtag!(assign, TokenContent::Assign);
 
 // arrows
-namedtag!(fatarrow, TokenContent::FatArrow); 
+namedtag!(fatarrow, TokenContent::FatArrow);
 namedtag!(rarrow, TokenContent::RArrow);
 
 // misc

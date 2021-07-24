@@ -23,12 +23,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-
 // get the tokens
-use crate::parser::terminals::{colon, ident, kw_unit, lbrace, rbrace};
-use crate::parser::state::state;
-use crate::token::TokenStream;
 use crate::error::IResult;
+use crate::parser::state::state;
+use crate::parser::terminals::{colon, ident, kw_unit, lbrace, rbrace};
+use crate::token::TokenStream;
 
 use nom::combinator::opt;
 use nom::sequence::{delimited, preceded};
@@ -50,26 +49,25 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
     let (i1, unitname) = match ident(i1) {
         Ok((i, u)) => (i, u),
         Err(e) => return Err(e),
-            // if we have parser failure, indicate this!
-            //let (i, k) = match e {
-            //    Err::Error(e) => (e.input, e.code),
-            //    x => panic!("unknown condition: {:?}", x),
-            //};
-            //return Err(Err::Failure(error_position!(i, k)))
+        // if we have parser failure, indicate this!
+        //let (i, k) = match e {
+        //    Err::Error(e) => (e.input, e.code),
+        //    x => panic!("unknown condition: {:?}", x),
+        //};
+        //return Err(Err::Failure(error_position!(i, k)))
     };
 
     // is it a derived type, then we may see a ` : type` clause
     let (i2, supertype) = match opt(preceded(colon, ident))(i1) {
         Ok((i, s)) => (i, s),
         // possibly check here for an error!
-        Err(e) => return Err(e)
-            // if we have parser failure, indicate this!
-            //let (i, k) = match e {
-            //    Err::Error(e) => (e.input, e.code),
-            //    x => panic!("unkown condition: {:?}", x),
-            //};
-            //return Err(Err::Failure(error_position!(i, k)));
-        //}
+        Err(e) => return Err(e), // if we have parser failure, indicate this!
+                                 //let (i, k) = match e {
+                                 //    Err::Error(e) => (e.input, e.code),
+                                 //    x => panic!("unkown condition: {:?}", x),
+                                 //};
+                                 //return Err(Err::Failure(error_position!(i, k)));
+                                 //}
     };
 
     // TODO: here we have ConstItem | InterfaceItem | StateItem | FunctionItem

@@ -27,15 +27,15 @@
 
 // lexer, parser terminals and ast
 use crate::ast::{Stmt, Type};
+use crate::error::IResult;
 use crate::parser::expression::{arith_expr, bool_expr};
 use crate::parser::terminals::{
     assign, colon, ident, kw_else, kw_if, kw_let, lbrace, rbrace, semicolon, typeinfo,
 };
 use crate::token::TokenStream;
-use crate::error::IResult;
 
 // the used nom componets
-use nom::{branch::alt};
+use nom::branch::alt;
 use nom::{
     combinator::cut,
     multi::many1,
@@ -84,20 +84,18 @@ fn if_else_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
     let (input, (cond, then)) = pair(bool_expr, delimited(lbrace, stmt, rbrace))(input)?;
 
     match kw_else(input.clone()) {
-        Ok((input, _)) => {
-            match delimited(lbrace, stmt, rbrace)(input) {
-                Ok((rem, stmt)) => Ok((
-                    rem,
-                    Stmt::IfElse {
-                        cond,
-                        then: Box::new(then),
-                        other: Some(Box::new(stmt)),
-                        pos,
-                    },
-                )),
-                Err(e) => Err(e)
-            }
-        }
+        Ok((input, _)) => match delimited(lbrace, stmt, rbrace)(input) {
+            Ok((rem, stmt)) => Ok((
+                rem,
+                Stmt::IfElse {
+                    cond,
+                    then: Box::new(then),
+                    other: Some(Box::new(stmt)),
+                    pos,
+                },
+            )),
+            Err(e) => Err(e),
+        },
         Err(_) => Ok((
             input,
             Stmt::IfElse {

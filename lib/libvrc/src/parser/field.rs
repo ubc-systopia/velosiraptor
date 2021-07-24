@@ -27,10 +27,10 @@
 
 // lexer, parser terminals and ast
 use crate::ast::Field;
+use crate::error::IResult;
 use crate::parser::bitslice::bitslice;
 use crate::parser::terminals::{comma, ident, lbrace, lbrack, num, rbrace, rbrack};
 use crate::token::TokenStream;
-use crate::error::IResult;
 
 // the used nom componets
 use nom::error::ErrorKind;

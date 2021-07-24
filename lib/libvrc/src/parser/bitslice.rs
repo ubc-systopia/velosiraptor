@@ -27,12 +27,12 @@
 
 // lexer, parser terminals and ast
 use crate::ast::BitSlice;
+use crate::error::IResult;
 use crate::parser::terminals::{ident, num};
 use crate::token::TokenStream;
-use crate::error::IResult;
 
 // the used nom components
-use nom::{sequence::tuple, combinator::cut};
+use nom::{combinator::cut, sequence::tuple};
 
 /// Parses a bitslice definition
 ///
@@ -60,20 +60,19 @@ pub fn bitslice(input: TokenStream) -> IResult<TokenStream, BitSlice> {
     let start = start as u16;
 
     // we match two numbers and an identifier
-    let (rem, (end, name)) = cut(tuple((num, ident)))(i1)?;/* {
-        Ok((rem, (e, id))) => (rem, e as u16, id),
-        Err(e) => {
-            // if we have parser failure, indicate this!
-            let (i, k) = match e {
-                Err::Error(e) => (e.input, e.code),
-                Err::Failure(e) => (e.input, e.code),
-                Err::Incomplete(_) => (input, ErrorKind::Eof),
-            };
-            return Err(Err::Failure(error_position!(i, k)));
-        }
-    };*/
+    let (rem, (end, name)) = cut(tuple((num, ident)))(i1)?; /* {
+                                                                Ok((rem, (e, id))) => (rem, e as u16, id),
+                                                                Err(e) => {
+                                                                    // if we have parser failure, indicate this!
+                                                                    let (i, k) = match e {
+                                                                        Err::Error(e) => (e.input, e.code),
+                                                                        Err::Failure(e) => (e.input, e.code),
+                                                                        Err::Incomplete(_) => (input, ErrorKind::Eof),
+                                                                    };
+                                                                    return Err(Err::Failure(error_position!(i, k)));
+                                                                }
+                                                            };*/
     let end = end as u16;
-
 
     Ok((
         rem,
