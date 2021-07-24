@@ -33,8 +33,8 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // the used crate-internal functionality
-use crate::ast::{AstNode, Const, Interface, Issues, Method, State};
-use crate::sourcepos::SourcePos;
+use crate::ast::{utils, AstNode, Const, Interface, Issues, Method, State};
+use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
 /// Defines a translation unit
@@ -60,21 +60,54 @@ pub struct Unit {
     pub methods: Vec<Method>,
     // TODO: maybe make the translate / constructors / map / ... explicit here?
     /// the position in the source tree where this unit is defined
-    pub pos: SourcePos,
+    pub pos: TokenStream,
 }
 
 /// Implementation of [Unit]
-impl Unit {
-    pub fn pos(&self) -> &SourcePos {
-        &self.pos
-    }
-}
+impl Unit {}
 
 /// Implemetation of the [AstNode] trait for [Unit]
 impl AstNode for Unit {
-    ///
     fn check(&self) -> Issues {
-        unimplemented!();
+        // all fine for now
+        let mut res = Issues::ok();
+
+        let name = self.name();
+        let pos = self.loc();
+
+        // name should start with upper case
+        if !name[0..1].as_bytes()[0].is_ascii_uppercase() {
+            let msg = format!("unit `{}` should start with an uppercase letter", name);
+            let hint = format!(
+                "convert the identifier to upper case (notice the capitalization): `{}{}`",
+                name, //[0..1].to_ascii_uppercase(),
+                name
+            );
+            VrsError::new_warn(pos.from_self(1..2), msg, Some(hint)).print();
+            res = res + Issues::warn();
+        }
+
+        // check if there are any double entries in the constants, and check the constants
+        let errors = utils::check_double_entries(&self.consts);
+        res.inc_err(errors);
+        for c in &self.consts {
+            res = res + c.check();
+        }
+
+        // check the state and interface
+        todo!("check state");
+        //res = res += self.state.check();
+
+        todo!("check interface");
+        //res = res += self.interface.check();
+
+        // check if there are any double entries in the methods, and check the constants
+        todo!("check methods");
+        // let errors = utils::check_double_entries(&self.methods);
+        // res.inc_err(errors);
+        // for m in &self.methods {
+        //     res = res + m.check();
+        // }
     }
     ///
     fn name(&self) -> &str {
@@ -99,7 +132,8 @@ impl Display for Unit {
 /// implementation of the [fmt::Debug] trait for the [Unit]
 impl Debug for Unit {
     fn fmt(&self, f: &mut Formatter) -> Result {
-        let (line, column) = self.pos.input_pos();
+        let line = self.loc().line();
+        let column = self.loc().column();
         match &self.derived {
             Some(n) => writeln!(
                 f,
