@@ -393,7 +393,6 @@ macro_rules! parse_equal (
     ($parser:expr, $lhs:expr, $rhs:expr) => (
         let sp = SourcePos::new("stdio", $lhs);
         let tokens = Lexer::lex_source_pos(sp).unwrap();
-        let len = tokens.len();
         let ts = TokenStream::from_vec(tokens);
         let (_, ex) = $parser(ts.clone()).unwrap();
         assert_eq!(
