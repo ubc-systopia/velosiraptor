@@ -35,12 +35,11 @@ mod interface;
 mod issues;
 mod method;
 mod state;
+mod symboltable;
+pub mod transform;
 mod types;
 mod unit;
 mod utils;
-
-pub mod symboltable;
-pub mod transform;
 
 use custom_error::custom_error;
 
@@ -51,6 +50,7 @@ use crate::token::TokenStream;
 custom_error! {#[derive(PartialEq)] pub AstError
     SymTabInsertExists         = "The symbol could not be inserted, already exists",
     SymTableNotExists          = "The symbol does not exist in the table",
+    SymTabError{i: Issues}    = "There was an error during creating the symbol table",
     ImportError{e:ParsErr} = "The parser has failed",
     MergeError{i: Issues} = "Merging of the ast has failed",
     CheckError{i: Issues} = "There were warnings or errors",
@@ -68,6 +68,7 @@ pub use issues::Issues;
 pub use method::Method;
 pub use method::Stmt;
 pub use state::State;
+pub use symboltable::{Symbol, SymbolKind, SymbolTable};
 pub use types::Type;
 pub use unit::Unit;
 
@@ -79,6 +80,11 @@ pub trait AstNode {
     fn check(&self) -> Issues {
         Issues::ok()
     }
+    // builds the symbol table
+    fn build_symtab(&self, _ctxt: &mut Vec<String>, _st: &mut SymbolTable) -> Issues {
+        Issues::ok()
+    }
+
     fn name(&self) -> &str;
     /// returns the location of the current
     fn loc(&self) -> &TokenStream;

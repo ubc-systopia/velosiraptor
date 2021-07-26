@@ -33,7 +33,7 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // the used crate-internal functionality
-use crate::ast::{AstNode, Expr, Issues};
+use crate::ast::{AstNode, Expr, Issues, Symbol, SymbolKind, Type};
 use crate::error::VrsError;
 use crate::token::TokenStream;
 
@@ -79,6 +79,33 @@ impl Const {
                 value,
                 pos: _,
             } => &value,
+        }
+    }
+
+    /// creates a symbol from the current Const
+    pub fn to_symbol(&self, ctxt: &Vec<String>) -> Symbol {
+        Symbol::new(
+            ctxt,
+            self.name(),
+            self.to_type(),
+            SymbolKind::Const,
+            self.loc().clone(),
+        )
+    }
+
+    pub fn to_type(&self) -> Type {
+        use self::Const::*;
+        match self {
+            Integer {
+                ident: _,
+                value: _,
+                pos: _,
+            } => Type::Integer,
+            Boolean {
+                ident: _,
+                value: _,
+                pos: _,
+            } => Type::Boolean,
         }
     }
 }

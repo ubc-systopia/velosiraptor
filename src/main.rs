@@ -162,12 +162,6 @@ fn main() {
     log::info!("{}", ast);
     log::info!("----------------------------");
 
-    eprintln!(
-        "{:>8}: {} import(s)...\n",
-        "resolve".bold().green(),
-        ast.imports.len(),
-    );
-
     // now resolve the imports
     match ast.resolve_imports() {
         Ok(()) => (),
@@ -189,13 +183,45 @@ fn main() {
         }
     };
 
+    eprintln!(
+        "{:>8}: resolved {} import(s)..\n",
+        "import".bold().green(),
+        ast.imports.len(),
+    );
+
     log::info!("AST:");
     log::info!("----------------------------");
     log::info!("{}", ast);
     log::info!("----------------------------");
 
+    let symtab = match ast.build_symboltable() {
+        Ok(symtab) => symtab,
+        Err(AstError::SymTabError { i }) => {
+            eprintln!(
+                "{}{}.\n",
+                "error".bold().red(),
+                ": during building of the symbol table".bold()
+            );
+            abort(infile, i);
+            return;
+        }
+        _ => {
+            abort(infile, Issues::err());
+            return;
+        }
+    };
+
     // build the symbolt table
-    eprintln!("{:>8}: symboltable...\n", "build".bold().green());
+    eprintln!(
+        "{:>8}: created symboltable with {} symbols\n",
+        "symtab".bold().green(),
+        symtab.count()
+    );
+
+    log::info!("Symbol Table:");
+    log::info!("----------------------------");
+    log::info!("\n{}", symtab);
+    log::info!("----------------------------");
 
     // now check the ast
 
