@@ -478,7 +478,7 @@ impl ErrorLocation for TokenStream {
     /// the length of the token
     fn length(&self) -> usize {
         // TODO: figure out the right thing here!
-        self.peek().spos.length()
+        self.input_sourcepos().length()
     }
 
     /// the context (stdin or filename)
