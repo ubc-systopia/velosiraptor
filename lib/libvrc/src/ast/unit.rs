@@ -33,7 +33,7 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // the used crate-internal functionality
-use crate::ast::{utils, AstNode, Const, Interface, Issues, Method, State};
+use crate::ast::{utils, AstNode, Const, Interface, Issues, Method, State, SymbolTable};
 use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
@@ -117,6 +117,21 @@ impl AstNode for Unit {
     /// returns the location of the current
     fn loc(&self) -> &TokenStream {
         &self.pos
+    }
+
+    // builds the symbol table
+    fn build_symtab(&self, ctxt: &mut Vec<String>, st: &mut SymbolTable) -> Issues {
+        let mut err = Issues::ok();
+
+        ctxt.push(self.name.clone());
+        for i in &self.consts {
+            let sym = i.to_symbol(&ctxt);
+            if st.insert(sym).is_err() {
+                err.inc_err(1);
+            };
+        }
+        ctxt.pop();
+        err
     }
 }
 

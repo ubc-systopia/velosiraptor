@@ -29,7 +29,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-use crate::ast::{utils, AstError, AstNode, Const, Import, Issues, Unit};
+use crate::ast::{utils, AstError, AstNode, Const, Import, Issues, SymbolTable, Unit};
 use crate::error::VrsError;
 use crate::parser::ParserError;
 use crate::token::TokenStream;
@@ -227,8 +227,26 @@ impl Ast {
         self.merge_imports()
     }
 
-    pub fn build_symboltable(&self) -> Result<(), AstError> {
-        Ok(())
+    pub fn build_symboltable(&self) -> Result<SymbolTable, AstError> {
+        let mut err = Issues::ok();
+        let mut st = SymbolTable::new();
+        let mut ctxt = Vec::new();
+        for c in &self.consts {
+            let sym = c.to_symbol(&ctxt);
+            if st.insert(sym).is_err() {
+                err.inc_err(1);
+            };
+        }
+
+        for u in &self.units {
+            err = err + u.build_symtab(&mut ctxt, &mut st);
+        }
+
+        if err.errors > 0 {
+            Err(AstError::SymTabError { i: err })
+        } else {
+            Ok(st)
+        }
     }
 
     ///
@@ -286,6 +304,10 @@ impl AstNode for Ast {
             res = res + val;
         }
         res
+    }
+    // builds the symbol table
+    fn build_symtab(&self, _ctxt: &mut Vec<String>, _st: &mut SymbolTable) -> Issues {
+        Issues::ok()
     }
     fn name(&self) -> &str {
         "ast"
