@@ -1,0 +1,3 @@
+const FOO: int = (123 + 123);
+const FOOBAR: int = (123 - 4213);
+const BAR: bool = const;
