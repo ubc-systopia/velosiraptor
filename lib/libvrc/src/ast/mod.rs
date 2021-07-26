@@ -23,7 +23,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Ast Module of the Velosiraptor Compiler
+//! # Ast Module of the Velosiraptor Compiler
+//!
+//! This module contains the AST representation produced by the parser from
+//! a given input in the Velosiraptor Specification Language format.
 
 mod ast;
 mod bitslice;

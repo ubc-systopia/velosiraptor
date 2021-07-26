@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Ast representation of the VelosiRaptor Definitions
+//! The AST Root Node
 
 use std::collections::HashMap;
 use std::fmt;
@@ -34,12 +34,16 @@ use crate::error::VrsError;
 use crate::parser::ParserError;
 use crate::token::TokenStream;
 
-/// represents the ast of a parsed file.
+/// The root node of the AST
 ///
-/// The parsed file consists of three possible directives:
-///   1. imports: references to other files
-///   2. constants: pre-defined values
-///   3. units: units defined in this file
+/// The root node of the AST corresponds to a single parsed input in the
+/// Velosiraptor Specificatino Language format. This may either originate
+/// from a string supplied by `STDIO` or from a file.
+///
+/// There are three branches in the AST root node:
+///   1. imports: references to other specification files imported by this AST.
+///   2. constants: globally defined constant values
+///   3. units: units defined in this AST
 #[derive(PartialEq, Clone)]
 pub struct Ast {
     /// the filename this ast represents
