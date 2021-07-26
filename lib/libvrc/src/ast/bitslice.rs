@@ -33,9 +33,9 @@ use crate::ast::{AstNode, Issues};
 use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
-/// Represents a bitslice of a [Field]
+/// Represents a bitslice of a
 ///
-/// The field corresponds to the slice `[start..end]` of the [Field]
+/// The field corresponds to the slice `[start..end]` within a field.
 #[derive(PartialEq, Clone)]
 pub struct BitSlice {
     /// the start bit

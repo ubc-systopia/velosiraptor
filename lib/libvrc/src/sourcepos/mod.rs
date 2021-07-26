@@ -660,7 +660,7 @@ impl fmt::Debug for SourcePos {
     }
 }
 
-/// Implementation of the [error::ErrorLocation] trait for [SourcePos]
+/// Implementation of the [ErrorLocation] trait for [SourcePos]
 impl ErrorLocation for SourcePos {
     /// the line number in the source file
     fn line(&self) -> u32 {
@@ -710,7 +710,7 @@ impl ErrorLocation for SourcePos {
     }
 }
 
-/// Implementation of the [error::ErrorLocation] trait for [SourcePos]
+/// Implementation of the [ErrorLocation] trait for [SourcePos]
 impl ErrorLocation for &SourcePos {
     /// the line number in the source file
     fn line(&self) -> u32 {

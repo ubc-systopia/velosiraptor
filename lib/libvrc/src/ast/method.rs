@@ -51,7 +51,7 @@ pub struct Method {
     pub pos: SourcePos,
 }
 
-/// Implementation of the [fmt::Display] trait for [Field]
+/// Implementation of the [fmt::Display] trait for [Method]
 impl fmt::Display for Method {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "fn {}() -> {} {{", self.name, self.rettype)?;
@@ -62,7 +62,7 @@ impl fmt::Display for Method {
     }
 }
 
-/// Implementation of the [fmt::Debug] trait for [Field]
+/// Implementation of the [fmt::Debug] trait for [Method]
 impl fmt::Debug for Method {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (line, column) = self.pos.input_pos();

@@ -138,7 +138,7 @@ impl Debug for State {
     }
 }
 
-/// implementation of [AstNode] for [Const]
+/// implementation of [AstNode] for [State]
 impl AstNode for State {
     fn check(&self) -> Issues {
         let mut res = Issues::ok();

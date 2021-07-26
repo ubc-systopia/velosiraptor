@@ -331,7 +331,7 @@ impl<I: ErrorLocation + fmt::Display> fmt::Debug for VrsError<I> {
     }
 }
 
-/// Implementation of [non::error::ContextError] for VrsError<I>
+/// Implementation of [ContextError] for VrsError<I>
 impl<I: ErrorLocation + fmt::Display> ContextError<I> for VrsError<I> {
     /// Creates a new error from an input position, a static string and an existing error.
     ///
@@ -342,7 +342,7 @@ impl<I: ErrorLocation + fmt::Display> ContextError<I> for VrsError<I> {
     }
 }
 
-/// Implementation of [nom:error::ParseError] for VrsError<I>
+/// Implementation of [ParseError] for VrsError<I>
 impl<I: ErrorLocation + fmt::Display> ParseError<I> for VrsError<I> {
     /// Creates an error from the input position and an ErrorKind
     fn from_error_kind(input: I, kind: ErrorKind) -> Self {
@@ -379,7 +379,7 @@ impl<I: ErrorLocation + fmt::Display> ParseError<I> for VrsError<I> {
     }
 }
 
-/// Implementation of [nom::FromExternalError] for [VrsError]
+/// Implementation of [FromExternalError] for [VrsError]
 impl<I: ErrorLocation + fmt::Display, E> FromExternalError<I, E> for VrsError<I> {
     fn from_external_error(input: I, kind: ErrorKind, _e: E) -> Self {
         VrsError::from_error_kind(input, kind)

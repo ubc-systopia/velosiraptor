@@ -58,14 +58,14 @@ impl Import {
     }
 }
 
-/// implementation of the [fmt::Display] trait for the [Import]
+/// implementation of the [Display] trait for the [Import]
 impl Display for Import {
     fn fmt(&self, f: &mut Formatter) -> Result {
         writeln!(f, "import {};", self.name)
     }
 }
 
-/// implementation of the [fmt::Debug] trait for the [Import]
+/// implementation of the [Debug] trait for the [Import]
 impl Debug for Import {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let (line, column) = self.pos.peek().spos.input_pos();

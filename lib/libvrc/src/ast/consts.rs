@@ -37,7 +37,7 @@ use crate::ast::{AstNode, Expr, Issues};
 use crate::error::VrsError;
 use crate::token::TokenStream;
 
-/// Defines a [Constant] statement node
+/// Defines a [Const] statement node
 ///
 /// The constants statement defines and delcares specific symbols
 /// with constant values to be used throughout the definitions.
@@ -83,7 +83,7 @@ impl Const {
     }
 }
 
-/// implementation of the [fmt::Display] trait for the [Const]
+/// implementation of the [Display] trait for the [Const]
 impl Display for Const {
     fn fmt(&self, f: &mut Formatter) -> Result {
         use self::Const::*;
@@ -102,7 +102,7 @@ impl Display for Const {
     }
 }
 
-/// implementation of the [fmt::Debug] trait for the [Const]
+/// implementation of the [Debug] trait for the [Const]
 impl Debug for Const {
     fn fmt(&self, f: &mut Formatter) -> Result {
         use self::Const::*;
@@ -127,7 +127,7 @@ impl Debug for Const {
     }
 }
 
-/// implementation of [PartialOrd] for [Import]
+/// implementation of [PartialOrd] for [Const]
 impl PartialOrd for Const {
     /// This method returns an ordering between self and other values if one exists.
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {

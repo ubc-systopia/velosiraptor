@@ -120,7 +120,7 @@ impl AstNode for Unit {
     }
 }
 
-/// implementation of the [fmt::Display] trait for the [Unit]
+/// implementation of the [Display] trait for the [Unit]
 impl Display for Unit {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match &self.derived {
@@ -130,7 +130,7 @@ impl Display for Unit {
     }
 }
 
-/// implementation of the [fmt::Debug] trait for the [Unit]
+/// implementation of the [Debug] trait for the [Unit]
 impl Debug for Unit {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let line = self.loc().line();
@@ -150,7 +150,7 @@ impl Debug for Unit {
     }
 }
 
-/// implementation of [PartialOrd] for [Import]
+/// implementation of [PartialOrd] for [Unit]
 impl PartialOrd for Unit {
     /// This method returns an ordering between self and other values if one exists.
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {

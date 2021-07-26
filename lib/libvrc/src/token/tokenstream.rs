@@ -87,7 +87,7 @@ impl TokenStream {
         Self::from_vec(tokens.to_vec())
     }
 
-    /// Creates a new [TokenStream] covering a subrange of [self]
+    /// Creates a new [TokenStream] covering a subrange of self
     ///
     /// # Panics
     ///
@@ -463,7 +463,7 @@ impl InputIter for TokenStream {
     }
 }
 
-/// Implementation of the [error::ErrorLocation] trait for [TokenStream]
+/// Implementation of the [ErrorLocation] trait for [TokenStream]
 impl ErrorLocation for TokenStream {
     /// the line number in the source file
     fn line(&self) -> u32 {
@@ -492,7 +492,7 @@ impl ErrorLocation for TokenStream {
     }
 }
 
-/// Implementation of the [error::ErrorLocation] trait for [TokenStream]
+/// Implementation of the [ErrorLocation] trait for [TokenStream]
 impl ErrorLocation for &TokenStream {
     /// the line number in the source file
     fn line(&self) -> u32 {
@@ -521,7 +521,7 @@ impl ErrorLocation for &TokenStream {
     }
 }
 
-/// Implementation of [std::convert::From<LexerError>] for [VrsError]
+/// Implementation of [std::convert::From<LexerError>] for [TokenStream]
 ///
 /// This converts from a lexer error to a parser error
 impl From<SourcePos> for TokenStream {
