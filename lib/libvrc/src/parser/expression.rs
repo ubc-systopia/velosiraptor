@@ -236,7 +236,7 @@ fn bool_cmp_expr_arith(input: TokenStream) -> IResult<TokenStream, Expr> {
 /// this expression evaluates to a boolean value
 fn bool_cmp_expr_bool(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
-    let (i, lhs) = bool_term_expr(input.clone())?;
+    let (i, lhs) = bool_term_expr(input)?;
     let (i, (op, rhs)) = alt((
         |i: TokenStream| {
             let (i, op) = preceded(eq, bool_term_expr)(i)?;

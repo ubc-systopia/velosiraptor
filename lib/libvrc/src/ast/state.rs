@@ -89,7 +89,6 @@ impl Display for State {
                 writeln!(f, "}}")
             }
             RegisterState { fields, pos: _ } => {
-                let s = String::new();
                 writeln!(f, "State(Registers) {{")?;
                 fields.iter().fold(Ok(()), |result, field| {
                     result.and_then(|_| writeln!(f, "{}", field))
@@ -124,7 +123,6 @@ impl Debug for State {
             RegisterState { fields, pos } => {
                 let line = pos.line();
                 let column = pos.column();
-                let s = String::new();
                 writeln!(f, "{:03}:{:03} | State(Registers) {{", line, column)?;
                 fields.iter().fold(Ok(()), |result, field| {
                     result.and_then(|_| writeln!(f, "{}", field))

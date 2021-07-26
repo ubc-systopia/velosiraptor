@@ -117,12 +117,5 @@ pub fn stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
     Ok((i, Stmt::Block { stmts, pos }))
 }
 
-#[cfg(test)]
-use crate::lexer::Lexer;
-#[cfg(test)]
-use crate::nom::Slice;
-#[cfg(test)]
-use crate::sourcepos::SourcePos;
-
 #[test]
 fn test_ok() {}

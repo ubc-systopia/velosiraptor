@@ -127,7 +127,7 @@ fn memory_state_parser_test() {
         Err(_) => panic!("Parsing failed"),
     };
 
-    let (bases, fields, pos) = match parsed_state {
+    let (bases, _fields, _pos) = match parsed_state {
         State::MemoryState { bases, fields, pos } => (bases, fields, pos),
         _ => panic!("Wrong type of State parsed"),
     };

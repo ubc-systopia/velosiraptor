@@ -105,24 +105,24 @@ impl fmt::Display for Stmt {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::Stmt::*;
         match self {
-            Block { stmts, pos: _ } => {
-                write!(f, "{{ TODO }} \n")
+            Block { stmts: _, pos: _ } => {
+                writeln!(f, "{{ TODO }}")
             }
             Assign {
                 typeinfo,
                 lhs,
                 rhs,
                 pos: _,
-            } => write!(f, "let {} : {} = {};\n", typeinfo, lhs, rhs),
-            Assert { expr, pos: _ } => write!(f, "assert {};", expr),
+            } => writeln!(f, "let {} : {} = {};", typeinfo, lhs, rhs),
+            Assert { expr, pos: _ } => writeln!(f, "assert {};", expr),
             IfElse {
                 cond,
                 then,
                 other,
                 pos: _,
             } => match other {
-                None => write!(f, "if {} {} \n", cond, then),
-                Some(x) => write!(f, "if {} {} else {} \n", cond, then, x),
+                None => writeln!(f, "if {} {}", cond, then),
+                Some(x) => writeln!(f, "if {} {} else {}", cond, then, x),
             },
         }
     }

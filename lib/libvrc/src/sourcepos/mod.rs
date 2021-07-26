@@ -692,11 +692,11 @@ impl ErrorLocation for SourcePos {
             if c as char == '\n' {
                 break;
             }
-            start = start - 1;
+            start -= 1;
         }
 
-        if self.content[start..].chars().next().unwrap() == '\n' {
-            start = start + 1;
+        if self.content.starts_with('\n') {
+            start += 1;
         }
 
         let mut end = self.range.start;
@@ -704,7 +704,7 @@ impl ErrorLocation for SourcePos {
             if c as char == '\n' {
                 break;
             }
-            end = end + 1;
+            end += 1;
         }
         &self.content[start..end]
     }
@@ -740,11 +740,11 @@ impl ErrorLocation for &SourcePos {
             if c as char == '\n' {
                 break;
             }
-            start = start - 1;
+            start -= 1;
         }
 
-        if self.content[start..].chars().next().unwrap() == '\n' {
-            start = start + 1;
+        if self.content.starts_with('\n') {
+            start += 1;
         }
 
         let mut end = self.range.start;
@@ -752,7 +752,7 @@ impl ErrorLocation for &SourcePos {
             if c as char == '\n' {
                 break;
             }
-            end = end + 1;
+            end += 1;
         }
         &self.content[start..end]
     }

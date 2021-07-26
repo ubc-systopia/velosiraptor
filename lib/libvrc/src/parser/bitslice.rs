@@ -27,7 +27,7 @@
 
 // lexer, parser terminals and ast
 use crate::ast::BitSlice;
-use crate::error::{IResult, VrsError};
+use crate::error::IResult;
 use crate::parser::terminals::{ident, num};
 use crate::token::TokenStream;
 
@@ -107,7 +107,6 @@ fn test_err() {
     let sp = SourcePos::new("stdio", "0 foobar");
     let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
     let ts = TokenStream::from_vec(tokens);
-    let ts2 = ts.slice(1..);
     assert!(bitslice(ts).is_err());
     //assert_eq!(
     //    bitslice(ts),
@@ -118,7 +117,6 @@ fn test_err() {
     let sp = SourcePos::new("stdio", "0 16 1");
     let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
     let ts = TokenStream::from_vec(tokens);
-    let ts2 = ts.slice(2..);
     assert!(bitslice(ts).is_err())
     //assert_eq!(
     //    bitslice(ts),

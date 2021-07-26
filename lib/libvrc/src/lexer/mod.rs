@@ -164,7 +164,7 @@ fn punctuation1(input: SourcePos) -> IResult<SourcePos, Token> {
 use nom::bytes::complete::take;
 
 fn any(input: SourcePos) -> IResult<SourcePos, Token> {
-    let (_, t) = take(1usize)(input.clone())?;
+    let (_, t) = take(1usize)(input)?;
     let msg = format!("illegal token `{}` encountered.", t);
     let err = VrsError::new_err(t, msg, Some(String::from("remove this character.")));
     Err(Err::Failure(err))

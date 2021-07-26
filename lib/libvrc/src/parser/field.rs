@@ -74,13 +74,10 @@ pub fn field(input: TokenStream) -> IResult<TokenStream, Field> {
 
 #[cfg(test)]
 use crate::ast::BitSlice;
+#[cfg(test)]
 use crate::lexer::Lexer;
 #[cfg(test)]
 use crate::nom::Slice;
-#[cfg(test)]
-use crate::sourcepos::SourcePos;
-#[cfg(test)]
-use crate::token::{Token, TokenContent};
 
 #[test]
 fn test_ok() {

@@ -136,14 +136,14 @@ impl AstNode for Field {
             let start = min(b.start, maxbits - 1) as usize;
             let end = min(b.end, maxbits - 1) as usize;
             // run from start up to including end
-            for i in start..=end {
-                match overlap[i] {
+            for (i, item) in overlap.iter_mut().enumerate().take(end + 1).skip(start) {
+                match item {
                     Some(other) => {
                         VrsError::new_overlap(i as u64, b.loc(), other.loc()).print();
                         res.inc_err(errors);
                     }
                     None => {
-                        overlap[i] = Some(b);
+                        *item = Some(b);
                     }
                 }
             }

@@ -51,7 +51,7 @@ pub fn import(input: TokenStream) -> IResult<TokenStream, Import> {
         Import {
             name,
             ast: None,
-            pos: pos,
+            pos,
         },
     ))
 }

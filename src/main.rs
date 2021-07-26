@@ -86,7 +86,7 @@ fn abort(target: &str, cnt: Issues) {
         let msg = format!(", and {} warnings emitted", cnt.warnings);
         eprintln!("{}\n", msg.bold());
     } else {
-        eprintln!("");
+        eprintln!(); // add some newline
     }
     eprintln!(
         "{}: could not compile `{}`.\n",
@@ -114,9 +114,8 @@ fn main() {
 
     // print the start message
     eprintln!(
-        "{:>8}: {}...\n",
+        "{:>8}: Velosiraptor Compiler (vrc)...\n",
         "start".bold().green(),
-        "Velosiraptor Compiler (vrc)"
     );
 
     let infile = matches.value_of("input").unwrap_or("none");
@@ -164,10 +163,9 @@ fn main() {
     log::info!("----------------------------");
 
     eprintln!(
-        "{:>8}: {} {}...\n",
+        "{:>8}: {} import(s)...\n",
         "resolve".bold().green(),
         ast.imports.len(),
-        "imports"
     );
 
     // now resolve the imports
@@ -197,16 +195,15 @@ fn main() {
     log::info!("----------------------------");
 
     // build the symbolt table
-    eprintln!("{:>8}: {}...\n", "build".bold().green(), "symboltable");
+    eprintln!("{:>8}: symboltable...\n", "build".bold().green());
 
     // now check the ast
 
     let cnt = Issues::ok();
 
     eprintln!(
-        "{:>8}: {}...\n",
+        "{:>8}: performing consistency check...\n",
         "check".bold().green(),
-        "performing consistency check"
     );
 
     let cnt = match ast.check_consistency() {
@@ -226,23 +223,20 @@ fn main() {
 
     // generate the raw interface files: this is the "language" to interface
     eprintln!(
-        "{:>8}: {}...\n",
+        "{:>8}: generating interface files...\n",
         "generate".bold().green(),
-        "generating interface files"
     );
 
     // generate the unit files that use the interface files
     eprintln!(
-        "{:>8}: {}...\n",
+        "{:>8}: generating unit files...\n",
         "generate".bold().green(),
-        "generating unit files"
     );
 
     // we can generate some modules
     eprintln!(
-        "{:>8}: {}...\n",
+        "{:>8}: generating Arm FastModels modules...\n",
         "generate".bold().green(),
-        "generating Arm FastModels modules"
     );
 
     if cnt.warnings > 0 {
@@ -251,5 +245,5 @@ fn main() {
     }
 
     // ok all done.
-    eprintln!("{:>8}: {}...\n", "finished".bold().green(), "...");
+    eprintln!("{:>8}: ...\n", "finished".bold().green());
 }

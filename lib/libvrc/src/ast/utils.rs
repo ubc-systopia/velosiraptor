@@ -36,7 +36,7 @@ pub fn collect_list<T: AstNode>(list: &mut Vec<T>, hmap: &mut HashMap<String, T>
         let key = elm.name();
         match hmap.get(key) {
             Some(prev) => {
-                errors = errors + 1;
+                errors += 1;
                 VrsError::new_double(key.to_string(), elm.loc().clone(), prev.loc().clone())
                     .print();
             }
@@ -51,16 +51,15 @@ pub fn collect_list<T: AstNode>(list: &mut Vec<T>, hmap: &mut HashMap<String, T>
 }
 
 /// drains the list and merges it into the hashmap
-pub fn check_double_entries<T: AstNode>(nodelist: &Vec<T>) -> u32 {
+pub fn check_double_entries<T: AstNode>(nodelist: &[T]) -> u32 {
     let mut errors = 0;
-    let mut idx = 0usize;
     let mut hmap = HashMap::new();
 
-    for elm in nodelist.iter() {
+    for (idx, elm) in nodelist.iter().enumerate() {
         let key = elm.name();
         match hmap.get(key) {
             Some(previdx) => {
-                errors = errors + 1;
+                errors += 1;
                 let prev: &T = nodelist.get(*previdx).unwrap();
                 VrsError::new_double(key.to_string(), elm.loc().clone(), prev.loc().clone())
                     .print();
@@ -70,7 +69,6 @@ pub fn check_double_entries<T: AstNode>(nodelist: &Vec<T>) -> u32 {
                 hmap.insert(String::from(key), idx);
             }
         }
-        idx += 1;
     }
     // return the errors
     errors

@@ -79,7 +79,7 @@ impl Ast {
             match currentimports.get(&i.name) {
                 Some(imp) => {
                     let msg = format!("{} is already imported ", i.name);
-                    let hint = format!("remove this import");
+                    let hint = String::from("remove this import");
                     VrsError::new_warn(imp.pos.clone(), msg, Some(hint)).print();
                 }
                 None => {
@@ -102,26 +102,23 @@ impl Ast {
                     Ok((ast, _)) => ast,
                     Err(ParserError::LexerFailure { error }) => {
                         let msg = String::from("during lexing of the file");
-                        return Err(VrsError::stack(val.pos.clone(), msg, error));
+                        return Err(VrsError::stack(val.pos, msg, error));
                     }
                     Err(ParserError::ParserFailure { error }) => {
                         let msg = String::from("during parsing of the file");
-                        return Err(VrsError::stack(val.pos.clone(), msg, error));
+                        return Err(VrsError::stack(val.pos, msg, error));
                     }
                     Err(ParserError::ParserIncomplete { error }) => {
                         let msg = String::from("unexpected junk at the end of the file");
-                        return Err(VrsError::stack(val.pos.clone(), msg, error));
+                        return Err(VrsError::stack(val.pos, msg, error));
                     }
                     Err(x) => panic!("foobar {:?}", x),
                 };
 
                 // parsing succeeded, recurse abort if there is an error downstream
-                match ast.do_parse_imports(path) {
-                    Err(err) => {
-                        let msg = String::from("while processing imports from");
-                        return Err(VrsError::stack(val.pos.clone(), msg, err));
-                    }
-                    _ => (),
+                if let Err(err) = ast.do_parse_imports(path) {
+                    let msg = String::from("while processing imports from");
+                    return Err(VrsError::stack(val.pos, msg, err));
                 }
                 // update the ast value
                 val.ast = Some(ast);
@@ -138,7 +135,7 @@ impl Ast {
                 if !s.is_empty() {
                     let msg = format!("circular dependency detected:\n  {} -> {}", s, filename);
                     let hint = String::from("try removing the following import");
-                    return Err(VrsError::new_err(val.pos.clone(), msg, Some(hint)));
+                    return Err(VrsError::new_err(val.pos, msg, Some(hint)));
                 }
             }
             // restore file path again
