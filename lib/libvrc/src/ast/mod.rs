@@ -1,4 +1,4 @@
-// Velosiraptor Lexer
+// Velosiraptor Ast
 //
 //
 // MIT License
@@ -32,6 +32,7 @@ mod expression;
 mod field;
 mod import;
 mod interface;
+mod issues;
 mod method;
 mod state;
 mod types;
@@ -63,6 +64,7 @@ pub use expression::{BinOp, Expr, UnOp};
 pub use field::Field;
 pub use import::Import;
 pub use interface::Interface;
+pub use issues::Issues;
 pub use method::Method;
 pub use method::Stmt;
 pub use state::State;
@@ -80,59 +82,4 @@ pub trait AstNode {
     fn name(&self) -> &str;
     /// returns the location of the current
     fn loc(&self) -> &TokenStream;
-}
-
-#[derive(Debug, PartialEq)]
-pub struct Issues {
-    pub errors: u32,
-    pub warnings: u32,
-}
-
-impl Issues {
-    pub fn new(errors: u32, warnings: u32) -> Self {
-        Issues { errors, warnings }
-    }
-    pub fn ok() -> Self {
-        Issues {
-            errors: 0,
-            warnings: 0,
-        }
-    }
-    pub fn warn() -> Self {
-        Issues {
-            errors: 0,
-            warnings: 1,
-        }
-    }
-    pub fn err() -> Self {
-        Issues {
-            errors: 1,
-            warnings: 0,
-        }
-    }
-
-    pub fn inc_err(&mut self, c: u32) {
-        self.errors += c;
-    }
-
-    pub fn inc_warn(&mut self, c: u32) {
-        self.warnings += c;
-    }
-}
-
-impl std::fmt::Display for Issues {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(f, "errors: {}  warnings: {}", self.errors, self.warnings)
-    }
-}
-
-impl std::ops::Add for Issues {
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self {
-        Self {
-            warnings: self.warnings + other.warnings,
-            errors: self.errors + other.errors,
-        }
-    }
 }
