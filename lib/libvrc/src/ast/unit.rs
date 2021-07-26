@@ -78,9 +78,10 @@ impl AstNode for Unit {
         // name should start with upper case
         if !name[0..1].as_bytes()[0].is_ascii_uppercase() {
             let msg = format!("unit `{}` should start with an uppercase letter", name);
+            let mut name = String::from(name);
+            name[0..1].make_ascii_uppercase();
             let hint = format!(
-                "convert the identifier to upper case (notice the capitalization): `{}{}`",
-                name, //[0..1].to_ascii_uppercase(),
+                "convert the identifier to upper case (notice the capitalization): `{}`",
                 name
             );
             VrsError::new_warn(pos.from_self(1..2), msg, Some(hint)).print();
@@ -95,19 +96,19 @@ impl AstNode for Unit {
         }
 
         // check the state and interface
-        todo!("check state");
-        //res = res += self.state.check();
+        res = res + self.state.check();
 
-        todo!("check interface");
+        //todo!("check interface");
         //res = res += self.interface.check();
 
         // check if there are any double entries in the methods, and check the constants
-        todo!("check methods");
+        //todo!("check methods");
         // let errors = utils::check_double_entries(&self.methods);
         // res.inc_err(errors);
         // for m in &self.methods {
         //     res = res + m.check();
         // }
+        res
     }
     ///
     fn name(&self) -> &str {
@@ -115,7 +116,7 @@ impl AstNode for Unit {
     }
     /// returns the location of the current
     fn loc(&self) -> &TokenStream {
-        unimplemented!();
+        &self.pos
     }
 }
 
