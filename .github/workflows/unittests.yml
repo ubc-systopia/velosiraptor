@@ -26,9 +26,8 @@ jobs:
         with:
           command: test
           args: --all
-      - working-directory: ./lib/libvrc
       - name: Lib Tests
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all
+          args: --all --manifest-path ./lib/libvrc/Cargo.toml
