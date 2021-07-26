@@ -33,9 +33,11 @@ use crate::parser::terminals::{comma, ident, lbrace, lbrack, num, rbrace, rbrack
 use crate::token::TokenStream;
 
 // the used nom componets
-use nom::error::ErrorKind;
-use nom::multi::separated_list1;
-use nom::sequence::{delimited, tuple};
+use nom::{
+    combinator::cut,
+    multi::separated_list1,
+    sequence::{delimited, tuple},
+};
 
 /// Parses a field definition
 ///
@@ -43,21 +45,21 @@ use nom::sequence::{delimited, tuple};
 ///  ident [ident, num, num] { FIELDS };
 ///
 pub fn field(input: TokenStream) -> IResult<TokenStream, Field> {
-    // record the position of the field
-    let pos = input.input_sourcepos();
-
     // we first start of with an identifier,
-    let (i1, name) = match ident(input) {
-        Ok((rem, s)) => (rem, s),
-        Err(x) => return Err(x),
-    };
+    let (i1, name) = ident(input.clone())?;
 
     // next we have the `[ident, num, num]`
-    let mut fieldhdr = delimited(lbrack, tuple((ident, comma, num, comma, num)), rbrack);
-    let (i2, (base, _, offset, _, length)) = fieldhdr(i1.clone())?;
+    let mut fieldhdr = cut(delimited(
+        lbrack,
+        tuple((ident, comma, num, comma, num)),
+        rbrack,
+    ));
+    let (i2, (base, _, offset, _, length)) = fieldhdr(i1)?;
 
     // we match two numbers and an identifier
-    let (rem, layout) = delimited(lbrace, separated_list1(comma, bitslice), rbrace)(i2.clone())?;
+    let (rem, layout) = cut(delimited(lbrace, separated_list1(comma, bitslice), rbrace))(i2)?;
+
+    let pos = input.from_self_until(&rem);
     Ok((
         rem,
         Field {
@@ -72,6 +74,7 @@ pub fn field(input: TokenStream) -> IResult<TokenStream, Field> {
 
 #[cfg(test)]
 use crate::ast::BitSlice;
+use crate::lexer::Lexer;
 #[cfg(test)]
 use crate::nom::Slice;
 #[cfg(test)]
@@ -82,32 +85,13 @@ use crate::token::{Token, TokenContent};
 #[test]
 fn test_ok() {
     let content = "foo [ base, 0, 1 ] { 0 16 foobar }";
-    let sp = SourcePos::new("stdio", content);
-
-    let tokens = vec![
-        Token::new(TokenContent::Identifier("foo".to_string()), sp.slice(0..3)),
-        Token::new(TokenContent::LBracket, sp.slice(0..3)),
-        Token::new(TokenContent::Identifier("base".to_string()), sp.slice(0..3)),
-        Token::new(TokenContent::Comma, sp.slice(0..3)),
-        Token::new(TokenContent::IntLiteral(0), sp.slice(0..3)),
-        Token::new(TokenContent::Comma, sp.slice(0..3)),
-        Token::new(TokenContent::IntLiteral(32), sp.slice(0..3)),
-        Token::new(TokenContent::RBracket, sp.slice(0..3)),
-        Token::new(TokenContent::LBrace, sp.slice(0..3)),
-        Token::new(TokenContent::IntLiteral(0), sp.slice(0..3)),
-        Token::new(TokenContent::IntLiteral(16), sp.slice(0..3)),
-        Token::new(
-            TokenContent::Identifier("foobar".to_string()),
-            sp.slice(0..3),
-        ),
-        Token::new(TokenContent::RBrace, sp.slice(0..3)),
-    ];
+    let tokens = Lexer::lex_string("stdio", content).unwrap();
     let ts = TokenStream::from_slice(&tokens);
     let fields = BitSlice {
         start: 0,
         end: 16,
         name: "foobar".to_string(),
-        pos: ts.slice(9..).input_sourcepos(),
+        pos: ts.slice(9..),
     };
     assert_eq!(
         field(ts.clone()),
@@ -118,7 +102,7 @@ fn test_ok() {
                 stateref: Some(("base".to_string(), 0)),
                 length: 32,
                 layout: vec![fields],
-                pos: ts.input_sourcepos()
+                pos: ts.slice(0..13)
             }
         ))
     );
@@ -127,20 +111,7 @@ fn test_ok() {
 #[test]
 fn test_err() {
     let content = "foo [ base, 0, 1 ] { }";
-    let sp = SourcePos::new("stdio", content);
-
-    let tokens = vec![
-        Token::new(TokenContent::Identifier("foo".to_string()), sp.slice(0..3)),
-        Token::new(TokenContent::LBracket, sp.slice(0..3)),
-        Token::new(TokenContent::Identifier("base".to_string()), sp.slice(0..3)),
-        Token::new(TokenContent::Comma, sp.slice(0..3)),
-        Token::new(TokenContent::IntLiteral(0), sp.slice(0..3)),
-        Token::new(TokenContent::Comma, sp.slice(0..3)),
-        Token::new(TokenContent::IntLiteral(32), sp.slice(0..3)),
-        Token::new(TokenContent::RBracket, sp.slice(0..3)),
-        Token::new(TokenContent::LBrace, sp.slice(0..3)),
-        Token::new(TokenContent::RBrace, sp.slice(0..3)),
-    ];
+    let tokens = Lexer::lex_string("stdio", content).unwrap();
     let ts = TokenStream::from_slice(&tokens);
     assert!(field(ts).is_err());
 }

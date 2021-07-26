@@ -66,7 +66,7 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
             name: unitname,
             derived: derived,
             consts: Vec::new(),
-            state: body.unwrap_or(State::None),
+            state: body.unwrap_or(State::None { pos: pos.clone() }),
             interface: Interface::None,
             methods: Vec::new(),
             pos,
