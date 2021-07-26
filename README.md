@@ -42,6 +42,14 @@ To build the compiler
 $ cargo build
 ```
 
+## Running
+
+The compiler expects a `*.vrs` file. See `cargo run -h` for more options.
+
+```
+cargo run <*.vrs>
+```
+
 ## Documentation
 
 ```
