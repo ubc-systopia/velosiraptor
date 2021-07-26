@@ -1,0 +1,25 @@
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+name: Documentation
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Doc App
+        uses: actions-rs/cargo@v1
+        with:
+          command: doc
+          args: --no-deps
+      - name: Doc Lib
+        uses: actions-rs/cargo@v1
+        with:
+          command: doc
+          args: --no-deps --manifest-path ./lib/libvrc/Cargo.toml
