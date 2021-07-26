@@ -30,7 +30,7 @@ use nom::{
     branch::alt,
     combinator::cut,
     multi::{many1, separated_list0},
-    sequence::{delimited, terminated},
+    sequence::delimited,
 };
 
 // lexer, parser terminals and ast
@@ -60,7 +60,7 @@ fn register_state(input: TokenStream) -> IResult<TokenStream, State> {
     let (i1, _) = kw_register(input.clone())?;
     let (i2, fields) = fields_parser(i1)?;
 
-    let pos = input.from_self_until(&i2);
+    let pos = input.expand_until(&i2);
     Ok((i2, State::RegisterState { fields, pos }))
 }
 
@@ -70,7 +70,7 @@ fn memory_state(input: TokenStream) -> IResult<TokenStream, State> {
     let (i2, bases) = argument_parser(i1)?;
     let (i3, fields) = fields_parser(i2)?;
 
-    let pos = input.from_self_until(&i3);
+    let pos = input.expand_until(&i3);
     Ok((i3, State::MemoryState { bases, fields, pos }))
 }
 
@@ -178,7 +178,7 @@ fn register_state_parser_test() {
         Err(x) => panic!("Parsing failed{}", x),
     };
 
-    let (fields, pos) = match parsed_state {
+    let (_fields, pos) = match parsed_state {
         State::RegisterState { fields, pos } => (fields, pos),
         _ => panic!("Wrong type of State parsed"),
     };

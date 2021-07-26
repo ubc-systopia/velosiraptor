@@ -59,12 +59,12 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
     // then we have the unit block, wrapped in curly braces and a ;
     let (i3, body) = cut(terminated(delimited(lbrace, unit_body, rbrace), semicolon))(i2)?;
 
-    let pos = input.from_self_until(&i3);
+    let pos = input.expand_until(&i3);
     Ok((
         i3,
         Unit {
             name: unitname,
-            derived: derived,
+            derived,
             consts: Vec::new(),
             state: body.unwrap_or(State::None { pos: pos.clone() }),
             interface: Interface::None,

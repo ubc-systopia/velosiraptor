@@ -32,9 +32,6 @@ use crate::ast::AstError;
 use crate::ast::Type;
 use crate::sourcepos::SourcePos;
 
-/// defines the type of the key
-type SymbolKey = String;
-
 /// represents the kind of a symbol
 #[derive(Debug, Clone, Copy)]
 pub enum SymbolKind {
@@ -56,7 +53,7 @@ pub struct Symbol {
     /// the kind of the symbol, constant, function, ...
     pub kind: SymbolKind,
     /// the name of the symbol, its identifier
-    pub name: SymbolKey,
+    pub name: String,
     /// the type of the symbol, `int|bool|...`
     pub typeinfo: Type,
     /// the position where this symbol has been defined
@@ -95,7 +92,7 @@ pub struct SymbolTable {
     /// represents the current context of the symbol table
     context: Vec<String>,
     /// the symbols of the table
-    syms: HashMap<SymbolKey, Symbol>,
+    syms: HashMap<String, Symbol>,
 }
 
 /// Implementation of [SymbolTable]
@@ -110,7 +107,7 @@ impl SymbolTable {
     }
 
     /// creates a new symbol table as a copy from [self]
-    pub fn from_self(&self, subcontext: String) -> Self {
+    pub fn with_range(&self, subcontext: String) -> Self {
         let syms = self.syms.clone();
         let mut context = self.context.clone();
         context.push(subcontext);
@@ -129,17 +126,17 @@ impl SymbolTable {
     }
 
     /// checks if there is a corresponding entry in the table
-    pub fn contains(&self, sym: &SymbolKey) -> bool {
+    pub fn contains(&self, sym: &str) -> bool {
         self.syms.contains_key(sym)
     }
 
     /// tries to obtain the entry
-    pub fn get(&self, sym: &SymbolKey) -> Option<&Symbol> {
+    pub fn get(&self, sym: &str) -> Option<&Symbol> {
         self.syms.get(sym)
     }
 
     /// removes a symbol from the table
-    pub fn remove(&mut self, sym: &SymbolKey) -> Result<Symbol, AstError> {
+    pub fn remove(&mut self, sym: &str) -> Result<Symbol, AstError> {
         match self.syms.remove(sym) {
             Some(e) => Ok(e),
             None => Err(AstError::SymTableNotExists),

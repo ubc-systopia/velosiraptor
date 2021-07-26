@@ -159,7 +159,7 @@ impl AstNode for Const {
                 "convert the identifier to ASCII: `{}`",
                 name.to_ascii_uppercase()
             );
-            VrsError::new_warn(pos.from_self(1..2), msg, Some(hint)).print();
+            VrsError::new_warn(pos.with_range(1..2), msg, Some(hint)).print();
             res = res + Issues::warn();
         }
 
@@ -173,7 +173,7 @@ impl AstNode for Const {
                 "convert the identifier to upper case (notice the capitalization): `{}`",
                 name.to_ascii_uppercase()
             );
-            VrsError::new_warn(pos.from_self(1..2), msg, Some(hint)).print();
+            VrsError::new_warn(pos.with_range(1..2), msg, Some(hint)).print();
             // warning
             res = res + Issues::warn();
         }

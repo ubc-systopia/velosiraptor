@@ -59,7 +59,7 @@ pub fn bitslice(input: TokenStream) -> IResult<TokenStream, BitSlice> {
     let (rem, (end, name)) = cut(tuple((num, ident)))(i1)?;
 
     // calculate the position of the bitslice
-    let pos = input.from_self_until(&rem);
+    let pos = input.expand_until(&rem);
 
     Ok((
         rem,

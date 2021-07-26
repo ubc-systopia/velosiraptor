@@ -55,7 +55,7 @@ pub fn constdef(input: TokenStream) -> IResult<TokenStream, Const> {
     }?;
 
     // create the token stream covering the entire const def
-    let pos = input.from_self_until(&i3);
+    let pos = input.expand_until(&i3);
     match ti {
         Type::Boolean => Ok((
             i3,

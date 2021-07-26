@@ -26,4 +26,4 @@
 use crate::token::TokenStream;
 
 /// Interface definition parsing
-pub fn interface(input: TokenStream) -> () {}
+pub fn interface(_input: TokenStream) {}
