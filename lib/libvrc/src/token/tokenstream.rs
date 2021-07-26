@@ -92,7 +92,7 @@ impl TokenStream {
     /// # Panics
     ///
     /// Panics if the supplied range is outside of the covered range by the [TokenStream]
-    pub fn from_self(&self, range: Range<usize>) -> Self {
+    pub fn with_range(&self, range: Range<usize>) -> Self {
         assert!(self.input_len() >= range.end - range.start);
         assert!(self.range.start + range.end <= self.range.end);
 
@@ -113,7 +113,7 @@ impl TokenStream {
     /// # Panics
     ///
     /// The function panics if the tokens are not matching, or the end is before the start
-    pub fn from_self_until(self, other: &Self) -> Self {
+    pub fn expand_until(self, other: &Self) -> Self {
         assert!(self.tokens == other.tokens);
         assert!(self.range.start < other.range.start);
         TokenStream {
@@ -122,7 +122,7 @@ impl TokenStream {
         }
     }
 
-    /// Creates a new [TokenStream] from self up until, not including the other
+    /// Creates a new [TokenStream] from self up until, and including the other
     ///
     /// The new range will start at current, and be set to the token just before
     /// the start of the other TokenStream
@@ -130,7 +130,7 @@ impl TokenStream {
     /// # Panics
     ///
     /// The function panics if the tokens are not matching, or the end is before the start
-    pub fn from_merged(self, other: &Self) -> Self {
+    pub fn merge(self, other: &Self) -> Self {
         assert!(self.tokens == other.tokens);
         assert!(self.range.start < other.range.end);
         TokenStream {
@@ -180,7 +180,7 @@ impl TokenStream {
         assert!(self.tokens == other.tokens);
         assert!(self.range.start <= other.range.start);
         self.input_sourcepos()
-            .from_self_until(&other.input_sourcepos())
+            .expand_until(&other.input_sourcepos())
     }
 
     /// Obtains the current range relative to the entire [TokenStream]
@@ -239,7 +239,7 @@ impl InputTake for TokenStream {
     /// The function panics if count > self.input_len()
     fn take(&self, count: usize) -> Self {
         assert!(count <= self.input_len());
-        self.from_self(0..count)
+        self.with_range(0..count)
     }
 
     #[inline]
@@ -250,8 +250,8 @@ impl InputTake for TokenStream {
     fn take_split(&self, count: usize) -> (Self, Self) {
         assert!(count <= self.input_len());
 
-        let first = self.from_self(0..count);
-        let second = self.from_self(count..self.input_len());
+        let first = self.with_range(0..count);
+        let second = self.with_range(count..self.input_len());
 
         // we sould not lose any data
         assert_eq!(first.input_len(), count);
@@ -289,7 +289,7 @@ impl Slice<Range<usize>> for TokenStream {
     #[inline]
     fn slice(&self, range: Range<usize>) -> Self {
         assert!(range.end <= self.input_len());
-        self.from_self(range)
+        self.with_range(range)
     }
 }
 

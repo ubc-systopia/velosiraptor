@@ -176,7 +176,7 @@ impl SourcePos {
     /// # Panics
     ///
     /// Panics if the supplied range is outside of the covered range by the SourcePos
-    pub fn from_self(&self, range: Range<usize>) -> Self {
+    pub fn with_range(&self, range: Range<usize>) -> Self {
         assert!(self.input_len() >= range.end - range.start);
         assert!(self.range.start + range.end <= self.range.end);
 
@@ -217,7 +217,7 @@ impl SourcePos {
     /// # Panics
     ///
     /// If the two source positions are not related
-    pub fn from_self_until(&self, other: &Self) -> Self {
+    pub fn expand_until(&self, other: &Self) -> Self {
         assert!(self.context == other.context);
         assert!(self.content == other.content);
         assert!(self.range.start <= other.range.start);
@@ -464,7 +464,7 @@ impl<'a> InputTake for SourcePos {
     #[inline]
     fn take(&self, count: usize) -> Self {
         assert!(count <= self.input_len());
-        self.from_self(0..count)
+        self.with_range(0..count)
     }
 
     /// Splits the current SourcePos at `count` returning two new [SourcePos] objects.ErrorKind
@@ -476,8 +476,8 @@ impl<'a> InputTake for SourcePos {
     fn take_split(&self, count: usize) -> (Self, Self) {
         assert!(count <= self.input_len());
         // create the new SourcePos objects
-        let first = self.from_self(0..count);
-        let second = self.from_self(count..self.input_len());
+        let first = self.with_range(0..count);
+        let second = self.with_range(count..self.input_len());
 
         // we sould not lose any data
         assert_eq!(first.input_len() + second.input_len(), self.input_len());
@@ -573,7 +573,7 @@ impl<'a> Slice<Range<usize>> for SourcePos {
     #[inline]
     fn slice(&self, range: Range<usize>) -> Self {
         assert!(range.end <= self.input_len());
-        self.from_self(range)
+        self.with_range(range)
     }
 }
 

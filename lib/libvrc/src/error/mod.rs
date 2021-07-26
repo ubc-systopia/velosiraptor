@@ -226,7 +226,7 @@ impl<I: ErrorLocation + fmt::Display> VrsError<I> {
         write!(f, "      {}         {}{}", pipe, indent, underline)?;
         match hint {
             Some(h) => writeln!(f, " {}", color(h)),
-            None => writeln!(f, ""),
+            None => writeln!(f),
         }
     }
 }

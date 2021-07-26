@@ -84,7 +84,7 @@ impl AstNode for Unit {
                 "convert the identifier to upper case (notice the capitalization): `{}`",
                 name
             );
-            VrsError::new_warn(pos.from_self(1..2), msg, Some(hint)).print();
+            VrsError::new_warn(pos.with_range(1..2), msg, Some(hint)).print();
             res = res + Issues::warn();
         }
 

@@ -34,7 +34,6 @@ use crate::token::TokenStream;
 
 // the used nom componets
 use nom::{
-    branch::alt,
     combinator::{cut, opt},
     multi::separated_list0,
     sequence::{delimited, pair, terminated},
@@ -72,10 +71,10 @@ pub fn field(input: TokenStream) -> IResult<TokenStream, Field> {
     let (rem, bitslices) = cut(terminated(opt(bitslicesparser), semicolon))(i2)?;
 
     // if there were bitslices parsed unwrap them, otherwise create an empty vector
-    let layout = bitslices.unwrap_or(Vec::new());
+    let layout = bitslices.unwrap_or_default();
 
     // calculate the position of the bitslice
-    let pos = input.from_self_until(&rem);
+    let pos = input.expand_until(&rem);
 
     Ok((
         rem,

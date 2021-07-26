@@ -44,7 +44,7 @@ pub fn import(input: TokenStream) -> IResult<TokenStream, Import> {
     let (rem, name) = cut(terminated(ident, semicolon))(i1)?;
 
     // create the token stream covering the entire import
-    let pos = input.from_self_until(&rem);
+    let pos = input.expand_until(&rem);
 
     Ok((
         rem,

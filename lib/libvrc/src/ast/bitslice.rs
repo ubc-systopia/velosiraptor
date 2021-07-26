@@ -75,7 +75,7 @@ impl AstNode for BitSlice {
         if self.start > self.end {
             let msg = String::from("negative interval detected: start bit > end bit");
             let hint = String::from("swap start with end bits");
-            VrsError::new_err(self.pos.from_self(0..2), msg, Some(hint)).print();
+            VrsError::new_err(self.pos.with_range(0..2), msg, Some(hint)).print();
             res.inc_err(1);
         }
 
@@ -83,7 +83,7 @@ impl AstNode for BitSlice {
         if self.end > 63 {
             let msg = String::from("the bitfield slice exceeds 64 bits.");
             let hint = String::from("reduce the end bit here");
-            VrsError::new_err(self.pos.from_self(1..2), msg, Some(hint)).print();
+            VrsError::new_err(self.pos.with_range(1..2), msg, Some(hint)).print();
             res.inc_err(1);
         }
 
@@ -100,7 +100,7 @@ impl AstNode for BitSlice {
                 "convert the identifier to snake case: `{}`",
                 self.name.to_ascii_lowercase()
             );
-            VrsError::new_warn(self.pos.from_self(2..3), msg, Some(hint)).print();
+            VrsError::new_warn(self.pos.with_range(2..3), msg, Some(hint)).print();
             res.inc_warn(1);
         }
 

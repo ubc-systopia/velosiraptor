@@ -99,7 +99,7 @@ impl AstNode for Field {
             let msg = format!("unusual field length: {} bytes", self.length);
             let hint = String::from("change this to either 1, 2, 4, or 8 bytes");
             VrsError::new_err(
-                self.pos.from_self(lenoffset..lenoffset + 1),
+                self.pos.with_range(lenoffset..lenoffset + 1),
                 msg,
                 Some(hint),
             )
@@ -118,7 +118,7 @@ impl AstNode for Field {
             if b.end as u64 >= maxbits {
                 let msg = String::from("the bitslice exceeds the size of the field");
                 let hint = format!("maximum number of bits is [0..{}]", maxbits - 1);
-                VrsError::new_err(b.pos.from_self(0..3), msg, Some(hint)).print();
+                VrsError::new_err(b.pos.with_range(0..3), msg, Some(hint)).print();
                 res.inc_err(1);
             }
         }
@@ -162,7 +162,7 @@ impl AstNode for Field {
                 "convert the identifier to snake case: `{}`",
                 self.name.to_ascii_lowercase()
             );
-            VrsError::new_warn(self.pos.from_self(0..1), msg, Some(hint)).print();
+            VrsError::new_warn(self.pos.with_range(0..1), msg, Some(hint)).print();
             res.inc_warn(1);
         }
 
