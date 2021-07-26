@@ -29,7 +29,7 @@
 use nom::{
     branch::alt,
     combinator::cut,
-    multi::separated_list0,
+    multi::{many1, separated_list0},
     sequence::{delimited, terminated},
 };
 
@@ -88,11 +88,7 @@ pub fn argument_parser(input: TokenStream) -> IResult<TokenStream, Vec<String>> 
 
 /// Parses and consumes a semicolon separated list of fields of the form "{ FIELD; ...; FIELD; }"
 pub fn fields_parser(input: TokenStream) -> IResult<TokenStream, Vec<Field>> {
-    cut(delimited(
-        lbrace,
-        terminated(separated_list0(semicolon, field), semicolon),
-        rbrace,
-    ))(input)
+    cut(delimited(lbrace, many1(field), rbrace))(input)
 }
 
 #[cfg(test)]
@@ -124,7 +120,7 @@ fn memory_state_parser_test() {
     let tok_stream = TokenStream::from_vec_filtered(tok_vec);
     let parsed_state = match state(tok_stream.clone()) {
         Ok((_, parsed_state)) => parsed_state,
-        Err(_) => panic!("Parsing failed"),
+        Err(x) => panic!("Parsing failed{}", x),
     };
 
     let (bases, _fields, _pos) = match parsed_state {
@@ -179,7 +175,7 @@ fn register_state_parser_test() {
     let tok_stream = TokenStream::from_vec_filtered(tok_vec);
     let parsed_state = match state(tok_stream.clone()) {
         Ok((_, parsed_state)) => parsed_state,
-        Err(_) => panic!("Parsing failed"),
+        Err(x) => panic!("Parsing failed{}", x),
     };
 
     let (fields, pos) = match parsed_state {
@@ -188,7 +184,7 @@ fn register_state_parser_test() {
     };
 
     // todo Should we be testing fields???
-    assert_eq!(pos, tok_stream.slice(2..4));
+    assert_eq!(pos, tok_stream.slice(2..27));
 }
 
 #[test]

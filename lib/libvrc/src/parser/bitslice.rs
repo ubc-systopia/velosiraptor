@@ -58,6 +58,7 @@ pub fn bitslice(input: TokenStream) -> IResult<TokenStream, BitSlice> {
     // we match two numbers and an identifier
     let (rem, (end, name)) = cut(tuple((num, ident)))(i1)?;
 
+    // calculate the position of the bitslice
     let pos = input.from_self_until(&rem);
 
     Ok((
@@ -85,7 +86,7 @@ fn test_ok() {
     let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
     let ts = TokenStream::from_vec(tokens);
 
-    let pos = ts.clone();
+    let pos = ts.slice(0..3);
     let ts2 = ts.slice(3..);
     assert_eq!(
         bitslice(ts),
