@@ -54,36 +54,38 @@
 //!                    and may contain other registers or alike not direcly
 //!                    related to the state.
 //!
-//!                    interface = MMIO(base) {
-//!                        ident [base, offset, length] => state.field
-//!                    };
 //!
-//!                    interface = MMIO(base) {
-//!                        ident [base, offset, length] {
-//!                            0..4 => state.field.slice
-//!                        }
-//!                        ident [base, offset, length] => None;
-//!                    };
+//!  interface = MMIO(base) {
+//!      ident [base, offset, length] => state.field
+//!  };
 //!
-//!                    interface = CPURegs {
-//!                        regname => {
-//!                        }
-//!                    }
+//!  interface = MMIO(base) {
+//!      ident [base, offset, length] {
+//!          0..4 => state.field.slice
+//!      }
+//!      ident [base, offset, length] => None;
+//!  };
 //!
-//!                    interface = CPURegs {
-//!                        base => None;
-//!                        length => None;
-//!                        trigger {
-//!                            base => state.base;
-//!                            length => state.length;
-//!                            1 => state.valid;
-//!                        }
-//!                        clear {
-//!                            0 => state.base;
-//!                            0 => state.length;
-//!                            0 => state.valid;
-//!                        }
-//!                    }
+//!  interface = CPURegs {
+//!      regname => {
+//!      }
+//!  }
+//!
+//!  interface = CPURegs {
+//!      base => None;
+//!      length => None;
+//!      trigger {
+//!          base => state.base;
+//!          length => state.length;
+//!          1 => state.valid;
+//!      }
+//!      clear {
+//!          0 => state.base;
+//!          0 => state.length;
+//!          0 => state.valid;
+//!      }
+//!  }
+//!
 //!
 //!  * No Interface:   In addition there might be no interface at all
 //!                    `interface = None;`
