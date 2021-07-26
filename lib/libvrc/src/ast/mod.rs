@@ -25,8 +25,23 @@
 
 //! # Ast Module of the Velosiraptor Compiler
 //!
-//! This module contains the AST representation produced by the parser from
+//! This module contains the abstract syntax tree representation produced by the parser from
 //! a given input in the Velosiraptor Specification Language format.
+//!
+//! # Node Types
+//!
+//! The AST node contsists of the following distinct node types:
+//!
+//!  * Ast
+//!  * Import
+//!  * Constants
+//!  * Units
+//!  * Interface
+//!  * Methods
+//!  * State
+//!  * Expressions
+//!  * Fields
+//!  * BitSlice
 
 mod ast;
 mod bitslice;
@@ -71,6 +86,7 @@ pub use method::Stmt;
 pub use state::State;
 pub use types::Type;
 pub use unit::Unit;
+
 
 /// Trait that checks the Ast nodes for consistency
 ///
