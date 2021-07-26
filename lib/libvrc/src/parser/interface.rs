@@ -23,6 +23,73 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+//! Interface Parser
+//!
+//! Software will interact with the interface to query and change the state of the
+//! translation unit.
+//! Conceptually, there are two operations on the interface: read and write.
+//! Each operation then maps to a sequence of actions on the state.
+//!
+//! interface = TYPE(params) {              // the interface as a type
+//!     ident [base, offset, length] => {   // gives a name to the interface field
+//!         state.field = 1;                // a list of actions that is performed
+//!         state.field2 = 2;
+//!     }
+//! }
+//!
+//! The supported interfaces depend on the used State type.
+//!
+//!  * Memory State:   In this state, we assume that all the state is exernal
+//!                    to the translation unit and thus can be fully accessed
+//!                    The corresponding interface is roughly an identity map.
+//!                    Each field has its corresponding field in the interface,
+//!                    read/writes correspond to a single read/write operation.
+//!                    The used address might be the same as in the state definition,
+//!                    or it might be something different.
+//!                    `interface = Memory(base);`
+//!
+//!  * Register State: Only the translation unit has full access to the state,
+//!                    software will need to go through an exposed interface,
+//!                    that exposes some of the state directly, none at all
+//!                    and may contain other registers or alike not direcly
+//!                    related to the state.
+//!
+//!
+//!  interface = MMIO(base) {
+//!      ident [base, offset, length] => state.field
+//!  };
+//!
+//!  interface = MMIO(base) {
+//!      ident [base, offset, length] {
+//!          0..4 => state.field.slice
+//!      }
+//!      ident [base, offset, length] => None;
+//!  };
+//!
+//!  interface = CPURegs {
+//!      regname => {
+//!      }
+//!  }
+//!
+//!  interface = CPURegs {
+//!      base => None;
+//!      length => None;
+//!      trigger {
+//!          base => state.base;
+//!          length => state.length;
+//!          1 => state.valid;
+//!      }
+//!      clear {
+//!          0 => state.base;
+//!          0 => state.length;
+//!          0 => state.valid;
+//!      }
+//!  }
+//!
+//!
+//!  * No Interface:   In addition there might be no interface at all
+//!                    `interface = None;`
+
 use crate::token::TokenStream;
 
 /// Interface definition parsing
