@@ -189,6 +189,7 @@ keywordparser!(pub kw_interface, Keyword::Interface);
 keywordparser!(pub kw_memory, Keyword::Memory);
 keywordparser!(pub kw_register, Keyword::Register);
 keywordparser!(pub kw_none, Keyword::None);
+keywordparser!(pub kw_fn, Keyword::Fn);
 
 /// parses a type expression
 ///
