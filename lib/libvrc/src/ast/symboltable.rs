@@ -67,14 +67,13 @@ pub struct Symbol {
 
 /// Implementation of [Symbol]
 impl Symbol {
-    pub fn new(
-        ctxt: &Vec<String>,
-        name: &str,
-        typeinfo: Type,
-        kind: SymbolKind,
-        loc: TokenStream,
-    ) -> Self {
-        let name = format!("{}::{}", ctxt.join("::"), name);
+    pub fn new(ctxt: &str, name: &str, typeinfo: Type, kind: SymbolKind, loc: TokenStream) -> Self {
+        let name = if ctxt == "" {
+            String::from(name)
+        } else {
+            format!("{}.{}", ctxt, name)
+        };
+
         Symbol {
             kind,
             name,
@@ -129,14 +128,9 @@ impl SymbolTable {
     }
 
     /// tries to insert a symbol into the symbol table
-    pub fn insert(&mut self, sym: Symbol) -> Result<(), AstError> {
-        if self.contains(&sym.name) {
-            Err(AstError::SymTabInsertExists)
-        } else {
-            let name = sym.name.clone();
-            self.syms.insert(name, sym);
-            Ok(())
-        }
+    pub fn insert(&mut self, sym: Symbol) -> Result<Option<Symbol>, AstError> {
+        let name = sym.name.clone();
+        Ok(self.syms.insert(name, sym))
     }
 
     /// checks if there is a corresponding entry in the table
@@ -146,7 +140,7 @@ impl SymbolTable {
 
     /// tries to obtain the entry
     pub fn get(&self, sym: &str) -> Option<&Symbol> {
-        self.syms.get(sym).or_else(|| self.localsyms.get(sym))
+        self.localsyms.get(sym).or_else(|| self.syms.get(sym))
     }
 
     /// removes a symbol from the table

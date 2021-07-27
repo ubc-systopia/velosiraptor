@@ -30,13 +30,15 @@
 // the used nom functionality
 use nom::{
     combinator::{cut, opt},
-    sequence::{delimited, pair, preceded, terminated},
+    multi::many0,
+    sequence::{delimited, pair, preceded, terminated, tuple},
 };
 
 // the used library-internal functionaltity
 use crate::ast::{Interface, State, Unit};
 use crate::error::IResult;
 use crate::parser::{
+    constdef,
     state::state,
     terminals::{colon, ident, kw_unit, lbrace, rbrace, semicolon},
 };
@@ -54,10 +56,11 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
 
     // TODO: here we have ConstItem | InterfaceItem | StateItem | FunctionItem
     // TODO: either put that as
-    let unit_body = opt(state);
+    let unit_body = tuple((many0(constdef), opt(state)));
 
     // then we have the unit block, wrapped in curly braces and a ;
-    let (i3, body) = cut(terminated(delimited(lbrace, unit_body, rbrace), semicolon))(i2)?;
+    let (i3, (consts, state)) =
+        cut(terminated(delimited(lbrace, unit_body, rbrace), semicolon))(i2)?;
 
     let pos = input.expand_until(&i3);
     Ok((
@@ -65,8 +68,8 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
         Unit {
             name: unitname,
             derived,
-            consts: Vec::new(),
-            state: body.unwrap_or(State::None { pos: pos.clone() }),
+            consts: consts,
+            state: state.unwrap_or(State::None { pos: pos.clone() }),
             interface: Interface::None,
             methods: Vec::new(),
             pos,
