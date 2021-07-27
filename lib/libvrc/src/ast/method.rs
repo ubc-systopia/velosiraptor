@@ -28,6 +28,7 @@ use std::fmt;
 
 use crate::ast::{Expr, Type};
 use crate::sourcepos::SourcePos;
+use crate::token::TokenStream;
 
 /// Defines a Method inside a unit
 ///
@@ -48,7 +49,9 @@ pub struct Method {
     /// A sequence of statements
     pub stmts: Vec<Stmt>,
     /// the position where the method was defined
-    pub pos: SourcePos,
+    pub pos: TokenStream,
+    /// Whether or not the method has an implementation
+    pub is_abstract: bool,
 }
 
 /// Implementation of the [fmt::Display] trait for [Field]
@@ -65,7 +68,7 @@ impl fmt::Display for Method {
 /// Implementation of the [fmt::Debug] trait for [Field]
 impl fmt::Debug for Method {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let (line, column) = self.pos.input_pos();
+        let (line, column) = self.pos.input_sourcepos().input_pos();
         writeln!(
             f,
             "{:03}:{:03} | fn {}() -> {} {{",
