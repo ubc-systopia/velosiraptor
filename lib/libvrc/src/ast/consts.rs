@@ -83,7 +83,7 @@ impl Const {
     }
 
     /// creates a symbol from the current Const
-    pub fn to_symbol(&self, ctxt: &Vec<String>) -> Symbol {
+    pub fn to_symbol(&self, ctxt: &str) -> Symbol {
         Symbol::new(
             ctxt,
             self.name(),

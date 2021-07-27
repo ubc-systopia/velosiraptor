@@ -230,16 +230,15 @@ impl Ast {
     pub fn build_symboltable(&self) -> Result<SymbolTable, AstError> {
         let mut err = Issues::ok();
         let mut st = SymbolTable::new();
-        let mut ctxt = Vec::new();
         for c in &self.consts {
-            let sym = c.to_symbol(&ctxt);
+            let sym = c.to_symbol("");
             if st.insert(sym).is_err() {
                 err.inc_err(1);
             };
         }
 
         for u in &self.units {
-            err = err + u.build_symtab(&mut ctxt, &mut st);
+            err = err + u.build_symtab(&mut st);
         }
 
         if err.errors > 0 {
@@ -306,7 +305,7 @@ impl AstNode for Ast {
         res
     }
     // builds the symbol table
-    fn build_symtab(&self, _ctxt: &mut Vec<String>, _st: &mut SymbolTable) -> Issues {
+    fn build_symtab(&self, _st: &mut SymbolTable) -> Issues {
         Issues::ok()
     }
     fn name(&self) -> &str {

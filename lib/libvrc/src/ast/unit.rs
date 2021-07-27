@@ -120,17 +120,14 @@ impl AstNode for Unit {
     }
 
     // builds the symbol table
-    fn build_symtab(&self, ctxt: &mut Vec<String>, st: &mut SymbolTable) -> Issues {
+    fn build_symtab(&self, st: &mut SymbolTable) -> Issues {
         let mut err = Issues::ok();
-
-        ctxt.push(self.name.clone());
         for i in &self.consts {
-            let sym = i.to_symbol(&ctxt);
+            let sym = i.to_symbol(&self.name());
             if st.insert(sym).is_err() {
                 err.inc_err(1);
             };
         }
-        ctxt.pop();
         err
     }
 }

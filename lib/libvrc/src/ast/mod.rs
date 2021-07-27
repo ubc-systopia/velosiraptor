@@ -81,7 +81,7 @@ pub trait AstNode {
         Issues::ok()
     }
     // builds the symbol table
-    fn build_symtab(&self, _ctxt: &mut Vec<String>, _st: &mut SymbolTable) -> Issues {
+    fn build_symtab(&self, _st: &mut SymbolTable) -> Issues {
         Issues::ok()
     }
 
