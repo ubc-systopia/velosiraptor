@@ -25,7 +25,7 @@
 
 //! Ast Module of the Velosiraptor Compiler
 
-use crate::sourcepos::SourcePos;
+use crate::token::TokenStream;
 
 /// Defines the software-visible interface of a unit
 ///
@@ -37,15 +37,46 @@ use crate::sourcepos::SourcePos;
 #[derive(PartialEq, Clone)]
 pub enum Interface {
     /// Defines a load/store interface to memory
-    Memory { pos: SourcePos },
+    Memory { pos: TokenStream },
     /// Defines a memory-mapped interface to registers
-    MMIORegisters { pos: SourcePos },
+    MMIORegisters { pos: TokenStream },
     /// Defines a load/store interface to CPU registers
-    CPURegisters { pos: SourcePos },
+    CPURegisters { pos: TokenStream },
     /// Defines a register interface using special instructions
-    SpecialRegisters { pos: SourcePos },
+    SpecialRegisters { pos: TokenStream },
     // TODO interface may be a combination: e.g., Memory + MMIORegisters
     //CombinedState {  },
     /// No software interface associated with this translation unit
     None,
+}
+
+/// Represents an action operand
+///
+/// The action operand defines the source and destination of an action
+pub enum ActionOp {
+    /// reference to a field/slice of the interface
+    InterfaceRef(String, String),
+    /// reference to a field/slice in the state
+    StateRef(String, String),
+    /// a constant boolean value
+    BoolValue(bool),
+    /// a constant integer value
+    IntValue(u64),
+}
+
+/// Defines an action that is executed on the interface
+///
+/// An action defines a read access to the state or a write access to the state. The latter
+/// basically triggers a state transition.
+///
+/// Currently an action is basically an assignment that assigns the destination the value of the
+/// source. If the destination is a StateRef, then this
+///   src => dst
+pub struct Action {
+    /// the source operand of the action
+    pub src: ActionOp,
+    /// the destination operand of the action
+    pub dst: ActionOp,
+    /// the location where the action was defined
+    pub pos: TokenStream,
 }
