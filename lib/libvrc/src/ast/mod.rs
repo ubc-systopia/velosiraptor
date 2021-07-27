@@ -63,7 +63,7 @@ pub use consts::Const;
 pub use expression::{BinOp, Expr, UnOp};
 pub use field::Field;
 pub use import::Import;
-pub use interface::Interface;
+pub use interface::{Action, ActionOp, Interface};
 pub use issues::Issues;
 pub use method::Method;
 pub use method::Stmt;
