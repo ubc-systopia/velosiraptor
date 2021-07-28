@@ -207,7 +207,7 @@ fn main() {
     // Step 3: Build Symboltable
     // ===========================================================================================
 
-    let symtab = match ast.build_symboltable() {
+    let mut symtab = match ast.build_symboltable() {
         Ok(symtab) => symtab,
         Err(AstError::SymTabError { i }) => {
             eprintln!(
@@ -247,7 +247,7 @@ fn main() {
         "check".bold().green(),
     );
 
-    let issues = match ast.check_consistency() {
+    let issues = match ast.check_consistency(&mut symtab) {
         Ok(i) => issues + i,
         Err(AstError::CheckError { i }) => {
             //            matches.value_of("input").unwrap_or("none");
@@ -264,7 +264,7 @@ fn main() {
     // Step 5: Transform AST
     // ===========================================================================================
 
-    let issues = match ast.check_consistency() {
+    let issues = match ast.apply_transformations() {
         Ok(i) => issues + i,
         Err(_) => {
             abort(infile, Issues::err());

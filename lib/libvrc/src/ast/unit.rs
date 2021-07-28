@@ -68,12 +68,15 @@ impl Unit {}
 
 /// Implemetation of the [AstNode] trait for [Unit]
 impl AstNode for Unit {
-    fn check(&self) -> Issues {
+    fn check(&self, st: &mut SymbolTable) -> Issues {
         // all fine for now
         let mut res = Issues::ok();
 
         let name = self.name();
         let pos = self.loc();
+
+        // set the current context
+        st.set_context(self.name());
 
         // name should start with upper case
         if !name[0..1].as_bytes()[0].is_ascii_uppercase() {
@@ -92,11 +95,11 @@ impl AstNode for Unit {
         let errors = utils::check_double_entries(&self.consts);
         res.inc_err(errors);
         for c in &self.consts {
-            res = res + c.check();
+            res = res + c.check(st);
         }
 
         // check the state and interface
-        res = res + self.state.check();
+        res = res + self.state.check(st);
 
         //todo!("check interface");
         //res = res += self.interface.check();

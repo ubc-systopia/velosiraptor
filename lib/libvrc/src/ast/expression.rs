@@ -26,7 +26,7 @@
 ///! Ast Module of the Velosiraptor Compiler
 use std::fmt;
 
-use crate::ast::AstNode;
+use crate::ast::{AstNode, SymbolTable};
 use crate::token::TokenStream;
 
 /// Binary operations for [Expr] <OP> [Expr]
@@ -264,7 +264,7 @@ pub enum Expr {
 
 impl Expr {
     /// returns ture if the expression is a constant expression
-    pub fn is_const_expr(&self) -> bool {
+    pub fn is_const_expr(&self, st: &SymbolTable) -> bool {
         use Expr::*;
         match self {
             Number { value: _, pos: _ } => true,
@@ -274,8 +274,16 @@ impl Expr {
                 lhs,
                 rhs,
                 pos: _,
-            } => lhs.is_const_expr() && rhs.is_const_expr(),
-            UnaryOperation { op: _, val, pos: _ } => val.is_const_expr(),
+            } => lhs.is_const_expr(st) && rhs.is_const_expr(st),
+            UnaryOperation { op: _, val, pos: _ } => val.is_const_expr(st),
+            Identifier { path, pos: _ } => {
+                // TODO: deal with context.symbol
+                let name = path.join(".");
+                match st.get(&name) {
+                    Some(s) => s.is_const(),
+                    None => false,
+                }
+            }
             _ => false,
         }
     }

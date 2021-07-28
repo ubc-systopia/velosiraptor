@@ -33,7 +33,7 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // the used crate-internal functionality
-use crate::ast::{AstNode, Expr, Issues, Symbol, SymbolKind, Type};
+use crate::ast::{AstNode, Expr, Issues, Symbol, SymbolKind, SymbolTable, Type};
 use crate::error::VrsError;
 use crate::token::TokenStream;
 
@@ -165,13 +165,13 @@ impl PartialOrd for Const {
 
 /// implementation of [AstNode] for [Const]
 impl AstNode for Const {
-    fn check(&self) -> Issues {
+    fn check(&self, st: &mut SymbolTable) -> Issues {
         let mut res = Issues::ok();
 
         let name = self.name();
         let pos = self.loc();
         let val = self.value();
-        if !val.is_const_expr() {
+        if !val.is_const_expr(st) {
             let msg = String::from("not a constant expression");
             let hint = String::from("convert the expression to a constant");
             VrsError::new_err(val.loc(), msg, Some(hint)).print();
