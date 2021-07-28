@@ -120,6 +120,8 @@ pub struct SymbolTable {
     syms: HashMap<String, Symbol>,
     /// represents local symbols
     localsyms: HashMap<String, Symbol>,
+    /// the currenct context
+    ctxt: String,
 }
 
 /// Implementation of [SymbolTable]
@@ -130,7 +132,11 @@ impl SymbolTable {
         let localsyms = HashMap::new();
         // insert the well-known symbols ?
 
-        SymbolTable { syms, localsyms }
+        SymbolTable {
+            syms,
+            localsyms,
+            ctxt: String::new(),
+        }
     }
 
     /// tries to insert a symbol into the symbol table
@@ -146,7 +152,13 @@ impl SymbolTable {
 
     /// tries to obtain the entry
     pub fn get(&self, sym: &str) -> Option<&Symbol> {
-        self.localsyms.get(sym).or_else(|| self.syms.get(sym))
+        self.localsyms
+            .get(sym)
+            .or_else(|| self.syms.get(sym))
+            .or_else(|| {
+                let sym = format!("{}.{}", self.ctxt, sym);
+                self.localsyms.get(&sym).or_else(|| self.syms.get(&sym))
+            })
     }
 
     /// removes a symbol from the table
@@ -155,6 +167,12 @@ impl SymbolTable {
             Some(e) => Ok(e),
             None => Err(AstError::SymTableNotExists),
         }
+    }
+
+    /// sets the current context, the enclusing unit
+    pub fn set_context(&mut self, ctxt: &str) {
+        self.ctxt.truncate(0);
+        self.ctxt.push_str(ctxt);
     }
 
     /// clears the local symbols
