@@ -248,7 +248,7 @@ impl Ast {
         }
     }
 
-    ///
+    /// checks for consistency
     pub fn check_consistency(&self) -> Result<Issues, AstError> {
         let val = self.check();
         if val.errors > 0 {
@@ -256,6 +256,11 @@ impl Ast {
         } else {
             Ok(val)
         }
+    }
+
+    // applies AST transformations
+    pub fn apply_transformations(&mut self) -> Result<Issues, AstError> {
+        Ok(Issues::ok())
     }
 }
 
