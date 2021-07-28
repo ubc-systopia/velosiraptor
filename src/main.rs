@@ -129,6 +129,10 @@ fn main() {
 
     log::info!("==== PARSING STAGE ====");
 
+    // ===========================================================================================
+    // Step 1: Parse the input file
+    // ===========================================================================================
+
     eprintln!("{:>8}: {}...\n", "parse".bold().green(), infile);
 
     // let's try to create a file parser
@@ -162,7 +166,10 @@ fn main() {
     log::info!("{}", ast);
     log::info!("----------------------------");
 
-    // now resolve the imports
+    // ===========================================================================================
+    // Step 2: Resolve the imports and merge ASTs
+    // ===========================================================================================
+
     match ast.resolve_imports() {
         Ok(()) => (),
         Err(AstError::ImportError { e }) => {
@@ -194,6 +201,12 @@ fn main() {
     log::info!("{}", ast);
     log::info!("----------------------------");
 
+    log::info!("==== CHECKING STAGE ====");
+
+    // ===========================================================================================
+    // Step 3: Build Symboltable
+    // ===========================================================================================
+
     let symtab = match ast.build_symboltable() {
         Ok(symtab) => symtab,
         Err(AstError::SymTabError { i }) => {
@@ -223,17 +236,19 @@ fn main() {
     log::info!("\n{}", symtab);
     log::info!("----------------------------");
 
-    // now check the ast
+    // ===========================================================================================
+    // Step 4: Consistency Checks
+    // ===========================================================================================
 
-    let cnt = Issues::ok();
+    let issues = Issues::ok();
 
     eprintln!(
         "{:>8}: performing consistency check...\n",
         "check".bold().green(),
     );
 
-    let cnt = match ast.check_consistency() {
-        Ok(i) => cnt + i,
+    let issues = match ast.check_consistency() {
+        Ok(i) => issues + i,
         Err(AstError::CheckError { i }) => {
             //            matches.value_of("input").unwrap_or("none");
             abort(infile, i);
@@ -244,6 +259,29 @@ fn main() {
             return;
         }
     };
+
+    // ===========================================================================================
+    // Step 5: Transform AST
+    // ===========================================================================================
+
+    let issues = match ast.check_consistency() {
+        Ok(i) => issues + i,
+        Err(_) => {
+            abort(infile, Issues::err());
+            return;
+        }
+    };
+
+    // ===========================================================================================
+    // Step 6: Generate OS code
+    // ===========================================================================================
+
+    if issues.is_err() {
+        abort(infile, issues);
+        return;
+    }
+
+    log::info!("==== CODE GENERATION STAGE ====");
 
     // so things should be fine, we can now go and generate stuff
 
@@ -259,14 +297,18 @@ fn main() {
         "generate".bold().green(),
     );
 
+    // ===========================================================================================
+    // Step 6: Generate simulator modules
+    // ===========================================================================================
+
     // we can generate some modules
     eprintln!(
         "{:>8}: generating Arm FastModels modules...\n",
         "generate".bold().green(),
     );
 
-    if cnt.warnings > 0 {
-        let msg = format!("{} warning(s) emitted", cnt.warnings);
+    if issues.warnings > 0 {
+        let msg = format!("{} warning(s) emitted", issues.warnings);
         eprintln!("{}{}.\n", "warning: ".bold().yellow(), msg.bold());
     }
 
