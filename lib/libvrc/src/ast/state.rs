@@ -29,7 +29,7 @@
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // used library internal functionality
-use crate::ast::{AstNode, Field, Issues};
+use crate::ast::{AstNode, Field, Issues, SymbolTable};
 use crate::error::ErrorLocation;
 use crate::token::TokenStream;
 
@@ -140,7 +140,7 @@ impl Debug for State {
 
 /// implementation of [AstNode] for [Const]
 impl AstNode for State {
-    fn check(&self) -> Issues {
+    fn check(&self, st: &mut SymbolTable) -> Issues {
         let mut res = Issues::ok();
 
         let fields = match self {
@@ -157,7 +157,7 @@ impl AstNode for State {
 
         // check the fields
         for f in fields {
-            res = res + f.check()
+            res = res + f.check(st)
         }
 
         res

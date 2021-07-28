@@ -77,7 +77,7 @@ pub use unit::Unit;
 /// This trait has to be implemented by all the nodes
 pub trait AstNode {
     // checks the node and returns the number of errors and warnings encountered
-    fn check(&self) -> Issues {
+    fn check(&self, _st: &mut SymbolTable) -> Issues {
         Issues::ok()
     }
     // builds the symbol table

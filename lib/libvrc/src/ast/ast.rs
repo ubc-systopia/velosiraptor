@@ -249,8 +249,8 @@ impl Ast {
     }
 
     /// checks for consistency
-    pub fn check_consistency(&self) -> Result<Issues, AstError> {
-        let val = self.check();
+    pub fn check_consistency(&self, st: &mut SymbolTable) -> Result<Issues, AstError> {
+        let val = self.check(st);
         if val.errors > 0 {
             Err(AstError::CheckError { i: val })
         } else {
@@ -293,18 +293,18 @@ impl fmt::Debug for Ast {
 
 /// implementation of [AstNode] for [Ast]
 impl AstNode for Ast {
-    fn check(&self) -> Issues {
+    fn check(&self, st: &mut SymbolTable) -> Issues {
         // no issues found
         let mut res = Issues::ok();
 
         // check all constant definitions
         for c in self.consts.iter() {
-            let val = c.check();
+            let val = c.check(st);
             res = res + val;
         }
         // check the unit definitions
         for u in self.units.iter() {
-            let val = u.check();
+            let val = u.check(st);
             res = res + val;
         }
         res

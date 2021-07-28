@@ -33,7 +33,7 @@ use std::cmp::min;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // used library internal functionality
-use crate::ast::{utils, AstNode, BitSlice, Issues};
+use crate::ast::{utils, AstNode, BitSlice, Issues, SymbolTable};
 use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
@@ -90,7 +90,7 @@ impl Debug for Field {
 
 /// implementation of [AstNode] for [Field]
 impl AstNode for Field {
-    fn check(&self) -> Issues {
+    fn check(&self, st: &mut SymbolTable) -> Issues {
         let mut res = Issues::ok();
 
         // check the length
@@ -109,7 +109,7 @@ impl AstNode for Field {
 
         // check the bitslices in the field
         for b in &self.layout {
-            res = res + b.check();
+            res = res + b.check(st);
         }
 
         // check the size of bits
