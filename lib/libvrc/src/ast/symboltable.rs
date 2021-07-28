@@ -69,7 +69,7 @@ pub struct Symbol {
 impl Symbol {
     /// creates a new symbol from the given context and name, type
     pub fn new(ctxt: &str, name: &str, typeinfo: Type, kind: SymbolKind, loc: TokenStream) -> Self {
-        let name = if ctxt == "" {
+        let name = if ctxt.is_empty() {
             String::from(name)
         } else {
             format!("{}.{}", ctxt, name)
@@ -85,10 +85,7 @@ impl Symbol {
 
     /// returns true if the symbol ist constant
     pub fn is_const(&self) -> bool {
-        match &self.kind {
-            SymbolKind::Const => true,
-            _ => false
-        }
+        matches!(&self.kind, SymbolKind::Const)
     }
 }
 
