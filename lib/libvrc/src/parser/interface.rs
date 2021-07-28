@@ -30,7 +30,6 @@
 //! Conceptually, there are two operations on the interface: read and write.
 //! Each operation then maps to a sequence of actions on the state.
 
-
 // interface = TYPE(params) {              // the interface as a type
 //     ident [base, offset, length] => {   // gives a name to the interface field
 //         state.field = 1;                // a list of actions that is performed
