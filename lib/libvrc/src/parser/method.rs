@@ -36,7 +36,6 @@ use nom::combinator::cut;
 use nom::multi::separated_list0;
 use nom::sequence::{delimited, pair, preceded, terminated};
 
-
 // TODO add tests
 
 /// Parses and consumes a method from a unit body
