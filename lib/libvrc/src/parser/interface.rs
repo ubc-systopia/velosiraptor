@@ -56,38 +56,60 @@
 //!
 //!
 //!  interface = MMIO(base) {
-//!      ident [base, offset, length] => state.field
+//!      ident [base, offset,length] <=> state.field
 //!  };
 //!
-//!  interface = MMIO(base) {
+//!  interface = MMIO(base) {      // // mov base, rax ;  mov #2134, (rax)
 //!      ident [base, offset, length] {
-//!          0..4 => state.field.slice
+//!          0 4  ident <=> state.field[.slice],
 //!      }
+//!
+//!      ident [base, offset, length] {
+//!          Layout {
+//!             0 4  ident,
+//!          }
+//!         ReadAction {
+//!             ident <= state.field.slice
+//!         }
+//!         WriteAction {
+//!             ident => state.field.slice
+//!         }
+//!      }
+//!
 //!      ident [base, offset, length] => None;
 //!  };
 //!
 //!  interface = CPURegs {
-//!      regname => {
-//!      }
+//!      regname <=> state.regname;
 //!  }
 //!
 //!  interface = CPURegs {
-//!      base => None;
-//!      length => None;
-//!      trigger {
+//!      reg base [size] => None;        // mov #2134, %base      arch::write_base_reg()
+//!      reg length [size] => None;
+//!      reg trigger {                   // mov 1, trigger
 //!          base => state.base;
 //!          length => state.length;
 //!          1 => state.valid;
+//!          ok <= 1;
 //!      }
-//!      clear {
+//!
+//!      reg status {
+//!          base <= state.base;
+//!          0    => state.valid
+//!      }
+//!
+//!      reg clear {                    // mrs 1, clear
 //!          0 => state.base;
 //!          0 => state.length;
 //!          0 => state.valid;
 //!      }
+//!      instr Foo(asdf) {            // foo #1234          arch::foo(1234);
+//!          state.base = asdf;
+//!      }
 //!  }
 //!
 //!  TODO: there can be load/stores to specific registers, or simply an instruction executed.
-//!
+//!  TODO: there can be loads and stores that do different things.
 //!
 //!
 //!  * No Interface:   In addition there might be no interface at all
