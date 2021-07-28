@@ -71,6 +71,11 @@ impl Issues {
     pub fn inc_warn(&mut self, c: u32) {
         self.warnings += c;
     }
+
+    /// returns true if we have found error issues
+    pub fn is_err(&self) -> bool {
+        self.errors > 0
+    }
 }
 
 /// implementation of [Dispaly] for [Issues]
