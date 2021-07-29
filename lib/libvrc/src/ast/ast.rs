@@ -294,19 +294,30 @@ impl fmt::Debug for Ast {
 /// implementation of [AstNode] for [Ast]
 impl AstNode for Ast {
     fn check(&self, st: &mut SymbolTable) -> Issues {
-        // no issues found
+        // no issues so far
         let mut res = Issues::ok();
 
+        // sanity check
+        for i in self.imports.iter() {
+            assert_eq!(i.ast, None);
+        }
+
         // check all constant definitions
+        // the constants have already been checked for double defined symbols during the merge
+        // phase of the import resolution
         for c in self.consts.iter() {
             let val = c.check(st);
             res = res + val;
         }
+
         // check the unit definitions
+        // the units have already been checked for double definitions during the merge phase of
+        // the import resolution
         for u in self.units.iter() {
             let val = u.check(st);
             res = res + val;
         }
+
         res
     }
     // builds the symbol table

@@ -33,7 +33,7 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // the used crate-internal functionality
-use crate::ast::{AstNode, Expr, Issues, Symbol, SymbolKind, SymbolTable, Type};
+use crate::ast::{utils, AstNode, Expr, Issues, Symbol, SymbolKind, SymbolTable, Type};
 use crate::error::VrsError;
 use crate::token::TokenStream;
 
@@ -171,40 +171,55 @@ impl AstNode for Const {
         let name = self.name();
         let pos = self.loc();
         let val = self.value();
+
+        // Check 1: Expression is Valid
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: The expression value is consisting of valid symbols.
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        res = res + val.check(st);
+
+        // Check 2: Value is constant
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: The value assigned to the constant must be a constant expression.
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
         if !val.is_const_expr(st) {
             let msg = String::from("not a constant expression");
             let hint = String::from("convert the expression to a constant");
             VrsError::new_err(val.loc(), msg, Some(hint)).print();
-
-            res = res + Issues::err();
+            res.inc_err(1);
         }
 
-        // issue warning
+        // Check 3: Identifier is ASCII
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: The name of the constant must be in ASCII characters.
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
         if !name.is_ascii() {
             let msg = format!("constant `{}` should have an upper case name", name);
             let hint = format!(
                 "convert the identifier to ASCII: `{}`",
                 name.to_ascii_uppercase()
             );
-            VrsError::new_warn(pos.with_range(1..2), msg, Some(hint)).print();
-            res = res + Issues::warn();
+            VrsError::new_err(pos.with_range(1..2), msg, Some(hint)).print();
+            res.inc_err(1)
         }
 
-        let allupper = name
-            .as_bytes()
-            .iter()
-            .fold(true, |acc, x| acc & !x.is_ascii_lowercase());
-        if !allupper {
-            let msg = format!("constant `{}` should have an upper case name", name);
-            let hint = format!(
-                "convert the identifier to upper case (notice the capitalization): `{}`",
-                name.to_ascii_uppercase()
-            );
-            VrsError::new_warn(pos.with_range(1..2), msg, Some(hint)).print();
-            // warning
-            res = res + Issues::warn();
-        }
-        res
+        // Check 4:
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning
+        // Description: The name of the constant should be all upper-case
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        res + utils::check_upper_case(name, pos)
     }
 
     fn name(&self) -> &str {
