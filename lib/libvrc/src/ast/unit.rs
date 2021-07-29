@@ -78,40 +78,89 @@ impl AstNode for Unit {
         // set the current context
         st.set_context(self.name());
 
-        // name should start with upper case
-        if !name[0..1].as_bytes()[0].is_ascii_uppercase() {
-            let msg = format!("unit `{}` should start with an uppercase letter", name);
-            let mut name = String::from(name);
-            name[0..1].make_ascii_uppercase();
-            let hint = format!(
-                "convert the identifier to upper case (notice the capitalization): `{}`",
-                name
-            );
-            VrsError::new_warn(pos.with_range(1..2), msg, Some(hint)).print();
-            res = res + Issues::warn();
-        }
-
-        // check if there are any double entries in the constants, and check the constants
-        let errors = utils::check_double_entries(&self.consts);
-        res.inc_err(errors);
+        // Check 1: Constants
+        // --------------------------------------------------------------------------------------
+        // Type:        Error/Warning
+        // Description: Check all defined constats of the Unit
+        // Notes:
+        // --------------------------------------------------------------------------------------
         for c in &self.consts {
             res = res + c.check(st);
         }
 
+        // Check 2: Double defined constants
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check that all constants of this field have distinct names
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        let errors = utils::check_double_entries(&self.consts);
+        res.inc_err(errors);
+
+        // Check 3: State Check
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning/Error
+        // Description: Check that the state definition is fine
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
         // check the state and interface
         res = res + self.state.check(st);
 
-        //todo!("check interface");
-        //res = res += self.interface.check();
+        // Check 4: State Param Check
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning/Error
+        // Description: Check that the state refers to actual parameters
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+        // TODO: check params
 
-        // check if there are any double entries in the methods, and check the constants
-        //todo!("check methods");
+        // Check 5: Interface Check
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning/Error
+        // Description: Check that the state definition is fine
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        res = res + self.state.check(st);
+
+        // Check 6: Interface param check
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning/Error
+        // Description: Check that the interface refers to actual parameters
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+        // TODO: check params / field refs
+
+        // Check 7: Methods double defined
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning/Error
+        // Description: Check double method definition
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
         // let errors = utils::check_double_entries(&self.methods);
         // res.inc_err(errors);
+
+        // Check 8: Method cehck
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning/Error
+        // Description: Check that the interface refers to actual parameters
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
         // for m in &self.methods {
-        //     res = res + m.check();
+        //     res = res + m.check(st);
         // }
-        res
+
+        // Check 9: Bases are defined
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning
+        // Description: Check if the unit name is CamelCase
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+        res + utils::check_camel_case(name, pos)
     }
     ///
     fn name(&self) -> &str {
