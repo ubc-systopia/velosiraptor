@@ -116,3 +116,20 @@ pub fn check_upper_case(name: &str, loc: &TokenStream) -> Issues {
         Issues::ok()
     }
 }
+
+/// checks if the identifier has snake case
+pub fn check_camel_case(name: &str, loc: &TokenStream) -> Issues {
+    if !name[0..1].as_bytes()[0].is_ascii_uppercase() || name.contains("_") {
+        let msg = format!("identifier `{}` should be CamelCasee", name);
+        let mut name = String::from(name);
+        name[0..1].make_ascii_uppercase();
+        let hint = format!(
+            "convert the identifier to CamelCase (notice the capitalization): `{}`",
+            name
+        );
+        VrsError::new_warn(loc.with_range(1..2), msg, Some(hint)).print();
+        Issues::warn()
+    } else {
+        Issues::ok()
+    }
+}
