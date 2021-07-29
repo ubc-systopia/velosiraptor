@@ -93,9 +93,25 @@ impl AstNode for Field {
     fn check(&self, st: &mut SymbolTable) -> Issues {
         let mut res = Issues::ok();
 
-        // check the length
-        let lenoffset = if self.stateref.is_none() { 2 } else { 6 };
+        // Check 1: Check all BitSlices
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning/Errors
+        // Description: Check all the BitSlices
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+        for b in &self.layout {
+            res = res + b.check(st);
+        }
+
+        // Check 2: Field size
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: The size of the field must be one of 1, 2, 4, 8
+        // Notes:       Technically, other values could be allowed
+        // --------------------------------------------------------------------------------------
+
         if !([1, 2, 4, 8].contains(&self.length)) {
+            let lenoffset = if self.stateref.is_none() { 2 } else { 6 };
             let msg = format!("unusual field length: {} bytes", self.length);
             let hint = String::from("change this to either 1, 2, 4, or 8 bytes");
             VrsError::new_err(
@@ -107,12 +123,13 @@ impl AstNode for Field {
             res.inc_err(1);
         }
 
-        // check the bitslices in the field
-        for b in &self.layout {
-            res = res + b.check(st);
-        }
+        // Check 3: BitSlice sizes
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check that all BitSlices are within the size of the field
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
 
-        // check the size of bits
         let maxbits = self.length * 8;
         for b in &self.layout {
             if b.end as u64 >= maxbits {
@@ -123,18 +140,32 @@ impl AstNode for Field {
             }
         }
 
-        // check if we have any double entries here:
+        // Check 4: Double defined bitslices
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check that all BitSlices of this field have distinct names
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
         let errors = utils::check_double_entries(&self.layout);
         res.inc_err(errors);
 
-        // a vector keeping track of overlap
+        // Check 5: Overlap check
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check that the BitSlices do not overlap
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
         let mut overlap: Vec<Option<&BitSlice>> = vec![None; maxbits as usize];
         for b in &self.layout {
+            // skip the ones that overshoot
             if b.start >= maxbits || b.end > maxbits {
                 continue;
             }
             let start = min(b.start, maxbits - 1) as usize;
             let end = min(b.end, maxbits - 1) as usize;
+
             // run from start up to including end
             for (i, item) in overlap.iter_mut().enumerate().take(end + 1).skip(start) {
                 match item {
@@ -149,24 +180,14 @@ impl AstNode for Field {
             }
         }
 
-        // check the name is something like `foo_bar`
-        let alllower = self
-            .name
-            .as_bytes()
-            .iter()
-            .fold(true, |acc, x| acc & !x.is_ascii_uppercase());
+        // Check 6: Identifier snake_case
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning
+        // Description: Checks if the identifier has snake_case
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
 
-        if !alllower {
-            let msg = format!("field `{}` should have an lower case name", self.name);
-            let hint = format!(
-                "convert the identifier to snake case: `{}`",
-                self.name.to_ascii_lowercase()
-            );
-            VrsError::new_warn(self.pos.with_range(0..1), msg, Some(hint)).print();
-            res.inc_warn(1);
-        }
-
-        res
+        res + utils::check_snake_case(&self.name, &self.pos)
     }
 
     fn name(&self) -> &str {
