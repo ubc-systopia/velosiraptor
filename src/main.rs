@@ -28,10 +28,12 @@
 use clap::{App, Arg};
 use colored::*;
 use simplelog::{Config, LevelFilter, SimpleLogger};
+use std::path::Path;
 use std::process::exit;
 
 // get the parser module
 use libvrc::ast::{AstError, Issues};
+use libvrc::codegen::CodeGen;
 use libvrc::parser::{Parser, ParserError};
 
 fn parse_cmdline() -> clap::ArgMatches<'static> {
@@ -45,6 +47,13 @@ fn parse_cmdline() -> clap::ArgMatches<'static> {
                 .long("output")
                 .takes_value(true)
                 .help("the output file"),
+        )
+        .arg(
+            Arg::with_name("backend")
+                .short("b")
+                .long("backend")
+                .takes_value(true)
+                .help("the code backend to use [rust, c]"),
         )
         .arg(
             Arg::with_name("v")
@@ -121,8 +130,11 @@ fn main() {
     let infile = matches.value_of("input").unwrap_or("none");
     log::info!("input file: {}", infile);
 
-    let outfile = matches.value_of("output").unwrap_or("<stdout>");
-    log::info!("output file: {}", outfile);
+    let outdir = matches.value_of("output").unwrap_or("<stdout>");
+    log::info!("output file: {}", outdir);
+
+    let backend = matches.value_of("backend").unwrap_or("rust");
+    log::info!("codegen backend: {}", backend);
 
     log::debug!("Debug output enabled");
     log::trace!("Tracing output enabled");
@@ -283,6 +295,52 @@ fn main() {
 
     log::info!("==== CODE GENERATION STAGE ====");
 
+    // get the output directory
+    let outpath = match outdir {
+        "<stdout>" => None,
+        b => {
+            let p = Path::new(b);
+            // if it's not a directory, this is wrong
+            if !p.exists() {
+                eprintln!(
+                    "{}{} `{}`.\n",
+                    "error".bold().red(),
+                    ": non-existing output path: ".bold(),
+                    outdir.bold()
+                );
+                abort(infile, issues);
+                return;
+            }
+
+            if !p.is_dir() {
+                eprintln!(
+                    "{}{} `{}`.\n",
+                    "error".bold().red(),
+                    ": output path is not a directory: ".bold(),
+                    outdir.bold()
+                );
+                abort(infile, issues);
+                return;
+            }
+            Some(String::from(b))
+        }
+    };
+
+    let codegen = match backend {
+        "rust" => CodeGen::new_rust(outpath),
+        "c" => CodeGen::new_c(outpath),
+        s => {
+            eprintln!(
+                "{}{} `{}`.\n",
+                "error".bold().red(),
+                ": unsupported code backend".bold(),
+                s.bold()
+            );
+            abort(infile, issues);
+            return;
+        }
+    };
+
     // so things should be fine, we can now go and generate stuff
 
     // generate the raw interface files: this is the "language" to interface
@@ -290,6 +348,36 @@ fn main() {
         "{:>8}: generating interface files...\n",
         "generate".bold().green(),
     );
+
+    codegen.generate_globals(&ast).unwrap_or_else(|e| {
+        eprintln!(
+            "{}{} `{}`.\n",
+            "error".bold().red(),
+            ": failure during globals generation".bold(),
+            e
+        );
+        abort(infile, issues);
+    });
+
+    codegen.generate_interface(&ast).unwrap_or_else(|e| {
+        eprintln!(
+            "{}{} `{}`.\n",
+            "error".bold().red(),
+            ": failure during interface generation".bold(),
+            e
+        );
+        abort(infile, issues);
+    });
+
+    codegen.generate_units(&ast).unwrap_or_else(|e| {
+        eprintln!(
+            "{}{} `{}`.\n",
+            "error".bold().red(),
+            ": failure during unit generation".bold(),
+            e
+        );
+        abort(infile, issues);
+    });
 
     // generate the unit files that use the interface files
     eprintln!(
