@@ -26,9 +26,9 @@
 ///! Ast Module of the Velosiraptor Compiler
 use std::fmt;
 
-use crate::ast::{AstNode, SymbolTable, SymbolKind, Issues};
-use crate::token::TokenStream;
+use crate::ast::{AstNode, Issues, SymbolKind, SymbolTable};
 use crate::error::VrsError;
+use crate::token::TokenStream;
 
 /// Binary operations for [Expr] <OP> [Expr]
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -321,22 +321,31 @@ impl Expr {
         }
     }
 
-
-    fn symbol_exists(pos: &TokenStream, path: &[String], st: &SymbolTable, kind: &[SymbolKind]) -> Issues{
+    fn symbol_exists(
+        pos: &TokenStream,
+        path: &[String],
+        st: &SymbolTable,
+        kind: &[SymbolKind],
+    ) -> Issues {
         let ident = path.join(".");
         match st.get(&ident) {
             Some(s) => {
-                if ! kind.contains(&s.kind) {
+                if !kind.contains(&s.kind) {
                     // warning
-                    let msg = format!("symbol `{}` exists but has a wrong type. Expected `{:?}`, was `{:?}`",
-                              ident, kind, s.kind);
-                    let hint = format!("define this symbol as {:?}, or converts its use to {:?}", kind, s.kind);
+                    let msg = format!(
+                        "symbol `{}` exists but has a wrong type. Expected `{:?}`, was `{:?}`",
+                        ident, kind, s.kind
+                    );
+                    let hint = format!(
+                        "define this symbol as {:?}, or converts its use to {:?}",
+                        kind, s.kind
+                    );
                     VrsError::new_err(pos, msg, Some(hint)).print();
                     Issues::err()
-                }  else {
+                } else {
                     Issues::ok()
                 }
-            },
+            }
             None => {
                 let msg = format!("symbol `{}` does not exist within this context", ident);
                 VrsError::new_err(pos, msg, None).print();
@@ -348,68 +357,67 @@ impl Expr {
     pub fn check_symbols(&self, st: &mut SymbolTable) -> Issues {
         use Expr::*;
         match self {
-            Identifier {
-                path,
-                pos
-            } => {
-                Expr::symbol_exists(&pos, &path, st, &[SymbolKind::Const, SymbolKind::Parameter, SymbolKind::Variable])
-            },
-            Number {
-                value:_,
-                pos:_
-            } => Issues::ok(),
-            Boolean {
-                value :_,
-                pos :_,
-            } => Issues::ok(),
+            Identifier { path, pos } => Expr::symbol_exists(
+                &pos,
+                &path,
+                st,
+                &[
+                    SymbolKind::Const,
+                    SymbolKind::Parameter,
+                    SymbolKind::Variable,
+                ],
+            ),
+            Number { value: _, pos: _ } => Issues::ok(),
+            Boolean { value: _, pos: _ } => Issues::ok(),
             BinaryOperation {
                 op: _,
                 lhs,
                 rhs,
                 pos: _,
-            } => {
-                lhs.check_symbols(st) + rhs.check_symbols(st)
-            },
-            UnaryOperation {
-                op:_ ,
-                val,
-                pos:_,
-            } => {
-                val.check_symbols(st)
-            }
-            FnCall {
-                path,
-                args :_,
-                pos,
-            } => {
-                let s = Expr::symbol_exists(&pos, &path, st, &[SymbolKind::Const, SymbolKind::Parameter, SymbolKind::Variable]);
+            } => lhs.check_symbols(st) + rhs.check_symbols(st),
+            UnaryOperation { op: _, val, pos: _ } => val.check_symbols(st),
+            FnCall { path, args: _, pos } => {
+                let s = Expr::symbol_exists(
+                    &pos,
+                    &path,
+                    st,
+                    &[
+                        SymbolKind::Const,
+                        SymbolKind::Parameter,
+                        SymbolKind::Variable,
+                    ],
+                );
                 // todo: function calls
                 //args.iter().fold(s, |acc, e| e.check_symbols(st) + acc)
                 s
             }
-            Slice {
-                path,
-                slice,
-                pos,
-            } => {
-                let s = Expr::symbol_exists(&pos, &path, st, &[SymbolKind::Const, SymbolKind::Parameter, SymbolKind::Variable]);
+            Slice { path, slice, pos } => {
+                let s = Expr::symbol_exists(
+                    &pos,
+                    &path,
+                    st,
+                    &[
+                        SymbolKind::Const,
+                        SymbolKind::Parameter,
+                        SymbolKind::Variable,
+                    ],
+                );
                 s + slice.check_symbols(st)
             }
-            Element {
-                path,
-                idx,
-                pos,
-            } => {
-                let s = Expr::symbol_exists(&pos, &path, st, &[SymbolKind::Const, SymbolKind::Parameter, SymbolKind::Variable]);
+            Element { path, idx, pos } => {
+                let s = Expr::symbol_exists(
+                    &pos,
+                    &path,
+                    st,
+                    &[
+                        SymbolKind::Const,
+                        SymbolKind::Parameter,
+                        SymbolKind::Variable,
+                    ],
+                );
                 s + idx.check_symbols(st)
             }
-            Range {
-                start,
-                end,
-                pos:_,
-            } => {
-                start.check_symbols(st) + end.check_symbols(st)
-            },
+            Range { start, end, pos: _ } => start.check_symbols(st) + end.check_symbols(st),
         }
     }
 

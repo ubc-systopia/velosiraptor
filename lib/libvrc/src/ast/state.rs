@@ -138,11 +138,12 @@ impl Debug for State {
     }
 }
 
-/// implementation of [AstNode] for [Const]
+/// implementation of [AstNode] for [State]
 impl AstNode for State {
     fn check(&self, st: &mut SymbolTable) -> Issues {
         let mut res = Issues::ok();
 
+        // extract the fields and bases from the  state
         let (fields, bases) = match self {
             State::MemoryState {
                 bases,
@@ -230,8 +231,22 @@ impl AstNode for State {
         // Description: Check if the bases are not double defined
         // Notes:       --
         // --------------------------------------------------------------------------------------
-
-        res
+        match bases {
+            Some(bases) => {
+                let mut s = bases.clone();
+                s.sort();
+                s.dedup();
+                if s.len() < bases.len() {
+                    let msg = String::from("double defined bases in state definition");
+                    VrsError::new_err(self.loc().with_range(1..2), msg, None).print();
+                    res.inc_err(1);
+                    res
+                } else {
+                    res
+                }
+            }
+            _ => res,
+        }
     }
 
     fn name(&self) -> &str {
