@@ -34,7 +34,7 @@ use std::fmt::{Debug, Display, Formatter, Result};
 
 // the used crate-internal functionality
 use crate::ast::{utils, AstNode, Const, Interface, Issues, Method, State, SymbolTable};
-use crate::error::{ErrorLocation};
+use crate::error::ErrorLocation;
 use crate::token::TokenStream;
 
 /// Defines a translation unit

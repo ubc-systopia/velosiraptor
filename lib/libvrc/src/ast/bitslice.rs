@@ -54,6 +54,7 @@ impl Display for BitSlice {
         write!(f, "[{:2}..{:2}]  {}", self.start, self.end, &self.name)
     }
 }
+
 /// Implementation of the [Debug] trait for [BitSlice]
 impl Debug for BitSlice {
     fn fmt(&self, f: &mut Formatter) -> Result {

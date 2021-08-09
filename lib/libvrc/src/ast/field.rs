@@ -93,12 +93,15 @@ impl AstNode for Field {
     fn check(&self, st: &mut SymbolTable) -> Issues {
         let mut res = Issues::ok();
 
+        // We already know that the bases are valid
+
         // Check 1: Check all BitSlices
         // --------------------------------------------------------------------------------------
         // Type:        Warning/Errors
         // Description: Check all the BitSlices
         // Notes:       --
         // --------------------------------------------------------------------------------------
+
         for b in &self.layout {
             res = res + b.check(st);
         }
