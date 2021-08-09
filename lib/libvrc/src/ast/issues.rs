@@ -32,7 +32,7 @@ use std::ops::Add;
 /// struct for counting issues
 ///
 /// Keeps track of the number of encountered errors and warnings
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Issues {
     /// the number of encountered errors
     pub errors: u32,
