@@ -1,0 +1,3 @@
+[submodule "lib/codegen"]
+    path = lib/codegen
+    url = git@github.com:achreto/codegen-rs.git

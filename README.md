@@ -27,6 +27,12 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 ```
 
+Make sure the submodules are initialized properly
+```
+git submodule init
+git submodule update
+```
+
 ## Contributing
 
 Please follow the [naming and formatting conventions](https://doc.rust-lang.org/1.0.0/style/style/naming/README.html)
