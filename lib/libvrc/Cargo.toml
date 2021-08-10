@@ -17,6 +17,9 @@ custom_error = "1.9.2"
 # for colorful output
 colored = "2"
 
+# code generation
+codegen-rs = { path = "../codegen" }
+
 # the parser combinators
 [dependencies.nom]
 version = "6"
