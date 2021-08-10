@@ -47,12 +47,28 @@ pub struct Field {
     pub name: String,
     /// a reference to the state where the field is (base + offset)
     pub stateref: Option<(String, u64)>,
-    /// the size of the field in bits
+    /// the size of the field in bytes
     pub length: u64,
     /// a vector of [BitSlice] representing the bitlayout
     pub layout: Vec<BitSlice>,
     /// the position where this field was defined
     pub pos: TokenStream,
+}
+
+impl Field {
+    /// constructs the mask value of the bit slices in the field
+    pub fn mask_value(&self) -> u64 {
+        let mut maskval = 0;
+        for s in &self.layout {
+            maskval |= s.mask_value();
+        }
+
+        maskval
+    }
+
+    pub fn nbits(&self) -> u64 {
+        self.length * 8
+    }
 }
 
 /// Implementation of the [Display] trait for [Field]

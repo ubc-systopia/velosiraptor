@@ -35,7 +35,8 @@ use crate::token::TokenStream;
 
 /// Represents a bitslice of a [Field]
 ///
-/// The field corresponds to the slice `[start..end]` of the [Field]
+/// The field corresponds to the slice `[start, end]` of the [Field]
+/// The end bit is including `[start..=end]`
 #[derive(PartialEq, Clone)]
 pub struct BitSlice {
     /// the start bit
@@ -46,6 +47,25 @@ pub struct BitSlice {
     pub name: String,
     /// where it was defined
     pub pos: TokenStream,
+}
+
+impl BitSlice {
+    /// constructs the mask value of the bit slice
+    ///
+    /// # Example
+    /// start = 0, end = 3 -> 0xf
+    pub fn mask_value(&self) -> u64 {
+        let mut mask = 0;
+        for i in self.start..=self.end {
+            mask |= 1 << i;
+        }
+        mask
+    }
+
+    /// returns the number of bits this slice covers
+    pub fn nbits(&self) -> u64 {
+        self.end - self.start + 1
+    }
 }
 
 /// Implementation of the [Display] trait for [BitSlice]
@@ -111,8 +131,8 @@ impl AstNode for BitSlice {
         // Notes:       --
         // --------------------------------------------------------------------------------------
 
-        if self.name.is_ascii() {
-            let msg = format!("constant `{}` should have an upper case name", self.name);
+        if !self.name.is_ascii() {
+            let msg = format!("constant `{}` should be in ASCII", self.name);
             let hint = format!(
                 "convert the identifier to ASCII: `{}`",
                 self.name.to_ascii_uppercase()
