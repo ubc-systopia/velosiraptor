@@ -129,6 +129,10 @@ fn main() {
 
     log::info!("==== PARSING STAGE ====");
 
+    // ===========================================================================================
+    // Step 1: Parse the input file
+    // ===========================================================================================
+
     eprintln!("{:>8}: {}...\n", "parse".bold().green(), infile);
 
     // let's try to create a file parser
@@ -162,13 +166,10 @@ fn main() {
     log::info!("{}", ast);
     log::info!("----------------------------");
 
-    eprintln!(
-        "{:>8}: {} import(s)...\n",
-        "resolve".bold().green(),
-        ast.imports.len(),
-    );
+    // ===========================================================================================
+    // Step 2: Resolve the imports and merge ASTs
+    // ===========================================================================================
 
-    // now resolve the imports
     match ast.resolve_imports() {
         Ok(()) => (),
         Err(AstError::ImportError { e }) => {
@@ -189,25 +190,65 @@ fn main() {
         }
     };
 
+    eprintln!(
+        "{:>8}: resolved {} import(s)..\n",
+        "import".bold().green(),
+        ast.imports.len(),
+    );
+
     log::info!("AST:");
     log::info!("----------------------------");
     log::info!("{}", ast);
     log::info!("----------------------------");
 
+    log::info!("==== CHECKING STAGE ====");
+
+    // ===========================================================================================
+    // Step 3: Build Symboltable
+    // ===========================================================================================
+
+    let mut symtab = match ast.build_symboltable() {
+        Ok(symtab) => symtab,
+        Err(AstError::SymTabError { i }) => {
+            eprintln!(
+                "{}{}.\n",
+                "error".bold().red(),
+                ": during building of the symbol table".bold()
+            );
+            abort(infile, i);
+            return;
+        }
+        _ => {
+            abort(infile, Issues::err());
+            return;
+        }
+    };
+
     // build the symbolt table
-    eprintln!("{:>8}: symboltable...\n", "build".bold().green());
+    eprintln!(
+        "{:>8}: created symboltable with {} symbols\n",
+        "symtab".bold().green(),
+        symtab.count()
+    );
 
-    // now check the ast
+    log::info!("Symbol Table:");
+    log::info!("----------------------------");
+    log::info!("\n{}", symtab);
+    log::info!("----------------------------");
 
-    let cnt = Issues::ok();
+    // ===========================================================================================
+    // Step 4: Consistency Checks
+    // ===========================================================================================
+
+    let issues = Issues::ok();
 
     eprintln!(
         "{:>8}: performing consistency check...\n",
         "check".bold().green(),
     );
 
-    let cnt = match ast.check_consistency() {
-        Ok(i) => cnt + i,
+    let issues = match ast.check_consistency(&mut symtab) {
+        Ok(i) => issues + i,
         Err(AstError::CheckError { i }) => {
             //            matches.value_of("input").unwrap_or("none");
             abort(infile, i);
@@ -218,6 +259,29 @@ fn main() {
             return;
         }
     };
+
+    // ===========================================================================================
+    // Step 5: Transform AST
+    // ===========================================================================================
+
+    let issues = match ast.apply_transformations() {
+        Ok(i) => issues + i,
+        Err(_) => {
+            abort(infile, Issues::err());
+            return;
+        }
+    };
+
+    // ===========================================================================================
+    // Step 6: Generate OS code
+    // ===========================================================================================
+
+    if issues.is_err() {
+        abort(infile, issues);
+        return;
+    }
+
+    log::info!("==== CODE GENERATION STAGE ====");
 
     // so things should be fine, we can now go and generate stuff
 
@@ -233,14 +297,18 @@ fn main() {
         "generate".bold().green(),
     );
 
+    // ===========================================================================================
+    // Step 6: Generate simulator modules
+    // ===========================================================================================
+
     // we can generate some modules
     eprintln!(
         "{:>8}: generating Arm FastModels modules...\n",
         "generate".bold().green(),
     );
 
-    if cnt.warnings > 0 {
-        let msg = format!("{} warning(s) emitted", cnt.warnings);
+    if issues.warnings > 0 {
+        let msg = format!("{} warning(s) emitted", issues.warnings);
         eprintln!("{}{}.\n", "warning: ".bold().yellow(), msg.bold());
     }
 

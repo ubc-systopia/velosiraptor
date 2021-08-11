@@ -1,4 +1,4 @@
-// Velosiraptor Lexer
+// Velosiraptor Ast
 //
 //
 // MIT License
@@ -32,14 +32,14 @@ mod expression;
 mod field;
 mod import;
 mod interface;
+mod issues;
 mod method;
 mod state;
+mod symboltable;
+pub mod transform;
 mod types;
 mod unit;
 mod utils;
-
-pub mod symboltable;
-pub mod transform;
 
 use custom_error::custom_error;
 
@@ -50,6 +50,7 @@ use crate::token::TokenStream;
 custom_error! {#[derive(PartialEq)] pub AstError
     SymTabInsertExists         = "The symbol could not be inserted, already exists",
     SymTableNotExists          = "The symbol does not exist in the table",
+    SymTabError{i: Issues}    = "There was an error during creating the symbol table",
     ImportError{e:ParsErr} = "The parser has failed",
     MergeError{i: Issues} = "Merging of the ast has failed",
     CheckError{i: Issues} = "There were warnings or errors",
@@ -63,9 +64,11 @@ pub use expression::{BinOp, Expr, UnOp};
 pub use field::Field;
 pub use import::Import;
 pub use interface::Interface;
+pub use issues::Issues;
 pub use method::Method;
 pub use method::Stmt;
 pub use state::State;
+pub use symboltable::{Symbol, SymbolKind, SymbolTable};
 pub use types::Type;
 pub use unit::Unit;
 
@@ -74,65 +77,15 @@ pub use unit::Unit;
 /// This trait has to be implemented by all the nodes
 pub trait AstNode {
     // checks the node and returns the number of errors and warnings encountered
-    fn check(&self) -> Issues {
+    fn check(&self, _st: &mut SymbolTable) -> Issues {
         Issues::ok()
     }
+    // builds the symbol table
+    fn build_symtab(&self, _st: &mut SymbolTable) -> Issues {
+        Issues::ok()
+    }
+
     fn name(&self) -> &str;
     /// returns the location of the current
     fn loc(&self) -> &TokenStream;
-}
-
-#[derive(Debug, PartialEq)]
-pub struct Issues {
-    pub errors: u32,
-    pub warnings: u32,
-}
-
-impl Issues {
-    pub fn new(errors: u32, warnings: u32) -> Self {
-        Issues { errors, warnings }
-    }
-    pub fn ok() -> Self {
-        Issues {
-            errors: 0,
-            warnings: 0,
-        }
-    }
-    pub fn warn() -> Self {
-        Issues {
-            errors: 0,
-            warnings: 1,
-        }
-    }
-    pub fn err() -> Self {
-        Issues {
-            errors: 1,
-            warnings: 0,
-        }
-    }
-
-    pub fn inc_err(&mut self, c: u32) {
-        self.errors += c;
-    }
-
-    pub fn inc_warn(&mut self, c: u32) {
-        self.warnings += c;
-    }
-}
-
-impl std::fmt::Display for Issues {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(f, "errors: {}  warnings: {}", self.errors, self.warnings)
-    }
-}
-
-impl std::ops::Add for Issues {
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self {
-        Self {
-            warnings: self.warnings + other.warnings,
-            errors: self.errors + other.errors,
-        }
-    }
 }

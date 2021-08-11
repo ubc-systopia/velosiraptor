@@ -29,8 +29,8 @@
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // used library internal functionality
-use crate::ast::{AstNode, Field, Issues};
-use crate::error::ErrorLocation;
+use crate::ast::{utils, AstNode, Field, Issues, SymbolTable};
+use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
 /// Defines the state of a translation unit
@@ -138,29 +138,115 @@ impl Debug for State {
     }
 }
 
-/// implementation of [AstNode] for [Const]
+/// implementation of [AstNode] for [State]
 impl AstNode for State {
-    fn check(&self) -> Issues {
+    fn check(&self, st: &mut SymbolTable) -> Issues {
         let mut res = Issues::ok();
 
-        let fields = match self {
+        // extract the fields and bases from the  state
+        let (fields, bases) = match self {
             State::MemoryState {
-                bases: _,
+                bases,
                 fields,
                 pos: _,
-            } => fields,
-            State::RegisterState { fields, pos: _ } => fields,
+            } => (fields, Some(bases)),
+            State::RegisterState { fields, pos: _ } => (fields, None),
             State::None { pos: _ } => {
                 return Issues::ok();
             }
         };
 
-        // check the fields
+        // Check 1: Fields
+        // --------------------------------------------------------------------------------------
+        // Type:        Error/Warning
+        // Description: Check all fields of the state
+        // Notes:
+        // --------------------------------------------------------------------------------------
         for f in fields {
-            res = res + f.check()
+            res = res + f.check(st)
         }
 
-        res
+        // Check 2: Double defined fields
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check that all BitSlices of this field have distinct names
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        let errors = utils::check_double_entries(&fields);
+        res.inc_err(errors);
+
+        // Check 3: Bases are defined
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check if the fields have all defined bases
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        match bases {
+            Some(bases) => {
+                for f in fields {
+                    if let Some(sref) = &f.stateref {
+                        // case 1: we have a state ref
+                        let (sref, _) = sref;
+                        // if the bases list contain a state ref, we're good
+                        if bases.contains(&sref) {
+                            continue;
+                        }
+                        // undefined base
+                        let msg = format!("field `{}` has invalid state ref", f.name());
+                        let hint =
+                            format!("add state reference here. One of `{}`", bases.join("`, `"));
+                        VrsError::new_err(f.loc().with_range(1..2), msg, Some(hint)).print();
+                        res.inc_err(1);
+                    } else {
+                        // no state ref, but required one
+                        let msg = format!("field `{}` has missing state reference", f.name());
+                        let hint =
+                            format!("add state reference here. One of `{}`", bases.join("`, `"));
+                        VrsError::new_err(f.loc().with_range(1..2), msg, Some(hint)).print();
+                        res.inc_err(1);
+                    }
+                }
+            }
+            None => {
+                for f in fields {
+                    if !f.stateref.is_none() {
+                        // state ref found, but none required
+                        let msg = format!(
+                            "field `{}` contains state reference, but state has none.",
+                            f.name()
+                        );
+                        let hint = format!("remove the state reference in the field");
+                        VrsError::new_err(f.loc().with_range(1..2), msg, Some(hint)).print();
+                        res.inc_err(1);
+                    }
+                }
+            }
+        }
+
+        // Check 4: No bases defined double
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check if the bases are not double defined
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+        match bases {
+            Some(bases) => {
+                let mut s = bases.clone();
+                s.sort();
+                s.dedup();
+                if s.len() < bases.len() {
+                    let msg = String::from("double defined bases in state definition");
+                    VrsError::new_err(self.loc().with_range(1..2), msg, None).print();
+                    res.inc_err(1);
+                    res
+                } else {
+                    res
+                }
+            }
+            _ => res,
+        }
     }
 
     fn name(&self) -> &str {

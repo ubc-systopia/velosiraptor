@@ -25,8 +25,9 @@
 
 //! Utils library
 
-use crate::ast::AstNode;
+use crate::ast::{AstNode, Issues};
 use crate::error::VrsError;
+use crate::token::TokenStream;
 use std::collections::HashMap;
 
 /// drains the list and merges it into the hashmap
@@ -72,4 +73,63 @@ pub fn check_double_entries<T: AstNode>(nodelist: &[T]) -> u32 {
     }
     // return the errors
     errors
+}
+
+/// checks if the identifier has snake case
+pub fn check_snake_case(name: &str, loc: &TokenStream) -> Issues {
+    // check the name is something like `foo_bar`
+    let alllower = name
+        .as_bytes()
+        .iter()
+        .fold(true, |acc, x| acc & !x.is_ascii_uppercase());
+
+    if !alllower {
+        let msg = format!("identifier `{}` should have an lower case name", name);
+        let hint = format!(
+            "convert the identifier to snake case: `{}`",
+            name.to_ascii_lowercase()
+        );
+        VrsError::new_warn(loc.with_range(0..1), msg, Some(hint)).print();
+
+        Issues::warn()
+    } else {
+        Issues::ok()
+    }
+}
+
+/// checks if the identifier has snake case
+pub fn check_upper_case(name: &str, loc: &TokenStream) -> Issues {
+    let allupper = name
+        .as_bytes()
+        .iter()
+        .fold(true, |acc, x| acc & !x.is_ascii_lowercase());
+    if !allupper {
+        let msg = format!("identifier `{}` should have an upper case name", name);
+        let hint = format!(
+            "convert the identifier to upper case (notice the capitalization): `{}`",
+            name.to_ascii_uppercase()
+        );
+        VrsError::new_warn(loc.with_range(1..2), msg, Some(hint)).print();
+
+        Issues::warn()
+    } else {
+        Issues::ok()
+    }
+}
+
+/// checks if the identifier has snake case
+pub fn check_camel_case(name: &str, loc: &TokenStream) -> Issues {
+    if !name[0..1].as_bytes()[0].is_ascii_uppercase() || name.contains("_") {
+        let msg = format!("identifier `{}` should be CamelCasee", name);
+        let mut name = String::from(name);
+        name[0..1].make_ascii_uppercase();
+        let hint = format!(
+            "convert the identifier to CamelCase (notice the capitalization): `{}`",
+            name
+        );
+        VrsError::new_warn(loc.with_range(1..2), msg, Some(hint)).print();
+        Issues::warn()
+    } else {
+        Issues::ok()
+    }
 }

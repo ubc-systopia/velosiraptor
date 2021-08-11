@@ -29,13 +29,14 @@
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // used library internal functionality
-use crate::ast::{AstNode, Issues};
+use crate::ast::{utils, AstNode, Issues, SymbolTable};
 use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
 /// Represents a bitslice of a [Field]
 ///
-/// The field corresponds to the slice `[start..end]` of the [Field]
+/// The field corresponds to the slice `[start, end]` of the [Field]
+/// The end bit is including `[start..=end]`
 #[derive(PartialEq, Clone)]
 pub struct BitSlice {
     /// the start bit
@@ -48,12 +49,32 @@ pub struct BitSlice {
     pub pos: TokenStream,
 }
 
+impl BitSlice {
+    /// constructs the mask value of the bit slice
+    ///
+    /// # Example
+    /// start = 0, end = 3 -> 0xf
+    pub fn mask_value(&self) -> u64 {
+        let mut mask = 0;
+        for i in self.start..=self.end {
+            mask |= 1 << i;
+        }
+        mask
+    }
+
+    /// returns the number of bits this slice covers
+    pub fn nbits(&self) -> u64 {
+        self.end - self.start + 1
+    }
+}
+
 /// Implementation of the [Display] trait for [BitSlice]
 impl Display for BitSlice {
     fn fmt(&self, f: &mut Formatter) -> Result {
         write!(f, "[{:2}..{:2}]  {}", self.start, self.end, &self.name)
     }
 }
+
 /// Implementation of the [Debug] trait for [BitSlice]
 impl Debug for BitSlice {
     fn fmt(&self, f: &mut Formatter) -> Result {
@@ -69,9 +90,18 @@ impl Debug for BitSlice {
 
 /// implementation of [AstNode] for [BitSlice]
 impl AstNode for BitSlice {
-    fn check(&self) -> Issues {
+    /// checks the bitslices node and reports issues
+    fn check(&self, _st: &mut SymbolTable) -> Issues {
         let mut res = Issues::ok();
-        // check start <= end
+
+        // Check 1: Valid range.
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: The interval specified by `start` and `end` must be valid, i.e.,
+        //              start <= end must hold.
+        // Notes:       We test for overlaps in the parent node.
+        // --------------------------------------------------------------------------------------
+
         if self.start > self.end {
             let msg = String::from("negative interval detected: start bit > end bit");
             let hint = String::from("swap start with end bits");
@@ -79,7 +109,14 @@ impl AstNode for BitSlice {
             res.inc_err(1);
         }
 
-        // no more that 64 bits for now!
+        // Check 2: Size of bits
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Currently, no more than 64 bits are supported, thus the end bit must be
+        //              less or equal to 63.
+        // Notes:       We test for the total field size in the parent node.
+        // --------------------------------------------------------------------------------------
+
         if self.end > 63 {
             let msg = String::from("the bitfield slice exceeds 64 bits.");
             let hint = String::from("reduce the end bit here");
@@ -87,24 +124,31 @@ impl AstNode for BitSlice {
             res.inc_err(1);
         }
 
-        // check the name is something like `foo_bar`
-        let alllower = self
-            .name
-            .as_bytes()
-            .iter()
-            .fold(true, |acc, x| acc & !x.is_ascii_uppercase());
+        // Check 3: Identifier is ASCII
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: The name of the bitslice must be in ASCII characters.
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
 
-        if !alllower {
-            let msg = format!("bitslice `{}` should have an lower case name", self.name);
+        if !self.name.is_ascii() {
+            let msg = format!("constant `{}` should be in ASCII", self.name);
             let hint = format!(
-                "convert the identifier to snake case: `{}`",
-                self.name.to_ascii_lowercase()
+                "convert the identifier to ASCII: `{}`",
+                self.name.to_ascii_uppercase()
             );
-            VrsError::new_warn(self.pos.with_range(2..3), msg, Some(hint)).print();
-            res.inc_warn(1);
+            VrsError::new_err(self.pos.with_range(1..2), msg, Some(hint)).print();
+            res.inc_err(1);
         }
 
-        res
+        // Check 4: Identifier format
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning
+        // Description: The identifier should be in `snake_case`.
+        // Notes:       We test for double defined slices in the parent node.
+        // --------------------------------------------------------------------------------------
+
+        res + utils::check_snake_case(&self.name, &self.pos)
     }
 
     fn name(&self) -> &str {

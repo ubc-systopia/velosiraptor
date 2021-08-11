@@ -33,8 +33,8 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // the used crate-internal functionality
-use crate::ast::{utils, AstNode, Const, Interface, Issues, Method, State};
-use crate::error::{ErrorLocation, VrsError};
+use crate::ast::{utils, AstNode, Const, Interface, Issues, Method, State, SymbolTable};
+use crate::error::ErrorLocation;
 use crate::token::TokenStream;
 
 /// Defines a translation unit
@@ -68,47 +68,99 @@ impl Unit {}
 
 /// Implemetation of the [AstNode] trait for [Unit]
 impl AstNode for Unit {
-    fn check(&self) -> Issues {
+    fn check(&self, st: &mut SymbolTable) -> Issues {
         // all fine for now
         let mut res = Issues::ok();
 
         let name = self.name();
         let pos = self.loc();
 
-        // name should start with upper case
-        if !name[0..1].as_bytes()[0].is_ascii_uppercase() {
-            let msg = format!("unit `{}` should start with an uppercase letter", name);
-            let mut name = String::from(name);
-            name[0..1].make_ascii_uppercase();
-            let hint = format!(
-                "convert the identifier to upper case (notice the capitalization): `{}`",
-                name
-            );
-            VrsError::new_warn(pos.with_range(1..2), msg, Some(hint)).print();
-            res = res + Issues::warn();
+        // set the current context
+        st.set_context(self.name());
+
+        // Check 1: Constants
+        // --------------------------------------------------------------------------------------
+        // Type:        Error/Warning
+        // Description: Check all defined constats of the Unit
+        // Notes:
+        // --------------------------------------------------------------------------------------
+        for c in &self.consts {
+            res = res + c.check(st);
         }
 
-        // check if there are any double entries in the constants, and check the constants
+        // Check 2: Double defined constants
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check that all constants of this field have distinct names
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
         let errors = utils::check_double_entries(&self.consts);
         res.inc_err(errors);
-        for c in &self.consts {
-            res = res + c.check();
-        }
+
+        // Check 3: State Check
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning/Error
+        // Description: Check that the state definition is fine
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
 
         // check the state and interface
-        res = res + self.state.check();
+        res = res + self.state.check(st);
 
-        //todo!("check interface");
-        //res = res += self.interface.check();
+        // Check 4: State Param Check
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning/Error
+        // Description: Check that the state refers to actual parameters
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+        // TODO: check params
 
-        // check if there are any double entries in the methods, and check the constants
-        //todo!("check methods");
+        // Check 5: Interface Check
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning/Error
+        // Description: Check that the state definition is fine
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        res = res + self.state.check(st);
+
+        // Check 6: Interface param check
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning/Error
+        // Description: Check that the interface refers to actual parameters
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+        // TODO: check params / field refs
+
+        // Check 7: Methods double defined
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning/Error
+        // Description: Check double method definition
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
         // let errors = utils::check_double_entries(&self.methods);
         // res.inc_err(errors);
+
+        // Check 8: Method cehck
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning/Error
+        // Description: Check that the interface refers to actual parameters
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
         // for m in &self.methods {
-        //     res = res + m.check();
+        //     res = res + m.check(st);
         // }
-        res
+
+        // Check 9: Bases are defined
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning
+        // Description: Check if the unit name is CamelCase
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+        res + utils::check_camel_case(name, pos)
     }
     ///
     fn name(&self) -> &str {
@@ -117,6 +169,18 @@ impl AstNode for Unit {
     /// returns the location of the current
     fn loc(&self) -> &TokenStream {
         &self.pos
+    }
+
+    // builds the symbol table
+    fn build_symtab(&self, st: &mut SymbolTable) -> Issues {
+        let mut err = Issues::ok();
+        for i in &self.consts {
+            let sym = i.to_symbol(&self.name());
+            if st.insert(sym).is_err() {
+                err.inc_err(1);
+            };
+        }
+        err
     }
 }
 

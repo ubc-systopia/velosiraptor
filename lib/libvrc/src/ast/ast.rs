@@ -29,7 +29,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-use crate::ast::{utils, AstError, AstNode, Const, Import, Issues, Unit};
+use crate::ast::{utils, AstError, AstNode, Const, Import, Issues, SymbolTable, Unit};
 use crate::error::VrsError;
 use crate::parser::ParserError;
 use crate::token::TokenStream;
@@ -227,18 +227,40 @@ impl Ast {
         self.merge_imports()
     }
 
-    pub fn build_symboltable(&self) -> Result<(), AstError> {
-        Ok(())
+    pub fn build_symboltable(&self) -> Result<SymbolTable, AstError> {
+        let mut err = Issues::ok();
+        let mut st = SymbolTable::new();
+        for c in &self.consts {
+            let sym = c.to_symbol("");
+            if st.insert(sym).is_err() {
+                err.inc_err(1);
+            };
+        }
+
+        for u in &self.units {
+            err = err + u.build_symtab(&mut st);
+        }
+
+        if err.errors > 0 {
+            Err(AstError::SymTabError { i: err })
+        } else {
+            Ok(st)
+        }
     }
 
-    ///
-    pub fn check_consistency(&self) -> Result<Issues, AstError> {
-        let val = self.check();
+    /// checks for consistency
+    pub fn check_consistency(&self, st: &mut SymbolTable) -> Result<Issues, AstError> {
+        let val = self.check(st);
         if val.errors > 0 {
             Err(AstError::CheckError { i: val })
         } else {
             Ok(val)
         }
+    }
+
+    // applies AST transformations
+    pub fn apply_transformations(&mut self) -> Result<Issues, AstError> {
+        Ok(Issues::ok())
     }
 }
 
@@ -271,21 +293,36 @@ impl fmt::Debug for Ast {
 
 /// implementation of [AstNode] for [Ast]
 impl AstNode for Ast {
-    fn check(&self) -> Issues {
-        // no issues found
+    fn check(&self, st: &mut SymbolTable) -> Issues {
+        // no issues so far
         let mut res = Issues::ok();
 
+        // sanity check
+        for i in self.imports.iter() {
+            assert_eq!(i.ast, None);
+        }
+
         // check all constant definitions
+        // the constants have already been checked for double defined symbols during the merge
+        // phase of the import resolution
         for c in self.consts.iter() {
-            let val = c.check();
+            let val = c.check(st);
             res = res + val;
         }
+
         // check the unit definitions
+        // the units have already been checked for double definitions during the merge phase of
+        // the import resolution
         for u in self.units.iter() {
-            let val = u.check();
+            let val = u.check(st);
             res = res + val;
         }
+
         res
+    }
+    // builds the symbol table
+    fn build_symtab(&self, _st: &mut SymbolTable) -> Issues {
+        Issues::ok()
     }
     fn name(&self) -> &str {
         "ast"
