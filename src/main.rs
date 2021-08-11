@@ -49,6 +49,13 @@ fn parse_cmdline() -> clap::ArgMatches<'static> {
                 .help("the output file"),
         )
         .arg(
+            Arg::with_name("pkg")
+                .short("p")
+                .long("pkg")
+                .takes_value(true)
+                .help("the package name to produce"),
+        )
+        .arg(
             Arg::with_name("backend")
                 .short("b")
                 .long("backend")
@@ -131,7 +138,10 @@ fn main() {
     log::info!("input file: {}", infile);
 
     let outdir = matches.value_of("output").unwrap_or("<stdout>");
-    log::info!("output file: {}", outdir);
+    log::info!("output directory: {}", outdir);
+
+    let pkgname = matches.value_of("pkg").unwrap_or("mpu");
+    log::info!("package name: {}", pkgname);
 
     let backend = matches.value_of("backend").unwrap_or("rust");
     log::info!("codegen backend: {}", backend);
@@ -300,23 +310,12 @@ fn main() {
         "<stdout>" => None,
         b => {
             let p = Path::new(b);
-            // if it's not a directory, this is wrong
-            if !p.exists() {
-                eprintln!(
-                    "{}{} `{}`.\n",
-                    "error".bold().red(),
-                    ": non-existing output path: ".bold(),
-                    outdir.bold()
-                );
-                abort(infile, issues);
-                return;
-            }
 
-            if !p.is_dir() {
+            if p.exists() && !p.is_dir() {
                 eprintln!(
                     "{}{} `{}`.\n",
                     "error".bold().red(),
-                    ": output path is not a directory: ".bold(),
+                    ": output path exists, but s not a directory: ".bold(),
                     outdir.bold()
                 );
                 abort(infile, issues);
