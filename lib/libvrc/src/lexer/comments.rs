@@ -70,7 +70,7 @@ pub fn blockcomment(input: SourcePos) -> IResult<SourcePos, Token> {
                 String::from("unclosed block comment."),
                 Some(String::from("insert `*/` after here.")),
             );
-            return Err(Err::Failure(err));
+            Err(Err::Failure(err))
         }
     }
 }

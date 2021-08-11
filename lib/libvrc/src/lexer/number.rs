@@ -44,7 +44,7 @@ fn base10(input: SourcePos) -> IResult<SourcePos, Token> {
     // match a digit followed by alphanumeric characters and the `_`
     // this is needed to recognize patterns of: 1234asdf
     let otherchar = alt((alphanumeric1, tag("_")));
-    let (rem, numsp) = recognize(pair(digit1, many0(otherchar)))(input.clone())?;
+    let (rem, numsp) = recognize(pair(digit1, many0(otherchar)))(input)?;
 
     // allow groups of digits 1234_5678
     let otherdigits = alt((digit1, tag("_")));

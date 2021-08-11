@@ -23,13 +23,22 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Velosiraptor Lexer Tokens
+//! Velosiraptor TokenStream
+//!
+//! The TokenStream represents a sequence of tokens produced by the lexer.
+//! It does not contain any whitespace tokens, but may contain comment
+//! tokens. Comment tokens can be filtered using the provided functionality.
 
-use nom::{InputIter, InputLength, InputTake, Needed, Slice};
-use std::fmt;
+// used standard library functionality
+use std::cmp::Ordering;
+use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 use std::rc::Rc;
 
+// used nom functionality
+use nom::{InputIter, InputLength, InputTake, Needed, Slice};
+
+// used crate-internal functionality
 use crate::error::ErrorLocation;
 use crate::sourcepos::SourcePos;
 use crate::token::{Token, TokenContent};
@@ -83,7 +92,7 @@ impl TokenStream {
     /// # Panics
     ///
     /// Panics if the supplied range is outside of the covered range by the [TokenStream]
-    pub fn from_self(&self, range: Range<usize>) -> Self {
+    pub fn with_range(&self, range: Range<usize>) -> Self {
         assert!(self.input_len() >= range.end - range.start);
         assert!(self.range.start + range.end <= self.range.end);
 
@@ -104,7 +113,7 @@ impl TokenStream {
     /// # Panics
     ///
     /// The function panics if the tokens are not matching, or the end is before the start
-    pub fn from_self_until(self, other: &Self) -> Self {
+    pub fn expand_until(self, other: &Self) -> Self {
         assert!(self.tokens == other.tokens);
         assert!(self.range.start < other.range.start);
         TokenStream {
@@ -113,7 +122,7 @@ impl TokenStream {
         }
     }
 
-    /// Creates a new [TokenStream] from self up until, not including the other
+    /// Creates a new [TokenStream] from self up until, and including the other
     ///
     /// The new range will start at current, and be set to the token just before
     /// the start of the other TokenStream
@@ -121,7 +130,7 @@ impl TokenStream {
     /// # Panics
     ///
     /// The function panics if the tokens are not matching, or the end is before the start
-    pub fn from_merged(self, other: &Self) -> Self {
+    pub fn merge(self, other: &Self) -> Self {
         assert!(self.tokens == other.tokens);
         assert!(self.range.start < other.range.end);
         TokenStream {
@@ -171,7 +180,7 @@ impl TokenStream {
         assert!(self.tokens == other.tokens);
         assert!(self.range.start <= other.range.start);
         self.input_sourcepos()
-            .from_self_until(&other.input_sourcepos())
+            .expand_until(&other.input_sourcepos())
     }
 
     /// Obtains the current range relative to the entire [TokenStream]
@@ -185,16 +194,16 @@ impl TokenStream {
     }
 }
 
-/// Implements the [std::fmt::Display] trait for [TokenStream]
-impl fmt::Display for TokenStream {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+/// Implements the [Display] trait for [TokenStream]
+impl Display for TokenStream {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(f, "{}", self.tokens[self.range.start])
     }
 }
 
-/// Implements the [std::fmt::Debug] trait for [TokenStream]
-impl fmt::Debug for TokenStream {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+/// Implements the [Debug] trait for [TokenStream]
+impl Debug for TokenStream {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
         let len = std::cmp::min(self.input_len(), 5);
         let mut tok = String::new();
         for i in &self.tokens[self.range.start..self.range.start + len] {
@@ -230,7 +239,7 @@ impl InputTake for TokenStream {
     /// The function panics if count > self.input_len()
     fn take(&self, count: usize) -> Self {
         assert!(count <= self.input_len());
-        self.from_self(0..count)
+        self.with_range(0..count)
     }
 
     #[inline]
@@ -241,8 +250,8 @@ impl InputTake for TokenStream {
     fn take_split(&self, count: usize) -> (Self, Self) {
         assert!(count <= self.input_len());
 
-        let first = self.from_self(0..count);
-        let second = self.from_self(count..self.input_len());
+        let first = self.with_range(0..count);
+        let second = self.with_range(count..self.input_len());
 
         // we sould not lose any data
         assert_eq!(first.input_len(), count);
@@ -280,7 +289,7 @@ impl Slice<Range<usize>> for TokenStream {
     #[inline]
     fn slice(&self, range: Range<usize>) -> Self {
         assert!(range.end <= self.input_len());
-        self.from_self(range)
+        self.with_range(range)
     }
 }
 
@@ -469,7 +478,7 @@ impl ErrorLocation for TokenStream {
     /// the length of the token
     fn length(&self) -> usize {
         // TODO: figure out the right thing here!
-        self.peek().spos.length()
+        self.input_sourcepos().length()
     }
 
     /// the context (stdin or filename)
@@ -524,5 +533,14 @@ impl From<SourcePos> for TokenStream {
             }]),
             range: 0..0,
         }
+    }
+}
+
+/// implementation of [PartialOrd] for [TokenStream]
+impl PartialOrd for TokenStream {
+    /// This method returns an ordering between self and other values if one exists.
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        // we jus compare with the head token position
+        self.peek().spos.partial_cmp(&other.peek().spos)
     }
 }

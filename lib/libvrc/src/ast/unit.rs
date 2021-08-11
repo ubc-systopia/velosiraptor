@@ -23,12 +23,19 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Ast Module of the Velosiraptor Compiler
+//! Unit Ast Node
+//!
+//! This defines a unit node in the AST. The unit node represents a unit definition,
+//! and as such a type.
 
-use crate::ast::{AstNode, Const, Interface, Issues, Method, State};
-use crate::sourcepos::SourcePos;
+// the used standard library functionality
+use std::cmp::Ordering;
+use std::fmt::{Debug, Display, Formatter, Result};
+
+// the used crate-internal functionality
+use crate::ast::{utils, AstNode, Const, Interface, Issues, Method, State, SymbolTable};
+use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
-use std::fmt;
 
 /// Defines a translation unit
 ///
@@ -53,21 +60,58 @@ pub struct Unit {
     pub methods: Vec<Method>,
     // TODO: maybe make the translate / constructors / map / ... explicit here?
     /// the position in the source tree where this unit is defined
-    pub pos: SourcePos,
+    pub pos: TokenStream,
 }
 
 /// Implementation of [Unit]
-impl Unit {
-    pub fn pos(&self) -> &SourcePos {
-        &self.pos
-    }
-}
+impl Unit {}
 
 /// Implemetation of the [AstNode] trait for [Unit]
 impl AstNode for Unit {
-    ///
-    fn check(&self) -> Issues {
-        unimplemented!();
+    fn check(&self, st: &mut SymbolTable) -> Issues {
+        // all fine for now
+        let mut res = Issues::ok();
+
+        let name = self.name();
+        let pos = self.loc();
+
+        // set the current context
+        st.set_context(self.name());
+
+        // name should start with upper case
+        if !name[0..1].as_bytes()[0].is_ascii_uppercase() {
+            let msg = format!("unit `{}` should start with an uppercase letter", name);
+            let mut name = String::from(name);
+            name[0..1].make_ascii_uppercase();
+            let hint = format!(
+                "convert the identifier to upper case (notice the capitalization): `{}`",
+                name
+            );
+            VrsError::new_warn(pos.with_range(1..2), msg, Some(hint)).print();
+            res = res + Issues::warn();
+        }
+
+        // check if there are any double entries in the constants, and check the constants
+        let errors = utils::check_double_entries(&self.consts);
+        res.inc_err(errors);
+        for c in &self.consts {
+            res = res + c.check(st);
+        }
+
+        // check the state and interface
+        res = res + self.state.check(st);
+
+        //todo!("check interface");
+        //res = res += self.interface.check();
+
+        // check if there are any double entries in the methods, and check the constants
+        //todo!("check methods");
+        // let errors = utils::check_double_entries(&self.methods);
+        // res.inc_err(errors);
+        // for m in &self.methods {
+        //     res = res + m.check();
+        // }
+        res
     }
     ///
     fn name(&self) -> &str {
@@ -75,13 +119,25 @@ impl AstNode for Unit {
     }
     /// returns the location of the current
     fn loc(&self) -> &TokenStream {
-        unimplemented!();
+        &self.pos
+    }
+
+    // builds the symbol table
+    fn build_symtab(&self, st: &mut SymbolTable) -> Issues {
+        let mut err = Issues::ok();
+        for i in &self.consts {
+            let sym = i.to_symbol(&self.name());
+            if st.insert(sym).is_err() {
+                err.inc_err(1);
+            };
+        }
+        err
     }
 }
 
 /// implementation of the [fmt::Display] trait for the [Unit]
-impl fmt::Display for Unit {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Display for Unit {
+    fn fmt(&self, f: &mut Formatter) -> Result {
         match &self.derived {
             Some(n) => writeln!(f, "Unit {} : {}  {{\nTODO\n}}", self.name, n),
             None => writeln!(f, "Unit {} {{\nTODO\n}}", self.name),
@@ -90,9 +146,10 @@ impl fmt::Display for Unit {
 }
 
 /// implementation of the [fmt::Debug] trait for the [Unit]
-impl fmt::Debug for Unit {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let (line, column) = self.pos.input_pos();
+impl Debug for Unit {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        let line = self.loc().line();
+        let column = self.loc().column();
         match &self.derived {
             Some(n) => writeln!(
                 f,
@@ -105,5 +162,14 @@ impl fmt::Debug for Unit {
                 line, column, self.name
             ),
         }
+    }
+}
+
+/// implementation of [PartialOrd] for [Import]
+impl PartialOrd for Unit {
+    /// This method returns an ordering between self and other values if one exists.
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        // we jus compare with the TokenStream position
+        self.loc().partial_cmp(&other.loc())
     }
 }

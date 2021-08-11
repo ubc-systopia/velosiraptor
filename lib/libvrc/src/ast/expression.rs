@@ -26,7 +26,7 @@
 ///! Ast Module of the Velosiraptor Compiler
 use std::fmt;
 
-use crate::ast::AstNode;
+use crate::ast::{AstNode, SymbolTable};
 use crate::token::TokenStream;
 
 /// Binary operations for [Expr] <OP> [Expr]
@@ -242,6 +242,7 @@ pub enum Expr {
     },
     FnCall {
         path: Vec<String>,
+        args: Vec<String>,
         pos: TokenStream,
     },
     Slice {
@@ -263,7 +264,7 @@ pub enum Expr {
 
 impl Expr {
     /// returns ture if the expression is a constant expression
-    pub fn is_const_expr(&self) -> bool {
+    pub fn is_const_expr(&self, st: &SymbolTable) -> bool {
         use Expr::*;
         match self {
             Number { value: _, pos: _ } => true,
@@ -273,8 +274,16 @@ impl Expr {
                 lhs,
                 rhs,
                 pos: _,
-            } => lhs.is_const_expr() && rhs.is_const_expr(),
-            UnaryOperation { op: _, val, pos: _ } => val.is_const_expr(),
+            } => lhs.is_const_expr(st) && rhs.is_const_expr(st),
+            UnaryOperation { op: _, val, pos: _ } => val.is_const_expr(st),
+            Identifier { path, pos: _ } => {
+                // TODO: deal with context.symbol
+                let name = path.join(".");
+                match st.get(&name) {
+                    Some(s) => s.is_const(),
+                    None => false,
+                }
+            }
             _ => false,
         }
     }
@@ -326,7 +335,11 @@ impl fmt::Display for Expr {
                 pos: _,
             } => write!(format, "({} {} {})", lhs, op, rhs),
             UnaryOperation { op, val, pos: _ } => write!(format, "{}({})", op, val),
-            FnCall { path, pos: _ } => {
+            FnCall {
+                path,
+                pos: _,
+                args: _,
+            } => {
                 write!(format, "{}()", path.join("."))
             }
             Slice {
@@ -361,7 +374,11 @@ impl AstNode for Expr {
                 pos,
             } => &pos,
             UnaryOperation { op: _, val: _, pos } => &pos,
-            FnCall { path: _, pos } => &pos,
+            FnCall {
+                path: _,
+                pos,
+                args: _,
+            } => &pos,
             Slice {
                 path: _,
                 slice: _,
@@ -384,7 +401,7 @@ impl AstNode for Expr {
 #[cfg(test)]
 use crate::lexer::Lexer;
 #[cfg(test)]
-use crate::parser::{arith_expr, bool_expr};
+use crate::parser::expression::{arith_expr, bool_expr};
 #[cfg(test)]
 use crate::sourcepos::SourcePos;
 

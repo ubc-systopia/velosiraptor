@@ -23,11 +23,18 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Ast Module of the Velosiraptor Compiler
+//! Import Ast Node
+//!
+//! This defines an import node in the AST. The import node represents the import
+//! statements in the source files. They may contain the corresponding ast.
 
+// the used standard library functionality
+use std::cmp::Ordering;
+use std::fmt::{Debug, Display, Formatter, Result};
+
+// the used crate-internal functionality
 use crate::ast::{Ast, AstNode};
 use crate::token::TokenStream;
-use std::fmt;
 
 /// Defines an [Import] statement node
 ///
@@ -45,32 +52,43 @@ pub struct Import {
 
 /// the implementation for the import struct
 impl Import {
+    /// returns the filename of the import by adding `*.vrs` to the name
     pub fn to_filename(&self) -> String {
         format!("{}.vrs", self.name)
     }
 }
 
 /// implementation of the [fmt::Display] trait for the [Import]
-impl fmt::Display for Import {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Display for Import {
+    fn fmt(&self, f: &mut Formatter) -> Result {
         writeln!(f, "import {};", self.name)
     }
 }
 
 /// implementation of the [fmt::Debug] trait for the [Import]
-impl fmt::Debug for Import {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Debug for Import {
+    fn fmt(&self, f: &mut Formatter) -> Result {
         let (line, column) = self.pos.peek().spos.input_pos();
         writeln!(f, "{:03}:{:03} | import {};", line, column, self.name)
     }
 }
 
+/// implementation of [PartialOrd] for [Import]
+impl PartialOrd for Import {
+    /// This method returns an ordering between self and other values if one exists.
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        // we jus compare with the TokenStream position
+        self.pos.partial_cmp(&other.pos)
+    }
+}
+
+/// implementation of [AstNode] for [Import]
 impl AstNode for Import {
     // returns the name of the node
     fn name(&self) -> &str {
         &self.name
     }
-    /// returns the location of the current
+    /// returns the location of the node, i.e. its [TokenStream]
     fn loc(&self) -> &TokenStream {
         &self.pos
     }

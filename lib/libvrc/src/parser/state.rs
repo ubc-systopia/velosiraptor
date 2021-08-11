@@ -25,22 +25,23 @@
 
 //! State definition parsing
 
+// the used nom components
+use nom::{
+    branch::alt,
+    combinator::cut,
+    multi::{many1, separated_list0},
+    sequence::delimited,
+};
+
 // lexer, parser terminals and ast
 use crate::ast::{Field, State};
+use crate::error::IResult;
 use crate::parser::field::field;
 use crate::parser::terminals::{
     assign, comma, ident, kw_memory, kw_none, kw_register, kw_state, lbrace, lparen, rbrace,
     rparen, semicolon,
 };
 use crate::token::TokenStream;
-
-use nom::multi::separated_list0;
-// the used nom components
-use crate::error::IResult;
-use crate::lexer::Lexer;
-use nom::branch::alt;
-use nom::sequence::{delimited, terminated};
-use nom::{combinator::cut, Slice};
 
 /// parses and consumes the [State] of a unit
 pub fn state(input: TokenStream) -> IResult<TokenStream, State> {
@@ -56,32 +57,28 @@ pub fn state(input: TokenStream) -> IResult<TokenStream, State> {
 
 /// parses and consumes [RegisterState] of a unit
 fn register_state(input: TokenStream) -> IResult<TokenStream, State> {
-    let pos = input.input_sourcepos();
-
-    let (i1, _) = kw_register(input)?;
+    let (i1, _) = kw_register(input.clone())?;
     let (i2, fields) = fields_parser(i1)?;
 
+    let pos = input.expand_until(&i2);
     Ok((i2, State::RegisterState { fields, pos }))
 }
 
 /// parses and consumes [MemoryState] of a unit
 fn memory_state(input: TokenStream) -> IResult<TokenStream, State> {
-    let pos = input.input_sourcepos();
-
-    let (i1, _) = kw_memory(input)?;
+    let (i1, _) = kw_memory(input.clone())?;
     let (i2, bases) = argument_parser(i1)?;
     let (i3, fields) = fields_parser(i2)?;
 
+    let pos = input.expand_until(&i3);
     Ok((i3, State::MemoryState { bases, fields, pos }))
 }
 
 /// parses and consumes [None] state of a unit
 fn none_state(input: TokenStream) -> IResult<TokenStream, State> {
-    let pos = input.input_sourcepos();
+    let (i1, s) = kw_none(input)?;
 
-    let (i1, _) = kw_none(input)?;
-
-    Ok((i1, State::None))
+    Ok((i1, State::None { pos: s }))
 }
 
 /// Parses and consumes a comma separated list of identifiers of the form "(ident, ..., ident)"
@@ -91,12 +88,13 @@ pub fn argument_parser(input: TokenStream) -> IResult<TokenStream, Vec<String>> 
 
 /// Parses and consumes a semicolon separated list of fields of the form "{ FIELD; ...; FIELD; }"
 pub fn fields_parser(input: TokenStream) -> IResult<TokenStream, Vec<Field>> {
-    cut(delimited(
-        lbrace,
-        terminated(separated_list0(semicolon, field), semicolon),
-        rbrace,
-    ))(input)
+    cut(delimited(lbrace, many1(field), rbrace))(input)
 }
+
+#[cfg(test)]
+use crate::lexer::Lexer;
+#[cfg(test)]
+use nom::Slice;
 
 // TODO ask Reto about current source pos assignment.
 #[test]
@@ -122,10 +120,10 @@ fn memory_state_parser_test() {
     let tok_stream = TokenStream::from_vec_filtered(tok_vec);
     let parsed_state = match state(tok_stream.clone()) {
         Ok((_, parsed_state)) => parsed_state,
-        Err(_) => panic!("Parsing failed"),
+        Err(x) => panic!("Parsing failed{}", x),
     };
 
-    let (bases, fields, pos) = match parsed_state {
+    let (bases, _fields, _pos) = match parsed_state {
         State::MemoryState { bases, fields, pos } => (bases, fields, pos),
         _ => panic!("Wrong type of State parsed"),
     };
@@ -156,7 +154,7 @@ fn none_state_parser_test() {
     };
 
     match parsed_state {
-        State::None => (),
+        State::None { pos: _ } => (),
         _ => panic!("Wrong type of State parsed"),
     };
 }
@@ -177,16 +175,17 @@ fn register_state_parser_test() {
     let tok_stream = TokenStream::from_vec_filtered(tok_vec);
     let parsed_state = match state(tok_stream.clone()) {
         Ok((_, parsed_state)) => parsed_state,
-        Err(_) => panic!("Parsing failed"),
+        Err(x) => panic!("Parsing failed{}", x),
     };
 
-    let (fields, pos) = match parsed_state {
+    let (_fields, pos) = match parsed_state {
         State::RegisterState { fields, pos } => (fields, pos),
         _ => panic!("Wrong type of State parsed"),
     };
 
     // todo Should we be testing fields???
     assert_eq!(pos, tok_stream.slice(2..).input_sourcepos());
+
 }
 
 #[test]

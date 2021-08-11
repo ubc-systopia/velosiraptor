@@ -23,79 +23,66 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// get the tokens
+//! Unit Parser
+//!
+//! Parses a Unit definition including its state, constants etc.
+
+// the used nom functionality
+use nom::{
+    combinator::{cut, opt},
+    multi::many0,
+    sequence::{delimited, pair, preceded, terminated, tuple},
+};
+
+// the used library-internal functionaltity
+use crate::ast::{Interface, State, Unit};
 use crate::error::IResult;
-use crate::parser::state::state;
-use crate::parser::terminals::{colon, ident, kw_unit, lbrace, rbrace};
+use crate::parser::{
+    constdef,
+    state::state,
+    terminals::{colon, ident, kw_unit, lbrace, rbrace, semicolon},
+};
 use crate::token::TokenStream;
 
-use nom::combinator::opt;
-use nom::sequence::{delimited, preceded};
-
-use crate::ast::{Interface, State, Unit};
-
-/// parses and consumes an import statement (`unit foo {};`) and any following whitespaces
+/// parses and consumes an import statement (`unit foo {};`)
 pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
-    // get the current position
-    let pos = input.input_sourcepos();
-
     // try to match the input keyword, there is no match, return.
-    let i1 = match kw_unit(input) {
-        Ok((input, _)) => input,
-        Err(x) => return Err(x),
-    };
+    let (i1, _) = kw_unit(input.clone())?;
 
-    // ok, so we've seen the `unit` keyword, so the next must be an identifier.
-    let (i1, unitname) = match ident(i1) {
-        Ok((i, u)) => (i, u),
-        Err(e) => return Err(e),
-        // if we have parser failure, indicate this!
-        //let (i, k) = match e {
-        //    Err::Error(e) => (e.input, e.code),
-        //    x => panic!("unknown condition: {:?}", x),
-        //};
-        //return Err(Err::Failure(error_position!(i, k)))
-    };
-
-    // is it a derived type, then we may see a ` : type` clause
-    let (i2, supertype) = match opt(preceded(colon, ident))(i1) {
-        Ok((i, s)) => (i, s),
-        // possibly check here for an error!
-        Err(e) => return Err(e), // if we have parser failure, indicate this!
-                                 //let (i, k) = match e {
-                                 //    Err::Error(e) => (e.input, e.code),
-                                 //    x => panic!("unkown condition: {:?}", x),
-                                 //};
-                                 //return Err(Err::Failure(error_position!(i, k)));
-                                 //}
-    };
+    // we've seen the `unit` keyword, next there is an identifyer maybe followed
+    // the drive clause (: identifier)
+    let derive = preceded(colon, cut(ident));
+    let (i2, (unitname, derived)) = cut(pair(ident, opt(derive)))(i1)?;
 
     // TODO: here we have ConstItem | InterfaceItem | StateItem | FunctionItem
-    let unit_body = state;
+    // TODO: either put that as
+    let unit_body = tuple((many0(constdef), opt(state)));
 
-    // then we have the unit block, wrapped in curly braces
-    let (i3, _) = match delimited(lbrace, unit_body, rbrace)(i2) {
-        Ok((i, b)) => (i, b),
-        Err(e) => return Err(e),
-        //     // if we have parser failure, indicate this!
-        //     let (i, k) = match e {
-        //         Err::Error(e) => (e.input, e.code),
-        //         x => panic!("unkown condition: {:?}", x),
-        //     };
-        //     return Err(Err::Failure(error_position!(i, k)));
-        // }
-    };
+    // then we have the unit block, wrapped in curly braces and a ;
+    let (i3, (consts, state)) =
+        cut(terminated(delimited(lbrace, unit_body, rbrace), semicolon))(i2)?;
 
+    let pos = input.expand_until(&i3);
     Ok((
         i3,
         Unit {
             name: unitname,
-            derived: None,
-            consts: Vec::new(),
-            state: State::None,
+            derived,
+            consts,
+            state: state.unwrap_or(State::None { pos: pos.clone() }),
             interface: Interface::None,
             methods: Vec::new(),
             pos,
         },
     ))
+}
+
+#[cfg(test)]
+use crate::lexer::Lexer;
+
+#[test]
+fn test_ok() {
+    let tokens = Lexer::lex_string("stdio", "unit foo {};").unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(unit(ts).is_ok());
 }

@@ -29,7 +29,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-use crate::ast::{utils, AstError, AstNode, Const, Import, Issues, Unit};
+use crate::ast::{utils, AstError, AstNode, Const, Import, Issues, SymbolTable, Unit};
 use crate::error::VrsError;
 use crate::parser::ParserError;
 use crate::token::TokenStream;
@@ -79,7 +79,7 @@ impl Ast {
             match currentimports.get(&i.name) {
                 Some(imp) => {
                     let msg = format!("{} is already imported ", i.name);
-                    let hint = format!("remove this import");
+                    let hint = String::from("remove this import");
                     VrsError::new_warn(imp.pos.clone(), msg, Some(hint)).print();
                 }
                 None => {
@@ -102,26 +102,23 @@ impl Ast {
                     Ok((ast, _)) => ast,
                     Err(ParserError::LexerFailure { error }) => {
                         let msg = String::from("during lexing of the file");
-                        return Err(VrsError::stack(val.pos.clone(), msg, error));
+                        return Err(VrsError::stack(val.pos, msg, error));
                     }
                     Err(ParserError::ParserFailure { error }) => {
                         let msg = String::from("during parsing of the file");
-                        return Err(VrsError::stack(val.pos.clone(), msg, error));
+                        return Err(VrsError::stack(val.pos, msg, error));
                     }
                     Err(ParserError::ParserIncomplete { error }) => {
                         let msg = String::from("unexpected junk at the end of the file");
-                        return Err(VrsError::stack(val.pos.clone(), msg, error));
+                        return Err(VrsError::stack(val.pos, msg, error));
                     }
                     Err(x) => panic!("foobar {:?}", x),
                 };
 
                 // parsing succeeded, recurse abort if there is an error downstream
-                match ast.do_parse_imports(path) {
-                    Err(err) => {
-                        let msg = String::from("while processing imports from");
-                        return Err(VrsError::stack(val.pos.clone(), msg, err));
-                    }
-                    _ => (),
+                if let Err(err) = ast.do_parse_imports(path) {
+                    let msg = String::from("while processing imports from");
+                    return Err(VrsError::stack(val.pos, msg, err));
                 }
                 // update the ast value
                 val.ast = Some(ast);
@@ -138,7 +135,7 @@ impl Ast {
                 if !s.is_empty() {
                     let msg = format!("circular dependency detected:\n  {} -> {}", s, filename);
                     let hint = String::from("try removing the following import");
-                    return Err(VrsError::new_err(val.pos.clone(), msg, Some(hint)));
+                    return Err(VrsError::new_err(val.pos, msg, Some(hint)));
                 }
             }
             // restore file path again
@@ -184,7 +181,7 @@ impl Ast {
         let mut asts = HashMap::new();
         self.do_collect_asts(&mut asts);
 
-        // cout the number of errors we've seen
+        // count the number of errors we've seen
         let mut errors = 0;
 
         // now we have all the asts read, we can start merging them
@@ -210,6 +207,10 @@ impl Ast {
             self.consts.push(c);
         }
 
+        // now sort the lists
+        self.units.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        self.consts.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
         // return the error count, if we encountered one
         if errors == 0 {
             Ok(())
@@ -226,18 +227,40 @@ impl Ast {
         self.merge_imports()
     }
 
-    pub fn build_symboltable(&self) -> Result<(), AstError> {
-        Ok(())
+    pub fn build_symboltable(&self) -> Result<SymbolTable, AstError> {
+        let mut err = Issues::ok();
+        let mut st = SymbolTable::new();
+        for c in &self.consts {
+            let sym = c.to_symbol("");
+            if st.insert(sym).is_err() {
+                err.inc_err(1);
+            };
+        }
+
+        for u in &self.units {
+            err = err + u.build_symtab(&mut st);
+        }
+
+        if err.errors > 0 {
+            Err(AstError::SymTabError { i: err })
+        } else {
+            Ok(st)
+        }
     }
 
-    ///
-    pub fn check_consistency(&self) -> Result<Issues, AstError> {
-        let val = self.check();
+    /// checks for consistency
+    pub fn check_consistency(&self, st: &mut SymbolTable) -> Result<Issues, AstError> {
+        let val = self.check(st);
         if val.errors > 0 {
             Err(AstError::CheckError { i: val })
         } else {
             Ok(val)
         }
+    }
+
+    // applies AST transformations
+    pub fn apply_transformations(&mut self) -> Result<Issues, AstError> {
+        Ok(Issues::ok())
     }
 }
 
@@ -268,15 +291,27 @@ impl fmt::Debug for Ast {
     }
 }
 
+/// implementation of [AstNode] for [Ast]
 impl AstNode for Ast {
-    fn check(&self) -> Issues {
+    fn check(&self, st: &mut SymbolTable) -> Issues {
+        // no issues found
         let mut res = Issues::ok();
-        // try to insert other constants into this ast
+
+        // check all constant definitions
         for c in self.consts.iter() {
-            let val = c.check();
+            let val = c.check(st);
+            res = res + val;
+        }
+        // check the unit definitions
+        for u in self.units.iter() {
+            let val = u.check(st);
             res = res + val;
         }
         res
+    }
+    // builds the symbol table
+    fn build_symtab(&self, _st: &mut SymbolTable) -> Issues {
+        Issues::ok()
     }
     fn name(&self) -> &str {
         "ast"

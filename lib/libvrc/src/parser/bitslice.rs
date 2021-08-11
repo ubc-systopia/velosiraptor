@@ -52,27 +52,14 @@ use nom::{combinator::cut, sequence::tuple};
 /// `0  0 bar`    -- represents bit 0 and associates the identifier "bar"
 ///
 pub fn bitslice(input: TokenStream) -> IResult<TokenStream, BitSlice> {
-    // record the current position of the bit slice
-    let pos = input.input_sourcepos();
-
     // the first thing here shall be a number, just return the error here
     let (i1, start) = num(input.clone())?;
-    let start = start as u16;
 
     // we match two numbers and an identifier
-    let (rem, (end, name)) = cut(tuple((num, ident)))(i1)?; /* {
-                                                                Ok((rem, (e, id))) => (rem, e as u16, id),
-                                                                Err(e) => {
-                                                                    // if we have parser failure, indicate this!
-                                                                    let (i, k) = match e {
-                                                                        Err::Error(e) => (e.input, e.code),
-                                                                        Err::Failure(e) => (e.input, e.code),
-                                                                        Err::Incomplete(_) => (input, ErrorKind::Eof),
-                                                                    };
-                                                                    return Err(Err::Failure(error_position!(i, k)));
-                                                                }
-                                                            };*/
-    let end = end as u16;
+    let (rem, (end, name)) = cut(tuple((num, ident)))(i1)?;
+
+    // calculate the position of the bitslice
+    let pos = input.expand_until(&rem);
 
     Ok((
         rem,
@@ -99,7 +86,7 @@ fn test_ok() {
     let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
     let ts = TokenStream::from_vec(tokens);
 
-    let pos = ts.input_sourcepos();
+    let pos = ts.slice(0..3);
     let ts2 = ts.slice(3..);
     assert_eq!(
         bitslice(ts),
@@ -121,7 +108,6 @@ fn test_err() {
     let sp = SourcePos::new("stdio", "0 foobar");
     let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
     let ts = TokenStream::from_vec(tokens);
-    let ts2 = ts.slice(1..);
     assert!(bitslice(ts).is_err());
     //assert_eq!(
     //    bitslice(ts),
@@ -132,7 +118,6 @@ fn test_err() {
     let sp = SourcePos::new("stdio", "0 16 1");
     let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
     let ts = TokenStream::from_vec(tokens);
-    let ts2 = ts.slice(2..);
     assert!(bitslice(ts).is_err())
     //assert_eq!(
     //    bitslice(ts),

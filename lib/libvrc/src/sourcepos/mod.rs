@@ -32,17 +32,21 @@
 //! The SourcePos structure implements several traits used by Nom so we can simply pass
 //! the SourcePos struct as input/outputs.
 
+// used standard library functionality
+use std::cmp::Ordering;
 use std::fmt;
 use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 use std::rc::Rc;
 
+// used nom functionality
 use nom::{
+    error::{ErrorKind, ParseError},
     Compare, CompareResult, Err, FindSubstring, IResult, InputIter, InputLength, InputTake,
     InputTakeAtPosition, Needed, Offset, Slice,
 };
 
+// used crate-internal functionality
 use crate::error::ErrorLocation;
-use nom::error::{ErrorKind, ParseError};
 
 /// Corresponds to a single byte of the source file
 pub type Element = char;
@@ -172,7 +176,7 @@ impl SourcePos {
     /// # Panics
     ///
     /// Panics if the supplied range is outside of the covered range by the SourcePos
-    pub fn from_self(&self, range: Range<usize>) -> Self {
+    pub fn with_range(&self, range: Range<usize>) -> Self {
         assert!(self.input_len() >= range.end - range.start);
         assert!(self.range.start + range.end <= self.range.end);
 
@@ -213,7 +217,7 @@ impl SourcePos {
     /// # Panics
     ///
     /// If the two source positions are not related
-    pub fn from_self_until(&self, other: &Self) -> Self {
+    pub fn expand_until(&self, other: &Self) -> Self {
         assert!(self.context == other.context);
         assert!(self.content == other.content);
         assert!(self.range.start <= other.range.start);
@@ -460,7 +464,7 @@ impl<'a> InputTake for SourcePos {
     #[inline]
     fn take(&self, count: usize) -> Self {
         assert!(count <= self.input_len());
-        self.from_self(0..count)
+        self.with_range(0..count)
     }
 
     /// Splits the current SourcePos at `count` returning two new [SourcePos] objects.ErrorKind
@@ -472,8 +476,8 @@ impl<'a> InputTake for SourcePos {
     fn take_split(&self, count: usize) -> (Self, Self) {
         assert!(count <= self.input_len());
         // create the new SourcePos objects
-        let first = self.from_self(0..count);
-        let second = self.from_self(count..self.input_len());
+        let first = self.with_range(0..count);
+        let second = self.with_range(count..self.input_len());
 
         // we sould not lose any data
         assert_eq!(first.input_len() + second.input_len(), self.input_len());
@@ -569,7 +573,7 @@ impl<'a> Slice<Range<usize>> for SourcePos {
     #[inline]
     fn slice(&self, range: Range<usize>) -> Self {
         assert!(range.end <= self.input_len());
-        self.from_self(range)
+        self.with_range(range)
     }
 }
 
@@ -688,11 +692,11 @@ impl ErrorLocation for SourcePos {
             if c as char == '\n' {
                 break;
             }
-            start = start - 1;
+            start -= 1;
         }
 
-        if self.content[start..].chars().next().unwrap() == '\n' {
-            start = start + 1;
+        if self.content.starts_with('\n') {
+            start += 1;
         }
 
         let mut end = self.range.start;
@@ -700,7 +704,7 @@ impl ErrorLocation for SourcePos {
             if c as char == '\n' {
                 break;
             }
-            end = end + 1;
+            end += 1;
         }
         &self.content[start..end]
     }
@@ -732,17 +736,15 @@ impl ErrorLocation for &SourcePos {
     fn linecontext(&self) -> &str {
         let mut start = self.range.start;
 
-        // panic!("start = {}", start);
-
         for c in self.content[0..start].chars().rev() {
             if c as char == '\n' {
                 break;
             }
-            start = start - 1;
+            start -= 1;
         }
 
-        if self.content[start..].chars().next().unwrap() == '\n' {
-            start = start + 1;
+        if self.content.starts_with('\n') {
+            start += 1;
         }
 
         let mut end = self.range.start;
@@ -750,9 +752,25 @@ impl ErrorLocation for &SourcePos {
             if c as char == '\n' {
                 break;
             }
-            end = end + 1;
+            end += 1;
         }
         &self.content[start..end]
+    }
+}
+
+/// implementation of [std::cmp::PartialOrd] for [SourcePos]
+impl PartialOrd for SourcePos {
+    /// This method returns an ordering between self and other values if one exists.
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let c = self.context.cmp(&other.context);
+        if c != Ordering::Equal {
+            return Some(c);
+        }
+
+        match self.line.cmp(&other.line) {
+            Ordering::Equal => Some(self.column.cmp(&other.column)),
+            o => Some(o),
+        }
     }
 }
 

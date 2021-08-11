@@ -23,11 +23,19 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Ast Module of the Velosiraptor Compiler
+//! Constant Ast Node
+//!
+//! This defines a constant node in the AST. The constant node represents a
+//! defined constant either in the file or unit context
 
-use crate::ast::{Expr, Issues};
+// the used standard library functionality
+use std::cmp::Ordering;
+use std::fmt::{Debug, Display, Formatter, Result};
+
+// the used crate-internal functionality
+use crate::ast::{AstNode, Expr, Issues, Symbol, SymbolKind, SymbolTable, Type};
+use crate::error::VrsError;
 use crate::token::TokenStream;
-use std::fmt;
 
 /// Defines a [Constant] statement node
 ///
@@ -57,6 +65,7 @@ pub enum Const {
 }
 
 impl Const {
+    /// returns the expression that defines the value
     pub fn value(&self) -> &Expr {
         use self::Const::*;
         match self {
@@ -72,11 +81,38 @@ impl Const {
             } => &value,
         }
     }
+
+    /// creates a symbol from the current Const
+    pub fn to_symbol(&self, ctxt: &str) -> Symbol {
+        Symbol::new(
+            ctxt,
+            self.name(),
+            self.to_type(),
+            SymbolKind::Const,
+            self.loc().clone(),
+        )
+    }
+
+    pub fn to_type(&self) -> Type {
+        use self::Const::*;
+        match self {
+            Integer {
+                ident: _,
+                value: _,
+                pos: _,
+            } => Type::Integer,
+            Boolean {
+                ident: _,
+                value: _,
+                pos: _,
+            } => Type::Boolean,
+        }
+    }
 }
 
 /// implementation of the [fmt::Display] trait for the [Const]
-impl fmt::Display for Const {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Display for Const {
+    fn fmt(&self, f: &mut Formatter) -> Result {
         use self::Const::*;
         match self {
             Integer {
@@ -94,8 +130,8 @@ impl fmt::Display for Const {
 }
 
 /// implementation of the [fmt::Debug] trait for the [Const]
-impl fmt::Debug for Const {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Debug for Const {
+    fn fmt(&self, f: &mut Formatter) -> Result {
         use self::Const::*;
         match self {
             Integer { ident, value, pos } => {
@@ -118,16 +154,24 @@ impl fmt::Debug for Const {
     }
 }
 
-use crate::ast::AstNode;
-use crate::error::VrsError;
+/// implementation of [PartialOrd] for [Import]
+impl PartialOrd for Const {
+    /// This method returns an ordering between self and other values if one exists.
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        // we jus compare with the TokenStream position
+        self.loc().partial_cmp(&other.loc())
+    }
+}
+
+/// implementation of [AstNode] for [Const]
 impl AstNode for Const {
-    fn check(&self) -> Issues {
+    fn check(&self, st: &mut SymbolTable) -> Issues {
         let mut res = Issues::ok();
 
         let name = self.name();
         let pos = self.loc();
         let val = self.value();
-        if !val.is_const_expr() {
+        if !val.is_const_expr(st) {
             let msg = String::from("not a constant expression");
             let hint = String::from("convert the expression to a constant");
             VrsError::new_err(val.loc(), msg, Some(hint)).print();
@@ -139,10 +183,10 @@ impl AstNode for Const {
         if !name.is_ascii() {
             let msg = format!("constant `{}` should have an upper case name", name);
             let hint = format!(
-                "convert the identifier to upper case (notice the capitalization): `{}`",
+                "convert the identifier to ASCII: `{}`",
                 name.to_ascii_uppercase()
             );
-            VrsError::new_warn(pos.from_self(1..2), msg, Some(hint)).print();
+            VrsError::new_warn(pos.with_range(1..2), msg, Some(hint)).print();
             res = res + Issues::warn();
         }
 
@@ -156,7 +200,7 @@ impl AstNode for Const {
                 "convert the identifier to upper case (notice the capitalization): `{}`",
                 name.to_ascii_uppercase()
             );
-            VrsError::new_warn(pos.from_self(1..2), msg, Some(hint)).print();
+            VrsError::new_warn(pos.with_range(1..2), msg, Some(hint)).print();
             // warning
             res = res + Issues::warn();
         }

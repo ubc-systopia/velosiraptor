@@ -92,6 +92,15 @@ pub enum VrsError<I: ErrorLocation> {
         /// site of the previous definition
         previous: I,
     },
+    /// represents a custom error
+    RangeOverlap {
+        /// error message
+        bit: u64,
+        /// the location where the error happened
+        current: I,
+        /// site of the previous definition
+        previous: I,
+    },
     /// reprsents a custom warning
     Warning {
         /// error message
@@ -139,6 +148,14 @@ impl<I: ErrorLocation + fmt::Display> VrsError<I> {
         }
     }
 
+    /// creates a new warning
+    pub fn new_overlap(bit: u64, current: I, previous: I) -> Self {
+        VrsError::RangeOverlap {
+            bit,
+            current,
+            previous,
+        }
+    }
     pub fn stack(location: I, message: String, other: VrsError<I>) -> Self {
         VrsError::Stack {
             message,
@@ -209,7 +226,7 @@ impl<I: ErrorLocation + fmt::Display> VrsError<I> {
         write!(f, "      {}         {}{}", pipe, indent, underline)?;
         match hint {
             Some(h) => writeln!(f, " {}", color(h)),
-            None => writeln!(f, ""),
+            None => writeln!(f),
         }
     }
 }
@@ -256,12 +273,26 @@ impl<I: ErrorLocation + fmt::Display> fmt::Display for VrsError<I> {
                 previous,
             } => {
                 let typ = applycolor(false)("error");
-                let message = format!("duplicate definition with name {}", ident);
+                let message = format!("duplicate definition with name `{}`", ident);
                 let hint = String::from("the second definition is here");
                 Self::fmthdr(f, typ, current, &message)?;
                 Self::fmtctx(f, false, current, Some(&hint))?;
                 Self::fmtloc(f, previous)?;
                 let hint = String::from("the previous definition was here");
+                Self::fmtctx(f, false, previous, Some(&hint))
+            }
+            VrsError::RangeOverlap {
+                bit,
+                current,
+                previous,
+            } => {
+                let typ = applycolor(false)("error");
+                let message = format!("range overlap at bit {}", bit);
+                let hint = String::from("the range definition here");
+                Self::fmthdr(f, typ, current, &message)?;
+                Self::fmtctx(f, false, current, Some(&hint))?;
+                Self::fmtloc(f, previous)?;
+                let hint = String::from("overlaps with this range definition here");
                 Self::fmtctx(f, false, previous, Some(&hint))
             }
             VrsError::ExpectedToken { location, tokens } => {

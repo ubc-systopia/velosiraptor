@@ -1,12 +1,8 @@
 on:
   push:
-    paths-ignore:
-      - 'doc/**'
-      - '**.md'
+    branches:
+      - main
   pull_request:
-    paths-ignore:
-      - 'doc/**'
-      - '**.md'
 
 name: Unit Tests
 jobs:
@@ -17,8 +13,17 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all
       - name: App Tests
         uses: actions-rs/cargo@v1
         with:
           command: test
           args: --all
+      - name: Lib Tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all --manifest-path ./lib/libvrc/Cargo.toml

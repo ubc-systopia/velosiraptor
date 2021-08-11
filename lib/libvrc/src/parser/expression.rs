@@ -66,7 +66,7 @@ fn fold_exprs(initial: Expr, remainder: Vec<(BinOp, Expr)>) -> Expr {
     remainder.into_iter().fold(initial, |acc, tuple| {
         let (op, expr) = tuple;
 
-        let pos = acc.loc().clone().from_merged(&expr.loc());
+        let pos = acc.loc().clone().merge(&expr.loc());
         Expr::BinaryOperation {
             op,
             lhs: Box::new(acc),
@@ -103,7 +103,7 @@ pub fn bool_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 /// an arithmetic expression evalutes to a number a | b
 pub fn range_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i, (s, _, e)) = tuple((arith_expr, dotdot, arith_expr))(input.clone())?;
-    let pos = input.from_merged(&i);
+    let pos = input.merge(&i);
     Ok((
         i,
         Expr::Range {
@@ -133,14 +133,14 @@ pub fn arith_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 pub fn num_lit_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
     let (i, value) = num(input.clone())?;
-    let pos = input.from_self_until(&i);
+    let pos = input.expand_until(&i);
     Ok((i, Expr::Number { value, pos }))
 }
 
 pub fn bool_lit_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
     let (i, value) = boolean(input.clone())?;
-    let pos = input.from_self_until(&i);
+    let pos = input.expand_until(&i);
     Ok((i, Expr::Boolean { value, pos }))
 }
 
@@ -219,7 +219,7 @@ fn bool_cmp_expr_arith(input: TokenStream) -> IResult<TokenStream, Expr> {
             Ok((i, (BinOp::Ge, op)))
         },
     ))(i)?;
-    let pos = lhs.loc().clone().from_merged(rhs.loc());
+    let pos = lhs.loc().clone().merge(rhs.loc());
     Ok((
         i,
         Expr::BinaryOperation {
@@ -236,7 +236,7 @@ fn bool_cmp_expr_arith(input: TokenStream) -> IResult<TokenStream, Expr> {
 /// this expression evaluates to a boolean value
 fn bool_cmp_expr_bool(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
-    let (i, lhs) = bool_term_expr(input.clone())?;
+    let (i, lhs) = bool_term_expr(input)?;
     let (i, (op, rhs)) = alt((
         |i: TokenStream| {
             let (i, op) = preceded(eq, bool_term_expr)(i)?;
@@ -247,7 +247,7 @@ fn bool_cmp_expr_bool(input: TokenStream) -> IResult<TokenStream, Expr> {
             Ok((i, (BinOp::Ne, op)))
         },
     ))(i)?;
-    let pos = lhs.loc().clone().from_merged(rhs.loc());
+    let pos = lhs.loc().clone().merge(rhs.loc());
     Ok((
         i,
         Expr::BinaryOperation {
@@ -263,7 +263,7 @@ fn bool_cmp_expr_bool(input: TokenStream) -> IResult<TokenStream, Expr> {
 fn bool_unary_lnot(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
     let (i, v) = preceded(lnot, bool_term_expr)(input.clone())?;
-    let pos = input.from_merged(v.loc());
+    let pos = input.merge(v.loc());
     Ok((
         i,
         Expr::UnaryOperation {
@@ -364,7 +364,7 @@ fn arit_mul_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 fn arith_unary_not(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
     let (i, val) = preceded(not, arith_term_expr)(input.clone())?;
-    let pos = input.from_merged(val.loc());
+    let pos = input.merge(val.loc());
     Ok((
         i,
         Expr::UnaryOperation {
@@ -384,7 +384,7 @@ fn ident_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i, (fst, mut ot)) = pair(ident, many0(preceded(dot, ident)))(input.clone())?;
     let mut path = Vec::from([fst]);
     path.append(&mut ot);
-    let pos = input.from_self_until(&i);
+    let pos = input.expand_until(&i);
     Ok((i, Expr::Identifier { path, pos }))
 }
 
@@ -392,11 +392,14 @@ fn ident_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 ///
 /// This parses a function call without arguments
 ///
-/// TODO: add support for arguments
+/// TODO: test support for arguments
 fn fn_call_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    let (i, e) = terminated(ident_expr, pair(lparen, rparen))(input)?;
+    let (i, (e, args)) = pair(
+        ident_expr,
+        delimited(lparen, separated_list0(comma, ident), rparen),
+    )(input)?;
     match e {
-        Expr::Identifier { path, pos } => Ok((i, Expr::FnCall { path, pos })),
+        Expr::Identifier { path, pos } => Ok((i, Expr::FnCall { path, args, pos })),
         _ => panic!("unexpected type"),
     }
 }
@@ -469,6 +472,7 @@ use crate::lexer::Lexer;
 use crate::nom::Slice;
 #[cfg(test)]
 use crate::sourcepos::SourcePos;
+use nom::multi::separated_list0;
 
 #[cfg(test)]
 macro_rules! parse_equal (
@@ -577,3 +581,7 @@ fn test_slice() {
         "foo[(a + 4)..(len - 1)]"
     }
 }
+
+#[test]
+// TODO: add function parser test
+fn test_functions() {}

@@ -25,35 +25,31 @@
 
 //! Parser Module of the Velosiraptor Compiler
 
-use custom_error::custom_error;
-use nom::Err;
+// the parser modules
+pub mod bitslice;
+pub mod constdef;
+pub mod expression;
+pub mod field;
+pub mod import;
+pub mod interface;
+pub mod state;
+pub mod statement;
+pub mod terminals;
+pub mod unit;
 
+// the used standard library functionality
 use std::rc::Rc;
 
-mod bitslice;
-mod expression;
-mod field;
-mod import;
-mod state;
-mod statement;
-pub mod terminals;
+// the used external libraries
+use custom_error::custom_error;
+use nom::{multi::many0, Err};
 
-mod constdef;
-mod interface;
-mod unit;
-
+// the used library-internal functionality
 use crate::ast::Ast;
-use constdef::constdef;
-use import::import;
-use terminals::eof;
-//use unit::unit;
-
-// reexports
-pub use expression::{arith_expr, bool_expr, bool_lit_expr, num_lit_expr, range_expr, slice_expr};
-
-use super::lexer::{Lexer, LexerError};
-use super::token::{Token, TokenStream};
 use crate::error::VrsError;
+use crate::lexer::{Lexer, LexerError};
+use crate::parser::{constdef::constdef, import::import, terminals::eof, unit::unit};
+use crate::token::{Token, TokenStream};
 
 /// define the lexer error type
 pub type ParsErr = VrsError<TokenStream>;
@@ -90,10 +86,10 @@ impl From<LexerError> for ParserError {
     }
 }
 
+// the parser Struct
 pub struct Parser;
 
-use nom::multi::many0;
-
+/// The parser implementation
 impl Parser {
     /// Parses a token vector and creates an [Ast]
     pub fn parse(context: &str, tokens: Vec<Token>) -> Result<Ast, ParserError> {
@@ -117,16 +113,11 @@ impl Parser {
         };
 
         // there must be at least one unit definition
-        let i3 = i2;
-        // let (rem, unitlist) = match many0(unit)(i2) {
-        //     Ok((rem, p)) => (rem, p),
-        //     Err(_) => return Err(ParserError::ParserFailure),
-        // };
-
-        let mut units = Vec::new();
-        // for i in unitlist {
-        //     units.insert(i.name.clone(), i);
-        // }
+        let (i3, units) = match many0(unit)(i2) {
+            Ok((rem, p)) => (rem, p),
+            Err(Err::Failure(error)) => return Err(ParserError::ParserFailure { error }),
+            e => panic!("unexpected error case: {:?}", e),
+        };
 
         // consume the end of file token
         log::debug!("parsing done.");

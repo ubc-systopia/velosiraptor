@@ -23,10 +23,15 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Ast Module of the Velosiraptor Compiler
+//! State Ast Node
 
-use crate::sourcepos::SourcePos;
-use std::fmt;
+// used standard library functionality
+use std::fmt::{Debug, Display, Formatter, Result};
+
+// used library internal functionality
+use crate::ast::{AstNode, Field, Issues, SymbolTable};
+use crate::error::ErrorLocation;
+use crate::token::TokenStream;
 
 /// Defines the state of a translation unit
 ///
@@ -44,27 +49,34 @@ pub enum State {
         /// defines a list of fields within the memory regions, defined by the bases
         fields: Vec<Field>,
         /// position where this state was defined
-        pos: SourcePos,
+        pos: TokenStream,
     },
     /// defines a register state (internal to the unit)
     RegisterState {
         /// defines a list of fields that form the state
         fields: Vec<Field>,
         /// the position where the state is defined
-        pos: SourcePos,
+        pos: TokenStream,
     },
     // TODO state that may be combined
     //CombinedState {  },
     /// No state associated with this translation unit
-    None,
+    None {
+        /// the position where the state is defined
+        pos: TokenStream,
+    },
 }
 
-/// implementation of the [fmt::Display] trait for the [State]
-impl fmt::Display for State {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+/// implementation of the [Display] trait for the [State]
+impl Display for State {
+    fn fmt(&self, f: &mut Formatter) -> Result {
         use self::State::*;
         match self {
-            MemoryState { bases, fields, pos } => {
+            MemoryState {
+                bases,
+                fields,
+                pos: _,
+            } => {
                 write!(f, "State(Memory) [")?;
                 bases
                     .iter()
@@ -76,27 +88,27 @@ impl fmt::Display for State {
                 })?;
                 writeln!(f, "}}")
             }
-            RegisterState { fields, pos } => {
-                let s = String::new();
+            RegisterState { fields, pos: _ } => {
                 writeln!(f, "State(Registers) {{")?;
                 fields.iter().fold(Ok(()), |result, field| {
                     result.and_then(|_| writeln!(f, "{}", field))
                 })?;
                 writeln!(f, "}}")
             }
-            None => writeln!(f, "State(None)"),
+            None { pos: _ } => writeln!(f, "State(None)"),
         }
     }
 }
 
-/// implementation of the [fmt::Debug] trait for the [State]
-impl fmt::Debug for State {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+/// implementation of the [Debug] trait for the [State]
+impl Debug for State {
+    fn fmt(&self, f: &mut Formatter) -> Result {
         use self::State::*;
         //let (line, column) = self.pos.input_pos();
         match self {
             MemoryState { bases, fields, pos } => {
-                let (line, column) = pos.input_pos();
+                let line = pos.line();
+                let column = pos.column();
                 write!(f, "{:03}:{:03} | State(Memory) [", line, column)?;
                 bases
                     .iter()
@@ -109,98 +121,63 @@ impl fmt::Debug for State {
                 writeln!(f, "}}")
             }
             RegisterState { fields, pos } => {
-                let (line, column) = pos.input_pos();
-                let s = String::new();
+                let line = pos.line();
+                let column = pos.column();
                 writeln!(f, "{:03}:{:03} | State(Registers) {{", line, column)?;
                 fields.iter().fold(Ok(()), |result, field| {
                     result.and_then(|_| writeln!(f, "{}", field))
                 })?;
                 writeln!(f, "}}")
             }
-            None => writeln!(f, "State(None)"),
+            None { pos } => {
+                let line = pos.line();
+                let column = pos.column();
+                writeln!(f, "{:03}:{:03} | State(None)", line, column)
+            }
         }
     }
 }
 
-/// Defines an field in the state
-///
-/// A field may represent a 8, 16, 32, or 64 bit region in the state with a
-/// specific bit layout.
-#[derive(PartialEq, Clone)]
-pub struct Field {
-    /// the name of the field
-    pub name: String,
-    /// a reference to the state where the field is (base + offset)
-    pub stateref: Option<(String, u64)>,
-    /// the size of the field in bits
-    pub length: u64,
-    /// a vector of [BitSlice] representing the bitlayout
-    pub layout: Vec<BitSlice>,
-    /// the position where this field was defined
-    pub pos: SourcePos,
-}
+/// implementation of [AstNode] for [Const]
+impl AstNode for State {
+    fn check(&self, st: &mut SymbolTable) -> Issues {
+        let mut res = Issues::ok();
 
-/// Implementation of the [fmt::Display] trait for [Field]
-impl fmt::Display for Field {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match &self.stateref {
-            Some((s, o)) => writeln!(f, "{} [{}, {}, {}] {{", self.name, s, o, self.length)?,
-            None => writeln!(f, "{} [{}] {{", self.name, self.length)?,
+        let fields = match self {
+            State::MemoryState {
+                bases: _,
+                fields,
+                pos: _,
+            } => fields,
+            State::RegisterState { fields, pos: _ } => fields,
+            State::None { pos: _ } => {
+                return Issues::ok();
+            }
         };
 
-        self.layout.iter().fold(Ok(()), |result, field| {
-            result.and_then(|_| writeln!(f, "  {}", field))
-        })?;
-        writeln!(f, "}}")
+        // check the fields
+        for f in fields {
+            res = res + f.check(st)
+        }
+
+        res
     }
-}
 
-/// Implementation of the [fmt::Debug] trait for [Field]
-impl fmt::Debug for Field {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let (line, column) = self.pos.input_pos();
-        write!(f, "{:03}:{:03} | ", line, column)?;
-        match &self.stateref {
-            Some((s, o)) => writeln!(f, "{} [{}, {}, {}] {{", self.name, s, o, self.length)?,
-            None => writeln!(f, "{} [{}] {{", self.name, self.length)?,
-        };
-
-        self.layout.iter().fold(Ok(()), |result, field| {
-            result.and_then(|_| writeln!(f, "  {:?}", field))
-        })?;
-        writeln!(f, "}}")
+    fn name(&self) -> &str {
+        "State"
     }
-}
 
-/// Represents a bitslice of a [Field]
-///
-/// The field corresponds to the slice `[start..end]` of the [Field]
-#[derive(PartialEq, Clone)]
-pub struct BitSlice {
-    /// the start bit
-    pub start: u16,
-    /// the end bit
-    pub end: u16,
-    /// the name of the slice
-    pub name: String,
-    /// where it was defined
-    pub pos: SourcePos,
-}
-
-/// Implementation of the [fmt::Display] trait for [BitSlice]
-impl fmt::Display for BitSlice {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "[{:2}..{:2}]  {}", self.start, self.end, &self.name)
-    }
-}
-/// Implementation of the [fmt::Debug] trait for [BitSlice]
-impl fmt::Debug for BitSlice {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let (line, column) = self.pos.input_pos();
-        write!(
-            f,
-            "{:03}:{:03} | [{:2}..{:2}]  {}",
-            line, column, self.start, self.end, &self.name
-        )
+    /// returns the location of the current
+    fn loc(&self) -> &TokenStream {
+        use self::State::*;
+        match self {
+            MemoryState {
+                bases: _,
+                fields: _,
+                pos,
+            } => &pos,
+            RegisterState { fields: _, pos } => &pos,
+            None { pos } => &pos,
+        }
     }
 }

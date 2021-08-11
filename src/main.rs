@@ -86,7 +86,7 @@ fn abort(target: &str, cnt: Issues) {
         let msg = format!(", and {} warnings emitted", cnt.warnings);
         eprintln!("{}\n", msg.bold());
     } else {
-        eprintln!("");
+        eprintln!(); // add some newline
     }
     eprintln!(
         "{}: could not compile `{}`.\n",
@@ -114,9 +114,8 @@ fn main() {
 
     // print the start message
     eprintln!(
-        "{:>8}: {}...\n",
+        "{:>8}: Velosiraptor Compiler (vrc)...\n",
         "start".bold().green(),
-        "Velosiraptor Compiler (vrc)"
     );
 
     let infile = matches.value_of("input").unwrap_or("none");
@@ -129,6 +128,10 @@ fn main() {
     log::trace!("Tracing output enabled");
 
     log::info!("==== PARSING STAGE ====");
+
+    // ===========================================================================================
+    // Step 1: Parse the input file
+    // ===========================================================================================
 
     eprintln!("{:>8}: {}...\n", "parse".bold().green(), infile);
 
@@ -163,14 +166,10 @@ fn main() {
     log::info!("{}", ast);
     log::info!("----------------------------");
 
-    eprintln!(
-        "{:>8}: {} {}...\n",
-        "resolve".bold().green(),
-        ast.imports.len(),
-        "imports"
-    );
+    // ===========================================================================================
+    // Step 2: Resolve the imports and merge ASTs
+    // ===========================================================================================
 
-    // now resolve the imports
     match ast.resolve_imports() {
         Ok(()) => (),
         Err(AstError::ImportError { e }) => {
@@ -191,26 +190,65 @@ fn main() {
         }
     };
 
+    eprintln!(
+        "{:>8}: resolved {} import(s)..\n",
+        "import".bold().green(),
+        ast.imports.len(),
+    );
+
     log::info!("AST:");
     log::info!("----------------------------");
     log::info!("{}", ast);
     log::info!("----------------------------");
 
+    log::info!("==== CHECKING STAGE ====");
+
+    // ===========================================================================================
+    // Step 3: Build Symboltable
+    // ===========================================================================================
+
+    let mut symtab = match ast.build_symboltable() {
+        Ok(symtab) => symtab,
+        Err(AstError::SymTabError { i }) => {
+            eprintln!(
+                "{}{}.\n",
+                "error".bold().red(),
+                ": during building of the symbol table".bold()
+            );
+            abort(infile, i);
+            return;
+        }
+        _ => {
+            abort(infile, Issues::err());
+            return;
+        }
+    };
+
     // build the symbolt table
-    eprintln!("{:>8}: {}...\n", "build".bold().green(), "symboltable");
-
-    // now check the ast
-
-    let cnt = Issues::ok();
-
     eprintln!(
-        "{:>8}: {}...\n",
-        "check".bold().green(),
-        "performing consistency check"
+        "{:>8}: created symboltable with {} symbols\n",
+        "symtab".bold().green(),
+        symtab.count()
     );
 
-    let cnt = match ast.check_consistency() {
-        Ok(i) => cnt + i,
+    log::info!("Symbol Table:");
+    log::info!("----------------------------");
+    log::info!("\n{}", symtab);
+    log::info!("----------------------------");
+
+    // ===========================================================================================
+    // Step 4: Consistency Checks
+    // ===========================================================================================
+
+    let issues = Issues::ok();
+
+    eprintln!(
+        "{:>8}: performing consistency check...\n",
+        "check".bold().green(),
+    );
+
+    let issues = match ast.check_consistency(&mut symtab) {
+        Ok(i) => issues + i,
         Err(AstError::CheckError { i }) => {
             //            matches.value_of("input").unwrap_or("none");
             abort(infile, i);
@@ -222,34 +260,58 @@ fn main() {
         }
     };
 
+    // ===========================================================================================
+    // Step 5: Transform AST
+    // ===========================================================================================
+
+    let issues = match ast.apply_transformations() {
+        Ok(i) => issues + i,
+        Err(_) => {
+            abort(infile, Issues::err());
+            return;
+        }
+    };
+
+    // ===========================================================================================
+    // Step 6: Generate OS code
+    // ===========================================================================================
+
+    if issues.is_err() {
+        abort(infile, issues);
+        return;
+    }
+
+    log::info!("==== CODE GENERATION STAGE ====");
+
     // so things should be fine, we can now go and generate stuff
 
     // generate the raw interface files: this is the "language" to interface
     eprintln!(
-        "{:>8}: {}...\n",
+        "{:>8}: generating interface files...\n",
         "generate".bold().green(),
-        "generating interface files"
     );
 
     // generate the unit files that use the interface files
     eprintln!(
-        "{:>8}: {}...\n",
+        "{:>8}: generating unit files...\n",
         "generate".bold().green(),
-        "generating unit files"
     );
+
+    // ===========================================================================================
+    // Step 6: Generate simulator modules
+    // ===========================================================================================
 
     // we can generate some modules
     eprintln!(
-        "{:>8}: {}...\n",
+        "{:>8}: generating Arm FastModels modules...\n",
         "generate".bold().green(),
-        "generating Arm FastModels modules"
     );
 
-    if cnt.warnings > 0 {
-        let msg = format!("{} warning(s) emitted", cnt.warnings);
+    if issues.warnings > 0 {
+        let msg = format!("{} warning(s) emitted", issues.warnings);
         eprintln!("{}{}.\n", "warning: ".bold().yellow(), msg.bold());
     }
 
     // ok all done.
-    eprintln!("{:>8}: {}...\n", "finished".bold().green(), "...");
+    eprintln!("{:>8}: ...\n", "finished".bold().green());
 }

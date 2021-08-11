@@ -1,12 +1,9 @@
 on:
   push:
-    paths-ignore:
-      - 'doc/**'
-      - '**.md'
+    branches:
+      - main
   pull_request:
-    paths-ignore:
-      - 'doc/**'
-      - '**.md'
+
 
 name: Clippy
 jobs:
@@ -19,8 +16,15 @@ jobs:
             toolchain: stable
             components: clippy
             override: true
-      - name: Clippy
+      - name: Clippy App
         uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features
+          # can add a `-- --deny warnings` here to convert warnings into errors
+          args:  --all-features --workspace
+      - name: Clippy Lib
+        uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # can add a `-- --deny warnings` here to convert warnings into errors
+          args:  --all-features --workspace --manifest-path ./lib/libvrc/Cargo.toml
