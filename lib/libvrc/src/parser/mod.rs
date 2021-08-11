@@ -32,6 +32,7 @@ pub mod expression;
 pub mod field;
 pub mod import;
 pub mod interface;
+pub mod method;
 pub mod state;
 pub mod statement;
 pub mod terminals;
