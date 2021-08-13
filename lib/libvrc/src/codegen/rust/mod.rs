@@ -29,7 +29,7 @@ use std::fs;
 use std::fs::File;
 use std::io::BufWriter;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use codegen_rs as CG;
 
@@ -66,11 +66,16 @@ impl BackendRust {
     }
 
     fn to_struct_name(s: &str) -> String {
-        String::from(s)
+        let mut c = s.chars();
+        match c.next() {
+            None => String::new(),
+            Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+        }
+        .replace("_", "")
     }
 
     fn to_const_name(s: &str) -> String {
-        String::from(s)
+        String::from(s.to_uppercase())
     }
 
     fn to_rust_type(l: u64) -> &'static str {
@@ -93,7 +98,7 @@ impl BackendRust {
         }
     }
 
-    fn generate_field(&self, field: &Field) {
+    fn generate_field(&self, field: &Field, outdir: &Option<PathBuf>) {
         // a field is a struct
         //
         // field_name  --> struct FieldName {  val: u64 };
@@ -108,7 +113,7 @@ impl BackendRust {
         let mut scope = CG::Scope::new();
 
         // adding the header
-        let mut lic = CG::License::new("FOOBAR", CG::LicenseType::Mit);
+        let mut lic = CG::License::new(&format!("Field interface for `{}`", field.name), CG::LicenseType::Mit);
         lic.add_copyright("2021 Systopia Lab, Computer Science, University of British Columbia");
         scope.license(lic);
 
@@ -191,9 +196,12 @@ impl BackendRust {
         // println!("===========================================");
 
         // assemble the
-        if let Some(p) = &self.outdir {
+        if let Some(p) = outdir {
             // the root directory
-            let mut path = Path::new(p).to_path_buf();
+            let outfile = p.join(format!("{}.rs", field.name));
+            let mut rustfile = File::create(outfile).unwrap();
+            rustfile.write_all(scope.to_string().as_bytes());
+            rustfile.flush();
         } else {
             println!("{:?}", scope.to_string())
         }
@@ -259,10 +267,20 @@ impl CodeGenBackend for BackendRust {
 
     fn generate_interfaces(&self, ast: &Ast) -> Result<(), CodeGenError> {
         for unit in &ast.units {
+            let outdir = if let Some(p) = &self.outdir {
+                // the root directory as supplied by backend
+                let outdir = Path::new(p);
+                let srcdir = outdir.join("src").join(unit.name.to_lowercase());
+                fs::create_dir_all(&srcdir)?;
+                Some(srcdir)
+            } else {
+                None
+            };
             match &unit.state {
                 State::MemoryState { bases, fields, pos } => {
                     for f in fields {
-                        self.generate_field(f)
+                        println!("generate interfaces fields");
+                        self.generate_field(f, &outdir)
                     }
                 }
                 _ => (),
