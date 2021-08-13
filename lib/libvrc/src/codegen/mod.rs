@@ -55,15 +55,20 @@ pub enum CodeGen {
 }
 
 impl CodeGen {
-    pub fn new_rust(outdir: Option<String>) -> CodeGen {
-        CodeGen::Rust(BackendRust::new(outdir))
+    pub fn new_rust(outdir: Option<String>, pkg: String) -> CodeGen {
+        CodeGen::Rust(BackendRust::new(pkg, outdir))
     }
 
-    pub fn new_c(outdir: Option<String>) -> CodeGen {
-        CodeGen::C(BackendC::new(outdir))
+    pub fn new_c(outdir: Option<String>, pkg: String) -> CodeGen {
+        CodeGen::C(BackendC::new(pkg, outdir))
     }
 
-    //pub fn prepare_output();
+    pub fn prepare(&self)  -> Result<(), CodeGenError> {
+        match self {
+            CodeGen::Rust(b) => b.prepare(),
+            CodeGen::C(b) => b.prepare(),
+        }
+    }
 
     pub fn generate_globals(&self, ast: &Ast) -> Result<(), CodeGenError> {
         match self {
