@@ -225,16 +225,8 @@ impl AstNode for Const {
     fn name(&self) -> &str {
         use self::Const::*;
         match self {
-            Integer {
-                ident,
-                value: _,
-                pos: _,
-            } => &ident,
-            Boolean {
-                ident,
-                value: _,
-                pos: _,
-            } => &ident,
+            Integer { ident, .. } => &ident,
+            Boolean { ident, .. } => &ident,
         }
     }
 
