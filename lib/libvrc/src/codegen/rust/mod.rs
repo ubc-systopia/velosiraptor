@@ -246,9 +246,9 @@ impl CodeGenBackend for BackendRust {
             self.generate_tomlfile(&outdir)?;
 
             // create the source directory
-            outdir.join("src");
+            let srcdir = outdir.join("src");
 
-            fs::create_dir_all(&outdir)?;
+            fs::create_dir_all(&srcdir)?;
         }
         Ok(())
     }
