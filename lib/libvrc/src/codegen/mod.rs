@@ -63,7 +63,7 @@ impl CodeGen {
         CodeGen::C(BackendC::new(pkg, outdir))
     }
 
-    pub fn prepare(&self)  -> Result<(), CodeGenError> {
+    pub fn prepare(&self) -> Result<(), CodeGenError> {
         match self {
             CodeGen::Rust(b) => b.prepare(),
             CodeGen::C(b) => b.prepare(),
