@@ -140,7 +140,7 @@ fn main() {
     let outdir = matches.value_of("output").unwrap_or("<stdout>");
     log::info!("output directory: {}", outdir);
 
-    let pkgname = matches.value_of("pkg").unwrap_or("mpu");
+    let pkgname = matches.value_of("pkg").unwrap_or("mpu").to_string();
     log::info!("package name: {}", pkgname);
 
     let backend = matches.value_of("backend").unwrap_or("rust");
@@ -326,8 +326,8 @@ fn main() {
     };
 
     let codegen = match backend {
-        "rust" => CodeGen::new_rust(outpath),
-        "c" => CodeGen::new_c(outpath),
+        "rust" => CodeGen::new_rust(outpath, pkgname),
+        "c" => CodeGen::new_c(outpath, pkgname),
         s => {
             eprintln!(
                 "{}{} `{}`.\n",
@@ -341,6 +341,22 @@ fn main() {
     };
 
     // so things should be fine, we can now go and generate stuff
+
+    // generate the raw interface files: this is the "language" to interface
+    eprintln!(
+        "{:>8}: prepare for code generation...\n",
+        "generate".bold().green(),
+    );
+
+    codegen.prepare().unwrap_or_else(|e| {
+        eprintln!(
+            "{}{} `{}`.\n",
+            "error".bold().red(),
+            ": failure during globals generation".bold(),
+            e
+        );
+        abort(infile, issues);
+    });
 
     // generate the raw interface files: this is the "language" to interface
     eprintln!(

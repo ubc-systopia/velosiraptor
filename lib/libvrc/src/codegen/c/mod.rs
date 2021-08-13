@@ -34,7 +34,7 @@ pub struct BackendC {
 }
 
 impl BackendC {
-    pub fn new(outdir: Option<String>) -> Self {
+    pub fn new(_pkg: String, outdir: Option<String>) -> Self {
         BackendC { outdir }
     }
 }
