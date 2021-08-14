@@ -192,6 +192,15 @@ impl TokenStream {
     pub fn input_tokens(&self) -> &[Token] {
         &self.tokens
     }
+
+    /// returns a string with the position information
+    pub fn location(&self) -> String {
+        format!("{}:{}:{}",
+            self.context(),
+            self.line(),
+            self.column()
+        )
+    }
 }
 
 /// Implements the [Display] trait for [TokenStream]
