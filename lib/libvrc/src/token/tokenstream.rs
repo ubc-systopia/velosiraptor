@@ -195,11 +195,7 @@ impl TokenStream {
 
     /// returns a string with the position information
     pub fn location(&self) -> String {
-        format!("{}:{}:{}",
-            self.context(),
-            self.line(),
-            self.column()
-        )
+        format!("{}:{}:{}", self.context(), self.line(), self.column())
     }
 }
 
