@@ -69,6 +69,10 @@ impl Field {
     pub fn nbits(&self) -> u64 {
         self.length * 8
     }
+
+    pub fn location(&self) -> String {
+        self.pos.location()
+    }
 }
 
 /// Implementation of the [Display] trait for [Field]
