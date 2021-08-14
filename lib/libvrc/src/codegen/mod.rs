@@ -37,6 +37,8 @@ use crate::ast::Ast;
 use crate::codegen::c::BackendC;
 use crate::codegen::rust::BackendRust;
 
+const COPYRIGHT : &'static str = "2021 Systopia Lab, Computer Science, University of British Columbia";
+
 // custom error definitions
 custom_error! {#[derive(PartialEq)] pub CodeGenError
     IOError           = "The input file could not be read.",
