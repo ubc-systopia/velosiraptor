@@ -30,14 +30,20 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::io::Write;
 use std::path::Path;
+use std::path::PathBuf;
 
-use crate::ast::{Ast, State};
+use codegen_rs as CG;
+
+use crate::ast::{Ast, Field, State};
 use crate::codegen::CodeGenBackend;
 use crate::codegen::CodeGenError;
 
 mod field;
 mod interface;
 mod utils;
+
+use field::field_type;
+use utils::{add_header, save_scope};
 
 /// The rust backend
 ///
@@ -98,6 +104,55 @@ impl BackendRust {
         cargo.flush()?;
         Ok(())
     }
+
+    fn generate_fields(
+        &self,
+        outdir: &Option<PathBuf>,
+        unitname: &str,
+        fields: &Vec<Field>,
+    ) -> Result<(), CodeGenError> {
+        let outdir = if let Some(p) = &outdir {
+            // the root directory as supplied by backend
+            let outdir = Path::new(p);
+            let srcdir = outdir.join("fields");
+            fs::create_dir_all(&srcdir)?;
+            Some(srcdir)
+        } else {
+            None
+        };
+
+        for f in fields {
+            println!("generate interfaces fields");
+            field::generate(unitname, f, &outdir);
+        }
+
+        // generate the mod file.
+        // the code generation scope
+        let mut scope = CG::Scope::new();
+
+        let title = format!("Module for all fields of unit '{}'", unitname);
+        add_header(&mut scope, &title);
+
+        // TODO: add doc comment
+
+        scope.new_comment("modules");
+        for f in fields {
+            scope.raw(&format!("mod {};", f.name.to_lowercase()));
+        }
+
+        scope.new_comment("re-exports");
+        for f in fields {
+            scope.raw(&format!(
+                "pub use {}::{};",
+                f.name.to_lowercase(),
+                field_type(f)
+            ));
+        }
+
+        save_scope(scope, &outdir, "mod");
+
+        Ok(())
+    }
 }
 
 impl CodeGenBackend for BackendRust {
@@ -137,13 +192,9 @@ impl CodeGenBackend for BackendRust {
                 None
             };
             match &unit.state {
-                State::MemoryState { bases, fields, pos } => {
-                    for f in fields {
-                        println!("generate interfaces fields");
-
-                        field::generate(&unit.name, f, &outdir)
-                    }
-                }
+                State::MemoryState { bases, fields, pos } => self
+                    .generate_fields(&outdir, &unit.name, &fields)
+                    .expect("field generation failed"),
                 _ => (),
             }
         }
