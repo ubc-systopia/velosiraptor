@@ -34,7 +34,7 @@ use std::path::PathBuf;
 
 use codegen_rs as CG;
 
-use crate::ast::{Ast, Field, State};
+use crate::ast::{Ast, AstNode, Field, State};
 use crate::codegen::CodeGenBackend;
 use crate::codegen::CodeGenError;
 
@@ -44,6 +44,9 @@ mod utils;
 
 use field::field_type;
 use utils::{add_header, save_scope};
+
+// the module name for the constants module
+const MOD_CONSTS: &'static str = "consts";
 
 /// The rust backend
 ///
@@ -142,6 +145,10 @@ impl BackendRust {
 }
 
 impl CodeGenBackend for BackendRust {
+    /// prepares the code generation for the Rust backend
+    ///
+    /// This will setup the output directories, create the Toml file and
+    /// create the `src` directory.
     fn prepare(&self) -> Result<(), CodeGenError> {
         // create the output directory, if needed
 
@@ -158,9 +165,49 @@ impl CodeGenBackend for BackendRust {
         Ok(())
     }
 
+    /// generates the global definitions.
+    ///
+    /// This will produce the constant files
     fn generate_globals(&self, ast: &Ast) -> Result<(), CodeGenError> {
-        for _const in &ast.consts {}
-        Ok(())
+        // no need to create anything if there are no constants defined
+        if ast.consts.is_empty() {
+            return Ok(());
+        }
+
+        // get the source directory
+        let srcdir = self.outdir.join("src");
+
+        // the code generation scope
+        let mut scope = CG::Scope::new();
+
+        // constant definitions
+        let title = format!("Global Constant Definitions for `{}` package", self.pkgname);
+        add_header(&mut scope, &title);
+
+        // now add the constants
+        for c in &ast.consts {
+            //
+            // TODO:
+            //  - here we should get the type information etc...
+            //  - also it would be nice to get brief descriptions of what the constant represents
+            let ty = "u64";
+            let val = "0xcafe";
+
+            // the constant value
+            let mconst = scope.new_const(c.name(), ty, val);
+
+            // add some documentation
+            mconst.doc(vec![
+                &format!("Defined constant `{}`", c.name()),
+                "",
+                &format!("@loc: {}", c.loc().location()),
+            ]);
+
+            // make it public
+            mconst.vis("pub");
+        }
+
+        save_scope(scope, &srcdir, MOD_CONSTS)
     }
 
     fn generate_interfaces(&self, ast: &Ast) -> Result<(), CodeGenError> {
@@ -186,6 +233,7 @@ impl CodeGenBackend for BackendRust {
         Ok(())
     }
 
+    /// Generates the units
     fn generate_units(&self, ast: &Ast) -> Result<(), CodeGenError> {
         // get the source dir
         let mut srcdir = self.outdir.join("src");
@@ -228,7 +276,7 @@ impl CodeGenBackend for BackendRust {
         // import the constants
         scope.new_comment("import constant definitions ");
         if !ast.consts.is_empty() {
-            scope.raw("pub mod consts;");
+            scope.raw(&format!("pub mod {};", MOD_CONSTS));
         } else {
             scope.new_comment("no constants defined");
         }
@@ -236,7 +284,7 @@ impl CodeGenBackend for BackendRust {
         // re-export the constants
         scope.new_comment("re-export the constants directly");
         if !ast.consts.is_empty() {
-            scope.raw("pub use consts::*;");
+            scope.raw(&format!("pub use {}::*;", MOD_CONSTS));
         } else {
             scope.new_comment("no constants defined");
         }
