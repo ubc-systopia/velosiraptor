@@ -1,3 +1,6 @@
+
+const PAGE_SIZE : int = 0x4000;
+
 unit foo {
     state = Memory(base) {
         pte [base, 0, 4] {
