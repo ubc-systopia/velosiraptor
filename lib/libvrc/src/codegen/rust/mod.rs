@@ -34,16 +34,17 @@ use std::path::PathBuf;
 
 use codegen_rs as CG;
 
-use crate::ast::{Ast, AstNode, Field, State};
+use crate::ast::{Ast, Field, State};
 use crate::codegen::CodeGenBackend;
 use crate::codegen::CodeGenError;
 
 mod field;
 mod interface;
+mod unit;
 mod utils;
 
 use field::field_type;
-use utils::{add_header, save_scope};
+use utils::{add_const_def, add_header, save_scope};
 
 // the module name for the constants module
 const MOD_CONSTS: &'static str = "consts";
@@ -167,7 +168,8 @@ impl CodeGenBackend for BackendRust {
 
     /// generates the global definitions.
     ///
-    /// This will produce the constant files
+    /// This will produce a file with all the globally defined constant definitions.
+    /// The file won't be produced if there are no globally defined constants
     fn generate_globals(&self, ast: &Ast) -> Result<(), CodeGenError> {
         // no need to create anything if there are no constants defined
         if ast.consts.is_empty() {
@@ -186,25 +188,7 @@ impl CodeGenBackend for BackendRust {
 
         // now add the constants
         for c in &ast.consts {
-            //
-            // TODO:
-            //  - here we should get the type information etc...
-            //  - also it would be nice to get brief descriptions of what the constant represents
-            let ty = "u64";
-            let val = "0xcafe";
-
-            // the constant value
-            let mconst = scope.new_const(c.name(), ty, val);
-
-            // add some documentation
-            mconst.doc(vec![
-                &format!("Defined constant `{}`", c.name()),
-                "",
-                &format!("@loc: {}", c.loc().location()),
-            ]);
-
-            // make it public
-            mconst.vis("pub");
+            add_const_def(&mut scope, &c);
         }
 
         save_scope(scope, &srcdir, MOD_CONSTS)
@@ -241,11 +225,22 @@ impl CodeGenBackend for BackendRust {
         for unit in &ast.units {
             srcdir.push(unit.name.to_lowercase());
 
+            // generate the unit
+            unit::generate(&unit, &srcdir)?;
+
             // construct the scope
             let mut scope = CG::Scope::new();
 
+            let title = format!("{} translation unit module", unit.name);
+            add_header(&mut scope, &title);
+
             // the fields
             scope.raw("pub mod fields;");
+            // the unit
+            scope.raw("mod unit;");
+
+            // the unit
+            scope.raw(&format!("pub use unit :: {};", unit.name));
 
             // save the scope
             save_scope(scope, &srcdir, "mod")?;

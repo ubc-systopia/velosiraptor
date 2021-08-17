@@ -64,7 +64,11 @@ pub struct Unit {
 }
 
 /// Implementation of [Unit]
-impl Unit {}
+impl Unit {
+    pub fn location(&self) -> String {
+        self.pos.location()
+    }
+}
 
 /// Implemetation of the [AstNode] trait for [Unit]
 impl AstNode for Unit {
