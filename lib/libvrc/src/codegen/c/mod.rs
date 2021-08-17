@@ -25,17 +25,21 @@
 
 //! C Code Generartion Backend
 
+use std::path::{Path, PathBuf};
+
 use crate::ast::Ast;
 use crate::codegen::CodeGenBackend;
 use crate::codegen::CodeGenError;
 
 pub struct BackendC {
-    outdir: Option<String>,
+    outdir: PathBuf,
 }
 
 impl BackendC {
-    pub fn new(_pkg: String, outdir: Option<String>) -> Self {
-        BackendC { outdir }
+    pub fn new(_pkg: String, outdir: &Path) -> Self {
+        BackendC {
+            outdir: outdir.to_path_buf(),
+        }
     }
 }
 
@@ -52,7 +56,7 @@ impl CodeGenBackend for BackendC {
     fn generate_units(&self, _ast: &Ast) -> Result<(), CodeGenError> {
         Ok(())
     }
-    fn finalize(&self) -> Result<(), CodeGenError> {
+    fn finalize(&self, _ast: &Ast) -> Result<(), CodeGenError> {
         Ok(())
     }
 }

@@ -306,24 +306,18 @@ fn main() {
     log::info!("==== CODE GENERATION STAGE ====");
 
     // get the output directory
-    let outpath = match outdir {
-        "<stdout>" => None,
-        b => {
-            let p = Path::new(b);
+    let outpath = Path::new(outdir);
 
-            if p.exists() && !p.is_dir() {
-                eprintln!(
-                    "{}{} `{}`.\n",
-                    "error".bold().red(),
-                    ": output path exists, but s not a directory: ".bold(),
-                    outdir.bold()
-                );
-                abort(infile, issues);
-                return;
-            }
-            Some(String::from(b))
-        }
-    };
+    if outpath.exists() && !outpath.is_dir() {
+        eprintln!(
+            "{}{} `{}`.\n",
+            "error".bold().red(),
+            ": output path exists, but s not a directory: ".bold(),
+            outdir.bold()
+        );
+        abort(infile, issues);
+        return;
+    }
 
     let codegen = match backend {
         "rust" => CodeGen::new_rust(outpath, pkgname),
@@ -384,6 +378,12 @@ fn main() {
         abort(infile, issues);
     });
 
+    // generate the unit files that use the interface files
+    eprintln!(
+        "{:>8}: generating unit files...\n",
+        "generate".bold().green(),
+    );
+
     codegen.generate_units(&ast).unwrap_or_else(|e| {
         eprintln!(
             "{}{} `{}`.\n",
@@ -396,9 +396,19 @@ fn main() {
 
     // generate the unit files that use the interface files
     eprintln!(
-        "{:>8}: generating unit files...\n",
+        "{:>8}: finalizing code generation...\n",
         "generate".bold().green(),
     );
+
+    codegen.finalize(&ast).unwrap_or_else(|e| {
+        eprintln!(
+            "{}{} `{}`.\n",
+            "error".bold().red(),
+            ": failure during code generation finalization".bold(),
+            e
+        );
+        abort(infile, issues);
+    });
 
     // ===========================================================================================
     // Step 6: Generate simulator modules

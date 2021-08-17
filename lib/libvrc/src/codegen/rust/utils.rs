@@ -26,14 +26,14 @@
 //! Rust code generation utilities
 
 // std includes
-use std::fs::File;
-use std::io::Write;
+use std::fs;
 use std::path::PathBuf;
 
 // get the code generator
 use codegen_rs as CG;
 
 //
+use crate::codegen::CodeGenError;
 use crate::codegen::COPYRIGHT;
 
 /// converts a string slice into a rustified string name
@@ -81,19 +81,17 @@ pub fn to_mask_str(m: u64, len: u64) -> String {
 }
 
 /// writes the scope to a file or to stdout
-pub fn save_scope(scope: CG::Scope, outdir: &Option<PathBuf>, name: &str) {
-    if let Some(p) = outdir {
-        // the root directory
-        let outfile = p.join(format!("{}.rs", name));
-        let mut rustfile = File::create(outfile).unwrap();
-        rustfile.write_all(scope.to_string().as_bytes()).unwrap();
-        rustfile.flush().unwrap();
-    } else {
-        println!("{:?}", scope.to_string())
-    }
+pub fn save_scope(scope: CG::Scope, outdir: &PathBuf, name: &str) -> Result<(), CodeGenError> {
+    // set the path to the file
+    let file = outdir.join(format!("{}.rs", name));
+
+    // write the file, return IOError otherwise
+    fs::write(file, scope.to_string().as_bytes())?;
+
+    Ok(())
 }
 
-// adds the header to the file
+/// adds the header to the file
 pub fn add_header(scope: &mut CG::Scope, title: &str) {
     // set the title of the file
     // construct the license
