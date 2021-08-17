@@ -55,21 +55,15 @@ use utils::{add_header, save_scope};
 ///  - outdir/pkgname/src/<unit>/interface.rs  the interface
 ///  - outdir/pkgname/src/<unit>/fields/<field>.rs
 pub struct BackendRust {
-    outdir: Option<String>,
+    outdir: PathBuf,
     pkgname: String,
-    usedirs: Vec<String>,
 }
 
 impl BackendRust {
-    pub fn new(pkgname: String, outdir: Option<String>) -> Self {
-        let outdir = match outdir {
-            Some(p) => Some(String::from(Path::new(&p).join(&pkgname).to_str().unwrap())),
-            None => None,
-        };
+    pub fn new(pkgname: String, outdir: &Path) -> Self {
         BackendRust {
-            outdir,
+            outdir: outdir.join(&pkgname),
             pkgname,
-            usedirs: Vec::new(),
         }
     }
 
@@ -107,23 +101,17 @@ impl BackendRust {
 
     fn generate_fields(
         &self,
-        outdir: &Option<PathBuf>,
+        outdir: &PathBuf,
         unitname: &str,
         fields: &Vec<Field>,
     ) -> Result<(), CodeGenError> {
-        let outdir = if let Some(p) = &outdir {
-            // the root directory as supplied by backend
-            let outdir = Path::new(p);
-            let srcdir = outdir.join("fields");
-            fs::create_dir_all(&srcdir)?;
-            Some(srcdir)
-        } else {
-            None
-        };
+        let fieldsdir = outdir.join("fields");
+
+        fs::create_dir_all(&fieldsdir)?;
 
         for f in fields {
             println!("generate interfaces fields");
-            field::generate(unitname, f, &outdir);
+            field::generate(unitname, f, &fieldsdir)?;
         }
 
         // generate the mod file.

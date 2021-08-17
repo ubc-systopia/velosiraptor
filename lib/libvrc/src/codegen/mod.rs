@@ -27,6 +27,7 @@
 
 // the used external libraries
 use custom_error::custom_error;
+use std::path::Path;
 
 // the code generation backends
 mod c;
@@ -58,11 +59,11 @@ pub enum CodeGen {
 }
 
 impl CodeGen {
-    pub fn new_rust(outdir: Option<String>, pkg: String) -> CodeGen {
+    pub fn new_rust(outdir: &Path, pkg: String) -> CodeGen {
         CodeGen::Rust(BackendRust::new(pkg, outdir))
     }
 
-    pub fn new_c(outdir: Option<String>, pkg: String) -> CodeGen {
+    pub fn new_c(outdir: &Path, pkg: String) -> CodeGen {
         CodeGen::C(BackendC::new(pkg, outdir))
     }
 
@@ -93,6 +94,13 @@ impl CodeGen {
             CodeGen::C(b) => b.generate_units(ast),
         }
     }
+
+    pub fn finalize(&self, ast: &Ast) -> Result<(), CodeGenError> {
+        match self {
+            CodeGen::Rust(b) => b.finalize(ast),
+            CodeGen::C(b) => b.finalize(ast),
+        }
+    }
 }
 
 pub trait CodeGenBackend {
@@ -100,5 +108,5 @@ pub trait CodeGenBackend {
     fn generate_globals(&self, ast: &Ast) -> Result<(), CodeGenError>;
     fn generate_interfaces(&self, ast: &Ast) -> Result<(), CodeGenError>;
     fn generate_units(&self, ast: &Ast) -> Result<(), CodeGenError>;
-    fn finalize(&self) -> Result<(), CodeGenError>;
+    fn finalize(&self, ast: &Ast) -> Result<(), CodeGenError>;
 }
