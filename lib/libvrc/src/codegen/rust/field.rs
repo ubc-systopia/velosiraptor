@@ -36,6 +36,7 @@ use super::utils::{
     add_header, save_scope, to_const_name, to_mask_str, to_rust_type, to_struct_name,
 };
 use crate::ast::{BitSlice, Field};
+use crate::codegen::CodeGenError;
 
 /// returns the string of the field type
 pub fn field_type(field: &Field) -> String {
@@ -52,6 +53,8 @@ fn add_field_constants(scope: &mut CG::Scope, field: &Field) {
     let mconst = scope.new_const(&maskname, to_rust_type(field.nbits()), &maskvalue);
     // adding the document comment
     mconst.doc(vec!["the mask value for the interface fields"]);
+    // make it public
+    mconst.vis("pub");
 }
 
 fn add_struct_definition(scope: &mut CG::Scope, field: &Field) {
@@ -61,6 +64,9 @@ fn add_struct_definition(scope: &mut CG::Scope, field: &Field) {
 
     // create the struct in the scope
     let st = scope.new_struct(&field_type(field));
+
+    // make it public
+    st.vis("pub");
 
     // add the doc field to the struct
     st.doc(&format!(
@@ -129,13 +135,15 @@ fn add_struct_impl(scope: &mut CG::Scope, field: &Field) {
 }
 
 /// generates the field value interface
-pub fn generate(unit: &str, field: &Field, outdir: &Option<PathBuf>) {
+pub fn generate(unit: &str, field: &Field, outdir: &PathBuf) -> Result<(), CodeGenError> {
     // the code generation scope
     let mut scope = CG::Scope::new();
 
-    // construct the scope
+    // add the header comments
     let title = format!("Field interface for `{}::{}`", unit, &field.name);
     add_header(&mut scope, &title);
+
+    // add the definitions
     add_field_constants(&mut scope, &field);
     add_struct_definition(&mut scope, &field);
     add_struct_impl(&mut scope, &field);

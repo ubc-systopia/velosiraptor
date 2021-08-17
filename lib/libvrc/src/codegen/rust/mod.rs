@@ -125,7 +125,7 @@ impl BackendRust {
 
         scope.new_comment("modules");
         for f in fields {
-            scope.raw(&format!("mod {};", f.name.to_lowercase()));
+            scope.raw(&format!("pub mod {};", f.name.to_lowercase()));
         }
 
         scope.new_comment("re-exports");
@@ -137,84 +137,99 @@ impl BackendRust {
             ));
         }
 
-        save_scope(scope, &outdir, "mod");
-
-        Ok(())
+        save_scope(scope, &fieldsdir, "mod")
     }
 }
 
 impl CodeGenBackend for BackendRust {
     fn prepare(&self) -> Result<(), CodeGenError> {
         // create the output directory, if needed
-        if let Some(p) = &self.outdir {
-            // the root directory as supplied by backend
-            let outdir = Path::new(p);
 
-            // create the package path
-            fs::create_dir_all(&outdir)?;
+        // create the package path
+        fs::create_dir_all(&self.outdir)?;
 
-            // generate the toml file
-            self.generate_tomlfile(&outdir)?;
+        // generate the toml file
+        self.generate_tomlfile(&self.outdir)?;
 
-            // create the source directory
-            let srcdir = outdir.join("src");
+        // create the source directory
+        let srcdir = self.outdir.join("src");
+        fs::create_dir_all(&srcdir)?;
 
-            fs::create_dir_all(&srcdir)?;
-        }
         Ok(())
     }
+
     fn generate_globals(&self, ast: &Ast) -> Result<(), CodeGenError> {
         for _const in &ast.consts {}
         Ok(())
     }
 
     fn generate_interfaces(&self, ast: &Ast) -> Result<(), CodeGenError> {
+        // get the source dir
+        let mut srcdir = self.outdir.join("src");
+
         for unit in &ast.units {
-            let outdir = if let Some(p) = &self.outdir {
-                // the root directory as supplied by backend
-                let outdir = Path::new(p);
-                let srcdir = outdir.join("src").join(unit.name.to_lowercase());
-                fs::create_dir_all(&srcdir)?;
-                Some(srcdir)
-            } else {
-                None
-            };
+            srcdir.push(unit.name.to_lowercase());
+            // the root directory as supplied by backend
+            fs::create_dir_all(&srcdir)?;
+
             match &unit.state {
-                State::MemoryState { bases, fields, pos } => self
-                    .generate_fields(&outdir, &unit.name, &fields)
+                State::MemoryState {
+                    bases: _, fields, ..
+                } => self
+                    .generate_fields(&srcdir, &unit.name, &fields)
                     .expect("field generation failed"),
                 _ => (),
             }
+
+            srcdir.pop();
         }
         Ok(())
     }
 
-    fn generate_units(&self, _ast: &Ast) -> Result<(), CodeGenError> {
+    fn generate_units(&self, ast: &Ast) -> Result<(), CodeGenError> {
+        // get the source dir
+        let mut srcdir = self.outdir.join("src");
+
+        for unit in &ast.units {
+            srcdir.push(unit.name.to_lowercase());
+
+            // construct the scope
+            let mut scope = CG::Scope::new();
+
+            // the fields
+            scope.raw("pub mod fields;");
+
+            // save the scope
+            save_scope(scope, &srcdir, "mod")?;
+
+            srcdir.pop();
+        }
+
         Ok(())
     }
 
-    fn finalize(&self) -> Result<(), CodeGenError> {
-        if let Some(p) = &self.outdir {
-            // the root directory
-            let mut path = Path::new(p).to_path_buf();
+    fn finalize(&self, ast: &Ast) -> Result<(), CodeGenError> {
+        // construct the source directory
+        let srcdir = self.outdir.join("src");
 
-            path.push("src");
-            path.push("lib.rs");
+        // construct the scope
+        let mut scope = CG::Scope::new();
 
-            // create the Cargo.toml
-            let librs = File::create(path)?;
+        let title = format!("{} Library", self.pkgname);
+        add_header(&mut scope, &title);
 
-            let mut librs = BufWriter::new(librs);
-
-            let mut lines = Vec::new();
-            writeln!(lines, "\n")?;
-            for u in &self.usedirs {
-                writeln!(lines, "pub use {}", u)?;
-            }
-
-            librs.write_all(&lines)?;
-            librs.flush()?;
+        // the modules
+        scope.new_comment("modules");
+        for unit in &ast.units {
+            scope.raw(&format!("pub mod {};", unit.name.to_lowercase()));
         }
-        Ok(())
+
+        scope.new_comment("re-exports");
+        for unit in &ast.units {
+            scope.raw(&format!("pub use {}::*;", unit.name.to_lowercase(),));
+        }
+
+        // save the scope
+        save_scope(scope, &srcdir, "lib")
     }
 }
