@@ -208,6 +208,13 @@ impl CodeGenBackend for BackendRust {
         Ok(())
     }
 
+    /// Finalizes the code generation
+    ///
+    /// Here we just need to generate the `lib.rs` file that pulls in all other
+    /// modules and constant definitions.
+    /// This basically creates a `pub mod` statement for each unit,
+    /// and also for for the constant definitions. It then also re-exports
+    /// the defined constants and unit types using `pub use` statements.
     fn finalize(&self, ast: &Ast) -> Result<(), CodeGenError> {
         // construct the source directory
         let srcdir = self.outdir.join("src");
@@ -218,15 +225,40 @@ impl CodeGenBackend for BackendRust {
         let title = format!("{} Library", self.pkgname);
         add_header(&mut scope, &title);
 
-        // the modules
-        scope.new_comment("modules");
-        for unit in &ast.units {
-            scope.raw(&format!("pub mod {};", unit.name.to_lowercase()));
+        // import the constants
+        scope.new_comment("import constant definitions ");
+        if !ast.consts.is_empty() {
+            scope.raw("pub mod consts;");
+        } else {
+            scope.new_comment("no constants defined");
         }
 
-        scope.new_comment("re-exports");
+        // re-export the constants
+        scope.new_comment("re-export the constants directly");
+        if !ast.consts.is_empty() {
+            scope.raw("pub use consts::*;");
+        } else {
+            scope.new_comment("no constants defined");
+        }
+
+        // impor the units
+        scope.new_comment("import the unit modules");
+        if !ast.units.is_empty() {
+            for unit in &ast.units {
+                scope.raw(&format!("pub mod {};", unit.name.to_lowercase()));
+            }
+        } else {
+            scope.new_comment("no unit definitions to import");
+        }
+
+        // reexport the
+        scope.new_comment("re-export the unit types directly");
         for unit in &ast.units {
-            scope.raw(&format!("pub use {}::*;", unit.name.to_lowercase(),));
+            scope.raw(&format!(
+                "pub use {}::{};",
+                unit.name.to_lowercase(),
+                unit.name
+            ));
         }
 
         // save the scope
