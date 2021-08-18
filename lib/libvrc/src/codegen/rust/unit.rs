@@ -61,13 +61,68 @@ fn add_struct_definition(scope: &mut CG::Scope, unit: &Unit) {
 
     // add the doc field to the struct
     st.doc(&format!(
-        "Represents the Unit type '{}'.\ndefined in: {}",
+        "Represents the Unit type '{}'.\n@loc: {}",
         unit.name,
         unit.location()
     ));
 
     // it has a single field, called 'val'
     //st.field("val", to_rust_type(field.nbits()));
+}
+
+
+fn add_constructor_function(imp: &mut CG::Impl, unit: &Unit) {
+    imp.new_fn("new")
+    .vis("pub")
+    .doc(&format!("Creates a new `{}` unit", unit.name))
+    //.ret(CG::Type::new("Self"))
+    .line("// TODO: SYNTHESIZE ME");
+}
+
+fn add_translate_function(imp: &mut CG::Impl, unit: &Unit) {
+    imp.new_fn("translate")
+    .vis("pub")
+    .doc(&format!("Creates a new {} unit", unit.name))
+    //.ret(CG::Type::new("Self"))
+    .line("// TODO: SYNTHESIZE ME");
+
+}
+
+fn add_map_function(imp: &mut CG::Impl, unit: &Unit) {
+    imp.new_fn("map")
+    .vis("pub")
+    .doc(&format!("Creates a new {} unit", unit.name))
+    //.ret(CG::Type::new("Self"))
+    .line("// TODO: SYNTHESIZE ME");
+}
+
+fn add_unmap_function(imp: &mut CG::Impl, unit: &Unit) {
+    imp.new_fn("unmap")
+    .vis("pub")
+    .doc(&format!("Creates a new {} unit", unit.name))
+    //.ret(CG::Type::new("Self"))
+    .line("// TODO: SYNTHESIZE ME");
+}
+
+fn add_protect_function(imp: &mut CG::Impl, unit: &Unit) {
+    imp.new_fn("protect")
+    .vis("pub")
+    .doc(&format!("Creates a new {} unit", unit.name))
+    //.ret(CG::Type::new("Self"))
+    .line("// TODO: SYNTHESIZE ME");
+}
+
+fn add_struct_impl(scope: &mut CG::Scope, unit: &Unit) {
+    // new implementation
+    let mut imp = scope.new_impl(&unit.name);
+
+    // add the new() function
+    add_constructor_function(&mut imp, unit);
+    add_map_function(&mut imp, unit);
+    add_unmap_function(&mut imp, unit);
+    add_protect_function(&mut imp, unit);
+
+    add_translate_function(&mut imp, unit);
 }
 
 /// generates the Unit definitions
@@ -80,9 +135,9 @@ pub fn generate(unit: &Unit, outdir: &PathBuf) -> Result<(), CodeGenError> {
     utils::add_header(&mut scope, &title);
 
     // add the definitions
-    add_unit_constants(&mut scope, &unit);
-    add_struct_definition(&mut scope, &unit);
-    //add_struct_impl(&mut scope, &field);
+    add_unit_constants(&mut scope, unit);
+    add_struct_definition(&mut scope, unit);
+    add_struct_impl(&mut scope, unit);
 
     // save the scope
     utils::save_scope(scope, outdir, "unit")

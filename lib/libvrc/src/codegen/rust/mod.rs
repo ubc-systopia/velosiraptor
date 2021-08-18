@@ -240,7 +240,7 @@ impl CodeGenBackend for BackendRust {
             scope.raw("mod unit;");
 
             // the unit
-            scope.raw(&format!("pub use unit :: {};", unit.name));
+            scope.raw(&format!("pub use unit :: *;"));
 
             // save the scope
             save_scope(scope, &srcdir, "mod")?;
