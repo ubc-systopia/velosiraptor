@@ -1,7 +1,9 @@
 
-const PAGE_SIZE : int = 0x4000;
+const PAGE_SIZE : int = 0x1000;
 
-unit foo {
+unit Foo {
+    const PAGE_SIZE : int = 0x1000;
+
     state = Memory(base) {
         pte [base, 0, 4] {
             0   0   present,
