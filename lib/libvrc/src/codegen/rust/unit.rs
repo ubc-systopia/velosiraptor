@@ -70,46 +70,44 @@ fn add_struct_definition(scope: &mut CG::Scope, unit: &Unit) {
     //st.field("val", to_rust_type(field.nbits()));
 }
 
-
 fn add_constructor_function(imp: &mut CG::Impl, unit: &Unit) {
     imp.new_fn("new")
-    .vis("pub")
-    .doc(&format!("Creates a new `{}` unit", unit.name))
-    //.ret(CG::Type::new("Self"))
-    .line("// TODO: SYNTHESIZE ME");
+        .vis("pub")
+        .doc(&format!("Creates a new `{}` unit", unit.name))
+        //.ret(CG::Type::new("Self"))
+        .line("// TODO: SYNTHESIZE ME");
 }
 
 fn add_translate_function(imp: &mut CG::Impl, unit: &Unit) {
     imp.new_fn("translate")
-    .vis("pub")
-    .doc(&format!("Creates a new {} unit", unit.name))
-    //.ret(CG::Type::new("Self"))
-    .line("// TODO: SYNTHESIZE ME");
-
+        .vis("pub")
+        .doc(&format!("Creates a new {} unit", unit.name))
+        //.ret(CG::Type::new("Self"))
+        .line("// TODO: SYNTHESIZE ME");
 }
 
 fn add_map_function(imp: &mut CG::Impl, unit: &Unit) {
     imp.new_fn("map")
-    .vis("pub")
-    .doc(&format!("Creates a new {} unit", unit.name))
-    //.ret(CG::Type::new("Self"))
-    .line("// TODO: SYNTHESIZE ME");
+        .vis("pub")
+        .doc(&format!("Creates a new {} unit", unit.name))
+        //.ret(CG::Type::new("Self"))
+        .line("// TODO: SYNTHESIZE ME");
 }
 
 fn add_unmap_function(imp: &mut CG::Impl, unit: &Unit) {
     imp.new_fn("unmap")
-    .vis("pub")
-    .doc(&format!("Creates a new {} unit", unit.name))
-    //.ret(CG::Type::new("Self"))
-    .line("// TODO: SYNTHESIZE ME");
+        .vis("pub")
+        .doc(&format!("Creates a new {} unit", unit.name))
+        //.ret(CG::Type::new("Self"))
+        .line("// TODO: SYNTHESIZE ME");
 }
 
 fn add_protect_function(imp: &mut CG::Impl, unit: &Unit) {
     imp.new_fn("protect")
-    .vis("pub")
-    .doc(&format!("Creates a new {} unit", unit.name))
-    //.ret(CG::Type::new("Self"))
-    .line("// TODO: SYNTHESIZE ME");
+        .vis("pub")
+        .doc(&format!("Creates a new {} unit", unit.name))
+        //.ret(CG::Type::new("Self"))
+        .line("// TODO: SYNTHESIZE ME");
 }
 
 fn add_struct_impl(scope: &mut CG::Scope, unit: &Unit) {
