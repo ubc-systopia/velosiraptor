@@ -25,20 +25,20 @@
 
 //! C Code Generartion Backend
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::ast::Ast;
 use crate::codegen::CodeGenBackend;
 use crate::codegen::CodeGenError;
 
 pub struct BackendC {
-    outdir: PathBuf,
+    //  outdir: PathBuf,
 }
 
 impl BackendC {
-    pub fn new(_pkg: String, outdir: &Path) -> Self {
+    pub fn new(_pkg: String, _outdir: &Path) -> Self {
         BackendC {
-            outdir: outdir.to_path_buf(),
+           // outdir: outdir.to_path_buf(),
         }
     }
 }
