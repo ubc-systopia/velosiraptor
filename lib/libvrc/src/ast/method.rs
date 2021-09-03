@@ -46,6 +46,10 @@ pub struct Method {
     pub rettype: Type,
     /// A list of arguments with their types
     pub args: Vec<(String, Type)>,
+    /// the ensures clauses
+    pub requires: Vec<Expr>,
+    /// the ensures clauses
+    pub ensures: Vec<Expr>,
     /// A sequence of statements
     pub stmts: Vec<Stmt>,
     /// the position where the method was defined
