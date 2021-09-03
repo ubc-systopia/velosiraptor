@@ -191,6 +191,9 @@ keywordparser!(pub kw_register, Keyword::Register);
 keywordparser!(pub kw_none, Keyword::None);
 keywordparser!(pub kw_fn, Keyword::Fn);
 keywordparser!(pub kw_size, Keyword::Size);
+keywordparser!(pub kw_requires, Keyword::Requires);
+keywordparser!(pub kw_ensures, Keyword::Ensures);
+keywordparser!(pub kw_assert, Keyword::Assert);
 
 /// parses a type expression
 ///
