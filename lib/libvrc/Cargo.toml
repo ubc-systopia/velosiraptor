@@ -22,5 +22,5 @@ codegen-rs = { path = "../codegen" }
 
 # the parser combinators
 [dependencies.nom]
-version = "6"
+version = "7"
 
