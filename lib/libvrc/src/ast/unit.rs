@@ -50,6 +50,8 @@ pub struct Unit {
     pub name: String,
     /// the name of the derrived unit
     pub derived: Option<String>,
+    /// the size of the unit in bits
+    pub size: Option<u64>,
     /// defined constants in this unit
     pub consts: Vec<Const>,
     /// the state of the unit

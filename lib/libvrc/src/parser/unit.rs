@@ -29,9 +29,10 @@
 
 // the used nom functionality
 use nom::{
+    branch::permutation,
     combinator::{cut, opt},
     multi::many0,
-    sequence::{delimited, pair, preceded, terminated, tuple},
+    sequence::{delimited, pair, preceded, terminated},
 };
 
 // the used library-internal functionaltity
@@ -40,11 +41,17 @@ use crate::error::IResult;
 use crate::parser::{
     constdef,
     state::state,
-    terminals::{colon, ident, kw_unit, lbrace, rbrace, semicolon},
+    terminals::{assign, colon, ident, kw_size, kw_unit, lbrace, num, rbrace, semicolon},
 };
 use crate::token::TokenStream;
 
-/// parses and consumes an import statement (`unit foo {};`)
+/// parses and consumes a size statement in a unit (`size = number`)
+fn size(input: TokenStream) -> IResult<TokenStream, u64> {
+    let (i1, _) = kw_size(input)?;
+    cut(delimited(assign, num, semicolon))(i1)
+}
+
+/// parses and consumes an unit declaration (`unit foo {};`)
 pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
     // try to match the input keyword, there is no match, return.
     let (i1, _) = kw_unit(input.clone())?;
@@ -56,10 +63,10 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
 
     // TODO: here we have ConstItem | InterfaceItem | StateItem | FunctionItem
     // TODO: either put that as
-    let unit_body = tuple((many0(constdef), opt(state)));
+    let unit_body = permutation((many0(constdef), opt(state), opt(size)));
 
     // then we have the unit block, wrapped in curly braces and a ;
-    let (i3, (consts, state)) =
+    let (i3, (consts, state, size)) =
         cut(terminated(delimited(lbrace, unit_body, rbrace), semicolon))(i2)?;
 
     let pos = input.expand_until(&i3);
@@ -68,6 +75,7 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
         Unit {
             name: unitname,
             derived,
+            size,
             consts,
             state: state.unwrap_or(State::None { pos: pos.clone() }),
             interface: Interface::None,
@@ -83,6 +91,14 @@ use crate::lexer::Lexer;
 #[test]
 fn test_ok() {
     let tokens = Lexer::lex_string("stdio", "unit foo {};").unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(unit(ts).is_ok());
+
+    let tokens = Lexer::lex_string("stdio", "unit foo { const foo : int = 32; };").unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(unit(ts).is_ok());
+
+    let tokens = Lexer::lex_string("stdio", "unit foo { size = 33; };").unwrap();
     let ts = TokenStream::from_vec(tokens);
     assert!(unit(ts).is_ok());
 }
