@@ -68,6 +68,7 @@ pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
         "bool" => Token::new(TokenContent::Keyword(Keyword::Boolean), ident),
         "requires" => Token::new(TokenContent::Keyword(Keyword::Requires), ident),
         "ensures" => Token::new(TokenContent::Keyword(Keyword::Ensures), ident),
+        "fn" => Token::new(TokenContent::Keyword(Keyword::Fn), ident),
         x => Token::new(TokenContent::Identifier(x.to_string()), ident),
     };
 
