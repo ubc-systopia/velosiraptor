@@ -25,16 +25,25 @@
 
 //! Implementation of method parsing
 
-use crate::ast::{Method, Stmt, Type};
+// the used nom functions
+use nom::{
+    combinator::{cut, opt},
+    multi::{many0, separated_list0},
+    sequence::{delimited, preceded, terminated, tuple},
+};
+
+// library internal includes
+use crate::ast::{Expr, Method, Stmt, Type};
 use crate::error::IResult;
-use crate::parser::statement::stmt;
-use crate::parser::terminals::{
-    colon, comma, ident, kw_fn, lbrace, lparen, rarrow, rbrace, rparen, semicolon, typeinfo,
+use crate::parser::{
+    expression::bool_expr,
+    statement::stmt,
+    terminals::{
+        colon, comma, ident, kw_ensures, kw_fn, kw_requires, lbrace, lparen, rarrow, rbrace,
+        rparen, semicolon, typeinfo,
+    },
 };
 use crate::token::TokenStream;
-use nom::combinator::cut;
-use nom::multi::separated_list0;
-use nom::sequence::{delimited, pair, preceded, terminated};
 
 // TODO add tests
 
@@ -46,21 +55,31 @@ use nom::sequence::{delimited, pair, preceded, terminated};
 ///     stmt;
 ///     return stmt;
 /// }
+///
+/// Another example with pre-/post conditions
+/// fn method_name(arg1: Size, arg2: Integer, arg3: Boolean) -> Address
+///    requires arg1 > 4
+///    ensures  ret < 3
+/// {
+///     stmt;
+///     stmt;
+///     return stmt;
+/// }
 pub fn method(input: TokenStream) -> IResult<TokenStream, Method> {
     // parse and consume fn keyword
     let (i1, _) = kw_fn(input.clone())?;
 
-    // parse and consume method name
-    let (i2, name) = cut(ident)(i1)?;
+    // get the method name and the arguments
+    let (i2, (name, args)) = cut(tuple((ident, typed_arguments)))(i1)?;
 
-    // parse and consume a list of arguments
-    let (i3, args) = cut(typed_arguments)(i2)?;
+    // get the return type
+    let (i3, rettype) = cut(preceded(rarrow, typeinfo))(i2)?;
 
-    // parse and consume a return type
-    let (i4, rettype) = cut(preceded(rarrow, typeinfo))(i3)?;
+    // get the ensure clauses
+    let (i4, (requires, ensures)) = tuple((many0(require_clauses), many0(ensure_clauses)))(i3)?;
 
     // parse and consume a function body (or an abstract function)
-    let (i5, stmts) = cut(method_body)(i4)?;
+    let (i5, stmts) = cut(opt(method_body))(i4)?;
 
     let is_abstract = false;
     // create the token stream covering the entire method def
@@ -72,7 +91,9 @@ pub fn method(input: TokenStream) -> IResult<TokenStream, Method> {
             name,
             rettype,
             args,
-            stmts,
+            requires,
+            ensures,
+            stmts: stmts.unwrap_or(Vec::new()),
             pos,
             is_abstract,
         },
@@ -80,17 +101,47 @@ pub fn method(input: TokenStream) -> IResult<TokenStream, Method> {
 }
 
 fn method_body(input: TokenStream) -> IResult<TokenStream, Vec<Stmt>> {
-    delimited(
-        lbrace,
-        terminated(separated_list0(semicolon, stmt), semicolon),
-        rbrace,
-    )(input)
+    delimited(lbrace, many0(stmt), rbrace)(input)
 }
 
 fn typed_arguments(input: TokenStream) -> IResult<TokenStream, Vec<(String, Type)>> {
     delimited(
         lparen,
-        separated_list0(comma, pair(ident, preceded(colon, typeinfo))),
+        separated_list0(comma, tuple((ident, preceded(colon, typeinfo)))),
         rparen,
     )(input)
+}
+
+fn require_clauses(input: TokenStream) -> IResult<TokenStream, Expr> {
+    let (i1, _) = kw_requires(input)?;
+    cut(terminated(bool_expr, semicolon))(i1)
+}
+
+fn ensure_clauses(input: TokenStream) -> IResult<TokenStream, Expr> {
+    let (i1, _) = kw_ensures(input)?;
+    cut(terminated(bool_expr, semicolon))(i1)
+}
+
+#[cfg(test)]
+use crate::lexer::Lexer;
+
+#[test]
+fn test_ok() {
+    let tokens = Lexer::lex_string("stdio", "fn foo() -> addr { let x : int = 3; }").unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(method(ts).is_ok());
+
+    let tokens = Lexer::lex_string(
+        "stdio",
+        "fn foo() -> addr requires x > 0; ensures y < 3; { let x : int = 3; }",
+    )
+    .unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(method(ts).is_ok());
+
+    // an abstract function
+    let tokens = Lexer::lex_string("stdio", "fn foo() -> addr;").unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    println!("{:?}", method(ts.clone()));
+    assert!(method(ts).is_ok());
 }
