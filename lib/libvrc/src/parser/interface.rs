@@ -115,7 +115,145 @@
 //  * No Interface:   In addition there might be no interface at all
 //                    `interface = None;`
 
+use crate::ast::interface::{ActionComponent, ActionType};
+use crate::ast::{Action, ActionOp, Field, Interface};
+use crate::error::IResult;
+use crate::error::VrsError::DoubleDef;
+use crate::parser::field::field;
+use crate::parser::state::argument_parser;
+use crate::parser::terminals::{
+    assign, boolean, dot, fatarrow, ident, kw_interface, kw_memory, kw_readaction, kw_state,
+    kw_writeaction, le, num, semicolon,
+};
 use crate::token::TokenStream;
+use nom::branch::alt;
+use nom::character::streaming::one_of;
+use nom::combinator::{cut, opt};
+use nom::multi::{many0, many1, separated_list0};
+use nom::sequence::{delimited, pair, preceded, terminated};
 
 /// Interface definition parsing
-pub fn interface(_input: TokenStream) {}
+pub fn interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
+    // try to match the interface keyword, if there is no match, return.TokenStream
+    let (i1, _) = kw_state(_input)?;
+
+    // We now attempt to parse the different interface types.
+    cut(delimited(
+        assign,
+        alt((memory_interface, none_interface)),
+        semicolon,
+    ))(i1)
+}
+
+fn none_interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
+    todo!()
+}
+
+fn memory_interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
+    let (i1, _) = kw_memory(_input.clone())?;
+    let (i2, bases) = argument_parser(i1)?;
+    let (i3, (fields, actions)) = cut(pair(many0(field), many1(action_parser)))(i2)?;
+
+    let pos = _input.expand_until(&i3);
+    Ok((
+        i3,
+        Interface::Memory {
+            bases,
+            fields,
+            actions,
+            pos,
+        },
+    ))
+}
+
+fn fields_parser(_input: TokenStream) -> IResult<TokenStream, Vec<Field>> {
+    cut(many0(field))(_input)
+}
+
+fn action_parser(_input: TokenStream) -> IResult<TokenStream, Action> {
+    // Parse the type of the action
+    let (i1, action_type) = alt((readaction_type, writeaction_type))(_input.clone())?;
+    let (i2, action_components) = many0(action_component)(i1)?;
+    todo!()
+}
+
+fn action_component(_input: TokenStream) -> IResult<TokenStream, ActionComponent> {
+    // Parse each of the actionOPs and then the pos
+
+    // Parse state.ident <=> interface.ident
+    // They could also be literals of
+
+    // This seems tough lets instead parse actionOPs first as a separate function.
+    let (i1, left_aop) = cut(alt((
+        actionop_bool,
+        actionop_int,
+        actionop_interfaceref,
+        actionop_stateref,
+    )))(_input.clone())?;
+    // TODO return type of terminals is not helpful here figure out a workaround.
+    let (i2, mapping_symbol) = alt((fatarrow, le))(i1)?;
+    //let (i1, loc1) = cut(alt((state_string,interface_string)))(_input.clone())?;
+
+    let pos = _input;
+    todo!()
+}
+
+fn actionop_stateref(_input: TokenStream) -> IResult<TokenStream, ActionOp> {
+    let (i1, _) = kw_state(_input)?;
+    let (i2, _) = dot(i1)?;
+    let (i3, field) = ident(i2)?;
+    let (i4, block) = opt(preceded(dot, ident))(i3)?;
+
+    Ok((i4, ActionOp::StateRef(field, block)))
+}
+
+fn actionop_interfaceref(_input: TokenStream) -> IResult<TokenStream, ActionOp> {
+    let (i1, _) = kw_interface(_input)?;
+    let (i2, _) = dot(i1)?;
+    let (i3, field) = ident(i2)?;
+    let (i4, block) = opt(preceded(dot, ident))(i3)?;
+
+    Ok((i4, ActionOp::InterfaceRef(field, block)))
+}
+
+fn actionop_int(_input: TokenStream) -> IResult<TokenStream, ActionOp> {
+    let (i1, val) = num(_input)?;
+
+    Ok((i1, ActionOp::IntValue(val)))
+}
+
+fn actionop_bool(_input: TokenStream) -> IResult<TokenStream, ActionOp> {
+    let (i1, bool) = boolean(_input)?;
+
+    Ok((i1, ActionOp::BoolValue(bool)))
+}
+
+/// Expands on the terminal parsers by defining a function with $name that calls $parser and on
+/// a success returns the $return_value of type $return_type
+macro_rules! terminalparse_with_return_type (
+    ($name: ident, $parser: ident, $return_value: expr, $return_type: ty) => (
+        fn $name(input: TokenStream) -> IResult<TokenStream, $return_type> {
+            match cut($parser)(input) {
+                Ok((i1, _)) => {
+                    Ok((i1, $return_value))
+                }
+                Err(x) => Err(x)
+            }
+        }
+    )
+);
+
+terminalparse_with_return_type!(readaction_type, kw_readaction, ActionType::Read, ActionType);
+terminalparse_with_return_type!(
+    writeaction_type,
+    kw_writeaction,
+    ActionType::Write,
+    ActionType
+);
+terminalparse_with_return_type!(state_string, kw_state, String::from("state"), String);
+terminalparse_with_return_type!(
+    interface_string,
+    kw_interface,
+    String::from("interface"),
+    String
+);

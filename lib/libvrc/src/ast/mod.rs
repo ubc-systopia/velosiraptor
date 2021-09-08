@@ -31,7 +31,7 @@ mod consts;
 mod expression;
 mod field;
 mod import;
-mod interface;
+pub mod interface;
 mod issues;
 mod method;
 mod state;
