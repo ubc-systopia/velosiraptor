@@ -47,9 +47,9 @@ pub enum Keyword {
     State,
     /// interface statement
     Interface,
-    /// Memory State statement
+    /// Memory State and Interface statement
     Memory,
-    /// Register State statement
+    /// Register State and Interface statement
     Register,
     /// Null-like value used for State and Interface
     None,
