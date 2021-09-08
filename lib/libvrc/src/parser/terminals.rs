@@ -98,8 +98,11 @@ terminalparser!(pub gt, TokenContent::Gt);
 terminalparser!(pub assign, TokenContent::Assign);
 
 // arrows
-terminalparser!(pub fatarrow, TokenContent::FatArrow);
+terminalparser!(pub larrow, TokenContent::LArrow);
 terminalparser!(pub rarrow, TokenContent::RArrow);
+terminalparser!(pub bidirarrow, TokenContent::BiDirArrow);
+terminalparser!(pub fatarrow, TokenContent::FatArrow);
+terminalparser!(pub bidirfatarrow, TokenContent::BiDirFatArrow);
 
 // comparators
 terminalparser!(pub at, TokenContent::At);

@@ -164,8 +164,11 @@ pub enum TokenContent {
     Assign, // =
 
     // arrows
+    LArrow,   // <-
     RArrow,   // ->
+    BiDirArrow, // <->
     FatArrow, // =>
+    BiDirFatArrow, // <=>
 
     // comparisons
     Eq, // ==
@@ -225,8 +228,11 @@ impl TokenContent {
             TokenContent::Assign => "=",
 
             // arrows
+            TokenContent::LArrow => "<-",
             TokenContent::RArrow => "->",
+            TokenContent::BiDirArrow => "<->",
             TokenContent::FatArrow => "=>",
+            TokenContent::BiDirFatArrow => "<=>",
 
             // comparisons
             TokenContent::Eq => "==",
