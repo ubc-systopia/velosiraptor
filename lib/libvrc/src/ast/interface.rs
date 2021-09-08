@@ -25,6 +25,7 @@
 
 //! Ast Module of the Velosiraptor Compiler
 
+use crate::ast::Field;
 use crate::token::TokenStream;
 
 /// Defines the software-visible interface of a unit
@@ -37,7 +38,12 @@ use crate::token::TokenStream;
 #[derive(PartialEq, Clone)]
 pub enum Interface {
     /// Defines a load/store interface to memory
-    Memory { pos: TokenStream },
+    Memory {
+        bases: Vec<String>,
+        fields: Vec<Field>,
+        actions: Vec<Action>,
+        pos: TokenStream,
+    },
     /// Defines a memory-mapped interface to registers
     MMIORegisters { pos: TokenStream },
     /// Defines a load/store interface to CPU registers
@@ -53,11 +59,12 @@ pub enum Interface {
 /// Represents an action operand
 ///
 /// The action operand defines the source and destination of an action
+#[derive(PartialEq, Clone)]
 pub enum ActionOp {
     /// reference to a field/slice of the interface
-    InterfaceRef(String, String),
+    InterfaceRef(String, Option<String>),
     /// reference to a field/slice in the state
-    StateRef(String, String),
+    StateRef(String, Option<String>),
     /// a constant boolean value
     BoolValue(bool),
     /// a constant integer value
@@ -72,11 +79,42 @@ pub enum ActionOp {
 /// Currently an action is basically an assignment that assigns the destination the value of the
 /// source. If the destination is a StateRef, then this
 ///   src => dst
-pub struct Action {
+#[derive(PartialEq, Clone)]
+pub struct ActionComponent {
     /// the source operand of the action
     pub src: ActionOp,
     /// the destination operand of the action
     pub dst: ActionOp,
+    /// the location where the action was defined
+    pub pos: TokenStream,
+}
+
+/// Represents the type of action
+///
+/// Currently the only supported action types are Read and Write but, we can imagine needing more
+/// types to support custom instructions needing to be executed to dump state to memory.
+#[derive(PartialEq, Clone)]
+pub enum ActionType {
+    Read,
+    Write,
+}
+
+/// Defines the collection of Action components that occur when a Read/Write operation is
+/// executed.
+///
+/// i.e:
+/// WriteAction {
+///     interface.size.npages => state.size.npages;
+///     1 => state.valid;
+///     0 => state.cache;
+///     1 => interface.status;
+/// }
+#[derive(PartialEq, Clone)]
+pub struct Action {
+    /// the type of the action (Read/Write)
+    pub action_type: ActionType,
+    /// the list of action components that are associated with this action
+    pub action_components: Vec<ActionComponent>,
     /// the location where the action was defined
     pub pos: TokenStream,
 }
