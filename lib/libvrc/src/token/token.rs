@@ -53,6 +53,9 @@ pub enum Keyword {
     Register,
     /// Null-like value used for State and Interface
     None,
+    /// Action types used in Interface
+    ReadAction,
+    WriteAction,
     /// defines a local variable
     Let,
     /// represents a function
@@ -87,6 +90,9 @@ impl fmt::Display for Keyword {
             Memory => "Memory",
             Register => "Register",
             None => "None",
+            // ActionTypes
+            ReadAction => "ReadAction",
+            WriteAction => "WriteAction",
             // types
             Addr => "addr",
             Size => "size",
