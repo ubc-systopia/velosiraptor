@@ -181,21 +181,39 @@ fn action_component(_input: TokenStream) -> IResult<TokenStream, ActionComponent
     // Parse each of the actionOPs and then the pos
 
     // Parse state.ident <=> interface.ident
-    // They could also be literals of
-
-    // This seems tough lets instead parse actionOPs first as a separate function.
-    let (i1, left_aop) = cut(alt((
+    let mut aop_parser = cut(alt((
         actionop_bool,
         actionop_int,
         actionop_interfaceref,
         actionop_stateref,
-    )))(_input.clone())?;
-    // TODO return type of terminals is not helpful here figure out a workaround.
-    let (i2, mapping_symbol) = alt((fatarrow, le))(i1)?;
-    //let (i1, loc1) = cut(alt((state_string,interface_string)))(_input.clone())?;
+    )));
 
-    let pos = _input;
-    todo!()
+    let (i1, left_aop) = aop_parser(_input.clone())?;
+    let (i2,mapping_dir) = alt((fatrightarrow, fatleftarrow))(i1)?;
+    let (i3, right_aop) = aop_parser(i2)?;
+
+    let pos = _input.expand_until(&i3);
+
+    // Order the
+    match mapping_dir {
+        MappingDirection::LeftToRight => {
+            Ok((i3, ActionComponent{
+                src: left_aop,
+                dst: right_aop,
+                pos
+            }))
+        }
+        MappingDirection::RightToLeft => {
+            Ok((i3, ActionComponent{
+                src: right_aop,
+                dst: left_aop,
+                pos
+            }))
+        }
+        MappingDirection::BiDirectional => {
+            todo!();
+        }
+    }
 }
 
 fn actionop_stateref(_input: TokenStream) -> IResult<TokenStream, ActionOp> {
@@ -257,3 +275,15 @@ terminalparse_with_return_type!(
     String::from("interface"),
     String
 );
+
+terminalparse_with_return_type!(fatrightarrow, fatarrow, MappingDirection::LeftToRight, MappingDirection);
+terminalparse_with_return_type!(fatleftarrow, le, MappingDirection::LeftToRight, MappingDirection);
+// todo add bidirectional arrow to token/lexer/terminalparser
+//terminalparse_with_return_type!(bidirectionalarrow, !!!, MappingDirection::LeftToRight, MappingDirection);
+
+
+enum MappingDirection {
+    LeftToRight,
+    RightToLeft,
+    BiDirectional,
+}
