@@ -28,7 +28,7 @@
 // the used nom functions
 use nom::{
     combinator::{cut, opt},
-    multi::{many0, separated_list0},
+    multi::{many0, many1, separated_list0},
     sequence::{delimited, preceded, terminated, tuple},
 };
 
@@ -105,13 +105,13 @@ pub fn method(input: TokenStream) -> IResult<TokenStream, Method> {
     // parse and consume fn keyword
     let (i1, _) = kw_fn(input.clone())?;
 
-    // get the method name and the arguments
+    // get the method name and the arguments `Ident (...)`
     let (i2, (name, args)) = cut(tuple((ident, typed_arguments)))(i1)?;
 
-    // get the return type
+    // get the return type `-> Type`
     let (i3, rettype) = cut(preceded(rarrow, typeinfo))(i2)?;
 
-    // get the ensure clauses
+    // get the ensure/require clauses
     let (i4, (requires, ensures)) = tuple((many0(require_clauses), many0(ensure_clauses)))(i3)?;
 
     // parse and consume a function body (or an abstract function)
@@ -136,8 +136,11 @@ pub fn method(input: TokenStream) -> IResult<TokenStream, Method> {
     ))
 }
 
+/// parses the method body
+///
+///
 fn method_body(input: TokenStream) -> IResult<TokenStream, Vec<Stmt>> {
-    delimited(lbrace, many0(stmt), rbrace)(input)
+    delimited(lbrace, many1(stmt), rbrace)(input)
 }
 
 fn typed_arguments(input: TokenStream) -> IResult<TokenStream, Vec<(String, Type)>> {
