@@ -45,9 +45,45 @@ use crate::parser::{
 };
 use crate::token::TokenStream;
 
-// TODO add tests
+/// Parses a require clause
+///
+/// This adds a pre-condition to the function/method
+///
+/// # Results
+///
+///  * OK:      the parser could successfully recognize the requires clause
+///  * Error:   the parser could not recognize the requires clause
+///  * Failure: the parser recognized the requires clause, but it did not properly parse
+///
+/// # Examples
+///
+/// `requires arg > 0`
+pub fn require_clauses(input: TokenStream) -> IResult<TokenStream, Expr> {
+    let (i1, _) = kw_requires(input)?;
+    cut(terminated(bool_expr, semicolon))(i1)
+}
+
+/// Parses a ensures clause
+///
+/// This adds a post-condition to the function/method.
+///
+/// # Results
+///
+///  * OK:      the parser could successfully recognize the ensures clause
+///  * Error:   the parser could not recognize the ensures clause
+///  * Failure: the parser recognized the ensures clause, but it did not properly parse
+///
+/// # Examples
+///
+/// `ensures ret < 5`
+pub fn ensure_clauses(input: TokenStream) -> IResult<TokenStream, Expr> {
+    let (i1, _) = kw_ensures(input)?;
+    cut(terminated(bool_expr, semicolon))(i1)
+}
 
 /// Parses and consumes a method from a unit body
+///
+/// # Examples
 ///
 /// example of method syntax:
 /// fn method_name(arg1: Size, arg2: Integer, arg3: Boolean) -> Address {
@@ -110,16 +146,6 @@ fn typed_arguments(input: TokenStream) -> IResult<TokenStream, Vec<(String, Type
         separated_list0(comma, tuple((ident, preceded(colon, typeinfo)))),
         rparen,
     )(input)
-}
-
-fn require_clauses(input: TokenStream) -> IResult<TokenStream, Expr> {
-    let (i1, _) = kw_requires(input)?;
-    cut(terminated(bool_expr, semicolon))(i1)
-}
-
-fn ensure_clauses(input: TokenStream) -> IResult<TokenStream, Expr> {
-    let (i1, _) = kw_ensures(input)?;
-    cut(terminated(bool_expr, semicolon))(i1)
 }
 
 #[cfg(test)]
