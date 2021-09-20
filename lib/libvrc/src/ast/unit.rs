@@ -34,7 +34,7 @@ use std::fmt::{Debug, Display, Formatter, Result};
 
 // the used crate-internal functionality
 use crate::ast::{utils, AstNode, Const, Interface, Issues, Method, State, SymbolTable};
-use crate::error::ErrorLocation;
+use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
 /// Defines a translation unit
@@ -146,10 +146,10 @@ impl AstNode for Unit {
         // Notes:       --
         // --------------------------------------------------------------------------------------
 
-        // let errors = utils::check_double_entries(&self.methods);
-        // res.inc_err(errors);
+        let errors = utils::check_double_entries(&self.methods);
+        res.inc_err(errors);
 
-        // Check 8: Method cehck
+        // Check 8: Method check
         // --------------------------------------------------------------------------------------
         // Type:        Warning/Error
         // Description: Check that the interface refers to actual parameters
@@ -166,7 +166,45 @@ impl AstNode for Unit {
         // Description: Check if the unit name is CamelCase
         // Notes:       --
         // --------------------------------------------------------------------------------------
-        res + utils::check_camel_case(name, pos)
+        res = res + utils::check_camel_case(name, pos);
+
+        // Check 10: Translate/Map methods defined
+        // --------------------------------------------------------------------------------------
+        // Type:        Error/Warning
+        // Description: Check all defined constats of the Unit
+        // Notes:
+        // --------------------------------------------------------------------------------------
+
+        let mut has_map = false;
+        let mut has_translate = false;
+        for m in &self.methods {
+            match m.name() {
+                "translate" => {
+                    res = res + m.check_translate();
+                    has_translate = true;
+                }
+                "map" => {
+                    res = res + m.check_map();
+                    has_map = true;
+                }
+                _ => {}
+            }
+        }
+
+        if !has_translate {
+            let msg = format!("translate() method not defined for unit {}", self.name);
+            let hint = format!("implement the translate() method for unit {}", self.name);
+            VrsError::new_err(&self.pos, msg, Some(hint)).print();
+            res.inc_err(1);
+        }
+        if !has_map {
+            let msg = format!("map() method not defined for unit {}", self.name);
+            let hint = format!("implement the map() method for unit {}", self.name);
+            VrsError::new_err(&self.pos, msg, Some(hint)).print();
+            res.inc_err(1);
+        }
+
+        res
     }
     ///
     fn name(&self) -> &str {
