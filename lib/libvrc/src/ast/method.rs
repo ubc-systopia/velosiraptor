@@ -26,7 +26,7 @@
 ///! Ast module
 use std::fmt;
 
-use crate::ast::{Expr, Type};
+use crate::ast::{AstNode, Expr, Issues, SymbolTable, Type};
 use crate::sourcepos::SourcePos;
 use crate::token::TokenStream;
 
@@ -58,6 +58,15 @@ pub struct Method {
     pub is_abstract: bool,
 }
 
+impl Method {
+    pub fn check_map(&self) -> Issues {
+        Issues::ok()
+    }
+    pub fn check_translate(&self) -> Issues {
+        Issues::ok()
+    }
+}
+
 /// Implementation of the [fmt::Display] trait for [Field]
 impl fmt::Display for Method {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -82,6 +91,22 @@ impl fmt::Debug for Method {
             result.and_then(|_| writeln!(f, "  {:?}", s))
         })?;
         writeln!(f, "}}")
+    }
+}
+
+/// implementation of [AstNode] for [Field]
+impl AstNode for Method {
+    fn check(&self, _st: &mut SymbolTable) -> Issues {
+        Issues::ok()
+    }
+
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// returns the location of the current
+    fn loc(&self) -> &TokenStream {
+        &self.pos
     }
 }
 
