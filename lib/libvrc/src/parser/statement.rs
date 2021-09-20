@@ -25,45 +25,61 @@
 
 //! Statement parsing
 
-// lexer, parser terminals and ast
-use crate::ast::{Stmt, Type};
-use crate::error::IResult;
-use crate::parser::expression::{arith_expr, bool_expr};
-use crate::parser::terminals::{
-    assign, colon, ident, kw_else, kw_if, kw_let, lbrace, rbrace, semicolon, typeinfo,
-};
-use crate::token::TokenStream;
-
 // the used nom componets
-use nom::branch::alt;
 use nom::{
+    branch::alt,
     combinator::cut,
     multi::many1,
     sequence::{delimited, pair, terminated},
 };
 
+// lexer, parser terminals and ast
+use crate::ast::{Stmt, Type};
+use crate::error::IResult;
+use crate::parser::{
+    expression::{arith_expr, bool_expr},
+    terminals::{
+        assign, colon, ident, kw_assert, kw_else, kw_if, kw_let, lbrace, lparen, rbrace, rparen,
+        semicolon, typeinfo,
+    },
+};
+use crate::token::TokenStream;
+
 /// parses a let statement
 ///
 /// The let statement defines a local variable with a given value
-/// For example: `let x = 123;`
 ///
-/// The statement has the form:
-/// `let IDENTIFIER = EXPR;`
+/// # Grammar
+///
+/// `STMT_LET := KW_LET IDENTIFIER : TYPE = EXPR;`
+///
+/// # Results
+///
+///  * OK:       when the parser successfully recognizes the let statemenet
+///  * Error:    when the parse could not recognize the let statement
+///  * Failure:  when the parser recognizes the let statement, but it is malformed
+///
+/// # Examples
+///
+/// `let x : int = 123;`
+///
 fn let_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
+    // get the input position
     let pos = input.input_sourcepos();
 
     // try to parse the `let` keyword, return error otherwise
     let (i1, _) = kw_let(input)?;
 
-    // parse tye type information `IDENT : TYPE =`
+    // parse the LHS identifier and type information `IDENT : TYPE =`
     let (i2, (lhs, ti)) = cut(pair(ident, delimited(colon, typeinfo, assign)))(i1)?;
 
-    // parse the expression
+    // parse the RHS expression, currently we support boolean and arithmetic expressions
     let (i3, rhs) = match ti {
         Type::Boolean => cut(terminated(bool_expr, semicolon))(i2),
         _ => cut(terminated(arith_expr, semicolon))(i2),
     }?;
 
+    // parsing successful, construct the token
     Ok((
         i3,
         Stmt::Assign {
@@ -73,6 +89,35 @@ fn let_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
             pos,
         },
     ))
+}
+
+/// parses an assert statement
+///
+/// The assert statement provides additional information/checks to the system
+///
+/// # Grammar
+///
+/// `STMT_ASSERT := KW_ASSERT ( BOOL_EXPR );`
+///
+/// # Results
+///
+///  * OK:       when the parser successfully recognizes the assert statemenet
+///  * Error:    when the parse could not recognize the assert statement
+///  * Failure:  when the parser recognizes the assert statement, but it is malformed
+///
+/// # Examples
+///
+/// `assert(in > 4);
+fn assert_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
+    // get the input position
+    let pos = input.input_sourcepos();
+
+    // try to parse the `let` keyword, return error otherwise
+    let (i1, _) = kw_assert(input)?;
+
+    let (i2, expr) = cut(terminated(delimited(lparen, bool_expr, rparen), semicolon))(i1)?;
+
+    Ok((i2, Stmt::Assert { expr, pos }))
 }
 
 /// parser the if/else statement
@@ -108,12 +153,19 @@ fn if_else_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
     }
 }
 
-/// Parses a expression
+/// Parses a statement
 ///
+/// It tries to recognize a single statement
 ///
+/// # Grammar
+///  `STMT := STMT_LET | STMT_ASSERT |
+///
+/// # Results
+///
+///z
 pub fn stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
     let pos = input.input_sourcepos();
-    let (i, stmts) = many1(alt((if_else_stmt, let_stmt)))(input)?;
+    let (i, stmts) = many1(alt((if_else_stmt, let_stmt, assert_stmt)))(input)?;
     Ok((i, Stmt::Block { stmts, pos }))
 }
 
