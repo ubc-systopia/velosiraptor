@@ -135,6 +135,7 @@ fn let_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
 /// # Examples
 ///
 /// `assert(in > 4);
+///
 fn assert_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
     // try to parse the `let` keyword, return error otherwise
     let (i1, _) = kw_assert(input.clone())?;
@@ -149,7 +150,8 @@ fn assert_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
 
 /// parses an if/else statement
 ///
-/// The if/else statement provides a conditional branching
+/// The if/else statement provides a conditional branching.
+/// The branches of the if/else statement must have at least one statement
 ///
 /// # Grammar
 ///
@@ -157,9 +159,14 @@ fn assert_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
 ///
 /// # Results
 ///
+///  * OK:       when the parser successfully recognizes the if/else statemenet
+///  * Error:    when the parse could not recognize the if/else statement
+///  * Failure:  when the parser recognizes the if/else statement, but it is malformed
+///
 /// # Examples
 ///
 /// `if a < 0 { foo; } else { bar; }`
+///
 fn if_else_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
     // try to parse the `if` keyword, return error otherwise
     let (i1, _tok) = kw_if(input.clone())?;
@@ -185,16 +192,19 @@ fn if_else_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
     ))
 }
 
-/// Parses a statement
+/// parses a statement
 ///
-/// It tries to recognize a single statement
+/// This parser recognizes a single of the possible statements
 ///
 /// # Grammar
-///  `STMT := STMT_LET | STMT_ASSERT |
+///  `STMT := STMT_LET | STMT_ASSERT | STMT_IFELSE | STMT_RETURN
 ///
 /// # Results
 ///
-///z
+///  * OK:       when the parser successfully recognizes one of the statements
+///  * Error:    when the parse could not recognize any of the statements
+///  * Failure:  when any of the sub parsers results in the failure state
+///
 pub fn stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
     alt((if_else_stmt, let_stmt, assert_stmt, return_stmt))(input)
 }
