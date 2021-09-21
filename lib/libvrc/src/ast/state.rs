@@ -211,13 +211,13 @@ impl AstNode for State {
             }
             None => {
                 for f in fields {
-                    if !f.stateref.is_none() {
+                    if f.stateref.is_some() {
                         // state ref found, but none required
                         let msg = format!(
                             "field `{}` contains state reference, but state has none.",
                             f.name()
                         );
-                        let hint = format!("remove the state reference in the field");
+                        let hint = String::from("remove the state reference in the field");
                         VrsError::new_err(f.loc().with_range(1..2), msg, Some(hint)).print();
                         res.inc_err(1);
                     }

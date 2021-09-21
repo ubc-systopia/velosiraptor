@@ -24,14 +24,14 @@
 // SOFTWARE.
 
 // NOM parsing constructs
-use nom::bytes::complete::take;
-// NOM results
-use nom::{Err, Needed};
+use nom::{bytes::complete::take, Err, Needed};
 
+// library internal includes
 use crate::ast::Type;
 use crate::error::{IResult, VrsError};
 use crate::token::{Keyword, TokenContent, TokenStream};
 
+/// ff
 macro_rules! terminalparser (
     ($vis:vis $name:ident, $tag: expr) => (
         $vis fn $name(input: TokenStream) -> IResult<TokenStream, ()> {

@@ -25,7 +25,7 @@
 
 //! Unit Generation (Rust)
 
-use std::path::PathBuf;
+use std::path::Path;
 
 use codegen_rs as CG;
 
@@ -124,7 +124,7 @@ fn add_struct_impl(scope: &mut CG::Scope, unit: &Unit) {
 }
 
 /// generates the Unit definitions
-pub fn generate(unit: &Unit, outdir: &PathBuf) -> Result<(), CodeGenError> {
+pub fn generate(unit: &Unit, outdir: &Path) -> Result<(), CodeGenError> {
     // the code generation scope
     let mut scope = CG::Scope::new();
 

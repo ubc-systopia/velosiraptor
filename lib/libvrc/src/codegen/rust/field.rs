@@ -26,7 +26,7 @@
 //! Field Generation (Rust)
 
 // std includes
-use std::path::PathBuf;
+use std::path::Path;
 
 // get the code generator
 use codegen_rs as CG;
@@ -135,7 +135,7 @@ fn add_struct_impl(scope: &mut CG::Scope, field: &Field) {
 }
 
 /// generates the field value interface
-pub fn generate(unit: &str, field: &Field, outdir: &PathBuf) -> Result<(), CodeGenError> {
+pub fn generate(unit: &str, field: &Field, outdir: &Path) -> Result<(), CodeGenError> {
     // the code generation scope
     let mut scope = CG::Scope::new();
 

@@ -47,7 +47,7 @@ use field::field_type;
 use utils::{add_const_def, add_header, save_scope};
 
 // the module name for the constants module
-const MOD_CONSTS: &'static str = "consts";
+const MOD_CONSTS: &str = "consts";
 
 /// The rust backend
 ///
@@ -105,9 +105,9 @@ impl BackendRust {
 
     fn generate_fields(
         &self,
-        outdir: &PathBuf,
+        outdir: &Path,
         unitname: &str,
-        fields: &Vec<Field>,
+        fields: &[Field],
     ) -> Result<(), CodeGenError> {
         let fieldsdir = outdir.join("fields");
 
@@ -240,7 +240,7 @@ impl CodeGenBackend for BackendRust {
             scope.raw("mod unit;");
 
             // the unit
-            scope.raw(&format!("pub use unit :: *;"));
+            scope.raw("pub use unit :: *;");
 
             // save the scope
             save_scope(scope, &srcdir, "mod")?;
