@@ -179,7 +179,7 @@ fn if_else_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
         Stmt::IfElse {
             cond,
             then,
-            other: other.unwrap_or(Vec::new()),
+            other: other.unwrap_or_default(),
             pos,
         },
     ))

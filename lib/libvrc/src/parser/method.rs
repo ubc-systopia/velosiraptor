@@ -129,7 +129,7 @@ pub fn method(input: TokenStream) -> IResult<TokenStream, Method> {
             args,
             requires,
             ensures,
-            stmts: stmts.unwrap_or(Vec::new()),
+            stmts: stmts.unwrap_or_default(),
             pos,
             is_abstract,
         },

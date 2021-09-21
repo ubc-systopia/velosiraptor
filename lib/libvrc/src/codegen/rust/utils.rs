@@ -27,7 +27,7 @@
 
 // std includes
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 
 // get the code generator
 use codegen_rs as CG;
@@ -55,7 +55,7 @@ pub fn to_struct_name(s: &str, suffix: Option<&str>) -> String {
 
 /// converts a string slice into a rusified constant identifier
 pub fn to_const_name(s: &str) -> String {
-    String::from(s.to_uppercase())
+    s.to_uppercase()
 }
 
 /// obtains the appropriate rust type for
@@ -76,13 +76,13 @@ pub fn to_mask_str(m: u64, len: u64) -> String {
         0..=8 => format!("0x{:02x}", (m & 0xff) as u8),
         9..=16 => format!("0x{:04x}", (m & 0xffff) as u16),
         17..=32 => format!("0x{:08x}", (m & 0xffffffff) as u32),
-        33..=64 => format!("0x{:016x}", (m & 0xffffffffffffffff) as u64),
+        33..=64 => format!("0x{:016x}", m),
         _ => String::from("unknown"),
     }
 }
 
 /// writes the scope to a file or to stdout
-pub fn save_scope(scope: CG::Scope, outdir: &PathBuf, name: &str) -> Result<(), CodeGenError> {
+pub fn save_scope(scope: CG::Scope, outdir: &Path, name: &str) -> Result<(), CodeGenError> {
     // set the path to the file
     let file = outdir.join(format!("{}.rs", name));
 
