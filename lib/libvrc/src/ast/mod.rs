@@ -35,6 +35,7 @@ mod interface;
 mod issues;
 mod method;
 mod state;
+mod statement;
 mod symboltable;
 pub mod transform;
 mod types;
@@ -48,12 +49,12 @@ use crate::token::TokenStream;
 
 // custom error definitions
 custom_error! {#[derive(PartialEq)] pub AstError
-    SymTabInsertExists         = "The symbol could not be inserted, already exists",
-    SymTableNotExists          = "The symbol does not exist in the table",
+    SymTabInsertExists        = "The symbol could not be inserted, already exists",
+    SymTableNotExists         = "The symbol does not exist in the table",
     SymTabError{i: Issues}    = "There was an error during creating the symbol table",
-    ImportError{e:ParsErr} = "The parser has failed",
-    MergeError{i: Issues} = "Merging of the ast has failed",
-    CheckError{i: Issues} = "There were warnings or errors",
+    ImportError{e:ParsErr}    = "The parser has failed",
+    MergeError{i: Issues}     = "Merging of the ast has failed",
+    CheckError{i: Issues}     = "There were warnings or errors",
 }
 
 // rexports
@@ -66,8 +67,8 @@ pub use import::Import;
 pub use interface::Interface;
 pub use issues::Issues;
 pub use method::Method;
-pub use method::Stmt;
 pub use state::State;
+pub use statement::Stmt;
 pub use symboltable::{Symbol, SymbolKind, SymbolTable};
 pub use types::Type;
 pub use unit::Unit;

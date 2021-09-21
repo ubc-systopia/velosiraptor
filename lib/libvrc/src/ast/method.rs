@@ -23,10 +23,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-///! Ast module
+///! Method module
+// std lib imports
 use std::fmt;
 
-use crate::ast::{AstNode, Expr, Issues, SymbolTable, Type};
+use crate::ast::{AstNode, Expr, Issues, Stmt, SymbolTable, Type};
 use crate::token::TokenStream;
 
 /// Defines a Method inside a unit
@@ -106,59 +107,5 @@ impl AstNode for Method {
     /// returns the location of the current
     fn loc(&self) -> &TokenStream {
         &self.pos
-    }
-}
-
-/// Represents a statement
-#[derive(Debug, PartialEq, Clone)]
-pub enum Stmt {
-    /// a block is a sequence of statements
-    Block { stmts: Vec<Stmt>, pos: TokenStream },
-    /// the assign statements gives a name to a value
-    Assign {
-        typeinfo: Type,
-        lhs: String,
-        rhs: Expr,
-        pos: TokenStream,
-    },
-    /// the conditional with
-    IfElse {
-        cond: Expr,
-        then: Vec<Stmt>,
-        other: Vec<Stmt>,
-        pos: TokenStream,
-    },
-    /// return statement
-    Return { expr: Expr, pos: TokenStream },
-    /// assert statement
-    Assert { expr: Expr, pos: TokenStream },
-}
-
-impl fmt::Display for Stmt {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use self::Stmt::*;
-        match self {
-            Block { stmts: _, pos: _ } => {
-                writeln!(f, "{{ TODO }}")
-            }
-            Return { expr, .. } => {
-                writeln!(f, "return {};", expr)
-            }
-            Assign {
-                typeinfo,
-                lhs,
-                rhs,
-                pos: _,
-            } => writeln!(f, "let {} : {} = {};", typeinfo, lhs, rhs),
-            Assert { expr, pos: _ } => writeln!(f, "assert {};", expr),
-            IfElse {
-                cond,
-                then,
-                other,
-                pos: _,
-            } => {
-                writeln!(f, "if {} {:?} else {:?}", cond, then, other)
-            }
-        }
     }
 }
