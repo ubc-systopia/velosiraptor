@@ -199,5 +199,27 @@ pub fn stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
     alt((if_else_stmt, let_stmt, assert_stmt, return_stmt))(input)
 }
 
+#[cfg(test)]
+use crate::lexer::Lexer;
+#[cfg(test)]
+use crate::sourcepos::SourcePos;
+
 #[test]
-fn test_ok() {}
+fn test_ok() {
+    let sp = SourcePos::new("stdio", "let x : int = 1234;");
+    let tokens = Lexer::lex_source_pos(sp).unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(stmt(ts).is_ok());
+
+    let sp = SourcePos::new("stdio", "assert(x < 5);");
+    let tokens = Lexer::lex_source_pos(sp).unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(stmt(ts).is_ok());
+}
+#[test]
+fn test_fail() {
+    let sp = SourcePos::new("stdio", "assert(x + 5);");
+    let tokens = Lexer::lex_source_pos(sp).unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(stmt(ts).is_err());
+}
