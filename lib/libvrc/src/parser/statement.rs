@@ -215,10 +215,30 @@ fn test_ok() {
     let tokens = Lexer::lex_source_pos(sp).unwrap();
     let ts = TokenStream::from_vec(tokens);
     assert!(stmt(ts).is_ok());
+
+    let sp = SourcePos::new("stdio", "return 5;");
+    let tokens = Lexer::lex_source_pos(sp).unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(stmt(ts).is_ok());
+
+    let sp = SourcePos::new("stdio", "if 5 < 4 { return 5; }");
+    let tokens = Lexer::lex_source_pos(sp).unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(stmt(ts).is_ok());
+
+    let sp = SourcePos::new("stdio", "if 5 < 4 { return 5; } else {return 4;}");
+    let tokens = Lexer::lex_source_pos(sp).unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(stmt(ts).is_ok());
 }
 #[test]
 fn test_fail() {
     let sp = SourcePos::new("stdio", "assert(x + 5);");
+    let tokens = Lexer::lex_source_pos(sp).unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(stmt(ts).is_err());
+
+    let sp = SourcePos::new("stdio", "if 5 + 4 { return 5; }");
     let tokens = Lexer::lex_source_pos(sp).unwrap();
     let ts = TokenStream::from_vec(tokens);
     assert!(stmt(ts).is_err());
