@@ -27,7 +27,6 @@
 use std::fmt;
 
 use crate::ast::{AstNode, Expr, Issues, SymbolTable, Type};
-use crate::sourcepos::SourcePos;
 use crate::token::TokenStream;
 
 /// Defines a Method inside a unit
@@ -114,23 +113,25 @@ impl AstNode for Method {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Stmt {
     /// a block is a sequence of statements
-    Block { stmts: Vec<Stmt>, pos: SourcePos },
+    Block { stmts: Vec<Stmt>, pos: TokenStream },
     /// the assign statements gives a name to a value
     Assign {
         typeinfo: Type,
         lhs: String,
         rhs: Expr,
-        pos: SourcePos,
+        pos: TokenStream,
     },
     /// the conditional with
     IfElse {
         cond: Expr,
-        then: Box<Stmt>,
-        other: Option<Box<Stmt>>,
-        pos: SourcePos,
+        then: Vec<Stmt>,
+        other: Vec<Stmt>,
+        pos: TokenStream,
     },
+    /// return statement
+    Return { expr: Expr, pos: TokenStream },
     /// assert statement
-    Assert { expr: Expr, pos: SourcePos },
+    Assert { expr: Expr, pos: TokenStream },
 }
 
 impl fmt::Display for Stmt {
@@ -139,6 +140,9 @@ impl fmt::Display for Stmt {
         match self {
             Block { stmts: _, pos: _ } => {
                 writeln!(f, "{{ TODO }}")
+            }
+            Return { expr, .. } => {
+                writeln!(f, "return {};", expr)
             }
             Assign {
                 typeinfo,
@@ -152,10 +156,9 @@ impl fmt::Display for Stmt {
                 then,
                 other,
                 pos: _,
-            } => match other {
-                None => writeln!(f, "if {} {}", cond, then),
-                Some(x) => writeln!(f, "if {} {} else {}", cond, then, x),
-            },
+            } => {
+                writeln!(f, "if {} {:?} else {:?}", cond, then, other)
+            }
         }
     }
 }
