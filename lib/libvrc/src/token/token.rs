@@ -71,6 +71,8 @@ pub enum Keyword {
     Requires,
     /// the ensures clause
     Ensures,
+    /// the return keyword
+    Return,
 }
 
 /// Implementation of the [std::fmt::Display] trait for [Token]
@@ -93,6 +95,7 @@ impl fmt::Display for Keyword {
             None => "None",
             Requires => "requires",
             Ensures => "ensures",
+            Return => "return",
             // types
             Addr => "addr",
             Size => "size",
