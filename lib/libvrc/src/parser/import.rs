@@ -40,7 +40,7 @@ use nom::{combinator::cut, sequence::terminated};
 ///
 /// # Grammar
 ///
-/// IMPORT := KW_IMPORT IDENT;
+/// `IMPORT := KW_IMPORT IDENT;`
 ///
 /// # Results
 ///
