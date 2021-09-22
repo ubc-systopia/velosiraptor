@@ -152,6 +152,15 @@ impl TokenStream {
         self.range.is_empty()
     }
 
+    /// Returns true if the current token is the end-of-file token
+    pub fn is_eof(&self) -> bool {
+        assert_eq!(
+            self.input_len() == 1,
+            self.peek().content == TokenContent::Eof
+        );
+        self.input_len() == 1
+    }
+
     /// Returns the current slice of Tokens backed by this [TokenStream]
     pub fn as_slice(&self) -> &[Token] {
         &self.tokens[self.range.clone()]
