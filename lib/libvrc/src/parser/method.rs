@@ -49,6 +49,10 @@ use crate::token::TokenStream;
 ///
 /// This adds a pre-condition to the function/method
 ///
+/// # Grammar
+///
+/// `REQUIRE := KW_REQUIRES BOOL_EXPR;`
+///
 /// # Results
 ///
 ///  * OK:      the parser could successfully recognize the requires clause
@@ -58,6 +62,7 @@ use crate::token::TokenStream;
 /// # Examples
 ///
 /// `requires arg > 0`
+///
 pub fn require_clauses(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i1, _) = kw_requires(input)?;
     cut(terminated(bool_expr, semicolon))(i1)
@@ -66,6 +71,10 @@ pub fn require_clauses(input: TokenStream) -> IResult<TokenStream, Expr> {
 /// Parses a ensures clause
 ///
 /// This adds a post-condition to the function/method.
+///
+/// # Grammar
+///
+/// `ENSURES := KW_ENSURES BOOL_EXPR;`
 ///
 /// # Results
 ///
@@ -76,14 +85,78 @@ pub fn require_clauses(input: TokenStream) -> IResult<TokenStream, Expr> {
 /// # Examples
 ///
 /// `ensures ret < 5`
+///
 pub fn ensure_clauses(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i1, _) = kw_ensures(input)?;
     cut(terminated(bool_expr, semicolon))(i1)
 }
 
-/// Parses and consumes a method from a unit body
+/// parses the method body
+///
+/// This parses the statements in the method body.
+/// The method body must have at least one statement.
+///
+/// # Grammar
+///
+/// FN_BODY := { STMT+ }
+///
+/// # Results
+///
+///  * OK:      the parser could successfully recognize the method body
+///  * Error:   the parser could not recognize the method body
+///  * Failure: the parser recognized the method body, but it did not properly parse
 ///
 /// # Examples
+///
+/// `{ return 0; }`
+///
+/// # TODO: is this just a statement block?
+///
+fn method_body(input: TokenStream) -> IResult<TokenStream, Vec<Stmt>> {
+    delimited(lbrace, many0(stmt), cut(rbrace))(input)
+}
+
+/// parses an arguments list
+///
+/// This function parses a list of arguments with types annotations
+///
+/// # Grammar
+///
+/// ARG     := IDENT : TYPE
+/// ARGLIST := (ARG | ARG (, ARG)+ )
+///
+/// # Results
+///
+///  * OK:      the parser could successfully recognize the arglist
+///  * Error:   the parser could not recognize the arglist
+///  * Failure: the parser recognized the arglist, but it did not properly parse
+///
+/// # Examples
+///
+/// `a : bool, b : int`
+///
+fn argument_list(input: TokenStream) -> IResult<TokenStream, Vec<(String, Type)>> {
+    separated_list0(comma, tuple((ident, cut(preceded(colon, typeinfo)))))(input)
+}
+
+/// parses a method definition
+///
+/// This function parses a full method definition.
+///
+/// # Grammar
+///
+/// METHOD := KW_FN IDENT ( ARGLIST ) -> TYPE REQUIRES+ ENSURES+ METHOD_BODY
+///
+/// # Results
+///
+///  * OK:      the parser could successfully recognize the method definition
+///  * Error:   the parser could not recognize the method definition
+///  * Failure: the parser recognized the method definition, but it did not properly parse
+///
+/// # Examples
+///
+/// `fn foo() -> addr`
+///
 ///
 /// example of method syntax:
 /// fn method_name(arg1: Size, arg2: Integer, arg3: Boolean) -> Address {
@@ -105,54 +178,83 @@ pub fn method(input: TokenStream) -> IResult<TokenStream, Method> {
     // parse and consume fn keyword
     let (i1, _) = kw_fn(input.clone())?;
 
-    // get the method name and the arguments `Ident (...)`
-    let (i2, (name, args)) = cut(tuple((ident, typed_arguments)))(i1)?;
+    // get the method identifier, fail if there is not an identifier
+    let (i2, name) = cut(ident)(i1)?;
 
-    // get the return type `-> Type`
-    let (i3, rettype) = cut(preceded(rarrow, typeinfo))(i2)?;
+    // get the method name and the arguments `IDENT ( ARGLIST )`, fail on missing parenstheses
+    let (i3, args) = delimited(cut(lparen), argument_list, cut(rparen))(i2)?;
 
-    // get the ensure/require clauses
-    let (i4, (requires, ensures)) = tuple((many0(require_clauses), many0(ensure_clauses)))(i3)?;
+    // get the return type `-> Type`, fail if there is no arrow, or type info
+    let (i4, rettype) = cut(preceded(rarrow, typeinfo))(i3)?;
 
-    // parse and consume a function body (or an abstract function)
-    let (i5, stmts) = cut(opt(method_body))(i4)?;
+    // get the ensures / requires clauses
+    let (i5, (requires, ensures)) = tuple((many0(require_clauses), many0(ensure_clauses)))(i4)?;
 
-    let is_abstract = false;
+    // try to parse the method body
+    let (i6, stmts) = opt(method_body)(i5)?;
+
+    let (i6, stmts) = match stmts {
+        Some(x) => {
+            let (s, _) = opt(semicolon)(i6)?;
+            (s, x)
+        }
+        None => {
+            let (s, _) = cut(semicolon)(i6)?;
+            (s, Vec::new())
+        }
+    };
+
     // create the token stream covering the entire method def
-    let pos = input.expand_until(&i5);
+    let pos = input.expand_until(&i6);
 
     Ok((
-        i5,
+        i6,
         Method {
             name,
             rettype,
             args,
             requires,
             ensures,
-            stmts: stmts.unwrap_or_default(),
+            stmts,
             pos,
-            is_abstract,
         },
     ))
 }
 
-/// parses the method body
-///
-///
-fn method_body(input: TokenStream) -> IResult<TokenStream, Vec<Stmt>> {
-    delimited(lbrace, many1(stmt), rbrace)(input)
-}
-
-fn typed_arguments(input: TokenStream) -> IResult<TokenStream, Vec<(String, Type)>> {
-    delimited(
-        lparen,
-        separated_list0(comma, tuple((ident, preceded(colon, typeinfo)))),
-        rparen,
-    )(input)
-}
-
 #[cfg(test)]
 use crate::lexer::Lexer;
+
+#[cfg(test)]
+use std::path::PathBuf;
+
+#[cfg(test)]
+use nom::InputLength;
+
+#[test]
+fn test_abstract() {
+    let tokens = Lexer::lex_string("stdio", "fn foo() -> addr;").unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(method(ts).is_ok());
+
+    let tokens = Lexer::lex_string("stdio", "fn foo(a : addr) -> addr;").unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(method(ts).is_ok());
+}
+
+#[test]
+fn test_fail() {
+    let tokens = Lexer::lex_string("stdio", "fn foo();").unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(method(ts).is_err());
+
+    let tokens = Lexer::lex_string("stdio", "fn foo(a) -> Addr;").unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(method(ts).is_err());
+
+    let tokens = Lexer::lex_string("stdio", "fn foo() -> Addr {}").unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(method(ts).is_err());
+}
 
 #[test]
 fn test_ok() {
@@ -167,10 +269,34 @@ fn test_ok() {
     .unwrap();
     let ts = TokenStream::from_vec(tokens);
     assert!(method(ts).is_ok());
+}
 
-    // an abstract function
-    let tokens = Lexer::lex_string("stdio", "fn foo() -> addr;").unwrap();
-    let ts = TokenStream::from_vec(tokens);
-    println!("{:?}", method(ts.clone()));
-    assert!(method(ts).is_ok());
+#[test]
+fn test_ok2() {
+    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    d.push("tests/parser");
+
+    for f in vec!["methods.vrs"] {
+        d.push(f);
+        let filename = format!("{}", d.display());
+
+        // lex the file
+        let tokens = Lexer::lex_file(&filename);
+        assert!(tokens.is_ok());
+
+        let ts = TokenStream::from_vec_filtered(tokens.unwrap().0);
+        let res = many1(method)(ts);
+
+        println!("{:?}", res);
+
+        let (res, x) = res.unwrap();
+
+        println!("{}", res);
+        println!("{:?}", x);
+
+        // consumed all, but the EOF token
+        assert!(res.is_eof());
+
+        d.pop();
+    }
 }
