@@ -27,7 +27,7 @@
 // std lib imports
 use std::fmt;
 
-use crate::ast::{AstNode, Expr, Issues, Stmt, SymbolTable, Type};
+use crate::ast::{utils, AstNode, Expr, Issues, Param, Stmt, SymbolTable, Type};
 use crate::token::TokenStream;
 
 /// Defines a Method inside a unit
@@ -45,7 +45,7 @@ pub struct Method {
     /// the return type of the method
     pub rettype: Type,
     /// A list of arguments with their types
-    pub args: Vec<(String, Type)>,
+    pub args: Vec<Param>,
     /// the ensures clauses
     pub requires: Vec<Expr>,
     /// the ensures clauses
@@ -65,7 +65,7 @@ impl Method {
     }
 }
 
-/// Implementation of the [fmt::Display] trait for [Field]
+/// Implementation of the [fmt::Display] trait for [Method]
 impl fmt::Display for Method {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "fn {}() -> {} {{", self.name, self.rettype)?;
@@ -76,7 +76,7 @@ impl fmt::Display for Method {
     }
 }
 
-/// Implementation of the [fmt::Debug] trait for [Field]
+/// Implementation of the [fmt::Debug] trait for [Method]
 impl fmt::Debug for Method {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (line, column) = self.pos.input_sourcepos().input_pos();
@@ -92,10 +92,49 @@ impl fmt::Debug for Method {
     }
 }
 
-/// implementation of [AstNode] for [Field]
+/// implementation of [AstNode] for [Method]
 impl AstNode for Method {
     fn check(&self, _st: &mut SymbolTable) -> Issues {
-        Issues::ok()
+        let mut res = Issues::ok();
+
+        // Check 1: Parameter Identifiers
+        // --------------------------------------------------------------------------------------
+        // Type:        Errors
+        // Description: Check if all parameter identifiers are unique
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+        let errors = utils::check_double_entries(&self.args);
+        res.inc_err(errors);
+
+        // Check 2: Types
+        // --------------------------------------------------------------------------------------
+        // Type:        Errors
+        // Description: Check if all parameters have the right type
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        // Check 3: Statements
+        // --------------------------------------------------------------------------------------
+        // Type:        Errors
+        // Description: Check if all statements are well-defined
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        // Check 4: Return Paths
+        // --------------------------------------------------------------------------------------
+        // Type:        Errors
+        // Description: Check if all branches have a well-defined return path
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        // Check 5: Identifier snake_case
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning
+        // Description: Checks if the identifier has snake_case
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        res + utils::check_snake_case(&self.name, &self.pos)
     }
 
     fn name(&self) -> &str {

@@ -28,12 +28,12 @@
 // the used nom functions
 use nom::{
     combinator::{cut, opt},
-    multi::{many0, many1, separated_list0},
+    multi::{many0, separated_list0},
     sequence::{delimited, preceded, terminated, tuple},
 };
 
 // library internal includes
-use crate::ast::{Expr, Method, Stmt, Type};
+use crate::ast::{Expr, Method, Param, Stmt};
 use crate::error::IResult;
 use crate::parser::{
     expression::bool_expr,
@@ -116,6 +116,38 @@ fn method_body(input: TokenStream) -> IResult<TokenStream, Vec<Stmt>> {
     delimited(lbrace, many0(stmt), cut(rbrace))(input)
 }
 
+/// parses a single parameter
+///
+/// This function parses a single, typed parameter
+///
+/// # Grammar
+///
+/// ARG     := IDENT : TYPE
+///
+/// # Results
+///
+///  * OK:      the parser could successfully recognize the parameter
+///  * Error:   the parser could not recognize the parameter
+///  * Failure: the parser recognized the parameter, but it did not properly parse
+///
+/// # Examples
+///
+/// `a : bool`
+///
+fn parameter(input: TokenStream) -> IResult<TokenStream, Param> {
+    // parse the identifier of the parameter
+    let (i1, name) = ident(input.clone())?;
+
+    // next, parse the type info
+    let (i2, ptype) = cut(preceded(colon, typeinfo))(i1)?;
+
+    // create the token stream covering the entire method def
+    let pos = input.expand_until(&i2);
+
+    // return the result
+    Ok((i2, Param { name, ptype, pos }))
+}
+
 /// parses an arguments list
 ///
 /// This function parses a list of arguments with types annotations
@@ -135,8 +167,8 @@ fn method_body(input: TokenStream) -> IResult<TokenStream, Vec<Stmt>> {
 ///
 /// `a : bool, b : int`
 ///
-fn argument_list(input: TokenStream) -> IResult<TokenStream, Vec<(String, Type)>> {
-    separated_list0(comma, tuple((ident, cut(preceded(colon, typeinfo)))))(input)
+fn argument_list(input: TokenStream) -> IResult<TokenStream, Vec<Param>> {
+    separated_list0(comma, parameter)(input)
 }
 
 /// parses a method definition
