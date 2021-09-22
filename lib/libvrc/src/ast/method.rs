@@ -54,8 +54,6 @@ pub struct Method {
     pub stmts: Vec<Stmt>,
     /// the position where the method was defined
     pub pos: TokenStream,
-    /// Whether or not the method has an implementation
-    pub is_abstract: bool,
 }
 
 impl Method {
