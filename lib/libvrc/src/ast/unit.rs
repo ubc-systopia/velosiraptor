@@ -219,7 +219,7 @@ impl AstNode for Unit {
     fn build_symtab(&self, st: &mut SymbolTable) -> Issues {
         let mut err = Issues::ok();
         for i in &self.consts {
-            let sym = i.to_symbol(&self.name());
+            let sym = i.to_symbol(self.name());
             if st.insert(sym).is_err() {
                 err.inc_err(1);
             };
@@ -263,6 +263,6 @@ impl PartialOrd for Unit {
     /// This method returns an ordering between self and other values if one exists.
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         // we jus compare with the TokenStream position
-        self.loc().partial_cmp(&other.loc())
+        self.loc().partial_cmp(other.loc())
     }
 }

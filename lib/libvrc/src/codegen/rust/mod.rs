@@ -188,7 +188,7 @@ impl CodeGenBackend for BackendRust {
 
         // now add the constants
         for c in &ast.consts {
-            add_const_def(&mut scope, &c);
+            add_const_def(&mut scope, c);
         }
 
         save_scope(scope, &srcdir, MOD_CONSTS)
@@ -207,7 +207,7 @@ impl CodeGenBackend for BackendRust {
                 State::MemoryState {
                     bases: _, fields, ..
                 } => self
-                    .generate_fields(&srcdir, &unit.name, &fields)
+                    .generate_fields(&srcdir, &unit.name, fields)
                     .expect("field generation failed"),
                 _ => (),
             }
@@ -226,7 +226,7 @@ impl CodeGenBackend for BackendRust {
             srcdir.push(unit.name.to_lowercase());
 
             // generate the unit
-            unit::generate(&unit, &srcdir)?;
+            unit::generate(unit, &srcdir)?;
 
             // construct the scope
             let mut scope = CG::Scope::new();

@@ -73,12 +73,12 @@ impl Const {
                 ident: _,
                 value,
                 pos: _,
-            } => &value,
+            } => value,
             Boolean {
                 ident: _,
                 value,
                 pos: _,
-            } => &value,
+            } => value,
         }
     }
 
@@ -159,7 +159,7 @@ impl PartialOrd for Const {
     /// This method returns an ordering between self and other values if one exists.
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         // we jus compare with the TokenStream position
-        self.loc().partial_cmp(&other.loc())
+        self.loc().partial_cmp(other.loc())
     }
 }
 
@@ -225,8 +225,8 @@ impl AstNode for Const {
     fn name(&self) -> &str {
         use self::Const::*;
         match self {
-            Integer { ident, .. } => &ident,
-            Boolean { ident, .. } => &ident,
+            Integer { ident, .. } => ident,
+            Boolean { ident, .. } => ident,
         }
     }
 
@@ -238,12 +238,12 @@ impl AstNode for Const {
                 ident: _,
                 value: _,
                 pos,
-            } => &pos,
+            } => pos,
             Boolean {
                 ident: _,
                 value: _,
                 pos,
-            } => &pos,
+            } => pos,
         }
     }
 }

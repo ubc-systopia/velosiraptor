@@ -93,10 +93,10 @@ impl AstNode for Stmt {
     /// returns the location of the current
     fn loc(&self) -> &TokenStream {
         match &self {
-            Stmt::IfElse { pos, .. } => &pos,
-            Stmt::Return { pos, .. } => &pos,
-            Stmt::Assert { pos, .. } => &pos,
-            Stmt::Assign { pos, .. } => &pos,
+            Stmt::IfElse { pos, .. } => pos,
+            Stmt::Return { pos, .. } => pos,
+            Stmt::Assert { pos, .. } => pos,
+            Stmt::Assign { pos, .. } => pos,
         }
     }
 }

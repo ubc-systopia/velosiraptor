@@ -96,7 +96,7 @@ pub fn save_scope(scope: CG::Scope, outdir: &Path, name: &str) -> Result<(), Cod
 pub fn add_header(scope: &mut CG::Scope, title: &str) {
     // set the title of the file
     // construct the license
-    let mut lic = CG::License::new(&title, CG::LicenseType::Mit);
+    let mut lic = CG::License::new(title, CG::LicenseType::Mit);
     lic.add_copyright(COPYRIGHT);
 
     // now add the license to the scope

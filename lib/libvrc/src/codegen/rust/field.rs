@@ -144,9 +144,9 @@ pub fn generate(unit: &str, field: &Field, outdir: &Path) -> Result<(), CodeGenE
     add_header(&mut scope, &title);
 
     // add the definitions
-    add_field_constants(&mut scope, &field);
-    add_struct_definition(&mut scope, &field);
-    add_struct_impl(&mut scope, &field);
+    add_field_constants(&mut scope, field);
+    add_struct_definition(&mut scope, field);
+    add_struct_impl(&mut scope, field);
 
     // save the scope
     save_scope(scope, outdir, &field.name.to_lowercase())

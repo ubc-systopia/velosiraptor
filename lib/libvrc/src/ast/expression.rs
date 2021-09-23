@@ -358,8 +358,8 @@ impl Expr {
         use Expr::*;
         match self {
             Identifier { path, pos } => Expr::symbol_exists(
-                &pos,
-                &path,
+                pos,
+                path,
                 st,
                 &[
                     SymbolKind::Const,
@@ -378,8 +378,8 @@ impl Expr {
             UnaryOperation { op: _, val, pos: _ } => val.check_symbols(st),
             FnCall { path, args: _, pos } => {
                 let s = Expr::symbol_exists(
-                    &pos,
-                    &path,
+                    pos,
+                    path,
                     st,
                     &[
                         SymbolKind::Const,
@@ -393,8 +393,8 @@ impl Expr {
             }
             Slice { path, slice, pos } => {
                 let s = Expr::symbol_exists(
-                    &pos,
-                    &path,
+                    pos,
+                    path,
                     st,
                     &[
                         SymbolKind::Const,
@@ -406,8 +406,8 @@ impl Expr {
             }
             Element { path, idx, pos } => {
                 let s = Expr::symbol_exists(
-                    &pos,
-                    &path,
+                    pos,
+                    path,
                     st,
                     &[
                         SymbolKind::Const,
@@ -557,36 +557,36 @@ impl AstNode for Expr {
     fn loc(&self) -> &TokenStream {
         use self::Expr::*;
         match &self {
-            Identifier { path: _, pos } => &pos,
-            Number { value: _, pos } => &pos,
-            Boolean { value: _, pos } => &pos,
+            Identifier { path: _, pos } => pos,
+            Number { value: _, pos } => pos,
+            Boolean { value: _, pos } => pos,
             BinaryOperation {
                 op: _,
                 lhs: _,
                 rhs: _,
                 pos,
-            } => &pos,
-            UnaryOperation { op: _, val: _, pos } => &pos,
+            } => pos,
+            UnaryOperation { op: _, val: _, pos } => pos,
             FnCall {
                 path: _,
                 pos,
                 args: _,
-            } => &pos,
+            } => pos,
             Slice {
                 path: _,
                 slice: _,
                 pos,
-            } => &pos,
+            } => pos,
             Element {
                 path: _,
                 idx: _,
                 pos,
-            } => &pos,
+            } => pos,
             Range {
                 start: _,
                 end: _,
                 pos,
-            } => &pos,
+            } => pos,
         }
     }
 }
