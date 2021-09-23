@@ -109,7 +109,7 @@ fn let_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
     // parsing successful, construct the token
     Ok((
         i3,
-        Stmt::Assign {
+        Stmt::Let {
             typeinfo: ti,
             lhs,
             rhs,
