@@ -84,13 +84,11 @@ impl Const {
 
     /// creates a symbol from the current Const
     pub fn to_symbol(&self, ctxt: &str) -> Symbol {
-        Symbol::new(
-            ctxt,
-            self.name(),
-            self.to_type(),
-            SymbolKind::Const,
-            self.loc().clone(),
-        )
+        let mut name = String::from(self.name());
+        if !ctxt.is_empty() {
+            name = format!("{}.{}", ctxt, self.name());
+        }
+        Symbol::new(name, self.to_type(), SymbolKind::Const, self.loc().clone())
     }
 
     pub fn to_type(&self) -> Type {

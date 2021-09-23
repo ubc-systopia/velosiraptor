@@ -73,13 +73,7 @@ pub struct Symbol {
 /// Implementation of [Symbol]
 impl Symbol {
     /// creates a new symbol from the given context and name, type
-    pub fn new(ctxt: &str, name: &str, typeinfo: Type, kind: SymbolKind, loc: TokenStream) -> Self {
-        let name = if ctxt.is_empty() {
-            String::from(name)
-        } else {
-            format!("{}.{}", ctxt, name)
-        };
-
+    pub fn new(name: String, typeinfo: Type, kind: SymbolKind, loc: TokenStream) -> Self {
         Symbol {
             kind,
             name,
