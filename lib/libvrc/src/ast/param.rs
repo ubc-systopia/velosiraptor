@@ -27,7 +27,7 @@
 // std lib imports
 use std::fmt;
 
-use crate::ast::{AstNode, Issues, SymbolTable, Type};
+use crate::ast::{AstNode, Issues, Symbol, SymbolKind, SymbolTable, Type};
 use crate::token::TokenStream;
 
 /// Defines a Method inside a unit
@@ -39,6 +39,19 @@ pub struct Param {
     pub ptype: Type,
     /// the position where the method was defined
     pub pos: TokenStream,
+}
+
+/// implementation of the [Param] ast node
+impl Param {
+    /// creates a new symbol from the parameter
+    pub fn to_symbol(&self) -> Symbol {
+        Symbol {
+            kind: SymbolKind::Parameter,
+            name: self.name.clone(),
+            typeinfo: self.ptype,
+            loc: self.pos.clone(),
+        }
+    }
 }
 
 /// Implementation of the [fmt::Display] trait for [Param]

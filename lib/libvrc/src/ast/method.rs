@@ -94,7 +94,7 @@ impl fmt::Debug for Method {
 
 /// implementation of [AstNode] for [Method]
 impl AstNode for Method {
-    fn check(&self, _st: &mut SymbolTable) -> Issues {
+    fn check(&self, st: &mut SymbolTable) -> Issues {
         let mut res = Issues::ok();
 
         // Check 1: Parameter Identifiers
@@ -112,6 +112,13 @@ impl AstNode for Method {
         // Description: Check if all parameters have the right type
         // Notes:       --
         // --------------------------------------------------------------------------------------
+
+        // build the symbol table with the
+        for p in &self.args {
+            if !st.insert(p.to_symbol()) {
+                res.inc_err(1);
+            }
+        }
 
         // Check 3: Statements
         // --------------------------------------------------------------------------------------

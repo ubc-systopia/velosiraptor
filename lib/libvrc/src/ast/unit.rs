@@ -82,7 +82,7 @@ impl AstNode for Unit {
         let pos = self.loc();
 
         // set the current context
-        st.set_context(self.name());
+        st.create_context(String::from(self.name()));
 
         // Check 1: Constants
         // --------------------------------------------------------------------------------------
@@ -220,7 +220,7 @@ impl AstNode for Unit {
         let mut err = Issues::ok();
         for i in &self.consts {
             let sym = i.to_symbol(self.name());
-            if st.insert(sym).is_err() {
+            if !st.insert(sym) {
                 err.inc_err(1);
             };
         }

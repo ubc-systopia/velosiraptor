@@ -280,7 +280,7 @@ impl Expr {
             Identifier { path, pos: _ } => {
                 // TODO: deal with context.symbol
                 let name = path.join(".");
-                match st.get(&name) {
+                match st.lookup(&name) {
                     Some(s) => s.is_const(),
                     None => false,
                 }
@@ -328,7 +328,7 @@ impl Expr {
         kind: &[SymbolKind],
     ) -> Issues {
         let ident = path.join(".");
-        match st.get(&ident) {
+        match st.lookup(&ident) {
             Some(s) => {
                 if !kind.contains(&s.kind) {
                     // warning
