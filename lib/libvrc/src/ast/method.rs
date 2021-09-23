@@ -113,35 +113,72 @@ impl AstNode for Method {
         // Notes:       --
         // --------------------------------------------------------------------------------------
 
-        // build the symbol table with the
+        // create a new symbol table context
+        st.create_context(self.name.clone());
+
+        // adding the parameters
         for p in &self.args {
             if !st.insert(p.to_symbol()) {
                 res.inc_err(1);
             }
         }
 
-        // Check 3: Statements
+        // TODO: adding return value
+
+        // Check 3: Ensures clauses
+        // --------------------------------------------------------------------------------------
+        // Type:        Errors
+        // Description: Check if all ensures clauses are well-defined
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        for e in &self.ensures {
+            res = res + e.check(st);
+        }
+
+        // Check 4: Requires clauses
+        // --------------------------------------------------------------------------------------
+        // Type:        Errors
+        // Description: Check if all requres clauses are well-defined
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        for e in &self.requires {
+            res = res + e.check(st);
+        }
+
+        // Check 5: Statements
         // --------------------------------------------------------------------------------------
         // Type:        Errors
         // Description: Check if all statements are well-defined
         // Notes:       --
         // --------------------------------------------------------------------------------------
 
-        // Check 4: Return Paths
+        for s in &self.stmts {
+            res = res + s.check(st);
+        }
+
+        // Check 6: Return Paths
         // --------------------------------------------------------------------------------------
         // Type:        Errors
         // Description: Check if all branches have a well-defined return path
         // Notes:       --
         // --------------------------------------------------------------------------------------
 
-        // Check 5: Identifier snake_case
+        // Check 7: Identifier snake_case
         // --------------------------------------------------------------------------------------
         // Type:        Warning
         // Description: Checks if the identifier has snake_case
         // Notes:       --
         // --------------------------------------------------------------------------------------
 
-        res + utils::check_snake_case(&self.name, &self.pos)
+        res = res + utils::check_snake_case(&self.name, &self.pos);
+
+        // restore the symbol table again
+        st.drop_context();
+
+        // return the number of issues found
+        res
     }
 
     fn name(&self) -> &str {

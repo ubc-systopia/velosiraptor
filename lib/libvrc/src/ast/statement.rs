@@ -28,14 +28,14 @@
 use std::fmt;
 
 // library internal imports
-use crate::ast::{AstNode, Expr, Issues, SymbolTable, Type};
+use crate::ast::{AstNode, Expr, Issues, Symbol, SymbolKind, SymbolTable, Type};
 use crate::token::TokenStream;
 
 /// Represents a statement
 #[derive(Debug, PartialEq, Clone)]
 pub enum Stmt {
     /// the assign statements gives a name to a value
-    Assign {
+    Let {
         pos: TokenStream,
         typeinfo: Type,
         lhs: String,
@@ -61,7 +61,7 @@ impl fmt::Display for Stmt {
             Return { expr, .. } => {
                 writeln!(f, "return {};", expr)
             }
-            Assign {
+            Let {
                 typeinfo,
                 lhs,
                 rhs,
@@ -82,8 +82,54 @@ impl fmt::Display for Stmt {
 
 /// implementation of [AstNode] for [Field]
 impl AstNode for Stmt {
-    fn check(&self, _st: &mut SymbolTable) -> Issues {
-        Issues::ok()
+    fn check(&self, st: &mut SymbolTable) -> Issues {
+        let mut res = Issues::ok();
+
+        use self::Stmt::*;
+        match self {
+            Assert { expr, .. } => {
+                res = res + expr.check(st) + expr.match_type(Type::Boolean, st);
+            }
+            Return { expr, .. } => {
+                // TODO: typecheck, lookup return symbol
+                res = res + expr.check(st)
+            }
+            IfElse {
+                cond, then, other, ..
+            } => {
+                res = res + cond.check(st) + cond.match_type(Type::Boolean, st);
+
+                // TODO: type check conditional!
+
+                st.create_context(String::from("if_then"));
+                for s in then {
+                    res = res + s.check(st);
+                }
+                st.drop_context();
+
+                st.create_context(String::from("if_else"));
+                for s in other {
+                    res = res + s.check(st);
+                }
+                st.drop_context();
+            }
+            Let {
+                pos,
+                typeinfo,
+                lhs,
+                rhs,
+            } => {
+                // check the expression and the type info
+                res = res + rhs.check(st) + rhs.match_type(*typeinfo, st);
+
+                // add the symbol to the context
+                let sym = Symbol::new(lhs.clone(), *typeinfo, SymbolKind::Variable, pos.clone());
+                st.insert(sym);
+            }
+        }
+
+        // return the number of issues found
+        res
     }
 
     fn name(&self) -> &str {
@@ -96,7 +142,7 @@ impl AstNode for Stmt {
             Stmt::IfElse { pos, .. } => pos,
             Stmt::Return { pos, .. } => pos,
             Stmt::Assert { pos, .. } => pos,
-            Stmt::Assign { pos, .. } => pos,
+            Stmt::Let { pos, .. } => pos,
         }
     }
 }

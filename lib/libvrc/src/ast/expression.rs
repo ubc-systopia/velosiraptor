@@ -26,7 +26,7 @@
 ///! Ast Module of the Velosiraptor Compiler
 use std::fmt;
 
-use crate::ast::{AstNode, Issues, SymbolKind, SymbolTable};
+use crate::ast::{AstNode, Issues, SymbolKind, SymbolTable, Type};
 use crate::error::VrsError;
 use crate::token::TokenStream;
 
@@ -268,16 +268,11 @@ impl Expr {
     pub fn is_const_expr(&self, st: &SymbolTable) -> bool {
         use Expr::*;
         match self {
-            Number { value: _, pos: _ } => true,
-            Boolean { value: _, pos: _ } => true,
-            BinaryOperation {
-                op: _,
-                lhs,
-                rhs,
-                pos: _,
-            } => lhs.is_const_expr(st) && rhs.is_const_expr(st),
-            UnaryOperation { op: _, val, pos: _ } => val.is_const_expr(st),
-            Identifier { path, pos: _ } => {
+            Number { .. } => true,
+            Boolean { .. } => true,
+            BinaryOperation { lhs, rhs, .. } => lhs.is_const_expr(st) && rhs.is_const_expr(st),
+            UnaryOperation { val, .. } => val.is_const_expr(st),
+            Identifier { path, .. } => {
                 // TODO: deal with context.symbol
                 let name = path.join(".");
                 match st.lookup(&name) {
@@ -287,6 +282,10 @@ impl Expr {
             }
             _ => false,
         }
+    }
+
+    pub fn match_type(&self, _ty: Type, _st: &SymbolTable) -> Issues {
+        Issues::ok()
     }
 
     pub fn fold_constants(self) -> Self {
