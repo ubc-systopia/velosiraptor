@@ -232,7 +232,7 @@ impl Ast {
         let mut st = SymbolTable::new();
         for c in &self.consts {
             let sym = c.to_symbol("");
-            if st.insert(sym).is_err() {
+            if !st.insert(sym) {
                 err.inc_err(1);
             };
         }
