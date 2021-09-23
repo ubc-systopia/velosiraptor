@@ -84,17 +84,7 @@ impl AstNode for Unit {
         // set the current context
         st.create_context(String::from(self.name()));
 
-        // Check 1: Constants
-        // --------------------------------------------------------------------------------------
-        // Type:        Error/Warning
-        // Description: Check all defined constats of the Unit
-        // Notes:
-        // --------------------------------------------------------------------------------------
-        for c in &self.consts {
-            res = res + c.check(st);
-        }
-
-        // Check 2: Double defined constants
+        // Check 1: Double defined constants
         // --------------------------------------------------------------------------------------
         // Type:        Error
         // Description: Check that all constants of this field have distinct names
@@ -103,6 +93,16 @@ impl AstNode for Unit {
 
         let errors = utils::check_double_entries(&self.consts);
         res.inc_err(errors);
+
+        // Check 2: Constants
+        // --------------------------------------------------------------------------------------
+        // Type:        Error/Warning
+        // Description: Check all defined constats of the Unit
+        // Notes:
+        // --------------------------------------------------------------------------------------
+        for c in &self.consts {
+            res = res + c.check(st);
+        }
 
         // Check 3: State Check
         // --------------------------------------------------------------------------------------
@@ -129,7 +129,7 @@ impl AstNode for Unit {
         // Notes:       --
         // --------------------------------------------------------------------------------------
 
-        res = res + self.state.check(st);
+        // res = res + self.interface.check(st);
 
         // Check 6: Interface param check
         // --------------------------------------------------------------------------------------
@@ -156,9 +156,9 @@ impl AstNode for Unit {
         // Notes:       --
         // --------------------------------------------------------------------------------------
 
-        // for m in &self.methods {
-        //     res = res + m.check(st);
-        // }
+        for m in &self.methods {
+            res = res + m.check(st);
+        }
 
         // Check 9: Bases are defined
         // --------------------------------------------------------------------------------------
@@ -219,7 +219,8 @@ impl AstNode for Unit {
     fn build_symtab(&self, st: &mut SymbolTable) -> Issues {
         let mut err = Issues::ok();
         for i in &self.consts {
-            let sym = i.to_symbol(self.name());
+            //let name = format!("{}.{}", self.name().to_uppercase(), i.name());
+            let sym = i.to_symbol();
             if !st.insert(sym) {
                 err.inc_err(1);
             };

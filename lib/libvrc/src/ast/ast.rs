@@ -231,7 +231,7 @@ impl Ast {
         let mut err = Issues::ok();
         let mut st = SymbolTable::new();
         for c in &self.consts {
-            let sym = c.to_symbol("");
+            let sym = c.to_symbol();
             if !st.insert(sym) {
                 err.inc_err(1);
             };

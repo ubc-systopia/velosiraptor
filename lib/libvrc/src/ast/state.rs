@@ -67,6 +67,24 @@ pub enum State {
     },
 }
 
+impl State {
+    /// builds the symboltable for the state related symbols
+    pub fn build_symboltable(&self, st: &mut SymbolTable) {
+        for f in self.fields() {
+            f.build_symboltable(st);
+        }
+    }
+
+    /// returns a slice of fields
+    pub fn fields(&self) -> &[Field] {
+        match self {
+            State::MemoryState { fields, .. } => fields,
+            State::RegisterState { fields, .. } => fields,
+            _ => &[],
+        }
+    }
+}
+
 /// implementation of the [Display] trait for the [State]
 impl Display for State {
     fn fmt(&self, f: &mut Formatter) -> Result {
