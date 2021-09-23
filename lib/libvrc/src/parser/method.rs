@@ -260,7 +260,7 @@ use crate::lexer::Lexer;
 use std::path::PathBuf;
 
 #[cfg(test)]
-use nom::InputLength;
+use nom::multi::many1;
 
 #[test]
 fn test_abstract() {
