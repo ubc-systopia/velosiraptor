@@ -69,41 +69,26 @@ impl Const {
     pub fn value(&self) -> &Expr {
         use self::Const::*;
         match self {
-            Integer {
-                ident: _,
-                value,
-                pos: _,
-            } => value,
-            Boolean {
-                ident: _,
-                value,
-                pos: _,
-            } => value,
+            Integer { value, .. } => value,
+            Boolean { value, .. } => value,
         }
     }
 
     /// creates a symbol from the current Const
-    pub fn to_symbol(&self, ctxt: &str) -> Symbol {
-        let mut name = String::from(self.name());
-        if !ctxt.is_empty() {
-            name = format!("{}.{}", ctxt, self.name());
-        }
-        Symbol::new(name, self.to_type(), SymbolKind::Const, self.loc().clone())
+    pub fn to_symbol(&self) -> Symbol {
+        Symbol::new(
+            String::from(self.name()),
+            self.to_type(),
+            SymbolKind::Const,
+            self.loc().clone(),
+        )
     }
 
     pub fn to_type(&self) -> Type {
         use self::Const::*;
         match self {
-            Integer {
-                ident: _,
-                value: _,
-                pos: _,
-            } => Type::Integer,
-            Boolean {
-                ident: _,
-                value: _,
-                pos: _,
-            } => Type::Boolean,
+            Integer { .. } => Type::Integer,
+            Boolean { .. } => Type::Boolean,
         }
     }
 }
@@ -113,16 +98,8 @@ impl Display for Const {
     fn fmt(&self, f: &mut Formatter) -> Result {
         use self::Const::*;
         match self {
-            Integer {
-                ident,
-                value,
-                pos: _,
-            } => write!(f, "const {} : int  = {};", ident, value),
-            Boolean {
-                ident,
-                value,
-                pos: _,
-            } => write!(f, "const {} : bool = {};", ident, value),
+            Integer { ident, value, .. } => write!(f, "const {} : int  = {};", ident, value),
+            Boolean { ident, value, .. } => write!(f, "const {} : bool = {};", ident, value),
         }
     }
 }
