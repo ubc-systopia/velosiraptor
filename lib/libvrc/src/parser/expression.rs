@@ -66,7 +66,7 @@ fn fold_exprs(initial: Expr, remainder: Vec<(BinOp, Expr)>) -> Expr {
     remainder.into_iter().fold(initial, |acc, tuple| {
         let (op, expr) = tuple;
 
-        let pos = acc.loc().clone().merge(&expr.loc());
+        let pos = acc.loc().clone().merge(expr.loc());
         Expr::BinaryOperation {
             op,
             lhs: Box::new(acc),

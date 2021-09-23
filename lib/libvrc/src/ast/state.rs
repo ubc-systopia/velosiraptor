@@ -173,7 +173,7 @@ impl AstNode for State {
         // Notes:       --
         // --------------------------------------------------------------------------------------
 
-        let errors = utils::check_double_entries(&fields);
+        let errors = utils::check_double_entries(fields);
         res.inc_err(errors);
 
         // Check 3: Bases are defined
@@ -190,7 +190,7 @@ impl AstNode for State {
                         // case 1: we have a state ref
                         let (sref, _) = sref;
                         // if the bases list contain a state ref, we're good
-                        if bases.contains(&sref) {
+                        if bases.contains(sref) {
                             continue;
                         }
                         // undefined base
@@ -261,9 +261,9 @@ impl AstNode for State {
                 bases: _,
                 fields: _,
                 pos,
-            } => &pos,
-            RegisterState { fields: _, pos } => &pos,
-            None { pos } => &pos,
+            } => pos,
+            RegisterState { fields: _, pos } => pos,
+            None { pos } => pos,
         }
     }
 }
