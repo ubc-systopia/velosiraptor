@@ -55,91 +55,109 @@ pub enum BinOp {
     Lor,
 }
 
+/// Implementation of binary operators
 impl BinOp {
+    /// Evalutes a BinOp expression
+    ///
+    /// The function creates a new [Expr] from the supplied operation and expression.
+    /// It folds the expression if applicapble
+    ///
+    /// # Example
+    ///
+    /// `1 + 4 => 5`
+    /// `1 < 5 => True`
+    /// `x + 5 => x + 5`
     pub fn eval(&self, lhs: Expr, rhs: Expr, pos: TokenStream) -> Expr {
         use BinOp::*;
         use Expr::*;
+
         match (self, lhs, rhs) {
-            // arithmetics
-            (Plus, Number { value: v1, pos: _ }, Number { value: v2, pos: _ }) => Number {
+            // XXX: handle case where v1 + v2 overflows
+            (Plus, Number { value: v1, .. }, Number { value: v2, .. }) => Number {
                 value: v1 + v2,
                 pos,
             },
-            (Minus, Number { value: v1, pos: _ }, Number { value: v2, pos: _ }) => Number {
+            // XXX: handle case where v2 > v1
+            (Minus, Number { value: v1, .. }, Number { value: v2, .. }) => Number {
                 value: v1 - v2,
                 pos,
             },
-            (Multiply, Number { value: v1, pos: _ }, Number { value: v2, pos: _ }) => Number {
+            // XXX: handle case where v1 * v2 overflows
+            (Multiply, Number { value: v1, .. }, Number { value: v2, .. }) => Number {
                 value: v1 * v2,
                 pos,
             },
-            (Divide, Number { value: v1, pos: _ }, Number { value: v2, pos: _ }) => Number {
+            // XXX: handle case where v2 == 0
+            (Divide, Number { value: v1, .. }, Number { value: v2, .. }) => Number {
                 value: v1 / v2,
                 pos,
             },
-            (Modulo, Number { value: v1, pos: _ }, Number { value: v2, pos: _ }) => Number {
+            // XXX: handle case where v2 == 0
+            (Modulo, Number { value: v1, .. }, Number { value: v2, .. }) => Number {
                 value: v1 % v2,
                 pos,
             },
-            (LShift, Number { value: v1, pos: _ }, Number { value: v2, pos: _ }) => Number {
+            // XXX: handle case where v2 > 63
+            (LShift, Number { value: v1, .. }, Number { value: v2, .. }) => Number {
                 value: v1 << v2,
                 pos,
             },
-            (RShift, Number { value: v1, pos: _ }, Number { value: v2, pos: _ }) => Number {
+            // XXX: handle case where v2 > 63
+            (RShift, Number { value: v1, .. }, Number { value: v2, .. }) => Number {
                 value: v1 >> v2,
                 pos,
             },
-            (And, Number { value: v1, pos: _ }, Number { value: v2, pos: _ }) => Number {
+            (And, Number { value: v1, .. }, Number { value: v2, .. }) => Number {
                 value: v1 & v2,
                 pos,
             },
-            (Xor, Number { value: v1, pos: _ }, Number { value: v2, pos: _ }) => Number {
+            (Xor, Number { value: v1, .. }, Number { value: v2, .. }) => Number {
                 value: v1 ^ v2,
                 pos,
             },
-            (Or, Number { value: v1, pos: _ }, Number { value: v2, pos: _ }) => Number {
+            (Or, Number { value: v1, .. }, Number { value: v2, .. }) => Number {
                 value: v1 | v2,
                 pos,
             },
             // comparisons
-            (Eq, Number { value: v1, pos: _ }, Number { value: v2, pos: _ }) => Boolean {
+            (Eq, Number { value: v1, .. }, Number { value: v2, .. }) => Boolean {
                 value: v1 == v2,
                 pos,
             },
-            (Ne, Number { value: v1, pos: _ }, Number { value: v2, pos: _ }) => Boolean {
+            (Ne, Number { value: v1, .. }, Number { value: v2, .. }) => Boolean {
                 value: v1 != v2,
                 pos,
             },
-            (Lt, Number { value: v1, pos: _ }, Number { value: v2, pos: _ }) => Boolean {
+            (Lt, Number { value: v1, .. }, Number { value: v2, .. }) => Boolean {
                 value: v1 < v2,
                 pos,
             },
-            (Gt, Number { value: v1, pos: _ }, Number { value: v2, pos: _ }) => Boolean {
+            (Gt, Number { value: v1, .. }, Number { value: v2, .. }) => Boolean {
                 value: v1 > v2,
                 pos,
             },
-            (Le, Number { value: v1, pos: _ }, Number { value: v2, pos: _ }) => Boolean {
+            (Le, Number { value: v1, .. }, Number { value: v2, .. }) => Boolean {
                 value: v1 <= v2,
                 pos,
             },
-            (Ge, Number { value: v1, pos: _ }, Number { value: v2, pos: _ }) => Boolean {
+            (Ge, Number { value: v1, .. }, Number { value: v2, .. }) => Boolean {
                 value: v1 >= v2,
                 pos,
             },
             // booleans
-            (Land, Boolean { value: v1, pos: _ }, Boolean { value: v2, pos: _ }) => Boolean {
+            (Land, Boolean { value: v1, .. }, Boolean { value: v2, .. }) => Boolean {
                 value: v1 && v2,
                 pos,
             },
-            (Lor, Boolean { value: v1, pos: _ }, Boolean { value: v2, pos: _ }) => Boolean {
+            (Lor, Boolean { value: v1, .. }, Boolean { value: v2, .. }) => Boolean {
                 value: v1 || v2,
                 pos,
             },
-            (Eq, Boolean { value: v1, pos: _ }, Boolean { value: v2, pos: _ }) => Boolean {
+            (Eq, Boolean { value: v1, .. }, Boolean { value: v2, .. }) => Boolean {
                 value: v1 == v2,
                 pos,
             },
-            (Ne, Boolean { value: v1, pos: _ }, Boolean { value: v2, pos: _ }) => Boolean {
+            (Ne, Boolean { value: v1, .. }, Boolean { value: v2, .. }) => Boolean {
                 value: v1 != v2,
                 pos,
             },
@@ -150,6 +168,60 @@ impl BinOp {
                 rhs: Box::new(rhs),
                 pos,
             },
+        }
+    }
+
+    /// the result type of a binary operation
+    fn result_numeric(&self) -> bool {
+        use BinOp::*;
+        match self {
+            // arithmetic opreators
+            Plus => true,
+            Minus => true,
+            Multiply => true,
+            Divide => true,
+            Modulo => true,
+            LShift => true,
+            RShift => true,
+            And => true,
+            Xor => true,
+            Or => true,
+            // boolean operators
+            Eq => false,
+            Ne => false,
+            Lt => false,
+            Gt => false,
+            Le => false,
+            Ge => false,
+            Land => false,
+            Lor => false,
+        }
+    }
+
+    /// the result type of a binary operation
+    fn result_boolean(&self) -> bool {
+        use BinOp::*;
+        match self {
+            // arithmetic opreators
+            Plus => false,
+            Minus => false,
+            Multiply => false,
+            Divide => false,
+            Modulo => false,
+            LShift => false,
+            RShift => false,
+            And => false,
+            Xor => false,
+            Or => false,
+            // boolean operators
+            Eq => true,
+            Ne => true,
+            Lt => true,
+            Gt => true,
+            Le => true,
+            Ge => true,
+            Land => true,
+            Lor => true,
         }
     }
 }
@@ -180,6 +252,7 @@ impl fmt::Display for BinOp {
     }
 }
 
+/// Represents an unary operator
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum UnOp {
     // arithmetic operators
@@ -189,6 +262,7 @@ pub enum UnOp {
     LNot,
 }
 
+/// Implementation of an unary operator
 impl UnOp {
     pub fn eval(&self, val: Expr, pos: TokenStream) -> Expr {
         use Expr::*;
@@ -205,6 +279,7 @@ impl UnOp {
     }
 }
 
+/// Implementation of [fmt::Display] for [UnOp]
 impl fmt::Display for UnOp {
     fn fmt(&self, format: &mut fmt::Formatter) -> fmt::Result {
         use self::UnOp::*;
@@ -216,46 +291,49 @@ impl fmt::Display for UnOp {
     }
 }
 
+/// Represents an Expression
+///
+/// The expressions form a trie that is the being evaluated bottom up.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
-    Identifier {
-        path: Vec<String>,
-        pos: TokenStream,
-    },
-    Number {
-        value: u64,
-        pos: TokenStream,
-    },
-    Boolean {
-        value: bool,
-        pos: TokenStream,
-    },
+    /// Represents an identifier. That may be qualified or not.  `a.b`
+    Identifier { path: Vec<String>, pos: TokenStream },
+    /// Represents a constant, unsigned number  `5`
+    Number { value: u64, pos: TokenStream },
+    /// Represents a constant boolean value  `True | False`
+    Boolean { value: bool, pos: TokenStream },
+    /// Represents a binary operation  `a + 1`
     BinaryOperation {
         op: BinOp,
         lhs: Box<Expr>,
         rhs: Box<Expr>,
         pos: TokenStream,
     },
+    /// Represents an unary operation `!a`
     UnaryOperation {
         op: UnOp,
         val: Box<Expr>,
         pos: TokenStream,
     },
+    /// Represents a function call  `a.b(x,y)`
     FnCall {
         path: Vec<String>,
         args: Vec<String>,
         pos: TokenStream,
     },
+    /// Represents a slice  `a[1..x]`
     Slice {
         path: Vec<String>,
         slice: Box<Expr>,
         pos: TokenStream,
     },
+    /// Represents an element aaccess `a[0]`
     Element {
         path: Vec<String>,
         idx: Box<Expr>,
         pos: TokenStream,
     },
+    /// Reprsents a range  `start..end`
     Range {
         start: Box<Expr>,
         end: Box<Expr>,
@@ -263,15 +341,21 @@ pub enum Expr {
     },
 }
 
+/// Implementation of [Expr]
 impl Expr {
     /// returns ture if the expression is a constant expression
+    ///
+    /// it consults the symbol table to figure out whether the symbol / variable is constant
     pub fn is_const_expr(&self, st: &SymbolTable) -> bool {
         use Expr::*;
         match self {
+            // numbers and booleans are constant
             Number { .. } => true,
             Boolean { .. } => true,
+            // unary and binary operations are constant, if and only if each operand is constnat
             BinaryOperation { lhs, rhs, .. } => lhs.is_const_expr(st) && rhs.is_const_expr(st),
             UnaryOperation { val, .. } => val.is_const_expr(st),
+            // an identifyer is constnat, if its in the symbol table as a constant
             Identifier { path, .. } => {
                 // TODO: deal with context.symbol
                 let name = path.join(".");
@@ -280,12 +364,117 @@ impl Expr {
                     None => false,
                 }
             }
+            // everything else is not constant
             _ => false,
         }
     }
 
-    pub fn match_type(&self, _ty: Type, _st: &SymbolTable) -> Issues {
-        Issues::ok()
+    pub fn match_symbol(path: &[String], pos: &TokenStream, ty: Type, st: &SymbolTable) -> Issues {
+        let name = path.join(".");
+        match st.lookup(&name) {
+            Some(s) => {
+                if !ty.compatible(s.typeinfo) {
+                    // warning
+                    let msg = format!(
+                        "expected expression of type `{}`, symbol `{}` has type",
+                        ty.to_type_string(),
+                        s.typeinfo.to_type_string()
+                    );
+                    let hint = format!("define symbol with matching type");
+                    VrsError::new_err(pos, msg, Some(hint)).print();
+                    Issues::err()
+                } else {
+                    Issues::ok()
+                }
+            }
+            None => {
+                // warning
+                let msg = format!(
+                    "expected expression of type `{}`, symbol `{}` was not found",
+                    ty.to_type_string(),
+                    name
+                );
+                let hint = format!("define symbol with type `{}`", ty.to_type_string());
+                VrsError::new_err(pos, msg, Some(hint)).print();
+                Issues::err()
+            }
+        }
+    }
+
+    /// matches the type of the expressin with the supplied type
+    pub fn match_type(&self, ty: Type, st: &SymbolTable) -> Issues {
+        use Expr::*;
+        match self {
+            // numbers and booleans are constant
+            Number { pos, .. } => {
+                if !ty.is_numeric() {
+                    // warning
+                    let msg = format!(
+                        "expected expression of type `{}`, but was of numeric type.`",
+                        ty.to_type_string()
+                    );
+                    let hint = format!("convert to `{}` type.", ty.to_type_string());
+                    VrsError::new_err(pos, msg, Some(hint)).print();
+                    Issues::err()
+                } else {
+                    Issues::ok()
+                }
+            }
+            Boolean { pos, .. } => {
+                if !ty.is_boolean() {
+                    // warning
+                    let msg = format!(
+                        "expected expression of type `{}`, but was of boolean type.`",
+                        ty.to_type_string()
+                    );
+                    let hint = format!("convert to `{}` type.", ty.to_type_string());
+                    VrsError::new_err(pos, msg, Some(hint)).print();
+                    Issues::err()
+                } else {
+                    Issues::ok()
+                }
+            }
+            // unary and binary operations are constant, if and only if each operand is constnat
+            BinaryOperation { op, pos, .. } => {
+                if op.result_boolean() && ty.is_boolean() || op.result_numeric() && ty.is_numeric()
+                {
+                    Issues::ok()
+                } else {
+                    // warning
+                    let msg = format!(
+                        "expected expression of type `{}`, but `{}` binary operation produces `",
+                        ty.to_type_string(),
+                        op
+                    );
+                    let hint = format!(
+                        "change expression to produce `{}` or change type",
+                        ty.to_type_string()
+                    );
+                    VrsError::new_err(pos, msg, Some(hint)).print();
+                    Issues::err()
+                }
+            }
+            UnaryOperation { val, .. } => val.match_type(ty, st),
+            // an identifyer is constnat, if its in the symbol table as a constant
+            Identifier { path, pos } => Self::match_symbol(path, pos, ty, st),
+            FnCall { path, pos, .. } => Self::match_symbol(path, pos, ty, st),
+            Element { path, pos, .. } => Self::match_symbol(path, pos, ty, st),
+            // everything else is currently not supported
+            x => {
+                // warning
+                let msg = format!(
+                    "expected expression of type `{}`, but found unsupported exprssion {}",
+                    ty.to_type_string(),
+                    x
+                );
+                let hint = format!(
+                    "change expression to produce `{}` or change type",
+                    ty.to_type_string()
+                );
+                VrsError::new_err(x.loc(), msg, Some(hint)).print();
+                Issues::err()
+            }
+        }
     }
 
     pub fn fold_constants(self) -> Self {
@@ -556,36 +745,15 @@ impl AstNode for Expr {
     fn loc(&self) -> &TokenStream {
         use self::Expr::*;
         match &self {
-            Identifier { path: _, pos } => pos,
-            Number { value: _, pos } => pos,
-            Boolean { value: _, pos } => pos,
-            BinaryOperation {
-                op: _,
-                lhs: _,
-                rhs: _,
-                pos,
-            } => pos,
-            UnaryOperation { op: _, val: _, pos } => pos,
-            FnCall {
-                path: _,
-                pos,
-                args: _,
-            } => pos,
-            Slice {
-                path: _,
-                slice: _,
-                pos,
-            } => pos,
-            Element {
-                path: _,
-                idx: _,
-                pos,
-            } => pos,
-            Range {
-                start: _,
-                end: _,
-                pos,
-            } => pos,
+            Identifier { pos, .. } => pos,
+            Number { pos, .. } => pos,
+            Boolean { pos, .. } => pos,
+            BinaryOperation { pos, .. } => pos,
+            UnaryOperation { pos, .. } => pos,
+            FnCall { pos, .. } => pos,
+            Slice { pos, .. } => pos,
+            Element { pos, .. } => pos,
+            Range { pos, .. } => pos,
         }
     }
 }

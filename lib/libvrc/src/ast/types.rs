@@ -43,6 +43,47 @@ pub enum Type {
     Size,
 }
 
+/// Implementation for [Type]
+impl Type {
+    /// returns true if the type is numeric
+    pub fn is_numeric(&self) -> bool {
+        use Type::*;
+        match self {
+            Boolean => false,
+            Integer => true,
+            Address => true,
+            Size => true,
+        }
+    }
+
+    /// returns true iff the type is boolean
+    pub fn is_boolean(&self) -> bool {
+        use Type::*;
+        match self {
+            Boolean => true,
+            Integer => false,
+            Address => false,
+            Size => false,
+        }
+    }
+
+    /// returns true iff the type is boolean
+    pub fn to_type_string(&self) -> &str {
+        use Type::*;
+        match self {
+            Boolean => "boolean",
+            Integer => "numeric",
+            Address => "numeric",
+            Size => "numeric",
+        }
+    }
+
+    /// returns true if two types are compatible
+    pub fn compatible(&self, other: Self) -> bool {
+        self.is_boolean() && other.is_boolean() || self.is_numeric() && other.is_numeric()
+    }
+}
+
 /// implementation of the [fmt::Display] trait for the [Type].
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
