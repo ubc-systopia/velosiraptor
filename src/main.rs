@@ -137,7 +137,7 @@ fn main() {
     let infile = matches.value_of("input").unwrap_or("none");
     log::info!("input file: {}", infile);
 
-    let outdir = matches.value_of("output").unwrap_or("<stdout>");
+    let outdir = matches.value_of("output").unwrap_or("");
     log::info!("output directory: {}", outdir);
 
     let pkgname = matches.value_of("pkg").unwrap_or("mpu").to_string();
@@ -303,6 +303,11 @@ fn main() {
         return;
     }
 
+    if outdir.is_empty() {
+        eprintln!("{:>8}: skipping code generation.\n", "check".bold().green(),);
+        return;
+    }
+
     log::info!("==== CODE GENERATION STAGE ====");
 
     // get the output directory
@@ -391,14 +396,7 @@ fn main() {
             ": failure during unit generation".bold(),
             e
         );
-        abort(infile, issues);
     });
-
-    // generate the unit files that use the interface files
-    eprintln!(
-        "{:>8}: finalizing code generation...\n",
-        "generate".bold().green(),
-    );
 
     codegen.finalize(&ast).unwrap_or_else(|e| {
         eprintln!(
