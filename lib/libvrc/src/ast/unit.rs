@@ -84,6 +84,13 @@ impl AstNode for Unit {
         // set the current context
         st.create_context(String::from(self.name()));
 
+        // add th emethods to it
+        for m in &self.methods {
+            if !st.insert(m.to_symbol()) {
+                res.inc_err(1);
+            }
+        }
+
         // Check 1: Double defined constants
         // --------------------------------------------------------------------------------------
         // Type:        Error
