@@ -57,6 +57,15 @@ pub enum SymbolKind {
     Interface,
 }
 
+/// Implementation of the [Display] trait for [Symbol]
+///
+/// We display it as a table form kind|type|name
+impl Display for SymbolKind {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        write!(f, "{:?}", self)
+    }
+}
+
 /// represents a defined symbol
 #[derive(Clone)]
 pub struct Symbol {
@@ -93,10 +102,10 @@ impl Symbol {
 /// We display it as a table form kind|type|name
 impl Display for Symbol {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
-        writeln!(
+        write!(
             f,
-            "{:10?}    {:9?}    {:20}    {}:{}:{}",
-            self.kind,
+            "{:10}   {:9?}    {:20}    {}:{}:{}",
+            self.kind.to_string(), // need to do this, to get it formatted properly??
             self.typeinfo,
             self.name,
             self.loc.context(),
@@ -162,7 +171,7 @@ impl SymbolTableContext {
 impl Display for SymbolTableContext {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         writeln!(f, "Context: {}", self.ctxt)?;
-        writeln!(f, "Kind     Type       Name                    Loc")?;
+        writeln!(f, "Kind         Type       Name                    Loc")?;
         for c in self.syms.values() {
             writeln!(f, "{}", c)?;
         }
@@ -205,8 +214,9 @@ impl SymbolTable {
                 let ctxt = self.syms.last_mut().unwrap();
                 ctxt.insert(sym)
             }
-            Some(x) => {
-                VrsError::new_double(sym.name.clone(), sym.loc.clone(), x.loc.clone()).print();
+            Some(_x) => {
+                // not warning here...
+                //VrsError::new_double(sym.name.clone(), sym.loc.clone(), x.loc.clone()).print();
                 false
             }
         }
@@ -227,6 +237,9 @@ impl SymbolTable {
         let mut sym = None;
         for ctxt in &self.syms {
             sym = ctxt.lookup(name);
+            if sym.is_some() {
+                return sym;
+            }
         }
         sym
     }
@@ -260,6 +273,7 @@ impl SymbolTable {
 /// Implementation of the [fmt::Display] trait for [SymbolTable]
 impl Display for SymbolTable {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        writeln!(f, "SYMBOL TABLE\n")?;
         for c in &self.syms {
             writeln!(f, "{}", c)?;
         }
