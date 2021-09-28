@@ -318,7 +318,7 @@ pub enum Expr {
     /// Represents a function call  `a.b(x,y)`
     FnCall {
         path: Vec<String>,
-        args: Vec<String>,
+        args: Vec<Expr>,
         pos: TokenStream,
     },
     /// Represents a slice  `a[1..x]`
@@ -369,6 +369,7 @@ impl Expr {
         }
     }
 
+    /// matches a symbol with a given type
     pub fn match_symbol(path: &[String], pos: &TokenStream, ty: Type, st: &SymbolTable) -> Issues {
         let name = path.join(".");
         match st.lookup(&name) {
@@ -380,7 +381,7 @@ impl Expr {
                         ty.to_type_string(),
                         s.typeinfo.to_type_string()
                     );
-                    let hint = format!("define symbol with matching type");
+                    let hint = String::from("define symbol with matching type");
                     VrsError::new_err(pos, msg, Some(hint)).print();
                     Issues::err()
                 } else {
@@ -477,6 +478,7 @@ impl Expr {
         }
     }
 
+    /// applies constant folding
     pub fn fold_constants(self) -> Self {
         use Expr::*;
         match self {
@@ -509,6 +511,7 @@ impl Expr {
         }
     }
 
+    /// checks if a given symbol exists with the path
     fn symbol_exists(
         pos: &TokenStream,
         path: &[String],
@@ -719,6 +722,7 @@ impl AstNode for Expr {
         "Expression"
     }
 
+    /// performs teh ast check on the expression node
     fn check(&self, st: &mut SymbolTable) -> Issues {
         let mut res = Issues::ok();
 

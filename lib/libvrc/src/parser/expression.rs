@@ -396,7 +396,7 @@ fn ident_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 fn fn_call_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i, (e, args)) = pair(
         ident_expr,
-        delimited(lparen, separated_list0(comma, ident), rparen),
+        delimited(lparen, separated_list0(comma, expr), rparen),
     )(input)?;
     match e {
         Expr::Identifier { path, pos } => Ok((i, Expr::FnCall { path, args, pos })),
@@ -529,6 +529,8 @@ fn test_arithmetic() {
         "(((1 + (2 * 3)) + 4) << (5 * 2))"
     );
     parse_equal!(arith_expr, "1 + a + b + 4 + 5", "((((1 + a) + b) + 4) + 5)");
+    parse_equal!(arith_expr, "a + 1 + b + 4 + 5", "((((a + 1) + b) + 4) + 5)");
+    parse_equal!(arith_expr, "a + 1", "(a + 1)");
 
     parse_fail!(bool_expr, "1 + 2 * 3 + 4");
 }
