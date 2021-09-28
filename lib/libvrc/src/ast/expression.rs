@@ -545,141 +545,41 @@ impl Expr {
         }
     }
 
+    /// checks that all symbols are defined in the exprssions
     pub fn check_symbols(&self, st: &mut SymbolTable) -> Issues {
+        let varkind = &[
+            SymbolKind::Const,
+            SymbolKind::Parameter,
+            SymbolKind::Variable,
+        ];
+        let fnkind = &[SymbolKind::Function];
         use Expr::*;
         match self {
-            Identifier { path, pos } => Expr::symbol_exists(
-                pos,
-                path,
-                st,
-                &[
-                    SymbolKind::Const,
-                    SymbolKind::Parameter,
-                    SymbolKind::Variable,
-                ],
-            ),
-            Number { value: _, pos: _ } => Issues::ok(),
-            Boolean { value: _, pos: _ } => Issues::ok(),
-            BinaryOperation {
-                op: _,
-                lhs,
-                rhs,
-                pos: _,
-            } => lhs.check_symbols(st) + rhs.check_symbols(st),
-            UnaryOperation { op: _, val, pos: _ } => val.check_symbols(st),
-            FnCall { path, args: _, pos } => {
-                let s = Expr::symbol_exists(
-                    pos,
-                    path,
-                    st,
-                    &[
-                        SymbolKind::Const,
-                        SymbolKind::Parameter,
-                        SymbolKind::Variable,
-                    ],
-                );
-                // todo: function calls
-                //args.iter().fold(s, |acc, e| e.check_symbols(st) + acc)
-                s
+            Identifier { path, pos } => Expr::symbol_exists(pos, path, st, varkind),
+            Number { .. } => Issues::ok(),
+            Boolean { .. } => Issues::ok(),
+            BinaryOperation { lhs, rhs, .. } => lhs.check_symbols(st) + rhs.check_symbols(st),
+            UnaryOperation { val, .. } => val.check_symbols(st),
+            FnCall { path, args, pos } => {
+                let s = Expr::symbol_exists(pos, path, st, fnkind);
+                args.iter().fold(s, |acc, e| e.check_symbols(st) + acc)
             }
             Slice { path, slice, pos } => {
-                let s = Expr::symbol_exists(
-                    pos,
-                    path,
-                    st,
-                    &[
-                        SymbolKind::Const,
-                        SymbolKind::Parameter,
-                        SymbolKind::Variable,
-                    ],
-                );
+                // currently we can't do foo()[]
+                let s = Expr::symbol_exists(pos, path, st, varkind);
                 s + slice.check_symbols(st)
             }
             Element { path, idx, pos } => {
-                let s = Expr::symbol_exists(
-                    pos,
-                    path,
-                    st,
-                    &[
-                        SymbolKind::Const,
-                        SymbolKind::Parameter,
-                        SymbolKind::Variable,
-                    ],
-                );
+                let s = Expr::symbol_exists(pos, path, st, varkind);
                 s + idx.check_symbols(st)
             }
-            Range { start, end, pos: _ } => start.check_symbols(st) + end.check_symbols(st),
+            Range { start, end, .. } => start.check_symbols(st) + end.check_symbols(st),
         }
     }
 
+    /// checks if the types of the expression match
     pub fn check_types(&self, _st: &mut SymbolTable) -> Issues {
         Issues::ok()
-
-        // use Expr::*;
-        // match self {
-        //     Identifier {
-        //         path,
-        //         pos
-        //     } => {
-        //         Expr::symbol_exists(&pos, &path, st, &[SymbolKind::Const, SymbolKind::Parameter, SymbolKind::Variable])
-        //     },
-        //     Number {
-        //         value:_,
-        //         pos:_
-        //     } => Issues::ok(),
-        //     Boolean {
-        //         value :_,
-        //         pos :_,
-        //     } => Issues::ok(),
-        //     BinaryOperation {
-        //         op: _,
-        //         lhs,
-        //         rhs,
-        //         pos: _,
-        //     } => {
-        //         lhs.check_symbols(st) + rhs.check_symbols(st)
-        //     },
-        //     UnaryOperation {
-        //         op:_ ,
-        //         val,
-        //         pos,
-        //     } => {
-        //         val.check_symbols(st)
-        //     }
-        //     FnCall {
-        //         path,
-        //         args,
-        //         pos,
-        //     } => {
-        //         let s = Expr::symbol_exists(&pos, &path, st, &[SymbolKind::Const, SymbolKind::Parameter, SymbolKind::Variable]);
-        //         // todo: function calls
-        //         //args.iter().fold(s, |acc, e| e.check_symbols(st) + acc)
-        //         s
-        //     }
-        //     Slice {
-        //         path,
-        //         slice,
-        //         pos,
-        //     } => {
-        //         let s = Expr::symbol_exists(&pos, &path, st, &[SymbolKind::Const, SymbolKind::Parameter, SymbolKind::Variable]);
-        //         s + slice.check_symbols(st)
-        //     }
-        //     Element {
-        //         path,
-        //         idx,
-        //         pos,
-        //     } => {
-        //         let s = Expr::symbol_exists(&pos, &path, st, &[SymbolKind::Const, SymbolKind::Parameter, SymbolKind::Variable]);
-        //         s + idx.check_symbols(st)
-        //     }
-        //     Range {
-        //         start,
-        //         end,
-        //         pos,
-        //     } => {
-        //         start.check_symbols(st) + end.check_symbols(st)
-        //     },
-        // }
     }
 }
 
