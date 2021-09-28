@@ -231,6 +231,20 @@ impl SymbolTable {
         sym
     }
 
+    /// lookup a symbol with a given kind
+    pub fn lookup_with_kind(&self, name: &str, kind: &[SymbolKind]) -> Option<&Symbol> {
+        match self.lookup(name) {
+            None => None,
+            Some(x) => {
+                if kind.contains(&x.kind) {
+                    Some(x)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
     /// removes a symbol from the current context
     pub fn remove(&mut self, sym: &str) -> Option<Symbol> {
         let ctxt = self.syms.last_mut().unwrap();
