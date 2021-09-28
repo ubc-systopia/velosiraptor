@@ -27,7 +27,9 @@
 // std lib imports
 use std::fmt;
 
-use crate::ast::{utils, AstNode, Expr, Issues, Param, Stmt, SymbolTable, Type};
+use crate::ast::{
+    utils, AstNode, Expr, Issues, Param, Stmt, Symbol, SymbolKind, SymbolTable, Type,
+};
 use crate::token::TokenStream;
 
 /// Defines a Method inside a unit
@@ -62,6 +64,14 @@ impl Method {
     }
     pub fn check_translate(&self) -> Issues {
         Issues::ok()
+    }
+    pub fn to_symbol(&self) -> Symbol {
+        Symbol::new(
+            self.name.clone(),
+            self.rettype,
+            SymbolKind::Function,
+            self.pos.clone(),
+        )
     }
 }
 
