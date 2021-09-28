@@ -192,15 +192,16 @@ impl AstNode for Unit {
         }
 
         if !has_translate {
-            let msg = format!("translate() method not defined for unit {}", self.name);
-            let hint = format!("implement the translate() method for unit {}", self.name);
-            VrsError::new_err(&self.pos, msg, Some(hint)).print();
+            let msg = format!("translate() method not defined for unit `{}`", self.name);
+            let hint = format!("implement the translate() method for unit `{}`", self.name);
+            VrsError::new_err(&self.pos.with_range(0..2), msg, Some(hint)).print();
             res.inc_err(1);
         }
         if !has_map {
-            let msg = format!("map() method not defined for unit {}", self.name);
-            let hint = format!("implement the map() method for unit {}", self.name);
-            VrsError::new_err(&self.pos, msg, Some(hint)).print();
+            let msg = format!("map() method not defined for unit `{}`", self.name);
+            let hint = format!("implement the map() method for unit `{}`", self.name);
+            VrsError::new_err(&self.pos.with_range(0..2), msg, Some(hint)).print();
+            println!("{}", self.pos);
             res.inc_err(1);
         }
 
