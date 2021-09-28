@@ -49,7 +49,9 @@ use nom::{multi::many0, Err};
 use crate::ast::Ast;
 use crate::error::VrsError;
 use crate::lexer::{Lexer, LexerError};
-use crate::parser::{constdef::constdef, import::import, terminals::eof, unit::unit};
+use crate::parser::{
+    constdef::constdef, import::import, method::method, state::state, terminals::eof, unit::unit,
+};
 use crate::token::{Token, TokenStream};
 
 /// define the lexer error type

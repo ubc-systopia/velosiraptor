@@ -37,7 +37,7 @@ use nom::{
 use crate::ast::{Stmt, Type};
 use crate::error::IResult;
 use crate::parser::{
-    expression::{arith_expr, bool_expr, expr},
+    expression::{arith_expr, bool_expr},
     terminals::{
         assign, colon, ident, kw_assert, kw_else, kw_if, kw_let, kw_return, lbrace, lparen, rbrace,
         rparen, semicolon, typeinfo,
@@ -63,7 +63,10 @@ fn return_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
     let (i1, _) = kw_return(input.clone())?;
 
     // parse the LHS identifier and type information `IDENT : TYPE =`
-    let (i2, exp) = cut(terminated(expr, semicolon))(i1)?;
+    let (i2, exp) = cut(alt((
+        terminated(bool_expr, semicolon),
+        terminated(arith_expr, semicolon),
+    )))(i1)?;
 
     // create the token stream covering the entire assert statement
     let pos = input.expand_until(&i2);
@@ -226,11 +229,6 @@ fn test_ok() {
     let ts = TokenStream::from_vec(tokens);
     assert!(stmt(ts).is_ok());
 
-    let sp = SourcePos::new("stdio", "return 5;");
-    let tokens = Lexer::lex_source_pos(sp).unwrap();
-    let ts = TokenStream::from_vec(tokens);
-    assert!(stmt(ts).is_ok());
-
     let sp = SourcePos::new("stdio", "if 5 < 4 { return 5; }");
     let tokens = Lexer::lex_source_pos(sp).unwrap();
     let ts = TokenStream::from_vec(tokens);
@@ -241,6 +239,39 @@ fn test_ok() {
     let ts = TokenStream::from_vec(tokens);
     assert!(stmt(ts).is_ok());
 }
+
+#[test]
+fn test_returns() {
+    let sp = SourcePos::new("stdio", "return 5;");
+    let tokens = Lexer::lex_source_pos(sp).unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(stmt(ts).is_ok());
+
+    let sp = SourcePos::new("stdio", "return 5 + 5;");
+    let tokens = Lexer::lex_source_pos(sp).unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(stmt(ts).is_ok());
+
+    let sp = SourcePos::new("stdio", "return a;");
+    let tokens = Lexer::lex_source_pos(sp).unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(stmt(ts).is_ok());
+
+    let sp = SourcePos::new("stdio", "return (a + 5);");
+    let tokens = Lexer::lex_source_pos(sp).unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    let res = stmt(ts);
+    println!("{:?}", res);
+    assert!(res.is_ok());
+
+    let sp = SourcePos::new("stdio", "return a + 5;");
+    let tokens = Lexer::lex_source_pos(sp).unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    let res = stmt(ts);
+    println!("{:?}", res);
+    assert!(res.is_ok());
+}
+
 #[test]
 fn test_fail() {
     let sp = SourcePos::new("stdio", "assert(x + 5);");
