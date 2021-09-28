@@ -257,13 +257,6 @@ fn test_returns() {
     let ts = TokenStream::from_vec(tokens);
     assert!(stmt(ts).is_ok());
 
-    let sp = SourcePos::new("stdio", "return (a + 5);");
-    let tokens = Lexer::lex_source_pos(sp).unwrap();
-    let ts = TokenStream::from_vec(tokens);
-    let res = stmt(ts);
-    println!("{:?}", res);
-    assert!(res.is_ok());
-
     let sp = SourcePos::new("stdio", "return a + 5;");
     let tokens = Lexer::lex_source_pos(sp).unwrap();
     let ts = TokenStream::from_vec(tokens);
