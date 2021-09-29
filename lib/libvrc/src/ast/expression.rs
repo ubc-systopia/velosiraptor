@@ -442,11 +442,7 @@ impl Expr {
                     Issues::ok()
                 } else {
                     // warning
-                    let msg = format!(
-                        "expected expression of type `{}`, but `{}` binary operation produces `",
-                        ty.to_type_string(),
-                        op
-                    );
+                    let msg = format!("expected expression of type `{}`", ty.to_type_string(),);
                     let hint = format!(
                         "change expression to produce `{}` or change type",
                         ty.to_type_string()

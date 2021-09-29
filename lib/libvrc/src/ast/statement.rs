@@ -29,11 +29,14 @@ use std::fmt;
 
 // library internal imports
 use crate::ast::{AstNode, Expr, Issues, Symbol, SymbolKind, SymbolTable, Type};
+use crate::error::VrsError;
 use crate::token::TokenStream;
 
 /// Represents a statement
 #[derive(Debug, PartialEq, Clone)]
 pub enum Stmt {
+    /// represents a block of statements
+    Block { pos: TokenStream, stmts: Vec<Stmt> },
     /// the assign statements gives a name to a value
     Let {
         pos: TokenStream,
@@ -45,8 +48,8 @@ pub enum Stmt {
     IfElse {
         pos: TokenStream,
         cond: Expr,
-        then: Vec<Stmt>,
-        other: Vec<Stmt>,
+        then: Box<Stmt>,
+        other: Box<Option<Stmt>>,
     },
     /// return statement
     Return { pos: TokenStream, expr: Expr },
@@ -54,10 +57,77 @@ pub enum Stmt {
     Assert { pos: TokenStream, expr: Expr },
 }
 
+/// implementation of [Stmt]
+impl Stmt {
+    pub fn check_return_types(&self, ty: Type, st: &SymbolTable) -> Issues {
+        use Stmt::*;
+        match self {
+            Block { stmts, pos } => {
+                let mut issues = Issues::ok();
+                let mut had_return = false;
+                for s in stmts {
+                    // recurse into the statement
+                    issues = issues + s.check_return_types(ty, st);
+                    if had_return {
+                        // we've already seen a return statement, so this is now dead code.
+                        let msg = String::from("statement after return statement");
+                        let hint = String::from("remove dead code here");
+                        VrsError::new_warn(s.loc(), msg, Some(hint)).print();
+
+                        issues.inc_warn(1);
+                    } else if let Return { .. } = s {
+                        // if it was a return statement, then mark it
+                        had_return = true;
+                    }
+                    // otherwise there is no return statement, and we haven't seen one yet
+                }
+                if !had_return {
+                    // we haven't seen any return statement in this branch, this is a bug.
+                    // note: this is currently only true because of the restrictive way branches
+                    //       are handled and may be revisited in the future
+                    let msg = String::from("no return statement in statement block");
+                    let hint = String::from("add a return statement here");
+                    let loc = match stmts.last() {
+                        Some(x) => x.loc(),
+                        None => pos,
+                    };
+                    VrsError::new_err(loc, msg, Some(hint)).print();
+                    issues.inc_err(1);
+                }
+                issues
+            }
+            IfElse { then, other, .. } => {
+                let issues = then.check_return_types(ty, st);
+                match other.as_ref() {
+                    None => issues,
+                    Some(b) => issues + b.check_return_types(ty, st),
+                }
+            }
+            // let is a no-po
+            Let { .. } => Issues::ok(),
+            // assert is a no-op
+            Assert { .. } => Issues::ok(),
+            // return
+            Return { expr, .. } => {
+                // check the return type
+                expr.match_type(ty, st)
+            }
+        }
+    }
+}
+
+/// implementation of [fmt::Display] for [Stmt]
 impl fmt::Display for Stmt {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::Stmt::*;
         match self {
+            Block { stmts, .. } => {
+                writeln!(f, "{{")?;
+                for s in stmts {
+                    writeln!(f, "{}", s)?;
+                }
+                writeln!(f, "}}")
+            }
             Return { expr, .. } => {
                 writeln!(f, "return {};", expr)
             }
@@ -80,13 +150,18 @@ impl fmt::Display for Stmt {
     }
 }
 
-/// implementation of [AstNode] for [Field]
+/// implementation of [AstNode] for [Stmt]
 impl AstNode for Stmt {
     fn check(&self, st: &mut SymbolTable) -> Issues {
         let mut res = Issues::ok();
 
         use self::Stmt::*;
         match self {
+            Block { stmts, .. } => {
+                for s in stmts {
+                    res = res + s.check(st);
+                }
+            }
             Assert { expr, .. } => {
                 res = res + expr.check(st) + expr.match_type(Type::Boolean, st);
             }
@@ -102,15 +177,17 @@ impl AstNode for Stmt {
                 // TODO: type check conditional!
 
                 st.create_context(String::from("if_then"));
-                for s in then {
-                    res = res + s.check(st);
-                }
+                match then.as_ref() {
+                    Block { .. } => res = res + then.check(st),
+                    _ => panic!("expected a block statement"),
+                };
                 st.drop_context();
 
                 st.create_context(String::from("if_else"));
-                for s in other {
-                    res = res + s.check(st);
-                }
+                match other.as_ref() {
+                    Some(s) => res = res + s.check(st),
+                    None => (),
+                };
                 st.drop_context();
             }
             Let {
@@ -143,6 +220,7 @@ impl AstNode for Stmt {
             Stmt::Return { pos, .. } => pos,
             Stmt::Assert { pos, .. } => pos,
             Stmt::Let { pos, .. } => pos,
+            Stmt::Block { pos, .. } => pos,
         }
     }
 }
