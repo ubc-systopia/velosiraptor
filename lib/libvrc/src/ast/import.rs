@@ -33,7 +33,7 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // the used crate-internal functionality
-use crate::ast::{AstRoot, AstNode};
+use crate::ast::{AstNode, AstRoot};
 use crate::token::TokenStream;
 
 /// Defines an [Import] statement node
