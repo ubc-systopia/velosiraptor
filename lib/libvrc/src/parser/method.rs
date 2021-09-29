@@ -223,16 +223,17 @@ pub fn method(input: TokenStream) -> IResult<TokenStream, Method> {
     let (i5, (requires, ensures)) = tuple((many0(require_clauses), many0(ensure_clauses)))(i4)?;
 
     // try to parse the method body
-    let (i6, stmts) = opt(method_body)(i5)?;
+    let (i6, stmts) = opt(method_body)(i5.clone())?;
 
     let (i6, stmts) = match stmts {
         Some(x) => {
+            let pos = i5.expand_until(&i6);
             let (s, _) = opt(semicolon)(i6)?;
-            (s, x)
+            (s, Some(Stmt::Block { stmts: x, pos }))
         }
         None => {
             let (s, _) = cut(semicolon)(i6)?;
-            (s, Vec::new())
+            (s, None)
         }
     };
 
