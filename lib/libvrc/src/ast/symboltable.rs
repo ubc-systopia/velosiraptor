@@ -28,8 +28,11 @@
 //! # General Structure
 //!
 //! The symbol table provides a mechanisms to look up symbols by name. Each symbol lives
-//! within a given context.
+//! within a given context. The contexts form a hierarchical structure:
+//!  `root -> unit -> methods -> blocks`
 //!
+//! When entering a new block (e.g., unit), a new context is created.
+//! The context is then dropped again when leaving the block.
 
 // the used std library functionality
 use std::collections::HashMap;
