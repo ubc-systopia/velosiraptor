@@ -290,7 +290,7 @@ impl Debug for SymbolTable {
 
 /// the default implementation
 impl Default for SymbolTable {
-     fn default() -> Self {
-         Self::new()
-     }
+    fn default() -> Self {
+        Self::new()
+    }
 }

@@ -25,7 +25,6 @@
 
 //! Ast Module of the Velosiraptor Compiler
 
-mod root;
 mod bitslice;
 mod consts;
 mod expression;
@@ -35,6 +34,7 @@ mod interface;
 mod issues;
 mod method;
 mod param;
+mod root;
 mod state;
 mod statement;
 mod symboltable;
@@ -59,7 +59,6 @@ custom_error! {#[derive(PartialEq)] pub AstError
 }
 
 // rexports
-pub use root::AstRoot;
 pub use bitslice::BitSlice;
 pub use consts::Const;
 pub use expression::{BinOp, Expr, UnOp};
@@ -69,6 +68,7 @@ pub use interface::Interface;
 pub use issues::Issues;
 pub use method::Method;
 pub use param::Param;
+pub use root::AstRoot;
 pub use state::State;
 pub use statement::Stmt;
 pub use symboltable::{Symbol, SymbolKind, SymbolTable};
