@@ -52,8 +52,8 @@ pub struct Method {
     pub requires: Vec<Expr>,
     /// the ensures clauses
     pub ensures: Vec<Expr>,
-    /// A sequence of statements
-    pub stmts: Vec<Stmt>,
+    /// the statements in the method
+    pub stmts: Option<Stmt>,
     /// the position where the method was defined
     pub pos: TokenStream,
 }
@@ -164,8 +164,8 @@ impl AstNode for Method {
         // Notes:       --
         // --------------------------------------------------------------------------------------
 
-        for s in &self.stmts {
-            res = res + s.check(st);
+        if let Some(stmts) = &self.stmts {
+            res = res + stmts.check(st);
         }
 
         // Check 6: Return Paths
@@ -174,6 +174,10 @@ impl AstNode for Method {
         // Description: Check if all branches have a well-defined return path
         // Notes:       --
         // --------------------------------------------------------------------------------------
+
+        if let Some(stmts) = &self.stmts {
+            res = res + stmts.check_return_types(self.rettype, st);
+        }
 
         // Check 7: Identifier snake_case
         // --------------------------------------------------------------------------------------
