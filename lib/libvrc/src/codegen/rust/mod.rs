@@ -34,7 +34,7 @@ use std::path::PathBuf;
 
 use codegen_rs as CG;
 
-use crate::ast::{Ast, Field, State};
+use crate::ast::{AstRoot, Field, State};
 use crate::codegen::CodeGenBackend;
 use crate::codegen::CodeGenError;
 
@@ -170,7 +170,7 @@ impl CodeGenBackend for BackendRust {
     ///
     /// This will produce a file with all the globally defined constant definitions.
     /// The file won't be produced if there are no globally defined constants
-    fn generate_globals(&self, ast: &Ast) -> Result<(), CodeGenError> {
+    fn generate_globals(&self, ast: &AstRoot) -> Result<(), CodeGenError> {
         // no need to create anything if there are no constants defined
         if ast.consts.is_empty() {
             return Ok(());
@@ -194,7 +194,7 @@ impl CodeGenBackend for BackendRust {
         save_scope(scope, &srcdir, MOD_CONSTS)
     }
 
-    fn generate_interfaces(&self, ast: &Ast) -> Result<(), CodeGenError> {
+    fn generate_interfaces(&self, ast: &AstRoot) -> Result<(), CodeGenError> {
         // get the source dir
         let mut srcdir = self.outdir.join("src");
 
@@ -218,7 +218,7 @@ impl CodeGenBackend for BackendRust {
     }
 
     /// Generates the units
-    fn generate_units(&self, ast: &Ast) -> Result<(), CodeGenError> {
+    fn generate_units(&self, ast: &AstRoot) -> Result<(), CodeGenError> {
         // get the source dir
         let mut srcdir = self.outdir.join("src");
 
@@ -258,7 +258,7 @@ impl CodeGenBackend for BackendRust {
     /// This basically creates a `pub mod` statement for each unit,
     /// and also for for the constant definitions. It then also re-exports
     /// the defined constants and unit types using `pub use` statements.
-    fn finalize(&self, ast: &Ast) -> Result<(), CodeGenError> {
+    fn finalize(&self, ast: &AstRoot) -> Result<(), CodeGenError> {
         // construct the source directory
         let srcdir = self.outdir.join("src");
 

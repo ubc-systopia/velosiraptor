@@ -287,3 +287,10 @@ impl Debug for SymbolTable {
         Display::fmt(self, f)
     }
 }
+
+/// the default implementation
+impl Default for SymbolTable {
+     fn default() -> Self {
+         Self::new()
+     }
+}
