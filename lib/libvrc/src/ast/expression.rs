@@ -377,8 +377,10 @@ impl Expr {
                 if !ty.compatible(s.typeinfo) {
                     // warning
                     let msg = format!(
-                        "expected expression of type `{}`, symbol `{}` has type",
+                        "expected expression of type `{}`, {} symbol `{}` has type `{}`",
                         ty.to_type_string(),
+                        s.kind,
+                        name,
                         s.typeinfo.to_type_string()
                     );
                     let hint = String::from("define symbol with matching type");
@@ -520,7 +522,7 @@ impl Expr {
                 if !kind.contains(&s.kind) {
                     // warning
                     let msg = format!(
-                        "symbol `{}` exists but has a wrong type. Expected `{:?}`, was `{:?}`",
+                        "symbol `{}` exists but has a wrong kind. Expected `{:?}`, was `{:?}`",
                         ident, kind, s.kind
                     );
                     let hint = format!(
