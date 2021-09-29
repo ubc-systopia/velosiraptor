@@ -30,7 +30,7 @@ use nom::{
     branch::alt,
     combinator::{cut, opt},
     multi::many1,
-    sequence::{delimited, pair, preceded, terminated, tuple},
+    sequence::{delimited, pair, preceded, terminated},
 };
 
 // lexer, parser terminals and ast
@@ -176,20 +176,37 @@ fn if_else_stmt(input: TokenStream) -> IResult<TokenStream, Stmt> {
 
     // parses the block of statement
 
-    let then_block = cut(delimited(lbrace, many1(stmt), rbrace));
-    let else_block = preceded(kw_else, cut(delimited(lbrace, many1(stmt), rbrace)));
+    let (i2, cond) = bool_expr(i1)?;
 
-    let (i2, (cond, then, other)) = tuple((bool_expr, then_block, opt(else_block)))(i1)?;
+    // the then {} part
+    let (i3, then) = cut(delimited(lbrace, many1(stmt), rbrace))(i2.clone())?;
+    let then = Box::new(Stmt::Block {
+        stmts: then,
+        pos: i2.expand_until(&i3),
+    });
+
+    // the else {} part
+    let (i4, other) = opt(preceded(
+        kw_else,
+        cut(delimited(lbrace, many1(stmt), rbrace)),
+    ))(i3.clone())?;
+    let other = match other {
+        None => Box::new(None),
+        Some(stmts) => Box::new(Some(Stmt::Block {
+            stmts,
+            pos: i3.expand_until(&i4),
+        })),
+    };
 
     // create the token stream covering the entire method def
-    let pos = input.expand_until(&i2);
+    let pos = input.expand_until(&i4);
 
     Ok((
-        i2,
+        i4,
         Stmt::IfElse {
             cond,
             then,
-            other: other.unwrap_or_default(),
+            other,
             pos,
         },
     ))
