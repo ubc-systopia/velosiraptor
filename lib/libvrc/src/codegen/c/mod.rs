@@ -27,7 +27,7 @@
 
 use std::path::Path;
 
-use crate::ast::Ast;
+use crate::ast::AstRoot;
 use crate::codegen::CodeGenBackend;
 use crate::codegen::CodeGenError;
 
@@ -47,16 +47,16 @@ impl CodeGenBackend for BackendC {
     fn prepare(&self) -> Result<(), CodeGenError> {
         Ok(())
     }
-    fn generate_globals(&self, _ast: &Ast) -> Result<(), CodeGenError> {
+    fn generate_globals(&self, _ast: &AstRoot) -> Result<(), CodeGenError> {
         Ok(())
     }
-    fn generate_interfaces(&self, _ast: &Ast) -> Result<(), CodeGenError> {
+    fn generate_interfaces(&self, _ast: &AstRoot) -> Result<(), CodeGenError> {
         Ok(())
     }
-    fn generate_units(&self, _ast: &Ast) -> Result<(), CodeGenError> {
+    fn generate_units(&self, _ast: &AstRoot) -> Result<(), CodeGenError> {
         Ok(())
     }
-    fn finalize(&self, _ast: &Ast) -> Result<(), CodeGenError> {
+    fn finalize(&self, _ast: &AstRoot) -> Result<(), CodeGenError> {
         Ok(())
     }
 }

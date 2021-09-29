@@ -41,7 +41,7 @@ use crate::token::TokenStream;
 ///   2. constants: pre-defined values
 ///   3. units: units defined in this file
 #[derive(PartialEq, Clone)]
-pub struct Ast {
+pub struct AstRoot {
     /// the filename this ast represents
     pub filename: String,
     /// the import statements found in the Ast
@@ -54,7 +54,7 @@ pub struct Ast {
 
 use crate::parser::Parser;
 
-impl Ast {
+impl AstRoot {
     /// resolves imports recursively
     ///
     /// Walks the import tree and tries to parse each import individually
@@ -159,7 +159,7 @@ impl Ast {
     }
 
     /// recursively collects all asts from the imports
-    fn do_collect_asts(&mut self, asts: &mut HashMap<String, Ast>) {
+    fn do_collect_asts(&mut self, asts: &mut HashMap<String, AstRoot>) {
         self.imports = self
             .imports
             .drain(..)
@@ -265,7 +265,7 @@ impl Ast {
 }
 
 /// implementation of the [fmt::Display] trait for the [Ast].
-impl fmt::Display for Ast {
+impl fmt::Display for AstRoot {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "AST")?;
         writeln!(f, " + Imports:")?;
@@ -285,14 +285,14 @@ impl fmt::Display for Ast {
 }
 
 /// implementation of the [fmt::Debug] display trait for the [Ast].
-impl fmt::Debug for Ast {
+impl fmt::Debug for AstRoot {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "Ast: TODO",)
     }
 }
 
 /// implementation of [AstNode] for [Ast]
-impl AstNode for Ast {
+impl AstNode for AstRoot {
     fn check(&self, st: &mut SymbolTable) -> Issues {
         // no issues so far
         let mut res = Issues::ok();

@@ -46,7 +46,7 @@ use custom_error::custom_error;
 use nom::{multi::many0, Err};
 
 // the used library-internal functionality
-use crate::ast::Ast;
+use crate::ast::AstRoot;
 use crate::error::VrsError;
 use crate::lexer::{Lexer, LexerError};
 use crate::parser::{
@@ -95,7 +95,7 @@ pub struct Parser;
 /// The parser implementation
 impl Parser {
     /// Parses a token vector and creates an [Ast]
-    pub fn parse(context: &str, tokens: Vec<Token>) -> Result<Ast, ParserError> {
+    pub fn parse(context: &str, tokens: Vec<Token>) -> Result<AstRoot, ParserError> {
         log::debug!("start parsing...");
 
         // get the token stream
@@ -125,7 +125,7 @@ impl Parser {
         // consume the end of file token
         log::debug!("parsing done.");
         match eof(i3.clone()) {
-            Ok(_) => Ok(Ast {
+            Ok(_) => Ok(AstRoot {
                 filename: context.to_string(),
                 imports,
                 consts,
@@ -141,14 +141,14 @@ impl Parser {
     }
 
     /// Parses a supplied string by lexing it first, create an Ast
-    pub fn parse_string(context: &str, string: &str) -> Result<Ast, ParserError> {
+    pub fn parse_string(context: &str, string: &str) -> Result<AstRoot, ParserError> {
         log::info!("creating string parser");
         let tokens = Lexer::lex_string(context, string)?;
         Parser::parse_tokens(context, &tokens)
     }
 
     /// Parses a file by lexing it first, create an Ast
-    pub fn parse_file(filename: &str) -> Result<(Ast, Rc<String>), ParserError> {
+    pub fn parse_file(filename: &str) -> Result<(AstRoot, Rc<String>), ParserError> {
         log::info!("creating file parser for '{}'", filename);
         let (tokens, content) = Lexer::lex_file(filename)?;
 
@@ -159,7 +159,7 @@ impl Parser {
     /// Parses a slice of tokens
     ///
     /// This will create a new vector of the token slice
-    pub fn parse_tokens(context: &str, tokens: &[Token]) -> Result<Ast, ParserError> {
+    pub fn parse_tokens(context: &str, tokens: &[Token]) -> Result<AstRoot, ParserError> {
         Parser::parse(context, tokens.to_vec())
     }
 }
