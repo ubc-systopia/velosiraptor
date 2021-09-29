@@ -77,7 +77,8 @@ pub use unit::Unit;
 
 /// Trait that checks the Ast nodes for consistency
 ///
-/// This trait has to be implemented by all the nodes
+/// This trait has to be implemented by all the nodes. It provides common functionality
+/// for the AstNodes, that is useful when printing error messages, for instance.
 pub trait AstNode {
     // checks the node and returns the number of errors and warnings encountered
     fn check(&self, _st: &mut SymbolTable) -> Issues {
@@ -88,7 +89,9 @@ pub trait AstNode {
         Issues::ok()
     }
 
+    /// returns a printable string representing the ast node
     fn name(&self) -> &str;
-    /// returns the location of the current
+
+    /// returns the location of the AstNode
     fn loc(&self) -> &TokenStream;
 }
