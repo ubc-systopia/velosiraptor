@@ -1,0 +1,38 @@
+
+unit Foo : Segment {
+    // a fine constant definition
+    const STATIC_ADDR : addr = 0x1000;
+
+    // a fine function
+    fn bar(a : int) -> int {
+        return 1 + a;
+    }
+
+    // that one has the wrong return type
+    fn wrong_return_type(a : int) -> bool {
+        return 1 + a;
+    }
+
+    // double defined parameters
+    fn double_defined_params(a: int, a: bool) -> bool {
+        return true;
+    }
+
+    // here a shadowes the definition param
+    fn shadowed_definition (a: bool) -> int {
+        let a : int = 123;
+        return a;
+    }
+
+    // required function
+    fn map(va: addr, flags: int, pa : addr) -> bool
+        requires va % 0x1000 == 0;
+    {
+        return true;
+    }
+
+    // required function
+    fn translate(va: addr, flags: int) -> addr {
+        return STATIC_ADDR;
+    }
+};
