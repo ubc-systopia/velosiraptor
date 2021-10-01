@@ -35,78 +35,87 @@
 unit X86_pte : Segment {
     // the state
     state = Memory(base) {
-        // one entry named 'pte' at offset 0, length 4 bytes
         pte [base, 0, 4] {
             // the following fields at starting bit, ending bit, name
-            0   0 present
-            1   1 writable
-            2   2 usersmode
-            3   3 writethrough
-            4   4 nocache
-            5   5 accessed
-            6   6 dirty
-            7   7 pat
-            8   8 global
-            9  11 ignored
+            0   0 present,
+            1   1 writable,
+            2   2 usersmode,
+            3   3 writethrough,
+            4   4 nocache,
+            5   5 accessed,
+            6   6 dirty,
+            7   7 pat,
+            8   8 global,
+            9  11 ignored,
            12  31 base
         };
-
-    // the intderface is just a load/store
-    interface = MemoryInterface(base) {
-        base[0..4] => state.pte;
-    }
-
-    // the state is given by a external memory reference (we don't know where it's located at)
-    // so the state will be a memory reference
-    x86_pte(base : MemRef) {
-        // the state must be aligned properly
-        assert aligned(base, 4);
-        assert size(base) == 4;
-    }
+    };
 
     // the base address where this entry translate to
-    get_base() {
-        return state.pte.page << 12;
+    fn get_base() -> addr {
+        return 0;
+        //return state.pte.page << 12;
     }
 
     // here the size is fixed
-    get_size() {
+    fn get_size() -> size {
         return 4096;
     };
 
+
     // matches a translation flags,
-    match_flags(flags) {
-        if (st.pte.present == 0) {
+    fn match_flags(flags : int) -> bool
+    {
+        if state.pte.present == 0 {
             return false;
         }
 
-        if (flags.write && !st.pte.write) {
+        // need a way to express the flags
+        if flags & !state.pte.write {
+            return false;
+        }
+        // need a way to express the flags
+        if flags & !state.pte.user {
             return false;
         }
 
-        if (flags.user && !st.pte.user) {
-            return false;
-        }
 
         return true;
     };
 
-    // constraints for the mapping
-    map(inaddr, outaddr, flags) {
-        assert aligned(addr, 4096);
-        assert type(addr) == Memory || type(addr) == DevMemory;
-        assert type(addr) == DevMemory ==> flags & CACHE_DISABLED
-    }
+    // unmapping an entry
+    fn unmap(va: addr, sz: size) -> bool
+        // need a way to express:
+        // forall a | va <= a < va + sz :: fail(translate(a, ANY))
+        ensures translate(va, 0) == 0;
+    ;
 
-    // constraints for unmapping
-    unmap() {
-        // ensures: forall flags :: match_flags(flags) == False
-    }
+    // mapping an entry
+    fn map(va: addr, sz: size, flags: int, pa : addr) -> bool
+        //requires (addr %  4096) == 0;
+        // need a way to express types:
+        // type(addr) == Memory || type(addr) == DevMemory;
+        // type(addr) == DevMemory ==> flags & CACHE_DISABLED
+        // need a way to express `forall i | 0 <= i < sz :: translate(va + i, flags) == pa + i
+        ensures translate(va, flags) == pa;
+    ;
 
-    // constraints for protecting
-    protect(flags) {
+
+    // protecting the entry, i.e., change its permission
+    fn protect(flags: int) -> bool
+        ensures match_flags(flags);
+    {
         // update the entry
         // ensures match_flags(flags) ==> translate(a) == translate(a)
+        return true;
     }
 
+
+    // the translation semantics, adding an option type?
+    fn translate(va: addr, flags: int) -> addr
+        requires va < get_size();
+        requires match_flags(flags);
+    {
+        return va + get_base();
+    }
 };
