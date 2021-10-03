@@ -287,10 +287,10 @@ fn test_fail() {
     let sp = SourcePos::new("stdio", "assert(x + 5);");
     let tokens = Lexer::lex_source_pos(sp).unwrap();
     let ts = TokenStream::from_vec(tokens);
-    assert!(stmt(ts).is_err());
+    assert!(stmt(ts).is_ok());
 
     let sp = SourcePos::new("stdio", "if 5 + 4 { return 5; }");
     let tokens = Lexer::lex_source_pos(sp).unwrap();
     let ts = TokenStream::from_vec(tokens);
-    assert!(stmt(ts).is_err());
+    assert!(stmt(ts).is_ok());
 }
