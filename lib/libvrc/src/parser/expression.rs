@@ -24,12 +24,25 @@
 // SOFTWARE.
 
 //! State definition parsing
+//!
+
+// the used nom componets
+use nom::{
+    branch::alt,
+    bytes::complete::take,
+    combinator::{cut, fail, opt},
+    multi::many0,
+    multi::{separated_list0, separated_list1},
+    sequence::{delimited, tuple},
+    sequence::{pair, preceded, terminated},
+    Err, Needed,
+};
 
 // lexer, parser terminals and ast
 use crate::ast::{AstNode, BinOp, Expr, UnOp};
-use crate::error::IResult;
+use crate::error::{IResult, VrsError};
 use crate::parser::terminals::*;
-use crate::token::TokenStream;
+use crate::token::{Keyword, TokenContent, TokenStream};
 
 // Precedence of Operators  (strong to weak)
 // Operator                         Associativity       Example
@@ -38,7 +51,7 @@ use crate::token::TokenStream;
 // Field expressions                left to right       a.b.c
 // Function calls, array indexing                       a()  a[1]
 // ?                                                    ?
-// Unary - * ! & &mut                                   !a
+// Unary - * ! &                                        !a
 // as                               left to right       as
 // * / %                            left to right       a * b, a / b, a % b
 // + -                              left to right       a + b, a - b
@@ -52,16 +65,10 @@ use crate::token::TokenStream;
 // .. ..=                           Require parentheses
 // =                                                    Assign
 
-// the used nom componets
-use nom::{
-    branch::alt,
-    combinator::cut,
-    multi::many0,
-    sequence::{delimited, tuple},
-    sequence::{pair, preceded, terminated},
-};
-
 /// folds expressions
+///
+/// convert a list of expressions with the same precedence into a tree
+/// representation
 fn fold_exprs(initial: Expr, remainder: Vec<(BinOp, Expr)>) -> Expr {
     remainder.into_iter().fold(initial, |acc, tuple| {
         let (op, expr) = tuple;
@@ -76,29 +83,257 @@ fn fold_exprs(initial: Expr, remainder: Vec<(BinOp, Expr)>) -> Expr {
     })
 }
 
-/// expression parsing: parses wither a boolean or arithmetic expression
-pub fn expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    assert!(!input.is_empty());
-    alt((bool_expr, range_expr, arith_expr))(input)
-}
-
-/// parses boolean expressions
+/// builds a binary operator parser
 ///
-/// this is an expression that evaluates to a boolean value.
-pub fn bool_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    // we start with a the logical or (||) as this has the weakest precedence
-    assert!(!input.is_empty());
-    let (i, initial) = bool_land(input)?;
+/// this constructs a binary operation parser for one or more operators with the same
+/// precedence.
+/// The macro supports multiple `(op, parser)` tuples as arguments.
+///
+/// # Grammar
+///
+/// `THIS_EXPR  := NEXT_EXPR (OP NEXT_EXPR)*
+///
+/// # Example
+///
+/// * Logical Or expressions (a || b): `binop_parser!(lor_expr, land_expr, (BinOp::Lor, lor))`
+///
+macro_rules! binop_parser (
+    ($this:ident, $next:ident, $( $optup:expr ),* ) => (
+        fn $this(input: TokenStream) -> IResult<TokenStream, Expr> {
+            // try to recognize at least one token of the next parser
+            let (i, initial) = $next(input)?;
+            // build the parser for one or more `OP NEXT_EXPR` parser
+            let (i, remainder) = many0(alt((
+                $(
+                    |i: TokenStream| {
+                        let (binop, binop_parse) = $optup;
+                        // recognize the operator, fail on the next parser
+                        let (i, op) = preceded(binop_parse, cut($next))(i)?;
+                        Ok((i, (binop, op)))
+                    },
+                )*
+                |i : TokenStream| {
+                    // always fail as we could not recognize any of the supplied binops here
+                    fail(i)
+                }
+            ))
+            )(i)?;
+            // all right, now fold the expressions, to bild the tree
+            Ok((i, fold_exprs(initial, remainder)))
+        }
+    )
+);
 
-    let (i, remainder) = many0(|i: TokenStream| {
-        let (i, add) = preceded(lor, bool_land)(i)?;
-        Ok((i, (BinOp::Lor, add)))
-    })(i)?;
+/// builds a unary operator parser
+///
+/// This constructs a unuary operator parser for one or more operators with the same precedence.
+/// The unary oparator may or may not be present.
+/// The macro supports multiple `(op, parser)` tuples as arguments.
+///
+/// # Grammar
+///
+/// `THIS_EXPR := OP NEXT_EXPR | NEXT_EXPR
+///
+/// # Example
+///
+///  * Logical Not expression (!a): `unop_parser!(unary_expr, term_expr, (UnOp::Not, not));`
+///
+macro_rules! unop_parser (
+    ($this:ident, $next:ident, $( $optup:expr ),* ) => (
+        fn $this(input: TokenStream) -> IResult<TokenStream, Expr> {
+            alt((
+                $(
+                    |i: TokenStream| {
+                        let (unop, unop_parse) = $optup;
+                        // recognize the unary operator followed by the next parser
+                        let (i2, op) = preceded(unop_parse, cut($next))(i.clone())?;
+                        // expand the position until the end
+                        let pos = i.expand_until(&i2);
+                        Ok((
+                            i2,
+                            Expr::UnaryOperation {
+                                op: unop,
+                                val: Box::new(op),
+                                pos
+                            },
+                        ))
+                    },
+                )*
+                    |i : TokenStream| {
+                        // the plain next parser without unary operator is the next
+                        $next(i)
+                    }
+            ))(input)
+        }
+    )
+);
 
-    Ok((i, fold_exprs(initial, remainder)))
+/// builds a comparator expression parser
+///
+/// This constructs parsers for comparison operations with a left-hand size and right-hand size
+///
+/// # Grammar
+///
+/// `THIS_EXPR := NEXT_EXPR (OP NEXT_EXPR)?
+///
+/// # Example
+///
+/// * equality: `cmp_parser!(cmp_expr, or_expr, (BinOp::Eq, eq)`
+macro_rules! cmp_parser (
+    ($this:ident, $next:ident, $( $optup:expr ),* ) => (
+        fn $this(input: TokenStream) -> IResult<TokenStream, Expr> {
+            let (i, lhs) = $next(input)?;
+            // take an option comparison operator here
+            let (i, rhs) = opt(alt((
+                $(
+                |i: TokenStream| {
+                    let (binop, binop_parse) = $optup;
+                    let (i, op) = preceded(binop_parse, cut($next))(i)?;
+                    Ok((i, (binop, op)))
+                },
+                )*
+                |i : TokenStream| {
+                    fail(i)
+                }
+            )))(i)?;
+            match rhs {
+                // we recognized the comparator
+                Some((op, rhs)) => {
+                    // position spans from LHS to RHS
+                    let pos = lhs.loc().clone().merge(rhs.loc());
+                    Ok((
+                        i,
+                        Expr::BinaryOperation {
+                            op,
+                            lhs: Box::new(lhs),
+                            rhs: Box::new(rhs),
+                            pos,
+                        },
+                    ))
+                }
+                // no comparator, just return the lhs
+                None => Ok((i, lhs))
+            }
+        }
+    )
+);
+
+/// parses an expression
+///
+/// This is the entry point into the expression parsing functionality. This
+/// parser recognizes any valid expression, but does not perform any type
+/// checking.
+///
+pub fn expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+    lor_expr(input)
 }
 
-/// parses a range expression (a..b)
+/// parses an arithmetic expression
+///
+/// Currently this is just parsing a generic expression
+///
+pub fn arith_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+    lor_expr(input)
+}
+
+/// parses a boolean expression
+///
+/// Currently this is just parsing a generic expression.
+///
+pub fn bool_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+    lor_expr(input)
+}
+
+// ||                               left to right
+binop_parser!(lor_expr, land_expr, (BinOp::Lor, lor));
+// &&                               left to right
+binop_parser!(land_expr, cmp_expr, (BinOp::Land, land));
+// == != < > <= >=                  Require parentheses
+cmp_parser!(
+    cmp_expr,
+    or_expr,
+    (BinOp::Eq, eq),
+    (BinOp::Ne, ne),
+    (BinOp::Gt, gt),
+    (BinOp::Lt, lt),
+    (BinOp::Le, le),
+    (BinOp::Ge, ge)
+);
+// |                                left to right       a | b
+binop_parser!(or_expr, xor_expr, (BinOp::Or, or));
+// ^                                left to right       a * b
+binop_parser!(xor_expr, and_expr, (BinOp::Xor, xor));
+// &                                left to right       a & b
+binop_parser!(and_expr, shift_expr, (BinOp::And, and));
+// << >>                            left to right       a << b, a >> b,
+binop_parser!(
+    shift_expr,
+    add_sub_expr,
+    (BinOp::LShift, lshift),
+    (BinOp::RShift, rshift)
+);
+// + -                              left to right       a + b, a - b
+binop_parser!(
+    add_sub_expr,
+    mul_div_expr,
+    (BinOp::Plus, plus),
+    (BinOp::Minus, minus)
+);
+// * / %                            left to right       a * b, a / b, a % b
+binop_parser!(
+    mul_div_expr,
+    unary_expr,
+    (BinOp::Multiply, star),
+    (BinOp::Divide, slash),
+    (BinOp::Modulo, percent)
+);
+
+// Unary - * ! &                                         !a, *a, ^a
+unop_parser!(
+    unary_expr,
+    term_expr,
+    (UnOp::Not, not),
+    (UnOp::Ref, and),
+    (UnOp::LNot, lnot)
+);
+
+/// parse a term expression
+///
+/// This is an expression term including literals, function calls, element acesses,
+/// identifiers, and `( expr )`.
+///
+/// # Grammar
+///
+/// `TERM_EXPR := NUM_LIT_EXPR | BOOL_LIT_EXPR | FN_CALL_EXPR | ELEMENT_EXPR | IDENT_EXPR | LPAREN EXPR RPAREN
+pub fn term_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+    alt((
+        // try to parse a number
+        num_lit_expr,
+        // it can be a boolean literal (true | false)
+        bool_lit_expr,
+        // a function call expression returning a boolean
+        fn_call_expr,
+        // element expression returning a boolean
+        element_expr,
+        // it can be a identifier (variable)
+        ident_expr,
+        // its a term in parenthesis
+        preceded(lparen, cut(terminated(expr, rparen))),
+    ))(input)
+}
+
+/// parses a range expression
+///
+/// The range expression is used to specify a range of values from a starting
+/// value, up to but not including end value.
+///
+/// # Grammar
+///
+/// `RANGE_EXPR := ARITH_EXPR .. ARITH_EXPR`
+///
+/// # Example
+///
+/// `0..10` corresponds to the mathematical interval `[0, 10)`
 ///
 /// an arithmetic expression evalutes to a number a | b
 pub fn range_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
@@ -114,22 +349,18 @@ pub fn range_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     ))
 }
 
-/// parse arithmetic expressions
+/// parses a numeric literal
 ///
-/// an arithmetic expression evalutes to a number a | b
-pub fn arith_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    // we start with the or expression (|)
-    assert!(!input.is_empty());
-    let (i, initial) = arith_xor_expr(input)?;
-
-    let (i, remainder) = many0(|i: TokenStream| {
-        let (i, op) = preceded(or, arith_xor_expr)(i)?;
-        Ok((i, (BinOp::Or, op)))
-    })(i)?;
-
-    Ok((i, fold_exprs(initial, remainder)))
-}
-
+/// The numeric literal is a hexdecima, decimal, octal or binary number
+///
+/// # Grammar
+///
+/// `NUM := HEX_NUM | DEC_NUM | OCT_NUM | BIN_NUM`
+///
+/// # Example
+///
+/// `1234`, `0xabc`
+///
 pub fn num_lit_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
     let (i, value) = num(input.clone())?;
@@ -137,6 +368,17 @@ pub fn num_lit_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     Ok((i, Expr::Number { value, pos }))
 }
 
+/// parses a boolean literal
+///
+/// This corresponds to true or false.
+///
+/// # Grammar
+///
+/// `BOOL := true | false
+///
+/// # Example
+///
+/// `true`, `false
 pub fn bool_lit_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     assert!(!input.is_empty());
     let (i, value) = boolean(input.clone())?;
@@ -144,9 +386,18 @@ pub fn bool_lit_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     Ok((i, Expr::Boolean { value, pos }))
 }
 
-/// parses a slice expression `foo[0..43]`
+/// parses a slice expression
 ///
-/// asdf
+/// The slice expression refers to range of elements within an array-like structure
+///
+/// # Grammar
+///
+/// SLICE_EXPR := IDENT_EXPR [ RANGE_EXPR ]
+///
+/// # Example
+///
+/// `foo[0..1]`
+///
 pub fn slice_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i, (p, e)) = pair(ident_expr, delimited(lbrack, range_expr, rbrack))(input)?;
     match p {
@@ -162,308 +413,94 @@ pub fn slice_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     }
 }
 
-/// parses a logical and (&&) expression
+/// parses an identifier expression
 ///
-/// this expression evaluates to a boolean value
-fn bool_land(input: TokenStream) -> IResult<TokenStream, Expr> {
-    // we take the logical and (&&) of terms
-    assert!(!input.is_empty());
-    let (i, initial) = bool_unary_expr(input)?;
-
-    let (i, remainder) = many0(|i: TokenStream| {
-        let (i, add) = preceded(land, bool_unary_expr)(i)?;
-        Ok((i, (BinOp::Land, add)))
-    })(i)?;
-
-    Ok((i, fold_exprs(initial, remainder)))
-}
-
-fn bool_unary_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    alt((
-        bool_unary_lnot,
-        bool_cmp_expr_arith,
-        bool_cmp_expr_bool,
-        bool_term_expr,
-    ))(input)
-}
-
-/// parses a comparison expression
+/// This parser recognizes identifiers includingthe special keywords `state` and `interface`.
 ///
-/// this expression evaluates to a boolean value
-fn bool_cmp_expr_arith(input: TokenStream) -> IResult<TokenStream, Expr> {
-    assert!(!input.is_empty());
-    let (i, lhs) = arith_expr(input)?;
-    let (i, (op, rhs)) = alt((
-        |i: TokenStream| {
-            let (i, op) = preceded(eq, arith_expr)(i)?;
-            Ok((i, (BinOp::Eq, op)))
-        },
-        |i: TokenStream| {
-            let (i, op) = preceded(ne, arith_expr)(i)?;
-            Ok((i, (BinOp::Ne, op)))
-        },
-        |i: TokenStream| {
-            let (i, op) = preceded(gt, arith_expr)(i)?;
-            Ok((i, (BinOp::Gt, op)))
-        },
-        |i: TokenStream| {
-            let (i, op) = preceded(lt, arith_expr)(i)?;
-            Ok((i, (BinOp::Lt, op)))
-        },
-        |i: TokenStream| {
-            let (i, op) = preceded(le, arith_expr)(i)?;
-            Ok((i, (BinOp::Le, op)))
-        },
-        |i: TokenStream| {
-            let (i, op) = preceded(ge, arith_expr)(i)?;
-            Ok((i, (BinOp::Ge, op)))
-        },
-    ))(i)?;
-    let pos = lhs.loc().clone().merge(rhs.loc());
-    Ok((
-        i,
-        Expr::BinaryOperation {
-            op,
-            lhs: Box::new(lhs),
-            rhs: Box::new(rhs),
-            pos,
-        },
-    ))
-}
-
-/// parses a comparison expression
+/// # Grammar
 ///
-/// this expression evaluates to a boolean value
-fn bool_cmp_expr_bool(input: TokenStream) -> IResult<TokenStream, Expr> {
-    assert!(!input.is_empty());
-    let (i, lhs) = bool_term_expr(input)?;
-    let (i, (op, rhs)) = alt((
-        |i: TokenStream| {
-            let (i, op) = preceded(eq, bool_term_expr)(i)?;
-            Ok((i, (BinOp::Eq, op)))
-        },
-        |i: TokenStream| {
-            let (i, op) = preceded(ne, bool_term_expr)(i)?;
-            Ok((i, (BinOp::Ne, op)))
-        },
-    ))(i)?;
-    let pos = lhs.loc().clone().merge(rhs.loc());
-    Ok((
-        i,
-        Expr::BinaryOperation {
-            op,
-            lhs: Box::new(lhs),
-            rhs: Box::new(rhs),
-            pos,
-        },
-    ))
-}
-
-/// parses a logical unary not (!) expression
-fn bool_unary_lnot(input: TokenStream) -> IResult<TokenStream, Expr> {
-    assert!(!input.is_empty());
-    let (i, v) = preceded(lnot, bool_term_expr)(input.clone())?;
-    let pos = input.merge(v.loc());
-    Ok((
-        i,
-        Expr::UnaryOperation {
-            op: UnOp::LNot,
-            val: Box::new(v),
-            pos,
-        },
-    ))
-}
-
-/// parses an xor expression
+/// `IDENT_EXPR := (KW_STATE | KW_INTERFACE | IDENT) (DOT IDENT)*
 ///
-/// an arithmetic expression that evaluates to a number (a ^ b)
-fn arith_xor_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    assert!(!input.is_empty());
-    let (i, initial) = arith_and_expr(input)?;
-
-    let (i, remainder) = many0(|i: TokenStream| {
-        let (i, op) = preceded(xor, arith_and_expr)(i)?;
-        Ok((i, (BinOp::Or, op)))
-    })(i)?;
-
-    Ok((i, fold_exprs(initial, remainder)))
-}
-
-/// parses an xor expression
+/// # Example
+///  * variable: `a`
+///  * State reference: `state.a`
 ///
-/// an arithmetic expression that evaluates to a number (a & b)
-fn arith_and_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    assert!(!input.is_empty());
-    let (i, initial) = arith_shift_expr(input)?;
-
-    let (i, remainder) = many0(|i: TokenStream| {
-        let (i, op) = preceded(and, arith_shift_expr)(i)?;
-        Ok((i, (BinOp::And, op)))
-    })(i)?;
-
-    Ok((i, fold_exprs(initial, remainder)))
-}
-
-fn arith_shift_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    assert!(!input.is_empty());
-    let (i, initial) = arith_add_expr(input)?;
-    let (i, remainder) = many0(alt((
-        |i: TokenStream| {
-            let (i, op) = preceded(lshift, arith_add_expr)(i)?;
-            Ok((i, (BinOp::LShift, op)))
-        },
-        |i: TokenStream| {
-            let (i, op) = preceded(rshift, arith_add_expr)(i)?;
-            Ok((i, (BinOp::RShift, op)))
-        },
-    )))(i)?;
-
-    Ok((i, fold_exprs(initial, remainder)))
-}
-
-/// parses a + / -
-fn arith_add_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    assert!(!input.is_empty());
-    let (i, initial) = arit_mul_expr(input)?;
-    let (i, remainder) = many0(alt((
-        |i: TokenStream| {
-            let (i, op) = preceded(plus, arit_mul_expr)(i)?;
-            Ok((i, (BinOp::Plus, op)))
-        },
-        |i: TokenStream| {
-            let (i, op) = preceded(minus, arit_mul_expr)(i)?;
-            Ok((i, (BinOp::Minus, op)))
-        },
-    )))(i)?;
-
-    Ok((i, fold_exprs(initial, remainder)))
-}
-
-/// parses a * / %
-fn arit_mul_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    assert!(!input.is_empty());
-    let (i, initial) = arith_unary_expr(input)?;
-    let (i, remainder) = many0(alt((
-        |i: TokenStream| {
-            let (i, op) = preceded(star, arith_unary_expr)(i)?;
-            Ok((i, (BinOp::Multiply, op)))
-        },
-        |i: TokenStream| {
-            let (i, op) = preceded(slash, arith_unary_expr)(i)?;
-            Ok((i, (BinOp::Divide, op)))
-        },
-        |i: TokenStream| {
-            let (i, op) = preceded(percent, arith_unary_expr)(i)?;
-            Ok((i, (BinOp::Modulo, op)))
-        },
-    )))(i)?;
-
-    Ok((i, fold_exprs(initial, remainder)))
-}
-
-fn arith_unary_not(input: TokenStream) -> IResult<TokenStream, Expr> {
-    assert!(!input.is_empty());
-    let (i, val) = preceded(not, arith_term_expr)(input.clone())?;
-    let pos = input.merge(val.loc());
-    Ok((
-        i,
-        Expr::UnaryOperation {
-            op: UnOp::LNot,
-            val: Box::new(val),
-            pos,
-        },
-    ))
-}
-
-fn arith_unary_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    alt((arith_unary_not, arith_term_expr))(input)
-}
-
 fn ident_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    assert!(!input.is_empty());
-    let (i, (fst, mut ot)) = pair(ident, many0(preceded(dot, ident)))(input.clone())?;
+    // we need to match on the state and interface keywords as well,
+    // so we are doing this manually here, try to take a single token
+    let (rem, tok) = take(1usize)(input.clone())?;
+    if tok.is_empty() {
+        return Err(Err::Incomplete(Needed::new(1)));
+    }
+
+    // now check what we've got, either a keyword or one of
+    let fst = match &tok.peek().content {
+        TokenContent::Keyword(Keyword::State) => String::from("state"),
+        TokenContent::Keyword(Keyword::Interface) => String::from("interface"),
+        TokenContent::Identifier(s) => String::from(s),
+        _ => {
+            return Err(Err::Error(VrsError::from_token(
+                input,
+                TokenContent::Identifier(String::new()),
+            )))
+        }
+    };
+    // recognize the `.ident` parts
+    let (i, mut ot) = many0(preceded(dot, ident))(rem)?;
+    // merge the path into one big vector
     let mut path = Vec::from([fst]);
     path.append(&mut ot);
     let pos = input.expand_until(&i);
     Ok((i, Expr::Identifier { path, pos }))
 }
 
-/// pares a function call expression `foo()`
+/// pares a function call expression
 ///
-/// This parses a function call without arguments
+/// This parser recognizes a function call expression.
 ///
-/// TODO: test support for arguments
+/// # Grammar
+///
+/// `FN_CALL_EXPR := IDENT (DOT IDENT)* LPAREN LIST(COMMA, EXPR) RPAREN
+///
+/// # Example
+///
+///  * `a()`
+///  * `b(a)`
+///
 fn fn_call_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    let (i, (e, args)) = pair(
-        ident_expr,
+    let (i, (path, args)) = pair(
+        separated_list1(dot, ident),
         delimited(lparen, separated_list0(comma, expr), rparen),
-    )(input)?;
-    match e {
-        Expr::Identifier { path, pos } => Ok((i, Expr::FnCall { path, args, pos })),
-        _ => panic!("unexpected type"),
-    }
+    )(input.clone())?;
+    let pos = input.expand_until(&i);
+    Ok((i, Expr::FnCall { path, args, pos }))
 }
 
-/// parses a slice element expression `foo[3]`
+/// parses a slice element expression
 ///
-/// this returns a single element from a slice
+/// This constructs a parser that recognizes an element access `foo[0]`.
+///
+/// # Grammar
+///
+/// `ELEMENT_EXPR := IDENT_EXPR LBRACK NUM_LIT RBRACK`
+///
+/// # Example
+///
+///  * `foo[1]`
 fn element_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    let (i, (p, e)) = pair(ident_expr, delimited(lbrack, num_lit_expr, rbrack))(input)?;
-    match p {
-        Expr::Identifier { path, pos } => Ok((
-            i,
-            Expr::Element {
-                path,
-                idx: Box::new(e),
-                pos,
-            },
-        )),
-        _ => panic!("unexpected type"),
-    }
-}
-
-/// parses a logical term
-///
-/// This is either
-///  - a boolean `true`
-///  - a function call or element access `foo()` or `foo[1]`
-///  - an identifier `abc`
-///  - or another boolean expression in parentesis `(a && b)`
-fn bool_term_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    alt((
-        // it can be a boolean literal (true | false)
-        bool_lit_expr,
-        // a function call expression returning a boolean
-        fn_call_expr,
-        // element expression returning a boolean
-        element_expr,
-        // it can be a identifier (variable)
-        ident_expr,
-        // its a term in parenthesis
-        preceded(lparen, terminated(bool_expr, cut(rparen))),
-    ))(input)
-}
-
-/// parses an arithmetic term expression
-///
-/// This is either
-///  - a number `123`
-///  - a function call or element access `foo()` or `foo[1]`
-///  - an identifier `abc`
-///  - or another arithmetic expression in parentesis `(a + b)`
-fn arith_term_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    alt((
-        // try to parse a number
-        num_lit_expr,
-        // a function call expression returning an integer
-        fn_call_expr,
-        // element expression returning an integer
-        element_expr,
-        // try to parse an identifier
-        ident_expr,
-        // try to parse an `(arith_expr)`
-        preceded(lparen, terminated(arith_expr, cut(rparen))),
-    ))(input)
+    let (i, (path, e)) = pair(
+        separated_list1(dot, ident),
+        delimited(lbrack, num_lit_expr, rbrack),
+    )(input.clone())?;
+    let pos = input.expand_until(&i);
+    Ok((
+        i,
+        Expr::Element {
+            path,
+            idx: Box::new(e),
+            pos,
+        },
+    ))
 }
 
 #[cfg(test)]
@@ -472,7 +509,6 @@ use crate::lexer::Lexer;
 use crate::nom::Slice;
 #[cfg(test)]
 use crate::sourcepos::SourcePos;
-use nom::multi::separated_list0;
 
 #[cfg(test)]
 macro_rules! parse_equal (
@@ -531,8 +567,6 @@ fn test_arithmetic() {
     parse_equal!(arith_expr, "1 + a + b + 4 + 5", "((((1 + a) + b) + 4) + 5)");
     parse_equal!(arith_expr, "a + 1 + b + 4 + 5", "((((a + 1) + b) + 4) + 5)");
     parse_equal!(arith_expr, "a + 1", "(a + 1)");
-
-    parse_fail!(bool_expr, "1 + 2 * 3 + 4");
 }
 
 #[test]
@@ -559,6 +593,7 @@ fn test_boolean() {
         "((((a && b) && c) || d) || true)"
     );
     parse_equal!(bool_expr, "a < 123 && b > 432", "((a < 123) && (b > 432))");
+    parse_equal!(bool_expr, "true == a", "(true == a)");
     parse_equal!(bool_expr, "a == true", "(a == true)");
 }
 

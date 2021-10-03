@@ -136,6 +136,21 @@ fn test_ok() {
     let sp = SourcePos::new("stdio", "const FOO : bool = true;");
     let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
     assert!(constdef(TokenStream::from_vec(tokens)).is_ok());
+
+    // wrong type, but should parse
+    let sp = SourcePos::new("stdio", "const FOO : size = true;");
+    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
+    assert!(constdef(TokenStream::from_vec(tokens)).is_ok());
+
+    // wrong type, but should parse
+    let sp = SourcePos::new("stdio", "const FOO : bool = 0x123;");
+    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
+    assert!(constdef(TokenStream::from_vec(tokens)).is_ok());
+
+    // wrong type, but should parse
+    let sp = SourcePos::new("stdio", "const FOO : addr = true;");
+    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
+    assert!(constdef(TokenStream::from_vec(tokens)).is_ok());
 }
 
 #[test]
@@ -157,21 +172,6 @@ fn test_fails() {
 
     // no type
     let sp = SourcePos::new("stdio", "const FOO  = true;");
-    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
-    assert!(constdef(TokenStream::from_vec(tokens)).is_err());
-
-    // wrong type
-    let sp = SourcePos::new("stdio", "const FOO : size = true;");
-    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
-    assert!(constdef(TokenStream::from_vec(tokens)).is_err());
-
-    // wrong type
-    let sp = SourcePos::new("stdio", "const FOO : bool = 0x123;");
-    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
-    assert!(constdef(TokenStream::from_vec(tokens)).is_err());
-
-    // wrong type
-    let sp = SourcePos::new("stdio", "const FOO : addr = true;");
     let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
     assert!(constdef(TokenStream::from_vec(tokens)).is_err());
 }
