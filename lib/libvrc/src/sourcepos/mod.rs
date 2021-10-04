@@ -686,16 +686,14 @@ impl ErrorLocation for SourcePos {
     fn linecontext(&self) -> &str {
         let mut start = self.range.start;
 
-        // panic!("start = {}", start);
-
         for c in self.content[0..start].chars().rev() {
-            if c as char == '\n' {
+            if c as char == '\n' || start == 0 {
                 break;
             }
             start -= 1;
         }
 
-        if self.content.starts_with('\n') {
+        if self.content[start..].starts_with('\n') {
             start += 1;
         }
 

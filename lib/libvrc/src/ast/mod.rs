@@ -25,7 +25,6 @@
 
 //! Ast Module of the Velosiraptor Compiler
 
-mod ast;
 mod bitslice;
 mod consts;
 mod expression;
@@ -34,7 +33,10 @@ mod import;
 pub mod interface;
 mod issues;
 mod method;
+mod param;
+mod root;
 mod state;
+mod statement;
 mod symboltable;
 pub mod transform;
 mod types;
@@ -48,16 +50,15 @@ use crate::token::TokenStream;
 
 // custom error definitions
 custom_error! {#[derive(PartialEq)] pub AstError
-    SymTabInsertExists         = "The symbol could not be inserted, already exists",
-    SymTableNotExists          = "The symbol does not exist in the table",
+    SymTabInsertExists        = "The symbol could not be inserted, already exists",
+    SymTableNotExists         = "The symbol does not exist in the table",
     SymTabError{i: Issues}    = "There was an error during creating the symbol table",
-    ImportError{e:ParsErr} = "The parser has failed",
-    MergeError{i: Issues} = "Merging of the ast has failed",
-    CheckError{i: Issues} = "There were warnings or errors",
+    ImportError{e:ParsErr}    = "The parser has failed",
+    MergeError{i: Issues}     = "Merging of the ast has failed",
+    CheckError{i: Issues}     = "There were warnings or errors",
 }
 
 // rexports
-pub use ast::Ast;
 pub use bitslice::BitSlice;
 pub use consts::Const;
 pub use expression::{BinOp, Expr, UnOp};
@@ -66,15 +67,18 @@ pub use import::Import;
 pub use interface::{Action, ActionOp, Interface};
 pub use issues::Issues;
 pub use method::Method;
-pub use method::Stmt;
+pub use param::Param;
+pub use root::AstRoot;
 pub use state::State;
+pub use statement::Stmt;
 pub use symboltable::{Symbol, SymbolKind, SymbolTable};
 pub use types::Type;
 pub use unit::Unit;
 
 /// Trait that checks the Ast nodes for consistency
 ///
-/// This trait has to be implemented by all the nodes
+/// This trait has to be implemented by all the nodes. It provides common functionality
+/// for the AstNodes, that is useful when printing error messages, for instance.
 pub trait AstNode {
     // checks the node and returns the number of errors and warnings encountered
     fn check(&self, _st: &mut SymbolTable) -> Issues {
@@ -85,7 +89,9 @@ pub trait AstNode {
         Issues::ok()
     }
 
+    /// returns a printable string representing the ast node
     fn name(&self) -> &str;
-    /// returns the location of the current
+
+    /// returns the location of the AstNode
     fn loc(&self) -> &TokenStream;
 }

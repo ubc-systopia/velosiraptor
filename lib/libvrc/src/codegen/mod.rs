@@ -34,12 +34,11 @@ mod c;
 mod rust;
 
 // used library internal modules
-use crate::ast::Ast;
+use crate::ast::AstRoot;
 use crate::codegen::c::BackendC;
 use crate::codegen::rust::BackendRust;
 
-const COPYRIGHT: &'static str =
-    "2021 Systopia Lab, Computer Science, University of British Columbia";
+const COPYRIGHT: &str = "2021 Systopia Lab, Computer Science, University of British Columbia";
 
 // custom error definitions
 custom_error! {#[derive(PartialEq)] pub CodeGenError
@@ -74,28 +73,28 @@ impl CodeGen {
         }
     }
 
-    pub fn generate_globals(&self, ast: &Ast) -> Result<(), CodeGenError> {
+    pub fn generate_globals(&self, ast: &AstRoot) -> Result<(), CodeGenError> {
         match self {
             CodeGen::Rust(b) => b.generate_globals(ast),
             CodeGen::C(b) => b.generate_globals(ast),
         }
     }
 
-    pub fn generate_interface(&self, ast: &Ast) -> Result<(), CodeGenError> {
+    pub fn generate_interface(&self, ast: &AstRoot) -> Result<(), CodeGenError> {
         match self {
             CodeGen::Rust(b) => b.generate_interfaces(ast),
             CodeGen::C(b) => b.generate_interfaces(ast),
         }
     }
 
-    pub fn generate_units(&self, ast: &Ast) -> Result<(), CodeGenError> {
+    pub fn generate_units(&self, ast: &AstRoot) -> Result<(), CodeGenError> {
         match self {
             CodeGen::Rust(b) => b.generate_units(ast),
             CodeGen::C(b) => b.generate_units(ast),
         }
     }
 
-    pub fn finalize(&self, ast: &Ast) -> Result<(), CodeGenError> {
+    pub fn finalize(&self, ast: &AstRoot) -> Result<(), CodeGenError> {
         match self {
             CodeGen::Rust(b) => b.finalize(ast),
             CodeGen::C(b) => b.finalize(ast),
@@ -105,8 +104,8 @@ impl CodeGen {
 
 pub trait CodeGenBackend {
     fn prepare(&self) -> Result<(), CodeGenError>;
-    fn generate_globals(&self, ast: &Ast) -> Result<(), CodeGenError>;
-    fn generate_interfaces(&self, ast: &Ast) -> Result<(), CodeGenError>;
-    fn generate_units(&self, ast: &Ast) -> Result<(), CodeGenError>;
-    fn finalize(&self, ast: &Ast) -> Result<(), CodeGenError>;
+    fn generate_globals(&self, ast: &AstRoot) -> Result<(), CodeGenError>;
+    fn generate_interfaces(&self, ast: &AstRoot) -> Result<(), CodeGenError>;
+    fn generate_units(&self, ast: &AstRoot) -> Result<(), CodeGenError>;
+    fn finalize(&self, ast: &AstRoot) -> Result<(), CodeGenError>;
 }

@@ -34,7 +34,7 @@ use std::fmt::{Debug, Display, Formatter, Result};
 
 // the used crate-internal functionality
 use crate::ast::{utils, AstNode, Const, Interface, Issues, Method, State, SymbolTable};
-use crate::error::ErrorLocation;
+use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
 /// Defines a translation unit
@@ -82,19 +82,16 @@ impl AstNode for Unit {
         let pos = self.loc();
 
         // set the current context
-        st.set_context(self.name());
+        st.create_context(String::from(self.name()));
 
-        // Check 1: Constants
-        // --------------------------------------------------------------------------------------
-        // Type:        Error/Warning
-        // Description: Check all defined constats of the Unit
-        // Notes:
-        // --------------------------------------------------------------------------------------
-        for c in &self.consts {
-            res = res + c.check(st);
+        // add th emethods to it
+        for m in &self.methods {
+            if !st.insert(m.to_symbol()) {
+                res.inc_err(1);
+            }
         }
 
-        // Check 2: Double defined constants
+        // Check 1: Double defined constants
         // --------------------------------------------------------------------------------------
         // Type:        Error
         // Description: Check that all constants of this field have distinct names
@@ -103,6 +100,16 @@ impl AstNode for Unit {
 
         let errors = utils::check_double_entries(&self.consts);
         res.inc_err(errors);
+
+        // Check 2: Constants
+        // --------------------------------------------------------------------------------------
+        // Type:        Error/Warning
+        // Description: Check all defined constats of the Unit
+        // Notes:
+        // --------------------------------------------------------------------------------------
+        for c in &self.consts {
+            res = res + c.check(st);
+        }
 
         // Check 3: State Check
         // --------------------------------------------------------------------------------------
@@ -129,7 +136,7 @@ impl AstNode for Unit {
         // Notes:       --
         // --------------------------------------------------------------------------------------
 
-        res = res + self.state.check(st);
+        // res = res + self.interface.check(st);
 
         // Check 6: Interface param check
         // --------------------------------------------------------------------------------------
@@ -146,19 +153,19 @@ impl AstNode for Unit {
         // Notes:       --
         // --------------------------------------------------------------------------------------
 
-        // let errors = utils::check_double_entries(&self.methods);
-        // res.inc_err(errors);
+        let errors = utils::check_double_entries(&self.methods);
+        res.inc_err(errors);
 
-        // Check 8: Method cehck
+        // Check 8: Method check
         // --------------------------------------------------------------------------------------
         // Type:        Warning/Error
         // Description: Check that the interface refers to actual parameters
         // Notes:       --
         // --------------------------------------------------------------------------------------
 
-        // for m in &self.methods {
-        //     res = res + m.check(st);
-        // }
+        for m in &self.methods {
+            res = res + m.check(st);
+        }
 
         // Check 9: Bases are defined
         // --------------------------------------------------------------------------------------
@@ -166,7 +173,46 @@ impl AstNode for Unit {
         // Description: Check if the unit name is CamelCase
         // Notes:       --
         // --------------------------------------------------------------------------------------
-        res + utils::check_camel_case(name, pos)
+        res = res + utils::check_camel_case(name, pos);
+
+        // Check 10: Translate/Map methods defined
+        // --------------------------------------------------------------------------------------
+        // Type:        Error/Warning
+        // Description: Check all defined constats of the Unit
+        // Notes:
+        // --------------------------------------------------------------------------------------
+
+        let mut has_map = false;
+        let mut has_translate = false;
+        for m in &self.methods {
+            match m.name() {
+                "translate" => {
+                    res = res + m.check_translate();
+                    has_translate = true;
+                }
+                "map" => {
+                    res = res + m.check_map();
+                    has_map = true;
+                }
+                _ => {}
+            }
+        }
+
+        if !has_translate {
+            let msg = format!("translate() method not defined for unit `{}`", self.name);
+            let hint = format!("implement the translate() method for unit `{}`", self.name);
+            VrsError::new_err(&self.pos.with_range(0..2), msg, Some(hint)).print();
+            res.inc_err(1);
+        }
+        if !has_map {
+            let msg = format!("map() method not defined for unit `{}`", self.name);
+            let hint = format!("implement the map() method for unit `{}`", self.name);
+            VrsError::new_err(&self.pos.with_range(0..2), msg, Some(hint)).print();
+            println!("{}", self.pos);
+            res.inc_err(1);
+        }
+
+        res
     }
     ///
     fn name(&self) -> &str {
@@ -181,8 +227,9 @@ impl AstNode for Unit {
     fn build_symtab(&self, st: &mut SymbolTable) -> Issues {
         let mut err = Issues::ok();
         for i in &self.consts {
-            let sym = i.to_symbol(&self.name());
-            if st.insert(sym).is_err() {
+            //let name = format!("{}.{}", self.name().to_uppercase(), i.name());
+            let sym = i.to_symbol();
+            if !st.insert(sym) {
                 err.inc_err(1);
             };
         }
@@ -225,6 +272,6 @@ impl PartialOrd for Unit {
     /// This method returns an ordering between self and other values if one exists.
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         // we jus compare with the TokenStream position
-        self.loc().partial_cmp(&other.loc())
+        self.loc().partial_cmp(other.loc())
     }
 }

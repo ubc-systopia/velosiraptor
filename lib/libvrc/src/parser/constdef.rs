@@ -34,13 +34,30 @@ use nom::{
 // lexer / parser imports
 use crate::ast::{Const, Type};
 use crate::error::IResult;
-use crate::parser::expression::{arith_expr, bool_expr};
-use crate::parser::terminals::{assign, colon, ident, kw_const, semicolon, typeinfo};
+use crate::parser::{
+    expression::{arith_expr, bool_expr},
+    terminals::{assign, colon, ident, kw_const, semicolon, typeinfo},
+};
 use crate::token::TokenStream;
 
-/// parses a constat item of a unit
+/// parses and consumes an constant definition
 ///
-/// `const IDENT : TYPE = 123;`
+/// The constant definition assigns a name to a constant value.
+///
+/// # Grammar
+///
+/// CONST := KW_CONST IDENT : TYPE = EXPR;
+///
+/// # Results
+///
+///  * OK:       when the parser successfully recognizes the constant definition
+///  * Error:    when the parse could not recognize the constant definition
+///  * Failure:  when the parser recognizes the constant definition, but it was malformed
+///
+/// # Examples
+///
+/// `const FOO : int = 1234;`
+///
 pub fn constdef(input: TokenStream) -> IResult<TokenStream, Const> {
     // parse the `const` keyword, return otherwise
     let (i1, _) = kw_const(input.clone())?;
@@ -119,6 +136,21 @@ fn test_ok() {
     let sp = SourcePos::new("stdio", "const FOO : bool = true;");
     let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
     assert!(constdef(TokenStream::from_vec(tokens)).is_ok());
+
+    // wrong type, but should parse
+    let sp = SourcePos::new("stdio", "const FOO : size = true;");
+    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
+    assert!(constdef(TokenStream::from_vec(tokens)).is_ok());
+
+    // wrong type, but should parse
+    let sp = SourcePos::new("stdio", "const FOO : bool = 0x123;");
+    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
+    assert!(constdef(TokenStream::from_vec(tokens)).is_ok());
+
+    // wrong type, but should parse
+    let sp = SourcePos::new("stdio", "const FOO : addr = true;");
+    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
+    assert!(constdef(TokenStream::from_vec(tokens)).is_ok());
 }
 
 #[test]
@@ -140,21 +172,6 @@ fn test_fails() {
 
     // no type
     let sp = SourcePos::new("stdio", "const FOO  = true;");
-    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
-    assert!(constdef(TokenStream::from_vec(tokens)).is_err());
-
-    // wrong type
-    let sp = SourcePos::new("stdio", "const FOO : size = true;");
-    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
-    assert!(constdef(TokenStream::from_vec(tokens)).is_err());
-
-    // wrong type
-    let sp = SourcePos::new("stdio", "const FOO : bool = 0x123;");
-    let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
-    assert!(constdef(TokenStream::from_vec(tokens)).is_err());
-
-    // wrong type
-    let sp = SourcePos::new("stdio", "const FOO : addr = true;");
     let tokens = Lexer::lex_source_pos(sp.clone()).unwrap();
     assert!(constdef(TokenStream::from_vec(tokens)).is_err());
 }

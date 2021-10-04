@@ -33,7 +33,7 @@ use std::cmp::min;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // used library internal functionality
-use crate::ast::{utils, AstNode, BitSlice, Issues, SymbolTable};
+use crate::ast::{utils, AstNode, BitSlice, Issues, Symbol, SymbolKind, SymbolTable, Type};
 use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
@@ -72,6 +72,29 @@ impl Field {
 
     pub fn location(&self) -> String {
         self.pos.location()
+    }
+
+    /// converts the field into a symbol
+    pub fn to_symbol(&self) -> Symbol {
+        // prepend the 'state' prefix
+        let name = format!("state.{}", self.name);
+        Symbol::new(name, Type::Integer, SymbolKind::State, self.pos.clone())
+    }
+
+    /// builds the symboltable for the state related symbols
+    pub fn build_symboltable(&self, st: &mut SymbolTable) {
+        // insert the own symbol
+        st.insert(self.to_symbol());
+
+        for s in &self.layout {
+            let name = format!("state.{}.{}", self.name, s.name);
+            st.insert(Symbol::new(
+                name,
+                Type::Integer,
+                SymbolKind::State,
+                s.loc().clone(),
+            ));
+        }
     }
 }
 

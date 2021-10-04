@@ -70,6 +70,12 @@ pub enum Keyword {
     Boolean,
     /// An integer value
     Integer,
+    /// the requires clause
+    Requires,
+    /// the ensures clause
+    Ensures,
+    /// the return keyword
+    Return,
 }
 
 /// Implementation of the [std::fmt::Display] trait for [Token]
@@ -90,6 +96,9 @@ impl fmt::Display for Keyword {
             Memory => "Memory",
             Register => "Register",
             None => "None",
+            Requires => "requires",
+            Ensures => "ensures",
+            Return => "return",
             // ActionTypes
             ReadAction => "ReadAction",
             WriteAction => "WriteAction",

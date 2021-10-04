@@ -33,7 +33,7 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // the used crate-internal functionality
-use crate::ast::{Ast, AstNode};
+use crate::ast::{AstNode, AstRoot};
 use crate::token::TokenStream;
 
 /// Defines an [Import] statement node
@@ -45,7 +45,7 @@ pub struct Import {
     /// the filename to import
     pub name: String,
     /// stores the ast at this import
-    pub ast: Option<Ast>,
+    pub ast: Option<AstRoot>,
     /// where in the current file there was this import statement
     pub pos: TokenStream,
 }

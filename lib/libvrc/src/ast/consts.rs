@@ -69,24 +69,15 @@ impl Const {
     pub fn value(&self) -> &Expr {
         use self::Const::*;
         match self {
-            Integer {
-                ident: _,
-                value,
-                pos: _,
-            } => &value,
-            Boolean {
-                ident: _,
-                value,
-                pos: _,
-            } => &value,
+            Integer { value, .. } => value,
+            Boolean { value, .. } => value,
         }
     }
 
     /// creates a symbol from the current Const
-    pub fn to_symbol(&self, ctxt: &str) -> Symbol {
+    pub fn to_symbol(&self) -> Symbol {
         Symbol::new(
-            ctxt,
-            self.name(),
+            String::from(self.name()),
             self.to_type(),
             SymbolKind::Const,
             self.loc().clone(),
@@ -96,16 +87,8 @@ impl Const {
     pub fn to_type(&self) -> Type {
         use self::Const::*;
         match self {
-            Integer {
-                ident: _,
-                value: _,
-                pos: _,
-            } => Type::Integer,
-            Boolean {
-                ident: _,
-                value: _,
-                pos: _,
-            } => Type::Boolean,
+            Integer { .. } => Type::Integer,
+            Boolean { .. } => Type::Boolean,
         }
     }
 }
@@ -115,16 +98,8 @@ impl Display for Const {
     fn fmt(&self, f: &mut Formatter) -> Result {
         use self::Const::*;
         match self {
-            Integer {
-                ident,
-                value,
-                pos: _,
-            } => write!(f, "const {} : int  = {};", ident, value),
-            Boolean {
-                ident,
-                value,
-                pos: _,
-            } => write!(f, "const {} : bool = {};", ident, value),
+            Integer { ident, value, .. } => write!(f, "const {} : int  = {};", ident, value),
+            Boolean { ident, value, .. } => write!(f, "const {} : bool = {};", ident, value),
         }
     }
 }
@@ -159,7 +134,7 @@ impl PartialOrd for Const {
     /// This method returns an ordering between self and other values if one exists.
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         // we jus compare with the TokenStream position
-        self.loc().partial_cmp(&other.loc())
+        self.loc().partial_cmp(other.loc())
     }
 }
 
@@ -225,8 +200,8 @@ impl AstNode for Const {
     fn name(&self) -> &str {
         use self::Const::*;
         match self {
-            Integer { ident, .. } => &ident,
-            Boolean { ident, .. } => &ident,
+            Integer { ident, .. } => ident,
+            Boolean { ident, .. } => ident,
         }
     }
 
@@ -238,12 +213,12 @@ impl AstNode for Const {
                 ident: _,
                 value: _,
                 pos,
-            } => &pos,
+            } => pos,
             Boolean {
                 ident: _,
                 value: _,
                 pos,
-            } => &pos,
+            } => pos,
         }
     }
 }

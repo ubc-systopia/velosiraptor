@@ -24,18 +24,18 @@
 // SOFTWARE.
 
 // NOM parsing constructs
-use nom::{take, try_parse};
-// NOM results
-use nom::{Err, Needed};
+use nom::{bytes::complete::take, Err, Needed};
 
+// library internal includes
 use crate::ast::Type;
 use crate::error::{IResult, VrsError};
 use crate::token::{Keyword, TokenContent, TokenStream};
 
+/// ff
 macro_rules! terminalparser (
     ($vis:vis $name:ident, $tag: expr) => (
         $vis fn $name(input: TokenStream) -> IResult<TokenStream, ()> {
-            let (rem, tok) = try_parse!(input.clone(), take!(1));
+            let (rem, tok) = take(1usize)(input.clone())?;
             // we need at least one token
             if tok.is_empty() {
                 Err(Err::Incomplete(Needed::new(1)))
@@ -113,7 +113,7 @@ terminalparser!(pub wildcard, TokenContent::Wildcard);
 terminalparser!(pub eof, TokenContent::Eof);
 
 pub fn ident(input: TokenStream) -> IResult<TokenStream, String> {
-    let (rem, tok) = try_parse!(input.clone(), take!(1));
+    let (rem, tok) = take(1usize)(input.clone())?;
     // we need at least one token
     if tok.is_empty() {
         Err(Err::Incomplete(Needed::new(1)))
@@ -130,7 +130,7 @@ pub fn ident(input: TokenStream) -> IResult<TokenStream, String> {
 }
 
 pub fn num(input: TokenStream) -> IResult<TokenStream, u64> {
-    let (rem, tok) = try_parse!(input.clone(), take!(1));
+    let (rem, tok) = take(1usize)(input.clone())?;
     // we need at least one token
     if tok.is_empty() {
         Err(Err::Incomplete(Needed::new(1)))
@@ -147,7 +147,7 @@ pub fn num(input: TokenStream) -> IResult<TokenStream, u64> {
 }
 
 pub fn boolean(input: TokenStream) -> IResult<TokenStream, bool> {
-    let (rem, tok) = try_parse!(input.clone(), take!(1));
+    let (rem, tok) = take(1usize)(input.clone())?;
     // we need at least one token
     if tok.is_empty() {
         Err(Err::Incomplete(Needed::new(1)))
@@ -166,7 +166,7 @@ pub fn boolean(input: TokenStream) -> IResult<TokenStream, bool> {
 macro_rules! keywordparser (
     ($vis:vis $name:ident, $tag: expr) => (
         $vis fn $name(input: TokenStream) -> IResult<TokenStream, TokenStream> {
-            let (rem, tok) = try_parse!(input.clone(), take!(1));
+            let (rem, tok) = take(1usize)(input.clone())?;
             // we need at least one token
             if tok.is_empty() {
                 Err(Err::Incomplete(Needed::new(1)))
@@ -196,13 +196,17 @@ keywordparser!(pub kw_fn, Keyword::Fn);
 keywordparser!(pub kw_size, Keyword::Size);
 keywordparser!(pub kw_readaction, Keyword::ReadAction);
 keywordparser!(pub kw_writeaction, Keyword::WriteAction);
+keywordparser!(pub kw_requires, Keyword::Requires);
+keywordparser!(pub kw_ensures, Keyword::Ensures);
+keywordparser!(pub kw_assert, Keyword::Assert);
+keywordparser!(pub kw_return, Keyword::Return);
 
 /// parses a type expression
 ///
 /// returns the type
 pub fn typeinfo(input: TokenStream) -> IResult<TokenStream, Type> {
     // we start with the or expression (|)
-    let (rem, tok) = try_parse!(input.clone(), take!(1));
+    let (rem, tok) = take(1usize)(input.clone())?;
     if tok.is_empty() {
         return Err(Err::Incomplete(Needed::new(1)));
     }

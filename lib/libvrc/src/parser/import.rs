@@ -34,7 +34,24 @@ use crate::token::TokenStream;
 // the used nom components
 use nom::{combinator::cut, sequence::terminated};
 
-/// parses and consumes an import statement (`import foo;`) and any following whitespaces
+/// parses and consumes an import directive
+///
+/// The import directive tells the compiler to include the contents of the imported file
+///
+/// # Grammar
+///
+/// `IMPORT := KW_IMPORT IDENT;`
+///
+/// # Results
+///
+///  * OK:       when the parser successfully recognizes the import directive
+///  * Error:    when the parse could not recognize the import directive
+///  * Failure:  when the parser recognizes the import directive, but it was malformed
+///
+/// # Examples
+///
+/// `import foo;`
+///
 pub fn import(input: TokenStream) -> IResult<TokenStream, Import> {
     // try to match the input keyword, there is no match, return.
     let (i1, _) = kw_import(input.clone())?;

@@ -67,6 +67,24 @@ pub enum State {
     },
 }
 
+impl State {
+    /// builds the symboltable for the state related symbols
+    pub fn build_symboltable(&self, st: &mut SymbolTable) {
+        for f in self.fields() {
+            f.build_symboltable(st);
+        }
+    }
+
+    /// returns a slice of fields
+    pub fn fields(&self) -> &[Field] {
+        match self {
+            State::MemoryState { fields, .. } => fields,
+            State::RegisterState { fields, .. } => fields,
+            _ => &[],
+        }
+    }
+}
+
 /// implementation of the [Display] trait for the [State]
 impl Display for State {
     fn fmt(&self, f: &mut Formatter) -> Result {
@@ -173,7 +191,7 @@ impl AstNode for State {
         // Notes:       --
         // --------------------------------------------------------------------------------------
 
-        let errors = utils::check_double_entries(&fields);
+        let errors = utils::check_double_entries(fields);
         res.inc_err(errors);
 
         // Check 3: Bases are defined
@@ -190,7 +208,7 @@ impl AstNode for State {
                         // case 1: we have a state ref
                         let (sref, _) = sref;
                         // if the bases list contain a state ref, we're good
-                        if bases.contains(&sref) {
+                        if bases.contains(sref) {
                             continue;
                         }
                         // undefined base
@@ -211,13 +229,13 @@ impl AstNode for State {
             }
             None => {
                 for f in fields {
-                    if !f.stateref.is_none() {
+                    if f.stateref.is_some() {
                         // state ref found, but none required
                         let msg = format!(
                             "field `{}` contains state reference, but state has none.",
                             f.name()
                         );
-                        let hint = format!("remove the state reference in the field");
+                        let hint = String::from("remove the state reference in the field");
                         VrsError::new_err(f.loc().with_range(1..2), msg, Some(hint)).print();
                         res.inc_err(1);
                     }
@@ -261,9 +279,9 @@ impl AstNode for State {
                 bases: _,
                 fields: _,
                 pos,
-            } => &pos,
-            RegisterState { fields: _, pos } => &pos,
-            None { pos } => &pos,
+            } => pos,
+            RegisterState { fields: _, pos } => pos,
+            None { pos } => pos,
         }
     }
 }
