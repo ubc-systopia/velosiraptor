@@ -25,7 +25,7 @@
 
 // the used nom componets
 use nom::{
-    bytes::complete::{take_while, tag, take_until},
+    bytes::complete::{tag, take_until, take_while},
     combinator::cut,
     sequence::terminated,
     Err,
@@ -41,7 +41,7 @@ pub fn linecomment(input: SourcePos) -> IResult<SourcePos, Token> {
     let (input, _) = tag("//")(input)?;
 
     // Matches a inline comment `// foobar`
-    let (input, c) = take_while(|f :char| f != '\n')(input)?;
+    let (input, c) = take_while(|f: char| f != '\n')(input)?;
     Ok((
         input,
         Token::new(TokenContent::Comment(c.as_str().trim().to_string()), c),
