@@ -57,6 +57,7 @@ unit X86_pte : Segment {
         //return state.pte.page << 12;
     }
 
+
     // here the size is fixed
     fn get_size() -> size {
         return 4096;
@@ -81,7 +82,7 @@ unit X86_pte : Segment {
 
 
         return true;
-    };
+    }
 
     // unmapping an entry
     fn unmap(va: addr, sz: size) -> bool
@@ -96,7 +97,8 @@ unit X86_pte : Segment {
         // need a way to express types:
         // type(addr) == Memory || type(addr) == DevMemory;
         // type(addr) == DevMemory ==> flags & CACHE_DISABLED
-        // need a way to express `forall i | 0 <= i < sz :: translate(va + i, flags) == pa + i
+        //
+        ensures forall i : addr :: 0 <= i && i < sz && translate(va + i, flags) == pa + i;
         ensures translate(va, flags) == pa;
     ;
 
