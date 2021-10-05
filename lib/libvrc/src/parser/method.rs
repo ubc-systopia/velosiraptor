@@ -27,6 +27,7 @@
 
 // the used nom functions
 use nom::{
+    branch::alt,
     combinator::{cut, opt},
     multi::{many0, separated_list0},
     sequence::{delimited, preceded, terminated, tuple},
@@ -36,7 +37,7 @@ use nom::{
 use crate::ast::{Expr, Method, Param, Stmt};
 use crate::error::IResult;
 use crate::parser::{
-    expression::bool_expr,
+    expression::{bool_expr, quantifier_expr},
     param::parameter,
     statement::stmt,
     terminals::{
@@ -66,7 +67,7 @@ use crate::token::TokenStream;
 ///
 pub fn require_clauses(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i1, _) = kw_requires(input)?;
-    cut(terminated(bool_expr, semicolon))(i1)
+    cut(terminated(alt((quantifier_expr, bool_expr)), semicolon))(i1)
 }
 
 /// Parses a ensures clause
@@ -89,7 +90,7 @@ pub fn require_clauses(input: TokenStream) -> IResult<TokenStream, Expr> {
 ///
 pub fn ensure_clauses(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i1, _) = kw_ensures(input)?;
-    cut(terminated(bool_expr, semicolon))(i1)
+    cut(terminated(alt((quantifier_expr, bool_expr)), semicolon))(i1)
 }
 
 /// parses the method body
