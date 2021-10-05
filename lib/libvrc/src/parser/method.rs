@@ -37,10 +37,11 @@ use crate::ast::{Expr, Method, Param, Stmt};
 use crate::error::IResult;
 use crate::parser::{
     expression::bool_expr,
+    param::parameter,
     statement::stmt,
     terminals::{
-        colon, comma, ident, kw_ensures, kw_fn, kw_requires, lbrace, lparen, rarrow, rbrace,
-        rparen, semicolon, typeinfo,
+        comma, ident, kw_ensures, kw_fn, kw_requires, lbrace, lparen, rarrow, rbrace, rparen,
+        semicolon, typeinfo,
     },
 };
 use crate::token::TokenStream;
@@ -114,38 +115,6 @@ pub fn ensure_clauses(input: TokenStream) -> IResult<TokenStream, Expr> {
 ///
 fn method_body(input: TokenStream) -> IResult<TokenStream, Vec<Stmt>> {
     delimited(lbrace, many0(stmt), cut(rbrace))(input)
-}
-
-/// parses a single parameter
-///
-/// This function parses a single, typed parameter
-///
-/// # Grammar
-///
-/// ARG     := IDENT : TYPE
-///
-/// # Results
-///
-///  * OK:      the parser could successfully recognize the parameter
-///  * Error:   the parser could not recognize the parameter
-///  * Failure: the parser recognized the parameter, but it did not properly parse
-///
-/// # Examples
-///
-/// `a : bool`
-///
-fn parameter(input: TokenStream) -> IResult<TokenStream, Param> {
-    // parse the identifier of the parameter
-    let (i1, name) = ident(input.clone())?;
-
-    // next, parse the type info
-    let (i2, ptype) = cut(preceded(colon, typeinfo))(i1)?;
-
-    // create the token stream covering the entire method def
-    let pos = input.expand_until(&i2);
-
-    // return the result
-    Ok((i2, Param { name, ptype, pos }))
 }
 
 /// parses an arguments list
