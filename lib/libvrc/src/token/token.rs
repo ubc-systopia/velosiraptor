@@ -73,6 +73,10 @@ pub enum Keyword {
     Ensures,
     /// the return keyword
     Return,
+    /// the forall quantifier
+    Forall,
+    /// the existential quantifier
+    Exists,
 }
 
 /// Implementation of the [std::fmt::Display] trait for [Token]
@@ -95,6 +99,8 @@ impl fmt::Display for Keyword {
             None => "None",
             Requires => "requires",
             Ensures => "ensures",
+            Forall => "forall",
+            Exists => "exists",
             Return => "return",
             // types
             Addr => "addr",
@@ -167,8 +173,9 @@ pub enum TokenContent {
     Assign, // =
 
     // arrows
-    RArrow,   // ->
-    FatArrow, // =>
+    RArrow,        // ->
+    FatArrow,      // =>
+    RLongFatArrow, // ==>
 
     // comparisons
     Eq, // ==
