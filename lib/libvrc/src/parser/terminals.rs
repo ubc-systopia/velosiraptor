@@ -195,6 +195,8 @@ keywordparser!(pub kw_requires, Keyword::Requires);
 keywordparser!(pub kw_ensures, Keyword::Ensures);
 keywordparser!(pub kw_assert, Keyword::Assert);
 keywordparser!(pub kw_return, Keyword::Return);
+keywordparser!(pub kw_forall, Keyword::Forall);
+keywordparser!(pub kw_exists, Keyword::Exists);
 
 /// parses a type expression
 ///
