@@ -115,22 +115,26 @@
 //  * No Interface:   In addition there might be no interface at all
 //                    `interface = None;`
 
-use crate::ast::interface::{ActionComponent, ActionType};
+use crate::ast::interface::{ActionComponent, ActionType, InterfaceField};
 use crate::ast::{Action, ActionOp, Field, Interface};
 use crate::error::IResult;
 use crate::error::VrsError::DoubleDef;
+use crate::parser::bitslice::bitslice;
+use crate::parser::expression::expr;
 use crate::parser::field::field;
 use crate::parser::state::argument_parser;
 use crate::parser::terminals::{
-    assign, boolean, dot, fatarrow, ident, kw_interface, kw_memory, kw_readaction, kw_state,
-    kw_writeaction, le, num, semicolon,
+    assign, boolean, comma, dot, fatarrow, ident, kw_interface, kw_layout, kw_memory, kw_mmio,
+    kw_none, kw_readaction, kw_state, kw_writeaction, lbrace, lbrack, le, num, rbrace, rbrack,
+    semicolon,
 };
 use crate::token::TokenStream;
-use nom::branch::alt;
+use nom::branch::{alt, permutation};
 use nom::character::streaming::one_of;
 use nom::combinator::{cut, opt};
 use nom::multi::{many0, many1, separated_list0};
 use nom::sequence::{delimited, pair, preceded, terminated};
+use std::collections::hash_map::RandomState;
 
 /// Interface definition parsing
 pub fn interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
@@ -140,112 +144,142 @@ pub fn interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
     // We now attempt to parse the different interface types.
     cut(delimited(
         assign,
-        alt((memory_interface, none_interface)),
+        alt((mmio_interface, none_interface)),
         semicolon,
     ))(i1)
 }
 
 fn none_interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
-    todo!()
+    let (i1, _) = kw_none(_input)?;
+
+    Ok((i1, Interface::None))
 }
 
-fn memory_interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
-    let (i1, _) = kw_memory(_input.clone())?;
+fn mmio_interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
+    let (i1, _) = kw_mmio(_input.clone())?;
     let (i2, bases) = argument_parser(i1)?;
-    let (i3, (fields, actions)) = cut(pair(many0(field), many1(action_parser)))(i2)?;
+    let (i3, fields) = cut(many0(interfacefield))(i2)?;
 
     let pos = _input.expand_until(&i3);
+    Ok((i3, Interface::MMIORegisters { bases, fields, pos }))
+}
+
+fn memory_interface(_input: TokenStream) -> IResult<TokenStream, Interface> {}
+
+/// Parses an interface field
+fn interfacefield(input: TokenStream) -> IResult<TokenStream, InterfaceField> {
+    // we first start off with an identifier,
+    let (i1, name) = ident(input.clone())?;
+
+    // define a parser for the base-offset: baseoffsetparser = ident, num,
+    let baseoffsetparser = pair(terminated(ident, cut(comma)), cut(terminated(num, comma)));
+
+    // recognize the field header: [baseoffsetparser, num]
+    let (i2, (stateref, length)) =
+        cut(delimited(lbrack, pair(opt(baseoffsetparser), num), rbrack))(i1)?;
+
+    // We now parse an optional Layout, ReadAction, WriteAction
+
+    // define the parser for the bitslices: bitslicesparser = {LIST(bitslice, comma)}
+    let bitslicesparser = terminated(
+        preceded(
+            kw_layout,
+            delimited(lbrace, cut(separated_list0(comma, bitslice)), rbrace),
+        ),
+        semicolon,
+    );
+
+    // We now parse the field body of Optional Bitslices, ReadAction, WriteAction
+    let (i3, (bitslices, readaction, writeaction)) =
+        permutation((opt(bitslicesparser), opt(readaction), opt(writeaction)))(i2)?;
+
+    // if there were bitslices parsed unwrap them, otherwise create an empty vector
+    let layout = bitslices.unwrap_or_default();
+
+    // calculate the position of the bitslice
+    let pos = input.expand_until(&i3);
+
+    let field = Field {
+        name,
+        stateref,
+        length,
+        layout,
+        pos,
+    };
+
     Ok((
         i3,
-        Interface::Memory {
-            bases,
-            fields,
-            actions,
-            pos,
+        InterfaceField {
+            field,
+            readaction,
+            writeaction,
         },
     ))
 }
 
-fn fields_parser(_input: TokenStream) -> IResult<TokenStream, Vec<Field>> {
-    cut(many0(field))(_input)
+fn readaction(input: TokenStream) -> IResult<TokenStream, Action> {
+    let (i1, _) = kw_readaction(input.clone())?;
+    let (i2, action_components) = terminated(
+        delimited(lbrace, separated_list0(semicolon, action_component), rbrace),
+        semicolon,
+    )(i1)?;
+    Ok((
+        i2,
+        Action {
+            action_type: ActionType::Read,
+            action_components,
+            pos: input.expand_until(&i2),
+        },
+    ))
 }
 
-fn action_parser(_input: TokenStream) -> IResult<TokenStream, Action> {
-    // Parse the type of the action
-    let (i1, action_type) = alt((readaction_type, writeaction_type))(_input.clone())?;
-    let (i2, action_components) = many0(action_component)(i1)?;
-    todo!()
+fn writeaction(input: TokenStream) -> IResult<TokenStream, Action> {
+    let (i1, _) = kw_writeaction(input.clone())?;
+    let (i2, action_components) = terminated(
+        delimited(lbrace, separated_list0(semicolon, action_component), rbrace),
+        semicolon,
+    )(i1)?;
+    Ok((
+        i2,
+        Action {
+            action_type: ActionType::Write,
+            action_components,
+            pos: input.expand_until(&i2),
+        },
+    ))
 }
-
 fn action_component(_input: TokenStream) -> IResult<TokenStream, ActionComponent> {
     // Parse each of the actionOPs and then the pos
 
-    // Parse state.ident <=> interface.ident
-    let mut aop_parser = cut(alt((
-        actionop_bool,
-        actionop_int,
-        actionop_interfaceref,
-        actionop_stateref,
-    )));
-
-    let (i1, left_aop) = aop_parser(_input.clone())?;
-    let (i2,mapping_dir) = alt((fatrightarrow, fatleftarrow))(i1)?;
-    let (i3, right_aop) = aop_parser(i2)?;
+    let (i1, left_aop) = expr(_input.clone())?;
+    let (i2, mapping_dir) = alt((mapleft, mapright))(i1)?;
+    let (i3, right_aop) = expr(i2)?;
 
     let pos = _input.expand_until(&i3);
 
     // Order the
     match mapping_dir {
-        MappingDirection::LeftToRight => {
-            Ok((i3, ActionComponent{
+        MappingDirection::LeftToRight => Ok((
+            i3,
+            ActionComponent {
                 src: left_aop,
                 dst: right_aop,
-                pos
-            }))
-        }
-        MappingDirection::RightToLeft => {
-            Ok((i3, ActionComponent{
+                pos,
+            },
+        )),
+        MappingDirection::RightToLeft => Ok((
+            i3,
+            ActionComponent {
                 src: right_aop,
                 dst: left_aop,
-                pos
-            }))
-        }
+                pos,
+            },
+        )),
         MappingDirection::BiDirectional => {
             todo!();
         }
     }
 }
-
-fn actionop_stateref(_input: TokenStream) -> IResult<TokenStream, ActionOp> {
-    let (i1, _) = kw_state(_input)?;
-    let (i2, _) = dot(i1)?;
-    let (i3, field) = ident(i2)?;
-    let (i4, block) = opt(preceded(dot, ident))(i3)?;
-
-    Ok((i4, ActionOp::StateRef(field, block)))
-}
-
-fn actionop_interfaceref(_input: TokenStream) -> IResult<TokenStream, ActionOp> {
-    let (i1, _) = kw_interface(_input)?;
-    let (i2, _) = dot(i1)?;
-    let (i3, field) = ident(i2)?;
-    let (i4, block) = opt(preceded(dot, ident))(i3)?;
-
-    Ok((i4, ActionOp::InterfaceRef(field, block)))
-}
-
-fn actionop_int(_input: TokenStream) -> IResult<TokenStream, ActionOp> {
-    let (i1, val) = num(_input)?;
-
-    Ok((i1, ActionOp::IntValue(val)))
-}
-
-fn actionop_bool(_input: TokenStream) -> IResult<TokenStream, ActionOp> {
-    let (i1, bool) = boolean(_input)?;
-
-    Ok((i1, ActionOp::BoolValue(bool)))
-}
-
 /// Expands on the terminal parsers by defining a function with $name that calls $parser and on
 /// a success returns the $return_value of type $return_type
 macro_rules! terminalparse_with_return_type (
@@ -276,11 +310,24 @@ terminalparse_with_return_type!(
     String
 );
 
-terminalparse_with_return_type!(fatrightarrow, fatarrow, MappingDirection::LeftToRight, MappingDirection);
-terminalparse_with_return_type!(fatleftarrow, le, MappingDirection::LeftToRight, MappingDirection);
-// todo add bidirectional arrow to token/lexer/terminalparser
-//terminalparse_with_return_type!(bidirectionalarrow, !!!, MappingDirection::LeftToRight, MappingDirection);
-
+terminalparse_with_return_type!(
+    mapright,
+    rarrow,
+    MappingDirection::LeftToRight,
+    MappingDirection
+);
+terminalparse_with_return_type!(
+    mapleft,
+    larrow,
+    MappingDirection::RightToLeft,
+    MappingDirection
+);
+terminalparse_with_return_type!(
+    mapbidir,
+    bidirarrow,
+    MappingDirection::BiDirectional,
+    MappingDirection
+);
 
 enum MappingDirection {
     LeftToRight,

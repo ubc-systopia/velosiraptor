@@ -25,7 +25,7 @@
 
 //! Ast Module of the Velosiraptor Compiler
 
-use crate::ast::Field;
+use crate::ast::{Expr, Field};
 use crate::token::TokenStream;
 
 /// Defines the software-visible interface of a unit
@@ -40,12 +40,14 @@ pub enum Interface {
     /// Defines a load/store interface to memory
     Memory {
         bases: Vec<String>,
-        fields: Vec<Field>,
-        actions: Vec<Action>,
         pos: TokenStream,
     },
     /// Defines a memory-mapped interface to registers
-    MMIORegisters { pos: TokenStream },
+    MMIORegisters {
+        bases: Vec<String>,
+        fields: Vec<InterfaceField>,
+        pos: TokenStream,
+    },
     /// Defines a load/store interface to CPU registers
     CPURegisters { pos: TokenStream },
     /// Defines a register interface using special instructions
@@ -56,19 +58,17 @@ pub enum Interface {
     None,
 }
 
-/// Represents an action operand
+/// Defines a field in the interface
 ///
-/// The action operand defines the source and destination of an action
-#[derive(PartialEq, Clone)]
-pub enum ActionOp {
-    /// reference to a field/slice of the interface
-    InterfaceRef(String, Option<String>),
-    /// reference to a field/slice in the state
-    StateRef(String, Option<String>),
-    /// a constant boolean value
-    BoolValue(bool),
-    /// a constant integer value
-    IntValue(u64),
+/// A field may represent a 8, 16, 32, 64 bit region in the state with a
+/// specific bit layout and an additional collection of  actions.
+pub struct InterfaceField {
+    // The field itself
+    pub field: Field,
+    // The ReadAction for this field
+    pub readaction: Option<Action>,
+    // The WriteAction for this field,
+    pub writeaction: Option<Action>,
 }
 
 /// Defines an action that is executed on the interface
@@ -82,9 +82,9 @@ pub enum ActionOp {
 #[derive(PartialEq, Clone)]
 pub struct ActionComponent {
     /// the source operand of the action
-    pub src: ActionOp,
+    pub src: Expr,
     /// the destination operand of the action
-    pub dst: ActionOp,
+    pub dst: Expr,
     /// the location where the action was defined
     pub pos: TokenStream,
 }

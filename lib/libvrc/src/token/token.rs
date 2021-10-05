@@ -49,6 +49,8 @@ pub enum Keyword {
     Interface,
     /// Memory State and Interface statement
     Memory,
+    /// Memory Mapped Interface statement
+    MMIO,
     /// Register State and Interface statement
     Register,
     /// Null-like value used for State and Interface
@@ -56,6 +58,8 @@ pub enum Keyword {
     /// Action types used in Interface
     ReadAction,
     WriteAction,
+    /// Used in identifying the Bitslice layout of an Interface field
+    Layout,
     /// defines a local variable
     Let,
     /// represents a function
@@ -94,11 +98,13 @@ impl fmt::Display for Keyword {
             State => "state",
             Interface => "Interface",
             Memory => "Memory",
+            MMIO => "MMIO",
             Register => "Register",
             None => "None",
             Requires => "requires",
             Ensures => "ensures",
             Return => "return",
+            Layout => "Layout",
             // ActionTypes
             ReadAction => "ReadAction",
             WriteAction => "WriteAction",
@@ -173,10 +179,10 @@ pub enum TokenContent {
     Assign, // =
 
     // arrows
-    LArrow,   // <-
-    RArrow,   // ->
-    BiDirArrow, // <->
-    FatArrow, // =>
+    LArrow,        // <-
+    RArrow,        // ->
+    BiDirArrow,    // <->
+    FatArrow,      // =>
     BiDirFatArrow, // <=>
 
     // comparisons
@@ -195,7 +201,7 @@ pub enum TokenContent {
     Wildcard,   // ?
 }
 
-/// Implementatin for TokenContent
+/// Implementation for TokenContent
 impl TokenContent {
     pub fn to_str(tok: TokenContent) -> &'static str {
         match tok {
