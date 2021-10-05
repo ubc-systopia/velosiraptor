@@ -237,6 +237,7 @@ impl TokenContent {
             // arrows
             TokenContent::RArrow => "->",
             TokenContent::FatArrow => "=>",
+            TokenContent::RLongFatArrow => "==>",
 
             // comparisons
             TokenContent::Eq => "==",
@@ -253,7 +254,15 @@ impl TokenContent {
             TokenContent::PathSep => "::",
             TokenContent::Wildcard => "?",
             TokenContent::Eof => "EOF",
-            _ => panic!("unknown symbol for token {:?}", tok),
+
+            // some other tokens
+            TokenContent::IntLiteral(_) => panic!("INTEGER"),
+            TokenContent::BoolLiteral(_) => panic!("BOOL"),
+            TokenContent::Identifier(_) => panic!("IDENTIFIER"),
+            TokenContent::Keyword(_) => panic!("KEYWORD"),
+            TokenContent::Comment(_) => panic!("COMMENT"),
+            TokenContent::BlockComment(_) => panic!("BLOCK COMMENT"),
+            TokenContent::Illegal => panic!("illegal token"),
         }
     }
 }
