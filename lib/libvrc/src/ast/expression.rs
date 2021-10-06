@@ -53,6 +53,7 @@ pub enum BinOp {
     Ge,
     Land,
     Lor,
+    Implies,
 }
 
 /// Implementation of binary operators
@@ -195,6 +196,7 @@ impl BinOp {
             Ge => false,
             Land => false,
             Lor => false,
+            Implies => false
         }
     }
 
@@ -222,6 +224,7 @@ impl BinOp {
             Ge => true,
             Land => true,
             Lor => true,
+            Implies => true
         }
     }
 }
@@ -248,6 +251,7 @@ impl fmt::Display for BinOp {
             Ge => write!(format, ">="),
             Land => write!(format, "&&"),
             Lor => write!(format, "||"),
+            Implies => write!(format, "==>")
         }
     }
 }

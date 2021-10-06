@@ -100,6 +100,7 @@ terminalparser!(pub assign, TokenContent::Assign);
 // arrows
 terminalparser!(pub fatarrow, TokenContent::FatArrow);
 terminalparser!(pub rarrow, TokenContent::RArrow);
+terminalparser!(pub rlongfatarrow, TokenContent::RLongFatArrow);
 
 // comparators
 terminalparser!(pub at, TokenContent::At);

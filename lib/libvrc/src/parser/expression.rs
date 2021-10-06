@@ -223,11 +223,18 @@ macro_rules! cmp_parser (
 /// # Grammar
 ///
 /// `QUANTIFIER_EXPR := KW_FORALL | KW_EXISTS (VARS)+ PathSep EXPR
+/// `QUANTIFIER_EXPR := KW_FORALL | KW_EXISTS (VARS)+ PIPE EXPR PathSep EXPR.
+///
+/// # Example
+///
+/// forall x :: x > 0
+///
 pub fn quantifier_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     // try parse the keyword
     let (i2, quantifier) = alt((kw_exists, kw_forall))(input.clone())?;
     // now we're in a quantifier, get the list of variables
     let (i3, vars) = cut(separated_list1(comma, parameter))(i2)?;
+
     // then the `::` followed by an expression
     let (i4, expr) = cut(preceded(pathsep, bool_expr))(i3)?;
 
@@ -259,7 +266,7 @@ pub fn quantifier_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 /// checking.
 ///
 pub fn expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    lor_expr(input)
+    implies_expr(input)
 }
 
 /// parses an arithmetic expression
@@ -267,7 +274,7 @@ pub fn expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 /// Currently this is just parsing a generic expression
 ///
 pub fn arith_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    lor_expr(input)
+    implies_expr(input)
 }
 
 /// parses a boolean expression
@@ -275,9 +282,11 @@ pub fn arith_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 /// Currently this is just parsing a generic expression.
 ///
 pub fn bool_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    lor_expr(input)
+    implies_expr(input)
 }
 
+// ===>                               left to right
+binop_parser!(implies_expr, lor_expr, (BinOp::Implies, rlongfatarrow));
 // ||                               left to right
 binop_parser!(lor_expr, land_expr, (BinOp::Lor, lor));
 // &&                               left to right
@@ -610,6 +619,13 @@ fn test_boolean() {
         "a && b || c && d || x > 9",
         "(((a && b) || (c && d)) || (x > 9))"
     );
+
+    parse_equal!(
+        bool_expr,
+        "a ==> b || c ==> d",
+        "((a ==> (b || c)) ==> d)"
+    );
+
     parse_equal!(
         bool_expr,
         "a.a && b.b || c.x && d.d.a || x > 9 && !zyw",
