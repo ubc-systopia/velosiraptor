@@ -91,6 +91,9 @@ impl AstNode for Unit {
             }
         }
 
+        // add the state symbolds
+        self.state.build_symboltable(st);
+
         // Check 1: Double defined constants
         // --------------------------------------------------------------------------------------
         // Type:        Error

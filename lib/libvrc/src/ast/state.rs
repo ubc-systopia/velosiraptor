@@ -29,7 +29,7 @@
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // used library internal functionality
-use crate::ast::{utils, AstNode, Field, Issues, SymbolTable};
+use crate::ast::{utils, AstNode, Field, Issues, SymbolTable, SymbolKind, Symbol, Type};
 use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
@@ -70,6 +70,11 @@ pub enum State {
 impl State {
     /// builds the symboltable for the state related symbols
     pub fn build_symboltable(&self, st: &mut SymbolTable) {
+
+        // create the 'state' symbol
+        let sym = Symbol::new(String::from("state"), Type::State, SymbolKind:: State, self.loc().clone());
+        st.insert(sym);
+
         for f in self.fields() {
             f.build_symboltable(st);
         }
