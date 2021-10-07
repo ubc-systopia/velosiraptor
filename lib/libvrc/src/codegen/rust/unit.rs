@@ -112,15 +112,15 @@ fn add_protect_function(imp: &mut CG::Impl, unit: &Unit) {
 
 fn add_struct_impl(scope: &mut CG::Scope, unit: &Unit) {
     // new implementation
-    let mut imp = scope.new_impl(&unit.name);
+    let imp = scope.new_impl(&unit.name);
 
     // add the new() function
-    add_constructor_function(&mut imp, unit);
-    add_map_function(&mut imp, unit);
-    add_unmap_function(&mut imp, unit);
-    add_protect_function(&mut imp, unit);
+    add_constructor_function(imp, unit);
+    add_map_function(imp, unit);
+    add_unmap_function(imp, unit);
+    add_protect_function(imp, unit);
 
-    add_translate_function(&mut imp, unit);
+    add_translate_function(imp, unit);
 }
 
 /// generates the Unit definitions
