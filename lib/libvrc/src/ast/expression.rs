@@ -589,6 +589,7 @@ impl Expr {
             SymbolKind::Const,
             SymbolKind::Parameter,
             SymbolKind::Variable,
+            SymbolKind::State,
         ];
         let fnkind = &[SymbolKind::Function];
         use Expr::*;
