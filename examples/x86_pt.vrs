@@ -39,7 +39,7 @@ unit X86_pte : Segment {
             // the following fields at starting bit, ending bit, name
             0   0 present,
             1   1 writable,
-            2   2 usersmode,
+            2   2 usermode,
             3   3 writethrough,
             4   4 nocache,
             5   5 accessed,
@@ -53,8 +53,7 @@ unit X86_pte : Segment {
 
     // the base address where this entry translate to
     fn get_base() -> addr {
-        return 0;
-        //return state.pte.page << 12;
+        return state.pte.base << 12;
     }
 
 
@@ -72,11 +71,11 @@ unit X86_pte : Segment {
         }
 
         // need a way to express the flags
-        if flags & !state.pte.write {
+        if (flags & !state.pte.writable) == 0 {
             return false;
         }
         // need a way to express the flags
-        if flags & !state.pte.user {
+        if (flags & !state.pte.usermode) == 0 {
             return false;
         }
 
