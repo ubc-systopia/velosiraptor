@@ -217,9 +217,10 @@ impl SymbolTable {
                 let ctxt = self.syms.last_mut().unwrap();
                 ctxt.insert(sym)
             }
-            Some(_x) => {
+            Some(x) => {
                 // not warning here...
-                //VrsError::new_double(sym.name.clone(), sym.loc.clone(), x.loc.clone()).print();
+                VrsError::new_double(sym.name.clone(), sym.loc.clone(), x.loc.clone()).print();
+
                 false
             }
         }

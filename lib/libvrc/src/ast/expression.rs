@@ -196,7 +196,7 @@ impl BinOp {
             Ge => false,
             Land => false,
             Lor => false,
-            Implies => false
+            Implies => false,
         }
     }
 
@@ -224,7 +224,7 @@ impl BinOp {
             Ge => true,
             Land => true,
             Lor => true,
-            Implies => true
+            Implies => true,
         }
     }
 }
@@ -251,7 +251,7 @@ impl fmt::Display for BinOp {
             Ge => write!(format, ">="),
             Land => write!(format, "&&"),
             Lor => write!(format, "||"),
-            Implies => write!(format, "==>")
+            Implies => write!(format, "==>"),
         }
     }
 }

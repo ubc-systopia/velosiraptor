@@ -42,7 +42,7 @@ pub enum Type {
     /// The size defines the number of addresses within a range
     Size,
     /// the state of a unit
-    State
+    State,
 }
 
 /// Implementation for [Type]
@@ -79,7 +79,7 @@ impl Type {
             Integer => "numeric",
             Address => "numeric",
             Size => "numeric",
-            State => "state"
+            State => "state",
         }
     }
 
@@ -98,7 +98,7 @@ impl fmt::Display for Type {
             Integer => write!(f, "int"),
             Address => write!(f, "addr"),
             Size => write!(f, "size"),
-            State => write!(f, "state")
+            State => write!(f, "state"),
         }
     }
 }
