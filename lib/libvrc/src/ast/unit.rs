@@ -33,7 +33,7 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // the used crate-internal functionality
-use crate::ast::{utils, AstNode, Const, Interface, Issues, Method, State, SymbolTable};
+use crate::ast::{utils, AstNode, Const, Interface, Issues, Method, Param, State, SymbolTable};
 use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
@@ -48,6 +48,8 @@ use crate::token::TokenStream;
 pub struct Unit {
     /// the name of the unit (identifier)
     pub name: String,
+    /// the unit parameters
+    pub params: Vec<Param>,
     /// the name of the derrived unit
     pub derived: Option<String>,
     /// the size of the unit in bits
