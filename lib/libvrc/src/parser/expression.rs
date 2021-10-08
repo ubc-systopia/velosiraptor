@@ -620,11 +620,7 @@ fn test_boolean() {
         "(((a && b) || (c && d)) || (x > 9))"
     );
 
-    parse_equal!(
-        bool_expr,
-        "a ==> b || c ==> d",
-        "((a ==> (b || c)) ==> d)"
-    );
+    parse_equal!(bool_expr, "a ==> b || c ==> d", "((a ==> (b || c)) ==> d)");
 
     parse_equal!(
         bool_expr,
