@@ -546,4 +546,3 @@ unit x86_pt {
     63      (XD)    If IA32_EFER.NXE = 1, execute-disable (if 1, instruction fetches are not allowed
                     from the 4-KByte page controlled by this entry); otherwise, reserved (must be 0)
 ```
-
