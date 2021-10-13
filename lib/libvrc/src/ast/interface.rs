@@ -38,7 +38,11 @@ use crate::token::TokenStream;
 #[derive(PartialEq, Clone)]
 pub enum Interface {
     /// Defines a load/store interface to memory
-    Memory { bases: Vec<Param>, pos: TokenStream },
+    Memory {
+        bases: Vec<Param>,
+        fields: Vec<InterfaceField>,
+        pos: TokenStream,
+    },
     /// Defines a memory-mapped interface to registers
     MMIORegisters {
         bases: Vec<Param>,
