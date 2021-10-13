@@ -25,7 +25,7 @@
 
 //! Ast Module of the Velosiraptor Compiler
 
-use crate::ast::{Expr, Field};
+use crate::ast::{Expr, Field, Param};
 use crate::token::TokenStream;
 
 /// Defines the software-visible interface of a unit
@@ -38,17 +38,17 @@ use crate::token::TokenStream;
 #[derive(PartialEq, Clone)]
 pub enum Interface {
     /// Defines a load/store interface to memory
-    Memory { pos: TokenStream },
+    Memory { bases: Vec<Param>, pos: TokenStream },
     /// Defines a memory-mapped interface to registers
     MMIORegisters {
-        bases: Vec<String>,
+        bases: Vec<Param>,
         fields: Vec<InterfaceField>,
         pos: TokenStream,
     },
     /// Defines a load/store interface to CPU registers
     CPURegisters {
         fields: Vec<InterfaceField>,
-        pos: TokenStream
+        pos: TokenStream,
     },
     /// Defines a register interface using special instructions
     SpecialRegisters { pos: TokenStream },
@@ -62,6 +62,7 @@ pub enum Interface {
 ///
 /// A field may represent a 8, 16, 32, 64 bit region in the state with a
 /// specific bit layout and an additional collection of  actions.
+#[derive(PartialEq, Clone)]
 pub struct InterfaceField {
     // The field itself
     pub field: Field,
