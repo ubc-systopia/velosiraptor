@@ -129,96 +129,234 @@
 //  * No Interface:   In addition there might be no interface at all
 //                    `interface = None;`
 
-use crate::ast::interface::{ActionComponent, ActionType, InterfaceField};
-use crate::ast::{Action, ActionOp, Field, Interface};
-use crate::error::IResult;
-use crate::error::VrsError::DoubleDef;
-use crate::parser::bitslice::bitslice;
-use crate::parser::expression::expr;
-use crate::parser::field::field;
-use crate::parser::state::argument_parser;
-use crate::parser::terminals::{assign, boolean, comma, dot, fatarrow, ident, kw_interface, kw_layout, kw_memory, kw_mmio, kw_none, kw_readaction, kw_state, kw_writeaction, lbrace, lbrack, le, num, rbrace, rbrack, semicolon, kw_register};
-use crate::token::{TokenStream, Token};
-use nom::branch::{alt, permutation};
-use nom::character::streaming::one_of;
-use nom::combinator::{cut, opt};
-use nom::multi::{many0, many1, separated_list0};
-use nom::sequence::{delimited, pair, preceded, terminated};
-use std::collections::hash_map::RandomState;
+// the used NOM components
+use nom::{
+    branch::{alt, permutation},
+    combinator::{cut, opt},
+    multi::{many1, separated_list0},
+    sequence::{delimited, preceded, terminated},
+    Err,
+};
 
-/// Interface definition parsing
-// TODO Does not yet include parsing for SpecialRegisters
-pub fn interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
-    // try to match the interface keyword, if there is no match, return.TokenStream
-    let (i1, _) = kw_state(_input)?;
+/// library internal includes
+use crate::ast::{Action, ActionComponent, ActionType, BitSlice, Field, Interface, InterfaceField};
+use crate::error::IResult;
+use crate::parser::{
+    bitslice::bitslice_block, expression::expr, field::field_params, state::argument_parser,
+    terminals::*,
+};
+use crate::token::TokenStream;
+
+/// parses a interface definition
+///
+/// This function parses a unit's interface definition
+///
+/// # Grammar
+///
+/// INTERFACE_DEFS := NONE_INTERFACE | MMIO_INTERFACE | MEMORY_INTERFACE | REGISTER_INTERFACE
+/// INTERFACE := KW_INTERFACE = INTERFACE_DEFS ;
+///
+/// # Results
+///
+///  * OK:      the parser could successfully recognize the interface
+///  * Error:   the parser could not recognize the interface definition keyword
+///  * Failure: the parser recognized the interface, but it did not properly parse
+///
+/// # Examples
+///
+/// interface = None;
+///
+pub fn interface(input: TokenStream) -> IResult<TokenStream, Interface> {
+    // try to match the interface keyword, if there is no match, return.
+    let (i1, _) = kw_interface(input)?;
 
     // We now attempt to parse the different interface types.
     cut(delimited(
         assign,
-        alt((mmio_interface, memory_interface, register_interface, none_interface)),
+        alt((
+            mmio_interface,
+            memory_interface,
+            register_interface,
+            none_interface,
+        )),
         semicolon,
     ))(i1)
 }
 
-fn none_interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
-    let (i1, _) = kw_none(_input)?;
-
+/// parses the none interface definition
+///
+/// # Grammar
+///
+/// NONE_INTERFACE := KW_NONE
+///
+/// # Results
+///
+///  * OK:      the parser could successfully recognize the interface
+///  * Error:   the parser could not recognize the interface definition keyword
+///
+/// # Examples
+///
+/// None
+///
+fn none_interface(input: TokenStream) -> IResult<TokenStream, Interface> {
+    // try parse the none keyword and return
+    let (i1, _) = kw_none(input)?;
     Ok((i1, Interface::None))
 }
 
-fn mmio_interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
-    let (i1, _) = kw_mmio(_input.clone())?;
-    let (i2, bases) = argument_parser(i1)?;
-    let (i3, fields) = cut(delimited(lbrack, many0(interfacefield), rbrack))(i2)?;
+/// parses the mmio interface definition
+///
+/// This interface is a register-like, memory-mapped interface. Software uses loads and
+/// stores to interoperate with the interface. In contrast to the memory interface,
+/// the MMIO interface may:
+///   - Hide parts of the state from software
+///   - trigger multiple state transitions
+///   - Software may need to use a specific load/store instructions (e.g., non-cached)
+///
+/// # Grammar
+///
+/// MMIO_INTERFACE := KW_MMIO LPAREN PARAMS RPAREN LBRACK (INTERFACEFIELD)+ RBRACK
+///
+/// # Results
+///
+///  * OK:      the parser could successfully recognize the mmio interface
+///  * Error:   the parser could not recognize the mmio interface definition keyword
+///  * Failure: the parser recognized the mmion interface, but it did not properly parse
+///
+/// # Examples
+///
+/// MMIOInterface(base : addr) { ... }
+///
+fn mmio_interface(input: TokenStream) -> IResult<TokenStream, Interface> {
+    // try to barse the MMIO keyword
+    let (i1, _) = kw_mmio(input.clone())?;
 
-    let pos = _input.expand_until(&i3);
+    // try to parse the arguments, must succeed
+    let (i2, bases) = cut(argument_parser)(i1)?;
+
+    // next try to parse the interface field definitions
+    let (i3, fields) = cut(delimited(lbrack, many1(interfacefield), rbrack))(i2)?;
+
+    // get the new position, and construct ast node
+    let pos = input.expand_until(&i3);
     Ok((i3, Interface::MMIORegisters { bases, fields, pos }))
 }
 
-fn register_interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
-    let (i1, _) = kw_register(_input.clone())?;
-    let (i2, fields) = cut(delimited(lbrack, many0(interfacefield), rbrack))(i1)?;
+/// parses the cpu register interface definition
+///
+/// This interface is a non-memory-mapped register interface. Software uses loads/stores
+/// to register locations rather than memory addresses.
+///
+/// The interface may
+///   - Hide parts of the state from software
+///   - trigger multiple state transitions
+///   - Software uses registers ad destination
+///
+/// # Grammar
+///
+/// REGISTER_INTERFACE := KW_REGISTER LPAREN PARAMS RPAREN LBRACK (INTERFACEFIELD)+ RBRACK
+///
+/// # Results
+///
+///  * OK:      the parser could successfully recognize the mmio interface
+///  * Error:   the parser could not recognize the mmio interface definition keyword
+///  * Failure: the parser recognized the register interface, but it did not properly parse
+///
+/// # Examples
+///
+/// MMIOInterface(base : addr) {}
+///
+fn register_interface(input: TokenStream) -> IResult<TokenStream, Interface> {
+    // try parse the registe rkeyword or return
+    let (i1, _) = kw_register(input.clone())?;
 
-    let pos = _input.expand_until(&i2);
-    Ok((i2, Interface::CPURegisters { fields, pos }))
+    // try to parse the arguments, must succeed
+    let (i2, _bases) = cut(argument_parser)(i1)?;
+
+    // now parse the interface fields
+    let (i3, fields) = cut(delimited(lbrack, many1(interfacefield), rbrack))(i2)?;
+
+    // get the new position, and construct ast node
+    let pos = input.expand_until(&i3);
+    Ok((i3, Interface::CPURegisters { fields, pos }))
 }
 
+/// parses the memory interface definition
+///
+/// This interface is a memory-backed interface. Software uses load/store to normal memory
+/// locationst to
+///
+/// The interface may
+///   - Hide parts of the state from software
+///   - trigger multiple state transitions
+///   - Software uses registers ad destination
+///
+/// # Grammar
+///
+/// MMIO_INTERFACE := KW_MEMORY [ LPAREN PARAMS RPAREN LBRACK (INTERFACEFIELD)+ RBRACK  ]
+///
+/// # Results
+///
+///  * OK:      the parser could successfully recognize the memory interface
+///  * Error:   the parser could not recognize the memory interface definition keyword
+///  * Failure: the parser recognized the memory interface, but it did not properly parse
+///
+/// # Examples
+///
+/// MemoryInterface(base : addr) {}
+///
 fn memory_interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
+    // try parse the memory keyword, or return
     let (i1, _) = kw_memory(_input.clone())?;
 
-    // Note that the Memory Interface should allow a direct 1-to-1 so for now we will only support the parsing of
-    // interface = Memory;
-    // as all other information can be just directly received from the state.
-    let pos  = _input.expand_until(&i1);
-    Ok((i1, Interface::Memory { pos }))
+    // if the memory interface is a true identity, then we're done here, otherwise we are
+    // constructing an normal interface definition with fields
+    let (i2, (bases, fields)) = match argument_parser(i1.clone()) {
+        Ok((i, bases)) => {
+            let (i3, fields) = cut(delimited(lbrack, many1(interfacefield), rbrack))(i)?;
+            (i3, (bases, fields))
+        }
+        Err(Err::Error(_)) => (i1, (Vec::new(), Vec::new())),
+        Err(x) => return Err(x),
+    };
+
+    // get the new position, and construct ast node
+    let pos = _input.expand_until(&i2);
+    Ok((i2, Interface::Memory { bases, fields, pos }))
 }
 
-/// Parses an interface field
+/// parses a single interface field definition
+///
+/// The interface field gives a name to a specific portion of the software-visible
+/// interface. It contains:
+///   - Layout: the meaning of the bits in the field
+///   - ReadAction: what happens when a read operation is carried out on the field
+///   - WriteAction: what happens when a write operation is carried out on the field
+///
+/// # Grammar
+///
+/// INTERFACE_FIELD := IDENT FIELD_PARAMS (LAYOUT, READACTION, WRITEACTION)
+///
+/// # Results
+///
+///  * OK:      the parser could successfully recognize the interface field
+///  * Error:   the parser could not recognize  the interface field definition keyword
+///  * Failure: the parser recognized the interface field, but it did not properly parse
+///
+/// # Examples
+///
+/// foo [base, 0, 0] {...}
+///
 fn interfacefield(input: TokenStream) -> IResult<TokenStream, InterfaceField> {
-    // we first start off with an identifier,
+    // we first start off with an identifier, no cut here
     let (i1, name) = ident(input.clone())?;
 
-    // define a parser for the base-offset: baseoffsetparser = ident, num,
-    let baseoffsetparser = pair(terminated(ident, cut(comma)), cut(terminated(num, comma)));
-
-    // recognize the field header: [baseoffsetparser, num]
-    let (i2, (stateref, length)) =
-        cut(delimited(lbrack, pair(opt(baseoffsetparser), num), rbrack))(i1)?;
+    // recognize the field params
+    let (i2, (stateref, length)) = cut(field_params)(i1)?;
 
     // We now parse an optional Layout, ReadAction, WriteAction
-
-    // define the parser for the bitslices: bitslicesparser = {LIST(bitslice, comma)}
-    let bitslicesparser = terminated(
-        preceded(
-            kw_layout,
-            delimited(lbrace, cut(separated_list0(comma, bitslice)), rbrace),
-        ),
-        semicolon,
-    );
-
-    // We now parse the field body of Optional Bitslices, ReadAction, WriteAction
     let (i3, (bitslices, readaction, writeaction)) =
-        permutation((opt(bitslicesparser), opt(readaction), opt(writeaction)))(i2)?;
+        permutation((opt(layout), opt(readaction), opt(writeaction)))(i2)?;
 
     // if there were bitslices parsed unwrap them, otherwise create an empty vector
     let layout = bitslices.unwrap_or_default();
@@ -226,6 +364,7 @@ fn interfacefield(input: TokenStream) -> IResult<TokenStream, InterfaceField> {
     // calculate the position of the bitslice
     let pos = input.expand_until(&i3);
 
+    // assemble the field definition
     let field = Field {
         name,
         stateref,
@@ -244,18 +383,39 @@ fn interfacefield(input: TokenStream) -> IResult<TokenStream, InterfaceField> {
     ))
 }
 
+/// parses the layout of an interface filed
+///
+/// # Grammar
+///
+/// LAYOUT := KW_LAYOUT BITSLICE_BLOCK ;
+///
+/// # Results
+///
+///  * OK:      the parser could successfully recognize the layout
+///  * Error:   the parser could not recognize  the layout definition keyword
+///  * Failure: the parser recognized the layout, but it did not properly parse
+///
+/// # Examples
+///
+/// layout = { .. }
+///
+fn layout(input: TokenStream) -> IResult<TokenStream, Vec<BitSlice>> {
+    terminated(preceded(kw_layout, cut(bitslice_block)), cut(semicolon))(input)
+}
+
 fn readaction(input: TokenStream) -> IResult<TokenStream, Action> {
     let (i1, _) = kw_readaction(input.clone())?;
     let (i2, action_components) = terminated(
         delimited(lbrace, separated_list0(semicolon, action_component), rbrace),
         semicolon,
     )(i1)?;
+    let pos = input.expand_until(&i2);
     Ok((
         i2,
         Action {
             action_type: ActionType::Read,
             action_components,
-            pos: input.expand_until(&i2),
+            pos,
         },
     ))
 }
@@ -266,12 +426,13 @@ fn writeaction(input: TokenStream) -> IResult<TokenStream, Action> {
         delimited(lbrace, separated_list0(semicolon, action_component), rbrace),
         semicolon,
     )(i1)?;
+    let pos = input.expand_until(&i2);
     Ok((
         i2,
         Action {
             action_type: ActionType::Write,
             action_components,
-            pos: input.expand_until(&i2),
+            pos,
         },
     ))
 }
@@ -307,6 +468,7 @@ fn action_component(_input: TokenStream) -> IResult<TokenStream, ActionComponent
         }
     }
 }
+
 /// Expands on the terminal parsers by defining a function with $name that calls $parser and on
 /// a success returns the $return_value of type $return_type
 macro_rules! terminalparse_with_return_type (
