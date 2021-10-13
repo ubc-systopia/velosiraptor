@@ -34,14 +34,14 @@ use crate::token::{Keyword, TokenContent, TokenStream};
 /// ff
 macro_rules! terminalparser (
     ($vis:vis $name:ident, $tag: expr) => (
-        $vis fn $name(input: TokenStream) -> IResult<TokenStream, ()> {
+        $vis fn $name(input: TokenStream) -> IResult<TokenStream, TokenContent> {
             let (rem, tok) = take(1usize)(input.clone())?;
             // we need at least one token
             if tok.is_empty() {
                 Err(Err::Incomplete(Needed::new(1)))
             } else {
                 if tok.peek().content == $tag {
-                    Ok((rem, ()))
+                    Ok((rem, $tag))
                 } else {
                     Err(Err::Error(VrsError::from_token(input, $tag)))
                 }
