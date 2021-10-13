@@ -58,6 +58,17 @@ pub trait ErrorLocation {
     fn linecontext(&self) -> &str;
 }
 
+/// represents a double definition mismatch
+#[derive(PartialEq)]
+pub enum Mismatch {
+    // symbol exists, but a type mismatch
+    Type,
+    // symbol exists, but a kind mismatch
+    Kind,
+    // symbol exists,
+    Exists,
+}
+
 /// Error representation
 ///
 /// This structure captuers the location of the error or warning occurred.
@@ -91,6 +102,8 @@ pub enum VrsError<I: ErrorLocation> {
         current: I,
         /// site of the previous definition
         previous: I,
+        /// type mismatch
+        mismatch: Mismatch,
     },
     /// represents a custom error
     RangeOverlap {
@@ -145,6 +158,26 @@ impl<I: ErrorLocation + fmt::Display> VrsError<I> {
             ident,
             current,
             previous,
+            mismatch: Mismatch::Exists,
+        }
+    }
+
+    /// creates a new warning
+    pub fn new_double_type(ident: String, current: I, previous: I) -> Self {
+        VrsError::DoubleDef {
+            ident,
+            current,
+            previous,
+            mismatch: Mismatch::Type,
+        }
+    }
+
+    pub fn new_double_kind(ident: String, current: I, previous: I) -> Self {
+        VrsError::DoubleDef {
+            ident,
+            current,
+            previous,
+            mismatch: Mismatch::Kind,
         }
     }
 
@@ -271,10 +304,27 @@ impl<I: ErrorLocation + fmt::Display> fmt::Display for VrsError<I> {
                 ident,
                 current,
                 previous,
+                mismatch,
             } => {
                 let typ = applycolor(false)("error");
-                let message = format!("duplicate definition with name `{}`", ident);
-                let hint = String::from("the second definition is here");
+                let (message, hint) = match mismatch {
+                    Mismatch::Exists => {
+                        let message = format!("duplicate definition with name `{}`", ident);
+                        let hint = String::from("the second definition is here");
+                        (message, hint)
+                    }
+                    Mismatch::Kind => {
+                        let message = format!("symbol `{}` defined with a different kind", ident);
+                        let hint = String::from("the second definition is here");
+                        (message, hint)
+                    }
+                    Mismatch::Type => {
+                        let message = format!("symbol `{}` defined with a different type", ident);
+                        let hint = String::from("the second definition is here");
+                        (message, hint)
+                    }
+                };
+
                 Self::fmthdr(f, typ, current, &message)?;
                 Self::fmtctx(f, false, current, Some(&hint))?;
                 Self::fmtloc(f, previous)?;
