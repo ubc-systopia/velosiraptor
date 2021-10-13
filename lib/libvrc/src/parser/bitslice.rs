@@ -28,11 +28,15 @@
 // lexer, parser terminals and ast
 use crate::ast::BitSlice;
 use crate::error::IResult;
-use crate::parser::terminals::{ident, num};
+use crate::parser::terminals::{comma, ident, lbrace, num, rbrace};
 use crate::token::TokenStream;
 
 // the used nom components
-use nom::{combinator::cut, sequence::tuple};
+use nom::{
+    combinator::cut,
+    multi::separated_list0,
+    sequence::{delimited, tuple},
+};
 
 /// Parses a bitslice definition
 ///
@@ -70,6 +74,30 @@ pub fn bitslice(input: TokenStream) -> IResult<TokenStream, BitSlice> {
             pos,
         },
     ))
+}
+
+/// parses a block of bit slices
+///
+/// This parse recognizes a block of bitslices.
+///
+/// # Grammar
+///
+/// BITSLICE_BLOCK := LBRACE LIST(, BITSLICE) RBRACE
+///
+/// # Results
+///
+///  * OK:      the parser could successfully recognize the bitslice blcok
+///  * Error:   the parser could not recognize the bitslice block
+///  * Failure: the parser recognized the interface field, but it did not properly parse
+///
+/// # Examples
+///
+///  - just the width: [8]
+///  - base offset, width: [base, 4, 4]
+///
+pub fn bitslice_block(input: TokenStream) -> IResult<TokenStream, Vec<BitSlice>> {
+    // recognize the field header: [baseoffsetparser, num]
+    delimited(lbrace, cut(separated_list0(comma, bitslice)), cut(rbrace))(input)
 }
 
 #[cfg(test)]
