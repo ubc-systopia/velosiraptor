@@ -83,6 +83,12 @@ pub trait AstNode {
     fn check(&self, _st: &mut SymbolTable) -> Issues {
         Issues::ok()
     }
+
+    // reqrite the ast
+    fn rewrite(&mut self, _st: &mut SymbolTable) {
+        // no-op
+    }
+
     // builds the symbol table
     fn build_symtab(&self, _st: &mut SymbolTable) -> Issues {
         Issues::ok()
