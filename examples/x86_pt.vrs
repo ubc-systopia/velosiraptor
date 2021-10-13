@@ -32,9 +32,9 @@
  */
 
 // represents an x86 page table entry
-unit X86_pte : Segment {
+unit X86_pte(base : addr) : Segment {
     // the state
-    state = Memory(base) {
+    state = Memory(base : addr) {
         pte [base, 0, 4] {
             // the following fields at starting bit, ending bit, name
             0   0 present,
