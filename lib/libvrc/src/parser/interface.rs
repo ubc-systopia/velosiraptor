@@ -134,7 +134,7 @@ use nom::{
     branch::{alt, permutation},
     combinator::{cut, opt},
     multi::{many1, separated_list0},
-    sequence::{delimited, preceded, terminated},
+    sequence::{delimited, preceded, terminated, tuple},
     Err,
 };
 
@@ -145,7 +145,7 @@ use crate::parser::{
     bitslice::bitslice_block, expression::expr, field::field_params, state::argument_parser,
     terminals::*,
 };
-use crate::token::TokenStream;
+use crate::token::{TokenContent, TokenStream};
 
 /// parses a interface definition
 ///
@@ -403,12 +403,33 @@ fn layout(input: TokenStream) -> IResult<TokenStream, Vec<BitSlice>> {
     terminated(preceded(kw_layout, cut(bitslice_block)), cut(semicolon))(input)
 }
 
+/// parses the read actions of a field
+///
+/// The read actions define what effects a read on the interface may have on the
+/// state of the translation unit, if at all
+///
+/// # Grammar
+///
+/// READACTION := KW_READACTION actions_block ;
+///
+/// # Results
+///
+///  * OK:      the parser could successfully recognize the read actions
+///  * Error:   the parser could not recognize the readactions definition keyword
+///  * Failure: the parser recognized the read actions, but it did not properly parse
+///
+/// # Examples
+///
+/// ReadActions = { .. };
+///
 fn readaction(input: TokenStream) -> IResult<TokenStream, Action> {
+    // try parsing the ReadAction keyword
     let (i1, _) = kw_readaction(input.clone())?;
-    let (i2, action_components) = terminated(
-        delimited(lbrace, separated_list0(semicolon, action_component), rbrace),
-        semicolon,
-    )(i1)?;
+
+    // now parse the actions block
+    let (i2, action_components) = cut(terminated(actions_block, semicolon))(i1)?;
+
+    // expand the source position
     let pos = input.expand_until(&i2);
     Ok((
         i2,
@@ -420,12 +441,33 @@ fn readaction(input: TokenStream) -> IResult<TokenStream, Action> {
     ))
 }
 
+/// parses the write actions of a field
+///
+/// The write actions define what effects a write on the interface may have on the
+/// state of the translation unit, if at all
+///
+/// # Grammar
+///
+/// WRITEACTION := KW_WRITEACTION ACTIONS_BLOCK ;
+///
+/// # Results
+///
+///  * OK:      the parser could successfully recognize the write actions
+///  * Error:   the parser could not recognize the write actions definition keyword
+///  * Failure: the parser recognized the write actions, but it did not properly parse
+///
+/// # Examples
+///
+/// WriteActions = { .. };
+///
 fn writeaction(input: TokenStream) -> IResult<TokenStream, Action> {
+    //try parsing the WriteAction keyword
     let (i1, _) = kw_writeaction(input.clone())?;
-    let (i2, action_components) = terminated(
-        delimited(lbrace, separated_list0(semicolon, action_component), rbrace),
-        semicolon,
-    )(i1)?;
+
+    // now parse the actions block
+    let (i2, action_components) = cut(terminated(actions_block, semicolon))(i1)?;
+
+    // expand the source position
     let pos = input.expand_until(&i2);
     Ok((
         i2,
@@ -436,90 +478,82 @@ fn writeaction(input: TokenStream) -> IResult<TokenStream, Action> {
         },
     ))
 }
-fn action_component(_input: TokenStream) -> IResult<TokenStream, ActionComponent> {
-    // Parse each of the actionOPs and then the pos
 
-    let (i1, left_aop) = expr(_input.clone())?;
-    let (i2, mapping_dir) = alt((mapleft, mapright))(i1)?;
-    let (i3, right_aop) = expr(i2)?;
-
-    let pos = _input.expand_until(&i3);
-
-    // Order the
-    match mapping_dir {
-        MappingDirection::LeftToRight => Ok((
-            i3,
-            ActionComponent {
-                src: left_aop,
-                dst: right_aop,
-                pos,
-            },
-        )),
-        MappingDirection::RightToLeft => Ok((
-            i3,
-            ActionComponent {
-                src: right_aop,
-                dst: left_aop,
-                pos,
-            },
-        )),
-        MappingDirection::BiDirectional => {
-            todo!();
-        }
-    }
+/// parses an action block
+///
+/// # Grammar
+///
+/// ACTIONS_BLOCK := LBRACE LIST(semicolon, ACTION_COMPONENT) RBRACE
+///
+/// # Results
+///
+///  * OK:      the parser could successfully recognize the action block
+///  * Error:   the parser could not recognize the action block definition keyword
+///  * Failure: the parser recognized the action block, but it did not properly parse
+///
+/// # Examples
+///
+/// WriteActions = { .. };
+///
+fn actions_block(input: TokenStream) -> IResult<TokenStream, Vec<ActionComponent>> {
+    delimited(
+        lbrace,
+        cut(separated_list0(semicolon, action_component)),
+        cut(rbrace),
+    )(input)
 }
 
-/// Expands on the terminal parsers by defining a function with $name that calls $parser and on
-/// a success returns the $return_value of type $return_type
-macro_rules! terminalparse_with_return_type (
-    ($name: ident, $parser: ident, $return_value: expr, $return_type: ty) => (
-        fn $name(input: TokenStream) -> IResult<TokenStream, $return_type> {
-            match cut($parser)(input) {
-                Ok((i1, _)) => {
-                    Ok((i1, $return_value))
-                }
-                Err(x) => Err(x)
-            }
-        }
-    )
-);
+/// parses an action
+///
+/// # Grammar
+///
+/// ACTION_COMPONENT := EXPR ACTION_DIRECTION EXPR
+///
+/// # Results
+///
+///  * OK:      the parser could successfully recognize the action
+///  * Error:   the parser could not recognize the action definition keyword
+///  * Failure: the parser recognized the action, but it did not properly parse
+///
+/// # Examples
+///
+/// WriteActions = { .. };
+///
+fn action_component(input: TokenStream) -> IResult<TokenStream, ActionComponent> {
+    // Parse each of the action ops
+    // note: a bidirectional arrow doesn't make much sense here I think.
+    let arrows = alt((larrow, rarrow));
 
-terminalparse_with_return_type!(readaction_type, kw_readaction, ActionType::Read, ActionType);
-terminalparse_with_return_type!(
-    writeaction_type,
-    kw_writeaction,
-    ActionType::Write,
-    ActionType
-);
-terminalparse_with_return_type!(state_string, kw_state, String::from("state"), String);
-terminalparse_with_return_type!(
-    interface_string,
-    kw_interface,
-    String::from("interface"),
-    String
-);
+    // parse the <expr> OP <expr> scheme, and match on the token
+    let (i1, (left, arrow, right)) = tuple((expr, arrows, expr))(input.clone())?;
+    let (src, dst) = match arrow {
+        TokenContent::LArrow => (right, left),
+        TokenContent::RArrow => (left, right),
+        _ => panic!("unexpected token"),
+    };
 
-terminalparse_with_return_type!(
-    mapright,
-    rarrow,
-    MappingDirection::LeftToRight,
-    MappingDirection
-);
-terminalparse_with_return_type!(
-    mapleft,
-    larrow,
-    MappingDirection::RightToLeft,
-    MappingDirection
-);
-terminalparse_with_return_type!(
-    mapbidir,
-    bidirarrow,
-    MappingDirection::BiDirectional,
-    MappingDirection
-);
+    let pos = input.expand_until(&i1);
+    Ok((i1, ActionComponent { src, dst, pos }))
+}
 
-enum MappingDirection {
-    LeftToRight,
-    RightToLeft,
-    BiDirectional,
+#[cfg(test)]
+use crate::lexer::Lexer;
+
+#[test]
+fn test_action_components() {
+    let tokens = Lexer::lex_string("stdio", "state.field -> state.field").unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(action_component(ts).is_ok());
+
+    let tokens = Lexer::lex_string("stdio", "state.field <- state.field").unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(action_component(ts).is_ok());
+
+    let tokens = Lexer::lex_string("stdio", "0 -> state.field").unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(action_component(ts).is_ok());
+
+    let tokens = Lexer::lex_string("stdio", "state -> interface").unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(action_component(ts).is_ok());
 }
