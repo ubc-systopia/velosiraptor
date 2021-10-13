@@ -39,9 +39,9 @@ use nom::{
 };
 
 // lexer, parser terminals and ast
-use crate::ast::{AstNode, BinOp, Expr, UnOp};
+use crate::ast::{AstNode, BinOp, Expr, Quantifier, UnOp};
 use crate::error::{IResult, VrsError};
-use crate::parser::terminals::*;
+use crate::parser::{param::parameter, terminals::*};
 use crate::token::{Keyword, TokenContent, TokenStream};
 
 // Precedence of Operators  (strong to weak)
@@ -218,6 +218,47 @@ macro_rules! cmp_parser (
     )
 );
 
+/// parses a quantifier expression
+///
+/// # Grammar
+///
+/// `QUANTIFIER_EXPR := KW_FORALL | KW_EXISTS (VARS)+ PathSep EXPR
+/// `QUANTIFIER_EXPR := KW_FORALL | KW_EXISTS (VARS)+ PIPE EXPR PathSep EXPR.
+///
+/// # Example
+///
+/// forall x :: x > 0
+///
+pub fn quantifier_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
+    // try parse the keyword
+    let (i2, quantifier) = alt((kw_exists, kw_forall))(input.clone())?;
+    // now we're in a quantifier, get the list of variables
+    let (i3, vars) = cut(separated_list1(comma, parameter))(i2)?;
+
+    // then the `::` followed by an expression
+    let (i4, expr) = cut(preceded(pathsep, bool_expr))(i3)?;
+
+    // calculate the tokenstream
+    let pos = input.expand_until(&i4);
+
+    // get the quantifier
+    let kind = match quantifier.peek().content {
+        TokenContent::Keyword(Keyword::Forall) => Quantifier::Forall,
+        TokenContent::Keyword(Keyword::Exists) => Quantifier::Exists,
+        _ => panic!("should not happen!"),
+    };
+
+    Ok((
+        i4,
+        Expr::Quantifier {
+            kind,
+            vars,
+            expr: Box::new(expr),
+            pos,
+        },
+    ))
+}
+
 /// parses an expression
 ///
 /// This is the entry point into the expression parsing functionality. This
@@ -225,7 +266,7 @@ macro_rules! cmp_parser (
 /// checking.
 ///
 pub fn expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    lor_expr(input)
+    implies_expr(input)
 }
 
 /// parses an arithmetic expression
@@ -233,7 +274,7 @@ pub fn expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 /// Currently this is just parsing a generic expression
 ///
 pub fn arith_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    lor_expr(input)
+    implies_expr(input)
 }
 
 /// parses a boolean expression
@@ -241,9 +282,11 @@ pub fn arith_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 /// Currently this is just parsing a generic expression.
 ///
 pub fn bool_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    lor_expr(input)
+    implies_expr(input)
 }
 
+// ===>                               left to right
+binop_parser!(implies_expr, lor_expr, (BinOp::Implies, rlongfatarrow));
 // ||                               left to right
 binop_parser!(lor_expr, land_expr, (BinOp::Lor, lor));
 // &&                               left to right
@@ -576,6 +619,9 @@ fn test_boolean() {
         "a && b || c && d || x > 9",
         "(((a && b) || (c && d)) || (x > 9))"
     );
+
+    parse_equal!(bool_expr, "a ==> b || c ==> d", "((a ==> (b || c)) ==> d)");
+
     parse_equal!(
         bool_expr,
         "a.a && b.b || c.x && d.d.a || x > 9 && !zyw",

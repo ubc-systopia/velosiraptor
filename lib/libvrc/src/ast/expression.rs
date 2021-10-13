@@ -26,7 +26,7 @@
 ///! Ast Module of the Velosiraptor Compiler
 use std::fmt;
 
-use crate::ast::{AstNode, Issues, SymbolKind, SymbolTable, Type};
+use crate::ast::{utils, AstNode, Issues, Param, SymbolKind, SymbolTable, Type};
 use crate::error::VrsError;
 use crate::token::TokenStream;
 
@@ -53,6 +53,7 @@ pub enum BinOp {
     Ge,
     Land,
     Lor,
+    Implies,
 }
 
 /// Implementation of binary operators
@@ -195,6 +196,7 @@ impl BinOp {
             Ge => false,
             Land => false,
             Lor => false,
+            Implies => false,
         }
     }
 
@@ -222,6 +224,7 @@ impl BinOp {
             Ge => true,
             Land => true,
             Lor => true,
+            Implies => true,
         }
     }
 }
@@ -248,6 +251,7 @@ impl fmt::Display for BinOp {
             Ge => write!(format, ">="),
             Land => write!(format, "&&"),
             Lor => write!(format, "||"),
+            Implies => write!(format, "==>"),
         }
     }
 }
@@ -287,6 +291,23 @@ impl fmt::Display for UnOp {
             Not => write!(format, "~"),
             LNot => write!(format, "!"),
             Ref => write!(format, "&"),
+        }
+    }
+}
+
+/// representation of a quantifier
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum Quantifier {
+    Forall,
+    Exists,
+}
+/// Implementation of [fmt::Display] for [Quantifier]
+impl fmt::Display for Quantifier {
+    fn fmt(&self, format: &mut fmt::Formatter) -> fmt::Result {
+        use self::Quantifier::*;
+        match self {
+            Forall => write!(format, "forall"),
+            Exists => write!(format, "exists"),
         }
     }
 }
@@ -337,6 +358,13 @@ pub enum Expr {
     Range {
         start: Box<Expr>,
         end: Box<Expr>,
+        pos: TokenStream,
+    },
+    /// Represents a quantifier `forall x | x > 0`
+    Quantifier {
+        kind: Quantifier,
+        vars: Vec<Param>,
+        expr: Box<Expr>,
         pos: TokenStream,
     },
 }
@@ -458,6 +486,18 @@ impl Expr {
             Identifier { path, pos } => Self::match_symbol(path, pos, ty, st),
             FnCall { path, pos, .. } => Self::match_symbol(path, pos, ty, st),
             Element { path, pos, .. } => Self::match_symbol(path, pos, ty, st),
+            Quantifier { pos, .. } => {
+                if ty.is_boolean() {
+                    Issues::ok()
+                } else {
+                    let msg = format!(
+                        "expected expression of type `{}`, but quantifier is boolean",
+                        ty.to_type_string(),
+                    );
+                    VrsError::new_err(pos, msg, None).print();
+                    Issues::err()
+                }
+            }
             // everything else is currently not supported
             x => {
                 // warning
@@ -549,6 +589,7 @@ impl Expr {
             SymbolKind::Const,
             SymbolKind::Parameter,
             SymbolKind::Variable,
+            SymbolKind::State,
         ];
         let fnkind = &[SymbolKind::Function];
         use Expr::*;
@@ -572,6 +613,32 @@ impl Expr {
                 s + idx.check_symbols(st)
             }
             Range { start, end, .. } => start.check_symbols(st) + end.check_symbols(st),
+            Quantifier { vars, expr, .. } => {
+                let mut issues = Issues::ok();
+                // create st context
+                st.create_context(String::from("quantifier"));
+                issues.inc_err(utils::check_double_entries(vars));
+                for v in vars {
+                    if let Some(s) = st.lookup(&v.name) {
+                        let msg = format!(
+                            "identifier `{}` shadows a previously defined symbol",
+                            s.name
+                        );
+                        let hint = String::from("consider giving the variable another name");
+                        VrsError::new_warn(v.loc(), msg, Some(hint)).print();
+                        issues.inc_warn(1);
+                    }
+                    issues = issues + utils::check_snake_case(&v.name, v.loc());
+                    st.insert(v.to_symbol());
+                }
+
+                issues = issues + expr.check_symbols(st) + expr.match_type(Type::Boolean, st);
+
+                // pop systable context
+                st.drop_context();
+
+                issues
+            }
         }
     }
 
@@ -585,32 +652,16 @@ impl fmt::Display for Expr {
     fn fmt(&self, format: &mut fmt::Formatter) -> fmt::Result {
         use self::Expr::*;
         match self {
-            Identifier { path, pos: _ } => write!(format, "{}", path.join(".")),
-            Number { value, pos: _ } => write!(format, "{}", value),
-            Boolean { value, pos: _ } => write!(format, "{}", value),
-            BinaryOperation {
-                op,
-                lhs,
-                rhs,
-                pos: _,
-            } => write!(format, "({} {} {})", lhs, op, rhs),
-            UnaryOperation { op, val, pos: _ } => write!(format, "{}({})", op, val),
-            FnCall {
-                path,
-                pos: _,
-                args: _,
-            } => {
-                write!(format, "{}()", path.join("."))
-            }
-            Slice {
-                path,
-                slice,
-                pos: _,
-            } => write!(format, "{}[{}]", path.join("."), slice),
-            Element { path, idx, pos: _ } => {
-                write!(format, "{}[{}]", path.join("."), idx)
-            }
-            Range { start, end, pos: _ } => write!(format, "{}..{}", start, end),
+            Identifier { path, .. } => write!(format, "{}", path.join(".")),
+            Number { value, .. } => write!(format, "{}", value),
+            Boolean { value, .. } => write!(format, "{}", value),
+            BinaryOperation { op, lhs, rhs, .. } => write!(format, "({} {} {})", lhs, op, rhs),
+            UnaryOperation { op, val, .. } => write!(format, "{}({})", op, val),
+            FnCall { path, .. } => write!(format, "{}()", path.join(".")),
+            Slice { path, slice, .. } => write!(format, "{}[{}]", path.join("."), slice),
+            Element { path, idx, .. } => write!(format, "{}[{}]", path.join("."), idx),
+            Range { start, end, .. } => write!(format, "{}..{}", start, end),
+            Quantifier { kind, expr, .. } => write!(format, "{} {}", kind, expr),
         }
     }
 }
@@ -656,6 +707,7 @@ impl AstNode for Expr {
             Slice { pos, .. } => pos,
             Element { pos, .. } => pos,
             Range { pos, .. } => pos,
+            Quantifier { pos, .. } => pos,
         }
     }
 }

@@ -33,6 +33,7 @@ pub mod field;
 pub mod import;
 pub mod interface;
 pub mod method;
+pub mod param;
 pub mod state;
 pub mod statement;
 pub mod terminals;
@@ -50,7 +51,8 @@ use crate::ast::AstRoot;
 use crate::error::VrsError;
 use crate::lexer::{Lexer, LexerError};
 use crate::parser::{
-    constdef::constdef, import::import, method::method, state::state, terminals::eof, unit::unit,
+    constdef::constdef, import::import, method::method, param::parameter, state::state,
+    terminals::eof, unit::unit,
 };
 use crate::token::{Token, TokenStream};
 

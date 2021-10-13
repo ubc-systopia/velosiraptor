@@ -19,3 +19,29 @@ unit Foo {
         };
     };
 };
+
+
+    // unmapping an entry
+    fn unmap(va: addr, sz: size)
+        // need a way to express:
+        // forall a | va <= a < va + sz :: fail(translate(a, ANY))
+        ensures translate(va, 0) == 0;
+    {
+
+    }
+
+    // protecting the entry, i.e., change its permission
+    fn protect(flags: int)
+        ensures match_flags(flags)
+    {
+        // update the entry
+        // ensures match_flags(flags) ==> translate(a) == translate(a)
+    }
+
+    // the translation semantics, adding an option type?
+    fn translate(va: addr, flags: int) -> addr
+        requires va < get_size();
+        requires match_flags(flags)
+    {
+        return va + get_base();
+    }

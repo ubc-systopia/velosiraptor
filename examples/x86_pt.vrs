@@ -32,14 +32,14 @@
  */
 
 // represents an x86 page table entry
-unit X86_pte : Segment {
+unit X86_pte(base : addr) : Segment {
     // the state
-    state = Memory(base) {
+    state = Memory(base : addr) {
         pte [base, 0, 4] {
             // the following fields at starting bit, ending bit, name
             0   0 present,
             1   1 writable,
-            2   2 usersmode,
+            2   2 usermode,
             3   3 writethrough,
             4   4 nocache,
             5   5 accessed,
@@ -53,9 +53,9 @@ unit X86_pte : Segment {
 
     // the base address where this entry translate to
     fn get_base() -> addr {
-        return 0;
-        //return state.pte.page << 12;
+        return state.pte.base << 12;
     }
+
 
     // here the size is fixed
     fn get_size() -> size {
@@ -71,17 +71,17 @@ unit X86_pte : Segment {
         }
 
         // need a way to express the flags
-        if flags & !state.pte.write {
+        if (flags & !state.pte.writable) == 0 {
             return false;
         }
         // need a way to express the flags
-        if flags & !state.pte.user {
+        if (flags & !state.pte.usermode) == 0 {
             return false;
         }
 
 
         return true;
-    };
+    }
 
     // unmapping an entry
     fn unmap(va: addr, sz: size) -> bool
@@ -96,7 +96,8 @@ unit X86_pte : Segment {
         // need a way to express types:
         // type(addr) == Memory || type(addr) == DevMemory;
         // type(addr) == DevMemory ==> flags & CACHE_DISABLED
-        // need a way to express `forall i | 0 <= i < sz :: translate(va + i, flags) == pa + i
+        //
+        ensures forall i : addr :: 0 <= i && i < sz && translate(va + i, flags) == pa + i;
         ensures translate(va, flags) == pa;
     ;
 

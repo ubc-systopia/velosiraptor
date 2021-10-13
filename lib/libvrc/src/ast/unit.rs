@@ -33,7 +33,7 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // the used crate-internal functionality
-use crate::ast::{utils, AstNode, Const, Interface, Issues, Method, State, SymbolTable};
+use crate::ast::{utils, AstNode, Const, Interface, Issues, Method, Param, State, SymbolTable};
 use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
@@ -48,6 +48,8 @@ use crate::token::TokenStream;
 pub struct Unit {
     /// the name of the unit (identifier)
     pub name: String,
+    /// the unit parameters
+    pub params: Vec<Param>,
     /// the name of the derrived unit
     pub derived: Option<String>,
     /// the size of the unit in bits
@@ -84,12 +86,22 @@ impl AstNode for Unit {
         // set the current context
         st.create_context(String::from(self.name()));
 
-        // add th emethods to it
+        // adding the module paramters
+        for p in &self.params {
+            if !st.insert(p.to_symbol()) {
+                res.inc_err(1);
+            }
+        }
+
+        // add the methods to it
         for m in &self.methods {
             if !st.insert(m.to_symbol()) {
                 res.inc_err(1);
             }
         }
+
+        // add the state symbolds
+        self.state.build_symboltable(st);
 
         // Check 1: Double defined constants
         // --------------------------------------------------------------------------------------

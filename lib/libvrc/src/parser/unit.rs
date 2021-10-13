@@ -31,16 +31,19 @@
 use nom::{
     branch::permutation,
     combinator::{cut, opt},
-    multi::many0,
-    sequence::{delimited, pair, preceded, terminated},
+    multi::{many0, separated_list0},
+    sequence::{delimited, preceded, terminated, tuple},
 };
 
 // the used library-internal functionaltity
 use crate::ast::{Interface, State, Unit};
 use crate::error::IResult;
 use crate::parser::{
-    constdef, method, state,
-    terminals::{assign, colon, ident, kw_size, kw_unit, lbrace, num, rbrace, semicolon},
+    constdef, method, parameter, state,
+    terminals::{
+        assign, colon, comma, ident, kw_size, kw_unit, lbrace, lparen, num, rbrace, rparen,
+        semicolon,
+    },
 };
 use crate::token::TokenStream;
 
@@ -55,10 +58,13 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
     // try to match the input keyword, there is no match, return.
     let (i1, _) = kw_unit(input.clone())?;
 
+    // get the params `(base : addr)`
+    let params = delimited(lparen, separated_list0(comma, parameter), rparen);
+
     // we've seen the `unit` keyword, next there is an identifyer maybe followed
     // the drive clause (: identifier)
     let derive = preceded(colon, cut(ident));
-    let (i2, (unitname, derived)) = cut(pair(ident, opt(derive)))(i1)?;
+    let (i2, (unitname, params, derived)) = cut(tuple((ident, opt(params), opt(derive))))(i1)?;
 
     // TODO: here we have ConstItem | InterfaceItem | StateItem | FunctionItem
     // TODO: either put that as
@@ -73,6 +79,7 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
         i3,
         Unit {
             name: unitname,
+            params: params.unwrap_or_default(),
             derived,
             size,
             consts,
@@ -90,6 +97,10 @@ use crate::lexer::Lexer;
 #[test]
 fn test_ok() {
     let tokens = Lexer::lex_string("stdio", "unit foo {};").unwrap();
+    let ts = TokenStream::from_vec(tokens);
+    assert!(unit(ts).is_ok());
+
+    let tokens = Lexer::lex_string("stdio", "unit foo(base: addr) {};").unwrap();
     let ts = TokenStream::from_vec(tokens);
     assert!(unit(ts).is_ok());
 

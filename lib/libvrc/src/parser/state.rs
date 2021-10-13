@@ -34,12 +34,13 @@ use nom::{
 };
 
 // lexer, parser terminals and ast
-use crate::ast::{Field, State};
+use crate::ast::{Field, Param, State};
 use crate::error::IResult;
 use crate::parser::field::field;
+use crate::parser::parameter;
 use crate::parser::terminals::{
-    assign, comma, ident, kw_memory, kw_none, kw_register, kw_state, lbrace, lparen, rbrace,
-    rparen, semicolon,
+    assign, comma, kw_memory, kw_none, kw_register, kw_state, lbrace, lparen, rbrace, rparen,
+    semicolon,
 };
 use crate::token::TokenStream;
 
@@ -82,8 +83,8 @@ fn none_state(input: TokenStream) -> IResult<TokenStream, State> {
 }
 
 /// Parses and consumes a comma separated list of identifiers of the form "(ident, ..., ident)"
-pub fn argument_parser(input: TokenStream) -> IResult<TokenStream, Vec<String>> {
-    cut(delimited(lparen, separated_list0(comma, ident), rparen))(input)
+pub fn argument_parser(input: TokenStream) -> IResult<TokenStream, Vec<Param>> {
+    cut(delimited(lparen, separated_list0(comma, parameter), rparen))(input)
 }
 
 /// Parses and consumes a semicolon separated list of fields of the form "{ FIELD; ...; FIELD; }"
@@ -99,7 +100,7 @@ use nom::Slice;
 // TODO ask Reto about current source pos assignment.
 #[test]
 fn memory_state_parser_test() {
-    let state_string = "state = Memory(base) {\
+    let state_string = "state = Memory(base : addr) {\
     pte [base, 0, 4] {\
         0   0   present,\
         1   1   writable,\
@@ -123,21 +124,10 @@ fn memory_state_parser_test() {
         Err(x) => panic!("Parsing failed{}", x),
     };
 
-    let (bases, _fields, _pos) = match parsed_state {
+    let (_bases, _fields, _pos) = match parsed_state {
         State::MemoryState { bases, fields, pos } => (bases, fields, pos),
         _ => panic!("Wrong type of State parsed"),
     };
-
-    // todo Do I need to test this when it's already being done in fields.rs
-    /*assert_eq!(fields,
-    vec![Field { name: String::from("pte"),
-        stateref: Some((String::from("base"), 0)),
-        length: 4,
-        layout: vec![],
-        pos: tok_stream.slice(17..).input_sourcepos()
-    }]);*/
-    assert_eq!(bases, vec!["base"])
-    //assert_eq!(parsed_state , vec!["base"]);
 }
 
 #[test]

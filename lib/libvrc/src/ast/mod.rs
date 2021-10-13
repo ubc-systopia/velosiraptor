@@ -61,7 +61,7 @@ custom_error! {#[derive(PartialEq)] pub AstError
 // rexports
 pub use bitslice::BitSlice;
 pub use consts::Const;
-pub use expression::{BinOp, Expr, UnOp};
+pub use expression::{BinOp, Expr, Quantifier, UnOp};
 pub use field::Field;
 pub use import::Import;
 pub use interface::{Action, ActionOp, Interface};

@@ -103,6 +103,7 @@ terminalparser!(pub rarrow, TokenContent::RArrow);
 terminalparser!(pub bidirarrow, TokenContent::BiDirArrow);
 terminalparser!(pub fatarrow, TokenContent::FatArrow);
 terminalparser!(pub bidirfatarrow, TokenContent::BiDirFatArrow);
+terminalparser!(pub rlongfatarrow, TokenContent::RLongFatArrow);
 
 // comparators
 terminalparser!(pub at, TokenContent::At);
@@ -202,6 +203,8 @@ keywordparser!(pub kw_requires, Keyword::Requires);
 keywordparser!(pub kw_ensures, Keyword::Ensures);
 keywordparser!(pub kw_assert, Keyword::Assert);
 keywordparser!(pub kw_return, Keyword::Return);
+keywordparser!(pub kw_forall, Keyword::Forall);
+keywordparser!(pub kw_exists, Keyword::Exists);
 
 /// parses a type expression
 ///

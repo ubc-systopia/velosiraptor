@@ -233,7 +233,44 @@ impl AstNode for Field {
         // Notes:       --
         // --------------------------------------------------------------------------------------
 
-        res + utils::check_snake_case(&self.name, &self.pos)
+        res = res + utils::check_snake_case(&self.name, &self.pos);
+
+        // Check 6: Bases defined
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Checks if the field has well-defined base
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+        if let Some(sref) = &self.stateref {
+            if let Some(sym) = st.lookup(&sref.0) {
+                // we found the symbol, check type
+                if sym.kind != SymbolKind::Parameter {
+                    VrsError::new_double_kind(
+                        String::from(&sref.0),
+                        self.loc().with_range(1..2),
+                        sym.loc.clone(),
+                    )
+                    .print();
+                    res.inc_err(1);
+                }
+                if sym.typeinfo != Type::Address {
+                    VrsError::new_double_type(
+                        String::from(&sref.0),
+                        self.loc().with_range(1..2),
+                        sym.loc.clone(),
+                    )
+                    .print();
+                    res.inc_err(1);
+                }
+            } else {
+                // undefined base
+                let msg = format!("field `{}` has invalid state ref `{}`", self.name, sref.0);
+                let hint = format!("add a `{} : addr to the state params", sref.0);
+                VrsError::new_err(self.loc().with_range(1..2), msg, Some(hint)).print();
+            }
+        }
+
+        res
     }
 
     fn name(&self) -> &str {

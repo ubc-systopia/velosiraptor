@@ -55,8 +55,9 @@ pub enum Keyword {
     Register,
     /// Null-like value used for State and Interface
     None,
-    /// Action types used in Interface
+    /// A read action from the interface on the state
     ReadAction,
+    /// A write action from the interface on the state
     WriteAction,
     /// Used in identifying the Bitslice layout of an Interface field
     Layout,
@@ -80,6 +81,10 @@ pub enum Keyword {
     Ensures,
     /// the return keyword
     Return,
+    /// the forall quantifier
+    Forall,
+    /// the existential quantifier
+    Exists,
 }
 
 /// Implementation of the [std::fmt::Display] trait for [Token]
@@ -103,6 +108,8 @@ impl fmt::Display for Keyword {
             None => "None",
             Requires => "requires",
             Ensures => "ensures",
+            Forall => "forall",
+            Exists => "exists",
             Return => "return",
             Layout => "Layout",
             // ActionTypes
@@ -184,6 +191,7 @@ pub enum TokenContent {
     BiDirArrow,    // <->
     FatArrow,      // =>
     BiDirFatArrow, // <=>
+    RLongFatArrow, // ==>
 
     // comparisons
     Eq, // ==
@@ -248,6 +256,7 @@ impl TokenContent {
             TokenContent::BiDirArrow => "<->",
             TokenContent::FatArrow => "=>",
             TokenContent::BiDirFatArrow => "<=>",
+            TokenContent::RLongFatArrow => "==>",
 
             // comparisons
             TokenContent::Eq => "==",
@@ -264,7 +273,15 @@ impl TokenContent {
             TokenContent::PathSep => "::",
             TokenContent::Wildcard => "?",
             TokenContent::Eof => "EOF",
-            _ => panic!("unknown symbol for token {:?}", tok),
+
+            // some other tokens
+            TokenContent::IntLiteral(_) => panic!("INTEGER"),
+            TokenContent::BoolLiteral(_) => panic!("BOOL"),
+            TokenContent::Identifier(_) => panic!("IDENTIFIER"),
+            TokenContent::Keyword(_) => panic!("KEYWORD"),
+            TokenContent::Comment(_) => panic!("COMMENT"),
+            TokenContent::BlockComment(_) => panic!("BLOCK COMMENT"),
+            TokenContent::Illegal => panic!("illegal token"),
         }
     }
 }
