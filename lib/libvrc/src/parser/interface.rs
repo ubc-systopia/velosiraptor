@@ -54,6 +54,20 @@
 //                    and may contain other registers or alike not direcly
 //                    related to the state.
 //
+//  interface = TYPE(params) {
+//      ident [base, offset, length] {
+//          Layout {
+//              0 4 ident,
+//          };
+//          ReadAction {
+//              expr <- expr;
+//          };
+//          WriteAction {
+//              expr <- expr;
+//              expr -> expr;
+//          };
+//      };
+//  };
 //
 //  interface = MMIO(base) {
 //      ident [base, offset,length] <=> state.field
@@ -123,12 +137,8 @@ use crate::parser::bitslice::bitslice;
 use crate::parser::expression::expr;
 use crate::parser::field::field;
 use crate::parser::state::argument_parser;
-use crate::parser::terminals::{
-    assign, boolean, comma, dot, fatarrow, ident, kw_interface, kw_layout, kw_memory, kw_mmio,
-    kw_none, kw_readaction, kw_state, kw_writeaction, lbrace, lbrack, le, num, rbrace, rbrack,
-    semicolon,
-};
-use crate::token::TokenStream;
+use crate::parser::terminals::{assign, boolean, comma, dot, fatarrow, ident, kw_interface, kw_layout, kw_memory, kw_mmio, kw_none, kw_readaction, kw_state, kw_writeaction, lbrace, lbrack, le, num, rbrace, rbrack, semicolon, kw_register};
+use crate::token::{TokenStream, Token};
 use nom::branch::{alt, permutation};
 use nom::character::streaming::one_of;
 use nom::combinator::{cut, opt};
@@ -137,6 +147,7 @@ use nom::sequence::{delimited, pair, preceded, terminated};
 use std::collections::hash_map::RandomState;
 
 /// Interface definition parsing
+// TODO Does not yet include parsing for SpecialRegisters
 pub fn interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
     // try to match the interface keyword, if there is no match, return.TokenStream
     let (i1, _) = kw_state(_input)?;
@@ -144,7 +155,7 @@ pub fn interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
     // We now attempt to parse the different interface types.
     cut(delimited(
         assign,
-        alt((mmio_interface, none_interface)),
+        alt((mmio_interface, memory_interface, register_interface, none_interface)),
         semicolon,
     ))(i1)
 }
@@ -158,13 +169,29 @@ fn none_interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
 fn mmio_interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
     let (i1, _) = kw_mmio(_input.clone())?;
     let (i2, bases) = argument_parser(i1)?;
-    let (i3, fields) = cut(many0(interfacefield))(i2)?;
+    let (i3, fields) = cut(delimited(lbrack, many0(interfacefield), rbrack))(i2)?;
 
     let pos = _input.expand_until(&i3);
     Ok((i3, Interface::MMIORegisters { bases, fields, pos }))
 }
 
-fn memory_interface(_input: TokenStream) -> IResult<TokenStream, Interface> {}
+fn register_interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
+    let (i1, _) = kw_register(_input.clone())?;
+    let (i2, fields) = cut(delimited(lbrack, many0(interfacefield), rbrack))(i1)?;
+
+    let pos = _input.expand_until(&i2);
+    Ok((i2, Interface::CPURegisters { fields, pos }))
+}
+
+fn memory_interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
+    let (i1, _) = kw_memory(_input.clone())?;
+
+    // Note that the Memory Interface should allow a direct 1-to-1 so for now we will only support the parsing of
+    // interface = Memory;
+    // as all other information can be just directly received from the state.
+    let pos  = _input.expand_until(&i1);
+    Ok((i1, Interface::Memory { pos }))
+}
 
 /// Parses an interface field
 fn interfacefield(input: TokenStream) -> IResult<TokenStream, InterfaceField> {
