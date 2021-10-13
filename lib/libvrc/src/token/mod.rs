@@ -25,9 +25,9 @@
 
 //! The Token module
 
-mod token;
+mod tokens;
 mod tokenstream;
 
 // re-export
-pub use token::{Keyword, Token, TokenContent};
+pub use tokens::{Keyword, Token, TokenContent};
 pub use tokenstream::TokenStream;
