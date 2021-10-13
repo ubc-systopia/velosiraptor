@@ -101,7 +101,7 @@ impl fmt::Display for Keyword {
             Fn => "fn",
             Assert => "assert",
             State => "state",
-            Interface => "Interface",
+            Interface => "interface",
             Memory => "Memory",
             MMIO => "MMIO",
             Register => "Register",

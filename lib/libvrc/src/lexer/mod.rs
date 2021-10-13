@@ -140,7 +140,7 @@ fn punctuation2(input: SourcePos) -> IResult<SourcePos, Token> {
         bidirarrow,
         fatarrow,
         bidirfatarrow, // shifts
-        fatarrow, // shifts
+        fatarrow,      // shifts
         lshift,
         rshift, // logical combinations
         land,
