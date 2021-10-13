@@ -51,6 +51,8 @@ unit X86_pte(base : addr) : Segment {
         };
     };
 
+    interface = Memory;
+
     // the base address where this entry translate to
     fn get_base() -> addr {
         return state.pte.base << 12;
