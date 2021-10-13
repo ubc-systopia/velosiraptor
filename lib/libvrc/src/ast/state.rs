@@ -29,7 +29,7 @@
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // used library internal functionality
-use crate::ast::{utils, AstNode, Field, Issues, Symbol, SymbolKind, SymbolTable, Type};
+use crate::ast::{utils, AstNode, Field, Issues, Param, Symbol, SymbolKind, SymbolTable, Type};
 use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
@@ -45,7 +45,7 @@ pub enum State {
     /// defines a memory state (external to the unit)
     MemoryState {
         /// a list of identifiers referring to memory regions
-        bases: Vec<String>,
+        bases: Vec<Param>,
         /// defines a list of fields within the memory regions, defined by the bases
         fields: Vec<Field>,
         /// position where this state was defined
@@ -171,17 +171,17 @@ impl AstNode for State {
         let mut res = Issues::ok();
 
         // extract the fields and bases from the  state
+        let _bases = Vec::new();
         let (fields, bases) = match self {
-            State::MemoryState {
-                bases,
-                fields,
-                pos: _,
-            } => (fields, Some(bases)),
-            State::RegisterState { fields, pos: _ } => (fields, None),
-            State::None { pos: _ } => {
+            State::MemoryState { bases, fields, .. } => (fields, bases.as_slice()),
+            State::RegisterState { fields, .. } => (fields, _bases.as_slice()),
+            State::None { .. } => {
                 return Issues::ok();
             }
         };
+
+        // create a new symtable context
+        st.create_context(String::from("state"));
 
         // Check 1: Fields
         // --------------------------------------------------------------------------------------
@@ -203,77 +203,89 @@ impl AstNode for State {
         let errors = utils::check_double_entries(fields);
         res.inc_err(errors);
 
-        // Check 3: Bases are defined
+        // Check 3: Double defined bases
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check that all bases of this field have distinct names
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+        let errors = utils::check_double_entries(bases);
+        res.inc_err(errors);
+
+        // Check 4: Bases are defined on unit level
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check if the defined bases are in fact valid
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+        for b in bases {
+            let sym = st.lookup(&b.name);
+            if let Some(sym) = sym {
+                println!("SYMBOL EXISTS");
+                if sym.kind != SymbolKind::Parameter {
+                    VrsError::new_double_kind(
+                        String::from(b.name()),
+                        b.loc().clone(),
+                        sym.loc.clone(),
+                    )
+                    .print();
+                    res.inc_err(1);
+                }
+
+                if !sym.typeinfo.compatible(b.ptype) {
+                    VrsError::new_double_type(
+                        String::from(b.name()),
+                        b.loc().clone(),
+                        sym.loc.clone(),
+                    )
+                    .print();
+                    res.inc_err(1);
+                }
+            } else {
+                // undefined base
+                let msg = format!(
+                    "state base `{}` has not been defined on unit level",
+                    b.name()
+                );
+                let hint = format!("add `{} : {}` to the unit parameters", b.name, b.ptype);
+                VrsError::new_err(b.loc(), msg, Some(hint)).print();
+                res.inc_err(1);
+
+                // insert the symbol, so we won't throw an error in the field level
+                st.insert(b.to_symbol());
+            }
+        }
+
+        // Check 5: Bases are defined
         // --------------------------------------------------------------------------------------
         // Type:        Error
         // Description: Check if the fields have all defined bases
         // Notes:       --
         // --------------------------------------------------------------------------------------
 
-        match bases {
-            Some(bases) => {
-                for f in fields {
-                    if let Some(sref) = &f.stateref {
-                        // case 1: we have a state ref
-                        let (sref, _) = sref;
-                        // if the bases list contain a state ref, we're good
-                        if bases.contains(sref) {
-                            continue;
-                        }
-                        // undefined base
-                        let msg = format!("field `{}` has invalid state ref", f.name());
-                        let hint =
-                            format!("add state reference here. One of `{}`", bases.join("`, `"));
-                        VrsError::new_err(f.loc().with_range(1..2), msg, Some(hint)).print();
-                        res.inc_err(1);
-                    } else {
-                        // no state ref, but required one
-                        let msg = format!("field `{}` has missing state reference", f.name());
-                        let hint =
-                            format!("add state reference here. One of `{}`", bases.join("`, `"));
-                        VrsError::new_err(f.loc().with_range(1..2), msg, Some(hint)).print();
-                        res.inc_err(1);
-                    }
-                }
+        let stateref_required = matches!(self, State::MemoryState { .. });
+
+        for f in fields {
+            if f.stateref.is_none() && stateref_required {
+                // no state ref, but required one
+                let msg = format!("field `{}` has missing state reference", f.name());
+                let hint = format!("add state reference here. One of `{:?}`", bases);
+                VrsError::new_err(f.loc().with_range(1..2), msg, Some(hint)).print();
+                res.inc_err(1);
             }
-            None => {
-                for f in fields {
-                    if f.stateref.is_some() {
-                        // state ref found, but none required
-                        let msg = format!(
-                            "field `{}` contains state reference, but state has none.",
-                            f.name()
-                        );
-                        let hint = String::from("remove the state reference in the field");
-                        VrsError::new_err(f.loc().with_range(1..2), msg, Some(hint)).print();
-                        res.inc_err(1);
-                    }
-                }
+            if f.stateref.is_some() && !stateref_required {
+                // state ref found, but none required
+                let msg = format!(
+                    "field `{}` contains state reference, but state has none.",
+                    f.name()
+                );
+                let hint = String::from("remove the state reference in the field");
+                VrsError::new_err(f.loc().with_range(1..2), msg, Some(hint)).print();
+                res.inc_err(1);
             }
         }
 
-        // Check 4: No bases defined double
-        // --------------------------------------------------------------------------------------
-        // Type:        Error
-        // Description: Check if the bases are not double defined
-        // Notes:       --
-        // --------------------------------------------------------------------------------------
-        match bases {
-            Some(bases) => {
-                let mut s = bases.clone();
-                s.sort();
-                s.dedup();
-                if s.len() < bases.len() {
-                    let msg = String::from("double defined bases in state definition");
-                    VrsError::new_err(self.loc().with_range(1..2), msg, None).print();
-                    res.inc_err(1);
-                    res
-                } else {
-                    res
-                }
-            }
-            _ => res,
-        }
+        res
     }
 
     fn name(&self) -> &str {

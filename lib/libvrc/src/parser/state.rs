@@ -34,12 +34,13 @@ use nom::{
 };
 
 // lexer, parser terminals and ast
-use crate::ast::{Field, State};
+use crate::ast::{Field, Param, State};
 use crate::error::IResult;
 use crate::parser::field::field;
+use crate::parser::parameter;
 use crate::parser::terminals::{
-    assign, comma, ident, kw_memory, kw_none, kw_register, kw_state, lbrace, lparen, rbrace,
-    rparen, semicolon,
+    assign, comma, kw_memory, kw_none, kw_register, kw_state, lbrace, lparen, rbrace, rparen,
+    semicolon,
 };
 use crate::token::TokenStream;
 
@@ -82,8 +83,8 @@ fn none_state(input: TokenStream) -> IResult<TokenStream, State> {
 }
 
 /// Parses and consumes a comma separated list of identifiers of the form "(ident, ..., ident)"
-pub fn argument_parser(input: TokenStream) -> IResult<TokenStream, Vec<String>> {
-    cut(delimited(lparen, separated_list0(comma, ident), rparen))(input)
+pub fn argument_parser(input: TokenStream) -> IResult<TokenStream, Vec<Param>> {
+    cut(delimited(lparen, separated_list0(comma, parameter), rparen))(input)
 }
 
 /// Parses and consumes a semicolon separated list of fields of the form "{ FIELD; ...; FIELD; }"
