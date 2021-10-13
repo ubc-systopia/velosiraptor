@@ -84,12 +84,12 @@ fn none_state(input: TokenStream) -> IResult<TokenStream, State> {
 
 /// Parses and consumes a comma separated list of identifiers of the form "(ident, ..., ident)"
 pub fn argument_parser(input: TokenStream) -> IResult<TokenStream, Vec<Param>> {
-    cut(delimited(lparen, separated_list0(comma, parameter), rparen))(input)
+    delimited(lparen, cut(separated_list0(comma, parameter)), cut(rparen))(input)
 }
 
 /// Parses and consumes a semicolon separated list of fields of the form "{ FIELD; ...; FIELD; }"
 pub fn fields_parser(input: TokenStream) -> IResult<TokenStream, Vec<Field>> {
-    cut(delimited(lbrace, many1(field), rbrace))(input)
+    delimited(lbrace, cut(many1(field)), cut(rbrace))(input)
 }
 
 #[cfg(test)]
