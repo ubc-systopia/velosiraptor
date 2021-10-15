@@ -25,7 +25,7 @@
 
 //! Ast Module of the Velosiraptor Compiler
 
-use crate::ast::{Expr, Field, Param};
+use crate::ast::{AstNode, Expr, Field, Param, Symbol, SymbolKind, SymbolTable, Type};
 use crate::token::TokenStream;
 
 /// Defines the software-visible interface of a unit
@@ -59,7 +59,56 @@ pub enum Interface {
     // TODO interface may be a combination: e.g., Memory + MMIORegisters
     //CombinedState {  },
     /// No software interface associated with this translation unit
-    None,
+    None { pos: TokenStream },
+}
+
+/// Implementation of the Interface
+impl Interface {
+    /// builds the symboltable for the state related symbols
+    pub fn build_symboltable(&self, st: &mut SymbolTable) {
+        // create the 'interface' symbol
+        let sym = Symbol::new(
+            String::from("interface"),
+            Type::Interface,
+            SymbolKind::Interface,
+            self.loc().clone(),
+        );
+        st.insert(sym);
+
+        // foreach field in the interface fields populate the symbol table
+        for f in self.fields() {
+            f.build_symboltable(st);
+        }
+    }
+
+    pub fn fields(&self) -> &[InterfaceField] {
+        match self {
+            Interface::CPURegisters { fields, .. } => fields,
+            Interface::Memory { fields, .. } => fields,
+            Interface::MMIORegisters { fields, .. } => fields,
+            Interface::SpecialRegisters { .. } => &[],
+            Interface::None {..} => &[],
+        }
+    }
+}
+
+/// Implementation of [AstNode] for [Interface]
+impl AstNode for Interface {
+    /// returns a printable string representing the ast node
+    fn name(&self) -> &str {
+        "interface"
+    }
+
+    /// returns the location of the AstNode
+    fn loc(&self) -> &TokenStream {
+        match self {
+            Interface::CPURegisters { pos, .. } => pos,
+            Interface::Memory { pos, .. } => pos,
+            Interface::MMIORegisters { pos, .. } => pos,
+            Interface::SpecialRegisters { pos, .. } => pos,
+            Interface::None { pos, .. } => pos,
+        }
+    }
 }
 
 /// Defines a field in the interface
@@ -75,6 +124,49 @@ pub struct InterfaceField {
     // The WriteAction for this field,
     pub writeaction: Option<Action>,
 }
+
+/// Implementation for the InterfaceField
+impl InterfaceField {
+    /// converts the field into a symbol
+    pub fn to_symbol(&self) -> Symbol {
+        // prepend the 'state' prefix
+        let name = format!("interface.{}", self.field.name);
+        Symbol::new(
+            name,
+            Type::Integer,
+            SymbolKind::State,
+            self.field.pos.clone(),
+        )
+    }
+
+    pub fn build_symboltable(&self, st: &mut SymbolTable) {
+        st.insert(self.to_symbol());
+
+        for s in &self.field.layout {
+            let name = format!("interface.{}.{}", self.field.name, s.name);
+            st.insert(Symbol::new(
+                name,
+                Type::Integer,
+                SymbolKind::State,
+                s.loc().clone(),
+            ));
+        }
+    }
+}
+
+/// Implementation of [AstNode] for [Interface]
+impl AstNode for InterfaceField {
+    /// returns a printable string representing the ast node
+    fn name(&self) -> &str {
+        self.field.name()
+    }
+
+    /// returns the location of the AstNode
+    fn loc(&self) -> &TokenStream {
+        self.field.loc()
+    }
+}
+
 
 /// Defines an action that is executed on the interface
 ///

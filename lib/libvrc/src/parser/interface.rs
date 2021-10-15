@@ -101,8 +101,9 @@ pub fn interface(input: TokenStream) -> IResult<TokenStream, Interface> {
 ///
 fn none_interface(input: TokenStream) -> IResult<TokenStream, Interface> {
     // try parse the none keyword and return
-    let (i1, _) = kw_none(input)?;
-    Ok((i1, Interface::None))
+    let (i1, _) = kw_none(input.clone())?;
+    let pos = input.expand_until(&i1);
+    Ok((i1, Interface::None { pos }))
 }
 
 /// parses the mmio interface definition

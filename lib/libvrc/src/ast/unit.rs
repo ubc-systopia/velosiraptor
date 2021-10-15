@@ -102,6 +102,7 @@ impl AstNode for Unit {
 
         // add the state symbolds
         self.state.build_symboltable(st);
+        self.interface.build_symboltable(st);
 
         // Check 1: Double defined constants
         // --------------------------------------------------------------------------------------

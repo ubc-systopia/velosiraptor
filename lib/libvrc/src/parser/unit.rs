@@ -90,7 +90,7 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
             size,
             consts,
             state: state.unwrap_or(State::None { pos: pos.clone() }),
-            interface: interface.unwrap_or(Interface::None),
+            interface: interface.unwrap_or(Interface::None { pos: TokenStream::empty() }),
             methods,
             pos,
         },
