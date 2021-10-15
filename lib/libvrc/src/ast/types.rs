@@ -43,6 +43,8 @@ pub enum Type {
     Size,
     /// the state of a unit
     State,
+    /// the interface of a unit
+    Interface,
 }
 
 /// Implementation for [Type]
@@ -56,6 +58,7 @@ impl Type {
             Address => true,
             Size => true,
             State => false,
+            Interface => false,
         }
     }
 
@@ -68,6 +71,7 @@ impl Type {
             Address => false,
             Size => false,
             State => false,
+            Interface => false,
         }
     }
 
@@ -80,6 +84,7 @@ impl Type {
             Address => "numeric",
             Size => "numeric",
             State => "state",
+            Interface => "interface",
         }
     }
 
@@ -99,6 +104,7 @@ impl fmt::Display for Type {
             Address => write!(f, "addr"),
             Size => write!(f, "size"),
             State => write!(f, "state"),
+            Interface => write!(f, "interface"),
         }
     }
 }
