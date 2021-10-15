@@ -43,6 +43,10 @@ use nom::{
 /// a [BitSlice] represents a slice of bits within a field.
 /// It lists the start, and end bits with an identifier.
 ///
+/// # Grammar
+///
+/// BITSLICE := NUM NUM IDENT
+///
 /// # Requirements
 ///
 /// The start bit shall be less or equal to the end bit number.
@@ -96,7 +100,6 @@ pub fn bitslice(input: TokenStream) -> IResult<TokenStream, BitSlice> {
 ///  - base offset, width: [base, 4, 4]
 ///
 pub fn bitslice_block(input: TokenStream) -> IResult<TokenStream, Vec<BitSlice>> {
-    // recognize the field header: [baseoffsetparser, num]
     delimited(lbrace, cut(separated_list0(comma, bitslice)), cut(rbrace))(input)
 }
 
