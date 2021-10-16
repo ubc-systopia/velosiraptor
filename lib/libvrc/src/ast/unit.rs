@@ -101,6 +101,7 @@ impl AstNode for Unit {
         }
 
         // add the state symbolds
+        // XXX: maybe we wan to do the symbol table building after checking the elements?
         self.state.build_symboltable(st);
         self.interface.build_symboltable(st);
 

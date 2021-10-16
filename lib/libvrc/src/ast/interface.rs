@@ -25,7 +25,7 @@
 
 //! Ast Module of the Velosiraptor Compiler
 
-use crate::ast::{AstNode, Expr, Field, Param, Symbol, SymbolKind, SymbolTable, Type};
+use crate::ast::{AstNode, Expr, Field, Issues, Param, Symbol, SymbolKind, SymbolTable, Type};
 use crate::token::TokenStream;
 
 /// Defines the software-visible interface of a unit
@@ -87,7 +87,7 @@ impl Interface {
             Interface::Memory { fields, .. } => fields,
             Interface::MMIORegisters { fields, .. } => fields,
             Interface::SpecialRegisters { .. } => &[],
-            Interface::None {..} => &[],
+            Interface::None { .. } => &[],
         }
     }
 }
@@ -97,6 +97,59 @@ impl AstNode for Interface {
     /// returns a printable string representing the ast node
     fn name(&self) -> &str {
         "interface"
+    }
+
+    // checks the node and returns the number of errors and warnings encountered
+    fn check(&self, st: &mut SymbolTable) -> Issues {
+        // TODO: Implement the checks, this may follow a similar structure as the state
+
+        // create a new symtable context, this is required for base checking in the fields
+        st.create_context(String::from("state"));
+
+        // Check 1: Fields
+        // --------------------------------------------------------------------------------------
+        // Type:        Error/Warning
+        // Description: Check all fields of the state
+        // Notes:
+        // --------------------------------------------------------------------------------------
+
+        // Check 2: Double defined fields
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check that all BitSlices of this field have distinct names
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        // Check 3: Double defined bases
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check that all bases of this field have distinct names
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        // Check 4: Bases are defined on unit level
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check if the defined bases are in fact valid
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        // Check 5: Bases are defined
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check if the fields have all defined bases
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        // drop the symbol table context again
+        st.drop_context();
+
+        Issues::ok()
+    }
+
+    // reqrite the ast
+    fn rewrite(&mut self, _st: &mut SymbolTable) {
+        // no-op
     }
 
     /// returns the location of the AstNode
@@ -166,7 +219,6 @@ impl AstNode for InterfaceField {
         self.field.loc()
     }
 }
-
 
 /// Defines an action that is executed on the interface
 ///
