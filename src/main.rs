@@ -315,7 +315,10 @@ fn main() {
     }
 
     if outdir.is_empty() {
-        eprintln!("{:>8}: skipping code generation.\n", "check".bold().green(),);
+        eprintln!(
+            "{:>8}: skipping code generation.\n",
+            "generate".bold().green(),
+        );
         return;
     }
 
