@@ -35,6 +35,7 @@ use std::process::exit;
 use libvrc::ast::{AstError, Issues};
 use libvrc::codegen::CodeGen;
 use libvrc::parser::{Parser, ParserError};
+use libvrc::synth::Synthesisizer;
 
 fn parse_cmdline() -> clap::ArgMatches<'static> {
     App::new("vtrc")
@@ -61,6 +62,13 @@ fn parse_cmdline() -> clap::ArgMatches<'static> {
                 .long("backend")
                 .takes_value(true)
                 .help("the code backend to use [rust, c]"),
+        )
+        .arg(
+            Arg::with_name("synth")
+                .short("s")
+                .long("synth")
+                .takes_value(true)
+                .help("the synthesis backend to use [rosette, z3]"),
         )
         .arg(
             Arg::with_name("v")
@@ -145,6 +153,9 @@ fn main() {
 
     let backend = matches.value_of("backend").unwrap_or("rust");
     log::info!("codegen backend: {}", backend);
+
+    let synth = matches.value_of("synth").unwrap_or("rosette");
+    log::info!("synthesis backend: {}", synth);
 
     log::debug!("Debug output enabled");
     log::trace!("Tracing output enabled");
@@ -325,13 +336,28 @@ fn main() {
     }
 
     let codegen = match backend {
-        "rust" => CodeGen::new_rust(outpath, pkgname),
-        "c" => CodeGen::new_c(outpath, pkgname),
+        "rust" => CodeGen::new_rust(outpath, pkgname.clone()),
+        "c" => CodeGen::new_c(outpath, pkgname.clone()),
         s => {
             eprintln!(
                 "{}{} `{}`.\n",
                 "error".bold().red(),
                 ": unsupported code backend".bold(),
+                s.bold()
+            );
+            abort(infile, issues);
+            return;
+        }
+    };
+
+    let synthsizer = match synth {
+        "rosette" => Synthesisizer::new_rosette(outpath, pkgname),
+        "z3" => Synthesisizer::new_z3(outpath, pkgname),
+        s => {
+            eprintln!(
+                "{}{} `{}`.\n",
+                "error".bold().red(),
+                ": unsupported synthesis backend".bold(),
                 s.bold()
             );
             abort(infile, issues);
@@ -351,7 +377,7 @@ fn main() {
         eprintln!(
             "{}{} `{}`.\n",
             "error".bold().red(),
-            ": failure during globals generation".bold(),
+            ": failure during codegen preparation generation".bold(),
             e
         );
         abort(infile, issues);
@@ -385,18 +411,69 @@ fn main() {
 
     // generate the unit files that use the interface files
     eprintln!(
+        "{:>8}: synthesizing map function...\n",
+        "synthesis".bold().green(),
+    );
+
+    let map_fn = synthsizer.synth_map(&ast).unwrap_or_else(|e| {
+        eprintln!(
+            "{}{} `{}`.\n",
+            "error".bold().red(),
+            ": failure during interface generation".bold(),
+            e
+        );
+        abort(infile, issues);
+        panic!("s");
+    });
+
+    eprintln!(
+        "{:>8}: synthesizing un function...\n",
+        "synthesis".bold().green(),
+    );
+
+    let unmap_fn = synthsizer.synth_unmap(&ast).unwrap_or_else(|e| {
+        eprintln!(
+            "{}{} `{}`.\n",
+            "error".bold().red(),
+            ": failure during interface generation".bold(),
+            e
+        );
+        abort(infile, issues);
+        panic!("s");
+    });
+
+    eprintln!(
+        "{:>8}: synthesizing un function...\n",
+        "synthesis".bold().green(),
+    );
+
+    let prot_fn = synthsizer.synth_protect(&ast).unwrap_or_else(|e| {
+        eprintln!(
+            "{}{} `{}`.\n",
+            "error".bold().red(),
+            ": failure during interface generation".bold(),
+            e
+        );
+        abort(infile, issues);
+        panic!("s");
+    });
+
+    // generate the unit files that use the interface files
+    eprintln!(
         "{:>8}: generating unit files...\n",
         "generate".bold().green(),
     );
 
-    codegen.generate_units(&ast).unwrap_or_else(|e| {
-        eprintln!(
-            "{}{} `{}`.\n",
-            "error".bold().red(),
-            ": failure during unit generation".bold(),
-            e
-        );
-    });
+    codegen
+        .generate_units(&ast, map_fn, unmap_fn, prot_fn)
+        .unwrap_or_else(|e| {
+            eprintln!(
+                "{}{} `{}`.\n",
+                "error".bold().red(),
+                ": failure during unit generation".bold(),
+                e
+            );
+        });
 
     codegen.finalize(&ast).unwrap_or_else(|e| {
         eprintln!(

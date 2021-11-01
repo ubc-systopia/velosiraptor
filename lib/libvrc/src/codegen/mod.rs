@@ -34,7 +34,7 @@ mod c;
 mod rust;
 
 // used library internal modules
-use crate::ast::AstRoot;
+use crate::ast::{AstRoot, Method};
 use crate::codegen::c::BackendC;
 use crate::codegen::rust::BackendRust;
 
@@ -87,7 +87,13 @@ impl CodeGen {
         }
     }
 
-    pub fn generate_units(&self, ast: &AstRoot) -> Result<(), CodeGenError> {
+    pub fn generate_units(
+        &self,
+        ast: &AstRoot,
+        _map: Method,
+        _unmap: Method,
+        _protec: Method,
+    ) -> Result<(), CodeGenError> {
         match self {
             CodeGen::Rust(b) => b.generate_units(ast),
             CodeGen::C(b) => b.generate_units(ast),
