@@ -25,17 +25,23 @@
 
 //! Rosette Code Generation Library
 
+use std::fs;
+use std::path::PathBuf;
+
 //mod constdef;
+mod require;
+
+use crate::require::Require;
 
 pub struct RosetteFile {
     /// the pathname of the file
-    path: String,
+    path: PathBuf,
     /// the document string
     doc: String,
     /// the language construct
     lang: String,
     /// the requres clauses
-    requires: Vec<String>, // TODO: change me
+    requires: Vec<Require>, // TODO: change me
     // the statemetns
     stmts: Vec<String>, // TODO: change me
 }
@@ -43,7 +49,7 @@ pub struct RosetteFile {
 /// implementation of the RosetteFile
 impl RosetteFile {
     /// creates a new rosette file
-    pub fn new(path: String, doc: String) -> Self {
+    pub fn new(path: PathBuf, doc: String) -> Self {
         RosetteFile {
             path,
             doc,
@@ -54,26 +60,21 @@ impl RosetteFile {
     }
 
     /// adds a new requires clause to the file
-    // pub fn add_new_requires(self, path: String) -> Self {
-    //     let nreq = Requires::new();
-    //     self.add_requires(self, nreq)
-    // }
+    pub fn add_new_require(&mut self, path: String) {
+        let nreq = Require::new(path);
+        self.add_require(nreq);
+    }
 
     /// adds a requires clause
-    // pub fn add_requires(self, req: Requires) -> Self {
-    //     self.requires.push(req);
-    //     self
-    // }
+    pub fn add_require(&mut self, req: Require) {
+        self.requires.push(req);
+    }
 
     /// adds a new struct definition to the file
-    pub fn add_struct_def(self, id: String, entries: Vec<String>, attrib: String) -> Self {
-        self
-    }
+    pub fn add_struct_def(&mut self, id: String, entries: Vec<String>, attrib: String) {}
 
     /// adds a type definition
-    pub fn add_type_def(self) -> Self {
-        self
-    }
+    pub fn add_type_def(&mut self) {}
 
     /// adds a new statement to the file
     // pub fn add_stmt(self, nstmt: Stmt) -> Self {
@@ -99,11 +100,27 @@ impl RosetteFile {
     //     self.add_stmt(nstmt)
     // }
 
+    pub fn to_code(&self) -> String {
+        let mut s = format!("; {}\n\n#lang {}\n\n", self.doc, self.lang);
+
+        for r in &self.requires {
+            let code = r.to_code();
+            s.push_str(code.as_str());
+        }
+        s
+    }
+
     /// saves the rosette file
-    pub fn save(&self) {}
+    pub fn save(&self) {
+        // write the file, return IOError otherwise
+        fs::write(&self.path, self.to_code().as_bytes());
+    }
 
     /// prints the content of the file to stdout
     pub fn print(&self) {}
+
+    ///
+    pub fn synth(&self) {}
 }
 
 pub trait RosetteFmt {

@@ -26,11 +26,13 @@
 //! Synthesis Module: Rosette
 
 // external libraries
+use std::fs;
 use std::path::{Path, PathBuf};
 
 // the used libraries
 use crate::ast::{AstRoot, Method, Type};
 use crate::synth::SynthError;
+use rosettelang::RosetteFile;
 
 pub struct SynthRosette {
     outdir: PathBuf,
@@ -40,18 +42,38 @@ pub struct SynthRosette {
 impl SynthRosette {
     pub fn new(outdir: &Path, pkg: String) -> Self {
         SynthRosette {
-            outdir: outdir.join(&pkg),
+            outdir: outdir.join(&pkg).join("synth"),
             pkg,
         }
     }
 
     /// synthesizes the `map` function and returns an ast of it
-    pub fn synth_map(&self, _ast: &AstRoot) -> Result<Method, SynthError> {
+    pub fn synth_map(&self, ast: &AstRoot) -> Result<Method, SynthError> {
+        fs::create_dir_all(&self.outdir)?;
+
+        for unit in &ast.units {
+            println!("synthesizing map: for {} in {:?}", unit.name, self.outdir);
+            let rktfilepath = self.outdir.join(format!("{}.rkt", unit.name));
+            let doc = format!("Unit: {}, Function: map()", unit.name);
+
+            let mut rkt = RosetteFile::new(rktfilepath, doc);
+
+            rkt.add_new_require(String::from("rosette/lib/syntax"));
+            rkt.add_new_require(String::from("rosette/lib/destruct"));
+
+            rkt.save();
+            rkt.synth();
+        }
+
         Ok(Method::new(String::from("map"), Type::Boolean, Vec::new()))
     }
 
     /// synthesizes the 'unmap' function and returns an ast of it
-    pub fn synth_unmap(&self, _ast: &AstRoot) -> Result<Method, SynthError> {
+    pub fn synth_unmap(&self, ast: &AstRoot) -> Result<Method, SynthError> {
+        for unit in &ast.units {
+            println!("synthesizing map: for {} in {:?}", unit.name, self.outdir);
+        }
+
         Ok(Method::new(
             String::from("unmap"),
             Type::Boolean,
@@ -59,7 +81,11 @@ impl SynthRosette {
         ))
     }
 
-    pub fn synth_protect(&self, _ast: &AstRoot) -> Result<Method, SynthError> {
+    pub fn synth_protect(&self, ast: &AstRoot) -> Result<Method, SynthError> {
+        for unit in &ast.units {
+            println!("synthesizing map: for {} in {:?}", unit.name, self.outdir);
+        }
+
         Ok(Method::new(
             String::from("protect"),
             Type::Boolean,

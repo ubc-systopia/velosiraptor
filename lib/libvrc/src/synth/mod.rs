@@ -45,6 +45,12 @@ custom_error! {#[derive(PartialEq)] pub SynthError
     FmtError          = "Could not format in buffer"
 }
 
+impl std::convert::From<std::io::Error> for SynthError {
+    fn from(_other: std::io::Error) -> SynthError {
+        SynthError::IOError
+    }
+}
+
 /// the
 pub enum Synthesisizer {
     Rosette(SynthRosette),
