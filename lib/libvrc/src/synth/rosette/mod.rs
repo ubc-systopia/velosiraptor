@@ -32,7 +32,7 @@ use std::path::{Path, PathBuf};
 // the used libraries
 use crate::ast::{AstRoot, BitSlice, Interface, Method, State, Type};
 use crate::synth::SynthError;
-use rosettelang::{FunctionDef, RosetteFile, StructDef};
+use rosettelang::{FunctionDef, RExpr, RosetteFile, StructDef};
 
 pub struct SynthRosette {
     outdir: PathBuf,
@@ -58,27 +58,67 @@ impl SynthRosette {
     }
 
     fn add_insert_extract(rkt: &mut RosetteFile, field: &str, bslice: &BitSlice) {
+        let fieldsize = 64;
+        let mask = (1u64 << (bslice.end - bslice.start + 1)) - 1;
+        let varname = String::from("val");
+        let oldname = String::from("old");
+
+        // extract function
         let fname = format!("state-fields-{}-{}-extract", field, bslice.name);
-        let mut fdef = FunctionDef::new(fname, vec![String::from("val")], Vec::new());
+        let args = vec![varname.clone()];
+        let body = RExpr::bvand(
+            RExpr::bvshr(
+                RExpr::var(varname.clone()),
+                RExpr::num(fieldsize, bslice.start),
+            ),
+            RExpr::num(fieldsize, mask),
+        );
+        let mut fdef = FunctionDef::new(fname, args, vec![body]);
         fdef.add_comment(format!(
-            "extract '{}' bits from '{}' field value",
-            field, bslice.name
+            "extract '{}' bits ({}..{}) from '{}' field value",
+            bslice.name, bslice.start, bslice.end, field,
         ));
         rkt.add_function_def(fdef);
 
+        // insert function
         let fname = format!("state-fields-{}-{}-insert", field, bslice.name);
-        let args = vec![String::from("old"), String::from("val")];
-        let mut fdef = FunctionDef::new(fname, args, Vec::new());
+        let args = vec![oldname.clone(), varname.clone()];
+        let body = RExpr::bvor(
+            // mask old value
+            RExpr::bvand(
+                RExpr::var(oldname.clone()),
+                // shift the mask to the start of the slice
+                RExpr::num(fieldsize, !(mask << bslice.start)),
+            ),
+            // new value
+            RExpr::bvshl(
+                RExpr::bvand(RExpr::var(varname.clone()), RExpr::num(fieldsize, mask)),
+                RExpr::num(fieldsize, bslice.start),
+            ),
+        );
+
+        let mut fdef = FunctionDef::new(fname, args, vec![body]);
         fdef.add_comment(format!(
-            "inserts '{}' bits from '{}' field value",
-            field, bslice.name
+            "inserts '{}' bits ({}..{}) from '{}' field value",
+            bslice.name, bslice.start, bslice.end, field
         ));
         rkt.add_function_def(fdef);
     }
 
     fn add_read_write_slice(rkt: &mut RosetteFile, field: &str, bslice: &str) {
+        let varname = String::from("val");
+        let stname = String::from("st");
+
         let fname = format!("state-fields-{}-{}-read", field, bslice);
-        let mut fdef = FunctionDef::new(fname, vec![String::from("st")], Vec::new());
+        let args = vec![stname.clone()];
+        let body = RExpr::fncall(
+            format!("state-fields-{}-{}-extract", field, bslice),
+            vec![RExpr::fncall(
+                format!("state-fields-load-{}", field),
+                vec![RExpr::var(stname.clone())],
+            )],
+        );
+        let mut fdef = FunctionDef::new(fname, args, vec![body]);
         fdef.add_comment(format!(
             "reads '{}' bits from '{}' field value",
             field, bslice
@@ -86,8 +126,25 @@ impl SynthRosette {
         rkt.add_function_def(fdef);
 
         let fname = format!("state-fields-{}-{}-write", field, bslice);
-        let args = vec![String::from("st"), String::from("val")];
-        let mut fdef = FunctionDef::new(fname, args, Vec::new());
+        let args = vec![stname.clone(), varname.clone()];
+        let body = RExpr::fncall(
+            format!("state-fields-store-{}", field),
+            vec![
+                RExpr::var(stname.clone()),
+                RExpr::fncall(
+                    format!("state-fields-{}-{}-insert", field, bslice),
+                    vec![
+                        RExpr::fncall(
+                            format!("state-fields-load-{}", field),
+                            vec![RExpr::var(stname.clone())],
+                        ),
+                        RExpr::var(varname.clone()),
+                    ],
+                ),
+            ],
+        );
+
+        let mut fdef = FunctionDef::new(fname, args, vec![body]);
         fdef.add_comment(format!(
             "writes '{}' bits from '{}' field value",
             field, bslice
@@ -97,7 +154,8 @@ impl SynthRosette {
 
     fn add_state_fields(rkt: &mut RosetteFile, state: &State) {
         rkt.add_section(String::from("State Fields"));
-
+        let statevar = String::from("st");
+        let valvar = String::from("val");
         // the state struct
         let entries = state
             .fields()
@@ -112,7 +170,15 @@ impl SynthRosette {
         rkt.add_struct_def(s);
 
         // add the constructor
-        let mut f = FunctionDef::new(String::from("make-state-fields"), Vec::new(), Vec::new());
+        let body = RExpr::fncall(
+            String::from(STATEFIELDS),
+            state
+                .fields()
+                .iter()
+                .map(|f| RExpr::num((f.length * 8) as u8, 0))
+                .collect::<Vec<RExpr>>(),
+        );
+        let mut f = FunctionDef::new(String::from("make-state-fields"), Vec::new(), vec![body]);
         f.add_comment(String::from("State Constructor"));
         rkt.add_function_def(f);
 
@@ -120,12 +186,44 @@ impl SynthRosette {
             rkt.add_subsection(format!("State Field: '{}'", f.name));
 
             let fname = format!("state-fields-load-{}", f.name);
-            let mut fdef = FunctionDef::new(fname, vec![String::from("st")], Vec::new());
+            let args = vec![statevar.clone()];
+            let body = RExpr::matchexpr(
+                statevar.clone(),
+                vec![
+                    (
+                        RExpr::fncall(
+                            String::from(STATEFIELDS),
+                            vec![RExpr::var(String::from("e"))],
+                        ),
+                        vec![RExpr::var(String::from("e"))],
+                    ),
+                    (
+                        RExpr::var(String::from("_")),
+                        vec![
+                            RExpr::fncall(
+                                String::from("printf"),
+                                vec![RExpr::text(String::from("wrong state supplied"))],
+                            ),
+                            RExpr::var(String::from("e")),
+                        ],
+                    ),
+                ],
+            );
+            let mut fdef = FunctionDef::new(fname, args, vec![body]);
             fdef.add_comment(String::from("Field accessor"));
             rkt.add_function_def(fdef);
 
             let fname = format!("state-fields-store-{}", f.name);
-            let mut fdef = FunctionDef::new(fname, vec![String::from("st")], Vec::new());
+            let args = vec![statevar.clone(), valvar.clone()];
+            let body = RExpr::fncall(
+                String::from("struct-copy"),
+                vec![
+                    RExpr::var(String::from(STATEFIELDS)),
+                    RExpr::var(statevar.clone()),
+                    RExpr::block(vec![(f.name.clone(), RExpr::var(valvar.clone()))]),
+                ],
+            );
+            let mut fdef = FunctionDef::new(fname, args, vec![body]);
             fdef.add_comment(String::from("Field update"));
             rkt.add_function_def(fdef);
 

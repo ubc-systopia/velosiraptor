@@ -25,6 +25,9 @@
 
 //! Const Definitions
 
+// the library includes
+use crate::RExpr;
+
 /// Represents a constante definition
 ///
 /// # Example
@@ -38,13 +41,13 @@ pub struct FunctionDef {
     /// the function arguments
     args: Vec<String>,
     /// the expressions in the body
-    exprs: Vec<String>,
+    exprs: Vec<RExpr>,
     /// the documentation
     doc: Option<String>,
 }
 
 impl FunctionDef {
-    pub fn new(ident: String, args: Vec<String>, exprs: Vec<String>) -> Self {
+    pub fn new(ident: String, args: Vec<String>, exprs: Vec<RExpr>) -> Self {
         FunctionDef {
             ident,
             args,
@@ -58,7 +61,18 @@ impl FunctionDef {
     }
 
     pub fn to_code(&self) -> String {
-        let f = format!("(define ({} {})\n   \n)\n", self.ident, self.args.join(" "));
+        let body = self
+            .exprs
+            .iter()
+            .map(|e| e.to_code(2))
+            .collect::<Vec<String>>();
+
+        let f = format!(
+            "(define ({} {})\n{}\n)\n",
+            self.ident,
+            self.args.join(" "),
+            body.join("\n")
+        );
         if let Some(c) = &self.doc {
             let mut doc = format!("; {}\n", c);
             doc.push_str(f.as_str());

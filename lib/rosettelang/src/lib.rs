@@ -29,11 +29,13 @@ use std::fs;
 use std::path::PathBuf;
 
 //mod constdef;
+mod expr;
 mod functiondef;
 mod require;
 mod structdef;
 mod typedef;
 
+pub use crate::expr::{BVOp, RExpr};
 pub use crate::functiondef::FunctionDef;
 pub use crate::require::Require;
 pub use crate::structdef::StructDef;
@@ -113,7 +115,7 @@ impl RosetteFile {
     }
 
     /// adds a new struct to the file
-    pub fn add_new_function_def(&mut self, ident: String, args: Vec<String>, exprs: Vec<String>) {
+    pub fn add_new_function_def(&mut self, ident: String, args: Vec<String>, exprs: Vec<RExpr>) {
         let f = FunctionDef::new(ident, args, exprs);
         self.add_function_def(f);
     }
