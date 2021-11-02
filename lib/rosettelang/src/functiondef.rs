@@ -1,4 +1,4 @@
-// Rosette Code Generation - Requires Clauses
+// Rosette Code Generation - Function Definitions
 //
 //
 // MIT License
@@ -23,44 +23,47 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Require Clause
+//! Const Definitions
 
-/// Represents a 'require' clause in rosette
+/// Represents a constante definition
 ///
 /// # Example
 ///
-/// ; include the syntax module
-/// (require rosette/lib/synthax)
+/// ; the maximum depth
+/// (define maxdepth 5)
 ///
-pub struct Require {
-    /// the path of the module to be included (e.g., rosette/lib/syntax)
-    path: String,
-    /// a comment string for the requires clause
-    comment: Option<String>,
+pub struct FunctionDef {
+    /// the identifier of th e struct
+    ident: String,
+    /// the function arguments
+    args: Vec<String>,
+    /// the expressions in the body
+    exprs: Vec<String>,
+    /// the documentation
+    doc: Option<String>,
 }
 
-impl Require {
-    /// creates a new requires expression
-    pub fn new(path: String) -> Self {
-        Require {
-            path,
-            comment: None,
+impl FunctionDef {
+    pub fn new(ident: String, args: Vec<String>, exprs: Vec<String>) -> Self {
+        FunctionDef {
+            ident,
+            args,
+            exprs,
+            doc: None,
         }
     }
 
-    // adds a comment to the requires expression
     pub fn add_comment(&mut self, comment: String) {
-        self.comment = Some(comment.replace("\n", ";\n"));
+        self.doc = Some(comment.replace("\n", ";\n"));
     }
 
-    /// formats the requires block into code
     pub fn to_code(&self) -> String {
-        let req = format!("(require {})\n", self.path);
-        if let Some(c) = &self.comment {
-            let mut comment = format!("; {}\n", c);
-            comment.push_str(req.as_str());
-            return comment;
+        let f = format!("(define ({} {})\n   \n)\n", self.ident, self.args.join(" "));
+        if let Some(c) = &self.doc {
+            let mut doc = format!("; {}\n", c);
+            doc.push_str(f.as_str());
+            return doc;
         }
-        req
+        f
     }
 }
