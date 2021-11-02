@@ -53,18 +53,24 @@ impl SynthRosette {
     fn add_bitvector_defs(rkt: &mut RosetteFile) {}
 
     fn add_requires(rkt: &mut RosetteFile) {
-        rkt.add_new_require(String::from("rosette/lib/syntax"));
+        rkt.add_new_require(String::from("rosette/lib/synthax"));
         rkt.add_new_require(String::from("rosette/lib/destruct"));
     }
 
-    fn add_insert_extract(rkt: &mut RosetteFile, field: &str, bslice: &BitSlice) {
-        let fieldsize = 64;
+    fn add_insert_extract(
+        rkt: &mut RosetteFile,
+        ftype: &str,
+        field: &str,
+        length: u64,
+        bslice: &BitSlice,
+    ) {
         let mask = (1u64 << (bslice.end - bslice.start + 1)) - 1;
+        let fieldsize = (length * 8) as u8;
         let varname = String::from("val");
         let oldname = String::from("old");
 
         // extract function
-        let fname = format!("state-fields-{}-{}-extract", field, bslice.name);
+        let fname = format!("{}-fields-{}-{}-extract", ftype, field, bslice.name);
         let args = vec![varname.clone()];
         let body = RExpr::bvand(
             RExpr::bvshr(
@@ -81,7 +87,7 @@ impl SynthRosette {
         rkt.add_function_def(fdef);
 
         // insert function
-        let fname = format!("state-fields-{}-{}-insert", field, bslice.name);
+        let fname = format!("{}-fields-{}-{}-insert", ftype, field, bslice.name);
         let args = vec![oldname.clone(), varname.clone()];
         let body = RExpr::bvor(
             // mask old value
@@ -105,16 +111,16 @@ impl SynthRosette {
         rkt.add_function_def(fdef);
     }
 
-    fn add_read_write_slice(rkt: &mut RosetteFile, field: &str, bslice: &str) {
+    fn add_read_write_slice(rkt: &mut RosetteFile, ftype: &str, field: &str, bslice: &str) {
         let varname = String::from("val");
         let stname = String::from("st");
 
-        let fname = format!("state-fields-{}-{}-read", field, bslice);
+        let fname = format!("{}-fields-{}-{}-read", ftype, field, bslice);
         let args = vec![stname.clone()];
         let body = RExpr::fncall(
-            format!("state-fields-{}-{}-extract", field, bslice),
+            format!("{}-fields-{}-{}-extract", ftype, field, bslice),
             vec![RExpr::fncall(
-                format!("state-fields-load-{}", field),
+                format!("{}-fields-load-{}", ftype, field),
                 vec![RExpr::var(stname.clone())],
             )],
         );
@@ -125,17 +131,17 @@ impl SynthRosette {
         ));
         rkt.add_function_def(fdef);
 
-        let fname = format!("state-fields-{}-{}-write", field, bslice);
+        let fname = format!("{}-fields-{}-{}-write", ftype, field, bslice);
         let args = vec![stname.clone(), varname.clone()];
         let body = RExpr::fncall(
-            format!("state-fields-store-{}", field),
+            format!("{}-fields-store-{}", ftype, field),
             vec![
                 RExpr::var(stname.clone()),
                 RExpr::fncall(
-                    format!("state-fields-{}-{}-insert", field, bslice),
+                    format!("{}-fields-{}-{}-insert", ftype, field, bslice),
                     vec![
                         RExpr::fncall(
-                            format!("state-fields-load-{}", field),
+                            format!("{}-fields-load-{}", ftype, field),
                             vec![RExpr::var(stname.clone())],
                         ),
                         RExpr::var(varname.clone()),
@@ -229,14 +235,17 @@ impl SynthRosette {
 
             for b in &f.layout {
                 rkt.add_subsection(format!("BitSlice: '{}.{}'", f.name, b.name));
-                SynthRosette::add_insert_extract(rkt, &f.name, b);
-                SynthRosette::add_read_write_slice(rkt, &f.name, &b.name)
+                SynthRosette::add_insert_extract(rkt, "state", &f.name, f.length, b);
+                SynthRosette::add_read_write_slice(rkt, "state", &f.name, &b.name)
             }
         }
     }
 
     fn add_interface_fields(rkt: &mut RosetteFile, iface: &Interface) {
         rkt.add_section(String::from("Interface Fields"));
+
+        let statevar = String::from("st");
+        let valvar = String::from("val");
 
         // the state struct
         //let entries = iface.fields().iter().map(|f|{ f.name.clone() }).collect::<Vec<String>>();
@@ -250,9 +259,69 @@ impl SynthRosette {
         // add the constructor
         rkt.add_struct_def(s);
 
-        let mut f = FunctionDef::new(String::from("make-state-iface"), Vec::new(), Vec::new());
+        let body = RExpr::fncall(
+            String::from(IFACEFIELDS),
+            iface
+                .fields()
+                .iter()
+                .map(|f| RExpr::num((f.field.length * 8) as u8, 0))
+                .collect::<Vec<RExpr>>(),
+        );
+        let mut f = FunctionDef::new(String::from("make-iface-fields"), Vec::new(), vec![body]);
         f.add_comment(String::from("Interface Constructor"));
         rkt.add_function_def(f);
+
+        for f in iface.fields() {
+            rkt.add_subsection(format!("Interface Field: '{}'", f.field.name));
+
+            let fname = format!("iface-fields-load-{}", f.field.name);
+            let args = vec![statevar.clone()];
+            let body = RExpr::matchexpr(
+                statevar.clone(),
+                vec![
+                    (
+                        RExpr::fncall(
+                            String::from(IFACEFIELDS),
+                            vec![RExpr::var(String::from("e"))],
+                        ),
+                        vec![RExpr::var(String::from("e"))],
+                    ),
+                    (
+                        RExpr::var(String::from("_")),
+                        vec![
+                            RExpr::fncall(
+                                String::from("printf"),
+                                vec![RExpr::text(String::from("wrong state supplied"))],
+                            ),
+                            RExpr::var(String::from("e")),
+                        ],
+                    ),
+                ],
+            );
+            let mut fdef = FunctionDef::new(fname, args, vec![body]);
+            fdef.add_comment(String::from("Field accessor"));
+            rkt.add_function_def(fdef);
+
+            let fname = format!("iface-fields-store-{}", f.field.name);
+            let args = vec![statevar.clone(), valvar.clone()];
+            let body = RExpr::fncall(
+                String::from("struct-copy"),
+                vec![
+                    RExpr::var(String::from(IFACEFIELDS)),
+                    RExpr::var(statevar.clone()),
+                    RExpr::block(vec![(f.field.name.clone(), RExpr::var(valvar.clone()))]),
+                ],
+            );
+            let mut fdef = FunctionDef::new(fname, args, vec![body]);
+            fdef.add_comment(String::from("Field update"));
+            rkt.add_function_def(fdef);
+
+            for b in &f.field.layout {
+                rkt.add_subsection(format!("BitSlice: '{}.{}'", f.field.name, b.name));
+                SynthRosette::add_insert_extract(rkt, "iface", &f.field.name, f.field.length, b);
+                SynthRosette::add_read_write_slice(rkt, "iface", &f.field.name, &b.name)
+            }
+        }
     }
 
     /// synthesizes the `map` function and returns an ast of it
