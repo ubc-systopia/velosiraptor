@@ -117,7 +117,7 @@ fn none_interface(input: TokenStream) -> IResult<TokenStream, Interface> {
 ///
 /// # Grammar
 ///
-/// MMIO_INTERFACE := KW_MMIO LPAREN PARAMS RPAREN LBRACK (INTERFACEFIELD)+ RBRACK
+/// MMIO_INTERFACE := KW_MMIO LPAREN PARAMS RPAREN LBRACE (INTERFACEFIELD)+ RBRACE
 ///
 /// # Results
 ///
@@ -137,7 +137,7 @@ fn mmio_interface(input: TokenStream) -> IResult<TokenStream, Interface> {
     let (i2, bases) = cut(argument_parser)(i1)?;
 
     // next try to parse the interface field definitions
-    let (i3, fields) = cut(delimited(lbrack, many1(interfacefield), rbrack))(i2)?;
+    let (i3, fields) = cut(delimited(lbrace, many1(interfacefield), rbrace))(i2)?;
 
     // get the new position, and construct ast node
     let pos = input.expand_until(&i3);
@@ -156,7 +156,7 @@ fn mmio_interface(input: TokenStream) -> IResult<TokenStream, Interface> {
 ///
 /// # Grammar
 ///
-/// REGISTER_INTERFACE := KW_REGISTER LPAREN PARAMS RPAREN LBRACK (INTERFACEFIELD)+ RBRACK
+/// REGISTER_INTERFACE := KW_REGISTER LPAREN PARAMS RPAREN LBRACE (INTERFACEFIELD)+ RBRACE
 ///
 /// # Results
 ///
@@ -176,7 +176,7 @@ fn register_interface(input: TokenStream) -> IResult<TokenStream, Interface> {
     let (i2, _bases) = cut(argument_parser)(i1)?;
 
     // now parse the interface fields
-    let (i3, fields) = cut(delimited(lbrack, many1(interfacefield), rbrack))(i2)?;
+    let (i3, fields) = cut(delimited(lbrace, many1(interfacefield), rbrace))(i2)?;
 
     // get the new position, and construct ast node
     let pos = input.expand_until(&i3);
@@ -195,7 +195,7 @@ fn register_interface(input: TokenStream) -> IResult<TokenStream, Interface> {
 ///
 /// # Grammar
 ///
-/// MMIO_INTERFACE := KW_MEMORY [ LPAREN PARAMS RPAREN LBRACK (INTERFACEFIELD)+ RBRACK  ]
+/// MMIO_INTERFACE := KW_MEMORY LPAREN PARAMS RPAREN LBRACE (INTERFACEFIELD)+ RBRACE
 ///
 /// # Results
 ///
@@ -215,7 +215,7 @@ fn memory_interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
     // constructing an normal interface definition with fields
     let (i2, (bases, fields)) = match argument_parser(i1.clone()) {
         Ok((i, bases)) => {
-            let (i3, fields) = cut(delimited(lbrack, many1(interfacefield), rbrack))(i)?;
+            let (i3, fields) = cut(delimited(lbrace, many1(interfacefield), rbrace))(i)?;
             (i3, (bases, fields))
         }
         Err(Err::Error(_)) => (i1, (Vec::new(), Vec::new())),
@@ -257,8 +257,11 @@ fn interfacefield(input: TokenStream) -> IResult<TokenStream, InterfaceField> {
     let (i2, (stateref, length)) = cut(mem_field_params)(i1)?;
 
     // We now parse an optional Layout, ReadAction, WriteAction
-    let (i3, (bitslices, readaction, writeaction)) =
-        permutation((opt(layout), opt(readaction), opt(writeaction)))(i2)?;
+    let (i3, (bitslices, readaction, writeaction)) = delimited(
+        cut(lbrace),
+        permutation((opt(layout), opt(readaction), opt(writeaction))),
+        cut(tuple((rbrace, semicolon))),
+    )(i2)?;
 
     // if there were bitslices parsed unwrap them, otherwise create an empty vector
     let layout = bitslices.unwrap_or_default();
