@@ -160,10 +160,10 @@ impl RosetteFile {
             let code = match expr {
                 Require(r) => r.to_code(),
                 Struct(s) => s.to_code(),
-                Function(f) => f.to_code(),
+                Function(f) => format!("\n{}", f.to_code()),
                 Comment(s) => format!("; {}\n", s),
                 Section(s) => format!("\n;{}\n; {}\n;{}\n\n", SECTION_SEP, s, SECTION_SEP),
-                SubSection(s) => format!("\n; {}\n;{}\n\n", s, SUBSECTION_SEP),
+                SubSection(s) => format!("\n; {}\n;{}\n", s, SUBSECTION_SEP),
             };
             s.push_str(code.as_str());
         }

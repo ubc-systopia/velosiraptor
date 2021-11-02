@@ -41,6 +41,7 @@ pub struct SynthRosette {
 
 const STATEFIELDS: &str = "statefields";
 const IFACEFIELDS: &str = "ifacefields";
+const MODEL: &str = "model";
 
 impl SynthRosette {
     pub fn new(outdir: &Path, pkg: String) -> Self {
@@ -324,6 +325,52 @@ impl SynthRosette {
         }
     }
 
+    fn add_model(rkt: &mut RosetteFile) {
+        rkt.add_section(String::from("Model Defintions"));
+
+        let attrib = String::from("#:transparent");
+        let mut s = StructDef::new(String::from(MODEL), vec![String::from("st"), String::from("var")], attrib);
+        s.add_doc(String::from(
+            "Model Definition: Combines State and Interface",
+        ));
+        rkt.add_struct_def(s);
+
+        // add the constructor
+        let body = RExpr::fncall(
+            String::from(MODEL),
+            vec![
+                RExpr::fncall(String::from("make-state-fields"), vec![]),
+                RExpr::fncall(String::from("make-iface-fields"), vec![])
+            ]
+        );
+        let mut f = FunctionDef::new(String::from("make-model"), Vec::new(), vec![body]);
+        f.add_comment(String::from("State Constructor"));
+        rkt.add_function_def(f);
+
+        rkt.add_section(String::from("Model Accessors"));
+
+
+        let mut f = FunctionDef::new(String::from("model-get-state"), Vec::new(), vec![]);
+        f.add_comment(String::from("Obtains the unit's state from the model"));
+        rkt.add_function_def(f);
+
+        let mut f = FunctionDef::new(String::from("model-set-state"), Vec::new(), vec![]);
+        f.add_comment(String::from("Updates the unit's state in the model"));
+        rkt.add_function_def(f);
+
+        let mut f = FunctionDef::new(String::from("model-get-iface"), Vec::new(), vec![]);
+        f.add_comment(String::from("Obtains the interface variables from the model"));
+        rkt.add_function_def(f);
+
+        let mut f = FunctionDef::new(String::from("model-set-iface"), Vec::new(), vec![]);
+        f.add_comment(String::from("Updates interface variables of the model"));
+        rkt.add_function_def(f);
+    }
+
+    fn add_actions(rkt: &mut RosetteFile) {
+        rkt.add_section(String::from("Actions"));
+    }
+
     /// synthesizes the `map` function and returns an ast of it
     pub fn synth_map(&self, ast: &AstRoot) -> Result<Method, SynthError> {
         fs::create_dir_all(&self.outdir)?;
@@ -339,6 +386,9 @@ impl SynthRosette {
             SynthRosette::add_bitvector_defs(&mut rkt);
             SynthRosette::add_state_fields(&mut rkt, &unit.state);
             SynthRosette::add_interface_fields(&mut rkt, &unit.interface);
+
+            SynthRosette::add_model(&mut rkt);
+            SynthRosette::add_actions(&mut rkt);
 
             rkt.save();
             rkt.synth();

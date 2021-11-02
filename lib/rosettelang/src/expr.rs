@@ -167,11 +167,16 @@ impl RExpr {
                 istr
             ),
             FnCall { ident, args } => {
-                let args = args
+                if args.is_empty() {
+                    format!("{}({})", istr, ident)
+                } else {
+                    let args = args
                     .iter()
                     .map(|a| a.to_code(indent + 2))
                     .collect::<Vec<String>>();
-                format!("{}({}\n{}\n{})", istr, ident, args.join("\n"), istr)
+                    format!("{}({}\n{}\n{})", istr, ident, args.join("\n"), istr)
+                }
+
             }
             Block { expr } => {
                 let args = expr
@@ -198,7 +203,7 @@ impl RExpr {
                     })
                     .collect::<Vec<String>>();
                 format!(
-                    "{}(match {}\n{}\n{})",
+                    "{}(match {}\n{}\n{})\n",
                     istr,
                     valexpr,
                     clauses.join("\n"),
