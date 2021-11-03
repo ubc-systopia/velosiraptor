@@ -35,6 +35,10 @@ use std::fmt;
 /// (define maxdepth 5)
 ///
 pub enum RExpr {
+    /// #:param
+    Param {
+        param: String,
+    },
     /// (match val-expr clause ...)
     ///     clause = [pat body ...+]
     Match {
@@ -89,21 +93,25 @@ pub enum BVOp {
     BVOr,
     BVShr,
     BVShl,
+    BVEq,
 }
 
 impl BVOp {
     pub fn to_code(&self) -> &str {
-        use BVOp::*;
-        match self {
-            BVAnd => "bvand",
-            BVOr => "bvor",
-            BVLshr => "bvlshr",
-            BVShl => "bvshl",
+        match *self {
+            BVOp::BVShl => "bvshl",
+            BVOp::BVEq => "bveq",
+            BVOp::BVAnd => "bvand",
+            BVOp::BVOr => "bvor",
+            BVOp::BVShr => "bvlshr",
         }
     }
 }
 
 impl RExpr {
+    pub fn param(param: String) -> Self {
+        RExpr::Param { param }
+    }
     pub fn var(name: String) -> Self {
         RExpr::Variable { name }
     }
@@ -113,6 +121,13 @@ impl RExpr {
     }
     pub fn text(text: String) -> Self {
         RExpr::Text { text }
+    }
+    pub fn bveq(lhs: RExpr, rhs: RExpr) -> Self {
+        RExpr::BVBinOp {
+            op: BVOp::BVEq,
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+        }
     }
     pub fn bvand(lhs: RExpr, rhs: RExpr) -> Self {
         RExpr::BVBinOp {
@@ -142,6 +157,7 @@ impl RExpr {
             rhs: Box::new(amount),
         }
     }
+
     pub fn fncall(ident: String, args: Vec<RExpr>) -> Self {
         RExpr::FnCall { ident, args }
     }
@@ -150,6 +166,19 @@ impl RExpr {
     }
     pub fn matchexpr(valexpr: String, clauses: Vec<(RExpr, Vec<RExpr>)>) -> Self {
         RExpr::Match { valexpr, clauses }
+    }
+    pub fn letexpr(defs: Vec<(String, RExpr)>, body: Vec<RExpr>) -> Self {
+        RExpr::Let { defs, body }
+    }
+    pub fn assert(expr: RExpr) -> Self {
+        RExpr::Assert {
+            test: Box::new(expr),
+        }
+    }
+    pub fn assume(expr: RExpr) -> Self {
+        RExpr::Assume {
+            test: Box::new(expr),
+        }
     }
     pub fn to_code(&self, indent: usize) -> String {
         let istr = std::iter::repeat(" ").take(indent).collect::<String>();
@@ -209,6 +238,32 @@ impl RExpr {
                     istr
                 )
             }
+            Assume { test } => {
+                format!("{}(assume\n{}\n{})", istr, test.to_code(indent + 2), istr)
+            }
+            Assert { test } => {
+                format!("{}(assert\n{}\n{})", istr, test.to_code(indent + 2), istr)
+            }
+            // defs: Vec<(String, RExpr)>,
+            // body: Vec<RExpr>,
+            Let { defs, body } => {
+                let d = defs
+                    .iter()
+                    .map(|(d, e)| format!("{} {}", d, e.to_code(0)))
+                    .collect::<Vec<String>>();
+                let e = body
+                    .iter()
+                    .map(|e| e.to_code(indent + 2))
+                    .collect::<Vec<String>>();
+                format!(
+                    "{}(let ([{}])\n{}\n{})",
+                    istr,
+                    d.join(" "),
+                    e.join("\n"),
+                    istr
+                )
+            }
+            Param { param } => format!("{}#:{}", istr, param),
             _ => String::from("UNKNOWN"),
         }
     }

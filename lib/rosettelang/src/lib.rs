@@ -33,18 +33,24 @@ mod expr;
 mod functiondef;
 mod require;
 mod structdef;
+mod symbolic;
 mod typedef;
+mod vardef;
 
 pub use crate::expr::{BVOp, RExpr};
 pub use crate::functiondef::FunctionDef;
 pub use crate::require::Require;
 pub use crate::structdef::StructDef;
+pub use crate::symbolic::SymbolicVar;
+pub use crate::vardef::VarDef;
 
 enum RosetteExpr {
     Require(Require),
     Struct(StructDef),
     Comment(String),
     Function(FunctionDef),
+    Symbolic(SymbolicVar),
+    Var(VarDef),
     Section(String),
     SubSection(String),
 }
@@ -125,6 +131,25 @@ impl RosetteFile {
         self.exprs.push(RosetteExpr::Function(f));
     }
 
+    ///
+    pub fn add_new_symbolic_var(&mut self, ident: String, ty: String) {
+        let v = SymbolicVar::new(ident, ty);
+        self.add_symbolic_var(v);
+    }
+
+    pub fn add_symbolic_var(&mut self, v: SymbolicVar) {
+        self.exprs.push(RosetteExpr::Symbolic(v));
+    }
+
+    pub fn add_new_var(&mut self, ident: String, ty: RExpr) {
+        let v = VarDef::new(ident, ty);
+        self.add_var(v);
+    }
+
+    pub fn add_var(&mut self, v: VarDef) {
+        self.exprs.push(RosetteExpr::Var(v));
+    }
+
     /// adds a type definition
     pub fn add_type_def(&mut self) {}
 
@@ -160,6 +185,8 @@ impl RosetteFile {
             let code = match expr {
                 Require(r) => r.to_code(),
                 Struct(s) => s.to_code(),
+                Symbolic(v) => v.to_code(),
+                Var(v) => v.to_code(),
                 Function(f) => format!("\n{}", f.to_code()),
                 Comment(s) => format!("; {}\n", s),
                 Section(s) => format!("\n;{}\n; {}\n;{}\n\n", SECTION_SEP, s, SECTION_SEP),
