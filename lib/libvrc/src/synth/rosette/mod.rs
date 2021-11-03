@@ -329,7 +329,11 @@ impl SynthRosette {
         rkt.add_section(String::from("Model Defintions"));
 
         let attrib = String::from("#:transparent");
-        let mut s = StructDef::new(String::from(MODEL), vec![String::from("st"), String::from("var")], attrib);
+        let mut s = StructDef::new(
+            String::from(MODEL),
+            vec![String::from("st"), String::from("var")],
+            attrib,
+        );
         s.add_doc(String::from(
             "Model Definition: Combines State and Interface",
         ));
@@ -340,8 +344,8 @@ impl SynthRosette {
             String::from(MODEL),
             vec![
                 RExpr::fncall(String::from("make-state-fields"), vec![]),
-                RExpr::fncall(String::from("make-iface-fields"), vec![])
-            ]
+                RExpr::fncall(String::from("make-iface-fields"), vec![]),
+            ],
         );
         let mut f = FunctionDef::new(String::from("make-model"), Vec::new(), vec![body]);
         f.add_comment(String::from("State Constructor"));
@@ -349,26 +353,276 @@ impl SynthRosette {
 
         rkt.add_section(String::from("Model Accessors"));
 
+        let statevar = String::from("mst");
+        let valvar = String::from("newst");
 
-        let mut f = FunctionDef::new(String::from("model-get-state"), Vec::new(), vec![]);
+        // get state from the model
+
+        let fnname = String::from("model-get-state");
+        let fnargs = vec![statevar.clone()];
+        let fnbody = RExpr::matchexpr(
+            statevar.clone(),
+            vec![
+                (
+                    RExpr::fncall(
+                        String::from(MODEL),
+                        vec![RExpr::var(String::from("s")), RExpr::var(String::from("i"))],
+                    ),
+                    vec![RExpr::var(String::from("s"))],
+                ),
+                (
+                    RExpr::var(String::from("_")),
+                    vec![
+                        RExpr::fncall(
+                            String::from("printf"),
+                            vec![RExpr::text(String::from("wrong state supplied"))],
+                        ),
+                        RExpr::var(String::from("e")),
+                    ],
+                ),
+            ],
+        );
+        let mut f = FunctionDef::new(fnname, fnargs, vec![fnbody]);
         f.add_comment(String::from("Obtains the unit's state from the model"));
         rkt.add_function_def(f);
 
-        let mut f = FunctionDef::new(String::from("model-set-state"), Vec::new(), vec![]);
+        // set the state of the model
+
+        let fnname = String::from("model-set-state");
+        let fnargs = vec![statevar.clone(), valvar.clone()];
+        let fnbody = RExpr::fncall(
+            String::from("struct-copy"),
+            vec![
+                RExpr::var(String::from(MODEL)),
+                RExpr::var(statevar.clone()),
+                RExpr::block(vec![(String::from("st"), RExpr::var(valvar.clone()))]),
+            ],
+        );
+        let mut f = FunctionDef::new(fnname, fnargs, vec![fnbody]);
         f.add_comment(String::from("Updates the unit's state in the model"));
         rkt.add_function_def(f);
 
-        let mut f = FunctionDef::new(String::from("model-get-iface"), Vec::new(), vec![]);
-        f.add_comment(String::from("Obtains the interface variables from the model"));
+        // get the interface state
+
+        let fnname = String::from("model-get-iface");
+        let fnargs = vec![statevar.clone(), valvar.clone()];
+        let fnbody = RExpr::matchexpr(
+            statevar.clone(),
+            vec![
+                (
+                    RExpr::fncall(
+                        String::from(MODEL),
+                        vec![RExpr::var(String::from("s")), RExpr::var(String::from("i"))],
+                    ),
+                    vec![RExpr::var(String::from("i"))],
+                ),
+                (
+                    RExpr::var(String::from("_")),
+                    vec![
+                        RExpr::fncall(
+                            String::from("printf"),
+                            vec![RExpr::text(String::from("wrong state supplied"))],
+                        ),
+                        RExpr::var(String::from("e")),
+                    ],
+                ),
+            ],
+        );
+        let mut f = FunctionDef::new(fnname, fnargs, vec![fnbody]);
+        f.add_comment(String::from(
+            "Obtains the interface variables from the model",
+        ));
         rkt.add_function_def(f);
 
-        let mut f = FunctionDef::new(String::from("model-set-iface"), Vec::new(), vec![]);
+        // set the interface state
+
+        let fnname = String::from("model-set-iface");
+        let fnargs = vec![statevar.clone(), valvar.clone()];
+        let fnbody = RExpr::fncall(
+            String::from("struct-copy"),
+            vec![
+                RExpr::var(String::from(MODEL)),
+                RExpr::var(statevar.clone()),
+                RExpr::block(vec![(String::from("var"), RExpr::var(valvar.clone()))]),
+            ],
+        );
+        let mut f = FunctionDef::new(fnname, fnargs, vec![fnbody]);
         f.add_comment(String::from("Updates interface variables of the model"));
         rkt.add_function_def(f);
     }
 
-    fn add_actions(rkt: &mut RosetteFile) {
+    fn add_model_field_accessor(rkt: &mut RosetteFile, ftype: &str, fieldname: &str) {
+        let stvar = String::from("st");
+        let valvar = String::from("val");
+
+        // load function
+
+        let fname = format!("{}-load-{}", ftype, fieldname);
+        let args = vec![stvar.clone()];
+        let body = RExpr::fncall(
+            format!("{}-fields-load-{}", ftype, fieldname),
+            vec![RExpr::fncall(
+                format!("model-get-{}", ftype),
+                vec![RExpr::var(stvar.clone())],
+            )],
+        );
+        let mut fdef = FunctionDef::new(fname, args, vec![body]);
+        fdef.add_comment(format!(
+            "loads the {} field from the {} of the model",
+            fieldname, ftype
+        ));
+        rkt.add_function_def(fdef);
+
+        // store function
+
+        let fname = format!("{}-store-{}", ftype, fieldname);
+        let args = vec![stvar.clone(), valvar.clone()];
+        let body = RExpr::fncall(
+            format!("model-set-{}", ftype),
+            vec![
+                RExpr::var(stvar.clone()),
+                RExpr::fncall(
+                    format!("{}-fields-store-{}", ftype, fieldname),
+                    vec![
+                        RExpr::fncall(
+                            format!("model-get-{}", ftype),
+                            vec![RExpr::var(stvar.clone())],
+                        ),
+                        RExpr::var(valvar.clone()),
+                    ],
+                ),
+            ],
+        );
+        let mut fdef = FunctionDef::new(fname, args, vec![body]);
+        fdef.add_comment(format!(
+            "stores the {} field into the {} of the model",
+            fieldname, ftype
+        ));
+        rkt.add_function_def(fdef);
+    }
+
+    fn add_model_slice_accessor(rkt: &mut RosetteFile, ftype: &str, fieldname: &str, slice: &str) {
+        let stvar = String::from("st");
+        let valvar = String::from("val");
+
+        // load function
+
+        let fname = format!("{}-{}-{}-read", ftype, fieldname, slice);
+        let args = vec![stvar.clone()];
+        let body = RExpr::fncall(
+            format!("{}-fields-{}-read", ftype, fieldname),
+            vec![RExpr::fncall(
+                format!("model-get-{}", ftype),
+                vec![RExpr::var(stvar.clone())],
+            )],
+        );
+        let mut fdef = FunctionDef::new(fname, args, vec![body]);
+        fdef.add_comment(format!(
+            "loads the {}.{} field from the {} of the model",
+            fieldname, slice, ftype
+        ));
+        rkt.add_function_def(fdef);
+
+        // store function
+
+        let fname = format!("{}-{}-{}-write", ftype, fieldname, slice);
+        let args = vec![stvar.clone(), valvar.clone()];
+        let body = RExpr::fncall(
+            format!("model-set-{}", ftype),
+            vec![
+                RExpr::var(stvar.clone()),
+                RExpr::fncall(
+                    format!("{}-fields-{}-{}-write", ftype, fieldname, slice),
+                    vec![
+                        RExpr::fncall(
+                            format!("model-get-{}", ftype),
+                            vec![RExpr::var(stvar.clone())],
+                        ),
+                        RExpr::var(valvar.clone()),
+                    ],
+                ),
+            ],
+        );
+        let mut fdef = FunctionDef::new(fname, args, vec![body]);
+        fdef.add_comment(format!(
+            "stores the {}.{} field from the {} of the model",
+            fieldname, slice, ftype
+        ));
+        rkt.add_function_def(fdef);
+    }
+
+    fn add_model_state_accessors(rkt: &mut RosetteFile, state: &State) {
+        rkt.add_section(String::from("Model State Accessors"));
+
+        for f in state.fields() {
+            rkt.add_subsection(format!("state field: {}", f.name));
+
+            SynthRosette::add_model_field_accessor(rkt, "state", &f.name);
+
+            for b in &f.layout {
+                SynthRosette::add_model_slice_accessor(rkt, "state", &f.name, &b.name);
+            }
+        }
+    }
+
+    fn add_model_iface_accessors(rkt: &mut RosetteFile, iface: &Interface) {
+        rkt.add_section(String::from("Model Interface Accessors"));
+
+        for f in iface.fields() {
+            rkt.add_subsection(format!("iface field: {}", f.field.name));
+
+            SynthRosette::add_model_field_accessor(rkt, "iface", &f.field.name);
+
+            for b in &f.field.layout {
+                SynthRosette::add_model_slice_accessor(rkt, "iface", &f.field.name, &b.name);
+            }
+        }
+    }
+
+    fn add_actions(rkt: &mut RosetteFile, iface: &Interface) {
         rkt.add_section(String::from("Actions"));
+        let stvar = String::from("st");
+        for f in iface.fields() {
+            rkt.add_subsection(format!("iface field: {}", f.field.name));
+
+            // write actions
+
+            let fname = format!("interface-{}-write-action", f.field.name);
+            let args = vec![stvar.clone()];
+
+            let mut fdef = FunctionDef::new(fname, args, vec![]);
+            fdef.add_comment(format!("performs the write actions of {}", f.field.name));
+            rkt.add_function_def(fdef);
+
+            // read actions
+
+            let fname = format!("interface-{}-read-action", f.field.name);
+            let args = vec![stvar.clone()];
+
+            let mut fdef = FunctionDef::new(fname, args, vec![]);
+            fdef.add_comment(format!("performs the read actions of {}", f.field.name));
+            rkt.add_function_def(fdef);
+        }
+    }
+
+    fn add_translate(rkt: &mut RosetteFile) {
+        rkt.add_section(String::from("Translation Function"));
+    }
+
+    fn add_grammar(rkt: &mut RosetteFile, iface: &Interface) {
+        rkt.add_section(String::from("Grammar Definition"));
+    }
+
+    fn add_interp_function(rkt: &mut RosetteFile, iface: &Interface) {
+        rkt.add_section(String::from("Interpretation Function"));
+    }
+
+    fn add_check_translate(rkt: &mut RosetteFile) {
+        rkt.add_section(String::from("Correctness Property"));
+    }
+
+    fn add_synthesis(rkt: &mut RosetteFile) {
+        rkt.add_section(String::from("Solving / Synthesis"));
     }
 
     /// synthesizes the `map` function and returns an ast of it
@@ -388,7 +642,14 @@ impl SynthRosette {
             SynthRosette::add_interface_fields(&mut rkt, &unit.interface);
 
             SynthRosette::add_model(&mut rkt);
-            SynthRosette::add_actions(&mut rkt);
+            SynthRosette::add_model_state_accessors(&mut rkt, &unit.state);
+            SynthRosette::add_model_iface_accessors(&mut rkt, &unit.interface);
+            SynthRosette::add_actions(&mut rkt, &unit.interface);
+            SynthRosette::add_translate(&mut rkt);
+            SynthRosette::add_grammar(&mut rkt, &unit.interface);
+            SynthRosette::add_interp_function(&mut rkt, &unit.interface);
+            SynthRosette::add_check_translate(&mut rkt);
+            SynthRosette::add_synthesis(&mut rkt);
 
             rkt.save();
             rkt.synth();

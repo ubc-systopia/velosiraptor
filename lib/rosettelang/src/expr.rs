@@ -171,12 +171,11 @@ impl RExpr {
                     format!("{}({})", istr, ident)
                 } else {
                     let args = args
-                    .iter()
-                    .map(|a| a.to_code(indent + 2))
-                    .collect::<Vec<String>>();
+                        .iter()
+                        .map(|a| a.to_code(indent + 2))
+                        .collect::<Vec<String>>();
                     format!("{}({}\n{}\n{})", istr, ident, args.join("\n"), istr)
                 }
-
             }
             Block { expr } => {
                 let args = expr
