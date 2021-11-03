@@ -32,7 +32,7 @@ use std::path::{Path, PathBuf};
 // the used libraries
 use crate::ast::{AstRoot, BitSlice, Interface, Method, State, Type};
 use crate::synth::SynthError;
-use rosettelang::{FunctionDef, RExpr, RosetteFile, StructDef};
+use rosettelang::{FunctionDef, RExpr, RosetteFile, StructDef, VarDef};
 
 pub struct SynthRosette {
     outdir: PathBuf,
@@ -587,25 +587,28 @@ impl SynthRosette {
 
             // write actions
 
-            let fname = format!("interface-{}-write-action", f.field.name);
-            let args = vec![stvar.clone()];
+            if let Some(action) = &f.writeaction {
+                let fname = format!("interface-{}-write-action", f.field.name);
+                let args = vec![stvar.clone()];
 
-            // TODO: fill in body
+                // TODO: fill in body
 
-            let mut fdef = FunctionDef::new(fname, args, vec![]);
-            fdef.add_comment(format!("performs the write actions of {}", f.field.name));
-            rkt.add_function_def(fdef);
+                let mut fdef = FunctionDef::new(fname, args, vec![]);
+                fdef.add_comment(format!("performs the write actions of {}", f.field.name));
+                rkt.add_function_def(fdef);
+            }
 
             // read actions
 
-            let fname = format!("interface-{}-read-action", f.field.name);
-            let args = vec![stvar.clone()];
-
             // TODO: fill in body
+            if let Some(action) = &f.readaction {
+                let fname = format!("interface-{}-read-action", f.field.name);
+                let args = vec![stvar.clone()];
 
-            let mut fdef = FunctionDef::new(fname, args, vec![]);
-            fdef.add_comment(format!("performs the read actions of {}", f.field.name));
-            rkt.add_function_def(fdef);
+                let mut fdef = FunctionDef::new(fname, args, vec![]);
+                fdef.add_comment(format!("performs the read actions of {}", f.field.name));
+                rkt.add_function_def(fdef);
+            }
         }
     }
 
@@ -621,9 +624,13 @@ impl SynthRosette {
         rkt.add_new_struct_def(
             String::from("Seq"),
             vec![String::from("op"), String::from("rem")],
-            String::from("#transparent"),
+            String::from("#:transparent"),
         );
-        rkt.add_new_struct_def(String::from("Return"), vec![], String::from("#transparent"));
+        rkt.add_new_struct_def(
+            String::from("Return"),
+            vec![],
+            String::from("#:transparent"),
+        );
 
         rkt.add_subsection(String::from("Grammar Elements"));
 
@@ -631,12 +638,12 @@ impl SynthRosette {
             for b in &f.field.layout {
                 let arg = String::from("arg");
                 let ident = format!("Op_Iface_{}_{}_Insert", f.field.name, b.name);
-                rkt.add_new_struct_def(ident, vec![arg], String::from("#transparent"));
+                rkt.add_new_struct_def(ident, vec![arg], String::from("#:transparent"));
             }
             let ident = format!("Op_Iface_{}_WriteAction", f.field.name);
-            rkt.add_new_struct_def(ident, vec![], String::from("#transparent"));
+            rkt.add_new_struct_def(ident, vec![], String::from("#:transparent"));
             let ident = format!("Op_Iface_{}_ReadAction", f.field.name);
-            rkt.add_new_struct_def(ident, vec![], String::from("#transparent"));
+            rkt.add_new_struct_def(ident, vec![], String::from("#:transparent"));
         }
 
         // now define the grammar
@@ -794,10 +801,134 @@ impl SynthRosette {
 
     fn add_check_translate(rkt: &mut RosetteFile) {
         rkt.add_section(String::from("Correctness Property"));
+
+        // add assumes clauses for va, pa, size, flags
+        // w.r.t: sizes, alignments, etc.
+        // those can come from the requires clauses from the map method
+
+        let defs = vec![(
+            String::from("st"),
+            RExpr::fncall(String::from("make-model"), vec![]),
+        )];
+        let body = vec![
+            RExpr::fncall(
+                String::from("set!"),
+                vec![
+                    RExpr::var(String::from("st")),
+                    RExpr::fncall(
+                        String::from("ast-interpret"),
+                        vec![
+                            RExpr::var(String::from("impl")),
+                            RExpr::var(String::from("st")),
+                            RExpr::var(String::from("va")),
+                            RExpr::var(String::from("pa")),
+                            RExpr::var(String::from("size")),
+                            RExpr::var(String::from("flags")),
+                        ],
+                    ),
+                    RExpr::var(String::from("st")),
+                ],
+            ),
+            RExpr::assert(RExpr::bveq(
+                RExpr::fncall(
+                    String::from("translate"),
+                    vec![
+                        RExpr::var(String::from("st")),
+                        RExpr::var(String::from("va")),
+                        RExpr::var(String::from("flags")),
+                    ],
+                ),
+                RExpr::var(String::from("pa")),
+            )),
+        ];
+
+        let fdef = FunctionDef::new(
+            String::from("ast-check-translate"),
+            vec![
+                String::from("impl"),
+                String::from("st"),
+                String::from("va"),
+                String::from("pa"),
+                String::from("size"),
+                String::from("flags"),
+            ],
+            vec![RExpr::letexpr(defs, body)],
+        );
+
+        rkt.add_function_def(fdef);
+        // add a let expr
+        //     (let ([st (make-model)])
+        //     ; evaluate the implementation, update the state
+        //     (set! st (ast-interpret (impl st va pa size flags) st))
+
+        //     ; now check if the translation is right
+        //     (assert (bveq (translate st va 0) pa))
+        //   )
     }
 
     fn add_synthesis(rkt: &mut RosetteFile) {
         rkt.add_section(String::from("Solving / Synthesis"));
+
+        rkt.add_subsection(String::from("Symbolic Variables"));
+        // TODO: check the types here?
+        rkt.add_new_symbolic_var(String::from("va"), String::from("int64?"));
+        rkt.add_new_symbolic_var(String::from("pa"), String::from("int64?"));
+        rkt.add_new_symbolic_var(String::from("size"), String::from("int64?"));
+        rkt.add_new_symbolic_var(String::from("flags"), String::from("int64?"));
+
+        // the map function
+        let fname = String::from("do-synth");
+        let args = vec![
+            String::from("st"),
+            String::from("va"),
+            String::from("pa"),
+            String::from("size"),
+            String::from("flags"),
+        ];
+        let body = vec![RExpr::fncall(
+            String::from("ast-grammar"),
+            vec![
+                RExpr::var(String::from("st")),
+                RExpr::var(String::from("va")),
+                RExpr::var(String::from("pa")),
+                RExpr::var(String::from("size")),
+                RExpr::var(String::from("flags")),
+                // RExpr::param(String::from("depty")),
+                // RExpr::var(String::from("5")),
+            ],
+        )];
+        let mut fdef = FunctionDef::new(fname, args, body);
+        fdef.add_comment(String::from("interprets the grammar"));
+        rkt.add_function_def(fdef);
+
+        let body = RExpr::fncall(
+            String::from("synthesize"),
+            vec![
+                RExpr::param(String::from("forall")),
+                RExpr::fncall(
+                    String::from("list"),
+                    vec![
+                        RExpr::var(String::from("va")),
+                        RExpr::var(String::from("pa")),
+                        RExpr::var(String::from("size")),
+                        RExpr::var(String::from("flags")),
+                    ],
+                ),
+                RExpr::param(String::from("guarantee")),
+                RExpr::fncall(
+                    String::from("ast-check-translate"),
+                    vec![
+                        RExpr::var(String::from("do-synth")),
+                        RExpr::var(String::from("va")),
+                        RExpr::var(String::from("pa")),
+                        RExpr::var(String::from("size")),
+                        RExpr::var(String::from("flags")),
+                    ],
+                ),
+            ],
+        );
+        let vdef = VarDef::new(String::from("sol"), body);
+        rkt.add_var(vdef);
     }
 
     /// synthesizes the `map` function and returns an ast of it
