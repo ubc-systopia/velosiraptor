@@ -590,6 +590,8 @@ impl SynthRosette {
             let fname = format!("interface-{}-write-action", f.field.name);
             let args = vec![stvar.clone()];
 
+            // TODO: fill in body
+
             let mut fdef = FunctionDef::new(fname, args, vec![]);
             fdef.add_comment(format!("performs the write actions of {}", f.field.name));
             rkt.add_function_def(fdef);
@@ -598,6 +600,8 @@ impl SynthRosette {
 
             let fname = format!("interface-{}-read-action", f.field.name);
             let args = vec![stvar.clone()];
+
+            // TODO: fill in body
 
             let mut fdef = FunctionDef::new(fname, args, vec![]);
             fdef.add_comment(format!("performs the read actions of {}", f.field.name));
@@ -611,10 +615,181 @@ impl SynthRosette {
 
     fn add_grammar(rkt: &mut RosetteFile, iface: &Interface) {
         rkt.add_section(String::from("Grammar Definition"));
+
+        rkt.add_subsection(String::from("Sequencing"));
+        // adding the struct definition
+        rkt.add_new_struct_def(
+            String::from("Seq"),
+            vec![String::from("op"), String::from("rem")],
+            String::from("#transparent"),
+        );
+        rkt.add_new_struct_def(String::from("Return"), vec![], String::from("#transparent"));
+
+        rkt.add_subsection(String::from("Grammar Elements"));
+
+        for f in iface.fields() {
+            for b in &f.field.layout {
+                let arg = String::from("arg");
+                let ident = format!("Op_Iface_{}_{}_Insert", f.field.name, b.name);
+                rkt.add_new_struct_def(ident, vec![arg], String::from("#transparent"));
+            }
+            let ident = format!("Op_Iface_{}_WriteAction", f.field.name);
+            rkt.add_new_struct_def(ident, vec![], String::from("#transparent"));
+            let ident = format!("Op_Iface_{}_ReadAction", f.field.name);
+            rkt.add_new_struct_def(ident, vec![], String::from("#transparent"));
+        }
+
+        // now define the grammar
+        let fname = String::from("ast-grammar");
+        let args = vec![
+            String::from("st"),
+            String::from("va"),
+            String::from("pa"),
+            String::from("size"),
+            String::from("flags"),
+        ];
+        let mut body = vec![RExpr::block(vec![(
+            String::from("stmts"),
+            RExpr::fncall(
+                String::from("choose"),
+                vec![
+                    RExpr::fncall(String::from("Return"), vec![]),
+                    RExpr::fncall(
+                        String::from("Seq"),
+                        vec![
+                            RExpr::fncall(String::from("ops"), vec![]),
+                            RExpr::fncall(String::from("stmts"), vec![]),
+                        ],
+                    ),
+                ],
+            ),
+        )])];
+
+        let mut ops = Vec::new();
+        for f in iface.fields() {
+            for b in &f.field.layout {
+                // let arg = String::from("arg");
+                let ident = format!("Op_Iface_{}_{}_Insert", f.field.name, b.name);
+                let args = RExpr::fncall(String::from("valexpr"), vec![]);
+                ops.push(RExpr::fncall(ident, vec![args]));
+            }
+            let ident = format!("Op_Iface_{}_WriteAction", f.field.name);
+            ops.push(RExpr::fncall(ident, vec![]));
+            let ident = format!("Op_Iface_{}_ReadAction", f.field.name);
+            ops.push(RExpr::fncall(ident, vec![]));
+        }
+        body.push(RExpr::block(vec![(
+            String::from("ops"),
+            RExpr::fncall(String::from("choose"), ops),
+        )]));
+
+        body.push(RExpr::block(vec![(
+            String::from("valexpr"),
+            RExpr::fncall(
+                String::from("choose"),
+                vec![
+                    RExpr::var(String::from("va")),
+                    RExpr::var(String::from("pa")),
+                    RExpr::var(String::from("size")),
+                    RExpr::var(String::from("flags")),
+                    RExpr::var(String::from("(?? int64)")),
+                    RExpr::var(String::from("(?? int32)")),
+                    RExpr::var(String::from("(?? int16)")),
+                    RExpr::var(String::from("(?? int8)")),
+                ],
+            ),
+        )]));
+
+        let mut fdef = FunctionDef::new(fname, args, body);
+        fdef.add_comment(String::from("defines the grammar for synthesis"));
+        fdef.add_suffix(String::from("grammar"));
+        rkt.add_function_def(fdef);
     }
 
     fn add_interp_function(rkt: &mut RosetteFile, iface: &Interface) {
         rkt.add_section(String::from("Interpretation Function"));
+
+        let fname = String::from("ast-interpret");
+        let args = vec![String::from("prog"), String::from("st")];
+
+        let mut matches = vec![RExpr::var(String::from("s"))];
+        for f in iface.fields() {
+            for b in &f.field.layout {
+                let structident = format!("(Op_Iface_{}_{}_Insert v)", f.field.name, b.name);
+                let fnident = format!("iface-{}-{}-write", f.field.name, b.name);
+                matches.push(RExpr::block(vec![(
+                    structident,
+                    RExpr::fncall(
+                        String::from("ast-interpret"),
+                        vec![
+                            RExpr::var(String::from("b")),
+                            RExpr::fncall(
+                                fnident,
+                                vec![
+                                    RExpr::var(String::from("st")),
+                                    RExpr::var(String::from("v")),
+                                ],
+                            ),
+                        ],
+                    ),
+                )]));
+            }
+
+            let structident = format!("(Op_Iface_{}_ReadAction)", f.field.name);
+            let fnident = format!("interface-{}-read-action", f.field.name);
+            matches.push(RExpr::block(vec![(
+                structident,
+                RExpr::fncall(
+                    String::from("ast-interpret"),
+                    vec![
+                        RExpr::var(String::from("b")),
+                        RExpr::fncall(
+                            fnident,
+                            vec![
+                                RExpr::var(String::from("st")),
+                                RExpr::var(String::from("v")),
+                            ],
+                        ),
+                    ],
+                ),
+            )]));
+
+            let structident = format!("(Op_Iface_{}_WriteAction)", f.field.name);
+            let fnident = format!("interface-{}-write-action", f.field.name);
+            matches.push(RExpr::block(vec![(
+                structident,
+                RExpr::fncall(
+                    String::from("ast-interpret"),
+                    vec![
+                        RExpr::var(String::from("b")),
+                        RExpr::fncall(
+                            fnident,
+                            vec![
+                                RExpr::var(String::from("st")),
+                                RExpr::var(String::from("v")),
+                            ],
+                        ),
+                    ],
+                ),
+            )]));
+        }
+
+        let body = RExpr::fncall(
+            String::from("destruct"),
+            vec![
+                RExpr::var(String::from("prog")),
+                RExpr::block(vec![(
+                    String::from("(Seq s b)"),
+                    RExpr::fncall(String::from("destruct"), matches),
+                )]),
+                RExpr::block(vec![(String::from("_"), RExpr::var(String::from("st")))]),
+            ],
+        );
+
+        let mut fdef = FunctionDef::new(fname, args, vec![body]);
+        fdef.add_comment(String::from("interprets the grammar"));
+        fdef.add_suffix(String::from("grammar"));
+        rkt.add_function_def(fdef);
     }
 
     fn add_check_translate(rkt: &mut RosetteFile) {

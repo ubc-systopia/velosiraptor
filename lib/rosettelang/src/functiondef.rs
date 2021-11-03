@@ -44,6 +44,8 @@ pub struct FunctionDef {
     exprs: Vec<RExpr>,
     /// the documentation
     doc: Option<String>,
+    /// adds a suffix to the  define clause
+    suffix: Option<String>,
 }
 
 impl FunctionDef {
@@ -53,11 +55,16 @@ impl FunctionDef {
             args,
             exprs,
             doc: None,
+            suffix: None,
         }
     }
 
     pub fn add_comment(&mut self, comment: String) {
         self.doc = Some(comment.replace("\n", ";\n"));
+    }
+
+    pub fn add_suffix(&mut self, suffix: String) {
+        self.suffix = Some(suffix)
     }
 
     pub fn to_code(&self) -> String {
@@ -67,8 +74,14 @@ impl FunctionDef {
             .map(|e| e.to_code(2))
             .collect::<Vec<String>>();
 
+        let suffix = match &self.suffix {
+            Some(s) => format!("-{}", s),
+            None => String::new(),
+        };
+
         let f = format!(
-            "(define ({} {})\n{}\n)\n",
+            "(define{} ({} {})\n{}\n)\n",
+            suffix,
             self.ident,
             self.args.join(" "),
             body.join("\n")

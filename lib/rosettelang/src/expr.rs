@@ -180,9 +180,9 @@ impl RExpr {
             Block { expr } => {
                 let args = expr
                     .iter()
-                    .map(|(i, e)| format!("{} {}", i, e.to_code(0)))
+                    .map(|(i, e)| format!("{}  {}\n{}", istr, i, e.to_code(indent + 2)))
                     .collect::<Vec<String>>();
-                format!("{}[{}]", istr, args.join(" "))
+                format!("{}[\n{}\n{}]", istr, args.join(" "), istr)
             }
             Match { valexpr, clauses } => {
                 let clauses = clauses
