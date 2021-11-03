@@ -67,6 +67,13 @@ unit X86_pte(base : addr) : Segment {
                 9  11 ignored,
                 12  31 base
             };
+            ReadAction {
+                interface.pte <- state.pte;
+            };
+            WriteAction {
+                interface.pte -> state.pte;
+            };
+
         };
     };
 
