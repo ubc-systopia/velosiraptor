@@ -27,6 +27,7 @@
 
 use std::fs;
 use std::path::PathBuf;
+use std::process::Command;
 
 //mod constdef;
 mod expr;
@@ -51,6 +52,7 @@ enum RosetteExpr {
     Function(FunctionDef),
     Symbolic(SymbolicVar),
     Var(VarDef),
+    Expr(RExpr),
     Section(String),
     SubSection(String),
 }
@@ -150,6 +152,10 @@ impl RosetteFile {
         self.exprs.push(RosetteExpr::Var(v));
     }
 
+    pub fn add_expr(&mut self, e: RExpr) {
+        self.exprs.push(RosetteExpr::Expr(e))
+    }
+
     /// adds a type definition
     pub fn add_type_def(&mut self) {}
 
@@ -187,6 +193,7 @@ impl RosetteFile {
                 Struct(s) => s.to_code(),
                 Symbolic(v) => v.to_code(),
                 Var(v) => v.to_code(),
+                Expr(e) => e.to_code(0),
                 Function(f) => format!("\n{}", f.to_code()),
                 Comment(s) => format!("; {}\n", s),
                 Section(s) => format!("\n;{}\n; {}\n;{}\n\n", SECTION_SEP, s, SECTION_SEP),
@@ -200,14 +207,36 @@ impl RosetteFile {
     /// saves the rosette file
     pub fn save(&self) {
         // write the file, return IOError otherwise
-        fs::write(&self.path, self.to_code().as_bytes());
+        fs::write(&self.path, self.to_code().as_bytes()).expect("failed to execute process");
     }
 
     /// prints the content of the file to stdout
     pub fn print(&self) {}
 
     ///
-    pub fn synth(&self) {}
+
+    pub fn synth(&self) {
+        let output = Command::new("/home/achreto/bin/racket/bin/racket")
+            .args([&self.path])
+            .output()
+            .expect("failed to execute process");
+
+        let s = match String::from_utf8(output.stdout) {
+            Ok(v) => v,
+            Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+        };
+
+        println!("SYNTH RESULT:");
+        println!("{}", s);
+
+        let s = match String::from_utf8(output.stderr) {
+            Ok(v) => v,
+            Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+        };
+
+        println!("{}", s);
+        println!("SYNTH RESULT END.");
+    }
 }
 
 pub trait RosetteFmt {

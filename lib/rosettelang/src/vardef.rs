@@ -48,6 +48,6 @@ impl VarDef {
     }
 
     pub fn to_code(&self) -> String {
-        format!("(define {} \n{}\n)", self.ident, self.value.to_code(2))
+        format!("(define {} \n{}\n)\n", self.ident, self.value.to_code(2))
     }
 }
