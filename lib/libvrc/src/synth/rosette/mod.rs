@@ -30,7 +30,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 // the used libraries
-use crate::ast::{AstRoot, BitSlice, Interface, Method, State, Type};
+use crate::ast::{AstRoot, BitSlice, Expr, Interface, Method, State, Type};
 use crate::synth::SynthError;
 use rosettelang::{FunctionDef, RExpr, RosetteFile, StructDef, VarDef};
 
@@ -51,7 +51,30 @@ impl SynthRosette {
         }
     }
 
-    fn add_bitvector_defs(rkt: &mut RosetteFile) {}
+    fn add_bitvector_defs(rkt: &mut RosetteFile) {
+        for x in [64, 32, 16, 8] {
+            let ident = format!("int{}?", x);
+            let arg = format!("{}", x);
+            rkt.add_new_var(
+                ident,
+                RExpr::fncall(String::from("bitvector"), vec![RExpr::var(arg)]),
+            );
+        }
+
+        for x in [64, 32, 16, 8] {
+            let ident = format!("int{}", x);
+            let arg = String::from("i");
+            let arg2 = format!("int{}?", x);
+            rkt.add_new_function_def(
+                ident,
+                vec![arg.clone()],
+                vec![RExpr::fncall(
+                    String::from("bv"),
+                    vec![RExpr::var(arg), RExpr::var(arg2)],
+                )],
+            );
+        }
+    }
 
     fn add_requires(rkt: &mut RosetteFile) {
         rkt.add_new_require(String::from("rosette/lib/synthax"));
@@ -211,7 +234,7 @@ impl SynthRosette {
                                 String::from("printf"),
                                 vec![RExpr::text(String::from("wrong state supplied"))],
                             ),
-                            RExpr::var(String::from("e")),
+                            RExpr::var(String::from("st")),
                         ],
                     ),
                 ],
@@ -249,8 +272,11 @@ impl SynthRosette {
         let valvar = String::from("val");
 
         // the state struct
-        //let entries = iface.fields().iter().map(|f|{ f.name.clone() }).collect::<Vec<String>>();
-        let entries = Vec::new();
+        let entries = iface
+            .fields()
+            .iter()
+            .map(|f| f.field.name.clone())
+            .collect::<Vec<String>>();
         let attrib = String::from("#:transparent");
         let mut s = StructDef::new(String::from(IFACEFIELDS), entries, attrib);
         s.add_doc(String::from(
@@ -275,7 +301,7 @@ impl SynthRosette {
         for f in iface.fields() {
             rkt.add_subsection(format!("Interface Field: '{}'", f.field.name));
 
-            let fname = format!("iface-fields-load-{}", f.field.name);
+            let fname = format!("interface-fields-load-{}", f.field.name);
             let args = vec![statevar.clone()];
             let body = RExpr::matchexpr(
                 statevar.clone(),
@@ -294,7 +320,7 @@ impl SynthRosette {
                                 String::from("printf"),
                                 vec![RExpr::text(String::from("wrong state supplied"))],
                             ),
-                            RExpr::var(String::from("e")),
+                            RExpr::var(String::from("st")),
                         ],
                     ),
                 ],
@@ -303,7 +329,7 @@ impl SynthRosette {
             fdef.add_comment(String::from("Field accessor"));
             rkt.add_function_def(fdef);
 
-            let fname = format!("iface-fields-store-{}", f.field.name);
+            let fname = format!("interface-fields-store-{}", f.field.name);
             let args = vec![statevar.clone(), valvar.clone()];
             let body = RExpr::fncall(
                 String::from("struct-copy"),
@@ -319,8 +345,14 @@ impl SynthRosette {
 
             for b in &f.field.layout {
                 rkt.add_subsection(format!("BitSlice: '{}.{}'", f.field.name, b.name));
-                SynthRosette::add_insert_extract(rkt, "iface", &f.field.name, f.field.length, b);
-                SynthRosette::add_read_write_slice(rkt, "iface", &f.field.name, &b.name)
+                SynthRosette::add_insert_extract(
+                    rkt,
+                    "interface",
+                    &f.field.name,
+                    f.field.length,
+                    b,
+                );
+                SynthRosette::add_read_write_slice(rkt, "interface", &f.field.name, &b.name)
             }
         }
     }
@@ -377,7 +409,7 @@ impl SynthRosette {
                             String::from("printf"),
                             vec![RExpr::text(String::from("wrong state supplied"))],
                         ),
-                        RExpr::var(String::from("e")),
+                        RExpr::var(statevar.clone()),
                     ],
                 ),
             ],
@@ -404,7 +436,7 @@ impl SynthRosette {
 
         // get the interface state
 
-        let fnname = String::from("model-get-iface");
+        let fnname = String::from("model-get-interface");
         let fnargs = vec![statevar.clone(), valvar.clone()];
         let fnbody = RExpr::matchexpr(
             statevar.clone(),
@@ -423,7 +455,7 @@ impl SynthRosette {
                             String::from("printf"),
                             vec![RExpr::text(String::from("wrong state supplied"))],
                         ),
-                        RExpr::var(String::from("e")),
+                        RExpr::var(statevar.clone()),
                     ],
                 ),
             ],
@@ -436,7 +468,7 @@ impl SynthRosette {
 
         // set the interface state
 
-        let fnname = String::from("model-set-iface");
+        let fnname = String::from("model-set-interface");
         let fnargs = vec![statevar.clone(), valvar.clone()];
         let fnbody = RExpr::fncall(
             String::from("struct-copy"),
@@ -510,7 +542,7 @@ impl SynthRosette {
         let fname = format!("{}-{}-{}-read", ftype, fieldname, slice);
         let args = vec![stvar.clone()];
         let body = RExpr::fncall(
-            format!("{}-fields-{}-read", ftype, fieldname),
+            format!("{}-fields-load-{}", ftype, fieldname),
             vec![RExpr::fncall(
                 format!("model-get-{}", ftype),
                 vec![RExpr::var(stvar.clone())],
@@ -569,12 +601,12 @@ impl SynthRosette {
         rkt.add_section(String::from("Model Interface Accessors"));
 
         for f in iface.fields() {
-            rkt.add_subsection(format!("iface field: {}", f.field.name));
+            rkt.add_subsection(format!("interface field: {}", f.field.name));
 
-            SynthRosette::add_model_field_accessor(rkt, "iface", &f.field.name);
+            SynthRosette::add_model_field_accessor(rkt, "interface", &f.field.name);
 
             for b in &f.field.layout {
-                SynthRosette::add_model_slice_accessor(rkt, "iface", &f.field.name, &b.name);
+                SynthRosette::add_model_slice_accessor(rkt, "interface", &f.field.name, &b.name);
             }
         }
     }
@@ -583,7 +615,7 @@ impl SynthRosette {
         rkt.add_section(String::from("Actions"));
         let stvar = String::from("st");
         for f in iface.fields() {
-            rkt.add_subsection(format!("iface field: {}", f.field.name));
+            rkt.add_subsection(format!("interface field: {}", f.field.name));
 
             // write actions
 
@@ -592,8 +624,52 @@ impl SynthRosette {
                 let args = vec![stvar.clone()];
 
                 // TODO: fill in body
+                let mut body = Vec::new();
+                for a in &action.action_components {
+                    let fieldwidth = (f.field.length * 8) as u8;
 
-                let mut fdef = FunctionDef::new(fname, args, vec![]);
+                    let dst = match &a.dst {
+                        Expr::Identifier { path, .. } => {
+                            if path.len() == 2 {
+                                format!("{}-store-{}", path[0], path[1])
+                            } else if path.len() == 3 {
+                                format!("{}-{}-{}-write", path[0], path[1], path[0])
+                            } else {
+                                panic!("unexpected identifier lenght");
+                            }
+                        }
+                        _ => String::from("UNKNOWN"),
+                    };
+
+                    let src = match &a.src {
+                        Expr::Identifier { path, .. } => {
+                            if path.len() == 2 {
+                                let ident = format!("{}-load-{}", path[0], path[1]);
+                                RExpr::fncall(ident, vec![RExpr::var(String::from("st"))])
+                            } else if path.len() == 3 {
+                                let ident = format!("{}-{}-{}-read", path[0], path[1], path[0]);
+                                RExpr::fncall(ident, vec![RExpr::var(String::from("st"))])
+                            } else {
+                                panic!("unexpected identifier lenght");
+                            }
+                        }
+                        Expr::Number { value, .. } => RExpr::num(fieldwidth, *value),
+                        Expr::Boolean { value: true, .. } => RExpr::num(fieldwidth, 1),
+                        Expr::Boolean { value: false, .. } => RExpr::num(fieldwidth, 0),
+                        _ => RExpr::var(String::from("UNKNOWN")),
+                    };
+
+                    body.push(RExpr::fncall(
+                        String::from("set!"),
+                        vec![
+                            RExpr::var(String::from("st")),
+                            RExpr::fncall(dst, vec![RExpr::var(String::from("st")), src]),
+                        ],
+                    ));
+                }
+                body.push(RExpr::var(String::from("st")));
+
+                let mut fdef = FunctionDef::new(fname, args, body);
                 fdef.add_comment(format!("performs the write actions of {}", f.field.name));
                 rkt.add_function_def(fdef);
             }
@@ -605,7 +681,52 @@ impl SynthRosette {
                 let fname = format!("interface-{}-read-action", f.field.name);
                 let args = vec![stvar.clone()];
 
-                let mut fdef = FunctionDef::new(fname, args, vec![]);
+                let mut body = Vec::new();
+                for a in &action.action_components {
+                    let fieldwidth = (f.field.length * 8) as u8;
+
+                    let dst = match &a.dst {
+                        Expr::Identifier { path, .. } => {
+                            if path.len() == 2 {
+                                format!("{}-store-{}", path[0], path[1])
+                            } else if path.len() == 3 {
+                                format!("{}-{}-{}-write", path[0], path[1], path[0])
+                            } else {
+                                panic!("unexpected identifier lenght");
+                            }
+                        }
+                        _ => String::from("UNKNOWN"),
+                    };
+
+                    let src = match &a.src {
+                        Expr::Identifier { path, .. } => {
+                            if path.len() == 2 {
+                                let ident = format!("{}-load-{}", path[0], path[1]);
+                                RExpr::fncall(ident, vec![RExpr::var(String::from("st"))])
+                            } else if path.len() == 3 {
+                                let ident = format!("{}-{}-{}-read", path[0], path[1], path[0]);
+                                RExpr::fncall(ident, vec![RExpr::var(String::from("st"))])
+                            } else {
+                                panic!("unexpected identifier lenght");
+                            }
+                        }
+                        Expr::Number { value, .. } => RExpr::num(fieldwidth, *value),
+                        Expr::Boolean { value: true, .. } => RExpr::num(fieldwidth, 1),
+                        Expr::Boolean { value: false, .. } => RExpr::num(fieldwidth, 0),
+                        _ => RExpr::var(String::from("UNKNOWN")),
+                    };
+
+                    body.push(RExpr::fncall(
+                        String::from("set!"),
+                        vec![
+                            RExpr::var(String::from("st")),
+                            RExpr::fncall(dst, vec![RExpr::var(String::from("st")), src]),
+                        ],
+                    ));
+                }
+                body.push(RExpr::var(String::from("st")));
+
+                let mut fdef = FunctionDef::new(fname, args, body);
                 fdef.add_comment(format!("performs the read actions of {}", f.field.name));
                 rkt.add_function_def(fdef);
             }
@@ -614,6 +735,16 @@ impl SynthRosette {
 
     fn add_translate(rkt: &mut RosetteFile) {
         rkt.add_section(String::from("Translation Function"));
+
+        let args = vec![
+            String::from("st"),
+            String::from("va"),
+            String::from("flags"),
+        ];
+
+        let body = vec![RExpr::var(String::from("va"))];
+
+        rkt.add_new_function_def(String::from("translate"), args, body)
     }
 
     fn add_grammar(rkt: &mut RosetteFile, iface: &Interface) {
@@ -723,7 +854,7 @@ impl SynthRosette {
         for f in iface.fields() {
             for b in &f.field.layout {
                 let structident = format!("(Op_Iface_{}_{}_Insert v)", f.field.name, b.name);
-                let fnident = format!("iface-{}-{}-write", f.field.name, b.name);
+                let fnident = format!("interface-{}-{}-write", f.field.name, b.name);
                 matches.push(RExpr::block(vec![(
                     structident,
                     RExpr::fncall(
@@ -750,13 +881,7 @@ impl SynthRosette {
                     String::from("ast-interpret"),
                     vec![
                         RExpr::var(String::from("b")),
-                        RExpr::fncall(
-                            fnident,
-                            vec![
-                                RExpr::var(String::from("st")),
-                                RExpr::var(String::from("v")),
-                            ],
-                        ),
+                        RExpr::fncall(fnident, vec![RExpr::var(String::from("st"))]),
                     ],
                 ),
             )]));
@@ -769,13 +894,7 @@ impl SynthRosette {
                     String::from("ast-interpret"),
                     vec![
                         RExpr::var(String::from("b")),
-                        RExpr::fncall(
-                            fnident,
-                            vec![
-                                RExpr::var(String::from("st")),
-                                RExpr::var(String::from("v")),
-                            ],
-                        ),
+                        RExpr::fncall(fnident, vec![RExpr::var(String::from("st"))]),
                     ],
                 ),
             )]));
@@ -795,7 +914,6 @@ impl SynthRosette {
 
         let mut fdef = FunctionDef::new(fname, args, vec![body]);
         fdef.add_comment(String::from("interprets the grammar"));
-        fdef.add_suffix(String::from("grammar"));
         rkt.add_function_def(fdef);
     }
 
@@ -818,15 +936,19 @@ impl SynthRosette {
                     RExpr::fncall(
                         String::from("ast-interpret"),
                         vec![
-                            RExpr::var(String::from("impl")),
+                            RExpr::fncall(
+                                String::from("impl"),
+                                vec![
+                                    RExpr::var(String::from("st")),
+                                    RExpr::var(String::from("va")),
+                                    RExpr::var(String::from("pa")),
+                                    RExpr::var(String::from("size")),
+                                    RExpr::var(String::from("flags")),
+                                ],
+                            ),
                             RExpr::var(String::from("st")),
-                            RExpr::var(String::from("va")),
-                            RExpr::var(String::from("pa")),
-                            RExpr::var(String::from("size")),
-                            RExpr::var(String::from("flags")),
                         ],
                     ),
-                    RExpr::var(String::from("st")),
                 ],
             ),
             RExpr::assert(RExpr::bveq(
@@ -929,6 +1051,11 @@ impl SynthRosette {
         );
         let vdef = VarDef::new(String::from("sol"), body);
         rkt.add_var(vdef);
+
+        rkt.add_expr(RExpr::fncall(
+            String::from("generate-forms"),
+            vec![RExpr::var(String::from("sol"))],
+        ));
     }
 
     /// synthesizes the `map` function and returns an ast of it
