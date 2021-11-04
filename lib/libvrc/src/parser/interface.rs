@@ -34,7 +34,7 @@
 use nom::{
     branch::{alt, permutation},
     combinator::{cut, opt},
-    multi::{many1, separated_list0},
+    multi::{many0, many1},
     sequence::{delimited, preceded, terminated, tuple},
     Err,
 };
@@ -259,6 +259,7 @@ fn interfacefield(input: TokenStream) -> IResult<TokenStream, InterfaceField> {
     // We now parse an optional Layout, ReadAction, WriteAction
     let (i3, (bitslices, readaction, writeaction)) = delimited(
         cut(lbrace),
+        // XXX: that doesn't quite work like this here!
         permutation((opt(layout), opt(readaction), opt(writeaction))),
         cut(tuple((rbrace, semicolon))),
     )(i2)?;
@@ -401,11 +402,7 @@ fn writeaction(input: TokenStream) -> IResult<TokenStream, Action> {
 /// WriteActions = { .. };
 ///
 fn actions_block(input: TokenStream) -> IResult<TokenStream, Vec<ActionComponent>> {
-    delimited(
-        lbrace,
-        cut(separated_list0(semicolon, action_component)),
-        cut(rbrace),
-    )(input)
+    delimited(lbrace, many0(action_component), rbrace)(input)
 }
 
 /// parses an action
@@ -430,7 +427,9 @@ fn action_component(input: TokenStream) -> IResult<TokenStream, ActionComponent>
     let arrows = alt((larrow, rarrow));
 
     // parse the <expr> OP <expr> scheme, and match on the token
-    let (i1, (left, arrow, right)) = tuple((expr, arrows, expr))(input.clone())?;
+    let (i1, (left, arrow, right)) =
+        terminated(tuple((expr, arrows, expr)), semicolon)(input.clone())?;
+
     let (src, dst) = match arrow {
         TokenContent::LArrow => (right, left),
         TokenContent::RArrow => (left, right),
