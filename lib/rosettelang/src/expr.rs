@@ -95,6 +95,8 @@ pub enum BVOp {
     BVShr,
     BVShl,
     BVEq,
+    BVAdd,
+    BVLt,
 }
 
 impl BVOp {
@@ -105,6 +107,8 @@ impl BVOp {
             BVOp::BVAnd => "bvand",
             BVOp::BVOr => "bvor",
             BVOp::BVShr => "bvlshr",
+            BVOp::BVAdd => "bvadd",
+            BVOp::BVLt => "bvult",
         }
     }
 }
@@ -126,6 +130,20 @@ impl RExpr {
     pub fn bveq(lhs: RExpr, rhs: RExpr) -> Self {
         RExpr::BVBinOp {
             op: BVOp::BVEq,
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+        }
+    }
+    pub fn bvlt(lhs: RExpr, rhs: RExpr) -> Self {
+        RExpr::BVBinOp {
+            op: BVOp::BVLt,
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+        }
+    }
+    pub fn bvadd(lhs: RExpr, rhs: RExpr) -> Self {
+        RExpr::BVBinOp {
+            op: BVOp::BVAdd,
             lhs: Box::new(lhs),
             rhs: Box::new(rhs),
         }
