@@ -706,16 +706,56 @@ impl SynthRosette {
         }
     }
 
-    fn add_translate(rkt: &mut RosetteFile) {
+    fn add_methods(rkt: &mut RosetteFile, methods: &[Method]) {
+        rkt.add_section(String::from("Methods"));
+
+        for m in methods {
+            match m.name.as_str() {
+                "translate" => continue,
+                "map" => continue,
+                "unmap" => continue,
+                "protect" => continue,
+                _ => (),
+            }
+
+            // let's add the arguments
+            let mut args = vec![String::from("st")];
+            for a in m.args.iter() {
+                args.push(a.name.clone());
+            }
+
+            // add the requires as assert
+            let mut body = Vec::new();
+            for p in m.requires.iter() {
+                body.push(RExpr::assert(RExpr::var(String::from("#t"))));
+            }
+
+            // convert statements into rosette statements
+
+            body.push(RExpr::var(String::from("va")));
+
+            rkt.add_new_function_def(m.name.clone(), args, body)
+        }
+    }
+
+    fn add_translate(rkt: &mut RosetteFile, translate: &Method) {
         rkt.add_section(String::from("Translation Function"));
 
-        let args = vec![
-            String::from("st"),
-            String::from("va"),
-            String::from("flags"),
-        ];
+        // let's add the arguments
+        let mut args = vec![String::from("st")];
+        for a in translate.args.iter() {
+            args.push(a.name.clone());
+        }
 
-        let body = vec![RExpr::var(String::from("va"))];
+        // add the requires as assert
+        let mut body = Vec::new();
+        for p in translate.requires.iter() {
+            body.push(RExpr::assert(RExpr::var(String::from("#t"))));
+        }
+
+        // convert statements into rosette statements
+
+        body.push(RExpr::var(String::from("va")));
 
         rkt.add_new_function_def(String::from("translate"), args, body)
     }
@@ -1051,7 +1091,15 @@ impl SynthRosette {
             SynthRosette::add_model_state_accessors(&mut rkt, &unit.state);
             SynthRosette::add_model_iface_accessors(&mut rkt, &unit.interface);
             SynthRosette::add_actions(&mut rkt, &unit.interface);
-            SynthRosette::add_translate(&mut rkt);
+
+            SynthRosette::add_methods(&mut rkt, &unit.methods);
+
+            for m in unit.methods.iter() {
+                if m.name == "translate" {
+                    SynthRosette::add_translate(&mut rkt, m);
+                }
+            }
+
             SynthRosette::add_grammar(&mut rkt, &unit.interface);
             SynthRosette::add_interp_function(&mut rkt, &unit.interface);
             SynthRosette::add_check_translate(&mut rkt);
