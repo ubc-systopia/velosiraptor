@@ -90,7 +90,7 @@ impl SynthRosette {
         length: u64,
         bslice: &BitSlice,
     ) {
-        let mask = (1u64 << (bslice.end - bslice.start + 1)) - 1;
+        let mask = ((1u128 << (bslice.end - bslice.start + 1)) - 1) as u64;
         let fieldsize = (length * 8) as u8;
         let varname = String::from("val");
         let oldname = String::from("old");
@@ -219,15 +219,18 @@ impl SynthRosette {
 
             let fname = format!("state-fields-load-{}", f.name);
             let args = vec![statevar.clone()];
+
+            let sfields = state
+                .fields()
+                .iter()
+                .map(|e| RExpr::var(e.name.clone()))
+                .collect::<Vec<RExpr>>();
             let body = RExpr::matchexpr(
                 statevar.clone(),
                 vec![
                     (
-                        RExpr::fncall(
-                            String::from(STATEFIELDS),
-                            vec![RExpr::var(String::from("e"))],
-                        ),
-                        vec![RExpr::var(String::from("e"))],
+                        RExpr::fncall(String::from(STATEFIELDS), sfields),
+                        vec![RExpr::var(f.name.clone())],
                     ),
                     (
                         RExpr::var(String::from("_")),
@@ -305,15 +308,17 @@ impl SynthRosette {
 
             let fname = format!("interface-fields-load-{}", f.field.name);
             let args = vec![statevar.clone()];
+            let sfields = iface
+                .fields()
+                .iter()
+                .map(|e| RExpr::var(e.field.name.clone()))
+                .collect::<Vec<RExpr>>();
             let body = RExpr::matchexpr(
                 statevar.clone(),
                 vec![
                     (
-                        RExpr::fncall(
-                            String::from(IFACEFIELDS),
-                            vec![RExpr::var(String::from("e"))],
-                        ),
-                        vec![RExpr::var(String::from("e"))],
+                        RExpr::fncall(String::from(IFACEFIELDS), sfields),
+                        vec![RExpr::var(f.field.name.clone())],
                     ),
                     (
                         RExpr::var(String::from("_")),
@@ -729,12 +734,13 @@ impl SynthRosette {
             // add the requires as assert
             let mut body = Vec::new();
             for p in m.requires.iter() {
-                body.push(RExpr::assert(RExpr::var(String::from("#t"))));
+                body.push(RExpr::assert(expr::expr_to_rosette(p)));
             }
 
             // convert statements into rosette statements
-
-            body.push(RExpr::var(String::from("va")));
+            if let Some(stmts) = &m.stmts {
+                body.push(expr::stmt_to_rosette(stmts))
+            }
 
             rkt.add_new_function_def(m.name.clone(), args, body)
         }
@@ -756,8 +762,9 @@ impl SynthRosette {
         }
 
         // convert statements into rosette statements
-
-        body.push(RExpr::var(String::from("va")));
+        if let Some(stmts) = &translate.stmts {
+            body.push(expr::stmt_to_rosette(stmts))
+        }
 
         rkt.add_new_function_def(String::from("translate"), args, body)
     }

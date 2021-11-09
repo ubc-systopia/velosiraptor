@@ -27,7 +27,7 @@
 
 use rosettelang::{BVOp, RExpr};
 
-use crate::ast::{BinOp, Expr};
+use crate::ast::{BinOp, Expr, Stmt};
 
 fn bin_op_to_rosette(op: BinOp) -> BVOp {
     use BinOp::*;
@@ -63,7 +63,7 @@ pub fn expr_to_rosette(e: &Expr) -> RExpr {
                 let ident = format!("{}-load-{}", path[0], path[1]);
                 RExpr::fncall(ident, vec![RExpr::var(String::from("st"))])
             } else if path.len() == 3 {
-                let ident = format!("{}-{}-{}-read", path[0], path[1], path[0]);
+                let ident = format!("{}-{}-{}-read", path[0], path[1], path[2]);
                 RExpr::fncall(ident, vec![RExpr::var(String::from("st"))])
             } else if path.len() == 1 {
                 RExpr::var(path[0].clone())
@@ -71,8 +71,9 @@ pub fn expr_to_rosette(e: &Expr) -> RExpr {
                 panic!("unexpected identifier lenght");
             }
         }
-        Number { value: u64, .. } => unimplemented!(),
-        Boolean { value, .. } => unimplemented!(),
+        Number { value, .. } => RExpr::num(64, *value),
+        Boolean { value: true, .. } => RExpr::num(64, 1),
+        Boolean { value: false, .. } => RExpr::num(64, 0),
         BinaryOperation { op, lhs, rhs, .. } => {
             let lhs = expr_to_rosette(lhs);
             let rhs = expr_to_rosette(rhs);
@@ -106,5 +107,25 @@ pub fn expr_to_rosette(e: &Expr) -> RExpr {
         Element { .. } => unimplemented!(),
         Range { .. } => unimplemented!(),
         Quantifier { .. } => unimplemented!(),
+    }
+}
+
+pub fn stmt_to_rosette(s: &Stmt) -> RExpr {
+    match s {
+        Stmt::Block { stmts, .. } => {
+            let e = stmts
+                .iter()
+                .map(|s| stmt_to_rosette(s))
+                .collect::<Vec<RExpr>>();
+            RExpr::begin(e)
+        }
+        Stmt::Let {
+            typeinfo, lhs, rhs, ..
+        } => unimplemented!(),
+        Stmt::IfElse {
+            cond, then, other, ..
+        } => unimplemented!(),
+        Stmt::Return { expr, .. } => expr_to_rosette(expr),
+        Stmt::Assert { expr, .. } => RExpr::assert(expr_to_rosette(expr)),
     }
 }
