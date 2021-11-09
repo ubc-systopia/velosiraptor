@@ -30,7 +30,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 // the used libraries
-use crate::ast::{AstRoot, BitSlice, Expr, Interface, Method, State, Type};
+use crate::ast::{Action, AstRoot, BitSlice, Expr, Interface, Method, State, Type};
 use crate::synth::SynthError;
 use rosettelang::{FunctionDef, RExpr, RosetteFile, StructDef, VarDef};
 
@@ -611,124 +611,97 @@ impl SynthRosette {
         }
     }
 
+    fn add_field_action(
+        rkt: &mut RosetteFile,
+        action: &Action,
+        fieldname: &str,
+        ty: &str,
+        fieldwidth: u8,
+    ) {
+        let fname = format!("interface-{}-{}-action", fieldname, ty);
+        let stvar = String::from("st");
+        let args = vec![stvar.clone()];
+
+        let mut defs = Vec::new();
+        let mut stvar = String::from("st");
+        let mut newvar = String::from("st_1");
+        for (i, a) in action.action_components.iter().enumerate() {
+            newvar = format!("st_{}", i + 1);
+
+            let dst = match &a.dst {
+                Expr::Identifier { path, .. } => {
+                    if path.len() == 2 {
+                        format!("{}-store-{}", path[0], path[1])
+                    } else if path.len() == 3 {
+                        format!("{}-{}-{}-write", path[0], path[1], path[0])
+                    } else {
+                        panic!("unexpected identifier lenght");
+                    }
+                }
+                _ => String::from("UNKNOWN"),
+            };
+
+            let src = match &a.src {
+                Expr::Identifier { path, .. } => {
+                    if path.len() == 2 {
+                        let ident = format!("{}-load-{}", path[0], path[1]);
+                        RExpr::fncall(ident, vec![RExpr::var(stvar.clone())])
+                    } else if path.len() == 3 {
+                        let ident = format!("{}-{}-{}-read", path[0], path[1], path[0]);
+                        RExpr::fncall(ident, vec![RExpr::var(stvar.clone())])
+                    } else {
+                        panic!("unexpected identifier lenght");
+                    }
+                }
+                Expr::Number { value, .. } => RExpr::num(fieldwidth, *value),
+                Expr::Boolean { value: true, .. } => RExpr::num(fieldwidth, 1),
+                Expr::Boolean { value: false, .. } => RExpr::num(fieldwidth, 0),
+                _ => RExpr::var(String::from("UNKNOWN")),
+            };
+
+            defs.push((
+                newvar.clone(),
+                RExpr::fncall(dst, vec![RExpr::var(stvar), src]),
+            ));
+            stvar = newvar.clone();
+        }
+
+        let lets = RExpr::var(newvar);
+        let body = RExpr::letstart(defs, vec![lets]);
+
+        let mut fdef = FunctionDef::new(fname, args, vec![body]);
+        fdef.add_comment(format!("performs the write actions of {}", fieldname));
+        rkt.add_function_def(fdef);
+    }
+
     fn add_actions(rkt: &mut RosetteFile, iface: &Interface) {
         rkt.add_section(String::from("Actions"));
-        let stvar = String::from("st");
         for f in iface.fields() {
             rkt.add_subsection(format!("interface field: {}", f.field.name));
 
             // write actions
 
             if let Some(action) = &f.writeaction {
-                let fname = format!("interface-{}-write-action", f.field.name);
-                let args = vec![stvar.clone()];
-
-                // TODO: fill in body
-                let mut body = Vec::new();
-                for a in &action.action_components {
-                    let fieldwidth = (f.field.length * 8) as u8;
-
-                    let dst = match &a.dst {
-                        Expr::Identifier { path, .. } => {
-                            if path.len() == 2 {
-                                format!("{}-store-{}", path[0], path[1])
-                            } else if path.len() == 3 {
-                                format!("{}-{}-{}-write", path[0], path[1], path[0])
-                            } else {
-                                panic!("unexpected identifier lenght");
-                            }
-                        }
-                        _ => String::from("UNKNOWN"),
-                    };
-
-                    let src = match &a.src {
-                        Expr::Identifier { path, .. } => {
-                            if path.len() == 2 {
-                                let ident = format!("{}-load-{}", path[0], path[1]);
-                                RExpr::fncall(ident, vec![RExpr::var(String::from("st"))])
-                            } else if path.len() == 3 {
-                                let ident = format!("{}-{}-{}-read", path[0], path[1], path[0]);
-                                RExpr::fncall(ident, vec![RExpr::var(String::from("st"))])
-                            } else {
-                                panic!("unexpected identifier lenght");
-                            }
-                        }
-                        Expr::Number { value, .. } => RExpr::num(fieldwidth, *value),
-                        Expr::Boolean { value: true, .. } => RExpr::num(fieldwidth, 1),
-                        Expr::Boolean { value: false, .. } => RExpr::num(fieldwidth, 0),
-                        _ => RExpr::var(String::from("UNKNOWN")),
-                    };
-
-                    body.push(RExpr::fncall(
-                        String::from("set!"),
-                        vec![
-                            RExpr::var(String::from("st")),
-                            RExpr::fncall(dst, vec![RExpr::var(String::from("st")), src]),
-                        ],
-                    ));
-                }
-                body.push(RExpr::var(String::from("st")));
-
-                let mut fdef = FunctionDef::new(fname, args, body);
-                fdef.add_comment(format!("performs the write actions of {}", f.field.name));
-                rkt.add_function_def(fdef);
+                SynthRosette::add_field_action(
+                    rkt,
+                    action,
+                    &f.field.name,
+                    "write",
+                    f.field.length as u8 * 8,
+                );
             }
 
             // read actions
 
             // TODO: fill in body
             if let Some(action) = &f.readaction {
-                let fname = format!("interface-{}-read-action", f.field.name);
-                let args = vec![stvar.clone()];
-
-                let mut body = Vec::new();
-                for a in &action.action_components {
-                    let fieldwidth = (f.field.length * 8) as u8;
-
-                    let dst = match &a.dst {
-                        Expr::Identifier { path, .. } => {
-                            if path.len() == 2 {
-                                format!("{}-store-{}", path[0], path[1])
-                            } else if path.len() == 3 {
-                                format!("{}-{}-{}-write", path[0], path[1], path[0])
-                            } else {
-                                panic!("unexpected identifier lenght");
-                            }
-                        }
-                        _ => String::from("UNKNOWN"),
-                    };
-
-                    let src = match &a.src {
-                        Expr::Identifier { path, .. } => {
-                            if path.len() == 2 {
-                                let ident = format!("{}-load-{}", path[0], path[1]);
-                                RExpr::fncall(ident, vec![RExpr::var(String::from("st"))])
-                            } else if path.len() == 3 {
-                                let ident = format!("{}-{}-{}-read", path[0], path[1], path[0]);
-                                RExpr::fncall(ident, vec![RExpr::var(String::from("st"))])
-                            } else {
-                                panic!("unexpected identifier lenght");
-                            }
-                        }
-                        Expr::Number { value, .. } => RExpr::num(fieldwidth, *value),
-                        Expr::Boolean { value: true, .. } => RExpr::num(fieldwidth, 1),
-                        Expr::Boolean { value: false, .. } => RExpr::num(fieldwidth, 0),
-                        _ => RExpr::var(String::from("UNKNOWN")),
-                    };
-
-                    body.push(RExpr::fncall(
-                        String::from("set!"),
-                        vec![
-                            RExpr::var(String::from("st")),
-                            RExpr::fncall(dst, vec![RExpr::var(String::from("st")), src]),
-                        ],
-                    ));
-                }
-                body.push(RExpr::var(String::from("st")));
-
-                let mut fdef = FunctionDef::new(fname, args, body);
-                fdef.add_comment(format!("performs the read actions of {}", f.field.name));
-                rkt.add_function_def(fdef);
+                SynthRosette::add_field_action(
+                    rkt,
+                    action,
+                    &f.field.name,
+                    "read",
+                    f.field.length as u8 * 8,
+                );
             }
         }
     }
@@ -1083,6 +1056,8 @@ impl SynthRosette {
             SynthRosette::add_interp_function(&mut rkt, &unit.interface);
             SynthRosette::add_check_translate(&mut rkt);
             SynthRosette::add_synthesis(&mut rkt);
+
+            // TODO: USE BEGIN
 
             rkt.save();
             rkt.synth();
