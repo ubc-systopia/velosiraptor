@@ -430,7 +430,7 @@ fn main() {
     });
 
     eprintln!(
-        "{:>8}: synthesizing un function...\n",
+        "{:>8}: synthesizing unmap function...\n",
         "synthesis".bold().green(),
     );
 
@@ -446,7 +446,7 @@ fn main() {
     });
 
     eprintln!(
-        "{:>8}: synthesizing un function...\n",
+        "{:>8}: synthesizing prot function...\n",
         "synthesis".bold().green(),
     );
 
