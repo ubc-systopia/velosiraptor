@@ -87,6 +87,9 @@ pub enum RExpr {
     Block {
         expr: Vec<(String, RExpr)>,
     },
+    Begin {
+        exprs: Vec<RExpr>,
+    },
 }
 
 pub enum BVOp {
@@ -210,6 +213,9 @@ impl RExpr {
             test: Box::new(expr),
         }
     }
+    pub fn begin(exprs: Vec<RExpr>) -> Self {
+        RExpr::Begin { exprs }
+    }
     pub fn to_code(&self, indent: usize) -> String {
         let istr = std::iter::repeat(" ").take(indent).collect::<String>();
         use RExpr::*;
@@ -273,6 +279,13 @@ impl RExpr {
             }
             Assert { test } => {
                 format!("{}(assert\n{}\n{})", istr, test.to_code(indent + 2), istr)
+            }
+            Begin { exprs } => {
+                let mut s = String::new();
+                for e in exprs {
+                    s.push_str(&format!("{}{}", istr, e.to_code(indent)));
+                }
+                s
             }
             // defs: Vec<(String, RExpr)>,
             // body: Vec<RExpr>,

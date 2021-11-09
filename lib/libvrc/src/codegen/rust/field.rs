@@ -93,7 +93,7 @@ fn add_insert_fn(imp: &mut CG::Impl, fname: &str, fbits: u64, sl: &BitSlice) {
             "self.val = (self.val & {}) | (((val as {}) & {}) << {})",
             to_mask_str(!sl.mask_value(), fbits),
             valtype,
-            to_mask_str((1 << sl.nbits()) - 1, sl.nbits()),
+            to_mask_str(((1u128 << sl.nbits()) - 1) as u64, sl.nbits()),
             sl.start
         ));
 }
@@ -111,7 +111,7 @@ fn add_extract_fn(imp: &mut CG::Impl, fname: &str, sl: &BitSlice) {
         .line(format!(
             "((self.val >> {}) & {}) as {}",
             sl.start,
-            to_mask_str((1 << sl.nbits()) - 1, sl.nbits()),
+            to_mask_str(((1u128 << sl.nbits()) - 1) as u64, sl.nbits()),
             ftype
         ));
 }
