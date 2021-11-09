@@ -34,6 +34,8 @@ use crate::ast::{Action, AstRoot, BitSlice, Expr, Interface, Method, State, Type
 use crate::synth::SynthError;
 use rosettelang::{FunctionDef, RExpr, RosetteFile, StructDef, VarDef};
 
+mod expr;
+
 pub struct SynthRosette {
     outdir: PathBuf,
     pkg: String,
@@ -750,7 +752,7 @@ impl SynthRosette {
         // add the requires as assert
         let mut body = Vec::new();
         for p in translate.requires.iter() {
-            body.push(RExpr::assert(RExpr::var(String::from("#t"))));
+            body.push(RExpr::assert(expr::expr_to_rosette(p)));
         }
 
         // convert statements into rosette statements
