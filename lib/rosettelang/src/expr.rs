@@ -65,6 +65,7 @@ pub enum RExpr {
     Let {
         defs: Vec<(String, RExpr)>,
         body: Vec<RExpr>,
+        star: bool,
     },
     // a variable
     Variable {
@@ -168,7 +169,18 @@ impl RExpr {
         RExpr::Match { valexpr, clauses }
     }
     pub fn letexpr(defs: Vec<(String, RExpr)>, body: Vec<RExpr>) -> Self {
-        RExpr::Let { defs, body }
+        RExpr::Let {
+            defs,
+            body,
+            star: false,
+        }
+    }
+    pub fn letstart(defs: Vec<(String, RExpr)>, body: Vec<RExpr>) -> Self {
+        RExpr::Let {
+            defs,
+            body,
+            star: true,
+        }
     }
     pub fn assert(expr: RExpr) -> Self {
         RExpr::Assert {
@@ -246,21 +258,32 @@ impl RExpr {
             }
             // defs: Vec<(String, RExpr)>,
             // body: Vec<RExpr>,
-            Let { defs, body } => {
+            Let { defs, body, star } => {
                 let d = defs
                     .iter()
-                    .map(|(d, e)| format!("{} {}", d, e.to_code(0)))
+                    .map(|(d, e)| {
+                        format!(
+                            "{}    [ {}\n{}\n{}    ]",
+                            istr,
+                            d,
+                            e.to_code(indent + 6),
+                            istr
+                        )
+                    })
                     .collect::<Vec<String>>();
                 let e = body
                     .iter()
                     .map(|e| e.to_code(indent + 2))
                     .collect::<Vec<String>>();
+                let s = if *star { "*" } else { "" };
                 format!(
-                    "{}(let ([{}])\n{}\n{})",
+                    "{}(let{} (\n{}\n{}  )\n{}\n{})",
                     istr,
-                    d.join(" "),
+                    s,
+                    d.join("\n"),
+                    istr,
                     e.join("\n"),
-                    istr
+                    istr,
                 )
             }
             Param { param } => format!("{}#:{}", istr, param),
