@@ -55,6 +55,7 @@ enum RosetteExpr {
     Expr(RExpr),
     Section(String),
     SubSection(String),
+    Raw(String),
 }
 
 const SECTION_SEP: &str =
@@ -159,6 +160,10 @@ impl RosetteFile {
     /// adds a type definition
     pub fn add_type_def(&mut self) {}
 
+    pub fn add_raw(&mut self, code: String) {
+        self.exprs.push(RosetteExpr::Raw(code))
+    }
+
     /// adds a new statement to the file
     // pub fn add_stmt(self, nstmt: Stmt) -> Self {
     //     self.stmts.push(nstmt)
@@ -194,6 +199,7 @@ impl RosetteFile {
                 Symbolic(v) => v.to_code(),
                 Var(v) => v.to_code(),
                 Expr(e) => e.to_code(0),
+                Raw(s) => s.clone(),
                 Function(f) => format!("\n{}", f.to_code()),
                 Comment(s) => format!("; {}\n", s),
                 Section(s) => format!("\n;{}\n; {}\n;{}\n\n", SECTION_SEP, s, SECTION_SEP),

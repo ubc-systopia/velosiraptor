@@ -99,7 +99,11 @@ pub enum BVOp {
     BVShl,
     BVEq,
     BVAdd,
+    BVSub,
     BVLt,
+    BVLe,
+    BVGt,
+    BVGe,
 }
 
 impl BVOp {
@@ -111,7 +115,11 @@ impl BVOp {
             BVOp::BVOr => "bvor",
             BVOp::BVShr => "bvlshr",
             BVOp::BVAdd => "bvadd",
+            BVOp::BVSub => "bvsub",
             BVOp::BVLt => "bvult",
+            BVOp::BVLe => "bvule",
+            BVOp::BVGt => "bvugt",
+            BVOp::BVGe => "bvuge",
         }
     }
 }
@@ -144,9 +152,37 @@ impl RExpr {
             rhs: Box::new(rhs),
         }
     }
+    pub fn bvle(lhs: RExpr, rhs: RExpr) -> Self {
+        RExpr::BVBinOp {
+            op: BVOp::BVLe,
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+        }
+    }
+    pub fn bvgt(lhs: RExpr, rhs: RExpr) -> Self {
+        RExpr::BVBinOp {
+            op: BVOp::BVGt,
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+        }
+    }
+    pub fn bvge(lhs: RExpr, rhs: RExpr) -> Self {
+        RExpr::BVBinOp {
+            op: BVOp::BVGe,
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+        }
+    }
     pub fn bvadd(lhs: RExpr, rhs: RExpr) -> Self {
         RExpr::BVBinOp {
             op: BVOp::BVAdd,
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+        }
+    }
+    pub fn bvsub(lhs: RExpr, rhs: RExpr) -> Self {
+        RExpr::BVBinOp {
+            op: BVOp::BVSub,
             lhs: Box::new(lhs),
             rhs: Box::new(rhs),
         }
