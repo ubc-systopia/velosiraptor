@@ -85,6 +85,9 @@ pub fn expr_to_rosette(e: &Expr) -> RExpr {
                 BinOp::Eq => RExpr::bveq(lhs, rhs),
                 BinOp::Plus => RExpr::bvadd(lhs, rhs),
                 BinOp::Lt => RExpr::bvlt(lhs, rhs),
+                BinOp::Le => RExpr::bvle(lhs, rhs),
+                BinOp::Ge => RExpr::bvge(lhs, rhs),
+                BinOp::Gt => RExpr::bvgt(lhs, rhs),
                 _ => {
                     println!("{:?}", op);
                     unimplemented!()

@@ -444,7 +444,7 @@ impl SynthRosette {
         // get the interface state
 
         let fnname = String::from("model-get-interface");
-        let fnargs = vec![statevar.clone(), valvar.clone()];
+        let fnargs = vec![statevar.clone()];
         let fnbody = RExpr::matchexpr(
             statevar.clone(),
             vec![
@@ -802,11 +802,10 @@ impl SynthRosette {
         // now define the grammar
         let fname = String::from("ast-grammar");
         let args = vec![
-            String::from("st"),
             String::from("va"),
-            String::from("pa"),
             String::from("size"),
             String::from("flags"),
+            String::from("pa"),
         ];
         let mut body = vec![RExpr::block(vec![(
             String::from("stmts"),
@@ -852,10 +851,10 @@ impl SynthRosette {
                     RExpr::var(String::from("pa")),
                     RExpr::var(String::from("size")),
                     RExpr::var(String::from("flags")),
-                    RExpr::var(String::from("(?? int64)")),
-                    RExpr::var(String::from("(?? int32)")),
-                    RExpr::var(String::from("(?? int16)")),
-                    RExpr::var(String::from("(?? int8)")),
+                    RExpr::var(String::from("(?? int64?)")),
+                    // RExpr::var(String::from("(?? int32?)")),
+                    // RExpr::var(String::from("(?? int16?)")),
+                    // RExpr::var(String::from("(?? int8?)")),
                 ],
             ),
         )]));
@@ -939,65 +938,83 @@ impl SynthRosette {
         rkt.add_function_def(fdef);
     }
 
-    fn add_check_translate(rkt: &mut RosetteFile) {
+    fn add_check_translate(rkt: &mut RosetteFile, m: &Method) {
         rkt.add_section(String::from("Correctness Property"));
 
         // add assumes clauses for va, pa, size, flags
         // w.r.t: sizes, alignments, etc.
         // those can come from the requires clauses from the map method
 
-        let defs = vec![(
-            String::from("st"),
-            RExpr::fncall(String::from("make-model"), vec![]),
-        )];
-        let body = vec![
-            RExpr::fncall(
-                String::from("set!"),
-                vec![
-                    RExpr::var(String::from("st")),
+        let mut body = Vec::new();
+        for c in &m.requires {
+            body.push(RExpr::assume(expr::expr_to_rosette(c)))
+        }
+
+        let args = m
+            .args
+            .iter()
+            .map(|a| RExpr::var(a.name.clone()))
+            .collect::<Vec<RExpr>>();
+
+        body.push(RExpr::letstart(
+            vec![
+                (
+                    String::from("st0"),
+                    RExpr::fncall(String::from("make-model"), vec![]),
+                ),
+                (
+                    String::from("st1"),
                     RExpr::fncall(
                         String::from("ast-interpret"),
                         vec![
-                            RExpr::fncall(
-                                String::from("impl"),
-                                vec![
-                                    RExpr::var(String::from("st")),
-                                    RExpr::var(String::from("va")),
-                                    RExpr::var(String::from("pa")),
-                                    RExpr::var(String::from("size")),
-                                    RExpr::var(String::from("flags")),
-                                ],
-                            ),
-                            RExpr::var(String::from("st")),
+                            RExpr::fncall(String::from("impl"), args),
+                            RExpr::var(String::from("st0")),
                         ],
                     ),
-                ],
-            ),
-            RExpr::assert(RExpr::bveq(
-                RExpr::fncall(
-                    String::from("translate"),
-                    vec![
-                        RExpr::var(String::from("st")),
-                        RExpr::var(String::from("va")),
-                        RExpr::var(String::from("flags")),
-                    ],
                 ),
-                RExpr::var(String::from("pa")),
-            )),
-        ];
-
-        let fdef = FunctionDef::new(
-            String::from("ast-check-translate"),
-            vec![
-                String::from("impl"),
-                String::from("st"),
-                String::from("va"),
-                String::from("pa"),
-                String::from("size"),
-                String::from("flags"),
             ],
-            vec![RExpr::letexpr(defs, body)],
-        );
+            vec![
+                RExpr::assert(RExpr::bveq(
+                    RExpr::fncall(
+                        String::from("translate"),
+                        vec![
+                            RExpr::var(String::from("st1")),
+                            RExpr::var(String::from("va")),
+                            RExpr::var(String::from("flags")),
+                        ],
+                    ),
+                    RExpr::var(String::from("pa")),
+                )),
+                RExpr::assert(RExpr::bveq(
+                    RExpr::fncall(
+                        String::from("translate"),
+                        vec![
+                            RExpr::var(String::from("st1")),
+                            RExpr::bvsub(
+                                RExpr::bvadd(
+                                    RExpr::var(String::from("va")),
+                                    RExpr::var(String::from("sz")),
+                                ),
+                                RExpr::num(64, 1),
+                            ),
+                            RExpr::var(String::from("flags")),
+                        ],
+                    ),
+                    RExpr::bvsub(
+                        RExpr::bvadd(
+                            RExpr::var(String::from("pa")),
+                            RExpr::var(String::from("sz")),
+                        ),
+                        RExpr::num(64, 1),
+                    ),
+                )),
+            ],
+        ));
+
+        let mut args = vec![String::from("impl")];
+        args.extend(m.args.iter().map(|a| a.name.clone()));
+
+        let fdef = FunctionDef::new(String::from("ast-check-translate"), args, body);
 
         rkt.add_function_def(fdef);
         // add a let expr
@@ -1023,22 +1040,20 @@ impl SynthRosette {
         // the map function
         let fname = String::from("do-synth");
         let args = vec![
-            String::from("st"),
             String::from("va"),
-            String::from("pa"),
             String::from("size"),
             String::from("flags"),
+            String::from("pa"),
         ];
         let body = vec![RExpr::fncall(
             String::from("ast-grammar"),
             vec![
-                RExpr::var(String::from("st")),
                 RExpr::var(String::from("va")),
-                RExpr::var(String::from("pa")),
                 RExpr::var(String::from("size")),
                 RExpr::var(String::from("flags")),
-                // RExpr::param(String::from("depty")),
-                // RExpr::var(String::from("5")),
+                RExpr::var(String::from("pa")),
+                RExpr::param(String::from("depth")),
+                RExpr::var(String::from("6")),
             ],
         )];
         let mut fdef = FunctionDef::new(fname, args, body);
@@ -1053,9 +1068,9 @@ impl SynthRosette {
                     String::from("list"),
                     vec![
                         RExpr::var(String::from("va")),
-                        RExpr::var(String::from("pa")),
                         RExpr::var(String::from("size")),
                         RExpr::var(String::from("flags")),
+                        RExpr::var(String::from("pa")),
                     ],
                 ),
                 RExpr::param(String::from("guarantee")),
@@ -1064,20 +1079,37 @@ impl SynthRosette {
                     vec![
                         RExpr::var(String::from("do-synth")),
                         RExpr::var(String::from("va")),
-                        RExpr::var(String::from("pa")),
                         RExpr::var(String::from("size")),
                         RExpr::var(String::from("flags")),
+                        RExpr::var(String::from("pa")),
                     ],
                 ),
             ],
         );
         let vdef = VarDef::new(String::from("sol"), body);
         rkt.add_var(vdef);
+    }
 
-        rkt.add_expr(RExpr::fncall(
-            String::from("generate-forms"),
-            vec![RExpr::var(String::from("sol"))],
-        ));
+    fn add_print_sol(rkt: &mut RosetteFile) {
+        rkt.add_raw(String::from(
+            "
+; Pretty-prints the result of (generate-forms sol).
+(define (my-print-forms sol)
+  (for ([f (generate-forms sol)])
+    (for ([e (syntax->list f)])
+      (let ([s  (format \"~a\" (syntax->datum e))])
+        (if (string-prefix? s \"(Seq\")
+          (printf \"~a\\n\" s)
+          (printf \"\")
+        )
+      )
+    )
+  )
+)
+;;pretty-print
+(my-print-forms sol)
+",
+        ))
     }
 
     /// synthesizes the `map` function and returns an ast of it
@@ -1103,17 +1135,19 @@ impl SynthRosette {
 
             SynthRosette::add_methods(&mut rkt, &unit.methods);
 
-            for m in unit.methods.iter() {
-                if m.name == "translate" {
-                    SynthRosette::add_translate(&mut rkt, m);
-                }
+            if let Some(m) = unit.get_method("translate") {
+                SynthRosette::add_translate(&mut rkt, m);
             }
 
             SynthRosette::add_grammar(&mut rkt, &unit.interface);
             SynthRosette::add_interp_function(&mut rkt, &unit.interface);
-            SynthRosette::add_check_translate(&mut rkt);
-            SynthRosette::add_synthesis(&mut rkt);
 
+            if let Some(m) = unit.get_method("map") {
+                SynthRosette::add_check_translate(&mut rkt, m);
+            }
+
+            SynthRosette::add_synthesis(&mut rkt);
+            SynthRosette::add_print_sol(&mut rkt);
             // TODO: USE BEGIN
 
             rkt.save();
