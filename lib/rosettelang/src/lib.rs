@@ -45,6 +45,16 @@ pub use crate::structdef::StructDef;
 pub use crate::symbolic::SymbolicVar;
 pub use crate::vardef::VarDef;
 
+use nom::{
+    branch::alt,
+    bytes::complete::tag,
+    character::complete::{alphanumeric1, digit1, hex_digit1, newline, space0, space1},
+    combinator::{all_consuming, opt, recognize},
+    multi::many1,
+    sequence::{delimited, preceded, terminated, tuple},
+    Err, IResult,
+};
+
 enum RosetteExpr {
     Require(Require),
     Struct(StructDef),
@@ -56,6 +66,13 @@ enum RosetteExpr {
     Section(String),
     SubSection(String),
     Raw(String),
+}
+
+#[derive(Debug)]
+pub enum OpArg {
+    Num(u64),
+    Var(String),
+    None,
 }
 
 const SECTION_SEP: &str =
@@ -219,7 +236,76 @@ impl RosetteFile {
     /// prints the content of the file to stdout
     pub fn print(&self) {}
 
-    ///
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    // Result Parsing
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    /// parser to recognize a bitvector constaint `(bv #x1 64)`
+    fn parse_oparg_bv(s: &str) -> IResult<&str, OpArg> {
+        let bv = tuple((tag("(bv"), space1));
+        let width = tuple((space1, digit1, tag(")")));
+        let value = preceded(tag("#x"), hex_digit1);
+
+        let (r, n) = delimited(bv, value, width)(s)?;
+        match u64::from_str_radix(n, 16) {
+            Ok(i) => Ok((r, OpArg::Num(i))),
+            Err(_) => panic!("number {} not parsable as hex", n),
+        }
+    }
+
+    /// parser to recognize a sybolic variable `pa`
+    fn parse_oparg_var(s: &str) -> IResult<&str, OpArg> {
+        let (r, n) = alphanumeric1(s)?;
+        Ok((r, OpArg::Var(String::from(n))))
+    }
+
+    /// parser to recognize a single operation `(op arg)`
+    fn parse_op(s: &str) -> IResult<&str, (String, OpArg)> {
+        // the op name is alphanumeric + '_'
+        let opname = recognize(many1(alt((alphanumeric1, tag("_")))));
+        // the opargs are bv, var, or nothing
+
+        let opargs = opt(alt((Self::parse_oparg_bv, Self::parse_oparg_var)));
+        // the operation is then the name, followed by maybe arguments
+
+        let op = tuple((opname, preceded(space0, opargs)));
+        // the operation is delimted in parenthesis
+
+        let (r, (n, a)) = delimited(tag("("), op, tag(")"))(s)?;
+        // get the argumetn, or set it to None if there was none
+
+        let arg = a.unwrap_or(OpArg::None);
+        Ok((r, (String::from(n), arg)))
+    }
+
+    /// parser to recognize a sequence `(Seq Op [Seq | Res])`
+    fn parse_seq(s: &str) -> IResult<&str, Vec<(String, OpArg)>> {
+        let next = preceded(space1, alt((Self::parse_seq, Self::parse_res)));
+        let (s1, op) = preceded(tag("(Seq "), Self::parse_op)(s)?;
+        let (s2, rops) = terminated(next, tag(")"))(s1)?;
+
+        let mut ops = vec![op];
+        ops.extend(rops);
+        Ok((s2, ops))
+    }
+
+    /// parser to recognize the return statement `(Return)`
+    fn parse_res(s: &str) -> IResult<&str, Vec<(String, OpArg)>> {
+        println!("parse_res: {}", s);
+        let (r, _) = delimited(tag("("), tag("Return"), tag(")"))(s)?;
+        Ok((r, vec![(String::from("return"), OpArg::None)]))
+    }
+
+    /// parse and validate the result from Rosette
+    fn parse_result(output: &str) {
+        let ops = match all_consuming(terminated(Self::parse_seq, newline))(output) {
+            Ok((_, v)) => v,
+            Err(e) => panic!("parser did not finish: {:?}", e),
+        };
+        for o in ops {
+            println!("OP: {:?} {:?}", o.0, o.1)
+        }
+    }
 
     pub fn synth(&self) {
         let output = Command::new("/home/achreto/bin/racket/bin/racket")
@@ -234,6 +320,7 @@ impl RosetteFile {
 
         println!("SYNTH RESULT:");
         println!("{}", s);
+        Self::parse_result(s.as_str());
 
         let s = match String::from_utf8(output.stderr) {
             Ok(v) => v,
@@ -247,4 +334,10 @@ impl RosetteFile {
 
 pub trait RosetteFmt {
     fn fmt(self, indent: usize) -> String;
+}
+
+#[test]
+fn test_parser() {
+    let s = "(Seq (Op_Iface_sz_bytes_Insert (bv #x4000000000000000 64)) (Seq (Op_Iface_sz_WriteAction) (Seq (Op_Iface_flags_present_Insert (bv #x0000000000000001 64)) (Seq (Op_Iface_flags_WriteAction) (Seq (Op_Iface_address_base_Insert pa) (Seq (Op_Iface_address_WriteAction) (Return)))))))";
+    RosetteFile::parse_result(s);
 }
