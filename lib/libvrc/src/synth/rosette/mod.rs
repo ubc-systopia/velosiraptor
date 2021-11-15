@@ -790,12 +790,12 @@ impl SynthRosette {
         for f in iface.fields() {
             for b in &f.field.layout {
                 let arg = String::from("arg");
-                let ident = format!("Op_Iface_{}_{}_Insert", f.field.name, b.name);
+                let ident = format!("Op-Iface-{}-{}-Insert", f.field.name, b.name);
                 rkt.add_new_struct_def(ident, vec![arg], String::from("#:transparent"));
             }
-            let ident = format!("Op_Iface_{}_WriteAction", f.field.name);
+            let ident = format!("Op-Iface-{}-WriteAction", f.field.name);
             rkt.add_new_struct_def(ident, vec![], String::from("#:transparent"));
-            let ident = format!("Op_Iface_{}_ReadAction", f.field.name);
+            let ident = format!("Op-Iface-{}-ReadAction", f.field.name);
             rkt.add_new_struct_def(ident, vec![], String::from("#:transparent"));
         }
 
@@ -828,13 +828,13 @@ impl SynthRosette {
         for f in iface.fields() {
             for b in &f.field.layout {
                 // let arg = String::from("arg");
-                let ident = format!("Op_Iface_{}_{}_Insert", f.field.name, b.name);
+                let ident = format!("Op-Iface-{}-{}-Insert", f.field.name, b.name);
                 let args = RExpr::fncall(String::from("valexpr"), vec![]);
                 ops.push(RExpr::fncall(ident, vec![args]));
             }
-            let ident = format!("Op_Iface_{}_WriteAction", f.field.name);
+            let ident = format!("Op-Iface-{}-WriteAction", f.field.name);
             ops.push(RExpr::fncall(ident, vec![]));
-            let ident = format!("Op_Iface_{}_ReadAction", f.field.name);
+            let ident = format!("Op-Iface-{}-ReadAction", f.field.name);
             ops.push(RExpr::fncall(ident, vec![]));
         }
         body.push(RExpr::block(vec![(
@@ -874,7 +874,7 @@ impl SynthRosette {
         let mut matches = vec![RExpr::var(String::from("s"))];
         for f in iface.fields() {
             for b in &f.field.layout {
-                let structident = format!("(Op_Iface_{}_{}_Insert v)", f.field.name, b.name);
+                let structident = format!("(Op-Iface-{}-{}-Insert v)", f.field.name, b.name);
                 let fnident = format!("interface-{}-{}-write", f.field.name, b.name);
                 matches.push(RExpr::block(vec![(
                     structident,
@@ -894,7 +894,7 @@ impl SynthRosette {
                 )]));
             }
 
-            let structident = format!("(Op_Iface_{}_ReadAction)", f.field.name);
+            let structident = format!("(Op-Iface-{}-ReadAction)", f.field.name);
             let fnident = format!("interface-{}-read-action", f.field.name);
             matches.push(RExpr::block(vec![(
                 structident,
@@ -907,7 +907,7 @@ impl SynthRosette {
                 ),
             )]));
 
-            let structident = format!("(Op_Iface_{}_WriteAction)", f.field.name);
+            let structident = format!("(Op-Iface-{}-WriteAction)", f.field.name);
             let fnident = format!("interface-{}-write-action", f.field.name);
             matches.push(RExpr::block(vec![(
                 structident,
