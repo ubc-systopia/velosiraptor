@@ -87,6 +87,17 @@ impl<'a> Unit {
             AstNode::Unit(self),
         )
     }
+
+    /// obtains a method with a given anme
+    pub fn get_method(&self, name: &str) -> Option<&Method> {
+        // TODO: make this a hashmap!
+        for m in self.methods.iter() {
+            if m.name == name {
+                return Some(m);
+            }
+        }
+        None
+    }
 }
 
 /// Implemetation of the [AstNodeGeneric] trait for [Unit]
