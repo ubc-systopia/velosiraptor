@@ -44,7 +44,7 @@ pub struct Param {
 /// implementation of the [Param] ast node
 impl Param {
     /// returns a new parameter without any associated TokenStream
-    fn new(name: String, ptype: Type) -> Self {
+    pub fn new(name: String, ptype: Type) -> Self {
         Param {
             name,
             ptype,
