@@ -148,6 +148,6 @@ pub fn parse_result(output: &str) -> Vec<Operation> {
 
 #[test]
 fn test_parser() {
-    let s = "(Seq (Op_Iface_sz_bytes_Insert (bv #x4000000000000000 64)) (Seq (Op_Iface_sz_WriteAction) (Seq (Op_Iface_flags_present_Insert (bv #x0000000000000001 64)) (Seq (Op_Iface_flags_WriteAction) (Seq (Op_Iface_address_base_Insert pa) (Seq (Op_Iface_address_WriteAction) (Return)))))))";
-    RosetteFile::parse_result(s);
+    let s = "(Seq (Op_Iface_sz_bytes_Insert (bv #x4000000000000000 64)) (Seq (Op_Iface_sz_WriteAction) (Seq (Op_Iface_flags_present_Insert (bv #x0000000000000001 64)) (Seq (Op_Iface_flags_WriteAction) (Seq (Op_Iface_address_base_Insert pa) (Seq (Op_Iface_address_WriteAction) (Return)))))))\n";
+    parse_result(s);
 }
