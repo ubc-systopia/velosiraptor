@@ -31,10 +31,16 @@ use std::path::{Path, PathBuf};
 
 // the used libraries
 use crate::ast::{Action, AstRoot, BitSlice, Expr, Interface, Method, State, Type};
-use crate::synth::SynthError;
+use crate::synth::{SynthError, COPYRIGHT};
 use rosettelang::{FunctionDef, RExpr, RosetteFile, StructDef, VarDef};
 
+// the modules
 mod expr;
+mod resultparser;
+
+// re-exports
+use resultparser::parse_result;
+pub use resultparser::{OpArg, Operation};
 
 pub struct SynthRosette {
     outdir: PathBuf,
@@ -118,13 +124,13 @@ impl SynthRosette {
         let body = RExpr::bvor(
             // mask old value
             RExpr::bvand(
-                RExpr::var(oldname.clone()),
+                RExpr::var(oldname),
                 // shift the mask to the start of the slice
                 RExpr::num(fieldsize, !(mask << bslice.start)),
             ),
             // new value
             RExpr::bvshl(
-                RExpr::bvand(RExpr::var(varname.clone()), RExpr::num(fieldsize, mask)),
+                RExpr::bvand(RExpr::var(varname), RExpr::num(fieldsize, mask)),
                 RExpr::num(fieldsize, bslice.start),
             ),
         );
@@ -168,9 +174,9 @@ impl SynthRosette {
                     vec![
                         RExpr::fncall(
                             format!("{}-fields-load-{}", ftype, field),
-                            vec![RExpr::var(stname.clone())],
+                            vec![RExpr::var(stname)],
                         ),
-                        RExpr::var(varname.clone()),
+                        RExpr::var(varname),
                     ],
                 ),
             ],
@@ -481,8 +487,8 @@ impl SynthRosette {
             String::from("struct-copy"),
             vec![
                 RExpr::var(String::from(MODEL)),
-                RExpr::var(statevar.clone()),
-                RExpr::block(vec![(String::from("var"), RExpr::var(valvar.clone()))]),
+                RExpr::var(statevar),
+                RExpr::block(vec![(String::from("var"), RExpr::var(valvar))]),
             ],
         );
         let mut f = FunctionDef::new(fnname, fnargs, vec![fnbody]);
@@ -523,11 +529,8 @@ impl SynthRosette {
                 RExpr::fncall(
                     format!("{}-fields-store-{}", ftype, fieldname),
                     vec![
-                        RExpr::fncall(
-                            format!("model-get-{}", ftype),
-                            vec![RExpr::var(stvar.clone())],
-                        ),
-                        RExpr::var(valvar.clone()),
+                        RExpr::fncall(format!("model-get-{}", ftype), vec![RExpr::var(stvar)]),
+                        RExpr::var(valvar),
                     ],
                 ),
             ],
@@ -573,11 +576,8 @@ impl SynthRosette {
                 RExpr::fncall(
                     format!("{}-fields-{}-{}-write", ftype, fieldname, slice),
                     vec![
-                        RExpr::fncall(
-                            format!("model-get-{}", ftype),
-                            vec![RExpr::var(stvar.clone())],
-                        ),
-                        RExpr::var(valvar.clone()),
+                        RExpr::fncall(format!("model-get-{}", ftype), vec![RExpr::var(stvar)]),
+                        RExpr::var(valvar),
                     ],
                 ),
             ],
@@ -627,7 +627,7 @@ impl SynthRosette {
     ) {
         let fname = format!("interface-{}-{}-action", fieldname, ty);
         let stvar = String::from("st");
-        let args = vec![stvar.clone()];
+        let args = vec![stvar];
 
         let mut defs = Vec::new();
         let mut stvar = String::from("st");
@@ -1122,6 +1122,7 @@ impl SynthRosette {
             let doc = format!("Unit: {}, Function: map()", unit.name);
 
             let mut rkt = RosetteFile::new(rktfilepath, doc);
+            rkt.add_comment(String::from(COPYRIGHT));
 
             SynthRosette::add_requires(&mut rkt);
             SynthRosette::add_bitvector_defs(&mut rkt);
@@ -1151,7 +1152,12 @@ impl SynthRosette {
             // TODO: USE BEGIN
 
             rkt.save();
-            rkt.synth();
+
+            let res = rkt.exec();
+
+            let _ops = parse_result(&res);
+
+            // TODO: conver the ops to a result
         }
 
         Ok(Method::new(String::from("map"), Type::Boolean, Vec::new()))

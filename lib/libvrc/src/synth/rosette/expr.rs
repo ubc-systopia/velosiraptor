@@ -25,35 +25,9 @@
 
 //! Synthesis Module: Rosette Expressions
 
-use rosettelang::{BVOp, RExpr};
+use rosettelang::RExpr;
 
 use crate::ast::{BinOp, Expr, Stmt};
-
-fn bin_op_to_rosette(op: BinOp) -> BVOp {
-    use BinOp::*;
-    match op {
-        Plus => unimplemented!(),
-        Minus => unimplemented!(),
-        Multiply => unimplemented!(),
-        Divide => unimplemented!(),
-        Modulo => unimplemented!(),
-        LShift => unimplemented!(),
-        RShift => unimplemented!(),
-        And => unimplemented!(),
-        Xor => unimplemented!(),
-        Or => unimplemented!(),
-        // boolean operators
-        Eq => unimplemented!(),
-        Ne => unimplemented!(),
-        Lt => unimplemented!(),
-        Gt => unimplemented!(),
-        Le => unimplemented!(),
-        Ge => unimplemented!(),
-        Land => unimplemented!(),
-        Lor => unimplemented!(),
-        Implies => unimplemented!(),
-    }
-}
 
 pub fn expr_to_rosette(e: &Expr) -> RExpr {
     use Expr::*;
@@ -94,7 +68,7 @@ pub fn expr_to_rosette(e: &Expr) -> RExpr {
                 }
             }
         }
-        UnaryOperation { op, val, .. } => unimplemented!(),
+        UnaryOperation { op: _, val: _, .. } => unimplemented!(),
         FnCall { path, args, .. } => {
             if path.len() != 1 {
                 panic!("unexpected identifier lenght");
@@ -116,17 +90,20 @@ pub fn expr_to_rosette(e: &Expr) -> RExpr {
 pub fn stmt_to_rosette(s: &Stmt) -> RExpr {
     match s {
         Stmt::Block { stmts, .. } => {
-            let e = stmts
-                .iter()
-                .map(|s| stmt_to_rosette(s))
-                .collect::<Vec<RExpr>>();
+            let e = stmts.iter().map(stmt_to_rosette).collect::<Vec<RExpr>>();
             RExpr::begin(e)
         }
         Stmt::Let {
-            typeinfo, lhs, rhs, ..
+            typeinfo: _,
+            lhs: _,
+            rhs: _,
+            ..
         } => unimplemented!(),
         Stmt::IfElse {
-            cond, then, other, ..
+            cond: _,
+            then: _,
+            other: _,
+            ..
         } => unimplemented!(),
         Stmt::Return { expr, .. } => expr_to_rosette(expr),
         Stmt::Assert { expr, .. } => RExpr::assert(expr_to_rosette(expr)),
