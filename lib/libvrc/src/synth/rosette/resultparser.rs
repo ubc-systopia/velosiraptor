@@ -47,22 +47,52 @@ pub enum OpArg {
     None,
 }
 
-/// defines an operation
 #[derive(Debug)]
-pub struct Operation {
-    /// the name of the operation as a string
-    pub op: String,
-    /// the arguments for this operation
-    pub arg: OpArg,
+pub enum Operation {
+    Insert {
+        field: String,
+        slice: Option<String>,
+        arg: OpArg,
+    },
+    Extract {
+        field: String,
+        slice: Option<String>,
+    },
+    WriteAction {
+        field: String,
+    },
+    ReadAction {
+        field: String,
+    },
+    Return,
 }
 
 impl Operation {
-    /// creates a new operation
-    pub fn new(op: &str, arg: OpArg) -> Self {
-        Operation {
-            op: String::from(op),
-            arg,
+    pub fn insert(field: &str, slice: Option<&str>, op: OpArg) -> Self {
+        Operation::Insert {
+            field: field.to_string(),
+            slice: slice.map(|s| s.to_string()),
+            arg: op,
         }
+    }
+    pub fn extract(field: &str, slice: Option<&str>) -> Self {
+        Operation::Extract {
+            field: field.to_string(),
+            slice: slice.map(|s| s.to_string()),
+        }
+    }
+    pub fn write(field: &str) -> Self {
+        Operation::WriteAction {
+            field: field.to_string(),
+        }
+    }
+    pub fn read(field: &str) -> Self {
+        Operation::ReadAction {
+            field: field.to_string(),
+        }
+    }
+    pub fn ret() -> Self {
+        Operation::Return
     }
 }
 
@@ -92,12 +122,12 @@ fn parse_oparg_var(s: &str) -> IResult<&str, OpArg> {
 /// parser to recognize a single operation `(op arg)`
 fn parse_op(s: &str) -> IResult<&str, Operation> {
     // the op name is alphanumeric + '_'
-    let opname = recognize(many1(alt((alphanumeric1, tag("_")))));
+    let opname = recognize(many1(alt((alphanumeric1, tag("_"), tag("-")))));
+
     // the opargs are bv, var, or nothing
-
     let opargs = opt(alt((parse_oparg_bv, parse_oparg_var)));
-    // the operation is then the name, followed by maybe arguments
 
+    // the operation is then the name, followed by maybe arguments
     let op = tuple((opname, preceded(space0, opargs)));
 
     // the operation is delimted in parenthesis
@@ -105,7 +135,36 @@ fn parse_op(s: &str) -> IResult<&str, Operation> {
 
     // get the argument, or set it to None if there was none
     let arg = a.unwrap_or(OpArg::None);
-    let op = Operation::new(n, arg);
+
+    // try to extrac the operation
+    let mut split = n.split('-').collect::<Vec<&str>>();
+
+    // if the length is smaller than 4 this is wrong
+    if split.len() < 4 {
+        panic!("there were too little elements {}", n);
+    }
+
+    // it should start with `Op-Iface`
+    if split[0] != "Op" || split[1] != "Iface" {
+        panic!("Expected operation to start with Op-Iface was {}", n);
+    }
+
+    // get the field and slice
+    let field = split[2];
+    let slice = if split.len() > 4 {
+        Some(split[3])
+    } else {
+        None
+    };
+
+    let op = match split.pop() {
+        Some("Insert") => Operation::insert(field, slice, arg),
+        Some("Extract") => Operation::extract(field, slice),
+        Some("WriteAction") => Operation::write(field),
+        Some("ReadAction") => Operation::read(field),
+        x => panic!("unknown {:?}", x),
+    };
+
     Ok((r, op))
 }
 
@@ -132,7 +191,7 @@ fn parse_seq(s: &str) -> IResult<&str, Vec<Operation>> {
 fn parse_res(s: &str) -> IResult<&str, Vec<Operation>> {
     // just recognize a `(Return)`
     let (r, _) = delimited(tag("("), tag("Return"), tag(")"))(s)?;
-    Ok((r, vec![Operation::new("return", OpArg::None)]))
+    Ok((r, vec![Operation::ret()]))
 }
 
 /// parse and validate the result from Rosette
