@@ -49,6 +49,7 @@ pub struct FunctionDef {
 }
 
 impl FunctionDef {
+    /// creates a new function definition
     pub fn new(ident: String, args: Vec<String>, exprs: Vec<RExpr>) -> Self {
         FunctionDef {
             ident,
@@ -59,14 +60,17 @@ impl FunctionDef {
         }
     }
 
+    /// adds a comment to the function
     pub fn add_comment(&mut self, comment: String) {
         self.doc = Some(comment.replace("\n", ";\n"));
     }
 
+    /// adds a suffix to the define clause
     pub fn add_suffix(&mut self, suffix: String) {
         self.suffix = Some(suffix)
     }
 
+    /// formats corresponding rosette code
     pub fn to_code(&self) -> String {
         let body = self
             .exprs

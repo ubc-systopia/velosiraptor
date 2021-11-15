@@ -29,15 +29,15 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
-//mod constdef;
+// modules
 mod expr;
 mod functiondef;
 mod require;
 mod structdef;
 mod symbolic;
-mod typedef;
 mod vardef;
 
+// public re-exports
 pub use crate::expr::{BVOp, RExpr};
 pub use crate::functiondef::FunctionDef;
 pub use crate::require::Require;
@@ -45,41 +45,31 @@ pub use crate::structdef::StructDef;
 pub use crate::symbolic::SymbolicVar;
 pub use crate::vardef::VarDef;
 
-use nom::{
-    branch::alt,
-    bytes::complete::tag,
-    character::complete::{alphanumeric1, digit1, hex_digit1, newline, space0, space1},
-    combinator::{all_consuming, opt, recognize},
-    multi::many1,
-    sequence::{delimited, preceded, terminated, tuple},
-    Err, IResult,
-};
-
+/// defines a rosette expression
 enum RosetteExpr {
+    // a requires clause
     Require(Require),
+    // structure definition
     Struct(StructDef),
-    Comment(String),
+    // a function/procedure definition
     Function(FunctionDef),
+    // a symbolic variable definition
     Symbolic(SymbolicVar),
+    // a variable definition
     Var(VarDef),
+    // a rosette expression
     Expr(RExpr),
+    // adds a section comment to the file
     Section(String),
+    // adds a subsection comment to the file
     SubSection(String),
+    // some normal comment
+    Comment(String),
+    // some raw rosette code
     Raw(String),
 }
 
-#[derive(Debug)]
-pub enum OpArg {
-    Num(u64),
-    Var(String),
-    None,
-}
-
-const SECTION_SEP: &str =
-    ";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;";
-const SUBSECTION_SEP: &str =
-    "------------------------------------------------------------------------------";
-
+/// defines a rosette file
 pub struct RosetteFile {
     /// the pathname of the file
     path: PathBuf,
@@ -103,22 +93,6 @@ impl RosetteFile {
         }
     }
 
-    /// adds a new requires clause to the file
-    pub fn add_new_require(&mut self, path: String) {
-        let nreq = Require::new(path);
-        self.add_require(nreq);
-    }
-
-    /// adds a requires clause
-    pub fn add_require(&mut self, req: Require) {
-        self.exprs.push(RosetteExpr::Require(req))
-    }
-
-    /// adds a comment to the file
-    pub fn add_comment(&mut self, comment: String) {
-        self.exprs.push(RosetteExpr::Comment(comment));
-    }
-
     /// adds a new section to the file
     pub fn add_section(&mut self, s: String) {
         self.exprs.push(RosetteExpr::Section(s));
@@ -129,13 +103,29 @@ impl RosetteFile {
         self.exprs.push(RosetteExpr::SubSection(s));
     }
 
+    /// adds a comment to the file
+    pub fn add_comment(&mut self, comment: String) {
+        self.exprs.push(RosetteExpr::Comment(comment));
+    }
+
+    /// adds a new requires clause to the file
+    pub fn add_new_require(&mut self, path: String) {
+        let nreq = Require::new(path);
+        self.add_require(nreq);
+    }
+
+    /// adds a requires clause to the file
+    pub fn add_require(&mut self, req: Require) {
+        self.exprs.push(RosetteExpr::Require(req))
+    }
+
     /// adds a new struct to the file
     pub fn add_new_struct_def(&mut self, id: String, entries: Vec<String>, attrib: String) {
         let s = StructDef::new(id, entries, attrib);
         self.add_struct_def(s);
     }
 
-    /// adds a struct to the curren tfile
+    /// adds a struct to the file
     pub fn add_struct_def(&mut self, s: StructDef) {
         self.exprs.push(RosetteExpr::Struct(s));
     }
@@ -146,65 +136,47 @@ impl RosetteFile {
         self.add_function_def(f);
     }
 
-    /// adds a struct to the curren tfile
+    /// adds a function definition to the file
     pub fn add_function_def(&mut self, f: FunctionDef) {
         self.exprs.push(RosetteExpr::Function(f));
     }
 
-    ///
+    /// defines a new symbolic variable
     pub fn add_new_symbolic_var(&mut self, ident: String, ty: String) {
         let v = SymbolicVar::new(ident, ty);
         self.add_symbolic_var(v);
     }
 
+    /// adds a symbolic variable to the file
     pub fn add_symbolic_var(&mut self, v: SymbolicVar) {
         self.exprs.push(RosetteExpr::Symbolic(v));
     }
 
+    /// adds a new variable definition
     pub fn add_new_var(&mut self, ident: String, ty: RExpr) {
         let v = VarDef::new(ident, ty);
         self.add_var(v);
     }
 
+    /// adds a variable to the file
     pub fn add_var(&mut self, v: VarDef) {
         self.exprs.push(RosetteExpr::Var(v));
     }
 
+    /// adds an expression  to the file
     pub fn add_expr(&mut self, e: RExpr) {
         self.exprs.push(RosetteExpr::Expr(e))
     }
 
-    /// adds a type definition
+    /// adds a type definition  to the file
     pub fn add_type_def(&mut self) {}
 
+    /// adds some raw code to the file
     pub fn add_raw(&mut self, code: String) {
         self.exprs.push(RosetteExpr::Raw(code))
     }
 
-    /// adds a new statement to the file
-    // pub fn add_stmt(self, nstmt: Stmt) -> Self {
-    //     self.stmts.push(nstmt)
-    //     self
-    // }
-
-    /// adds a new section to the file
-    ///
-    /// a section is basically a comment that acts as a visual divisor
-    ///
-    // pub fn add_section(self, sec: String) -> Self {
-    //     let nstmt = sec
-    //     self.add_stmt(nstmt)
-    // }
-
-    /// adds a new sub section to the file
-    ///
-    /// a subsection is basically a comment that acts as a visual divisor
-    ///
-    // pub fn add_subsection(self, sec: String) -> Self {
-    //     let nstmt = sec
-    //     self.add_stmt(nstmt)
-    // }
-
+    /// formats the current file into rosette code
     pub fn to_code(&self) -> String {
         let mut s = format!("; {}\n\n#lang {}\n\n", self.doc, self.lang);
 
@@ -219,8 +191,14 @@ impl RosetteFile {
                 Raw(s) => s.clone(),
                 Function(f) => format!("\n{}", f.to_code()),
                 Comment(s) => format!("; {}\n", s),
-                Section(s) => format!("\n;{}\n; {}\n;{}\n\n", SECTION_SEP, s, SECTION_SEP),
-                SubSection(s) => format!("\n; {}\n;{}\n", s, SUBSECTION_SEP),
+                Section(s) => {
+                    let sep = ";".repeat(80);
+                    format!("\n;{}\n; {}\n;{}\n\n", sep, s, sep)
+                }
+                SubSection(s) => {
+                    let sep = "-".repeat(80);
+                    format!("\n; {}\n;{}\n", s, sep)
+                }
             };
             s.push_str(code.as_str());
         }
@@ -236,108 +214,31 @@ impl RosetteFile {
     /// prints the content of the file to stdout
     pub fn print(&self) {}
 
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    // Result Parsing
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-
-    /// parser to recognize a bitvector constaint `(bv #x1 64)`
-    fn parse_oparg_bv(s: &str) -> IResult<&str, OpArg> {
-        let bv = tuple((tag("(bv"), space1));
-        let width = tuple((space1, digit1, tag(")")));
-        let value = preceded(tag("#x"), hex_digit1);
-
-        let (r, n) = delimited(bv, value, width)(s)?;
-        match u64::from_str_radix(n, 16) {
-            Ok(i) => Ok((r, OpArg::Num(i))),
-            Err(_) => panic!("number {} not parsable as hex", n),
-        }
-    }
-
-    /// parser to recognize a sybolic variable `pa`
-    fn parse_oparg_var(s: &str) -> IResult<&str, OpArg> {
-        let (r, n) = alphanumeric1(s)?;
-        Ok((r, OpArg::Var(String::from(n))))
-    }
-
-    /// parser to recognize a single operation `(op arg)`
-    fn parse_op(s: &str) -> IResult<&str, (String, OpArg)> {
-        // the op name is alphanumeric + '_'
-        let opname = recognize(many1(alt((alphanumeric1, tag("_")))));
-        // the opargs are bv, var, or nothing
-
-        let opargs = opt(alt((Self::parse_oparg_bv, Self::parse_oparg_var)));
-        // the operation is then the name, followed by maybe arguments
-
-        let op = tuple((opname, preceded(space0, opargs)));
-        // the operation is delimted in parenthesis
-
-        let (r, (n, a)) = delimited(tag("("), op, tag(")"))(s)?;
-        // get the argumetn, or set it to None if there was none
-
-        let arg = a.unwrap_or(OpArg::None);
-        Ok((r, (String::from(n), arg)))
-    }
-
-    /// parser to recognize a sequence `(Seq Op [Seq | Res])`
-    fn parse_seq(s: &str) -> IResult<&str, Vec<(String, OpArg)>> {
-        let next = preceded(space1, alt((Self::parse_seq, Self::parse_res)));
-        let (s1, op) = preceded(tag("(Seq "), Self::parse_op)(s)?;
-        let (s2, rops) = terminated(next, tag(")"))(s1)?;
-
-        let mut ops = vec![op];
-        ops.extend(rops);
-        Ok((s2, ops))
-    }
-
-    /// parser to recognize the return statement `(Return)`
-    fn parse_res(s: &str) -> IResult<&str, Vec<(String, OpArg)>> {
-        println!("parse_res: {}", s);
-        let (r, _) = delimited(tag("("), tag("Return"), tag(")"))(s)?;
-        Ok((r, vec![(String::from("return"), OpArg::None)]))
-    }
-
-    /// parse and validate the result from Rosette
-    fn parse_result(output: &str) {
-        let ops = match all_consuming(terminated(Self::parse_seq, newline))(output) {
-            Ok((_, v)) => v,
-            Err(e) => panic!("parser did not finish: {:?}", e),
-        };
-        for o in ops {
-            println!("OP: {:?} {:?}", o.0, o.1)
-        }
-    }
-
-    pub fn synth(&self) {
-        let output = Command::new("/home/achreto/bin/racket/bin/racket")
+    /// invokes racket with the rosette file
+    pub fn exec(&mut self) -> String {
+        // just call racket, requires it to be part of the search path
+        let output = Command::new("racket")
             .args([&self.path])
             .output()
             .expect("failed to execute process");
 
+        // grab the stdout
         let s = match String::from_utf8(output.stdout) {
             Ok(v) => v,
             Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
         };
 
-        println!("SYNTH RESULT:");
-        println!("{}", s);
-        Self::parse_result(s.as_str());
-
-        let s = match String::from_utf8(output.stderr) {
-            Ok(v) => v,
-            Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-        };
-
-        println!("{}", s);
-        println!("SYNTH RESULT END.");
+        // if it's empty, assume error
+        if s.is_empty() {
+            let e = match String::from_utf8(output.stderr) {
+                Ok(v) => v,
+                Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+            };
+            println!("rosette failure!");
+            println!("{}", e);
+        }
+        // return the output caputured from stdout
+        // TODO: properly handle errors
+        s
     }
-}
-
-pub trait RosetteFmt {
-    fn fmt(self, indent: usize) -> String;
-}
-
-#[test]
-fn test_parser() {
-    let s = "(Seq (Op_Iface_sz_bytes_Insert (bv #x4000000000000000 64)) (Seq (Op_Iface_sz_WriteAction) (Seq (Op_Iface_flags_present_Insert (bv #x0000000000000001 64)) (Seq (Op_Iface_flags_WriteAction) (Seq (Op_Iface_address_base_Insert pa) (Seq (Op_Iface_address_WriteAction) (Return)))))))";
-    RosetteFile::parse_result(s);
 }

@@ -25,9 +25,6 @@
 
 //! Struct Definitions
 
-// the formatter
-use crate::RosetteFmt;
-
 /// Represents a struct definition
 ///
 /// # Example
@@ -48,6 +45,7 @@ pub struct StructDef {
 
 /// implementation
 impl StructDef {
+    /// creates new struct definition
     pub fn new(ident: String, fields: Vec<String>, attrib: String) -> Self {
         StructDef {
             ident,
@@ -57,10 +55,12 @@ impl StructDef {
         }
     }
 
+    /// adds documentation to the struct definition
     pub fn add_doc(&mut self, doc: String) {
         self.doc = Some(doc.replace("\n", ";\n"));
     }
 
+    /// formats corresponding rosette code
     pub fn to_code(&self) -> String {
         let sdef = format!(
             "(struct {} ({}) {})\n",
@@ -76,21 +76,3 @@ impl StructDef {
         sdef
     }
 }
-
-// impl RosetteFmt for TypeDef {
-//     pub fn fmt(self, indent: usize) -> String {
-//         let indent = (0..indent).map(|_| " ").collect::<String>();
-
-//         let mut frags = Vec::new();
-
-//         if let Some(doc) = self.doc {
-//             frags.push(format!("; {}", doc))
-//         }
-
-//         frags.push(format!("(struct {} ({} {})"))
-
-//         frags.push("; constructor")
-//         frags.push("")
-
-//     }
-// }

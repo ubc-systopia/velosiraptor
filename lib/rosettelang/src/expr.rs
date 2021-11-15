@@ -25,8 +25,6 @@
 
 //! Rosette Expressions
 
-use std::fmt;
-
 /// Represents a constante definition
 ///
 /// # Example
@@ -107,6 +105,7 @@ pub enum BVOp {
 }
 
 impl BVOp {
+    /// formats corresponding rosette code
     pub fn to_code(&self) -> &str {
         match *self {
             BVOp::BVShl => "bvshl",
@@ -252,8 +251,10 @@ impl RExpr {
     pub fn begin(exprs: Vec<RExpr>) -> Self {
         RExpr::Begin { exprs }
     }
+
+    /// formats corresponding rosette code
     pub fn to_code(&self, indent: usize) -> String {
-        let istr = std::iter::repeat(" ").take(indent).collect::<String>();
+        let istr = " ".repeat(indent);
         use RExpr::*;
         match self {
             Variable { name } => format!("{}{}", istr, name),

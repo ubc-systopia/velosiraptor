@@ -40,10 +40,12 @@ pub struct SymbolicVar {
 }
 
 impl SymbolicVar {
+    /// defines a new symbolic variable
     pub fn new(ident: String, ty: String) -> Self {
         SymbolicVar { ident, ty }
     }
 
+    /// formats corresponding rosette code
     pub fn to_code(&self) -> String {
         format!("(define-symbolic {} {})\n", self.ident, self.ty)
     }

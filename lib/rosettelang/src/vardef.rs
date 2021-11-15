@@ -43,10 +43,12 @@ pub struct VarDef {
 
 /// implementation
 impl VarDef {
+    /// creates a new variable definition
     pub fn new(ident: String, value: RExpr) -> Self {
         VarDef { ident, value }
     }
 
+    /// formats corresponding rosette code
     pub fn to_code(&self) -> String {
         format!("(define {} \n{}\n)\n", self.ident, self.value.to_code(2))
     }
