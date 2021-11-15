@@ -445,23 +445,23 @@ use crate::lexer::Lexer;
 
 #[test]
 fn test_action_components() {
-    let tokens = Lexer::lex_string("stdio", "state.field -> state.field").unwrap();
+    let tokens = Lexer::lex_string("stdio", "state.field -> state.field;").unwrap();
     let ts = TokenStream::from_vec(tokens);
     assert!(action_component(ts).is_ok());
 
-    let tokens = Lexer::lex_string("stdio", "state.field <- state.field").unwrap();
+    let tokens = Lexer::lex_string("stdio", "state.field <- state.field;").unwrap();
     let ts = TokenStream::from_vec(tokens);
     assert!(action_component(ts).is_ok());
 
-    let tokens = Lexer::lex_string("stdio", "0 -> state.field").unwrap();
+    let tokens = Lexer::lex_string("stdio", "0 -> state.field;").unwrap();
     let ts = TokenStream::from_vec(tokens);
     assert!(action_component(ts).is_ok());
 
-    let tokens = Lexer::lex_string("stdio", "state -> interface").unwrap();
+    let tokens = Lexer::lex_string("stdio", "state -> interface;").unwrap();
     let ts = TokenStream::from_vec(tokens);
     assert!(action_component(ts).is_ok());
 
-    let tokens = Lexer::lex_string("stdio", "state.field[0..7] -> interface.field[8..15]").unwrap();
+    let tokens = Lexer::lex_string("stdio", "state.field[0..7] -> interface.field[8..15];").unwrap();
     let ts = TokenStream::from_vec(tokens);
     assert!(action_component(ts).is_ok());
 }
