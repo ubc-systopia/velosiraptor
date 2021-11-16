@@ -98,11 +98,19 @@ impl<'a> Interface {
 
     pub fn bases(&self) -> &[Param] {
         match self {
-            Interface::Memory { bases, .. } => bases,
-            Interface::MMIORegisters { bases, .. } => bases,
-            Interface::CPURegisters { .. } => &[],
+            Interface::CPURegisters { fields, .. } => &[],
+            Interface::Memory { bases, .. } => &bases,
+            Interface::MMIORegisters { bases, .. } => &bases,
             Interface::SpecialRegisters { .. } => &[],
             Interface::None { .. } => &[],
+        }
+    }
+
+    pub fn is_none(&self) -> bool {
+        if let Interface::None { .. } = self {
+            true
+        } else {
+            false
         }
     }
 }
