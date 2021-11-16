@@ -150,7 +150,7 @@ impl BackendRust {
         unitname: &str,
         fields: &[InterfaceField],
     ) -> Result<(), CodeGenError> {
-        let fieldsdir = outdir.join("interfaces");
+        let fieldsdir = outdir.join("fields");
 
         fs::create_dir_all(&fieldsdir)?;
 
