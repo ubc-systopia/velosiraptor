@@ -34,7 +34,7 @@ use std::path::PathBuf;
 
 use codegen_rs as CG;
 
-use crate::ast::{AstRoot, Field, Interface, InterfaceField};
+use crate::ast::AstRoot;
 use crate::codegen::CodeGenBackend;
 use crate::codegen::CodeGenError;
 
@@ -43,7 +43,6 @@ mod interface;
 mod unit;
 mod utils;
 
-use field::field_type;
 use utils::{add_const_def, add_header, save_scope};
 
 // the module name for the constants module
@@ -188,9 +187,12 @@ impl CodeGenBackend for BackendRust {
             scope.raw("pub mod fields;");
             // the unit
             scope.raw("mod unit;");
-
             // the unit
             scope.raw("pub use unit :: *;");
+
+            // the unit
+            scope.raw("mod interface;");
+            scope.raw("pub use interface :: *;");
 
             // save the scope
             save_scope(scope, &srcdir, "mod")?;

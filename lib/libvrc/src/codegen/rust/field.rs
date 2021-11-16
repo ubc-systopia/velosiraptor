@@ -71,6 +71,7 @@ fn add_struct_definition(scope: &mut CG::Scope, field: &Field) {
     // add c representation
     st.repr("C");
     st.derive("Copy");
+    st.derive("Clone");
 
     // add the doc field to the struct
     st.doc(&format!(
@@ -88,23 +89,50 @@ fn add_insert_fn(imp: &mut CG::Impl, fname: &str, fbits: u64, sl: &BitSlice) {
     let ftype = to_rust_type(sl.nbits());
     let valtype = to_rust_type(fbits);
     // set function
-    imp.new_fn(&fnname)
-        .vis("pub")
-        .arg_mut_self()
-        .arg("val", CG::Type::new(ftype))
-        .doc(&format!("inserts value {}.{} in field", fname, sl.name))
-        .line(format!(
+
+    let body = if sl.start != 0 {
+        format!(
             "self.val = (self.val & {}) | (((val as {}) & {}) << {})",
             to_mask_str(!sl.mask_value(), fbits),
             valtype,
             to_mask_str(((1u128 << sl.nbits()) - 1) as u64, sl.nbits()),
             sl.start
-        ));
+        )
+    } else {
+        format!(
+            "self.val = (self.val & {}) | ((val as {}) & {})",
+            to_mask_str(!sl.mask_value(), fbits),
+            valtype,
+            to_mask_str(((1u128 << sl.nbits()) - 1) as u64, sl.nbits())
+        )
+    };
+
+    imp.new_fn(&fnname)
+        .vis("pub")
+        .arg_mut_self()
+        .arg("val", CG::Type::new(ftype))
+        .doc(&format!("inserts value {}.{} in field", fname, sl.name))
+        .line(body);
 }
 
 fn add_extract_fn(imp: &mut CG::Impl, fname: &str, sl: &BitSlice) {
     let fnname = format!("extract_{}", sl.name);
     let ftype = to_rust_type(sl.nbits());
+
+    let body = if sl.start != 0 {
+        format!(
+            "((self.val >> {}) & {}) as {}",
+            sl.start,
+            to_mask_str(((1u128 << sl.nbits()) - 1) as u64, sl.nbits()),
+            ftype
+        )
+    } else {
+        format!(
+            "(self.val & {}) as {}",
+            to_mask_str(((1u128 << sl.nbits()) - 1) as u64, sl.nbits()),
+            ftype
+        )
+    };
 
     // get function
     imp.new_fn(&fnname)
@@ -112,12 +140,7 @@ fn add_extract_fn(imp: &mut CG::Impl, fname: &str, sl: &BitSlice) {
         .doc(&format!("extracts value {}.{} from field", fname, sl.name))
         .arg_ref_self()
         .ret(CG::Type::new(ftype))
-        .line(format!(
-            "((self.val >> {}) & {}) as {}",
-            sl.start,
-            to_mask_str(((1u128 << sl.nbits()) - 1) as u64, sl.nbits()),
-            ftype
-        ));
+        .line(body);
 }
 
 fn add_struct_impl(scope: &mut CG::Scope, field: &Field) {
@@ -138,6 +161,15 @@ fn add_struct_impl(scope: &mut CG::Scope, field: &Field) {
     }
 }
 
+fn add_default_impl(scope: &mut CG::Scope, field: &Field) {
+    let imp = scope.new_impl(&field_type(field));
+    imp.impl_trait("Default");
+
+    imp.new_fn("default")
+        .ret(CG::Type::new("Self"))
+        .line("Self::new()");
+}
+
 /// generates the field value interface
 pub fn generate(unit: &str, field: &Field, outdir: &Path) -> Result<(), CodeGenError> {
     // the code generation scope
@@ -151,6 +183,8 @@ pub fn generate(unit: &str, field: &Field, outdir: &Path) -> Result<(), CodeGenE
     add_field_constants(&mut scope, field);
     add_struct_definition(&mut scope, field);
     add_struct_impl(&mut scope, field);
+
+    add_default_impl(&mut scope, field);
 
     // save the scope
     save_scope(scope, outdir, &field.name.to_lowercase())

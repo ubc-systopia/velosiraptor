@@ -25,6 +25,7 @@
 
 //! Unit Generation (Rust)
 
+use std::collections::HashSet;
 use std::path::Path;
 
 use codegen_rs as CG;
@@ -32,6 +33,7 @@ use codegen_rs as CG;
 use super::utils;
 use crate::ast::Unit;
 use crate::codegen::CodeGenError;
+use crate::synth::{OpArg, Operation};
 
 pub fn unit_type(unit: &Unit) -> String {
     unit.name.clone()
@@ -96,16 +98,86 @@ fn add_translate_function(imp: &mut CG::Impl, unit: &Unit) {
         .line("// TODO: SYNTHESIZE ME");
 }
 
+fn oparg_to_rust_expr(op: &OpArg) -> String {
+    match op {
+        OpArg::None => String::new(),
+        OpArg::Num(x) => format!("{:x}", x),
+        OpArg::Var(x) => x.clone(),
+    }
+}
+
+fn op_to_rust_expr(op: &Operation) -> String {
+    match op {
+        Operation::Insert {
+            field,
+            slice: Some(slice),
+            arg,
+        } => {
+            format!("v_{}.insert_{}({});", field, slice, oparg_to_rust_expr(arg))
+        }
+        Operation::Insert {
+            field,
+            slice: None,
+            arg,
+        } => {
+            format!("v_{}.set_val({});", field, oparg_to_rust_expr(arg))
+        }
+        Operation::Extract {
+            field,
+            slice: Some(slice),
+        } => {
+            format!("v_{}.extract_{}();", field, slice)
+        }
+        Operation::Extract { field, slice: None } => {
+            format!("v_{}.get_val();", field)
+        }
+        Operation::WriteAction { field } => {
+            format!("self.interface.write_{}(v_{});", field, field)
+        }
+        Operation::ReadAction { field } => {
+            format!("self.interface.read_{}();", field)
+        }
+        Operation::Return => String::new(),
+    }
+}
+
 fn add_map_function(imp: &mut CG::Impl, unit: &Unit) {
-    let m = imp
-        .new_fn("map")
-        .vis("pub")
-        .doc(&format!("Creates a new {} unit", unit.name))
-        //.ret(CG::Type::new("Self"))
-        .line("// TODO: SYNTHESIZE ME");
+    let mut fields = HashSet::new();
     if let Some(ops) = &unit.map_ops {
         for op in ops {
-            m.line(&format!("// {:?}", op));
+            let fname = op.fieldname();
+            if fname.is_empty() {
+                continue;
+            }
+            fields.insert(String::from(fname));
+        }
+    }
+
+    let m = imp
+        .new_fn("map")
+        .arg_ref_self()
+        .arg("va", "u64")
+        .arg("pa", "u64")
+        .arg("flags", "u64")
+        .vis("pub")
+        .doc(&format!("Creates a new {} unit", unit.name));
+    //.ret(CG::Type::new("Self"))
+
+    m.line("// field variable definitions");
+    for f in fields {
+        m.line(format!(
+            "let mut v_{} = {}::new();",
+            f,
+            utils::to_struct_name(&f, Some("Field"))
+        ));
+    }
+
+    m.line("");
+    m.line("//operation sequence");
+
+    if let Some(ops) = &unit.map_ops {
+        for op in ops {
+            m.line(&op_to_rust_expr(op));
         }
     }
 }
