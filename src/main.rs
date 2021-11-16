@@ -418,7 +418,7 @@ fn main() {
         "synthesis".bold().green(),
     );
 
-    let map_fn = synthsizer.synth_map(&ast).unwrap_or_else(|e| {
+    synthsizer.synth_map(&mut ast).unwrap_or_else(|e| {
         eprintln!(
             "{}{} `{}`.\n",
             "error".bold().red(),
@@ -434,7 +434,7 @@ fn main() {
         "synthesis".bold().green(),
     );
 
-    let unmap_fn = synthsizer.synth_unmap(&ast).unwrap_or_else(|e| {
+    synthsizer.synth_unmap(&mut ast).unwrap_or_else(|e| {
         eprintln!(
             "{}{} `{}`.\n",
             "error".bold().red(),
@@ -450,7 +450,7 @@ fn main() {
         "synthesis".bold().green(),
     );
 
-    let prot_fn = synthsizer.synth_protect(&ast).unwrap_or_else(|e| {
+    synthsizer.synth_protect(&mut ast).unwrap_or_else(|e| {
         eprintln!(
             "{}{} `{}`.\n",
             "error".bold().red(),
@@ -467,16 +467,14 @@ fn main() {
         "generate".bold().green(),
     );
 
-    codegen
-        .generate_units(&ast, map_fn, unmap_fn, prot_fn)
-        .unwrap_or_else(|e| {
-            eprintln!(
-                "{}{} `{}`.\n",
-                "error".bold().red(),
-                ": failure during unit generation".bold(),
-                e
-            );
-        });
+    codegen.generate_units(&ast).unwrap_or_else(|e| {
+        eprintln!(
+            "{}{} `{}`.\n",
+            "error".bold().red(),
+            ": failure during unit generation".bold(),
+            e
+        );
+    });
 
     codegen.finalize(&ast).unwrap_or_else(|e| {
         eprintln!(
