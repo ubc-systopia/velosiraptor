@@ -30,7 +30,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 // the used libraries
-use crate::ast::{Action, AstRoot, BitSlice, Expr, Interface, Method, State, Type};
+use crate::ast::{Action, AstRoot, BitSlice, Expr, Interface, Method, State};
 use crate::synth::{SynthError, COPYRIGHT};
 use rosettelang::{FunctionDef, RExpr, RosetteFile, StructDef, VarDef};
 
@@ -40,7 +40,6 @@ mod resultparser;
 
 // re-exports
 use resultparser::parse_result;
-pub use resultparser::{OpArg, Operation};
 
 pub struct SynthRosette {
     outdir: PathBuf,
@@ -1113,10 +1112,10 @@ impl SynthRosette {
     }
 
     /// synthesizes the `map` function and returns an ast of it
-    pub fn synth_map(&self, ast: &AstRoot) -> Result<Method, SynthError> {
+    pub fn synth_map(&self, ast: &mut AstRoot) -> Result<(), SynthError> {
         fs::create_dir_all(&self.outdir)?;
 
-        for unit in &ast.units {
+        for unit in &mut ast.units {
             println!("synthesizing map: for {} in {:?}", unit.name, self.outdir);
             let rktfilepath = self.outdir.join(format!("{}.rkt", unit.name));
             let doc = format!("Unit: {}, Function: map()", unit.name);
@@ -1155,36 +1154,31 @@ impl SynthRosette {
 
             let res = rkt.exec();
 
-            let _ops = parse_result(&res);
+            let ops = parse_result(&res);
 
-            // TODO: conver the ops to a result
+            unit.map_ops = Some(ops);
         }
 
-        Ok(Method::new(String::from("map"), Type::Boolean, Vec::new()))
+        Ok(())
     }
 
     /// synthesizes the 'unmap' function and returns an ast of it
-    pub fn synth_unmap(&self, ast: &AstRoot) -> Result<Method, SynthError> {
-        for unit in &ast.units {
+    pub fn synth_unmap(&self, ast: &mut AstRoot) -> Result<(), SynthError> {
+        for unit in &mut ast.units {
             println!("synthesizing map: for {} in {:?}", unit.name, self.outdir);
+            let ops = Vec::new();
+            unit.unmap_ops = Some(ops);
         }
-
-        Ok(Method::new(
-            String::from("unmap"),
-            Type::Boolean,
-            Vec::new(),
-        ))
+        Ok(())
     }
 
-    pub fn synth_protect(&self, ast: &AstRoot) -> Result<Method, SynthError> {
-        for unit in &ast.units {
+    pub fn synth_protect(&self, ast: &mut AstRoot) -> Result<(), SynthError> {
+        for unit in &mut ast.units {
             println!("synthesizing map: for {} in {:?}", unit.name, self.outdir);
+            let ops = Vec::new();
+            unit.protect_ops = Some(ops);
         }
 
-        Ok(Method::new(
-            String::from("protect"),
-            Type::Boolean,
-            Vec::new(),
-        ))
+        Ok(())
     }
 }

@@ -25,6 +25,8 @@
 
 //! Parsing
 
+use crate::synth::{OpArg, Operation};
+
 /// the used nom parsing facilities
 use nom::{
     branch::alt,
@@ -35,66 +37,6 @@ use nom::{
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
-
-/// defines an argumetn for an operation
-#[derive(Debug)]
-pub enum OpArg {
-    /// a constant number
-    Num(u64),
-    /// a variable
-    Var(String),
-    /// no argument for this operation
-    None,
-}
-
-#[derive(Debug)]
-pub enum Operation {
-    Insert {
-        field: String,
-        slice: Option<String>,
-        arg: OpArg,
-    },
-    Extract {
-        field: String,
-        slice: Option<String>,
-    },
-    WriteAction {
-        field: String,
-    },
-    ReadAction {
-        field: String,
-    },
-    Return,
-}
-
-impl Operation {
-    pub fn insert(field: &str, slice: Option<&str>, op: OpArg) -> Self {
-        Operation::Insert {
-            field: field.to_string(),
-            slice: slice.map(|s| s.to_string()),
-            arg: op,
-        }
-    }
-    pub fn extract(field: &str, slice: Option<&str>) -> Self {
-        Operation::Extract {
-            field: field.to_string(),
-            slice: slice.map(|s| s.to_string()),
-        }
-    }
-    pub fn write(field: &str) -> Self {
-        Operation::WriteAction {
-            field: field.to_string(),
-        }
-    }
-    pub fn read(field: &str) -> Self {
-        Operation::ReadAction {
-            field: field.to_string(),
-        }
-    }
-    pub fn ret() -> Self {
-        Operation::Return
-    }
-}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 // Result Parsing

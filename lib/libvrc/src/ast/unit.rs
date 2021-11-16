@@ -38,6 +38,7 @@ use crate::ast::{
     SymbolKind, SymbolTable, Type,
 };
 use crate::error::{ErrorLocation, VrsError};
+use crate::synth::Operation;
 use crate::token::TokenStream;
 
 /// Defines a translation unit
@@ -68,6 +69,12 @@ pub struct Unit {
     /// the methods defined by this unit
     pub methods: Vec<Method>,
     // TODO: maybe make the translate / constructors / map / ... explicit here?
+    /// synthesized map operations for this unit
+    pub map_ops: Option<Vec<Operation>>,
+    /// synthesizeed unmap operations for this unit
+    pub unmap_ops: Option<Vec<Operation>>,
+    /// synthesized protect operations for this unit
+    pub protect_ops: Option<Vec<Operation>>,
     /// the position in the source tree where this unit is defined
     pub pos: TokenStream,
 }

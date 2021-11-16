@@ -30,10 +30,12 @@ use custom_error::custom_error;
 use std::path::Path;
 
 // the code generation backends
+mod operation;
 mod rosette;
 
 // the used library modules
-use crate::ast::{AstRoot, Method};
+use crate::ast::AstRoot;
+pub use crate::synth::operation::{OpArg, Operation};
 use crate::synth::rosette::SynthRosette;
 
 const COPYRIGHT: &str = "2021 Systopia Lab, Computer Science, University of British Columbia";
@@ -68,7 +70,7 @@ impl Synthesisizer {
     }
 
     /// synthesizes the `map` function and returns an ast of it
-    pub fn synth_map(&self, ast: &AstRoot) -> Result<Method, SynthError> {
+    pub fn synth_map(&self, ast: &mut AstRoot) -> Result<(), SynthError> {
         use Synthesisizer::*;
         match self {
             Rosette(r) => r.synth_map(ast),
@@ -77,7 +79,7 @@ impl Synthesisizer {
     }
 
     /// synthesizes the 'unmap' function and returns an ast of it
-    pub fn synth_unmap(&self, ast: &AstRoot) -> Result<Method, SynthError> {
+    pub fn synth_unmap(&self, ast: &mut AstRoot) -> Result<(), SynthError> {
         use Synthesisizer::*;
         match self {
             Rosette(r) => r.synth_unmap(ast),
@@ -85,7 +87,7 @@ impl Synthesisizer {
         }
     }
 
-    pub fn synth_protect(&self, ast: &AstRoot) -> Result<Method, SynthError> {
+    pub fn synth_protect(&self, ast: &mut AstRoot) -> Result<(), SynthError> {
         use Synthesisizer::*;
         match self {
             Rosette(r) => r.synth_protect(ast),
