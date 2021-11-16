@@ -83,4 +83,14 @@ impl Operation {
     pub fn ret() -> Self {
         Operation::Return
     }
+
+    pub fn fieldname(&self) -> &str {
+        match self {
+            Operation::Insert { field, .. } => field,
+            Operation::Extract { field, .. } => field,
+            Operation::WriteAction { field, .. } => field,
+            Operation::ReadAction { field, .. } => field,
+            Operation::Return => "",
+        }
+    }
 }
