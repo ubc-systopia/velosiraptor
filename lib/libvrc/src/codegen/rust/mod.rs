@@ -102,68 +102,6 @@ impl BackendRust {
         cargo.flush()?;
         Ok(())
     }
-
-    fn generate_fields(
-        &self,
-        outdir: &Path,
-        unitname: &str,
-        fields: &[Field],
-    ) -> Result<(), CodeGenError> {
-        let fieldsdir = outdir.join("fields");
-
-        fs::create_dir_all(&fieldsdir)?;
-
-        for f in fields {
-            println!("generate interfaces fields");
-            field::generate(unitname, f, &fieldsdir)?;
-        }
-
-        // generate the mod file.
-        // the code generation scope
-        let mut scope = CG::Scope::new();
-
-        let title = format!("Module for all fields of unit '{}'", unitname);
-        add_header(&mut scope, &title);
-
-        // TODO: add doc comment
-
-        scope.new_comment("modules");
-        for f in fields {
-            scope.raw(&format!("pub mod {};", f.name.to_lowercase()));
-        }
-
-        scope.new_comment("re-exports");
-        for f in fields {
-            scope.raw(&format!(
-                "pub use {}::{};",
-                f.name.to_lowercase(),
-                field_type(f)
-            ));
-        }
-
-        save_scope(scope, &fieldsdir, "mod")
-    }
-
-    fn generate_interface_fields(
-        &self,
-        outdir: &Path,
-        unitname: &str,
-        fields: &[InterfaceField],
-    ) -> Result<(), CodeGenError> {
-        let fieldsdir = outdir.join("fields");
-
-        fs::create_dir_all(&fieldsdir)?;
-
-        let res: Result<(), CodeGenError> = Ok(());
-        fields.iter().fold(res, |res: Result<(), CodeGenError>, e| {
-            let r = field::generate(unitname, &e.field, &fieldsdir);
-            if res.is_err() {
-                res
-            } else {
-                r
-            }
-        })
-    }
 }
 
 impl CodeGenBackend for BackendRust {
@@ -223,16 +161,7 @@ impl CodeGenBackend for BackendRust {
             srcdir.push(unit.name.to_lowercase());
             // the root directory as supplied by backend
             fs::create_dir_all(&srcdir)?;
-
-            match &unit.interface {
-                Interface::Memory { fields, .. } => self
-                    .generate_interface_fields(&srcdir, &unit.name, fields)
-                    .expect("field generation failed"),
-                Interface::MMIORegisters { .. } => {}
-                Interface::CPURegisters { .. } => {}
-                _ => (),
-            }
-
+            interface::generate(unit, &srcdir)?;
             srcdir.pop();
         }
         Ok(())

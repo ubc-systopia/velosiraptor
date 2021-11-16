@@ -68,6 +68,10 @@ fn add_struct_definition(scope: &mut CG::Scope, field: &Field) {
     // make it public
     st.vis("pub");
 
+    // add c representation
+    st.repr("C");
+    st.derive("Copy");
+
     // add the doc field to the struct
     st.doc(&format!(
         "Represents the interface field '{}',\ndefined in: {}",

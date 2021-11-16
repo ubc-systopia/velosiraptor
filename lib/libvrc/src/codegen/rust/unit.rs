@@ -33,6 +33,10 @@ use super::utils;
 use crate::ast::Unit;
 use crate::codegen::CodeGenError;
 
+pub fn unit_type(unit: &Unit) -> String {
+    unit.name.clone()
+}
+
 /// adds the constants defined in the unit to the scope
 fn add_unit_constants(scope: &mut CG::Scope, unit: &Unit) {
     scope.new_comment("Defined unit constants");
@@ -76,6 +80,12 @@ fn add_constructor_function(imp: &mut CG::Impl, unit: &Unit) {
         .doc(&format!("Creates a new `{}` unit", unit.name))
         //.ret(CG::Type::new("Self"))
         .line("// TODO: SYNTHESIZE ME");
+
+    imp.new_fn("from_raw")
+        .vis("pub")
+        .doc(&format!("Creates a new `{}` unit", unit.name))
+        //.ret(CG::Type::new("Self"))
+        .line("// TODO: SYNTHESIZE ME");
 }
 
 fn add_translate_function(imp: &mut CG::Impl, unit: &Unit) {
@@ -87,11 +97,17 @@ fn add_translate_function(imp: &mut CG::Impl, unit: &Unit) {
 }
 
 fn add_map_function(imp: &mut CG::Impl, unit: &Unit) {
-    imp.new_fn("map")
+    let m = imp
+        .new_fn("map")
         .vis("pub")
         .doc(&format!("Creates a new {} unit", unit.name))
         //.ret(CG::Type::new("Self"))
         .line("// TODO: SYNTHESIZE ME");
+    if let Some(ops) = &unit.map_ops {
+        for op in ops {
+            m.line(&format!("// {:?}", op));
+        }
+    }
 }
 
 fn add_unmap_function(imp: &mut CG::Impl, unit: &Unit) {
