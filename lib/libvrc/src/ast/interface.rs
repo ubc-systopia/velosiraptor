@@ -29,7 +29,7 @@ use crate::ast::{
     utils, AstNode, Expr, Field, Issues, Param, Symbol, SymbolKind, SymbolTable, Type,
 };
 use crate::error::VrsError;
-use crate::parser::state::state;
+// use crate::parser::state::state;
 use crate::token::TokenStream;
 
 /// Defines the software-visible interface of a unit
@@ -108,11 +108,6 @@ impl Interface {
 
 /// Implementation of [AstNode] for [Interface]
 impl AstNode for Interface {
-    /// returns a printable string representing the ast node
-    fn name(&self) -> &str {
-        "interface"
-    }
-
     // checks the node and returns the number of errors and warnings encountered
     fn check(&self, st: &mut SymbolTable) -> Issues {
         // TODO: Implement the checks, this may follow a similar structure as the state
@@ -226,6 +221,11 @@ impl AstNode for Interface {
         // no-op
     }
 
+    /// returns a printable string representing the ast node
+    fn name(&self) -> &str {
+        "interface"
+    }
+
     /// returns the location of the AstNode
     fn loc(&self) -> &TokenStream {
         match self {
@@ -283,16 +283,6 @@ impl InterfaceField {
 
 /// Implementation of [AstNode] for [Interface]
 impl AstNode for InterfaceField {
-    /// returns a printable string representing the ast node
-    fn name(&self) -> &str {
-        self.field.name()
-    }
-
-    /// returns the location of the AstNode
-    fn loc(&self) -> &TokenStream {
-        self.field.loc()
-    }
-
     fn check(&self, st: &mut SymbolTable) -> Issues {
         let mut res = Issues::ok();
 
@@ -343,6 +333,16 @@ impl AstNode for InterfaceField {
 
         res
     }
+
+    /// returns a printable string representing the ast node
+    fn name(&self) -> &str {
+        self.field.name()
+    }
+
+    /// returns the location of the AstNode
+    fn loc(&self) -> &TokenStream {
+        self.field.loc()
+    }
 }
 
 /// Defines an action that is executed on the interface
@@ -364,7 +364,8 @@ pub struct ActionComponent {
 }
 
 impl ActionComponent {
-    fn check(&self, st: &mut SymbolTable) -> Issues {
+    // TODO: Not sure we can actually take advantage of the SymbolTable here...
+    fn check(&self, _st: &mut SymbolTable) -> Issues {
         let mut res = Issues::ok();
 
         match &self.src {
