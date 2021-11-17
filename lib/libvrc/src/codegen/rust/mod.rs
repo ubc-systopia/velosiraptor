@@ -154,10 +154,14 @@ impl BackendRust {
 
         fs::create_dir_all(&fieldsdir)?;
 
-        let res : Result<(), CodeGenError> = Ok(());
-        fields.iter().fold(res, |res : Result<(), CodeGenError>, e| {
+        let res: Result<(), CodeGenError> = Ok(());
+        fields.iter().fold(res, |res: Result<(), CodeGenError>, e| {
             let r = field::generate(unitname, &e.field, &fieldsdir);
-            if res.is_err() { res } else { r }
+            if res.is_err() {
+                res
+            } else {
+                r
+            }
         })
     }
 }
@@ -221,16 +225,12 @@ impl CodeGenBackend for BackendRust {
             fs::create_dir_all(&srcdir)?;
 
             match &unit.interface {
-                Interface::Memory { fields,.. } => {
-                    self.generate_interface_fields(&srcdir, &unit.name, fields).expect("field generation failed")
-                }
-                Interface::MMIORegisters { .. } => {
-
-                }
-                Interface::CPURegisters { .. } => {
-
-                }
-                _ => ()
+                Interface::Memory { fields, .. } => self
+                    .generate_interface_fields(&srcdir, &unit.name, fields)
+                    .expect("field generation failed"),
+                Interface::MMIORegisters { .. } => {}
+                Interface::CPURegisters { .. } => {}
+                _ => (),
             }
 
             srcdir.pop();
