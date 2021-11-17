@@ -32,6 +32,7 @@ pub mod expression;
 pub mod field;
 pub mod import;
 pub mod interface;
+mod map;
 pub mod method;
 pub mod param;
 pub mod state;

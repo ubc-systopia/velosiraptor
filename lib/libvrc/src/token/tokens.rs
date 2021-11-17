@@ -41,10 +41,14 @@ pub enum Keyword {
     If,
     /// conditional else branch
     Else,
+    /// for statements,
+    For,
     /// import statements
     Import,
     /// state statement
     State,
+    /// Map
+    Map,
     /// interface statement
     Interface,
     /// Memory State and Interface statement
@@ -96,11 +100,13 @@ impl fmt::Display for Keyword {
             Unit => "unit",
             If => "if",
             Else => "else",
+            For => "for",
             Import => "import",
             Let => "let",
             Fn => "fn",
             Assert => "assert",
             State => "state",
+            Map => "map",
             Interface => "interface",
             Memory => "Memory",
             MMIO => "MMIO",
