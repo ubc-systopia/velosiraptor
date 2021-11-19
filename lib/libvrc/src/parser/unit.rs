@@ -39,7 +39,7 @@ use nom::{
 use crate::ast::{Interface, State, Unit};
 use crate::error::IResult;
 use crate::parser::{
-    constdef, method, parameter, state,
+    constdef, interface, method, parameter, state,
     terminals::{
         assign, colon, comma, ident, kw_size, kw_unit, lbrace, lparen, num, rbrace, rparen,
         semicolon,
@@ -68,10 +68,16 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
 
     // TODO: here we have ConstItem | InterfaceItem | StateItem | FunctionItem
     // TODO: either put that as
-    let unit_body = permutation((many0(constdef), opt(state), opt(size), many0(method)));
+    let unit_body = permutation((
+        many0(constdef),
+        opt(state),
+        opt(interface),
+        opt(size),
+        many0(method),
+    ));
 
     // then we have the unit block, wrapped in curly braces and a ;
-    let (i3, (consts, state, size, methods)) =
+    let (i3, (consts, state, interface, size, methods)) =
         cut(terminated(delimited(lbrace, unit_body, rbrace), semicolon))(i2)?;
 
     let pos = input.expand_until(&i3);
@@ -84,7 +90,9 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
             size,
             consts,
             state: state.unwrap_or(State::None { pos: pos.clone() }),
-            interface: Interface::None,
+            interface: interface.unwrap_or(Interface::None {
+                pos: TokenStream::empty(),
+            }),
             methods,
             pos,
         },

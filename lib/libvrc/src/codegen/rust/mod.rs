@@ -34,7 +34,7 @@ use std::path::PathBuf;
 
 use codegen_rs as CG;
 
-use crate::ast::{AstRoot, Field, State};
+use crate::ast::{AstRoot, Field, Interface, InterfaceField};
 use crate::codegen::CodeGenBackend;
 use crate::codegen::CodeGenError;
 
@@ -143,6 +143,27 @@ impl BackendRust {
 
         save_scope(scope, &fieldsdir, "mod")
     }
+
+    fn generate_interface_fields(
+        &self,
+        outdir: &Path,
+        unitname: &str,
+        fields: &[InterfaceField],
+    ) -> Result<(), CodeGenError> {
+        let fieldsdir = outdir.join("interfaces");
+
+        fs::create_dir_all(&fieldsdir)?;
+
+        let res: Result<(), CodeGenError> = Ok(());
+        fields.iter().fold(res, |res: Result<(), CodeGenError>, e| {
+            let r = field::generate(unitname, &e.field, &fieldsdir);
+            if res.is_err() {
+                res
+            } else {
+                r
+            }
+        })
+    }
 }
 
 impl CodeGenBackend for BackendRust {
@@ -203,12 +224,12 @@ impl CodeGenBackend for BackendRust {
             // the root directory as supplied by backend
             fs::create_dir_all(&srcdir)?;
 
-            match &unit.state {
-                State::MemoryState {
-                    bases: _, fields, ..
-                } => self
-                    .generate_fields(&srcdir, &unit.name, fields)
+            match &unit.interface {
+                Interface::Memory { fields, .. } => self
+                    .generate_interface_fields(&srcdir, &unit.name, fields)
                     .expect("field generation failed"),
+                Interface::MMIORegisters { .. } => {}
+                Interface::CPURegisters { .. } => {}
                 _ => (),
             }
 

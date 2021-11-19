@@ -41,18 +41,30 @@ pub enum Keyword {
     If,
     /// conditional else branch
     Else,
+    /// for statements,
+    For,
     /// import statements
     Import,
     /// state statement
     State,
+    /// Map
+    Map,
     /// interface statement
     Interface,
-    /// Memory State statement
+    /// Memory State and Interface statement
     Memory,
-    /// Register State statement
+    /// Memory Mapped Interface statement
+    MMIO,
+    /// Register State and Interface statement
     Register,
     /// Null-like value used for State and Interface
     None,
+    /// A read action from the interface on the state
+    ReadAction,
+    /// A write action from the interface on the state
+    WriteAction,
+    /// Used in identifying the Bitslice layout of an Interface field
+    Layout,
     /// defines a local variable
     Let,
     /// represents a function
@@ -88,13 +100,16 @@ impl fmt::Display for Keyword {
             Unit => "unit",
             If => "if",
             Else => "else",
+            For => "for",
             Import => "import",
             Let => "let",
             Fn => "fn",
             Assert => "assert",
             State => "state",
-            Interface => "Interface",
+            Map => "map",
+            Interface => "interface",
             Memory => "Memory",
+            MMIO => "MMIO",
             Register => "Register",
             None => "None",
             Requires => "requires",
@@ -102,6 +117,10 @@ impl fmt::Display for Keyword {
             Forall => "forall",
             Exists => "exists",
             Return => "return",
+            Layout => "Layout",
+            // ActionTypes
+            ReadAction => "ReadAction",
+            WriteAction => "WriteAction",
             // types
             Addr => "addr",
             Size => "size",
@@ -173,8 +192,11 @@ pub enum TokenContent {
     Assign, // =
 
     // arrows
+    LArrow,        // <-
     RArrow,        // ->
+    BiDirArrow,    // <->
     FatArrow,      // =>
+    BiDirFatArrow, // <=>
     RLongFatArrow, // ==>
 
     // comparisons
@@ -193,7 +215,7 @@ pub enum TokenContent {
     Wildcard,   // ?
 }
 
-/// Implementatin for TokenContent
+/// Implementation for TokenContent
 impl TokenContent {
     pub fn to_str(tok: TokenContent) -> &'static str {
         match tok {
@@ -235,8 +257,11 @@ impl TokenContent {
             TokenContent::Assign => "=",
 
             // arrows
+            TokenContent::LArrow => "<-",
             TokenContent::RArrow => "->",
+            TokenContent::BiDirArrow => "<->",
             TokenContent::FatArrow => "=>",
+            TokenContent::BiDirFatArrow => "<=>",
             TokenContent::RLongFatArrow => "==>",
 
             // comparisons

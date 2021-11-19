@@ -1,4 +1,4 @@
-// Velosiraptor Compiler
+// Velosiraptor Parser
 //
 //
 // MIT License
@@ -23,11 +23,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! The Token module
+//! MAP ast node
 
-mod tokens;
-mod tokenstream;
+use crate::ast::Expr;
+use crate::token::TokenStream;
 
-// re-export
-pub use tokens::{Keyword, Token, TokenContent};
-pub use tokenstream::TokenStream;
+pub struct Map {
+    pub sizes: Vec<(u64, u64)>,
+    pub units: Vec<(String, Expr)>,
+    pub pos: TokenStream,
+}

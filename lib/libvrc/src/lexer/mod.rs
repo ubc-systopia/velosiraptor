@@ -114,8 +114,11 @@ namedtag!(gt, TokenContent::Gt);
 namedtag!(assign, TokenContent::Assign);
 
 // arrows
-namedtag!(fatarrow, TokenContent::FatArrow);
+namedtag!(larrow, TokenContent::LArrow);
 namedtag!(rarrow, TokenContent::RArrow);
+namedtag!(bidirarrow, TokenContent::BiDirArrow);
+namedtag!(fatarrow, TokenContent::FatArrow);
+namedtag!(bidirfatarrow, TokenContent::BiDirFatArrow);
 namedtag!(rlongfatarrow, TokenContent::RLongFatArrow);
 
 // misc
@@ -132,8 +135,12 @@ fn punctuation2(input: SourcePos) -> IResult<SourcePos, Token> {
         rlongfatarrow,
         dotdot,
         pathsep,
+        larrow,
         rarrow,
-        fatarrow, // shifts
+        bidirarrow,
+        fatarrow,
+        bidirfatarrow, // shifts
+        fatarrow,      // shifts
         lshift,
         rshift, // logical combinations
         land,

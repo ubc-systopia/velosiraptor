@@ -32,13 +32,13 @@ mod field;
 mod import;
 mod interface;
 mod issues;
+mod map;
 mod method;
 mod param;
 mod root;
 mod state;
 mod statement;
 mod symboltable;
-pub mod transform;
 mod types;
 mod unit;
 mod utils;
@@ -64,8 +64,9 @@ pub use consts::Const;
 pub use expression::{BinOp, Expr, Quantifier, UnOp};
 pub use field::Field;
 pub use import::Import;
-pub use interface::Interface;
+pub use interface::{Action, ActionComponent, ActionType, Interface, InterfaceField};
 pub use issues::Issues;
+pub use map::Map;
 pub use method::Method;
 pub use param::Param;
 pub use root::AstRoot;
@@ -84,6 +85,12 @@ pub trait AstNode {
     fn check(&self, _st: &mut SymbolTable) -> Issues {
         Issues::ok()
     }
+
+    // reqrite the ast
+    fn rewrite(&mut self, _st: &mut SymbolTable) {
+        // no-op
+    }
+
     // builds the symbol table
     fn build_symtab(&self, _st: &mut SymbolTable) -> Issues {
         Issues::ok()

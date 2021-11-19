@@ -356,6 +356,8 @@ pub fn term_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
         bool_lit_expr,
         // a function call expression returning a boolean
         fn_call_expr,
+        // slice expression
+        slice_expr,
         // element expression returning a boolean
         element_expr,
         // it can be a identifier (variable)
@@ -593,6 +595,7 @@ fn test_literals() {
     parse_equal!(expr, "foo[3]", "foo[3]");
     parse_equal!(expr, "bar()", "bar()");
     parse_equal!(expr, "foo.bar[3]", "foo.bar[3]");
+    parse_equal!(expr, "foo.bar[0..3]", "foo.bar[0..3]");
     // unclosed
     parse_fail!(expr, "(1");
     parse_fail!(expr, "(1(");

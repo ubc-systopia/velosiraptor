@@ -28,14 +28,13 @@
 // lexer, parser terminals and ast
 use crate::ast::Field;
 use crate::error::IResult;
-use crate::parser::bitslice::bitslice;
-use crate::parser::terminals::{comma, ident, lbrace, lbrack, num, rbrace, rbrack, semicolon};
+use crate::parser::bitslice::bitslice_block;
+use crate::parser::terminals::{comma, ident, lbrack, num, rbrack, semicolon};
 use crate::token::TokenStream;
 
 // the used nom componets
 use nom::{
     combinator::{cut, opt},
-    multi::separated_list0,
     sequence::{delimited, pair, terminated},
 };
 
@@ -52,23 +51,16 @@ use nom::{
 ///  * No fields: `ident [ident, num, num];`
 ///  * No fields: `ident [ident, num, num] {};
 ///  * No base/offset: `ident [num];
-
+///
 pub fn field(input: TokenStream) -> IResult<TokenStream, Field> {
     // we first start of with an identifier,
     let (i1, name) = ident(input.clone())?;
 
-    // define a parser for the base-offset: baseoffsetparser = ident, num,
-    let baseoffsetparser = pair(terminated(ident, cut(comma)), cut(terminated(num, comma)));
-
-    // recognize the field header: [baseoffsetparser, num]
-    let (i2, (stateref, length)) =
-        cut(delimited(lbrack, pair(opt(baseoffsetparser), num), rbrack))(i1)?;
-
-    // define the parser for the bitslices: bitslicesparser = {LIST(bitslice, comma)}
-    let bitslicesparser = delimited(lbrace, cut(separated_list0(comma, bitslice)), rbrace);
+    // parse the field params
+    let (i2, (stateref, length)) = cut(field_params)(i1)?;
 
     // now recognize the optional bitslices, and the semicolon.
-    let (rem, bitslices) = cut(terminated(opt(bitslicesparser), semicolon))(i2)?;
+    let (rem, bitslices) = cut(terminated(opt(bitslice_block), semicolon))(i2)?;
 
     // if there were bitslices parsed unwrap them, otherwise create an empty vector
     let layout = bitslices.unwrap_or_default();
@@ -86,6 +78,34 @@ pub fn field(input: TokenStream) -> IResult<TokenStream, Field> {
             pos,
         },
     ))
+}
+
+/// parses field parameters
+///
+/// This parser recognizes field parameters that define the size of the field,
+/// and the memory location if applicable
+///
+/// # Grammar
+///
+/// FIELD_PARAMS := LBRACK [IDENT, NUM, ] NUM
+///
+/// # Results
+///
+///  * OK:      the parser could successfully recognize the interface field
+///  * Error:   the parser could not recognize  the interface field definition keyword
+///  * Failure: the parser recognized the interface field, but it did not properly parse
+///
+/// # Examples
+///
+///  - just the width: [8]
+///  - base offset, width: [base, 4, 4]
+///
+pub fn field_params(input: TokenStream) -> IResult<TokenStream, (Option<(String, u64)>, u64)> {
+    // define a parser for the base-offset: baseoffsetparser = ident, num,
+    let baseoffsetparser = pair(terminated(ident, cut(comma)), cut(terminated(num, comma)));
+
+    // recognize the field header: [baseoffsetparser, num]
+    delimited(lbrack, pair(opt(baseoffsetparser), num), rbrack)(input)
 }
 
 #[cfg(test)]

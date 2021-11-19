@@ -180,7 +180,7 @@ impl AstNode for State {
             }
         };
 
-        // create a new symtable context
+        // create a new symtable context, this is required for base checking in the fields
         st.create_context(String::from("state"));
 
         // Check 1: Fields
@@ -221,7 +221,6 @@ impl AstNode for State {
         for b in bases {
             let sym = st.lookup(&b.name);
             if let Some(sym) = sym {
-                println!("SYMBOL EXISTS");
                 if sym.kind != SymbolKind::Parameter {
                     VrsError::new_double_kind(
                         String::from(b.name()),
@@ -284,6 +283,9 @@ impl AstNode for State {
                 res.inc_err(1);
             }
         }
+
+        // drop the symbol table context again
+        st.drop_context();
 
         res
     }

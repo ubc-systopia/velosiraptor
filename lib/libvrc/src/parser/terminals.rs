@@ -34,14 +34,14 @@ use crate::token::{Keyword, TokenContent, TokenStream};
 /// ff
 macro_rules! terminalparser (
     ($vis:vis $name:ident, $tag: expr) => (
-        $vis fn $name(input: TokenStream) -> IResult<TokenStream, ()> {
+        $vis fn $name(input: TokenStream) -> IResult<TokenStream, TokenContent> {
             let (rem, tok) = take(1usize)(input.clone())?;
             // we need at least one token
             if tok.is_empty() {
                 Err(Err::Incomplete(Needed::new(1)))
             } else {
                 if tok.peek().content == $tag {
-                    Ok((rem, ()))
+                    Ok((rem, $tag))
                 } else {
                     Err(Err::Error(VrsError::from_token(input, $tag)))
                 }
@@ -98,8 +98,11 @@ terminalparser!(pub gt, TokenContent::Gt);
 terminalparser!(pub assign, TokenContent::Assign);
 
 // arrows
-terminalparser!(pub fatarrow, TokenContent::FatArrow);
+terminalparser!(pub larrow, TokenContent::LArrow);
 terminalparser!(pub rarrow, TokenContent::RArrow);
+terminalparser!(pub bidirarrow, TokenContent::BiDirArrow);
+terminalparser!(pub fatarrow, TokenContent::FatArrow);
+terminalparser!(pub bidirfatarrow, TokenContent::BiDirFatArrow);
 terminalparser!(pub rlongfatarrow, TokenContent::RLongFatArrow);
 
 // comparators
@@ -188,16 +191,22 @@ keywordparser!(pub kw_else, Keyword::Else);
 keywordparser!(pub kw_state, Keyword::State);
 keywordparser!(pub kw_interface, Keyword::Interface);
 keywordparser!(pub kw_memory, Keyword::Memory);
+keywordparser!(pub kw_mmio, Keyword::MMIO);
 keywordparser!(pub kw_register, Keyword::Register);
 keywordparser!(pub kw_none, Keyword::None);
+keywordparser!(pub kw_layout, Keyword::Layout);
 keywordparser!(pub kw_fn, Keyword::Fn);
 keywordparser!(pub kw_size, Keyword::Size);
+keywordparser!(pub kw_readaction, Keyword::ReadAction);
+keywordparser!(pub kw_writeaction, Keyword::WriteAction);
 keywordparser!(pub kw_requires, Keyword::Requires);
 keywordparser!(pub kw_ensures, Keyword::Ensures);
 keywordparser!(pub kw_assert, Keyword::Assert);
 keywordparser!(pub kw_return, Keyword::Return);
 keywordparser!(pub kw_forall, Keyword::Forall);
 keywordparser!(pub kw_exists, Keyword::Exists);
+keywordparser!(pub kw_map, Keyword::Map);
+keywordparser!(pub kw_for, Keyword::For);
 
 /// parses a type expression
 ///
