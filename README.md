@@ -33,6 +33,12 @@ git submodule init
 git submodule update
 ```
 
+To build the documentation, install the `mdbook` crate.
+
+```
+cargo install mdbook
+```
+
 ## Contributing
 
 Please follow the [naming and formatting conventions](https://doc.rust-lang.org/1.0.0/style/style/naming/README.html)
@@ -58,9 +64,20 @@ cargo run <*.vrs>
 
 ## Documentation
 
+The documentation is located in the `doc` directory.
+We use Rust's [mdBook](https://github.com/rust-lang/mdBook) to build the documentation change
+to the `doc` directory and run the folloing commands.
+
+ * `mdbook build` builds the documentation
+ * `mdbook serve` to make it accessible on `http://localhost:3000`
+
+
+To build the documentation of the code run the following command.
+
 ```
 $ cargo doc --no-deps
 ```
+
 
 
 ## Testing
