@@ -9,7 +9,4 @@ Ultimately, the language should serve as a basis for generating both, an OS driv
 and a hardware component implementing the translation hardware, either simulated
 or a real implementation in a hardware description language.
 
-## Specification Files
 
-A translation hardware component is specified in a VelosiRaptor Specification Language file
-(`*.vrs`). The encoding of the file should be plain ASCII.
