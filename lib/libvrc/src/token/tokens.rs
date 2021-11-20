@@ -212,7 +212,6 @@ pub enum TokenContent {
 
     // others, maybe not used
     At,         // @
-    Underscore, // _
     DotDot,     // ..  for slices
     PathSep,    // ::
     Wildcard,   // ?
@@ -262,7 +261,7 @@ impl TokenContent {
             // arrows
             TokenContent::LArrow => "<-",
             TokenContent::RArrow => "->",
-            TokenContent::BiDirArrow => "<->",
+            TokenContent::BiDirArrow => "<-->",
             TokenContent::FatArrow => "=>",
             TokenContent::BiDirFatArrow => "<=>",
             TokenContent::RLongFatArrow => "==>",
