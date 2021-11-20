@@ -28,83 +28,77 @@
 //  2. List Comprehension that split the address space equally amongst them.
 //  3. List Comprehension with explicit address ranges.
 
-use crate::ast::Map;
+use crate::ast::{Map, MapEntry, Expr};
 use crate::error::IResult;
 use crate::parser::expression::{expr, range_expr};
-use crate::parser::terminals::{
-    assign, comma, ident, kw_for, kw_map, lbrace, lbrack, rbrace, rbrack, semicolon,
-};
-use crate::token::TokenStream;
-use nom::branch::alt;
-use nom::combinator::cut;
-use nom::multi::separated_list1;
+use crate::parser::terminals::{assign, comma, ident, kw_for, kw_map, lbrace, lbrack, rbrace, rbrack, semicolon, at, kw_in, num, dotdot};
+use crate::token::{TokenStream};
+
+use nom::combinator::{cut, opt};
+use nom::multi::{separated_list1, separated_list0};
 use nom::sequence::{delimited, pair, preceded, tuple};
+use nom::branch::alt;
 
-// Encompases all the different cases of Map parsing.
-fn parse_map(input: TokenStream) -> IResult<TokenStream, Map> {
-    alt((
-        parse_explicit_map,
-        parse_simple_list_comprehension,
-        parse_address_range_list_comprehension,
-    ))(input)
-}
 
-// Parses explicit map lists of the type:
-// map = [ UnitName(ident + offset), ..., UnitName(ident + offset) ];
-fn parse_explicit_map(input: TokenStream) -> IResult<TokenStream, Map> {
+// Parses Map Statements
+pub fn parse_map(input: TokenStream) -> IResult<TokenStream, Map> {
     let (i1, _) = kw_map(input.clone())?;
-    let map_body_parser = delimited(
-        lbrack,
-        // UnitName(ident + offset), UnitName(ident + offset)
-        separated_list1(comma, pair(ident, delimited(lbrace, expr, rbrace))),
-        rbrack,
-    );
-    let (i2, units) = cut(delimited(assign, map_body_parser, semicolon))(i1)?;
+    let (i2, entries) = cut(delimited(
+        pair(assign, lbrack),
+        alt((parse_explicit_map_body, parse_list_comprehension_map_body)),
+        pair(rbrack, semicolon)
+    ))(i1)?;
     let pos = input.expand_until(&i2);
-    Ok((
-        i2,
-        Map {
-            // NOTE: length of size is 0 in this case because we won't actually know what they are until
-            // we compile the Units which it is constructed from.
-            sizes: vec![],
-            units,
-            pos,
-        },
-    ))
+    Ok((i2, Map {entries, pos}))
 }
 
-// Parses List Comprehensin that split the addres space equally amongst them:
-// These should look like:
-// map = [ UnitName(Expr) for ident in x..y ]
-fn parse_simple_list_comprehension(input: TokenStream) -> IResult<TokenStream, Map> {
-    let (i1, _) = kw_map(input.clone())?;
-
-    // TODO: map_body_parser
-    let map_body_parser = delimited(
-        lbrack,
+// Parses explicit map body of the type:
+// UnitName(Expr), ..., UnitName(Expr)
+// Optionally also parses: UnitName(Expr) @ Number
+fn parse_explicit_map_body(input: TokenStream) -> IResult<TokenStream, Vec<MapEntry>> {
+    let (i1, map_body): (TokenStream, Vec<(String, Vec<Expr>, Option<Expr>)>) = separated_list1(
+        comma,
         tuple((
             ident,
-            delimited(lbrace, expr, rbrace),
-            preceded(kw_for, ident),
-            preceded(kw_for, range_expr),
-        )),
-        rbrack,
-    );
-
-    let (i2, (unitname, unit_arg, itter_var, range)) =
-        cut(delimited(assign, map_body_parser, semicolon))(i1)?;
-    let pos = input.expand_until(&i2);
-    Ok((
-        i2,
-        Map {
-            sizes: vec![],
-            units: vec![],
-            pos,
-        },
-    ))
+            delimited(lbrace, separated_list0(comma, expr), rbrace),
+            opt(preceded(at, expr))
+            ))
+    )(input)?;
+    let mut map_entries: Vec<MapEntry> = vec![];
+    for (u, p, o) in map_body {
+        map_entries.push(MapEntry {
+            range: None,
+            unit_name: u,
+            unit_params: p,
+            offset: o,
+            ..Default::default()
+        });
+    }
+    Ok((i1, map_entries))
 }
 
-// Parses List Comprehension that explicitly lists the address
-fn parse_address_range_list_comprehension(_input: TokenStream) -> IResult<TokenStream, Map> {
-    todo!()
+// Parses List Comprehension map bodies of the type:
+// Optional(Range) UnitName(ident) Optional(@ Number) for ident in Number..Number
+fn parse_list_comprehension_map_body(input: TokenStream) -> IResult<TokenStream, Vec<MapEntry>> {
+    let (i1, (unit_range, unit_name, unit_params, offset)) = tuple((
+        opt(range_expr),
+        ident,
+        delimited(lbrace, separated_list0(comma, expr), rbrace),
+        opt(preceded(at, expr))
+        ))(input)?;
+    let (_i2, (list_itterator, (lower, _, upper))) = tuple((
+        preceded(kw_for, ident),
+        preceded(kw_in, tuple((num, dotdot, num))),
+        ))(i1)?;
+    let mut map_entries: Vec<MapEntry> = vec![];
+    for i in lower..=upper {
+        map_entries.push(MapEntry {
+            range: unit_range.clone(),
+            unit_name: unit_name.clone(),
+            unit_params: unit_params.clone(),
+            offset: offset.clone(),
+            iteration: Some((list_itterator.clone(), i))
+        })
+    }
+    Ok((_i2, map_entries))
 }

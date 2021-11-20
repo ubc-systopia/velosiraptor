@@ -33,7 +33,7 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // the used crate-internal functionality
-use crate::ast::{utils, AstNode, Const, Interface, Issues, Method, Param, State, SymbolTable};
+use crate::ast::{utils, AstNode, Const, Interface, Issues, Method, Param, State, SymbolTable, Map};
 use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
@@ -60,6 +60,8 @@ pub struct Unit {
     pub state: State,
     /// the software visible interface of the unit
     pub interface: Interface,
+    /// Optional map in the case of map UnitType
+    pub map: Option<Map>,
     /// the methods defined by this unit
     pub methods: Vec<Method>,
     // TODO: maybe make the translate / constructors / map / ... explicit here?

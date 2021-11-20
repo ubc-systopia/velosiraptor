@@ -43,6 +43,8 @@ pub enum Keyword {
     Else,
     /// for statements,
     For,
+    /// inclusion statement,
+    In,
     /// import statements
     Import,
     /// state statement
@@ -101,6 +103,7 @@ impl fmt::Display for Keyword {
             If => "if",
             Else => "else",
             For => "for",
+            In => "in",
             Import => "import",
             Let => "let",
             Fn => "fn",

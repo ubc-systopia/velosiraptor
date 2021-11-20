@@ -66,7 +66,7 @@ pub use field::Field;
 pub use import::Import;
 pub use interface::{Action, ActionComponent, ActionType, Interface, InterfaceField};
 pub use issues::Issues;
-pub use map::Map;
+pub use map::{Map, MapEntry};
 pub use method::Method;
 pub use param::Param;
 pub use root::AstRoot;

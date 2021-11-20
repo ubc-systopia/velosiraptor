@@ -207,6 +207,7 @@ keywordparser!(pub kw_forall, Keyword::Forall);
 keywordparser!(pub kw_exists, Keyword::Exists);
 keywordparser!(pub kw_map, Keyword::Map);
 keywordparser!(pub kw_for, Keyword::For);
+keywordparser!(pub kw_in, Keyword::In);
 
 /// parses a type expression
 ///

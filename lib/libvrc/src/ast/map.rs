@@ -28,8 +28,17 @@
 use crate::ast::Expr;
 use crate::token::TokenStream;
 
+#[derive(PartialEq, Clone)]
 pub struct Map {
-    pub sizes: Vec<(u64, u64)>,
-    pub units: Vec<(String, Expr)>,
+    pub entries: Vec<MapEntry>,
     pub pos: TokenStream,
+}
+
+#[derive(Default, PartialEq, Clone)]
+pub struct MapEntry {
+    pub range: Option<Expr>,
+    pub unit_name: String,
+    pub unit_params: Vec<Expr>,
+    pub offset: Option<Expr>,
+    pub iteration: Option<(String, u64)>,
 }
