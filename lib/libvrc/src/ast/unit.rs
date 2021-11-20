@@ -33,7 +33,9 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // the used crate-internal functionality
-use crate::ast::{utils, AstNode, Const, Interface, Issues, Method, Param, State, SymbolTable, Map};
+use crate::ast::{
+    utils, AstNode, Const, Interface, Issues, Map, Method, Param, State, SymbolTable,
+};
 use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 

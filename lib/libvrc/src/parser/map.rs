@@ -28,17 +28,19 @@
 //  2. List Comprehension that split the address space equally amongst them.
 //  3. List Comprehension with explicit address ranges.
 
-use crate::ast::{Map, MapEntry, Expr};
+use crate::ast::{Expr, Map, MapEntry};
 use crate::error::IResult;
 use crate::parser::expression::{expr, range_expr};
-use crate::parser::terminals::{assign, comma, ident, kw_for, kw_map, lbrace, lbrack, rbrace, rbrack, semicolon, at, kw_in, num, dotdot};
-use crate::token::{TokenStream};
+use crate::parser::terminals::{
+    assign, at, comma, dotdot, ident, kw_for, kw_in, kw_map, lbrace, lbrack, num, rbrace, rbrack,
+    semicolon,
+};
+use crate::token::TokenStream;
 
-use nom::combinator::{cut, opt};
-use nom::multi::{separated_list1, separated_list0};
-use nom::sequence::{delimited, pair, preceded, tuple};
 use nom::branch::alt;
-
+use nom::combinator::{cut, opt};
+use nom::multi::{separated_list0, separated_list1};
+use nom::sequence::{delimited, pair, preceded, tuple};
 
 // Parses Map Statements
 pub fn parse_map(input: TokenStream) -> IResult<TokenStream, Map> {
@@ -46,10 +48,10 @@ pub fn parse_map(input: TokenStream) -> IResult<TokenStream, Map> {
     let (i2, entries) = cut(delimited(
         pair(assign, lbrack),
         alt((parse_explicit_map_body, parse_list_comprehension_map_body)),
-        pair(rbrack, semicolon)
+        pair(rbrack, semicolon),
     ))(i1)?;
     let pos = input.expand_until(&i2);
-    Ok((i2, Map {entries, pos}))
+    Ok((i2, Map { entries, pos }))
 }
 
 // Parses explicit map body of the type:
@@ -61,8 +63,8 @@ fn parse_explicit_map_body(input: TokenStream) -> IResult<TokenStream, Vec<MapEn
         tuple((
             ident,
             delimited(lbrace, separated_list0(comma, expr), rbrace),
-            opt(preceded(at, expr))
-            ))
+            opt(preceded(at, expr)),
+        )),
     )(input)?;
     let mut map_entries: Vec<MapEntry> = vec![];
     for (u, p, o) in map_body {
@@ -84,12 +86,12 @@ fn parse_list_comprehension_map_body(input: TokenStream) -> IResult<TokenStream,
         opt(range_expr),
         ident,
         delimited(lbrace, separated_list0(comma, expr), rbrace),
-        opt(preceded(at, expr))
-        ))(input)?;
+        opt(preceded(at, expr)),
+    ))(input)?;
     let (_i2, (list_itterator, (lower, _, upper))) = tuple((
         preceded(kw_for, ident),
         preceded(kw_in, tuple((num, dotdot, num))),
-        ))(i1)?;
+    ))(i1)?;
     let mut map_entries: Vec<MapEntry> = vec![];
     for i in lower..=upper {
         map_entries.push(MapEntry {
@@ -97,7 +99,7 @@ fn parse_list_comprehension_map_body(input: TokenStream) -> IResult<TokenStream,
             unit_name: unit_name.clone(),
             unit_params: unit_params.clone(),
             offset: offset.clone(),
-            iteration: Some((list_itterator.clone(), i))
+            iteration: Some((list_itterator.clone(), i)),
         })
     }
     Ok((_i2, map_entries))
