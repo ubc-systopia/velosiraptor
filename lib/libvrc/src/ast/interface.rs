@@ -29,7 +29,6 @@ use crate::ast::{
     utils, AstNode, Expr, Field, Issues, Param, Symbol, SymbolKind, SymbolTable, Type,
 };
 use crate::error::VrsError;
-// use crate::parser::state::state;
 use crate::token::TokenStream;
 
 /// Defines the software-visible interface of a unit
@@ -68,7 +67,7 @@ pub enum Interface {
 
 /// Implementation of the Interface
 impl Interface {
-    /// builds the symboltable for the state related symbols
+    /// builds the symboltable for the interface related symbols
     pub fn build_symboltable(&self, st: &mut SymbolTable) {
         // create the 'interface' symbol
         let sym = Symbol::new(
@@ -281,7 +280,7 @@ impl InterfaceField {
     }
 }
 
-/// Implementation of [AstNode] for [Interface]
+/// Implementation of [AstNode] for [InterfaceField]
 impl AstNode for InterfaceField {
     fn check(&self, st: &mut SymbolTable) -> Issues {
         let mut res = Issues::ok();
