@@ -19,5 +19,6 @@
         - [Methods](language/parser/methods.md)
         - [Translate](language/parser/translate.md)
         - [Map/Unmap/Protect](language/parser/mapunmapprotect.md)
+        - [Expressions](language/parser/expressions.md)
 - [Synthesis](synthesis/synthesis.md)
 - [Code Generation](codegen/codegen.md)
