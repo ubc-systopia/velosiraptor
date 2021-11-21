@@ -12,9 +12,10 @@ A translation hardware component is specified in a VelosiRaptor Specification La
  2. [Constants](constants.md) that defines globally visible constants.
  3. [Units](units.md) that specify translation hardware components.
 
+The unit is the *core* element of the specification language.
 
 **Encoding**
-The encoding of the file should be plain ASCII, and proces
+The encoding of the file should be plain ASCII, and process
 
 **Naming**
 Currently all specification files should be placed in the same directory, and must have
@@ -29,13 +30,14 @@ itself.
 ```vrs
 // A sample specification file
 
-// impor the global variables
+// import of the global constants, defined in another file
 import globals;
 
-
+// define some constants used in the spec
 const NUM_ENTRIES : int = 512;
 const PAGE_TABLE_SIZE : int = NUM_ENTRIES * POINTER_SIZE;
 
+// define the page table unit
 unit PageTable(base : addr) {
     state = ...
     interface = ...

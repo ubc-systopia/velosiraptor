@@ -4,6 +4,7 @@
 - [Command Line Interface](cli/cli.md)
 - [Architecture](architecture/overview.md)
 - [Specification Language](language/language.md)
+    - [HowTo](language/howto.md)
     - [Lexer](language/lexer/lexer.md)
         - [Identifiers](language/lexer/identifiers.md)
         - [Keywords](language/lexer/keywords.md)

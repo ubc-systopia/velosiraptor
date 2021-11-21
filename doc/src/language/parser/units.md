@@ -2,7 +2,7 @@
 
 The unit is the core part of the specification. It combines the [state](state.md), the
 [interface](interface.md) and [translation semantics](translate.md) to build a model
-of the translation hardware unit.
+of the translation hardware unit and how it translates input addresses.
 
 Note, a complete translation scheme (e.g., an x86 memory management unit) is expressed as a
 *collection* of units each of which modeling a specific aspect of it (e.g, a page table entry
@@ -10,6 +10,9 @@ at a specific level). The full specification is a *composition* of these units (
 a page table is a composition of 512 page table entries).
 
 ```
+                        interface
+                            |
+                            v
                 +-----------------------+
   input addr    |                       |  output addr
  -------------> | translate(input addr) | ------------->
@@ -27,8 +30,7 @@ to a virtual to physical address translation. There are *two* distinct translati
 
 In the page table example, the page table as a whole is a fixed mapping of an input address
 onto one of the 512 entries, and in turn each entry is a configurable unit defining the
-translation of the page.
-
+translation of the page depending on the *state* of the entry.
 
 
 ## Grammar
