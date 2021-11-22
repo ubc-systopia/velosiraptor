@@ -22,3 +22,4 @@
         - [Expressions](language/parser/expressions.md)
 - [Synthesis](synthesis/synthesis.md)
 - [Code Generation](codegen/codegen.md)
+- [Examples](examples/examples.md)
