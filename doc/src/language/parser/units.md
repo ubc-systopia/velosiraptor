@@ -36,17 +36,93 @@ translation of the page depending on the *state* of the entry.
 ## Grammar
 
 ```
-UNIT :=
+UNIT         := KW_UNIT LPAREN ARGLIST RPAREN UNIT_DERIVE LBRACE UNIT_BODY RBRACE
+
+UNIT_DERIVE  := COLON IDENT
+UNIT_BODY    := [ CONST* | STATE? | INTERFACE? | MAP? | METHOD* ]
+
+ARGLIST      := [ ARG [COMMA ARG]* ]?
+ARG          := IDENT COLON TYPE
 ```
 
 ## Example
 
 ```vrs
-unit Foo()
+unit Simple(base : addr) : Segment {
+    // the state
+    state = ...
+
+    // the interface
+    interface = ...
+
+    // translation semantics
+    fn translate(va: addr, flags: int) -> addr
+        ...
+
+    // unmapping an entry
+    fn unmap(va: addr, sz: size) -> bool
+        ...
+
+    // mapping an entry
+    fn map(va: addr, sz: size, flags: int, pa : addr) -> bool
+        ...
+
+    // protecting the entry, i.e., change its permission
+    fn protect(flags: int) -> bool
+        ...
+};
 ```
 
+## Unit Components
+
+The following table outlines the main components and which unit type they are required for.
+
+| Component         | Required for                |
+|-------------------|-----------------------------|
+| State             | Configurable Units          |
+| Interface         | Configurable Units          |
+| Map               | Static Units                |
+| Translate         | Configurable Units          |
+| Map/Unmap/Protect | Maybe both                  |
 
 
-The unit has the following components:
+**State Description**
+A *configurable* unit has a [state description](state.md). The state of the unit defines
+its translation behavior.
 
- - a [state description](state.md)
+**Interface Description**
+A *configurable* unit has an [interface description](interface.md). The interface defines
+how software can interact with the unit to change its translation behavior.
+
+**Map Description**
+A *static* unit has a [map description](map.md) defining a static address translation
+function that is fixed at compile time.
+
+**Translate Description**
+A *configurable* unit has a [translate description](translate.md). This defines the
+translation behavior of the unit.
+
+**Map/Unmap/Protect**
+A unit may define [map/unmap/protect functions](mapunmapprotect.md). These methods
+provide constraints used by the synthesis step.
+
+
+## Additional Unit Components
+
+**Constants**
+Units can have [constant definitions](constants.md). In contrast to the constants
+defined at the top level, those constants are available within the scope of the unit.
+
+**Methods**
+Units can have [method definitions](methods.md) that provide a mechanism to provide
+a commonly used computation over the state.
+
+
+## Unit Parameters
+
+A unit may be parameterized. This is required to define the state of the unit that may
+be located at a specific address that is unknown at compile time. For example, a
+page table may be allocated anywhere in memory subject to alignment constraints.
+
+## Derivation (Inheritance)
+
