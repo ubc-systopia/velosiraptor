@@ -24,9 +24,12 @@ a page table is a composition of 512 page table entries).
 Conceptually, a unit *translates* an input address to an output address -- analogous (but not limited)
 to a virtual to physical address translation. There are *two* distinct translation behaviors:
 
- 1. The **static map** defines a *fixed* translation function known at compile time.
- 2. The **configurable segment** defines a configurable translation function that depends
+ 1. The **[static map](#static-map-units)** defines a *fixed* translation function known at compile time.
+ 2. The **[configurable segment](#configurable-segment-units)** defines a configurable translation function that depends
     on the runtime *state*.
+
+Thus, to model a translation unit one needs to find a representation in terms of a combination
+of static maps and configurable segments.
 
 In the page table example, the page table as a whole is a fixed mapping of an input address
 onto one of the 512 entries, and in turn each entry is a configurable unit defining the
@@ -39,7 +42,7 @@ translation of the page depending on the *state* of the entry.
 UNIT         := KW_UNIT LPAREN ARGLIST RPAREN UNIT_DERIVE LBRACE UNIT_BODY RBRACE
 
 UNIT_DERIVE  := COLON IDENT
-UNIT_BODY    := [ CONST* | STATE? | INTERFACE? | MAP? | METHOD* ]
+UNIT_BODY    := CONST*  STATE?  INTERFACE?  MAP?  METHOD*
 
 ARGLIST      := [ ARG [COMMA ARG]* ]?
 ARG          := IDENT COLON TYPE
@@ -72,6 +75,32 @@ unit Simple(base : addr) : Segment {
         ...
 };
 ```
+
+## Static Map Units
+
+Conceptually, the static map unit type defines a list of input address ranges. Each range
+has a well-defined mapping onto either an output address range or another unit.
+
+This modifies the address in the following way:
+
+```
+OUT = IN - REGION_BASE + OFFSET
+```
+This normalizes the address to be translated, i.e., it falls within `[OFFSET, OFFSET + REGION_SIZE)`. For example, an x86_64 page table is a static map of 512 ranges each of which
+has size 4096. A page-table entry in turn translates a range `[0, 4096)`.
+
+
+## Configurable Segment Units
+
+Configurable units are abstracted as a *segment*, i.e., a range of addresses `[0, size)`
+that map to an output range `[pa, pa + size)`.
+
+This modifies the address in the following way:
+
+```
+OUT = IN + BASE
+```
+
 
 ## Unit Components
 

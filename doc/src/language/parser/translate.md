@@ -73,8 +73,7 @@ There are three areas to consider when formulating the pre-conditions.
  - Exact match, or what set of flags is still sufficient?
 
 **State**
- - Are there any predicates over the state that must be satisified?
-
+ - Are there any predicates over the state that must be satisfied?
 
 
 ## Static Map Units
