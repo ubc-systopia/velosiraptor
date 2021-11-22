@@ -88,11 +88,12 @@ The following table outlines the main components and which unit type they are re
 
 **State Description**
 A *configurable* unit has a [state description](state.md). The state of the unit defines
-its translation behavior.
+its translation behavior. Methods can reference the state through the `state` symbol.
 
 **Interface Description**
 A *configurable* unit has an [interface description](interface.md). The interface defines
 how software can interact with the unit to change its translation behavior.
+Interface fields are referenced through the `interface` symbol.
 
 **Map Description**
 A *static* unit has a [map description](map.md) defining a static address translation
@@ -126,3 +127,6 @@ page table may be allocated anywhere in memory subject to alignment constraints.
 
 ## Derivation (Inheritance)
 
+A unit can be derived from another unit. This is similar to inheritance.
+The deriving units can overwrite certain aspects, or fill in blanks in a
+template provided by the derived unit.

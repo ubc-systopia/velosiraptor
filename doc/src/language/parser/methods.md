@@ -6,6 +6,9 @@ parameters and the current state of the translation unit. Generally, they are
 Methods define certain procedures such as extracting the base address from the state,
 or match supplied flags.
 
+Methods contain statements and/or pre- and post-conditions that contain
+[expressions](expressions.md).
+
 ## Grammar
 
 ```
@@ -21,6 +24,12 @@ ARGLIST      := [ ARG [COMMA ARG]* ]?
 ARG          := IDENT COLON TYPE
 
 METHOD_BODY  := RBRACE [ STMT ]* LBRACE
+
+STMT := STMT_RETURN | STMT_LET | STMT_ASSERT | STMT_COND
+STMT_RETURN  := KW_RETURN EXPR SEMICOLON
+STMT_LET     := KW_LE IDENT COLON TYPE EQ EXPR SEMICOLON
+STMT_ASSERT  := KW_ASSERT LPAREN BOOL_EXPR RPAREN SEMICOLON
+STMT_COND    := KW_IF BOOL_EXPR LBRACE STMT+ RBRACE [KW_ELSE LBRACE STMT+ RBRACE]?
 ```
 
 ## Example
@@ -43,8 +52,35 @@ fn calc_size(val : int) -> int
 
 There are two distinct method types:
 
- 1. Internal methods with an implementation used by the translation hardware
- 2. External methods that are abstract and provide constraints to the code generation system.
+ 1. External methods that are abstract and provide constraints to the code generation system.
+ 2. Internal methods with an implementation used by the translation hardware
+
+
+## External Methods
+
+External methods are generally abstract and correspond to operations that are executed by
+system software. They are abstract because their implementation will be provided by the
+code generation framework through the synthesis process.
+
+These methods are useful to provide additional *constraints* to the code generation module. For more information see [Map/Unmap/Protect](mapunmapprotect.md)
+
+
+**Map (required)**
+
+This method ensures that the translation of a certain range (addr-size-tuple) produces
+an address within the destination range. This is a state modifying operation.
+
+
+**Unmap (optional)**
+
+This method ensures that the range of addresses won't be mapped anymore.
+This is a state modifying operation.
+
+**Protect (optional)**
+
+This method changes the protection of an already mapped region.
+This is a state modifying operation.
+
 
 ## Internal methods
 
@@ -58,41 +94,13 @@ The [translate](translate.md) method must be defined for each unit. It defines t
 semantics. This is a function state, address and flags, to a new address
 (technically a *partial function*).
 
-```
-translate :: State -> Addr -> Flags -> Addr
-```
-
 The translation function may make use of any other defined methods of the unit.
 
-## External Methods
+**Other Methods**
 
-External methods are generally abstract and correspond to operations that are executed by
-system software. They are abstract because their implementation will be provided by the
-code generation framework through the synthesis process.
-
-These methods are useful to provide additional *constraints* to the code generation module.
-
-
-**Map (required)**
-
-This method ensures that the translation of a certain range (addr-size-tuple) produces
-an address within the destination range. This is a state modifying operation.
-
-```
-map :: Addr -> Size -> Addr -> Flags -> State -> State
-```
-
-**Unmap (optional)**
-
-This method ensures that the range of addresses won't be mapped anymore.
-
-TODO.
-
-**Protect (optional)**
-
-This method changes the protection of an already mapped region
-
-TODO.
+Additional methods can be declared in a unit context. All of them are
+internal methods and are available as predicates and/or within the translation
+method.
 
 ## Pre- and Post-Conditions
 
@@ -114,3 +122,20 @@ fn map(va: addr, sz: size, flags: int, pa: addr)
                 ==> translate(va + i, flags) == pa + i
 {} // empty
 ```
+
+## Statements
+
+The body of the units are restricted to four statement kinds each of which
+evaluate [expressions](expressions.md).
+
+**Return**
+Returns the value produced by the expression. Each branch must have a return statement.
+
+**Let**
+Defines a local variable.
+
+**Assert**
+Provides some additional constraint to the synthesizer
+
+**Conditional**
+Provides an if-then-else statement. Both branches must have a return statement.
