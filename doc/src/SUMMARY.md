@@ -23,3 +23,8 @@
 - [Synthesis](synthesis/synthesis.md)
 - [Code Generation](codegen/codegen.md)
 - [Examples](examples/examples.md)
+    - [Segmentation](examples/segmentation.md)
+    - [x86 Page Table](examples/x86_pt.md)
+    - [ARMv8 Page Table](examples/armv8_pt.md)
+    - [SMPT](examples/smpt.md)
+    - [...]()
