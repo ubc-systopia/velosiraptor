@@ -23,7 +23,9 @@ The register is 32-bits in size, where
 ## Unit Specification
 
 ```vrs, editable
-// nothing here yet
+unit Smpt(..) {
+    ..
+}
 ```
 
 ## Generated Code
