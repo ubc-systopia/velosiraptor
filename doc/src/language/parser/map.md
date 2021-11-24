@@ -11,7 +11,7 @@ selects the page table entry for the translation.
 # Grammar
 
 ```
-MAP := LBRACK [ MAP_EXPLICIT_LIST | MAP_LIST_CMPR ]  RBRACK SEMICOLON
+MAP := KW_STATICMAP ASSIGN LBRACK [ MAP_EXPLICIT_LIST | MAP_LIST_CMPR ]  RBRACK SEMICOLON
 
 MAP_EXPLICIT_LIST := MAP_ELEMENT [ COMMA MAP_ELEMENT ]*
 MAP_LIST_COMPR := MAP_ELEMENT KW_FOR IDENT KW_IN RANGE_EXPR
@@ -31,18 +31,18 @@ EXPR_LIST := [ EXPR [ COMMA EXPR ]* ]?
 ```vrs
 
 // simple, explicit list
-map = [
+staticmap = [
     PageTableEntry(base + 0),
     PageTableEntry(base + 1),
 ];
 
 // comprehension
-map = [
+staticmap = [
     PageTableEntry(base + i) for i in 0..512
 ];
 
 // with input and output ranges
-map = [
+staticmap = [
     0x0000..0x0fff => DestUnit(base) @ 0x1000
 ]
 

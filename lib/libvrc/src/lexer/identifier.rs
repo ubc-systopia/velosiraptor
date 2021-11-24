@@ -61,7 +61,7 @@ pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
         "state" => Token::new(TokenContent::Keyword(Keyword::State), ident),
         "in" => Token::new(TokenContent::Keyword(Keyword::In), ident),
         "interface" => Token::new(TokenContent::Keyword(Keyword::Interface), ident),
-        "map" => Token::new(TokenContent::Keyword(Keyword::Map), ident),
+        "staticmap" => Token::new(TokenContent::Keyword(Keyword::StaticMap), ident),
         "Memory" => Token::new(TokenContent::Keyword(Keyword::Memory), ident),
         "MMIO" => Token::new(TokenContent::Keyword(Keyword::MMIO), ident),
         "Register" => Token::new(TokenContent::Keyword(Keyword::Register), ident),

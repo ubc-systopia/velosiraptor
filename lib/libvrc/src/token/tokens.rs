@@ -49,8 +49,8 @@ pub enum Keyword {
     Import,
     /// state statement
     State,
-    /// Map
-    Map,
+    /// StaticMap
+    StaticMap,
     /// interface statement
     Interface,
     /// Memory State and Interface statement
@@ -109,7 +109,7 @@ impl fmt::Display for Keyword {
             Fn => "fn",
             Assert => "assert",
             State => "state",
-            Map => "map",
+            StaticMap => "staticmap",
             Interface => "interface",
             Memory => "Memory",
             MMIO => "MMIO",
