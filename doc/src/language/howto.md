@@ -36,7 +36,7 @@ a page directory table is different from a page table). Thus, to represent a fou
 page table implies 5 different units (one for each level of the page table, plus one to
 express the processor registers).
 
-***Rule 2: One unit for each array entry***
+***Rule 2: One unit for each array of entries***
 Translation hardware may allow controlling several regions in the same fashion (e.g.,
 a page table has a set of equal entries that control a portion of the translation).
 This suggests expressing the entry as its own unit, and the table as a separate unit
@@ -73,32 +73,32 @@ hardware.
 ```vrs
 unit X86PageTableEntry(base: addr) {
     state = Memory(base: addr) {
-        entry [base, 0, 0] {
+        entry [base, 0, 8] {
              0  0 present,
             // more fields omitted
-            12 63 base
+            12 63 frame_addr
         };
     };
     // the interface has the same
-    interface = Memory(base: addr);
+    interface = Memory;
 
     // the translation semantics
     fn translate(va: addr, flags: int) -> addr
       requires state.entry.present; // present bit must be set
     {
-        return state.base << 12 + va;
+        return (state.frame_addr << 12) + va;
     }
-}
+};
 
 unit X86PageTable(base: addr) {
     // the table itself doesn't have state or interface
 
     // it has 512 entries expressed as a map
-    map = [ X86PageTableEntry(base + i * 8) for i in 0..512 ];
+    staticmap = [ X86PageTableEntry(base + i * 8) for i in 0..512 ];
 
     // translate basically forwards the translation to the entry
     fn translate(va: addr, flags: int) -> addr {
         return map[va / 4096].translate(va % 4096, flags)
     }
-}
+};
 ```
