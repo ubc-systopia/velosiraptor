@@ -30,81 +30,131 @@
 
 use crate::ast::{Expr, Map, MapEntry};
 use crate::error::IResult;
-use crate::parser::expression::{expr, range_expr};
+use crate::parser::expression::{expr, expr_list, range_expr};
 use crate::parser::terminals::{
-    assign, at, comma, dotdot, ident, kw_for, kw_in, kw_map, lbrace, lbrack, num, rbrace, rbrack,
-    semicolon,
+    assign, at, comma, dotdot, fatarrow, ident, kw_for, kw_in, kw_map, lbrace, lbrack, lparen, num,
+    rbrace, rbrack, rparen, semicolon,
 };
 use crate::token::TokenStream;
 
 use nom::branch::alt;
 use nom::combinator::{cut, opt};
 use nom::multi::{separated_list0, separated_list1};
-use nom::sequence::{delimited, pair, preceded, tuple};
+use nom::sequence::{delimited, pair, preceded, terminated, tuple};
 
 // Parses Map Statements
 pub fn parse_map(input: TokenStream) -> IResult<TokenStream, Map> {
     let (i1, _) = kw_map(input.clone())?;
     let (i2, entries) = cut(delimited(
         pair(assign, lbrack),
-        alt((parse_explicit_map_body, parse_list_comprehension_map_body)),
+        alt((list_comprehension, entry_list)),
         pair(rbrack, semicolon),
     ))(i1)?;
     let pos = input.expand_until(&i2);
     Ok((i2, Map { entries, pos }))
 }
 
-// Parses explicit map body of the type:
-// UnitName(Expr), ..., UnitName(Expr)
-// Optionally also parses: UnitName(Expr) @ Number
-fn parse_explicit_map_body(input: TokenStream) -> IResult<TokenStream, Vec<MapEntry>> {
-    let (i1, map_body): (TokenStream, Vec<(String, Vec<Expr>, Option<Expr>)>) = separated_list1(
-        comma,
-        tuple((
-            ident,
-            delimited(lparen, separated_list0(comma, expr), rparen),
-            opt(preceded(at, expr)),
-        )),
-    )(input)?;
-    let mut map_entries: Vec<MapEntry> = vec![];
-    for (u, p, o) in map_body {
-        map_entries.push(MapEntry {
-            range: None,
-            unit_name: u,
-            unit_params: p,
-            offset: o,
-            ..Default::default()
-        });
-    }
-    Ok((i1, map_entries))
+/// parses a map elemenet
+///
+/// # Grammar
+///
+/// MAP_ELEMENT := MAP_SRC? MAP_DST
+///
+/// # Example
+///
+///  - `UnitA()`
+///  - `UnitA(base)
+///  - `0..0x1000 => UnitA()`
+///  - `0..0x1000 => UnitA() @ 0x10`
+fn map_element(input: TokenStream) -> IResult<TokenStream, MapEntry> {
+    let (i1, (src, (dst, args, offset))) = pair(opt(map_src), map_dst)(input)?;
+
+    Ok((
+        i1,
+        MapEntry {
+            range: src,
+            unit_name: dst,
+            unit_params: args,
+            offset,
+            iteration: None,
+        },
+    ))
 }
 
-// Parses List Comprehension map bodies of the type:
-// Optional(Range) UnitName(ident) Optional(@ Number) for ident in Number..Number
-fn parse_list_comprehension_map_body(input: TokenStream) -> IResult<TokenStream, Vec<MapEntry>> {
-    let (i1, (unit_range, unit_name, unit_params, offset)) = tuple((
-        opt(range_expr),
-        ident,
-        delimited(lparen, separated_list0(comma, expr), rparen),
-        opt(preceded(at, expr)),
-    ))(input)?;
-    let (_i2, (list_itterator, (lower, _, upper))) = tuple((
+/// parses a map source description
+///
+/// # Grammar
+///
+/// MAP_SRC := RANGE_EXPR RARROW
+///
+/// # Example
+///
+///  - `0..0x1000 =>`
+fn map_src(input: TokenStream) -> IResult<TokenStream, Expr> {
+    terminated(range_expr, cut(fatarrow))(input)
+}
+
+/// parses the destination of a map element
+///
+/// # Grammar
+///
+/// `MAP_ELEMENT := IDENT LPAREN EXPR_LIST RPAREN [AT OFFSET]?
+///
+/// # Example
+///
+///  - `UnitA(base) @ 123`
+///
+fn map_dst(input: TokenStream) -> IResult<TokenStream, (String, Vec<Expr>, Option<Expr>)> {
+    let (i1, unitname) = ident(input.clone())?;
+
+    // get the unit args
+    let (i2, unitargs) = cut(delimited(lparen, expr_list, rparen))(i1)?;
+
+    // get the offset
+    let (i3, offset) = opt(preceded(at, expr))(i2)?;
+
+    Ok((i3, (unitname, unitargs, offset)))
+}
+
+/// parses a list of map entries
+///
+/// # Grammar
+///
+/// `ENTRY_LIST := MAP_ELEMENT (COMMA MAP_ELEMENT)*`
+///
+/// # Example
+///
+/// - `0..0x1000 => UnitA() @ 0x10, 0x2000..0x3000 => UnitA() @ 0x20`
+fn entry_list(input: TokenStream) -> IResult<TokenStream, Vec<MapEntry>> {
+    separated_list1(comma, map_element)(input)
+}
+
+/// parses a list comprehension of map entries
+///
+/// # Grammar
+///
+/// `LIST_COMPREHENSION := MAP_ELEMENT FOR IDENT IN RANGE_EXPR`
+///
+/// # Example
+///
+///  - `UnitA() for i in 0..512`
+///
+fn list_comprehension(input: TokenStream) -> IResult<TokenStream, Vec<MapEntry>> {
+    let (i1, elm) = map_element(input.clone())?;
+
+    let (i2, (list_itterator, (lower, _, upper))) = tuple((
         preceded(kw_for, ident),
         preceded(kw_in, tuple((num, dotdot, num))),
     ))(i1)?;
+
     let mut map_entries: Vec<MapEntry> = vec![];
     for i in lower..=upper {
-        map_entries.push(MapEntry {
-            range: unit_range.clone(),
-            unit_name: unit_name.clone(),
-            unit_params: unit_params.clone(),
-            offset: offset.clone(),
-            iteration: Some((list_itterator.clone(), i)),
-        })
+        let mut entry = elm.clone();
+        entry.iteration = Some((list_itterator.clone(), i));
+        map_entries.push(entry);
     }
-    Ok((_i2, map_entries))
+    Ok((i2, map_entries))
 }
-
 
 #[cfg(test)]
 use crate::ast::BitSlice;
@@ -120,7 +170,43 @@ fn test_map_simple() {
     let res = parse_map(ts);
     assert!(res.is_ok());
 
+    let content = "map = [UnitA()];";
+    let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());
+    let res = parse_map(ts);
+    assert!(res.is_ok());
+
+    let content = "map = [UnitA() @ a];";
+    let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());
+    let res = parse_map(ts);
+    assert!(res.is_ok());
+
+    let content = "map = [ 0.. 1 => UnitA()];";
+    let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());
+    let res = parse_map(ts);
+    assert!(res.is_ok());
+}
+
+#[test]
+fn test_map_comprehension() {
     let content = "map = [UnitA() for i in 0..512];";
+    let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());
+    let res = parse_map(ts);
+    println!("{:?}", res);
+    assert!(res.is_ok());
+
+    let content = "map = [UnitA() @ i for i in 0..512];";
+    let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());
+    let res = parse_map(ts);
+    println!("{:?}", res);
+    assert!(res.is_ok());
+
+    let content = "map = [0..1 => UnitA() @ i for i in 0..512];";
+    let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());
+    let res = parse_map(ts);
+    println!("{:?}", res);
+    assert!(res.is_ok());
+
+    let content = "map = [0*i..1*i => UnitA() @ i for i in 0..512];";
     let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());
     let res = parse_map(ts);
     println!("{:?}", res);

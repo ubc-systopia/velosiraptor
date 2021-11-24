@@ -499,6 +499,15 @@ fn ident_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     Ok((i, Expr::Identifier { path, pos }))
 }
 
+/// parses an expression list
+///
+/// # Grammar
+///
+/// `EXPR_LIST := [ EXPR (COMMA EXPR)* ]?`
+pub fn expr_list(input: TokenStream) -> IResult<TokenStream, Vec<Expr>> {
+    separated_list0(comma, expr)(input)
+}
+
 /// pares a function call expression
 ///
 /// This parser recognizes a function call expression.
@@ -515,7 +524,7 @@ fn ident_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 fn fn_call_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i, (path, args)) = pair(
         separated_list1(dot, ident),
-        delimited(lparen, separated_list0(comma, expr), rparen),
+        delimited(lparen, expr_list, rparen),
     )(input.clone())?;
     let pos = input.expand_until(&i);
     Ok((i, Expr::FnCall { path, args, pos }))
