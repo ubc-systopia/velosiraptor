@@ -328,10 +328,10 @@ className:{1:"keyword",3:"title.class"}},{begin:e.IDENT_RE+"::",keywords:{
 keyword:"Self",built_in:s}},{className:"punctuation",begin:"->"},n]}},
 grmr_vrs:e=>{const t=e.regex,n={className:"title.function.invoke",relevance:0,
 begin:t.concat(/\b/,/(?!let\b)/,e.IDENT_RE,t.lookahead(/\s*\(/))
-},i="([ui](8|16|32|64|128|size)|f(32|64))?",s=["state","interface","assert"]
+},i="([ui](8|16|32|64|128|size)|f(32|64))?",s=["state","interface","assert","staticmap"]
 ;return{name:"VelosiRaptor Specification Language",aliases:["vrs"],keywords:{
 $pattern:e.IDENT_RE+"!?",type:["int","addr","bool","size"],
-keyword:["bool","const","else","ensures","exists","fn","for","forall","if","import","Layout","let","map","Memory","MMIO","ReadAction","Register","requires","return","unit","WriteAction"],
+keyword:["bool","const","else","ensures","exists","fn","for","forall","if","import","in","Layout","let","map","Memory","MMIO","ReadAction","Register","requires","return","unit","WriteAction"],
 literal:["true","false","None"],built_in:s},illegal:"</",
 contains:[e.C_LINE_COMMENT_MODE,e.COMMENT("/\\*","\\*/",{contains:["self"]
 }),e.inherit(e.QUOTE_STRING_MODE,{begin:/b?"/,illegal:null}),{
