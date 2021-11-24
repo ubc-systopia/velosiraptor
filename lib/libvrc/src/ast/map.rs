@@ -29,7 +29,7 @@ use crate::ast::{Expr, AstNode, SymbolTable, Issues};
 use crate::token::TokenStream;
 
 /// Defines a mapping between addresses and units
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Debug,Clone)]
 pub struct Map {
     pub entries: Vec<MapEntry>,
     pub pos: TokenStream,
@@ -64,7 +64,7 @@ impl AstNode for Map {
 /// TODO:
 ///     Might need to add an AstNode Trait Implementation for
 ///     the MapEntry struct
-#[derive(Default, PartialEq, Clone)]
+#[derive(Default, PartialEq, Debug, Clone)]
 pub struct MapEntry {
     pub range: Option<Expr>,
     pub unit_name: String,
