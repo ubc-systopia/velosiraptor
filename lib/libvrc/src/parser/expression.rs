@@ -544,7 +544,7 @@ fn fn_call_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 fn element_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i, (path, e)) = pair(
         separated_list1(dot, ident),
-        delimited(lbrack, num_lit_expr, rbrack),
+        delimited(lbrack, expr, rbrack),
     )(input.clone())?;
     let pos = input.expand_until(&i);
     Ok((
