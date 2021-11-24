@@ -211,10 +211,10 @@ pub enum TokenContent {
     Ge, // >=
 
     // others, maybe not used
-    At,         // @
-    DotDot,     // ..  for slices
-    PathSep,    // ::
-    Wildcard,   // ?
+    At,       // @
+    DotDot,   // ..  for slices
+    PathSep,  // ::
+    Wildcard, // ?
 }
 
 /// Implementation for TokenContent

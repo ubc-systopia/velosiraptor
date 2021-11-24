@@ -25,11 +25,11 @@
 
 //! MAP ast node
 
-use crate::ast::{Expr, AstNode, SymbolTable, Issues};
+use crate::ast::{AstNode, Expr, Issues, SymbolTable};
 use crate::token::TokenStream;
 
 /// Defines a mapping between addresses and units
-#[derive(PartialEq, Debug,Clone)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Map {
     pub entries: Vec<MapEntry>,
     pub pos: TokenStream,
@@ -56,7 +56,6 @@ impl AstNode for Map {
     fn loc(&self) -> &TokenStream {
         &self.pos
     }
-
 }
 
 /// Defines the parameters for constructing a Unit as a component
