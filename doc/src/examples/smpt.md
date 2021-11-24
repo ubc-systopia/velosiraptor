@@ -22,20 +22,11 @@ The register is 32-bits in size, where
 
 ## Unit Specification
 
+Editable field to fill in the spec. **Does not save**
+
 ```vrs, editable
 unit Smpt(..) {
     ..
 }
 ```
 
-## Generated Code
-
-**Rust Code**
-```rust
-// nothing here yet
-```
-
-**C Code**
-```c
-// nothing here yet
-```

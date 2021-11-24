@@ -27,20 +27,10 @@ using load/stores (e.g., `mov rax vabase`).
 
 ## Unit Specification
 
+Editable field to fill in the spec. **Does not save**
+
 ```vrs, editable
 unit DirectSegment(..) {
     ..
 }
-```
-
-## Generated Code
-
-**Rust Code**
-```rust
-// nothing here yet
-```
-
-**C Code**
-```c
-// nothing here yet
 ```

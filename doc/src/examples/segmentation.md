@@ -36,20 +36,10 @@ If `S == 0` this is a system-segment and gate-descriptor. Let's ignore that for 
 
 ## Unit Specification
 
+Editable field to fill in the spec. **Does not save**
+
 ```vrs, editable
 unit X86SegmentDescriptor(..) {
     ..
 }
-```
-
-## Generated Code
-
-**Rust Code**
-```rust
-// nothing here yet
-```
-
-**C Code**
-```c
-// nothing here yet
 ```

@@ -60,20 +60,10 @@ The page table maps an aligned 4k page in memory.
 
 ## Unit Specification (Page Table)
 
+Editable field to fill in the spec. **Does not save**
+
 ```vrs, editable
 unit X86PageTable(..) {
     ..
 }
-```
-
-## Generated Code
-
-**Rust Code**
-```rust
-// nothing here yet
-```
-
-**C Code**
-```c
-// nothing here yet
 ```
