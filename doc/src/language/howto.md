@@ -97,8 +97,10 @@ unit X86PageTable(base: addr) {
     staticmap = [ X86PageTableEntry(base + i * 8) for i in 0..512 ];
 
     // translate basically forwards the translation to the entry
+    // this is for illustration purposes only, and is not required,
+    // as it is derived from the staticmap description
     fn translate(va: addr, flags: int) -> addr {
-        return map[va / 4096].translate(va % 4096, flags)
+        return staticmap[va / 4096].translate(va % 4096, flags)
     }
 };
 ```
