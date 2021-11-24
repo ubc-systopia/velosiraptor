@@ -62,7 +62,7 @@ fn parse_explicit_map_body(input: TokenStream) -> IResult<TokenStream, Vec<MapEn
         comma,
         tuple((
             ident,
-            delimited(lbrace, separated_list0(comma, expr), rbrace),
+            delimited(lparen, separated_list0(comma, expr), rparen),
             opt(preceded(at, expr)),
         )),
     )(input)?;
@@ -85,7 +85,7 @@ fn parse_list_comprehension_map_body(input: TokenStream) -> IResult<TokenStream,
     let (i1, (unit_range, unit_name, unit_params, offset)) = tuple((
         opt(range_expr),
         ident,
-        delimited(lbrace, separated_list0(comma, expr), rbrace),
+        delimited(lparen, separated_list0(comma, expr), rparen),
         opt(preceded(at, expr)),
     ))(input)?;
     let (_i2, (list_itterator, (lower, _, upper))) = tuple((
@@ -103,4 +103,26 @@ fn parse_list_comprehension_map_body(input: TokenStream) -> IResult<TokenStream,
         })
     }
     Ok((_i2, map_entries))
+}
+
+
+#[cfg(test)]
+use crate::ast::BitSlice;
+#[cfg(test)]
+use crate::lexer::Lexer;
+#[cfg(test)]
+use crate::nom::Slice;
+
+#[test]
+fn test_map_simple() {
+    let content = "map = [UnitA(), UnitB()];";
+    let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());
+    let res = parse_map(ts);
+    assert!(res.is_ok());
+
+    let content = "map = [UnitA() for i in 0..512];";
+    let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());
+    let res = parse_map(ts);
+    println!("{:?}", res);
+    assert!(res.is_ok());
 }
