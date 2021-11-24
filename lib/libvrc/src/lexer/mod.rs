@@ -123,7 +123,6 @@ namedtag!(rlongfatarrow, TokenContent::RLongFatArrow);
 
 // misc
 namedtag!(at, TokenContent::At);
-namedtag!(underscore, TokenContent::Underscore);
 namedtag!(dotdot, TokenContent::DotDot);
 namedtag!(pathsep, TokenContent::PathSep);
 namedtag!(wildcard, TokenContent::Wildcard);
@@ -174,7 +173,7 @@ fn puncts(input: SourcePos) -> IResult<SourcePos, Token> {
 /// sybols with one caracter with
 fn punctuation1(input: SourcePos) -> IResult<SourcePos, Token> {
     alt((
-        arithop, lnot, bitwiseop, lt, gt, parens, puncts, assign, wildcard, at, underscore,
+        arithop, lnot, bitwiseop, lt, gt, parens, puncts, assign, wildcard, at,
     ))(input)
 }
 

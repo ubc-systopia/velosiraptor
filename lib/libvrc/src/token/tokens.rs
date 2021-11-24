@@ -276,7 +276,6 @@ impl TokenContent {
 
             // others, maybe not used
             TokenContent::At => "@",
-            TokenContent::Underscore => "_",
             TokenContent::DotDot => "..",
             TokenContent::PathSep => "::",
             TokenContent::Wildcard => "?",

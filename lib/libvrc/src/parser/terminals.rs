@@ -107,7 +107,6 @@ terminalparser!(pub rlongfatarrow, TokenContent::RLongFatArrow);
 
 // comparators
 terminalparser!(pub at, TokenContent::At);
-terminalparser!(pub underscore, TokenContent::Underscore);
 terminalparser!(pub dotdot, TokenContent::DotDot);
 terminalparser!(pub pathsep, TokenContent::PathSep);
 terminalparser!(pub wildcard, TokenContent::Wildcard);
