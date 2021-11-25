@@ -542,10 +542,8 @@ fn fn_call_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 ///
 ///  * `foo[1]`
 fn element_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    let (i, (path, e)) = pair(
-        separated_list1(dot, ident),
-        delimited(lbrack, expr, rbrack),
-    )(input.clone())?;
+    let (i, (path, e)) =
+        pair(separated_list1(dot, ident), delimited(lbrack, expr, rbrack))(input.clone())?;
     let pos = input.expand_until(&i);
     Ok((
         i,

@@ -16,6 +16,7 @@
         - [Units](language/parser/units.md)
         - [State](language/parser/state.md)
         - [Interface](language/parser/interface.md)
+        - [Fields](language/parser/fields.md)
         - [Map](language/parser/map.md)
         - [Methods](language/parser/methods.md)
         - [Translate](language/parser/translate.md)
