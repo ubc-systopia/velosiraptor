@@ -33,7 +33,7 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // the used crate-internal functionality
-use crate::ast::{AstNode, AstRoot};
+use crate::ast::{AstNodeGeneric, AstRoot};
 use crate::token::TokenStream;
 
 /// Defines an [Import] statement node
@@ -82,8 +82,8 @@ impl PartialOrd for Import {
     }
 }
 
-/// implementation of [AstNode] for [Import]
-impl AstNode for Import {
+/// implementation of [AstNodeGeneric] for [Import]
+impl AstNodeGeneric for Import {
     // returns the name of the node
     fn name(&self) -> &str {
         &self.name

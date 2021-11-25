@@ -33,7 +33,7 @@ use std::cmp::min;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // used library internal functionality
-use crate::ast::{utils, AstNode, BitSlice, Issues, Symbol, SymbolKind, SymbolTable, Type};
+use crate::ast::{utils, AstNodeGeneric, BitSlice, Issues, Symbol, SymbolKind, SymbolTable, Type};
 use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
@@ -131,8 +131,8 @@ impl Debug for Field {
     }
 }
 
-/// implementation of [AstNode] for [Field]
-impl AstNode for Field {
+/// implementation of [AstNodeGeneric] for [Field]
+impl AstNodeGeneric for Field {
     fn check(&self, st: &mut SymbolTable) -> Issues {
         let mut res = Issues::ok();
 

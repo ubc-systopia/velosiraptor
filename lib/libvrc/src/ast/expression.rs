@@ -26,7 +26,7 @@
 ///! Ast Module of the Velosiraptor Compiler
 use std::fmt;
 
-use crate::ast::{utils, AstNode, Issues, Param, SymbolKind, SymbolTable, Type};
+use crate::ast::{utils, AstNodeGeneric, Issues, Param, SymbolKind, SymbolTable, Type};
 use crate::error::VrsError;
 use crate::token::TokenStream;
 
@@ -666,7 +666,7 @@ impl fmt::Display for Expr {
     }
 }
 
-impl AstNode for Expr {
+impl AstNodeGeneric for Expr {
     fn name(&self) -> &str {
         "Expression"
     }

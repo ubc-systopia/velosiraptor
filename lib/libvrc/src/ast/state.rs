@@ -29,7 +29,9 @@
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // used library internal functionality
-use crate::ast::{utils, AstNode, Field, Issues, Param, Symbol, SymbolKind, SymbolTable, Type};
+use crate::ast::{
+    utils, AstNodeGeneric, Field, Issues, Param, Symbol, SymbolKind, SymbolTable, Type,
+};
 use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
@@ -165,8 +167,8 @@ impl Debug for State {
     }
 }
 
-/// implementation of [AstNode] for [State]
-impl AstNode for State {
+/// implementation of [AstNodeGeneric] for [State]
+impl AstNodeGeneric for State {
     fn check(&self, st: &mut SymbolTable) -> Issues {
         let mut res = Issues::ok();
 

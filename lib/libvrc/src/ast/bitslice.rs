@@ -29,7 +29,7 @@
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // used library internal functionality
-use crate::ast::{utils, AstNode, Issues, SymbolTable};
+use crate::ast::{utils, AstNodeGeneric, Issues, SymbolTable};
 use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
@@ -88,8 +88,8 @@ impl Debug for BitSlice {
     }
 }
 
-/// implementation of [AstNode] for [BitSlice]
-impl AstNode for BitSlice {
+/// implementation of [AstNodeGeneric] for [BitSlice]
+impl AstNodeGeneric for BitSlice {
     /// checks the bitslices node and reports issues
     fn check(&self, _st: &mut SymbolTable) -> Issues {
         let mut res = Issues::ok();

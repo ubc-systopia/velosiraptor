@@ -28,7 +28,7 @@
 use std::fmt;
 
 // library internal imports
-use crate::ast::{AstNode, Expr, Issues, Symbol, SymbolKind, SymbolTable, Type};
+use crate::ast::{AstNodeGeneric, Expr, Issues, Symbol, SymbolKind, SymbolTable, Type};
 use crate::error::VrsError;
 use crate::token::TokenStream;
 
@@ -150,8 +150,8 @@ impl fmt::Display for Stmt {
     }
 }
 
-/// implementation of [AstNode] for [Stmt]
-impl AstNode for Stmt {
+/// implementation of [AstNodeGeneric] for [Stmt]
+impl AstNodeGeneric for Stmt {
     fn check(&self, st: &mut SymbolTable) -> Issues {
         let mut res = Issues::ok();
 

@@ -39,7 +39,7 @@ use nom::{
 };
 
 // lexer, parser terminals and ast
-use crate::ast::{AstNode, BinOp, Expr, Quantifier, UnOp};
+use crate::ast::{AstNodeGeneric, BinOp, Expr, Quantifier, UnOp};
 use crate::error::{IResult, VrsError};
 use crate::parser::{param::parameter, terminals::*};
 use crate::token::{Keyword, TokenContent, TokenStream};

@@ -34,7 +34,7 @@ use std::fmt::{Debug, Display, Formatter, Result};
 
 // the used crate-internal functionality
 use crate::ast::{
-    utils, AstNode, Const, Interface, Issues, Map, Method, Param, State, SymbolTable,
+    utils, AstNodeGeneric, Const, Interface, Issues, Map, Method, Param, State, SymbolTable,
 };
 use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
@@ -78,8 +78,8 @@ impl Unit {
     }
 }
 
-/// Implemetation of the [AstNode] trait for [Unit]
-impl AstNode for Unit {
+/// Implemetation of the [AstNodeGeneric] trait for [Unit]
+impl AstNodeGeneric for Unit {
     fn check(&self, st: &mut SymbolTable) -> Issues {
         // all fine for now
         let mut res = Issues::ok();

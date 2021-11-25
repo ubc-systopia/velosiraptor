@@ -25,7 +25,7 @@
 
 //! MAP ast node
 
-use crate::ast::{AstNode, Expr, Issues, SymbolTable};
+use crate::ast::{AstNodeGeneric, Expr, Issues, SymbolTable};
 use crate::token::TokenStream;
 
 /// Defines a mapping between addresses and units
@@ -35,8 +35,8 @@ pub struct Map {
     pub pos: TokenStream,
 }
 
-/// Implementation of [AstNode] for [Map]
-impl AstNode for Map {
+/// Implementation of [AstNodeGeneric] for [Map]
+impl AstNodeGeneric for Map {
     // checks the node and returns the number of errors and warnings encountered
     fn check(&self, _st: &mut SymbolTable) -> Issues {
         todo!()
@@ -52,7 +52,7 @@ impl AstNode for Map {
         "map"
     }
 
-    /// returns the location of the AstNode
+    /// returns the location of the AstNodeGeneric
     fn loc(&self) -> &TokenStream {
         &self.pos
     }
@@ -61,7 +61,7 @@ impl AstNode for Map {
 /// Defines the parameters for constructing a Unit as a component
 /// of a given map
 /// TODO:
-///     Might need to add an AstNode Trait Implementation for
+///     Might need to add an AstNodeGeneric Trait Implementation for
 ///     the MapEntry struct
 #[derive(Default, PartialEq, Debug, Clone)]
 pub struct MapEntry {

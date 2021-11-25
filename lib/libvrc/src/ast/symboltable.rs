@@ -80,6 +80,7 @@ pub struct Symbol {
     pub typeinfo: Type,
     /// the location where this symbol has been defined
     pub loc: TokenStream,
+    //pub ast_node: Option<Box<AstNodeGeneric>>,
 }
 
 /// Implementation of [Symbol]

@@ -26,7 +26,7 @@
 //! Ast Module of the Velosiraptor Compiler
 
 use crate::ast::{
-    utils, AstNode, Expr, Field, Issues, Param, Symbol, SymbolKind, SymbolTable, Type,
+    utils, AstNodeGeneric, Expr, Field, Issues, Param, Symbol, SymbolKind, SymbolTable, Type,
 };
 use crate::error::VrsError;
 use crate::token::TokenStream;
@@ -105,8 +105,8 @@ impl Interface {
     }
 }
 
-/// Implementation of [AstNode] for [Interface]
-impl AstNode for Interface {
+/// Implementation of [AstNodeGeneric] for [Interface]
+impl AstNodeGeneric for Interface {
     // checks the node and returns the number of errors and warnings encountered
     fn check(&self, st: &mut SymbolTable) -> Issues {
         // TODO: Implement the checks, this may follow a similar structure as the state
@@ -225,7 +225,7 @@ impl AstNode for Interface {
         "interface"
     }
 
-    /// returns the location of the AstNode
+    /// returns the location of the AstNodeGeneric
     fn loc(&self) -> &TokenStream {
         match self {
             Interface::CPURegisters { pos, .. } => pos,
@@ -280,8 +280,8 @@ impl InterfaceField {
     }
 }
 
-/// Implementation of [AstNode] for [InterfaceField]
-impl AstNode for InterfaceField {
+/// Implementation of [AstNodeGeneric] for [InterfaceField]
+impl AstNodeGeneric for InterfaceField {
     fn check(&self, st: &mut SymbolTable) -> Issues {
         let mut res = Issues::ok();
 
@@ -338,7 +338,7 @@ impl AstNode for InterfaceField {
         self.field.name()
     }
 
-    /// returns the location of the AstNode
+    /// returns the location of the AstNodeGeneric
     fn loc(&self) -> &TokenStream {
         self.field.loc()
     }

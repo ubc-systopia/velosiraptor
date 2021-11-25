@@ -29,7 +29,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-use crate::ast::{utils, AstError, AstNode, Const, Import, Issues, SymbolTable, Unit};
+use crate::ast::{utils, AstError, AstNodeGeneric, Const, Import, Issues, SymbolTable, Unit};
 use crate::error::VrsError;
 use crate::parser::ParserError;
 use crate::token::TokenStream;
@@ -291,8 +291,8 @@ impl fmt::Debug for AstRoot {
     }
 }
 
-/// implementation of [AstNode] for [Ast]
-impl AstNode for AstRoot {
+/// implementation of [AstNodeGeneric] for [Ast]
+impl AstNodeGeneric for AstRoot {
     fn check(&self, st: &mut SymbolTable) -> Issues {
         // no issues so far
         let mut res = Issues::ok();
