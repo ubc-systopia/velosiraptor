@@ -5,6 +5,7 @@
 - [Architecture](architecture/overview.md)
 - [Specification Language](language/language.md)
     - [HowTo](language/howto.md)
+    - [Conventions](language/conventions.md)
     - [Lexer](language/lexer/lexer.md)
         - [Identifiers](language/lexer/identifiers.md)
         - [Keywords](language/lexer/keywords.md)

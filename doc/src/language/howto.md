@@ -16,11 +16,18 @@ For example, this may be some specific registers, or an in-memory data structure
 such as the page table. This step also identifies the layout of the state (the meaning of bits),
 and how the translation is defined with respect to those bits.
 
-**x86_64 MMU**
- - radix tree with four levels: PML4, PDPT, PDIR, PT
- - CPU registers: CR3, CR4
- - entry: base address and flags, only translates if the present bit is set.
+It is important to identify all aspects that may define the translation behavior:
+ - registers that enable/disable translations
+ - registers that directly control the translation
+ - registers holding pointers to in-memory data structures
+ - in-memory data structures
 
+**x86_64 MMU**
+
+In this example, we can identify:
+ - cr4 register that controls whether translation is enabled or not.
+ - cr3 register that holds a pointer to an in-memory data structure
+ - radix tree with four levels: PML4, PDPT, PDIR, PT as an in-memory data structure
 
 ## 2. Identify the Units
 
@@ -28,15 +35,15 @@ The next step involves identifying the [units](parser/units.md). Note, there may
 be more than one way to represent a specific translation hardware in terms of a collection
 of units.
 
-The following a few *rules of thumb*.
+The following a few steps to identify the units, given the state identified above
 
-***Rule 1: one state, one unit.***
-Translation hardware may make use of different in-memory data structures, or registers (e.g.,
-a page directory table is different from a page table). Thus, to represent a four-level
-page table implies 5 different units (one for each level of the page table, plus one to
-express the processor registers).
+***1. one state type, one unit.***
+For each state type (register or memory) define one unit. This results in one or two units.
 
-***Rule 2: One unit for each array of entries***
+***2. Split in-memory state***
+For each distinct part of the in-memory state (e.g., table type) define a new unit.
+
+***3. Separate "arrays of entries"***
 Translation hardware may allow controlling several regions in the same fashion (e.g.,
 a page table has a set of equal entries that control a portion of the translation).
 This suggests expressing the entry as its own unit, and the table as a separate unit
@@ -44,20 +51,51 @@ that has collection of these entry units.
 
 **x86_64 MMU**
 
-Applying those rules to the identified state yields nine different units:
+Applying those steps we get the following:
+ 1. RegisterUnit for CR3/CR4 registers, and PageTableUnit for the radix tree.
+ 2. Split the radix tree into distinct components: PML4, PDPT, PDIR, PT
+ 3. Separate the entries. all in-memory tables are array of entries.
 
- - Units: PML4, PML4_Entry, PDPT, PDPT_Entry, PDIR, PDIR_Entry, PT, PT_Entry, x86MMU
+This yields the following units: PML4, PML4_Entry, PDPT, PDPT_Entry, PDIR, PDIR_Entry, PT, PT_Entry, x86MMU
 
 
 ## 3. Identify the Interface
 
-System software interacts with the translation hardware in a certain way. This may be through
-a register interface, or by writing to a specific memory location. This step identifies
-the interface used with its fields and the meaning its contents.
+For each unit, identify the interface software uses to interact with it.
+
+**1. In-memory state => Memory Interface**
+For in-memory states, select the memory interface for the unit.
+
+**2. Memory-mapped registers => MMIO Interface**
+For registers that are exposed to software through memory mapped registers, use a MMIO interface for
+the unit. Identify the layout of the MMIO interface, and what happens when the register is read/
+written.
+
+**3. Specific registers => CPU Register Interface**
+For registers that are exposed to software through distinct CPU registers, use a CPURegister
+interface. Identify the layout of the CPU registers, and what happens when the register is read/
+written.
+
 
 **x86_64 MMU**
- - page tables: load-store interface to memory, one field (the entry) with present bit, base ...
+ - page tables: Memory Interface for all entries.
  - CPU registers: CR3 holding base and context identifier, CR4 to enable/disable translation
+
+
+## 4. Formulate Translation Function and Constraints
+
+The next step is to formulate the translation function for each unit and to define the
+constraints.
+
+**Translate:** There are two aspects to consider:
+ 1. When does it successfully translate. For each condition add a `requires` clause
+ 2. formulate how it translates.
+```vrs
+fn translate(va: addr, flags: int) -> addr
+```
+
+**Constraints** For each of the three functions `map/unmap/protect` think of the constraints
+that need to be met. Minimum and Maximum supported values, alignments, ...
 
 ## 4. Putting it Together
 
