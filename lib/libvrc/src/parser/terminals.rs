@@ -107,7 +107,6 @@ terminalparser!(pub rlongfatarrow, TokenContent::RLongFatArrow);
 
 // comparators
 terminalparser!(pub at, TokenContent::At);
-terminalparser!(pub underscore, TokenContent::Underscore);
 terminalparser!(pub dotdot, TokenContent::DotDot);
 terminalparser!(pub pathsep, TokenContent::PathSep);
 terminalparser!(pub wildcard, TokenContent::Wildcard);
@@ -205,8 +204,9 @@ keywordparser!(pub kw_assert, Keyword::Assert);
 keywordparser!(pub kw_return, Keyword::Return);
 keywordparser!(pub kw_forall, Keyword::Forall);
 keywordparser!(pub kw_exists, Keyword::Exists);
-keywordparser!(pub kw_map, Keyword::Map);
+keywordparser!(pub kw_staticmap, Keyword::StaticMap);
 keywordparser!(pub kw_for, Keyword::For);
+keywordparser!(pub kw_in, Keyword::In);
 
 /// parses a type expression
 ///

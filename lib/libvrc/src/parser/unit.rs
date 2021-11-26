@@ -73,11 +73,12 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
         opt(state),
         opt(interface),
         opt(size),
+        opt(parse_map),
         many0(method),
     ));
 
     // then we have the unit block, wrapped in curly braces and a ;
-    let (i3, (consts, state, interface, size, methods)) =
+    let (i3, (consts, state, interface, size, map, methods)) =
         cut(terminated(delimited(lbrace, unit_body, rbrace), semicolon))(i2)?;
 
     let pos = input.expand_until(&i3);
@@ -93,6 +94,7 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
             interface: interface.unwrap_or(Interface::None {
                 pos: TokenStream::empty(),
             }),
+            map,
             methods,
             pos,
         },
@@ -101,6 +103,7 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
 
 #[cfg(test)]
 use crate::lexer::Lexer;
+use crate::parser::map::parse_map;
 
 #[test]
 fn test_ok() {

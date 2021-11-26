@@ -43,8 +43,8 @@ use nom::{
 use crate::ast::{Action, ActionComponent, ActionType, BitSlice, Field, Interface, InterfaceField};
 use crate::error::IResult;
 use crate::parser::{
-    bitslice::bitslice_block, expression::expr, field::field_params, state::argument_parser,
-    terminals::*,
+    bitslice::bitslice_block, expression::expr, field::mem_field_params, field::reg_field_params,
+    state::argument_parser, terminals::*,
 };
 use crate::token::{TokenContent, TokenStream};
 
@@ -254,7 +254,7 @@ fn interfacefield(input: TokenStream) -> IResult<TokenStream, InterfaceField> {
     let (i1, name) = ident(input.clone())?;
 
     // recognize the field params
-    let (i2, (stateref, length)) = cut(field_params)(i1)?;
+    let (i2, (stateref, length)) = cut(mem_field_params)(i1)?;
 
     // We now parse an optional Layout, ReadAction, WriteAction
     let (i3, (bitslices, readaction, writeaction)) =
@@ -269,7 +269,7 @@ fn interfacefield(input: TokenStream) -> IResult<TokenStream, InterfaceField> {
     // assemble the field definition
     let field = Field {
         name,
-        stateref,
+        stateref: Some(stateref),
         length,
         layout,
         pos,

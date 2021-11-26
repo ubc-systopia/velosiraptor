@@ -43,12 +43,14 @@ pub enum Keyword {
     Else,
     /// for statements,
     For,
+    /// inclusion statement,
+    In,
     /// import statements
     Import,
     /// state statement
     State,
-    /// Map
-    Map,
+    /// StaticMap
+    StaticMap,
     /// interface statement
     Interface,
     /// Memory State and Interface statement
@@ -101,12 +103,13 @@ impl fmt::Display for Keyword {
             If => "if",
             Else => "else",
             For => "for",
+            In => "in",
             Import => "import",
             Let => "let",
             Fn => "fn",
             Assert => "assert",
             State => "state",
-            Map => "map",
+            StaticMap => "staticmap",
             Interface => "interface",
             Memory => "Memory",
             MMIO => "MMIO",
@@ -208,11 +211,10 @@ pub enum TokenContent {
     Ge, // >=
 
     // others, maybe not used
-    At,         // @
-    Underscore, // _
-    DotDot,     // ..  for slices
-    PathSep,    // ::
-    Wildcard,   // ?
+    At,       // @
+    DotDot,   // ..  for slices
+    PathSep,  // ::
+    Wildcard, // ?
 }
 
 /// Implementation for TokenContent
@@ -259,7 +261,7 @@ impl TokenContent {
             // arrows
             TokenContent::LArrow => "<-",
             TokenContent::RArrow => "->",
-            TokenContent::BiDirArrow => "<->",
+            TokenContent::BiDirArrow => "<-->",
             TokenContent::FatArrow => "=>",
             TokenContent::BiDirFatArrow => "<=>",
             TokenContent::RLongFatArrow => "==>",
@@ -274,7 +276,6 @@ impl TokenContent {
 
             // others, maybe not used
             TokenContent::At => "@",
-            TokenContent::Underscore => "_",
             TokenContent::DotDot => "..",
             TokenContent::PathSep => "::",
             TokenContent::Wildcard => "?",

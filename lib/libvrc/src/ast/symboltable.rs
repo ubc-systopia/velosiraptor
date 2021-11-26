@@ -39,7 +39,7 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 // the used library internal functionality
-use crate::ast::Type;
+use crate::ast::{AstNode, Type};
 use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
@@ -58,6 +58,8 @@ pub enum SymbolKind {
     State,
     /// this is a special symbol referring to the interface
     Interface,
+    /// This symbol is a unit (type)
+    Unit,
 }
 
 /// Implementation of the [Display] trait for [Symbol]
@@ -71,7 +73,7 @@ impl Display for SymbolKind {
 
 /// represents a defined symbol
 #[derive(Clone)]
-pub struct Symbol {
+pub struct Symbol<'a> {
     /// the kind of the symbol, constant, function, ...
     pub kind: SymbolKind,
     /// the name of the symbol, its identifier
@@ -80,17 +82,26 @@ pub struct Symbol {
     pub typeinfo: Type,
     /// the location where this symbol has been defined
     pub loc: TokenStream,
+    /// the astnode of this symbol
+    pub ast_node: AstNode<'a>,
 }
 
 /// Implementation of [Symbol]
-impl Symbol {
+impl<'a> Symbol<'a> {
     /// creates a new symbol from the given context and name, type
-    pub fn new(name: String, typeinfo: Type, kind: SymbolKind, loc: TokenStream) -> Self {
+    pub fn new(
+        name: String,
+        typeinfo: Type,
+        kind: SymbolKind,
+        loc: TokenStream,
+        ast_node: AstNode<'a>,
+    ) -> Self {
         Symbol {
             kind,
             name,
             typeinfo,
             loc,
+            ast_node,
         }
     }
 
@@ -103,7 +114,7 @@ impl Symbol {
 /// Implementation of the [Display] trait for [Symbol]
 ///
 /// We display it as a table form kind|type|name
-impl Display for Symbol {
+impl<'a> Display for Symbol<'a> {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(
             f,
@@ -119,23 +130,23 @@ impl Display for Symbol {
 }
 
 /// Implementation of the [Debug] trait for [Symbol]
-impl Debug for Symbol {
+impl<'a> Debug for Symbol<'a> {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         Display::fmt(self, f)
     }
 }
 
 /// repretents a symbol table context
-struct SymbolTableContext {
+struct SymbolTableContext<'a> {
     /// the symbols of the table, we use a vector
-    syms: HashMap<String, Symbol>,
+    syms: HashMap<String, Symbol<'a>>,
     /// the currenct context
     ctxt: String,
 }
 
-impl SymbolTableContext {
+impl<'a> SymbolTableContext<'a> {
     /// tries to insert a new symbol into the context
-    fn insert(&mut self, sym: Symbol) -> bool {
+    fn insert(&mut self, sym: Symbol<'a>) -> bool {
         match self.syms.get(&sym.name) {
             None => {
                 self.syms.insert(sym.name.clone(), sym);
@@ -171,7 +182,7 @@ impl SymbolTableContext {
 }
 
 /// Implementation of the [fmt::Display] trait for [SymbolTableContext]
-impl Display for SymbolTableContext {
+impl<'a> Display for SymbolTableContext<'a> {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         writeln!(f, "Context: {}", self.ctxt)?;
         writeln!(f, "Kind         Type       Name                    Loc")?;
@@ -183,13 +194,13 @@ impl Display for SymbolTableContext {
 }
 
 /// Represents a symbol table
-pub struct SymbolTable {
+pub struct SymbolTable<'a> {
     /// a vector of symbol table contexts
-    syms: Vec<SymbolTableContext>,
+    syms: Vec<SymbolTableContext<'a>>,
 }
 
 /// Implementation of [SymbolTable]
-impl SymbolTable {
+impl<'a> SymbolTable<'a> {
     /// creates a new empty symbol table
     pub fn new() -> Self {
         let mut st = SymbolTable { syms: Vec::new() };
@@ -211,7 +222,7 @@ impl SymbolTable {
     }
 
     /// tries to insert the symbol into the current context
-    pub fn insert(&mut self, sym: Symbol) -> bool {
+    pub fn insert(&mut self, sym: Symbol<'a>) -> bool {
         match self.lookup(&sym.name) {
             None => {
                 let ctxt = self.syms.last_mut().unwrap();
@@ -275,7 +286,7 @@ impl SymbolTable {
 }
 
 /// Implementation of the [fmt::Display] trait for [SymbolTable]
-impl Display for SymbolTable {
+impl<'a> Display for SymbolTable<'a> {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         writeln!(f, "SYMBOL TABLE\n")?;
         for c in &self.syms {
@@ -286,14 +297,14 @@ impl Display for SymbolTable {
 }
 
 /// Implementation of the [Debug] trait for [Symbol]
-impl Debug for SymbolTable {
+impl<'a> Debug for SymbolTable<'a> {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         Display::fmt(self, f)
     }
 }
 
 /// the default implementation
-impl Default for SymbolTable {
+impl<'a> Default for SymbolTable<'a> {
     fn default() -> Self {
         Self::new()
     }

@@ -26,21 +26,15 @@
 //! State definition parsing
 
 // the used nom components
-use nom::{
-    branch::alt,
-    combinator::cut,
-    multi::{many1, separated_list0},
-    sequence::delimited,
-};
+use nom::{branch::alt, combinator::cut, multi::separated_list1, sequence::delimited};
 
 // lexer, parser terminals and ast
-use crate::ast::{Field, Param, State};
+use crate::ast::{Param, State};
 use crate::error::IResult;
-use crate::parser::field::field;
+use crate::parser::field::{mem_field_block, reg_field_block};
 use crate::parser::parameter;
 use crate::parser::terminals::{
-    assign, comma, kw_memory, kw_none, kw_register, kw_state, lbrace, lparen, rbrace, rparen,
-    semicolon,
+    assign, comma, kw_memory, kw_none, kw_register, kw_state, lparen, rparen, semicolon,
 };
 use crate::token::TokenStream;
 
@@ -59,7 +53,7 @@ pub fn state(input: TokenStream) -> IResult<TokenStream, State> {
 /// parses and consumes [RegisterState] of a unit
 fn register_state(input: TokenStream) -> IResult<TokenStream, State> {
     let (i1, _) = kw_register(input.clone())?;
-    let (i2, fields) = fields_parser(i1)?;
+    let (i2, fields) = reg_field_block(i1)?;
 
     let pos = input.expand_until(&i2);
     Ok((i2, State::RegisterState { fields, pos }))
@@ -69,7 +63,7 @@ fn register_state(input: TokenStream) -> IResult<TokenStream, State> {
 fn memory_state(input: TokenStream) -> IResult<TokenStream, State> {
     let (i1, _) = kw_memory(input.clone())?;
     let (i2, bases) = argument_parser(i1)?;
-    let (i3, fields) = fields_parser(i2)?;
+    let (i3, fields) = mem_field_block(i2)?;
 
     let pos = input.expand_until(&i3);
     Ok((i3, State::MemoryState { bases, fields, pos }))
@@ -84,12 +78,7 @@ fn none_state(input: TokenStream) -> IResult<TokenStream, State> {
 
 /// Parses and consumes a comma separated list of identifiers of the form "(ident, ..., ident)"
 pub fn argument_parser(input: TokenStream) -> IResult<TokenStream, Vec<Param>> {
-    delimited(lparen, cut(separated_list0(comma, parameter)), cut(rparen))(input)
-}
-
-/// Parses and consumes a semicolon separated list of fields of the form "{ FIELD; ...; FIELD; }"
-pub fn fields_parser(input: TokenStream) -> IResult<TokenStream, Vec<Field>> {
-    delimited(lbrace, cut(many1(field)), cut(rbrace))(input)
+    delimited(lparen, cut(separated_list1(comma, parameter)), cut(rparen))(input)
 }
 
 #[cfg(test)]
@@ -102,16 +91,16 @@ use nom::Slice;
 fn memory_state_parser_test() {
     let state_string = "state = Memory(base : addr) {\
     pte [base, 0, 4] {\
-        0   0   present,\
-        1   1   writable,\
-        3   3   writethrough,\
-        4   4   nocache,\
-        5   5   accessed,\
-        6   6   dirty,\
-        7   7   pat,\
-        8   8   global,\
-        9  11   ignored,\
-        12  31  base\
+        0   0   present;\
+        1   1   writable;\
+        3   3   writethrough;\
+        4   4   nocache;\
+        5   5   accessed;\
+        6   6   dirty;\
+        7   7   pat;\
+        8   8   global;\
+        9  11   ignored;\
+        12  31  base;\
         };\
     };";
     let tok_vec = match Lexer::lex_string("stdin", state_string) {
@@ -152,10 +141,10 @@ fn none_state_parser_test() {
 #[test]
 fn register_state_parser_test() {
     let state_string = "state = Register {\
-        base [_, 0, 1] {\
-            0  0 enabled,\
-            1  1 read,\
-            2  2 write\
+        base [1] {\
+            0  0 enabled;\
+            1  1 read;\
+            2  2 write;\
         };
     };";
     let tok_vec = match Lexer::lex_string("stdin", state_string) {
@@ -174,7 +163,7 @@ fn register_state_parser_test() {
     };
 
     // todo Should we be testing fields???
-    assert_eq!(pos, tok_stream.slice(2..27));
+    assert_eq!(pos, tok_stream.slice(2..24));
 }
 
 #[test]
@@ -192,9 +181,9 @@ fn fake_field_type_test() {
 fn missing_semicolon_test() {
     let state_string = "state = Register {\
         base [_, 0, 1] {\
-            0  0 enabled,\
-            1  1 read,\
-            2  2 write\
+            0  0 enabled;\
+            1  1 read;\
+            2  2 write;\
         };
     }";
     let tok_vec = match Lexer::lex_string("stdin", state_string) {
@@ -203,20 +192,4 @@ fn missing_semicolon_test() {
     };
     let tok_stream = TokenStream::from_vec_filtered(tok_vec);
     assert!(state(tok_stream).is_err());
-}
-
-#[test]
-fn fields_parser_err_test() {
-    let fields_string = "\
-            0  0 enabled,\
-            1  1 read\
-            2  2 write,\
-            3  64 address\
-    ";
-    let tok_vec = match Lexer::lex_string("stdin", fields_string) {
-        Ok(tok_vec) => tok_vec,
-        Err(_) => panic!("Lexing failed"),
-    };
-    let tok_stream = TokenStream::from_vec_filtered(tok_vec);
-    assert!(fields_parser(tok_stream).is_err());
 }

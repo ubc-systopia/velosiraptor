@@ -17,6 +17,9 @@ custom_error = "1.9.2"
 # for colorful output
 colored = "2"
 
+# itertools
+itertools = "0.10.1"
+
 # rust code generation
 codegen-rs = { path = "../codegen" }
 

@@ -37,17 +37,17 @@ unit X86_pte(base : addr) : Segment {
     state = Memory(base : addr) {
         pte [base, 0, 4] {
             // the following fields at starting bit, ending bit, name
-            0   0 present,
-            1   1 writable,
-            2   2 usermode,
-            3   3 writethrough,
-            4   4 nocache,
-            5   5 accessed,
-            6   6 dirty,
-            7   7 pat,
-            8   8 global,
-            9  11 ignored,
-           12  31 base
+            0   0 present;
+            1   1 writable;
+            2   2 usermode;
+            3   3 writethrough;
+            4   4 nocache;
+            5   5 accessed;
+            6   6 dirty;
+            7   7 pat;
+            8   8 global;
+            9  11 ignored;
+           12  31 base;
         };
     };
 
@@ -122,3 +122,44 @@ unit X86_pte(base : addr) : Segment {
         return va + get_base();
     }
 };
+
+
+// represents an x86 page table entry
+unit X86_pt(base : addr) : StaticMap {
+    staticmap = [ X86_pte(base + i * 4) for i in 0..1024 ];
+};
+
+
+/*
+unit X86PageTableEntry(base: addr) {
+    state = Memory(base: addr) {
+        entry [base, 0, 8] {
+             0  0 present;
+            // more fields omitted
+            12 63 frame_addr;
+        };
+    };
+    // the interface has the same
+    interface = Memory;
+
+    // the translation semantics
+    fn translate(va: addr, flags: int) -> addr
+      requires state.entry.present; // present bit must be set
+    {
+        return (state.frame_addr << 12) + va;
+    }
+};
+
+
+unit X86PageTable(base: addr) {
+    // the table itself doesn't have state or interface
+
+    // it has 512 entries expressed as a
+    staticmap = [ X86PageTableEntry(base + i * 8) for i in 0..512 ];
+
+    // translate basically forwards the translation to the entry
+    fn translate(va: addr, flags: int) -> addr {
+        return map[va / 4096].translate(va % 4096, flags);
+    }
+};
+*/

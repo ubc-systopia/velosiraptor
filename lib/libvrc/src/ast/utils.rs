@@ -25,13 +25,16 @@
 
 //! Utils library
 
-use crate::ast::{AstNode, Issues};
+use crate::ast::{AstNodeGeneric, Issues};
 use crate::error::VrsError;
 use crate::token::TokenStream;
 use std::collections::HashMap;
 
 /// drains the list and merges it into the hashmap
-pub fn collect_list<T: AstNode>(list: &mut Vec<T>, hmap: &mut HashMap<String, T>) -> u32 {
+pub fn collect_list<'a, T: AstNodeGeneric<'a>>(
+    list: &mut Vec<T>,
+    hmap: &mut HashMap<String, T>,
+) -> u32 {
     let mut errors = 0;
     for elm in list.drain(..) {
         let key = elm.name();
@@ -52,7 +55,7 @@ pub fn collect_list<T: AstNode>(list: &mut Vec<T>, hmap: &mut HashMap<String, T>
 }
 
 /// drains the list and merges it into the hashmap
-pub fn check_double_entries<T: AstNode>(nodelist: &[T]) -> u32 {
+pub fn check_double_entries<'a, T: AstNodeGeneric<'a>>(nodelist: &[T]) -> u32 {
     let mut errors = 0;
     let mut hmap = HashMap::new();
 

@@ -33,7 +33,7 @@ use std::path::Path;
 use codegen_rs as CG;
 
 //
-use crate::ast::{AstNode, Const};
+use crate::ast::{AstNodeGeneric, Const};
 use crate::codegen::CodeGenError;
 use crate::codegen::COPYRIGHT;
 

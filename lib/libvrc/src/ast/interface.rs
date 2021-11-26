@@ -26,10 +26,10 @@
 //! Ast Module of the Velosiraptor Compiler
 
 use crate::ast::{
-    utils, AstNode, Expr, Field, Issues, Param, Symbol, SymbolKind, SymbolTable, Type,
+    utils, AstNode, AstNodeGeneric, Expr, Field, Issues, Param, Symbol, SymbolKind, SymbolTable,
+    Type,
 };
 use crate::error::VrsError;
-// use crate::parser::state::state;
 use crate::token::TokenStream;
 
 /// Defines the software-visible interface of a unit
@@ -67,15 +67,16 @@ pub enum Interface {
 }
 
 /// Implementation of the Interface
-impl Interface {
-    /// builds the symboltable for the state related symbols
-    pub fn build_symboltable(&self, st: &mut SymbolTable) {
+impl<'a> Interface {
+    /// builds the symboltable for the interface related symbols
+    pub fn build_symboltable(&'a self, st: &mut SymbolTable<'a>) {
         // create the 'interface' symbol
         let sym = Symbol::new(
             String::from("interface"),
             Type::Interface,
             SymbolKind::Interface,
             self.loc().clone(),
+            AstNode::Interface(self),
         );
         st.insert(sym);
 
@@ -106,10 +107,10 @@ impl Interface {
     }
 }
 
-/// Implementation of [AstNode] for [Interface]
-impl AstNode for Interface {
+/// Implementation of [AstNodeGeneric] for [Interface]
+impl<'a> AstNodeGeneric<'a> for Interface {
     // checks the node and returns the number of errors and warnings encountered
-    fn check(&self, st: &mut SymbolTable) -> Issues {
+    fn check(&'a self, st: &mut SymbolTable<'a>) -> Issues {
         // TODO: Implement the checks, this may follow a similar structure as the state
         let mut res = Issues::ok();
 
@@ -226,7 +227,7 @@ impl AstNode for Interface {
         "interface"
     }
 
-    /// returns the location of the AstNode
+    /// returns the location of the AstNodeGeneric
     fn loc(&self) -> &TokenStream {
         match self {
             Interface::CPURegisters { pos, .. } => pos,
@@ -253,7 +254,7 @@ pub struct InterfaceField {
 }
 
 /// Implementation for the InterfaceField
-impl InterfaceField {
+impl<'a> InterfaceField {
     /// converts the field into a symbol
     pub fn to_symbol(&self) -> Symbol {
         // prepend the 'state' prefix
@@ -263,10 +264,11 @@ impl InterfaceField {
             Type::Integer,
             SymbolKind::State,
             self.field.pos.clone(),
+            AstNode::InterfaceField(self),
         )
     }
 
-    pub fn build_symboltable(&self, st: &mut SymbolTable) {
+    pub fn build_symboltable(&'a self, st: &mut SymbolTable<'a>) {
         st.insert(self.to_symbol());
 
         for s in &self.field.layout {
@@ -276,14 +278,15 @@ impl InterfaceField {
                 Type::Integer,
                 SymbolKind::State,
                 s.loc().clone(),
+                AstNode::BitSlice(s),
             ));
         }
     }
 }
 
-/// Implementation of [AstNode] for [Interface]
-impl AstNode for InterfaceField {
-    fn check(&self, st: &mut SymbolTable) -> Issues {
+/// Implementation of [AstNodeGeneric] for [InterfaceField]
+impl<'a> AstNodeGeneric<'a> for InterfaceField {
+    fn check(&'a self, st: &mut SymbolTable<'a>) -> Issues {
         let mut res = Issues::ok();
 
         // Check 1: Validate Field
@@ -339,7 +342,7 @@ impl AstNode for InterfaceField {
         self.field.name()
     }
 
-    /// returns the location of the AstNode
+    /// returns the location of the AstNodeGeneric
     fn loc(&self) -> &TokenStream {
         self.field.loc()
     }

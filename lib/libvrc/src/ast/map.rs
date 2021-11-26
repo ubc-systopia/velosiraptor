@@ -25,11 +25,49 @@
 
 //! MAP ast node
 
-use crate::ast::Expr;
+use crate::ast::{AstNodeGeneric, Expr, Issues, SymbolTable};
 use crate::token::TokenStream;
 
+/// Defines a mapping between addresses and units
+#[derive(PartialEq, Debug, Clone)]
 pub struct Map {
-    pub sizes: Vec<(u64, u64)>,
-    pub units: Vec<(String, Expr)>,
+    pub entries: Vec<MapEntry>,
     pub pos: TokenStream,
+}
+
+/// Implementation of [AstNodeGeneric] for [Map]
+impl<'a> AstNodeGeneric<'a> for Map {
+    // checks the node and returns the number of errors and warnings encountered
+    fn check(&self, _st: &mut SymbolTable) -> Issues {
+        todo!()
+    }
+
+    /// rewrite the ast
+    fn rewrite(&mut self, _st: &mut SymbolTable) {
+        // no-op
+    }
+
+    /// returns a printable string representation of the ast node
+    fn name(&self) -> &str {
+        "map"
+    }
+
+    /// returns the location of the AstNodeGeneric
+    fn loc(&self) -> &TokenStream {
+        &self.pos
+    }
+}
+
+/// Defines the parameters for constructing a Unit as a component
+/// of a given map
+/// TODO:
+///     Might need to add an AstNodeGeneric Trait Implementation for
+///     the MapEntry struct
+#[derive(Default, PartialEq, Debug, Clone)]
+pub struct MapEntry {
+    pub range: Option<Expr>,
+    pub unit_name: String,
+    pub unit_params: Vec<Expr>,
+    pub offset: Option<Expr>,
+    pub iteration: Option<(String, u64)>,
 }

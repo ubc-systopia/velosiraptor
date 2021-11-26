@@ -39,7 +39,7 @@ use nom::{
 };
 
 // lexer, parser terminals and ast
-use crate::ast::{AstNode, BinOp, Expr, Quantifier, UnOp};
+use crate::ast::{AstNodeGeneric, BinOp, Expr, Quantifier, UnOp};
 use crate::error::{IResult, VrsError};
 use crate::parser::{param::parameter, terminals::*};
 use crate::token::{Keyword, TokenContent, TokenStream};
@@ -499,6 +499,15 @@ fn ident_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     Ok((i, Expr::Identifier { path, pos }))
 }
 
+/// parses an expression list
+///
+/// # Grammar
+///
+/// `EXPR_LIST := [ EXPR (COMMA EXPR)* ]?`
+pub fn expr_list(input: TokenStream) -> IResult<TokenStream, Vec<Expr>> {
+    separated_list0(comma, expr)(input)
+}
+
 /// pares a function call expression
 ///
 /// This parser recognizes a function call expression.
@@ -515,7 +524,7 @@ fn ident_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 fn fn_call_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i, (path, args)) = pair(
         separated_list1(dot, ident),
-        delimited(lparen, separated_list0(comma, expr), rparen),
+        delimited(lparen, expr_list, rparen),
     )(input.clone())?;
     let pos = input.expand_until(&i);
     Ok((i, Expr::FnCall { path, args, pos }))
@@ -533,10 +542,8 @@ fn fn_call_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 ///
 ///  * `foo[1]`
 fn element_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    let (i, (path, e)) = pair(
-        separated_list1(dot, ident),
-        delimited(lbrack, num_lit_expr, rbrack),
-    )(input.clone())?;
+    let (i, (path, e)) =
+        pair(separated_list1(dot, ident), delimited(lbrack, expr, rbrack))(input.clone())?;
     let pos = input.expand_until(&i);
     Ok((
         i,

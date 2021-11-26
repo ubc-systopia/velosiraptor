@@ -27,7 +27,7 @@
 // std lib imports
 use std::fmt;
 
-use crate::ast::{AstNode, Issues, Symbol, SymbolKind, SymbolTable, Type};
+use crate::ast::{AstNode, AstNodeGeneric, Issues, Symbol, SymbolKind, SymbolTable, Type};
 use crate::token::TokenStream;
 
 /// Defines a Method inside a unit
@@ -50,6 +50,7 @@ impl Param {
             name: self.name.clone(),
             typeinfo: self.ptype,
             loc: self.pos.clone(),
+            ast_node: AstNode::Parameter(self),
         }
     }
 }
@@ -68,8 +69,8 @@ impl fmt::Debug for Param {
     }
 }
 
-/// implementation of [AstNode] for [Method]
-impl AstNode for Param {
+/// implementation of [AstNodeGeneric] for [Method]
+impl<'a> AstNodeGeneric<'a> for Param {
     // performs checks on the parameter
     fn check(&self, _st: &mut SymbolTable) -> Issues {
         Issues::ok()

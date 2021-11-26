@@ -655,7 +655,7 @@ impl fmt::Debug for SourcePos {
             self.context,
             self.line,
             self.column,
-            self.as_str().to_string()
+            self.as_str()
         )
     }
 }

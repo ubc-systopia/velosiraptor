@@ -33,7 +33,9 @@ use std::cmp::min;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // used library internal functionality
-use crate::ast::{utils, AstNode, BitSlice, Issues, Symbol, SymbolKind, SymbolTable, Type};
+use crate::ast::{
+    utils, AstNode, AstNodeGeneric, BitSlice, Issues, Symbol, SymbolKind, SymbolTable, Type,
+};
 use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
@@ -55,7 +57,7 @@ pub struct Field {
     pub pos: TokenStream,
 }
 
-impl Field {
+impl<'a> Field {
     /// constructs the mask value of the bit slices in the field
     pub fn mask_value(&self) -> u64 {
         let mut maskval = 0;
@@ -78,11 +80,17 @@ impl Field {
     pub fn to_symbol(&self) -> Symbol {
         // prepend the 'state' prefix
         let name = format!("state.{}", self.name);
-        Symbol::new(name, Type::Integer, SymbolKind::State, self.pos.clone())
+        Symbol::new(
+            name,
+            Type::Integer,
+            SymbolKind::State,
+            self.pos.clone(),
+            AstNode::Field(self),
+        )
     }
 
     /// builds the symboltable for the state related symbols
-    pub fn build_symboltable(&self, st: &mut SymbolTable) {
+    pub fn build_symboltable(&'a self, st: &mut SymbolTable<'a>) {
         // insert the own symbol
         st.insert(self.to_symbol());
 
@@ -93,6 +101,7 @@ impl Field {
                 Type::Integer,
                 SymbolKind::State,
                 s.loc().clone(),
+                AstNode::BitSlice(s),
             ));
         }
     }
@@ -131,9 +140,9 @@ impl Debug for Field {
     }
 }
 
-/// implementation of [AstNode] for [Field]
-impl AstNode for Field {
-    fn check(&self, st: &mut SymbolTable) -> Issues {
+/// implementation of [AstNodeGeneric] for [Field]
+impl<'a> AstNodeGeneric<'a> for Field {
+    fn check(&'a self, st: &mut SymbolTable<'a>) -> Issues {
         let mut res = Issues::ok();
 
         // We already know that the bases are valid

@@ -33,7 +33,10 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // the used crate-internal functionality
-use crate::ast::{utils, AstNode, Const, Interface, Issues, Method, Param, State, SymbolTable};
+use crate::ast::{
+    utils, AstNode, AstNodeGeneric, Const, Interface, Issues, Map, Method, Param, State, Symbol,
+    SymbolKind, SymbolTable, Type,
+};
 use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
@@ -60,6 +63,8 @@ pub struct Unit {
     pub state: State,
     /// the software visible interface of the unit
     pub interface: Interface,
+    /// Optional map in the case of map UnitType
+    pub map: Option<Map>,
     /// the methods defined by this unit
     pub methods: Vec<Method>,
     // TODO: maybe make the translate / constructors / map / ... explicit here?
@@ -68,15 +73,25 @@ pub struct Unit {
 }
 
 /// Implementation of [Unit]
-impl Unit {
+impl<'a> Unit {
     pub fn location(&self) -> String {
         self.pos.location()
     }
+
+    pub fn to_symbol(&self) -> Symbol {
+        Symbol::new(
+            self.name.clone(),
+            Type::Unit,
+            SymbolKind::Unit,
+            self.loc().clone(),
+            AstNode::Unit(self),
+        )
+    }
 }
 
-/// Implemetation of the [AstNode] trait for [Unit]
-impl AstNode for Unit {
-    fn check(&self, st: &mut SymbolTable) -> Issues {
+/// Implemetation of the [AstNodeGeneric] trait for [Unit]
+impl<'a> AstNodeGeneric<'a> for Unit {
+    fn check(&'a self, st: &mut SymbolTable<'a>) -> Issues {
         // all fine for now
         let mut res = Issues::ok();
 
@@ -89,6 +104,13 @@ impl AstNode for Unit {
         // adding the module paramters
         for p in &self.params {
             if !st.insert(p.to_symbol()) {
+                res.inc_err(1);
+            }
+        }
+
+        // adding the constants
+        for c in &self.consts {
+            if !st.insert(c.to_symbol()) {
                 res.inc_err(1);
             }
         }
@@ -226,6 +248,8 @@ impl AstNode for Unit {
             res.inc_err(1);
         }
 
+        st.drop_context();
+
         res
     }
     ///
@@ -235,19 +259,6 @@ impl AstNode for Unit {
     /// returns the location of the current
     fn loc(&self) -> &TokenStream {
         &self.pos
-    }
-
-    // builds the symbol table
-    fn build_symtab(&self, st: &mut SymbolTable) -> Issues {
-        let mut err = Issues::ok();
-        for i in &self.consts {
-            //let name = format!("{}.{}", self.name().to_uppercase(), i.name());
-            let sym = i.to_symbol();
-            if !st.insert(sym) {
-                err.inc_err(1);
-            };
-        }
-        err
     }
 }
 
