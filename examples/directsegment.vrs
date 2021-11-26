@@ -21,61 +21,87 @@ unit DirectSegment : Segment {
 
     // the state will be two registers:
     state = Register {
-        base [_, 0, 8] {
+        src_addr [8] {
+             0  5  _;
+             6 64  address;
+        }
+
+        dst_addr [8] {
              0  0  enabled;
              1  1  read;
              2  2  write;
              6 64  address;
         };
-        size [_, 8, 8] {
+        length [8] {
             0  5 _;
-            6 40 size
+            6 40 bytes
         };
     };
 
     // the interface is a register interface, assume there are two registers
     // called `base` and `size`. They can be updated using load/store instructions
     interface = Register {
-        base => state.base;
-        size => state.size;
+        dsbase <=> state.src_addr;
+        dssize <=> state.length;
+        dsdst <=> state.dst_addr;
     };
-
-    // No real need for a constructor
-    DirectSegment() { }
 
     /* segment specific elements */
 
     // the base address will be the address part shifted by 6
     fn segbase() -> addr {
-        state.base.address << 6
+        return state.src_addr.address << 6
     }
 
     // the size is given by the state
     fn segsize() -> size {
-        state.size.size << 6
+        return state.length.bytes << 6;
     }
 
-    // match flags, returns true if we can translate
-    fn match_flags(flags) -> bool {
-        state.base.enabled && ((state.base.write && flags.write) || (state.base.read && flags.read))
+    //
+    fn dstaddr() -> addr {
+        return state.dst_addr.address << 6;
     }
 
-    map(inaddr, outaddr, length, flags) {
-        // must be a memory type
-        assert type(outaddr) == Memory;
-        // aligned to 64
-        assert aligned(outaddr, 64);
-        assert aligned(length, 64);
-        // input address must be 0
-        assert inaddr == 0;
+    fn enabled() -> bool {
+        return state.dst_addr.enabled;
     }
 
-    // cant unmap or protect
-    unmap() {
-        true
+    // unmapping an entry
+    fn unmap(va: addr, sz: size) -> bool
+        // need a way to express:
+        // forall a | va <= a < va + sz :: fail(translate(a, ANY))
+        ensures translate(va, 0) == 0;
+    ;
+
+    // mapping an entry
+    fn map(va: addr, sz: size, flags: int, pa : addr) -> bool
+        //requires (addr %  4096) == 0;
+        // need a way to express types:
+        // type(addr) == Memory || type(addr) == DevMemory;
+        // type(addr) == DevMemory ==> flags & CACHE_DISABLED
+        //
+        ensures forall i : addr :: 0 <= i && i < sz && translate(va + i, flags) == pa + i;
+        ensures translate(va, flags) == pa;
+    ;
+
+
+    // protecting the entry, i.e., change its permission
+    fn protect(flags: int) -> bool
+        ensures match_flags(flags);
+    {
+        // update the entry
+        // ensures match_flags(flags) ==> translate(a) == translate(a)
+        return true;
     }
 
-    protect(flags) {
-        true
+
+    // the translation semantics, adding an option type?
+    fn translate(va: addr, flags: int) -> addr
+        requires va < segbase() + segsize();
+        requires segbase() <= va
+        requires
+    {
+        return va + get_base();
     }
  }
