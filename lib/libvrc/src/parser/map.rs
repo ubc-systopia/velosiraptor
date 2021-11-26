@@ -105,7 +105,7 @@ fn map_src(input: TokenStream) -> IResult<TokenStream, Expr> {
 ///  - `UnitA(base) @ 123`
 ///
 fn map_dst(input: TokenStream) -> IResult<TokenStream, (String, Vec<Expr>, Option<Expr>)> {
-    let (i1, unitname) = ident(input.clone())?;
+    let (i1, unitname) = ident(input)?;
 
     // get the unit args
     let (i2, unitargs) = cut(delimited(lparen, expr_list, rparen))(i1)?;
@@ -140,7 +140,7 @@ fn entry_list(input: TokenStream) -> IResult<TokenStream, Vec<MapEntry>> {
 ///  - `UnitA() for i in 0..512`
 ///
 fn list_comprehension(input: TokenStream) -> IResult<TokenStream, Vec<MapEntry>> {
-    let (i1, elm) = map_element(input.clone())?;
+    let (i1, elm) = map_element(input)?;
 
     let (i2, (list_itterator, (lower, _, upper))) = tuple((
         preceded(kw_for, cut(ident)),

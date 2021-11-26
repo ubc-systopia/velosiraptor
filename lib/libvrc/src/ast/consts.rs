@@ -33,7 +33,9 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // the used crate-internal functionality
-use crate::ast::{utils, AstNodeGeneric, Expr, Issues, Symbol, SymbolKind, SymbolTable, Type};
+use crate::ast::{
+    utils, AstNode, AstNodeGeneric, Expr, Issues, Symbol, SymbolKind, SymbolTable, Type,
+};
 use crate::error::VrsError;
 use crate::token::TokenStream;
 
@@ -81,6 +83,7 @@ impl Const {
             self.to_type(),
             SymbolKind::Const,
             self.loc().clone(),
+            AstNode::Const(self),
         )
     }
 
@@ -139,8 +142,8 @@ impl PartialOrd for Const {
 }
 
 /// implementation of [AstNodeGeneric] for [Const]
-impl AstNodeGeneric for Const {
-    fn check(&self, st: &mut SymbolTable) -> Issues {
+impl<'a> AstNodeGeneric<'a> for Const {
+    fn check(&'a self, st: &mut SymbolTable<'a>) -> Issues {
         let mut res = Issues::ok();
 
         let name = self.name();

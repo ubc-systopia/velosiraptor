@@ -89,7 +89,7 @@ impl Debug for BitSlice {
 }
 
 /// implementation of [AstNodeGeneric] for [BitSlice]
-impl AstNodeGeneric for BitSlice {
+impl<'a> AstNodeGeneric<'a> for BitSlice {
     /// checks the bitslices node and reports issues
     fn check(&self, _st: &mut SymbolTable) -> Issues {
         let mut res = Issues::ok();

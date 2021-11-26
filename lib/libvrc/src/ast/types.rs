@@ -45,6 +45,8 @@ pub enum Type {
     State,
     /// the interface of a unit
     Interface,
+    ///
+    Unit,
 }
 
 /// Implementation for [Type]
@@ -59,6 +61,7 @@ impl Type {
             Size => true,
             State => false,
             Interface => false,
+            Unit => false,
         }
     }
 
@@ -72,6 +75,7 @@ impl Type {
             Size => false,
             State => false,
             Interface => false,
+            Unit => false,
         }
     }
 
@@ -85,6 +89,7 @@ impl Type {
             Size => "numeric",
             State => "state",
             Interface => "interface",
+            Unit => "unit",
         }
     }
 
@@ -105,6 +110,7 @@ impl fmt::Display for Type {
             Size => write!(f, "size"),
             State => write!(f, "state"),
             Interface => write!(f, "interface"),
+            Unit => write!(f, "unit"),
         }
     }
 }

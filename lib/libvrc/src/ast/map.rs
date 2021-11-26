@@ -36,7 +36,7 @@ pub struct Map {
 }
 
 /// Implementation of [AstNodeGeneric] for [Map]
-impl AstNodeGeneric for Map {
+impl<'a> AstNodeGeneric<'a> for Map {
     // checks the node and returns the number of errors and warnings encountered
     fn check(&self, _st: &mut SymbolTable) -> Issues {
         todo!()

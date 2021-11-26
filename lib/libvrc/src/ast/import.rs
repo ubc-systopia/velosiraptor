@@ -83,7 +83,7 @@ impl PartialOrd for Import {
 }
 
 /// implementation of [AstNodeGeneric] for [Import]
-impl AstNodeGeneric for Import {
+impl<'a> AstNodeGeneric<'a> for Import {
     // returns the name of the node
     fn name(&self) -> &str {
         &self.name

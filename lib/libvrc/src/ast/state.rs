@@ -30,7 +30,7 @@ use std::fmt::{Debug, Display, Formatter, Result};
 
 // used library internal functionality
 use crate::ast::{
-    utils, AstNodeGeneric, Field, Issues, Param, Symbol, SymbolKind, SymbolTable, Type,
+    utils, AstNode, AstNodeGeneric, Field, Issues, Param, Symbol, SymbolKind, SymbolTable, Type,
 };
 use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
@@ -69,15 +69,16 @@ pub enum State {
     },
 }
 
-impl State {
+impl<'a> State {
     /// builds the symboltable for the state related symbols
-    pub fn build_symboltable(&self, st: &mut SymbolTable) {
+    pub fn build_symboltable(&'a self, st: &mut SymbolTable<'a>) {
         // create the 'state' symbol
         let sym = Symbol::new(
             String::from("state"),
             Type::State,
             SymbolKind::State,
             self.loc().clone(),
+            AstNode::State(self),
         );
         st.insert(sym);
 
@@ -91,6 +92,13 @@ impl State {
         match self {
             State::MemoryState { fields, .. } => fields,
             State::RegisterState { fields, .. } => fields,
+            _ => &[],
+        }
+    }
+
+    pub fn bases(&self) -> &[Param] {
+        match self {
+            State::MemoryState { bases, .. } => bases.as_slice(),
             _ => &[],
         }
     }
@@ -168,19 +176,18 @@ impl Debug for State {
 }
 
 /// implementation of [AstNodeGeneric] for [State]
-impl AstNodeGeneric for State {
-    fn check(&self, st: &mut SymbolTable) -> Issues {
+impl<'a> AstNodeGeneric<'a> for State {
+    fn check(&'a self, st: &mut SymbolTable<'a>) -> Issues {
         let mut res = Issues::ok();
 
         // extract the fields and bases from the  state
-        let _bases = Vec::new();
-        let (fields, bases) = match self {
-            State::MemoryState { bases, fields, .. } => (fields, bases.as_slice()),
-            State::RegisterState { fields, .. } => (fields, _bases.as_slice()),
-            State::None { .. } => {
-                return Issues::ok();
-            }
-        };
+
+        if let State::None { .. } = self {
+            return Issues::ok();
+        }
+
+        let fields = self.fields();
+        let bases = self.bases();
 
         // create a new symtable context, this is required for base checking in the fields
         st.create_context(String::from("state"));

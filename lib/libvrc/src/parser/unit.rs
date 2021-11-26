@@ -94,7 +94,7 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
             interface: interface.unwrap_or(Interface::None {
                 pos: TokenStream::empty(),
             }),
-            map: map,
+            map,
             methods,
             pos,
         },

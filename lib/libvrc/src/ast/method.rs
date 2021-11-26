@@ -28,7 +28,8 @@
 use std::fmt;
 
 use crate::ast::{
-    utils, AstNodeGeneric, Expr, Issues, Param, Stmt, Symbol, SymbolKind, SymbolTable, Type,
+    utils, AstNode, AstNodeGeneric, Expr, Issues, Param, Stmt, Symbol, SymbolKind, SymbolTable,
+    Type,
 };
 use crate::token::TokenStream;
 
@@ -71,6 +72,7 @@ impl Method {
             self.rettype,
             SymbolKind::Function,
             self.pos.clone(),
+            AstNode::Method(self),
         )
     }
 }
@@ -103,8 +105,8 @@ impl fmt::Debug for Method {
 }
 
 /// implementation of [AstNodeGeneric] for [Method]
-impl AstNodeGeneric for Method {
-    fn check(&self, st: &mut SymbolTable) -> Issues {
+impl<'a> AstNodeGeneric<'a> for Method {
+    fn check(&'a self, st: &mut SymbolTable<'a>) -> Issues {
         let mut res = Issues::ok();
 
         // Check 1: Parameter Identifiers

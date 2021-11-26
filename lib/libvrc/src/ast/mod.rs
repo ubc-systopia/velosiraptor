@@ -80,20 +80,15 @@ pub use unit::Unit;
 ///
 /// This trait has to be implemented by all the nodes. It provides common functionality
 /// for the AstNodeGenerics, that is useful when printing error messages, for instance.
-pub trait AstNodeGeneric {
-    // checks the node and returns the number of errors and warnings encountered
-    fn check(&self, _st: &mut SymbolTable) -> Issues {
+pub trait AstNodeGeneric<'a> {
+    // checks the node and returns the number of errors encountered
+    fn check(&'a self, _st: &mut SymbolTable<'a>) -> Issues {
         Issues::ok()
     }
 
     // reqrite the ast
-    fn rewrite(&mut self, _st: &mut SymbolTable) {
+    fn rewrite(&'a mut self, _st: &mut SymbolTable<'a>) {
         // no-op
-    }
-
-    // builds the symbol table
-    fn build_symtab(&self, _st: &mut SymbolTable) -> Issues {
-        Issues::ok()
     }
 
     /// returns a printable string representing the ast node
@@ -101,4 +96,72 @@ pub trait AstNodeGeneric {
 
     /// returns the location of the AstNodeGeneric
     fn loc(&self) -> &TokenStream;
+}
+
+/// enum of all AstNodes
+#[derive(Clone)]
+pub enum AstNode<'a> {
+    Root(&'a AstRoot),
+    Import(&'a Import),
+    Const(&'a Const),
+    Unit(&'a Unit),
+    // state
+    State(&'a State),
+    Field(&'a Field),
+    BitSlice(&'a BitSlice),
+
+    // interface
+    Interface(&'a Interface),
+    InterfaceField(&'a InterfaceField),
+
+    // map
+    Map(&'a Map),
+
+    // methods
+    Method(&'a Method),
+    Parameter(&'a Param),
+    Statement(&'a Stmt),
+    Expression(&'a Expr),
+}
+
+impl<'a> AstNodeGeneric<'a> for AstNode<'a> {
+    /// returns a printable string representing the ast node
+    fn name(&self) -> &str {
+        match self {
+            AstNode::Root(x) => x.name(),
+            AstNode::Import(x) => x.name(),
+            AstNode::Const(x) => x.name(),
+            AstNode::Unit(x) => x.name(),
+            AstNode::State(x) => x.name(),
+            AstNode::Field(x) => x.name(),
+            AstNode::BitSlice(x) => x.name(),
+            AstNode::Interface(x) => x.name(),
+            AstNode::InterfaceField(x) => x.name(),
+            AstNode::Map(x) => x.name(),
+            AstNode::Method(x) => x.name(),
+            AstNode::Parameter(x) => x.name(),
+            AstNode::Statement(x) => x.name(),
+            AstNode::Expression(x) => x.name(),
+        }
+    }
+
+    /// returns the location of the AstNodeGeneric
+    fn loc(&self) -> &TokenStream {
+        match self {
+            AstNode::Root(x) => x.loc(),
+            AstNode::Import(x) => x.loc(),
+            AstNode::Const(x) => x.loc(),
+            AstNode::Unit(x) => x.loc(),
+            AstNode::State(x) => x.loc(),
+            AstNode::Field(x) => x.loc(),
+            AstNode::BitSlice(x) => x.loc(),
+            AstNode::Interface(x) => x.loc(),
+            AstNode::InterfaceField(x) => x.loc(),
+            AstNode::Map(x) => x.loc(),
+            AstNode::Method(x) => x.loc(),
+            AstNode::Parameter(x) => x.loc(),
+            AstNode::Statement(x) => x.loc(),
+            AstNode::Expression(x) => x.loc(),
+        }
+    }
 }

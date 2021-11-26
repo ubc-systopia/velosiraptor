@@ -54,7 +54,7 @@ pub struct AstRoot {
 
 use crate::parser::Parser;
 
-impl AstRoot {
+impl<'a> AstRoot {
     /// resolves imports recursively
     ///
     /// Walks the import tree and tries to parse each import individually
@@ -238,7 +238,10 @@ impl AstRoot {
         }
 
         for u in &self.units {
-            err = err + u.build_symtab(&mut st);
+            let sym = u.to_symbol();
+            if !st.insert(sym) {
+                err.inc_err(1);
+            };
         }
 
         if err.errors > 0 {
@@ -249,7 +252,7 @@ impl AstRoot {
     }
 
     /// checks for consistency
-    pub fn check_consistency(&self, st: &mut SymbolTable) -> Result<Issues, AstError> {
+    pub fn check_consistency(&'a self, st: &mut SymbolTable<'a>) -> Result<Issues, AstError> {
         let val = self.check(st);
         if val.errors > 0 {
             Err(AstError::CheckError { i: val })
@@ -292,8 +295,8 @@ impl fmt::Debug for AstRoot {
 }
 
 /// implementation of [AstNodeGeneric] for [Ast]
-impl AstNodeGeneric for AstRoot {
-    fn check(&self, st: &mut SymbolTable) -> Issues {
+impl<'a> AstNodeGeneric<'a> for AstRoot {
+    fn check(&'a self, st: &mut SymbolTable<'a>) -> Issues {
         // no issues so far
         let mut res = Issues::ok();
 
@@ -320,10 +323,7 @@ impl AstNodeGeneric for AstRoot {
 
         res
     }
-    // builds the symbol table
-    fn build_symtab(&self, _st: &mut SymbolTable) -> Issues {
-        Issues::ok()
-    }
+
     fn name(&self) -> &str {
         "ast"
     }

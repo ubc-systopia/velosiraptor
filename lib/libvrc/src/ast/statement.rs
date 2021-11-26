@@ -28,7 +28,7 @@
 use std::fmt;
 
 // library internal imports
-use crate::ast::{AstNodeGeneric, Expr, Issues, Symbol, SymbolKind, SymbolTable, Type};
+use crate::ast::{AstNode, AstNodeGeneric, Expr, Issues, Symbol, SymbolKind, SymbolTable, Type};
 use crate::error::VrsError;
 use crate::token::TokenStream;
 
@@ -151,8 +151,8 @@ impl fmt::Display for Stmt {
 }
 
 /// implementation of [AstNodeGeneric] for [Stmt]
-impl AstNodeGeneric for Stmt {
-    fn check(&self, st: &mut SymbolTable) -> Issues {
+impl<'a> AstNodeGeneric<'a> for Stmt {
+    fn check(&'a self, st: &mut SymbolTable<'a>) -> Issues {
         let mut res = Issues::ok();
 
         use self::Stmt::*;
@@ -200,7 +200,13 @@ impl AstNodeGeneric for Stmt {
                 res = res + rhs.check(st) + rhs.match_type(*typeinfo, st);
 
                 // add the symbol to the context
-                let sym = Symbol::new(lhs.clone(), *typeinfo, SymbolKind::Variable, pos.clone());
+                let sym = Symbol::new(
+                    lhs.clone(),
+                    *typeinfo,
+                    SymbolKind::Variable,
+                    pos.clone(),
+                    AstNode::Statement(self),
+                );
                 st.insert(sym);
             }
         }

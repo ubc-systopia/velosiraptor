@@ -370,7 +370,7 @@ pub enum Expr {
 }
 
 /// Implementation of [Expr]
-impl Expr {
+impl<'a> Expr {
     /// returns ture if the expression is a constant expression
     ///
     /// it consults the symbol table to figure out whether the symbol / variable is constant
@@ -584,7 +584,7 @@ impl Expr {
     }
 
     /// checks that all symbols are defined in the exprssions
-    pub fn check_symbols(&self, st: &mut SymbolTable) -> Issues {
+    pub fn check_symbols(&'a self, st: &mut SymbolTable<'a>) -> Issues {
         let varkind = &[
             SymbolKind::Const,
             SymbolKind::Parameter,
@@ -666,13 +666,13 @@ impl fmt::Display for Expr {
     }
 }
 
-impl AstNodeGeneric for Expr {
+impl<'a> AstNodeGeneric<'a> for Expr {
     fn name(&self) -> &str {
         "Expression"
     }
 
     /// performs teh ast check on the expression node
-    fn check(&self, st: &mut SymbolTable) -> Issues {
+    fn check(&'a self, st: &mut SymbolTable<'a>) -> Issues {
         let mut res = Issues::ok();
 
         // Check 1: Sybol definitions
