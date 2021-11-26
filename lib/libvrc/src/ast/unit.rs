@@ -248,6 +248,8 @@ impl<'a> AstNodeGeneric<'a> for Unit {
             res.inc_err(1);
         }
 
+        st.drop_context();
+
         res
     }
     ///
