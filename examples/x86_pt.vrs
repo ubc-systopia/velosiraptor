@@ -37,17 +37,17 @@ unit X86_pte(base : addr) : Segment {
     state = Memory(base : addr) {
         pte [base, 0, 4] {
             // the following fields at starting bit, ending bit, name
-            0   0 present,
-            1   1 writable,
-            2   2 usermode,
-            3   3 writethrough,
-            4   4 nocache,
-            5   5 accessed,
-            6   6 dirty,
-            7   7 pat,
-            8   8 global,
-            9  11 ignored,
-           12  31 base
+            0   0 present;
+            1   1 writable;
+            2   2 usermode;
+            3   3 writethrough;
+            4   4 nocache;
+            5   5 accessed;
+            6   6 dirty;
+            7   7 pat;
+            8   8 global;
+            9  11 ignored;
+           12  31 base;
         };
     };
 
@@ -130,13 +130,13 @@ unit X86_pt(base : addr) : StaticMap {
 };
 
 
-
+/*
 unit X86PageTableEntry(base: addr) {
     state = Memory(base: addr) {
         entry [base, 0, 8] {
-             0  0 present,
+             0  0 present;
             // more fields omitted
-            12 63 frame_addr
+            12 63 frame_addr;
         };
     };
     // the interface has the same
@@ -162,3 +162,4 @@ unit X86PageTable(base: addr) {
         return map[va / 4096].translate(va % 4096, flags);
     }
 };
+*/
