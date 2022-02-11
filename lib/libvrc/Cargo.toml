@@ -24,8 +24,8 @@ itertools = "0.10.1"
 codegen-rs = { path = "../codegen" }
 
 # c code generation
-# crustal = { path = "../crustal" }
-crustal = "0.1.2"
+crustal = { path = "../crustal" }
+# crustal = "0.1.2"
 
 # synthesis
 rosettelang = { path = "../rosettelang" }
