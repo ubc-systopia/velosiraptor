@@ -34,6 +34,7 @@ use std::process::exit;
 // get the parser module
 use libvrc::ast::{AstError, Issues};
 use libvrc::codegen::CodeGen;
+use libvrc::hwgen::HWGen;
 use libvrc::parser::{Parser, ParserError};
 use libvrc::synth::Synthesisizer;
 
@@ -50,9 +51,9 @@ fn parse_cmdline() -> clap::ArgMatches<'static> {
                 .help("the output file"),
         )
         .arg(
-            Arg::with_name("pkg")
-                .short("p")
-                .long("pkg")
+            Arg::with_name("name")
+                .short("n")
+                .long("name")
                 .takes_value(true)
                 .help("the package name to produce"),
         )
@@ -62,6 +63,13 @@ fn parse_cmdline() -> clap::ArgMatches<'static> {
                 .long("backend")
                 .takes_value(true)
                 .help("the code backend to use [rust, c]"),
+        )
+        .arg(
+            Arg::with_name("platform")
+                .short("p")
+                .long("platform")
+                .takes_value(true)
+                .help("the hardware platform to generate the module for [fastmodels]"),
         )
         .arg(
             Arg::with_name("synth")
@@ -148,11 +156,14 @@ fn main() {
     let outdir = matches.value_of("output").unwrap_or("");
     log::info!("output directory: {}", outdir);
 
-    let pkgname = matches.value_of("pkg").unwrap_or("mpu").to_string();
+    let pkgname = matches.value_of("name").unwrap_or("mpu").to_string();
     log::info!("package name: {}", pkgname);
 
     let backend = matches.value_of("backend").unwrap_or("rust");
     log::info!("codegen backend: {}", backend);
+
+    let platform = matches.value_of("platform").unwrap_or("fastmodels");
+    log::info!("platform backend: {}", platform);
 
     let synth = matches.value_of("synth").unwrap_or("rosette");
     log::info!("synthesis backend: {}", synth);
@@ -354,8 +365,8 @@ fn main() {
     };
 
     let synthsizer = match synth {
-        "rosette" => Synthesisizer::new_rosette(outpath, pkgname),
-        "z3" => Synthesisizer::new_z3(outpath, pkgname),
+        "rosette" => Synthesisizer::new_rosette(outpath, pkgname.clone()),
+        "z3" => Synthesisizer::new_z3(outpath, pkgname.clone()),
         s => {
             eprintln!(
                 "{}{} `{}`.\n",
@@ -490,11 +501,39 @@ fn main() {
     // Step 6: Generate simulator modules
     // ===========================================================================================
 
+    log::info!("==== HARDWARE GENERATION STAGE ====");
+
     // we can generate some modules
-    eprintln!(
-        "{:>8}: generating Arm FastModels modules...\n",
-        "generate".bold().green(),
-    );
+    let outpath = Path::new(outdir);
+
+    if outpath.exists() && !outpath.is_dir() {
+        eprintln!(
+            "{}{} `{}`.\n",
+            "error".bold().red(),
+            ": output path exists, but s not a directory: ".bold(),
+            outdir.bold()
+        );
+        abort(infile, issues);
+        return;
+    }
+
+    let platform = match platform {
+        "fastmodels" => HWGen::new_fastmodels(outpath, pkgname.clone()),
+        s => {
+            eprintln!(
+                "{}{} `{}`.\n",
+                "error".bold().red(),
+                ": unsupported platform backend".bold(),
+                s.bold()
+            );
+            abort(infile, issues);
+            return;
+        }
+    };
+
+    platform.prepare();
+    platform.generate(&ast);
+    platform.finalize();
 
     if issues.warnings > 0 {
         let msg = format!("{} warning(s) emitted", issues.warnings);
