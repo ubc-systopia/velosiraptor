@@ -17,55 +17,48 @@
 unit DirectSegment : Segment {
 
     // let's assume the maximum size of the segment is 40 bits.
-    size = 40;
+    // size = 40;
 
     // the state will be two registers:
     state = Register {
-        src_addr [8] {
-             0  5  _;
-             6 64  address;
-        }
 
-        dst_addr [8] {
-             0  0  enabled;
-             1  1  read;
-             2  2  write;
-             6 64  address;
+        base [8] {
+             0 63  address;
         };
+
         length [8] {
-            0  5 _;
-            6 40 bytes
+            0 39 bytes;
         };
     };
 
     // the interface is a register interface, assume there are two registers
     // called `base` and `size`. They can be updated using load/store instructions
-    interface = Register {
-        dsbase <=> state.src_addr;
-        dssize <=> state.length;
-        dsdst <=> state.dst_addr;
+    interface = Register(base : addr) {
+
+        base [base, 8, 8] {
+            Layout {
+             0 63  address;
+            };
+            ReadAction {
+                interface.base <- state.base;
+            };
+            WriteAction {
+                interface.base -> state.base;
+            };
+        };
+
+        length [base, 16, 8] {
+            Layout {
+            0 39 bytes;
+            };
+            ReadAction {
+                interface.length <- state.length;
+            };
+            WriteAction {
+                interface.length -> state.length;
+            };
+        };
     };
-
-    /* segment specific elements */
-
-    // the base address will be the address part shifted by 6
-    fn segbase() -> addr {
-        return state.src_addr.address << 6
-    }
-
-    // the size is given by the state
-    fn segsize() -> size {
-        return state.length.bytes << 6;
-    }
-
-    //
-    fn dstaddr() -> addr {
-        return state.dst_addr.address << 6;
-    }
-
-    fn enabled() -> bool {
-        return state.dst_addr.enabled;
-    }
 
     // unmapping an entry
     fn unmap(va: addr, sz: size) -> bool
@@ -81,6 +74,15 @@ unit DirectSegment : Segment {
         // type(addr) == Memory || type(addr) == DevMemory;
         // type(addr) == DevMemory ==> flags & CACHE_DISABLED
         //
+        // the va should be 0 here
+        requires va == 0;
+
+        requires 1 <= sz;
+        requires sz < 0xff_ffff_ffff;
+
+        requires 0 <= pa;
+        requires pa <= 0xff_ffff_ffff;
+
         ensures forall i : addr :: 0 <= i && i < sz && translate(va + i, flags) == pa + i;
         ensures translate(va, flags) == pa;
     ;
@@ -88,7 +90,6 @@ unit DirectSegment : Segment {
 
     // protecting the entry, i.e., change its permission
     fn protect(flags: int) -> bool
-        ensures match_flags(flags);
     {
         // update the entry
         // ensures match_flags(flags) ==> translate(a) == translate(a)
@@ -98,10 +99,9 @@ unit DirectSegment : Segment {
 
     // the translation semantics, adding an option type?
     fn translate(va: addr, flags: int) -> addr
-        requires va < segbase() + segsize();
-        requires segbase() <= va
-        requires
+        requires va < state.length.bytes;
     {
-        return va + get_base();
+        return va + state.base.address;
     }
- }
+
+ };

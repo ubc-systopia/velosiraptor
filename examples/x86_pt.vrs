@@ -55,17 +55,17 @@ unit X86_pte(base : addr) : Segment {
         pte [base, 0, 4] {
             Layout {
                 // the following fields at starting bit, ending bit, name
-                0   0 present,
-                1   1 writable,
-                2   2 usermode,
-                3   3 writethrough,
-                4   4 nocache,
-                5   5 accessed,
-                6   6 dirty,
-                7   7 pat,
-                8   8 global,
-                9  11 ignored,
-                12  31 base
+                0   0 present;
+                1   1 writable;
+                2   2 usermode;
+                3   3 writethrough;
+                4   4 nocache;
+                5   5 accessed;
+                6   6 dirty;
+                7   7 pat;
+                8   8 global;
+                9  11 ignored;
+                12  31 base;
             };
             ReadAction {
                 interface.pte <- state.pte;
