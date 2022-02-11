@@ -63,7 +63,7 @@ fn base10(input: SourcePos) -> IResult<SourcePos, Token> {
     }
 
     // now convert the string to to a number
-    let numstr = String::from(numsp.as_str()).replace("_", "");
+    let numstr = String::from(numsp.as_str()).replace('_', "");
     let num = match numstr.parse::<u64>() {
         Ok(i) => i,
         Err(_) => {
