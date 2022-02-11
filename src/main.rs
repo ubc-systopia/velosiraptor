@@ -518,7 +518,7 @@ fn main() {
     }
 
     let platform = match platform {
-        "fastmodels" => HWGen::new_fastmodels(outpath, pkgname.clone()),
+        "fastmodels" => HWGen::new_fastmodels(outpath, pkgname),
         s => {
             eprintln!(
                 "{}{} `{}`.\n",
@@ -531,9 +531,32 @@ fn main() {
         }
     };
 
-    platform.prepare();
-    platform.generate(&ast);
-    platform.finalize();
+    platform.prepare().unwrap_or_else(|e| {
+        eprintln!(
+            "{}{} `{}`.\n",
+            "error".bold().red(),
+            ": failure during hw platform preparation".bold(),
+            e
+        );
+    });
+
+    platform.generate(&ast).unwrap_or_else(|e| {
+        eprintln!(
+            "{}{} `{}`.\n",
+            "error".bold().red(),
+            ": failure during hw platform generation".bold(),
+            e
+        );
+    });
+
+    platform.finalize().unwrap_or_else(|e| {
+        eprintln!(
+            "{}{} `{}`.\n",
+            "error".bold().red(),
+            ": failure during hw platform finalization".bold(),
+            e
+        );
+    });
 
     if issues.warnings > 0 {
         let msg = format!("{} warning(s) emitted", issues.warnings);
