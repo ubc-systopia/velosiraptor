@@ -64,8 +64,9 @@ pub struct BackendRust {
 
 impl BackendRust {
     pub fn new(pkgname: String, outdir: &Path) -> Self {
+        let path = outdir.join("rust");
         BackendRust {
-            outdir: outdir.join(&pkgname),
+            outdir: path,
             pkgname,
         }
     }

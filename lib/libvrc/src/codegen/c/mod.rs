@@ -38,6 +38,7 @@ pub struct BackendC {
 impl BackendC {
     pub fn new(_pkg: String, _outdir: &Path) -> Self {
         BackendC {
+            // let path = outdir.join("clang");
            // outdir: outdir.to_path_buf(),
         }
     }
