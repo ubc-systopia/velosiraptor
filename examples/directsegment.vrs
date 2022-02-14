@@ -33,7 +33,7 @@ unit DirectSegment : Segment {
 
     // the interface is a register interface, assume there are two registers
     // called `base` and `size`. They can be updated using load/store instructions
-    interface = Register(base : addr) {
+    interface = MMIO(base : addr) {
 
         base [base, 8, 8] {
             Layout {
