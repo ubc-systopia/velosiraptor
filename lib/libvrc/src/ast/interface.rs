@@ -109,6 +109,10 @@ impl<'a> Interface {
     pub fn is_none(&self) -> bool {
         matches!(self, Interface::None { .. })
     }
+
+    pub fn is_register(&self) -> bool {
+        matches!(self, Interface::MMIORegisters { .. })
+    }
 }
 
 /// Implementation of [AstNodeGeneric] for [Interface]
