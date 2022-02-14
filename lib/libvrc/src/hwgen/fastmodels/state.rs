@@ -93,7 +93,7 @@ pub fn generate_state_header(name: &str, state: &State, outdir: &Path) -> Result
 
         // get/set the field values
         let methodname = format!("get_{}_val", f.name);
-        let m = c.new_method(&methodname, C::Type::new(C::BaseType::new_int(f.length)));
+        let m = c.new_method(&methodname, C::Type::new(C::BaseType::new_int(f.nbits())));
         m.public()
             .inside_def()
             .push_stmt(C::Stmt::retval(C::Expr::method_call(
@@ -103,9 +103,9 @@ pub fn generate_state_header(name: &str, state: &State, outdir: &Path) -> Result
             )));
 
         let methodname = format!("set_{}_val", f.name);
-        let arg = C::MethodParam::new("val", C::Type::new(C::BaseType::new_int(f.length)));
+        let arg = C::MethodParam::new("val", C::Type::new(C::BaseType::new_int(f.nbits())));
         let argexpr = C::Expr::from_method_param(&arg);
-        let m = c.new_method(&methodname, C::Type::new(C::BaseType::new_int(f.length)));
+        let m = c.new_method(&methodname, C::Type::new(C::BaseType::new_int(f.nbits())));
         m.public()
             .inside_def()
             .push_argument(arg)

@@ -36,7 +36,6 @@ use std::path::Path;
 use std::path::PathBuf;
 
 // other libraries
-use crustal as CG;
 use custom_error::custom_error;
 
 // the lirbrary
@@ -51,6 +50,8 @@ mod interface;
 use interface::{generate_interface_header, generate_interface_impl};
 mod unit;
 use unit::{generate_unit_header, generate_unit_impl};
+mod registers;
+use registers::{generate_register_header, generate_register_impl};
 
 /// # The Arm FastModels Platform Module
 ///
@@ -164,15 +165,22 @@ impl HWGenBackend for ArmFastModelsModule {
 
     /// generates the unit
     fn generate_unit(&self, ast: &AstRoot) -> Result<(), HWGenError> {
-        generate_unit_header(&self.outdir).expect("failed to generate the unit header");
-        generate_unit_impl(&self.outdir).expect("failed to generate the unit implementation");
+        generate_unit_header(&self.pkgname, &ast.units[0], &self.outdir)
+            .expect("failed to generate the unit header");
+        generate_unit_impl(&self.pkgname, &ast.units[0], &self.outdir)
+            .expect("failed to generate the unit implementation");
         Ok(())
     }
 
     /// generate the interface definitions
     fn generate_interface(&self, ast: &AstRoot) -> Result<(), HWGenError> {
-        generate_interface_header(&self.outdir).expect("failed to generate the interface header");
-        generate_interface_impl(&self.outdir)
+        generate_register_header(&self.pkgname, &ast.units[0].interface, &self.outdir)
+            .expect("failed to generate the interface header");
+        generate_register_impl(&self.pkgname, &ast.units[0].interface, &self.outdir)
+            .expect("failed to generate the interface header");
+        generate_interface_header(&self.pkgname, &ast.units[0].interface, &self.outdir)
+            .expect("failed to generate the interface header");
+        generate_interface_impl(&self.pkgname, &ast.units[0].interface, &self.outdir)
             .expect("failed to generate the interface implementation");
         Ok(())
     }
