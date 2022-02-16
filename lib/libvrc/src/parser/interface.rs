@@ -43,8 +43,8 @@ use nom::{
 use crate::ast::{Action, ActionComponent, ActionType, BitSlice, Field, Interface, InterfaceField};
 use crate::error::IResult;
 use crate::parser::{
-    bitslice::bitslice_block, expression::expr, field::mem_field_params, field::reg_field_params,
-    state::argument_parser, terminals::*,
+    bitslice::bitslice_block, expression::expr, field::mem_field_params, state::argument_parser,
+    terminals::*,
 };
 use crate::token::{TokenContent, TokenStream};
 
