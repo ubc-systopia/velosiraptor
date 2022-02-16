@@ -35,10 +35,6 @@ use crate::ast::Unit;
 use crate::codegen::CodeGenError;
 use crate::synth::{OpArg, Operation};
 
-pub fn unit_type(unit: &Unit) -> String {
-    unit.name.clone()
-}
-
 /// adds the constants defined in the unit to the scope
 fn add_unit_constants(scope: &mut CG::Scope, unit: &Unit) {
     scope.new_comment("Defined unit constants");
