@@ -33,15 +33,31 @@ use std::path::Path;
 
 // other libraries
 use crustal as C;
-use custom_error::custom_error;
 
 // the defined errors
-use crate::ast::Unit;
-use crate::hwgen::fastmodels::interface::to_interface_class_name;
-use crate::hwgen::fastmodels::state::to_state_class_name;
+use crate::ast::{Expr, Method, Stmt, Unit};
+use crate::hwgen::fastmodels::add_header;
+use crate::hwgen::fastmodels::interface::{interface_class_name, interface_header_file};
+use crate::hwgen::fastmodels::state::{state_class_name, state_header_file};
 use crate::hwgen::HWGenError;
 
-pub fn to_unit_class_name(name: &str) -> String {
+/// generates the name of the state field header file
+pub fn unit_header_file(name: &str) -> String {
+    format!("{}_unit.hpp", name)
+}
+
+/// generates the path of the state field header file
+pub fn unit_header_file_path(name: &str) -> String {
+    format!("include/{}", unit_header_file(name))
+}
+
+/// generates the name of the state field header file
+pub fn unit_impl_file(name: &str) -> String {
+    format!("{}_unit.cpp", name)
+}
+
+/// generates the name of the state class
+pub fn unit_class_name(name: &str) -> String {
     format!("{}{}Unit", name[0..1].to_uppercase(), &name[1..])
 }
 
@@ -63,10 +79,25 @@ fn add_constructor(c: &mut C::Class, ifn: &str, scn: &str) {
 
     c.new_constructor()
         .private()
-        .push_argument(C::MethodParam::new("name", arg0_type))
-        .push_parent_initializer(C::Expr::fn_call("TranslationUnitBase", vec![/* TOOD */]))
+        .push_argument(C::MethodParam::new("name", arg0_type.clone()))
+        .push_parent_initializer(C::Expr::fn_call(
+            "TranslationUnitBase",
+            vec![
+                C::Expr::new_var("name", arg0_type),
+                C::Expr::new_var("ptw_pvbus", arg1_type.clone()),
+            ],
+        ))
         .push_initializer("_state", C::Expr::fn_call(scn, vec![]))
-        .push_initializer("_interface", C::Expr::fn_call(ifn, vec![]))
+        .push_initializer(
+            "_interface",
+            C::Expr::fn_call(
+                ifn,
+                vec![C::Expr::addr_of(&C::Expr::new_var(
+                    "_state",
+                    C::Type::new_class("Interface"),
+                ))],
+            ),
+        )
         .new_argument("ptw_pvbus", arg1_type)
         .default("nullptr");
 }
@@ -79,7 +110,10 @@ fn add_create(c: &mut C::Class, ucn: &str) {
 
     let unit_ptr_type = C::Type::from_ptr(&C::Type::new_class(ucn));
 
-    let mut m = c.new_method("create", unit_ptr_type).public().sstatic();
+    let m = c
+        .new_method("create", unit_ptr_type.clone())
+        .public()
+        .sstatic();
 
     let mut arg0_type = C::Type::new_class("sg::ComponentBase");
     arg0_type.pointer();
@@ -99,20 +133,36 @@ fn add_create(c: &mut C::Class, ucn: &str) {
         .push_argument(C::MethodParam::new("cadi", arg2_type))
         .push_argument(C::MethodParam::new("ptw_pvbus", arg3_type));
 
-    // body
-    let unitvar = C::Stmt::localvar("t", C::Type::new_class(ucn));
+    let unitvar = C::Expr::new_var("t", unit_ptr_type.clone());
 
-    m.push_stmt(unitvar)
-    .push_stmt(C::Stmt::fn_call(C::Expr::fn_call(
-        "Logging::debug",
-        vec![C::Expr::new_str("Register::do_read()")],
-    )))
+    let statevar = C::Expr::field_access(&unitvar, "_state");
+    let ifvar = C::Expr::field_access(&unitvar, "_interface");
 
-
-     ;
-
-
-    ;
+    //  TranslationUnit *t;
+    m.push_stmt(C::Stmt::localvar("t", unit_ptr_type))
+        .push_stmt(C::Stmt::fn_call(C::Expr::fn_call(
+            "Logging::debug",
+            vec![C::Expr::new_str("Register::do_read()")],
+        )))
+        // t = new TranslationUnit(name, ptw_pvbus)
+        .push_stmt(C::Stmt::Assign {
+            lhs: unitvar.clone(),
+            rhs: C::Expr::Raw(format!(" new {}(name, ptw_pvbus)", ucn)),
+        })
+        // t->_state.print_state_fields();
+        .push_stmt(C::Stmt::fn_call(C::Expr::method_call(
+            &statevar,
+            "print_state_fields",
+            vec![],
+        )))
+        // t->_interface.debug_print_interface();
+        .push_stmt(C::Stmt::fn_call(C::Expr::method_call(
+            &ifvar,
+            "debug_print_interface",
+            vec![],
+        )))
+        // return t;
+        .push_stmt(C::Stmt::retval(&unitvar));
 
     // TranslationUnit *TranslationUnit::create(sg::ComponentBase *parentComponent,
     //                                          std::string const &name, sg::CADIBase *cadi,
@@ -122,7 +172,6 @@ fn add_create(c: &mut C::Class, ucn: &str) {
 
     //     TranslationUnit *t = new TranslationUnit(name, ptw_pvbus);
 
-    //     t->_state.print_state_fields();
     //     t->_interface.debug_print_interface();
 
     //     Logging::debug("translation unit created.\n");
@@ -131,18 +180,127 @@ fn add_create(c: &mut C::Class, ucn: &str) {
     // }
 }
 
-fn add_translate(c: &mut C::Class, ifn: &str, scn: &str) {
+fn state_field_access(path: &[String]) -> C::Expr {
+    let st = C::Expr::field_access(&C::Expr::this(), "_state");
+
+    if path.len() == 1 {
+        let accname = format!("get_{}_val", &path[0]);
+        return C::Expr::method_call(&st, &accname, vec![]);
+    }
+
+    if path.len() == 2 {
+        let accname = format!("{}_field", &path[0]);
+        let mut fld = C::Expr::method_call(&st, &accname, vec![]);
+        // we'll get back a pointer
+        fld.set_ptr();
+        let accname = format!("get_{}_val", &path[1]);
+        return C::Expr::method_call(&fld, &accname, vec![]);
+    }
+
+    panic!("unhandled!")
+}
+
+fn expr_to_cpp(expr: &Expr) -> C::Expr {
+    use Expr::*;
+    match expr {
+        Identifier { path, .. } => {
+            match path[0].as_str() {
+                "state" => {
+                    // this->_state.control_field()
+                    state_field_access(&path[1..])
+                }
+                "interface" => panic!("state not implemented"),
+                p => C::Expr::new_var(p, C::Type::new_int(64)),
+            }
+        }
+        Number { value, .. } => C::Expr::new_num(*value),
+        Boolean { value: true, .. } => C::Expr::btrue(),
+        Boolean { value: false, .. } => C::Expr::bfalse(),
+        BinaryOperation { op, lhs, rhs, .. } => {
+            let o = format!("{}", op);
+            let e = expr_to_cpp(lhs);
+            let e2 = expr_to_cpp(rhs);
+            C::Expr::binop(e, &o, e2)
+        }
+        UnaryOperation { op, val, .. } => {
+            let o = format!("{}", op);
+            let e = expr_to_cpp(val);
+            C::Expr::uop(&o, e)
+        }
+        FnCall { path, args, .. } => {
+            if path.len() != 1 {
+                panic!("TODO: handle multiple path components");
+            }
+            C::Expr::method_call(
+                &C::Expr::this(),
+                &path[0],
+                args.iter().map(expr_to_cpp).collect(),
+            )
+        }
+        Slice { .. } => panic!("don't know how to handle slice"),
+        Element { .. } => panic!("don't know how to handle element"),
+        Range { .. } => panic!("don't know how to handle range"),
+        Quantifier { .. } => panic!("don't know how to handle quantifier"),
+    }
+}
+
+fn assert_to_cpp(expr: &Expr) -> C::Stmt {
+    C::Stmt::ifthen(
+        expr_to_cpp(expr),
+        vec![
+            C::Stmt::Raw(format!("Logging::debug(\"TranslationUnit::translate() precondition/assertion failed ({})\");", expr)),
+            C::Stmt::retval(&C::Expr::bfalse())
+        ],
+    )
+}
+
+fn handle_requires_assert(method: &mut C::Method, expr: &Expr) {
+    method.push_stmt(assert_to_cpp(expr));
+}
+
+fn stmt_to_cpp(s: &Stmt) -> Vec<C::Stmt> {
+    use Stmt::*;
+    match s {
+        Block { stmts, .. } => stmts.iter().map(stmt_to_cpp).flatten().collect(),
+        Return { expr, .. } => {
+            vec![C::Stmt::retval(&expr_to_cpp(expr))]
+        }
+        Let {
+            typeinfo: _,
+            lhs: _,
+            rhs: _,
+            pos: _,
+        } => panic!("not handled yet!"),
+        Assert { expr, pos: _ } => vec![assert_to_cpp(expr)],
+        IfElse {
+            cond,
+            then,
+            other,
+            pos: _,
+        } => match other.as_ref() {
+            None => vec![C::Stmt::ifthen(expr_to_cpp(cond), stmt_to_cpp(then))],
+            Some(e) => vec![C::Stmt::ifthenelse(
+                expr_to_cpp(cond),
+                stmt_to_cpp(then),
+                stmt_to_cpp(e),
+            )],
+        },
+    }
+}
+
+fn add_translate(c: &mut C::Class, tm: &Method) {
     // virtual bool do_translate(lvaddr_t src_addr, size_t size, access_mode_t mode,
     // lpaddr_t *dst_addr) override;
 
-    let src_addr_param = C::MethodParam::new("src_addr", C::Type::new_typedef("lvaddr_t"));
+    let src_addr_param = C::MethodParam::new(&tm.args[0].name, C::Type::new_typedef("lvaddr_t"));
     let size_param = C::MethodParam::new("size", C::Type::new_size());
-    let mode_param = C::MethodParam::new("mode", C::Type::new_typedef("access_mode_t"));
+    let mode_param = C::MethodParam::new(&tm.args[1].name, C::Type::new_typedef("access_mode_t"));
     let dst_addr_param = C::MethodParam::new(
         "dst_addr",
         C::Type::from_ptr(&C::Type::new_typedef("lpaddr_t")),
     );
-    c.new_method("do_translate", C::Type::from_ptr(&C::Type::new_bool()))
+    let m = c
+        .new_method("do_translate", C::Type::new_bool())
         .public()
         .virt()
         .overrid()
@@ -150,6 +308,16 @@ fn add_translate(c: &mut C::Class, ifn: &str, scn: &str) {
         .push_argument(size_param)
         .push_argument(mode_param)
         .push_argument(dst_addr_param);
+
+    for e in &tm.requires {
+        handle_requires_assert(m, e);
+    }
+
+    if let Some(body) = &tm.stmts {
+        for s in stmt_to_cpp(body) {
+            m.push_stmt(s);
+        }
+    }
 
     // bool TranslationUnit::do_translate(lvaddr_t src_addr, size_t size, access_mode_t mode,
     //                                    lpaddr_t *dst_addr)
@@ -192,21 +360,20 @@ fn add_translate(c: &mut C::Class, ifn: &str, scn: &str) {
 
 pub fn generate_unit_header(name: &str, unit: &Unit, outdir: &Path) -> Result<(), HWGenError> {
     let mut scope = C::Scope::new();
-    scope.set_filename("include/unit.hpp");
 
-    let ifn = to_interface_class_name(name);
-    let scn = to_state_class_name(name);
-    let ucn = to_unit_class_name(name);
+    // document header
+    add_header(&mut scope, name, "unit");
 
-    scope.push_doc_str(format!("The Unit of the '{}' Translation Unit\n\n", scn).as_str());
-    scope.push_doc_str("WARNING: This file is auto-generated by the  Velosiraptor compiler.\n");
+    let ifn = interface_class_name(name);
+    let scn = state_class_name(name);
+    let ucn = unit_class_name(name);
 
-    // set the header guard
-    let guard = scope.new_ifdef(format!("{}_UNIT_HPP_", name.to_uppercase()).as_str());
-
-    // create the scope guard
+    // set the header guard, and create
+    let hdrguard = format!("{}_UNIT_HPP_", name.to_uppercase());
+    let guard = scope.new_ifdef(&hdrguard);
     let s = guard.guard().then_scope();
 
+    // adding the includes
     s.new_comment("system includes");
     s.new_include("string.h", true);
     s.new_include("assert.h", true);
@@ -216,17 +383,22 @@ pub fn generate_unit_header(name: &str, unit: &Unit, outdir: &Path) -> Result<()
     s.new_include("generic/translation_unit_base.hpp", true);
 
     s.new_comment("translation unit specific includes");
-    s.new_include("state.hpp", true);
-    s.new_include("interface.hpp", true);
+    let statehdr = state_header_file(name);
+    s.new_include(&statehdr, true);
+    let ifhdr = interface_header_file(name);
+    s.new_include(&ifhdr, true);
 
     // create a new class in the scope
-    let c = s.new_class(ucn.as_str());
+    let c = s.new_class(&ucn);
 
     c.set_base("TranslationUnitBase", C::Visibility::Public);
 
     add_constructor(c, &ifn, &scn);
     add_create(c, &ucn);
-    add_translate(c, &ifn, &scn);
+
+    if let Some(m) = unit.get_method("translate") {
+        add_translate(c, m);
+    }
 
     //
     // virtual UnitBase *get_interface(void) override
@@ -235,13 +407,13 @@ pub fn generate_unit_header(name: &str, unit: &Unit, outdir: &Path) -> Result<()
     // }
     c.new_method(
         "get_interface",
-        C::Type::from_ptr(&C::Type::new_class("UnitBase")),
+        C::Type::from_ptr(&C::Type::new_class("InterfaceBase")),
     )
     .public()
     .virt()
     .inside_def()
     .overrid()
-    .push_stmt(C::Stmt::retval(C::Expr::addr_of(&C::Expr::field_access(
+    .push_stmt(C::Stmt::retval(&C::Expr::addr_of(&C::Expr::field_access(
         &C::Expr::this(),
         "_interface",
     ))));
@@ -259,15 +431,15 @@ pub fn generate_unit_header(name: &str, unit: &Unit, outdir: &Path) -> Result<()
     .virt()
     .overrid()
     .inside_def()
-    .push_stmt(C::Stmt::retval(C::Expr::addr_of(&C::Expr::field_access(
+    .push_stmt(C::Stmt::retval(&C::Expr::addr_of(&C::Expr::field_access(
         &C::Expr::this(),
         "_state",
     ))));
 
     // attributes
 
-    let state_ptr_type = C::Type::from_ptr(&C::Type::new_class(&scn));
-    let iface_ptr_type = C::Type::from_ptr(&C::Type::new_class(&ifn));
+    let state_ptr_type = C::Type::new_class(&scn);
+    let iface_ptr_type = C::Type::new_class(&ifn);
 
     // add the state attribute
     c.new_attribute("_state", state_ptr_type);
@@ -279,6 +451,8 @@ pub fn generate_unit_header(name: &str, unit: &Unit, outdir: &Path) -> Result<()
     }
 
     // save the scope
+    let filename = unit_header_file_path(name);
+    scope.set_filename(&filename);
     scope.to_file(outdir, true)?;
 
     Ok(())
@@ -286,14 +460,9 @@ pub fn generate_unit_header(name: &str, unit: &Unit, outdir: &Path) -> Result<()
 
 pub fn generate_unit_impl(name: &str, unit: &Unit, outdir: &Path) -> Result<(), HWGenError> {
     let mut scope = C::Scope::new();
-    scope.set_filename("unit.cpp");
 
-    let ifn = to_interface_class_name(name);
-    let scn = to_state_class_name(name);
-    let ucn = to_unit_class_name(name);
-
-    scope.push_doc_str(format!("The Unit of the '{}' Translation Unit\n\n", scn).as_str());
-    scope.push_doc_str("WARNING: This file is auto-generated by the  Velosiraptor compiler.\n");
+    // add the header
+    add_header(&mut scope, name, "unit");
 
     scope.new_comment("system includes");
     scope.new_include("string.h", true);
@@ -304,17 +473,23 @@ pub fn generate_unit_impl(name: &str, unit: &Unit, outdir: &Path) -> Result<(), 
     scope.new_include("generic/logging.hpp", true);
 
     scope.new_comment("translation unit specific includes");
-    scope.new_include("unit.hpp", true);
-    scope.new_include("interface.hpp", true);
+    let unithdr = unit_header_file(name);
+    scope.new_include(&unithdr, true);
 
     // create a new class in the scope
+    let ucn = unit_class_name(name);
     let c = scope.new_class(ucn.as_str());
 
     c.set_base("TranslationUnitBase", C::Visibility::Public);
 
+    let ifn = interface_class_name(name);
+    let scn = state_class_name(name);
+
     add_constructor(c, &ifn, &scn);
-    add_translate(c, &ifn, &scn);
     add_create(c, &ucn);
+    if let Some(m) = unit.get_method("translate") {
+        add_translate(c, m);
+    }
 
     /*
      * -------------------------------------------------------------------------------------------
@@ -326,6 +501,9 @@ pub fn generate_unit_impl(name: &str, unit: &Unit, outdir: &Path) -> Result<(), 
     for m in &unit.methods {
         println!("handle method {}!", m.name);
     }
+
+    let filename = unit_impl_file(name);
+    scope.set_filename(&filename);
 
     scope.to_file(outdir, false)?;
 
