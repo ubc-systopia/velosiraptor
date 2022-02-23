@@ -105,40 +105,35 @@ pub fn generate_state_header(name: &str, state: &State, outdir: &Path) -> Result
 
         // get/set the field
         let methodname = format!("{}_field", f.name);
-        let m = c.new_method(&methodname, C::Type::from_ptr(&ty));
+        let m = c.new_method(&methodname, C::Type::to_ptr(&ty));
 
-        m.public()
-            .inside_def()
-            .push_stmt(C::Stmt::retval(&C::Expr::addr_of(&e_field_acc)));
+        m.set_public()
+            .set_inside_def()
+            .body()
+            .return_expr(C::Expr::addr_of(&e_field_acc));
 
         // get/set the field values
         let methodname = format!("get_{}_val", f.name);
         let m = c.new_method(&methodname, C::Type::new(C::BaseType::new_int(f.nbits())));
-        m.public()
-            .inside_def()
-            .push_stmt(C::Stmt::retval(&C::Expr::method_call(
-                &e_field_acc,
-                "get_value",
-                vec![],
-            )));
+        m.set_public()
+            .set_inside_def()
+            .body()
+            .return_expr(C::Expr::method_call(&e_field_acc, "get_value", vec![]));
 
         let methodname = format!("set_{}_val", f.name);
         let arg = C::MethodParam::new("val", C::Type::new(C::BaseType::new_int(f.nbits())));
         let argexpr = C::Expr::from_method_param(&arg);
         let m = c.new_method(&methodname, C::Type::new_void());
-        m.public()
-            .inside_def()
-            .push_argument(arg)
-            .push_stmt(C::Stmt::FnCall(C::Expr::method_call(
-                &e_field_acc,
-                "set_value",
-                vec![argexpr],
-            )));
+        m.set_public()
+            .set_inside_def()
+            .push_param(arg)
+            .body()
+            .method_call(e_field_acc, "set_value", vec![argexpr]);
     }
 
     // adding the state fields to the class
     for f in state.fields() {
-        let ty = C::BaseType::Class(state_fields_class_name(&f.name), vec![]);
+        let ty = C::BaseType::Class(state_fields_class_name(&f.name));
         let fieldname = format!("_{}", f.name);
         c.new_attribute(&fieldname, C::Type::new(ty));
     }
@@ -183,11 +178,8 @@ pub fn generate_state_impl(name: &str, state: &State, outdir: &Path) -> Result<(
 
         let this = C::Expr::this();
         let field = C::Expr::field_access(&this, &fieldname);
-        cons.push_stmt(C::Stmt::fn_call(C::Expr::method_call(
-            &this,
-            "add_field",
-            vec![C::Expr::addr_of(&field)],
-        )));
+        cons.body()
+            .method_call(C::Expr::this(), "add_field", vec![C::Expr::addr_of(&field)]);
     }
 
     let filename = state_impl_file(name);

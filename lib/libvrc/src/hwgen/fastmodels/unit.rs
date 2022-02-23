@@ -79,7 +79,7 @@ fn add_constructor(c: &mut C::Class, ifn: &str, scn: &str) {
 
     c.new_constructor()
         .private()
-        .push_argument(C::MethodParam::new("name", arg0_type.clone()))
+        .push_param(C::MethodParam::new("name", arg0_type.clone()))
         .push_parent_initializer(C::Expr::fn_call(
             "TranslationUnitBase",
             vec![
@@ -98,8 +98,8 @@ fn add_constructor(c: &mut C::Class, ifn: &str, scn: &str) {
                 ))],
             ),
         )
-        .new_argument("ptw_pvbus", arg1_type)
-        .default("nullptr");
+        .new_param("ptw_pvbus", arg1_type)
+        .set_default_value("nullptr");
 }
 
 fn add_create(c: &mut C::Class, ucn: &str) {
@@ -108,12 +108,12 @@ fn add_create(c: &mut C::Class, ucn: &str) {
     //     pv::RandomContextTransactionGenerator *ptw_pvbus);
     // TODO: finish
 
-    let unit_ptr_type = C::Type::from_ptr(&C::Type::new_class(ucn));
+    let unit_ptr_type = C::Type::to_ptr(&C::Type::new_class(ucn));
 
     let m = c
         .new_method("create", unit_ptr_type.clone())
-        .public()
-        .sstatic();
+        .set_public()
+        .set_static();
 
     let mut arg0_type = C::Type::new_class("sg::ComponentBase");
     arg0_type.pointer();
@@ -128,10 +128,10 @@ fn add_create(c: &mut C::Class, ucn: &str) {
     arg3_type.pointer();
 
     // arguments
-    m.push_argument(C::MethodParam::new("parentComponent", arg0_type))
-        .push_argument(C::MethodParam::new("name", arg1_type))
-        .push_argument(C::MethodParam::new("cadi", arg2_type))
-        .push_argument(C::MethodParam::new("ptw_pvbus", arg3_type));
+    m.push_param(C::MethodParam::new("parentComponent", arg0_type))
+        .push_param(C::MethodParam::new("name", arg1_type))
+        .push_param(C::MethodParam::new("cadi", arg2_type))
+        .push_param(C::MethodParam::new("ptw_pvbus", arg3_type));
 
     let unitvar = C::Expr::new_var("t", unit_ptr_type.clone());
 
@@ -139,30 +139,23 @@ fn add_create(c: &mut C::Class, ucn: &str) {
     let ifvar = C::Expr::field_access(&unitvar, "_interface");
 
     //  TranslationUnit *t;
-    m.push_stmt(C::Stmt::localvar("t", unit_ptr_type))
-        .push_stmt(C::Stmt::fn_call(C::Expr::fn_call(
+    m.body()
+        .variable(C::Variable::new("t", unit_ptr_type))
+        .fn_call(
             "Logging::debug",
             vec![C::Expr::new_str("Register::do_read()")],
-        )))
+        )
         // t = new TranslationUnit(name, ptw_pvbus)
-        .push_stmt(C::Stmt::Assign {
-            lhs: unitvar.clone(),
-            rhs: C::Expr::Raw(format!(" new {}(name, ptw_pvbus)", ucn)),
-        })
+        .assign(
+            unitvar.clone(),
+            C::Expr::Raw(format!(" new {}(name, ptw_pvbus)", ucn)),
+        )
         // t->_state.print_state_fields();
-        .push_stmt(C::Stmt::fn_call(C::Expr::method_call(
-            &statevar,
-            "print_state_fields",
-            vec![],
-        )))
+        .method_call(statevar, "print_state_fields", vec![])
         // t->_interface.debug_print_interface();
-        .push_stmt(C::Stmt::fn_call(C::Expr::method_call(
-            &ifvar,
-            "debug_print_interface",
-            vec![],
-        )))
+        .method_call(ifvar, "debug_print_interface", vec![])
         // return t;
-        .push_stmt(C::Stmt::retval(&unitvar));
+        .return_expr(unitvar);
 
     // TranslationUnit *TranslationUnit::create(sg::ComponentBase *parentComponent,
     //                                          std::string const &name, sg::CADIBase *cadi,
@@ -244,26 +237,32 @@ fn expr_to_cpp(expr: &Expr) -> C::Expr {
     }
 }
 
-fn assert_to_cpp(expr: &Expr) -> C::Stmt {
-    C::Stmt::ifthen(
-        expr_to_cpp(expr),
-        vec![
-            C::Stmt::Raw(format!("Logging::debug(\"TranslationUnit::translate() precondition/assertion failed ({})\");", expr)),
-            C::Stmt::retval(&C::Expr::bfalse())
-        ],
-    )
+fn assert_to_cpp(expr: &Expr) -> C::IfElse {
+    let mut c = C::IfElse::with_expr(expr_to_cpp(expr));
+    c.then_branch()
+        .raw(format!(
+            "Logging::debug(\"TranslationUnit::translate() precondition/assertion failed ({})\");",
+            expr
+        ))
+        .return_expr(C::Expr::bfalse());
+    c
 }
 
 fn handle_requires_assert(method: &mut C::Method, expr: &Expr) {
-    method.push_stmt(assert_to_cpp(expr));
+    method.body().ifelse(assert_to_cpp(expr));
 }
 
-fn stmt_to_cpp(s: &Stmt) -> Vec<C::Stmt> {
+fn stmt_to_cpp(s: &Stmt) -> C::Block {
     use Stmt::*;
     match s {
-        Block { stmts, .. } => stmts.iter().map(stmt_to_cpp).flatten().collect(),
+        Block { stmts, .. } => stmts.iter().fold(C::Block::new(), |mut acc, x| {
+            acc.merge(stmt_to_cpp(x));
+            acc
+        }),
         Return { expr, .. } => {
-            vec![C::Stmt::retval(&expr_to_cpp(expr))]
+            let mut b = C::Block::new();
+            b.return_expr(expr_to_cpp(expr));
+            b
         }
         Let {
             typeinfo: _,
@@ -271,52 +270,56 @@ fn stmt_to_cpp(s: &Stmt) -> Vec<C::Stmt> {
             rhs: _,
             pos: _,
         } => panic!("not handled yet!"),
-        Assert { expr, pos: _ } => vec![assert_to_cpp(expr)],
+        Assert { expr, pos: _ } => {
+            let mut b = C::Block::new();
+            b.ifelse(assert_to_cpp(expr));
+            b
+        }
         IfElse {
             cond,
             then,
             other,
             pos: _,
-        } => match other.as_ref() {
-            None => vec![C::Stmt::ifthen(expr_to_cpp(cond), stmt_to_cpp(then))],
-            Some(e) => vec![C::Stmt::ifthenelse(
-                expr_to_cpp(cond),
-                stmt_to_cpp(then),
-                stmt_to_cpp(e),
-            )],
-        },
+        } => {
+            let mut b = C::Block::new();
+            let mut ifelse = C::IfElse::with_expr(expr_to_cpp(cond));
+            if let Some(other) = other.as_ref() {
+                ifelse.set_other(stmt_to_cpp(other));
+            }
+            ifelse.set_then(stmt_to_cpp(then));
+            b.ifelse(ifelse);
+            b
+        }
     }
 }
 
 fn add_translate(c: &mut C::Class, tm: &Method) {
     // virtual bool do_translate(lvaddr_t src_addr, size_t size, access_mode_t mode,
-    // lpaddr_t *dst_addr) override;
+    // lpaddr_t *dst_addr) set_overridee;
 
     let src_addr_param = C::MethodParam::new(&tm.args[0].name, C::Type::new_typedef("lvaddr_t"));
     let size_param = C::MethodParam::new("size", C::Type::new_size());
     let mode_param = C::MethodParam::new(&tm.args[1].name, C::Type::new_typedef("access_mode_t"));
     let dst_addr_param = C::MethodParam::new(
         "dst_addr",
-        C::Type::from_ptr(&C::Type::new_typedef("lpaddr_t")),
+        C::Type::to_ptr(&C::Type::new_typedef("lpaddr_t")),
     );
     let m = c
         .new_method("do_translate", C::Type::new_bool())
-        .public()
-        .virt()
-        .overrid()
-        .push_argument(src_addr_param)
-        .push_argument(size_param)
-        .push_argument(mode_param)
-        .push_argument(dst_addr_param);
+        .set_public()
+        .set_virtual()
+        .set_override()
+        .push_param(src_addr_param)
+        .push_param(size_param)
+        .push_param(mode_param)
+        .push_param(dst_addr_param);
 
     for e in &tm.requires {
         handle_requires_assert(m, e);
     }
 
     if let Some(body) = &tm.stmts {
-        for s in stmt_to_cpp(body) {
-            m.push_stmt(s);
-        }
+        m.set_body(stmt_to_cpp(body));
     }
 
     // bool TranslationUnit::do_translate(lvaddr_t src_addr, size_t size, access_mode_t mode,
@@ -401,40 +404,42 @@ pub fn generate_unit_header(name: &str, unit: &Unit, outdir: &Path) -> Result<()
     }
 
     //
-    // virtual UnitBase *get_interface(void) override
+    // virtual UnitBase *get_interface(void) set_overridee
     // {
     //     return &this->_interface;
     // }
     c.new_method(
         "get_interface",
-        C::Type::from_ptr(&C::Type::new_class("InterfaceBase")),
+        C::Type::to_ptr(&C::Type::new_class("InterfaceBase")),
     )
-    .public()
-    .virt()
-    .inside_def()
-    .overrid()
-    .push_stmt(C::Stmt::retval(&C::Expr::addr_of(&C::Expr::field_access(
+    .set_public()
+    .set_virtual()
+    .set_inside_def()
+    .set_override()
+    .body()
+    .return_expr(C::Expr::addr_of(&C::Expr::field_access(
         &C::Expr::this(),
         "_interface",
-    ))));
+    )));
 
     //
-    // virtual StateBase *get_state(void) override
+    // virtual StateBase *get_state(void) set_overridee
     // {
     //     return &this->_state;
     // }
     c.new_method(
         "get_state",
-        C::Type::from_ptr(&C::Type::new_class("StateBase")),
+        C::Type::to_ptr(&C::Type::new_class("StateBase")),
     )
-    .public()
-    .virt()
-    .overrid()
-    .inside_def()
-    .push_stmt(C::Stmt::retval(&C::Expr::addr_of(&C::Expr::field_access(
+    .set_public()
+    .set_virtual()
+    .set_override()
+    .set_inside_def()
+    .body()
+    .return_expr(C::Expr::addr_of(&C::Expr::field_access(
         &C::Expr::this(),
         "_state",
-    ))));
+    )));
 
     // attributes
 

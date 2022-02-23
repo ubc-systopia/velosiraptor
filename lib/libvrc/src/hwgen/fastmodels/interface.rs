@@ -99,10 +99,10 @@ pub fn generate_interface_header(
     c.set_base("InterfaceBase", C::Visibility::Public);
 
     let scn = state_class_name(name);
-    let state_ptr_type = C::Type::from_ptr(&C::Type::new_class(&scn));
+    let state_ptr_type = C::Type::to_ptr(&C::Type::new_class(&scn));
 
     let cons = c.new_constructor();
-    cons.new_argument("state", state_ptr_type.clone());
+    cons.new_param("state", state_ptr_type.clone());
 
     // add the state attribute
     c.new_attribute("_state", state_ptr_type);
@@ -149,11 +149,11 @@ pub fn generate_interface_impl(
     let c = scope.new_class(icn.as_str());
 
     let scn = state_class_name(name);
-    let state_ptr_type = C::Type::from_ptr(&C::Type::new_class(&scn));
+    let state_ptr_type = C::Type::to_ptr(&C::Type::new_class(&scn));
 
     let cons = c.new_constructor();
 
-    let m = cons.new_argument("state", state_ptr_type);
+    let m = cons.new_param("state", state_ptr_type);
 
     let pa = C::Expr::from_method_param(m);
 
@@ -167,11 +167,11 @@ pub fn generate_interface_impl(
 
         let this = C::Expr::this();
         let field = C::Expr::field_access(&this, &fieldname);
-        cons.push_stmt(C::Stmt::fn_call(C::Expr::method_call(
-            &this,
+        cons.body().method_call(
+            C::Expr::this(),
             "add_register",
             vec![C::Expr::addr_of(&field)],
-        )));
+        );
     }
 
     let filename = interface_impl_file(name);

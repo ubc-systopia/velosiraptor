@@ -103,27 +103,30 @@ pub fn generate_field_header(name: &str, state: &State, outdir: &Path) -> Result
 
         for sl in &f.layout {
             let slname = state_fields_slice_getter_name(&sl.name);
-            c.new_method(&slname, C::Type::new_int(64))
-                .public()
-                .inline()
-                .push_stmt(C::Stmt::localvar("data", C::Type::new_int(64)))
-                .push_stmt(C::Stmt::fn_call(C::Expr::method_call(
-                    &C::Expr::this(),
+            let m = c
+                .new_method(&slname, C::Type::new_int(64))
+                .set_public()
+                .set_inline();
+            m.body()
+                .variable(C::Variable::new("data", C::Type::new_int(64)))
+                .method_call(
+                    C::Expr::this(),
                     "get_slice_value",
                     vec![C::Expr::new_str(&sl.name), C::Expr::addr_of(&var)],
-                )))
-                .push_stmt(C::Stmt::retval(&var));
+                )
+                .return_expr(var.clone());
 
             let slname = state_fields_slice_setter_name(&sl.name);
-            c.new_method(&slname, C::Type::new_void())
-                .public()
-                .inline()
-                .push_stmt(C::Stmt::fn_call(C::Expr::method_call(
-                    &C::Expr::this(),
-                    "set_slice_value",
-                    vec![C::Expr::new_str(&sl.name), var.clone()],
-                )))
-                .new_argument("data", C::Type::new_int(64));
+            let m = c
+                .new_method(&slname, C::Type::new_void())
+                .set_public()
+                .set_inline();
+            m.new_param("data", C::Type::new_int(64));
+            m.body().method_call(
+                C::Expr::this(),
+                "set_slice_value",
+                vec![C::Expr::new_str(&sl.name), var.clone()],
+            );
         }
     }
 
@@ -168,15 +171,15 @@ pub fn generate_field_impl(name: &str, state: &State, outdir: &Path) -> Result<(
         ));
 
         for sl in &f.layout {
-            cons.push_stmt(C::Stmt::fn_call(C::Expr::method_call(
-                &C::Expr::this(),
+            cons.body().method_call(
+                C::Expr::this(),
                 "add_slice",
                 vec![
                     C::Expr::new_str(&sl.name),
                     C::Expr::new_num(sl.start),
                     C::Expr::new_num(sl.end),
                 ],
-            )));
+            );
         }
     }
 

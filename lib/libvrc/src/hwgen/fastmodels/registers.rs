@@ -100,17 +100,17 @@ pub fn generate_register_header(
 
         let scn = state_class_name(name);
         let sctype = C::Type::new_class(&scn);
-        let state_ptr_type = C::Type::from_ptr(&sctype);
+        let state_ptr_type = C::Type::to_ptr(&sctype);
 
-        c.new_constructor().new_argument("state", state_ptr_type);
+        c.new_constructor().new_param("state", state_ptr_type);
 
         c.new_method("do_read", C::Type::new_int(64))
-            .public()
-            .overrid();
+            .set_override()
+            .set_public();
         c.new_method("do_write", C::Type::new_void())
-            .overrid()
-            .public()
-            .new_argument("data", C::Type::new_int(64));
+            .set_override()
+            .set_public()
+            .new_param("data", C::Type::new_int(64));
     }
 
     // done, save the scope
@@ -154,7 +154,7 @@ pub fn generate_register_impl(
 
         let scn = state_class_name(name);
         let sctype = C::Type::new_class(&scn);
-        let state_ptr_type = C::Type::from_ptr(&sctype);
+        let state_ptr_type = C::Type::to_ptr(&sctype);
 
         let stvar = C::Expr::new_var("st", state_ptr_type.clone());
 
@@ -172,44 +172,44 @@ pub fn generate_register_impl(
                 C::Expr::from_method_param(&cparam),
             ],
         ))
-        .push_argument(cparam);
+        .push_param(cparam);
 
         let mut field_access_expr =
             C::Expr::method_call(&stvar, &format!("{}_field", f.field.name), vec![]);
         field_access_expr.set_ptr();
 
-        c.new_method("do_read", C::Type::new_int(64))
-            .overrid()
-            .push_stmt(C::Stmt::fn_call(C::Expr::fn_call(
+        let m = c.new_method("do_read", C::Type::new_int(64)).set_override();
+        m.body()
+            .fn_call(
                 "Logging::debug",
                 vec![C::Expr::new_str("Register::do_read()")],
-            )))
-            .push_stmt(C::Stmt::Raw(format!(
+            )
+            .raw(format!(
                 "auto st = static_cast<{} *>(this->get_state())",
                 scn
-            )))
-            .push_stmt(C::Stmt::retval(&C::Expr::method_call(
+            ))
+            .return_expr(C::Expr::method_call(
                 &field_access_expr,
                 "get_value",
                 vec![],
-            )));
+            ));
 
-        c.new_method("do_write", C::Type::new_void())
-            .overrid()
-            .push_stmt(C::Stmt::fn_call(C::Expr::fn_call(
+        let m = c.new_method("do_write", C::Type::new_void()).set_override();
+        m.new_param("data", C::Type::new_int(64));
+        m.body()
+            .fn_call(
                 "Logging::debug",
                 vec![C::Expr::new_str("Register::do_write()")],
-            )))
-            .push_stmt(C::Stmt::Raw(format!(
+            )
+            .raw(format!(
                 "auto st = static_cast<{} *>(this->get_state())",
                 scn
-            )))
-            .push_stmt(C::Stmt::fn_call(C::Expr::method_call(
-                &field_access_expr,
+            ))
+            .method_call(
+                field_access_expr,
                 "set_value",
                 vec![C::Expr::new_var("data", C::Type::new_int(64))],
-            )))
-            .new_argument("data", C::Type::new_int(64));
+            );
     }
 
     // set the outfile name
