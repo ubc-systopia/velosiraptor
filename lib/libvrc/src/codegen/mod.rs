@@ -64,7 +64,7 @@ impl CodeGen {
     }
 
     pub fn new_c(outdir: &Path, pkg: String) -> CodeGen {
-        let path = outdir.join("sw");
+        let path = outdir.join(pkg.as_str()).join("sw");
         CodeGen::C(BackendC::new(pkg, path.as_path()))
     }
 
