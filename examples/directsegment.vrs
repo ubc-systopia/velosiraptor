@@ -14,7 +14,7 @@
  */
 
 // This defines an SMPT Entry
-unit DirectSegment : Segment {
+unit DirectSegment(base : addr) : Segment {
 
     // let's assume the maximum size of the segment is 40 bits.
     // size = 40;

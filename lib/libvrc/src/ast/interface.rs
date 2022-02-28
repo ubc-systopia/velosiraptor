@@ -113,6 +113,10 @@ impl<'a> Interface {
     pub fn is_register(&self) -> bool {
         matches!(self, Interface::MMIORegisters { .. })
     }
+
+    pub fn field_by_name(&self, name: &str) -> Option<&InterfaceField> {
+        self.fields().iter().find(|f| f.name() == name)
+    }
 }
 
 /// Implementation of [AstNodeGeneric] for [Interface]
