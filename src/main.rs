@@ -517,6 +517,12 @@ fn main() {
         return;
     }
 
+    eprintln!(
+        "{:>8}: prepare for hardware generation {}...\n",
+        "generate".bold().green(),
+        platform
+    );
+
     let platform = match platform {
         "fastmodels" => HWGen::new_fastmodels(outpath, pkgname),
         s => {
@@ -540,6 +546,11 @@ fn main() {
         );
     });
 
+    eprintln!(
+        "{:>8}: generate hardware component...\n",
+        "generate".bold().green(),
+    );
+
     platform.generate(&ast).unwrap_or_else(|e| {
         eprintln!(
             "{}{} `{}`.\n",
@@ -548,6 +559,11 @@ fn main() {
             e
         );
     });
+
+    eprintln!(
+        "{:>8}: finalize hardware component...\n",
+        "generate".bold().green(),
+    );
 
     platform.finalize().unwrap_or_else(|e| {
         eprintln!(
