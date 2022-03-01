@@ -140,7 +140,7 @@ fn add_extract_fn(scope: &mut C::Scope, unit: &Unit, field: &Field, sl: &BitSlic
     f.push_doc_str("");
     f.push_doc_str(&format!("@loc: {}", sl.pos));
 
-    let p = f.new_param("field", C::Type::new_typedef(&fieldtype));
+    f.new_param("field", C::Type::new_typedef(&fieldtype));
 
     let body = if sl.start != 0 {
         C::Expr::Raw(format!(

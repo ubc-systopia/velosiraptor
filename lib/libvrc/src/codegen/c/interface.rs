@@ -35,12 +35,7 @@ use crate::ast::{BitSlice, Field, Interface, Unit};
 use crate::codegen::c::field;
 use crate::codegen::CodeGenError;
 
-/// returns the string of the field type
-pub fn interface_type(unit: &Unit) -> String {
-    utils::to_struct_name(&unit.name, Some("Interface"))
-}
-
-pub fn generate_memory_interface(scope: &mut C::Scope, unit: &Unit) {
+pub fn generate_memory_interface(_scope: &mut C::Scope, _unit: &Unit) {
     //     let ifname = interface_type(unit);
 
     //     // Step 1:  add the struct definition, here we need to add all the fields
@@ -268,7 +263,7 @@ pub fn generate_mmio_interface(scope: &mut C::Scope, unit: &Unit) {
     }
 }
 
-pub fn generate_register_interface(scope: &mut C::Scope, unit: &Unit) {
+pub fn generate_register_interface(_scope: &mut C::Scope, _unit: &Unit) {
     // there is not really an interface here, so an empty struct
     // let st = scope.new_struct(&interface_type(unit));
     // st.vis("pub");
