@@ -239,7 +239,7 @@ fn add_map_function(scope: &mut C::Scope, unit: &Unit) {
 }
 
 fn add_unmap_function(scope: &mut C::Scope, unit: &Unit) {
-    let fname = utils::protect_fn_name(unit);
+    let fname = utils::unmap_fn_name(unit);
     scope
         .new_function(&fname, C::Type::new_void())
         .set_static()
@@ -275,7 +275,7 @@ pub fn generate(unit: &Unit, outdir: &Path) -> Result<(), CodeGenError> {
     let title = format!("`{}` Unit definition ", unit.name);
     utils::add_header(s, &title);
 
-    s.new_include("interface.h", true);
+    s.new_include("interface.h", false);
 
     // add the definitions
     add_unit_constants(s, unit);
@@ -284,8 +284,6 @@ pub fn generate(unit: &Unit, outdir: &Path) -> Result<(), CodeGenError> {
     add_unmap_function(s, unit);
     add_protect_function(s, unit);
     add_translate_function(s, unit);
-
-    println!("hhhhh");
 
     // save the scope
     scope.set_filename("unit.h");

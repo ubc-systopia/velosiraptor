@@ -151,7 +151,8 @@ pub fn constructor_fn_name(unit: &Unit) -> String {
 
 pub fn mmio_register_read_fn(unit_var: &C::Expr, field: &Field) -> C::Expr {
     if let Some((base, offset)) = &field.stateref {
-        let fnname = format!("mmio_register_read_{}", field.length);
+        let fnname = format!("mmio_register_read_{}", field.nbits());
+        let base = format!("_{}", base);
         C::Expr::fn_call(
             &fnname,
             vec![
@@ -166,7 +167,8 @@ pub fn mmio_register_read_fn(unit_var: &C::Expr, field: &Field) -> C::Expr {
 
 pub fn mmio_register_write_fn(unit_var: &C::Expr, field: &Field, val: &C::Expr) -> C::Expr {
     if let Some((base, offset)) = &field.stateref {
-        let fnname = format!("mmio_register_write_{}", field.length);
+        let fnname = format!("mmio_register_write_{}", field.nbits());
+        let base = format!("_{}", base);
         C::Expr::fn_call(
             &fnname,
             vec![

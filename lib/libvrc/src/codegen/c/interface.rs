@@ -3,7 +3,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2021 Systopia Lab, Computer Science, University of British Columbia
+// Copyright (c) 2022 Systopia Lab, Computer Science, University of British Columbia
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Interface Generation (Rust)
+//! Interface Generation (C/CPP)
 
 use std::fs;
 use std::path::Path;
@@ -241,7 +241,7 @@ fn generate_write_slice_mmio(scope: &mut C::Scope, unit: &Unit, field: &Field, s
         )
         .assign(
             field_var.clone(),
-            C::Expr::fn_call(&insert_fn, vec![val_var]),
+            C::Expr::fn_call(&insert_fn, vec![field_var.clone(), val_var]),
         )
         .fn_call(&set_val_fn, vec![unit_var, field_var]);
     scope.push_function(f);
@@ -333,7 +333,7 @@ pub fn generate(unit: &Unit, outdir: &Path) -> Result<(), CodeGenError> {
         s.new_include(&fieldname, false);
     }
 
-    s.new_include("support/mmio.h", true);
+    s.new_include("mmio.h", true);
 
     generate_unit_struct(s, unit);
 
