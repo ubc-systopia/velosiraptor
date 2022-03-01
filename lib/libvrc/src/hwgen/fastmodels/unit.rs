@@ -35,7 +35,7 @@ use std::path::Path;
 use crustal as C;
 
 // the defined errors
-use crate::ast::{Expr, Method, Stmt, Unit};
+use crate::ast::{Expr, Method, Stmt, Type, Unit};
 use crate::hwgen::fastmodels::add_header;
 use crate::hwgen::fastmodels::interface::{interface_class_name, interface_header_file};
 use crate::hwgen::fastmodels::state::{state_class_name, state_header_file};
@@ -321,44 +321,39 @@ fn add_translate(c: &mut C::Class, tm: &Method) {
     if let Some(body) = &tm.stmts {
         m.set_body(stmt_to_cpp(body));
     }
+}
 
-    // bool TranslationUnit::do_translate(lvaddr_t src_addr, size_t size, access_mode_t mode,
-    //                                    lpaddr_t *dst_addr)
-    // {
-    //     Logging::debug("TranslationUnit::do_translate()");
+fn ast_type_to_c_type(t: &Type) -> C::Type {
+    match t {
+        Type::Boolean => C::Type::new_bool(),
+        Type::Integer => C::Type::new_uint(64),
+        Type::Size => C::Type::new_size(),
+        Type::Address => C::Type::new_typedef("genaddr_t"),
+        _ => panic!("unhandled!"),
+    }
+}
 
-    //     auto ctrl = this->_state.control_field();
-    //     if (!(ctrl->get_value() & 0x1)) {
-    //         Logging::debug("TranslationUnit::translate() - disabled. don't remap. %x");
-    //         *dst_addr = src_addr;
-    //         return true;
-    //     }
+fn add_method(c: &mut C::Class, tm: &Method) {
+    match &tm.name[..] {
+        "translate" => add_translate(c, tm),
+        "map" => return,
+        "unmap" => return,
+        "protect" => return,
+        _ => (),
+    }
 
-    //     size_t idx    = src_addr / CONFIG_TRANSLATION_BLOCK_SIZE;
-    //     size_t offset = src_addr % CONFIG_TRANSLATION_BLOCK_SIZE;
+    let m = c.new_method(&tm.name, ast_type_to_c_type(&tm.rettype));
+    for p in &tm.args {
+        m.push_param(C::MethodParam::new(&p.name, ast_type_to_c_type(&p.ptype)));
+    }
 
-    //     assert(idx < CONFIG_NUM_TRANSLATION_REGISTERS);
+    for e in &tm.requires {
+        handle_requires_assert(m, e);
+    }
 
-    //     lpaddr_t segbase = this->_state.get_base_field_n_value(idx);
-    //     size_t   segsize = this->_state.get_size_field_n_value(idx);
-
-    //     if (offset >= segsize) {
-    //         Logging::debug("TranslationUnit::translate() - offset >= size ", src_addr, size);
-    //         return false;
-    //     }
-
-    //     if (idx >= CONFIG_NUM_TRANSLATION_REGISTERS) {
-    //         Logging::debug("TranslationUnit::translate() - idx %zu >= "
-    //                        "CONFIG_NUM_TRANSLATION_REGISTERS %u",
-    //                        idx, CONFIG_NUM_TRANSLATION_REGISTERS);
-    //         return false;
-    //     }
-
-    //     // set the return address
-    //     *dst_addr = segbase + offset;
-
-    //     return true;
-    // }
+    if let Some(body) = &tm.stmts {
+        m.set_body(stmt_to_cpp(body));
+    }
 }
 
 pub fn generate_unit_header(name: &str, unit: &Unit, outdir: &Path) -> Result<(), HWGenError> {
@@ -398,10 +393,6 @@ pub fn generate_unit_header(name: &str, unit: &Unit, outdir: &Path) -> Result<()
 
     add_constructor(c, &ifn, &scn);
     add_create(c, &ucn);
-
-    if let Some(m) = unit.get_method("translate") {
-        add_translate(c, m);
-    }
 
     //
     // virtual UnitBase *get_interface(void) set_overridee
@@ -452,7 +443,7 @@ pub fn generate_unit_header(name: &str, unit: &Unit, outdir: &Path) -> Result<()
 
     // TODO: handle the methods!
     for m in &unit.methods {
-        println!("handle method {}!", m.name);
+        add_method(c, m);
     }
 
     // save the scope
@@ -492,9 +483,6 @@ pub fn generate_unit_impl(name: &str, unit: &Unit, outdir: &Path) -> Result<(), 
 
     add_constructor(c, &ifn, &scn);
     add_create(c, &ucn);
-    if let Some(m) = unit.get_method("translate") {
-        add_translate(c, m);
-    }
 
     /*
      * -------------------------------------------------------------------------------------------
@@ -504,7 +492,7 @@ pub fn generate_unit_impl(name: &str, unit: &Unit, outdir: &Path) -> Result<(), 
 
     // TODO: handle the methods!
     for m in &unit.methods {
-        println!("handle method {}!", m.name);
+        add_method(c, m)
     }
 
     let filename = unit_impl_file(name);
