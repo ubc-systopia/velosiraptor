@@ -43,7 +43,7 @@ use resultparser::parse_result;
 
 pub struct SynthRosette {
     outdir: PathBuf,
-    pkg: String,
+    _pkg: String,
 }
 
 const STATEFIELDS: &str = "statefields";
@@ -54,7 +54,7 @@ impl SynthRosette {
     pub fn new(outdir: &Path, pkg: String) -> Self {
         SynthRosette {
             outdir: outdir.join(&pkg).join("synth"),
-            pkg,
+            _pkg: pkg,
         }
     }
 
