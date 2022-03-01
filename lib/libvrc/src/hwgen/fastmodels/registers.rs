@@ -78,8 +78,8 @@ pub fn generate_register_header(
 
     // adding the includes
     s.new_comment("framework includes");
-    s.new_include("generic/types.hpp", true);
-    s.new_include("generic/register_base.hpp", true);
+    s.new_include("framework/types.hpp", true);
+    s.new_include("framework/register_base.hpp", true);
 
     s.new_comment("translation register specific includes");
     let statehdr = state_header_file(name);
@@ -104,13 +104,13 @@ pub fn generate_register_header(
 
         c.new_constructor().new_param("state", state_ptr_type);
 
-        c.new_method("do_read", C::Type::new_int(64))
+        c.new_method("do_read", C::Type::new_uint(64))
             .set_override()
             .set_public();
         c.new_method("do_write", C::Type::new_void())
             .set_override()
             .set_public()
-            .new_param("data", C::Type::new_int(64));
+            .new_param("data", C::Type::new_uint(64));
     }
 
     // done, save the scope
@@ -134,8 +134,8 @@ pub fn generate_register_impl(
 
     // adding the includes
     scope.new_comment("framework includes");
-    scope.new_include("generic/types.hpp", true);
-    scope.new_include("generic/logging.hpp", true);
+    scope.new_include("framework/types.hpp", true);
+    scope.new_include("framework/logging.hpp", true);
     scope.new_comment("translation register specific includes");
     let reghdr = registers_header_file(name);
     scope.new_include(&reghdr, true);
@@ -178,7 +178,9 @@ pub fn generate_register_impl(
             C::Expr::method_call(&stvar, &format!("{}_field", f.field.name), vec![]);
         field_access_expr.set_ptr();
 
-        let m = c.new_method("do_read", C::Type::new_int(64)).set_override();
+        let m = c
+            .new_method("do_read", C::Type::new_uint(64))
+            .set_override();
         m.body()
             .fn_call(
                 "Logging::debug",
@@ -195,7 +197,7 @@ pub fn generate_register_impl(
             ));
 
         let m = c.new_method("do_write", C::Type::new_void()).set_override();
-        m.new_param("data", C::Type::new_int(64));
+        m.new_param("data", C::Type::new_uint(64));
         m.body()
             .fn_call(
                 "Logging::debug",
@@ -208,7 +210,7 @@ pub fn generate_register_impl(
             .method_call(
                 field_access_expr,
                 "set_value",
-                vec![C::Expr::new_var("data", C::Type::new_int(64))],
+                vec![C::Expr::new_var("data", C::Type::new_uint(64))],
             );
     }
 

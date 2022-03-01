@@ -83,8 +83,8 @@ pub fn generate_field_header(name: &str, state: &State, outdir: &Path) -> Result
 
     // adding the includes
     s.new_comment("framework includes");
-    s.new_include("generic/types.hpp", true);
-    s.new_include("generic/state_field_base.hpp", true);
+    s.new_include("framework/types.hpp", true);
+    s.new_include("framework/state_field_base.hpp", true);
 
     // generate a new class for each field
     for f in state.fields() {
@@ -99,16 +99,16 @@ pub fn generate_field_header(name: &str, state: &State, outdir: &Path) -> Result
         c.new_constructor();
 
         // the variable
-        let var = C::Expr::new_var("data", C::Type::new_int(64));
+        let var = C::Expr::new_var("data", C::Type::new_uint(64));
 
         for sl in &f.layout {
             let slname = state_fields_slice_getter_name(&sl.name);
             let m = c
-                .new_method(&slname, C::Type::new_int(64))
+                .new_method(&slname, C::Type::new_uint(64))
                 .set_public()
                 .set_inline();
             m.body()
-                .variable(C::Variable::new("data", C::Type::new_int(64)))
+                .variable(C::Variable::new("data", C::Type::new_uint(64)))
                 .method_call(
                     C::Expr::this(),
                     "get_slice_value",
@@ -149,7 +149,7 @@ pub fn generate_field_impl(name: &str, state: &State, outdir: &Path) -> Result<(
 
     // adding includes
     scope.new_comment("framework includes");
-    scope.new_include("generic/types.hpp", true);
+    scope.new_include("framework/types.hpp", true);
     scope.new_comment("translation unit generic includes");
     let hdrfile = state_fields_header_file(name);
     scope.new_include(&hdrfile, true);

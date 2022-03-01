@@ -238,7 +238,7 @@ fn expr_to_cpp(expr: &Expr) -> C::Expr {
 }
 
 fn assert_to_cpp(expr: &Expr) -> C::IfElse {
-    let mut c = C::IfElse::with_expr(expr_to_cpp(expr));
+    let mut c = C::IfElse::with_expr(C::Expr::not(expr_to_cpp(expr)));
     c.then_branch()
         .raw(format!(
             "Logging::debug(\"TranslationUnit::translate() precondition/assertion failed ({})\");",
@@ -293,17 +293,36 @@ fn stmt_to_cpp(s: &Stmt) -> C::Block {
     }
 }
 
+fn add_translate_remap(c: &mut C::Class, tm: &Method) {
+    let src_addr_param = C::MethodParam::new(&tm.args[0].name, C::Type::new_typedef("lvaddr_t"));
+    let mode_param = C::MethodParam::new(&tm.args[1].name, C::Type::new_typedef("access_mode_t"));
+    let m = c
+        .new_method("do_translate_remap", C::Type::new_typedef("lpaddr_t"))
+        .push_param(src_addr_param)
+        .push_param(mode_param);
+
+    if let Some(body) = &tm.stmts {
+        m.set_body(stmt_to_cpp(body));
+    }
+}
+
 fn add_translate(c: &mut C::Class, tm: &Method) {
+    add_translate_remap(c, tm);
+
     // virtual bool do_translate(lvaddr_t src_addr, size_t size, access_mode_t mode,
     // lpaddr_t *dst_addr) set_overridee;
 
     let src_addr_param = C::MethodParam::new(&tm.args[0].name, C::Type::new_typedef("lvaddr_t"));
+    let src_var = C::Expr::from_method_param(&src_addr_param);
     let size_param = C::MethodParam::new("size", C::Type::new_size());
     let mode_param = C::MethodParam::new(&tm.args[1].name, C::Type::new_typedef("access_mode_t"));
+    let mode_var = C::Expr::from_method_param(&mode_param);
     let dst_addr_param = C::MethodParam::new(
         "dst_addr",
         C::Type::to_ptr(&C::Type::new_typedef("lpaddr_t")),
     );
+    let dst_addr = C::Expr::from_method_param(&dst_addr_param);
+
     let m = c
         .new_method("do_translate", C::Type::new_bool())
         .set_public()
@@ -314,13 +333,24 @@ fn add_translate(c: &mut C::Class, tm: &Method) {
         .push_param(mode_param)
         .push_param(dst_addr_param);
 
+    m.body().raw(format!(
+        "Logging::debug(\"TranslationUnit::translate(%lx)\", {});",
+        &tm.args[0].name
+    ));
+
     for e in &tm.requires {
         handle_requires_assert(m, e);
     }
 
-    if let Some(body) = &tm.stmts {
-        m.set_body(stmt_to_cpp(body));
-    }
+    m.body().assign(
+        C::Expr::deref(&dst_addr),
+        C::Expr::method_call(
+            &C::Expr::this(),
+            "do_translate_remap",
+            vec![src_var, mode_var],
+        ),
+    );
+    m.body().return_expr(C::Expr::btrue());
 }
 
 fn ast_type_to_c_type(t: &Type) -> C::Type {
@@ -335,7 +365,10 @@ fn ast_type_to_c_type(t: &Type) -> C::Type {
 
 fn add_method(c: &mut C::Class, tm: &Method) {
     match &tm.name[..] {
-        "translate" => add_translate(c, tm),
+        "translate" => {
+            add_translate(c, tm);
+            return;
+        }
         "map" => return,
         "unmap" => return,
         "protect" => return,
@@ -352,7 +385,7 @@ fn add_method(c: &mut C::Class, tm: &Method) {
     }
 
     if let Some(body) = &tm.stmts {
-        m.set_body(stmt_to_cpp(body));
+        m.body().merge(stmt_to_cpp(body));
     }
 }
 
@@ -377,8 +410,8 @@ pub fn generate_unit_header(name: &str, unit: &Unit, outdir: &Path) -> Result<()
     s.new_include("assert.h", true);
 
     s.new_comment("framework includes");
-    s.new_include("generic/types.hpp", true);
-    s.new_include("generic/translation_unit_base.hpp", true);
+    s.new_include("framework/types.hpp", true);
+    s.new_include("framework/translation_unit_base.hpp", true);
 
     s.new_comment("translation unit specific includes");
     let statehdr = state_header_file(name);
@@ -465,8 +498,8 @@ pub fn generate_unit_impl(name: &str, unit: &Unit, outdir: &Path) -> Result<(), 
     scope.new_include("assert.h", true);
 
     scope.new_comment("framework includes");
-    scope.new_include("generic/types.hpp", true);
-    scope.new_include("generic/logging.hpp", true);
+    scope.new_include("framework/types.hpp", true);
+    scope.new_include("framework/logging.hpp", true);
 
     scope.new_comment("translation unit specific includes");
     let unithdr = unit_header_file(name);

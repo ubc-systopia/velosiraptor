@@ -78,8 +78,8 @@ pub fn generate_state_header(name: &str, state: &State, outdir: &Path) -> Result
     s.new_include("assert.h", true);
 
     s.new_comment("framework includes");
-    s.new_include("generic/types.hpp", true);
-    s.new_include("generic/state_base.hpp", true);
+    s.new_include("framework/types.hpp", true);
+    s.new_include("framework/state_base.hpp", true);
 
     s.new_comment("translation unit specific includes");
     let fieldshdr = state_fields_header_file(name);
@@ -159,8 +159,8 @@ pub fn generate_state_impl(name: &str, state: &State, outdir: &Path) -> Result<(
     scope.new_include("pv/RemapRequest.h", true);
 
     scope.new_comment("framework includes");
-    scope.new_include("generic/logging.hpp", true);
-    scope.new_include("generic/state_field_base.hpp", true);
+    scope.new_include("framework/logging.hpp", true);
+    scope.new_include("framework/state_field_base.hpp", true);
 
     scope.new_comment("unit includes");
     let statehdr = state_header_file(name);

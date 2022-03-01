@@ -106,7 +106,7 @@ impl ArmFastModelsModule {
         writeln!(f, "\n# Set the build directory")?;
         writeln!(f, "BUILD_DIR := $(CURDIR)/build")?;
         writeln!(f, "SOURCE_DIR := $(CURDIR)")?;
-        writeln!(f, "FRAMEWORK_DIR := $(CURDIR)")?;
+        writeln!(f, "FRAMEWORK_DIR ?= $(CURDIR)/framework")?;
 
         // flags for the compiler
         writeln!(f, "# compiler flags")?;
