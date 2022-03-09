@@ -60,7 +60,7 @@ use crustal as C;
 use super::utils;
 use crate::ast::Unit;
 use crate::codegen::CodeGenError;
-use crate::synth::{OpArg, Operation};
+use crate::synth::{OpExpr, Operation};
 
 /// adds the constants defined in the unit to the scope
 fn add_unit_constants(scope: &mut C::Scope, unit: &Unit) {
@@ -119,11 +119,21 @@ fn add_translate_function(scope: &mut C::Scope, unit: &Unit) {
         .new_comment("TODO: SYNTHESIZE ME");
 }
 
-fn oparg_to_rust_expr(op: &OpArg) -> Option<C::Expr> {
+fn oparg_to_rust_expr(op: &OpExpr) -> Option<C::Expr> {
     match op {
-        OpArg::None => None,
-        OpArg::Num(x) => Some(C::Expr::new_num(*x)),
-        OpArg::Var(x) => Some(C::Expr::new_var(x, C::Type::new_int(64))),
+        OpExpr::None => None,
+        OpExpr::Num(x) => Some(C::Expr::new_num(*x)),
+        OpExpr::Var(x) => Some(C::Expr::new_var(x, C::Type::new_int(64))),
+        OpExpr::Shl(x, y) => Some(C::Expr::binop(
+            oparg_to_rust_expr(x).unwrap(),
+            "<<",
+            oparg_to_rust_expr(y).unwrap(),
+        )),
+        OpExpr::Shr(x, y) => Some(C::Expr::binop(
+            oparg_to_rust_expr(x).unwrap(),
+            ">>",
+            oparg_to_rust_expr(y).unwrap(),
+        )),
     }
 }
 

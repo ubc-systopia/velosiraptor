@@ -828,7 +828,7 @@ impl SynthRosette {
             for b in &f.field.layout {
                 // let arg = String::from("arg");
                 let ident = format!("Op-Iface-{}-{}-Insert", f.field.name, b.name);
-                let args = RExpr::fncall(String::from("valexpr"), vec![]);
+                let args = RExpr::fncall(String::from("binop"), vec![]);
                 ops.push(RExpr::fncall(ident, vec![args]));
             }
             let ident = format!("Op-Iface-{}-WriteAction", f.field.name);
@@ -839,6 +839,24 @@ impl SynthRosette {
         body.push(RExpr::block(vec![(
             String::from("ops"),
             RExpr::fncall(String::from("choose"), ops),
+        )]));
+
+        body.push(RExpr::block(vec![(
+            String::from("binop"),
+            RExpr::fncall(
+                String::from("choose"),
+                vec![
+                    RExpr::var(String::from("(valexpr)")),
+                    RExpr::var(String::from("(bvshl (binop) (valexpr))")),
+                    RExpr::var(String::from("(bvlshr (binop) (valexpr))")),
+                    RExpr::var(String::from(";(bvadd (binop) (valexpr))")),
+                    RExpr::var(String::from(";(bvand (binop) (valexpr))")),
+                    RExpr::var(String::from(";(bvor (binop) (valexpr))")),
+                    RExpr::var(String::from(";(bvmul (binop) (valexpr))")),
+                    RExpr::var(String::from(";(bvudiv (binop) (valexpr))")),
+                    RExpr::var(String::from(";(bvurem (binop) (valexpr))")),
+                ],
+            ),
         )]));
 
         body.push(RExpr::block(vec![(

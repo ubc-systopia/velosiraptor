@@ -25,7 +25,7 @@
 
 //! Parsing
 
-use crate::synth::{OpArg, Operation};
+use crate::synth::{OpExpr, Operation};
 
 /// the used nom parsing facilities
 use nom::{
@@ -43,22 +43,43 @@ use nom::{
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
 /// parser to recognize a bitvector constaint `(bv #x1 64)`
-fn parse_oparg_bv(s: &str) -> IResult<&str, OpArg> {
+fn parse_oparg_bv(s: &str) -> IResult<&str, OpExpr> {
     let bv = tuple((tag("(bv"), space1));
     let width = tuple((space1, digit1, tag(")")));
     let value = preceded(tag("#x"), hex_digit1);
 
     let (r, n) = delimited(bv, value, width)(s)?;
     match u64::from_str_radix(n, 16) {
-        Ok(i) => Ok((r, OpArg::Num(i))),
+        Ok(i) => Ok((r, OpExpr::Num(i))),
         Err(_) => panic!("number {} not parsable as hex", n),
     }
 }
 
 /// parser to recognize a sybolic variable  e.g., `pa`
-fn parse_oparg_var(s: &str) -> IResult<&str, OpArg> {
+fn parse_oparg_var(s: &str) -> IResult<&str, OpExpr> {
     let (r, n) = alphanumeric1(s)?;
-    Ok((r, OpArg::Var(String::from(n))))
+    Ok((r, OpExpr::Var(String::from(n))))
+}
+
+/// parses a bitvector operator argument `(bvshl va size)`
+fn parse_oparg_bvop(s: &str) -> IResult<&str, OpExpr> {
+    // the possible bi
+    let bvop = alt((tag("bvshl"), tag("bvlshr")));
+
+    let bvop_parser = tuple((
+        bvop,
+        space1,
+        alt((parse_oparg_bv, parse_oparg_var)),
+        space1,
+        alt((parse_oparg_bv, parse_oparg_var)),
+    ));
+    let (r, (o, _, a1, _, a2)) = delimited(tag("("), bvop_parser, tag(")"))(s)?;
+
+    match o {
+        "bvshl" => Ok((r, OpExpr::Shl(Box::new(a1), Box::new(a2)))),
+        "bvlshr" => Ok((r, OpExpr::Shl(Box::new(a1), Box::new(a2)))),
+        _ => panic!("unexpected operator {}", o),
+    }
 }
 
 /// parser to recognize a single operation `(op arg)`
@@ -67,7 +88,7 @@ fn parse_op(s: &str) -> IResult<&str, Operation> {
     let opname = recognize(many1(alt((alphanumeric1, tag("_"), tag("-")))));
 
     // the opargs are bv, var, or nothing
-    let opargs = opt(alt((parse_oparg_bv, parse_oparg_var)));
+    let opargs = opt(alt((parse_oparg_bv, parse_oparg_var, parse_oparg_bvop)));
 
     // the operation is then the name, followed by maybe arguments
     let op = tuple((opname, preceded(space0, opargs)));
@@ -76,7 +97,7 @@ fn parse_op(s: &str) -> IResult<&str, Operation> {
     let (r, (n, a)) = delimited(tag("("), op, tag(")"))(s)?;
 
     // get the argument, or set it to None if there was none
-    let arg = a.unwrap_or(OpArg::None);
+    let arg = a.unwrap_or(OpExpr::None);
 
     // try to extrac the operation
     let mut split = n.split('-').collect::<Vec<&str>>();

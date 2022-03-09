@@ -25,14 +25,14 @@
 
 //! Operations
 
-/// defines an argument
 #[derive(PartialEq, Clone, Debug)]
-pub enum OpArg {
+pub enum OpExpr {
     /// a constant number
     Num(u64),
     /// a variable
     Var(String),
-    /// no argument for this operation
+    Shl(Box<OpExpr>, Box<OpExpr>),
+    Shr(Box<OpExpr>, Box<OpExpr>),
     None,
 }
 
@@ -41,7 +41,7 @@ pub enum Operation {
     Insert {
         field: String,
         slice: Option<String>,
-        arg: OpArg,
+        arg: OpExpr,
     },
     Extract {
         field: String,
@@ -57,7 +57,7 @@ pub enum Operation {
 }
 
 impl Operation {
-    pub fn insert(field: &str, slice: Option<&str>, op: OpArg) -> Self {
+    pub fn insert(field: &str, slice: Option<&str>, op: OpExpr) -> Self {
         Operation::Insert {
             field: field.to_string(),
             slice: slice.map(|s| s.to_string()),

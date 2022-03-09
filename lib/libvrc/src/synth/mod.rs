@@ -35,7 +35,7 @@ mod rosette;
 
 // the used library modules
 use crate::ast::AstRoot;
-pub use crate::synth::operation::{OpArg, Operation};
+pub use crate::synth::operation::{OpExpr, Operation};
 use crate::synth::rosette::SynthRosette;
 
 const COPYRIGHT: &str = "2021 Systopia Lab, Computer Science, University of British Columbia";

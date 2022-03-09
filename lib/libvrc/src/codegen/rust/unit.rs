@@ -33,7 +33,7 @@ use codegen_rs as CG;
 use super::utils;
 use crate::ast::Unit;
 use crate::codegen::CodeGenError;
-use crate::synth::{OpArg, Operation};
+use crate::synth::{OpExpr, Operation};
 
 /// adds the constants defined in the unit to the scope
 fn add_unit_constants(scope: &mut CG::Scope, unit: &Unit) {
@@ -94,11 +94,13 @@ fn add_translate_function(imp: &mut CG::Impl, unit: &Unit) {
         .line("// TODO: SYNTHESIZE ME");
 }
 
-fn oparg_to_rust_expr(op: &OpArg) -> String {
+fn oparg_to_rust_expr(op: &OpExpr) -> String {
     match op {
-        OpArg::None => String::new(),
-        OpArg::Num(x) => format!("{:x}", x),
-        OpArg::Var(x) => x.clone(),
+        OpExpr::None => String::new(),
+        OpExpr::Num(x) => format!("{:x}", x),
+        OpExpr::Var(x) => x.clone(),
+        OpExpr::Shl(x, y) => format!("{} << {}", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
+        OpExpr::Shr(x, y) => format!("{} >> {}", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
     }
 }
 
