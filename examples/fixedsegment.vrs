@@ -14,7 +14,7 @@
  */
 
 // This defines an SMPT Entry
-unit DirectSegment(base : addr) : Segment {
+unit FixedSegment(base : addr) : Segment {
 
     // let's assume the maximum size of the segment is 40 bits.
     // size = 40;
@@ -23,18 +23,13 @@ unit DirectSegment(base : addr) : Segment {
     state = Register {
 
         base [8] {
-             0 63  address;
-        };
-
-        length [8] {
-            0 39 bytes;
+            0 63  address;
         };
     };
 
     // the interface is a register interface, assume there are two registers
     // called `base` and `size`. They can be updated using load/store instructions
     interface = MMIO(base : addr) {
-
         base [base, 16, 8] {
             Layout {
                0 63  address;
@@ -43,19 +38,7 @@ unit DirectSegment(base : addr) : Segment {
                 interface.base <- state.base;
             };
             WriteAction {
-                interface.base -> state.base;
-            };
-        };
-
-        length [base, 8, 8] {
-            Layout {
-                0 39 bytes;
-            };
-            ReadAction {
-                interface.length <- state.length;
-            };
-            WriteAction {
-                interface.length -> state.length;
+                interface.base.address -> state.base.address;
             };
         };
     };
@@ -76,13 +59,11 @@ unit DirectSegment(base : addr) : Segment {
         //
         // the va should be 0 here
         requires va == 0;
-
-        requires 1 <= sz;
-        requires sz < 0xff_ffff_ffff;
+        requires sz == 4096;
 
         requires 0 <= pa;
         requires pa & 0xfff == 0;
-        requires (pa >> 12) << 12 == pa;
+        requires ((pa >> 12) << 12) == pa;
         requires pa <= 0xff_ffff_ffff;
 
         ensures forall i : addr :: 0 <= i && i < sz && translate(va + i, flags) == pa + i;
@@ -101,9 +82,9 @@ unit DirectSegment(base : addr) : Segment {
 
     // the translation semantics, adding an option type?
     fn translate(va: addr, flags: int) -> addr
-        requires va < state.length.bytes;
+        requires va < 4096;
     {
-        return va + state.base.address;
+        return va + (state.base.address << 12);
     }
 
  };
