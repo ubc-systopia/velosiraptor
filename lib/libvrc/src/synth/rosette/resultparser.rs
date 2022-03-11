@@ -187,6 +187,10 @@ pub fn parse_result(output: &str) -> Vec<Operation> {
 
 #[test]
 fn test_parser() {
-    let s = "(Seq (Op_Iface_sz_bytes_Insert (bv #x4000000000000000 64)) (Seq (Op_Iface_sz_WriteAction) (Seq (Op_Iface_flags_present_Insert (bv #x0000000000000001 64)) (Seq (Op_Iface_flags_WriteAction) (Seq (Op_Iface_address_base_Insert pa) (Seq (Op_Iface_address_WriteAction) (Return)))))))\n";
+    let s = "(Seq (Op-Iface-length-bytes-Insert size) (Seq (Op-Iface-base-address-Insert pa) (Seq (Op-Iface-length-WriteAction) (Seq (Op-Iface-base-WriteAction) (Return)))))\n";
     parse_result(s);
+
+    let s = "(Seq (Op-Iface-length-bytes-Insert (bv #x000000ffffffffff 64)) (Seq (Op-Iface-base-address-Insert (bvlshr pa (bv #x000000000000000c 64))) (Seq (Op-Iface-base-WriteAction) (Seq (Op-Iface-length-WriteAction) (Return)))))\n";
+    parse_result(s);
+
 }
