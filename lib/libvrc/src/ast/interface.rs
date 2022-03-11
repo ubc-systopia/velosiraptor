@@ -98,12 +98,24 @@ impl<'a> Interface {
 
     pub fn bases(&self) -> &[Param] {
         match self {
+            Interface::CPURegisters { .. } => &[],
             Interface::Memory { bases, .. } => bases,
             Interface::MMIORegisters { bases, .. } => bases,
-            Interface::CPURegisters { .. } => &[],
             Interface::SpecialRegisters { .. } => &[],
             Interface::None { .. } => &[],
         }
+    }
+
+    pub fn is_none(&self) -> bool {
+        matches!(self, Interface::None { .. })
+    }
+
+    pub fn is_register(&self) -> bool {
+        matches!(self, Interface::MMIORegisters { .. })
+    }
+
+    pub fn field_by_name(&self, name: &str) -> Option<&InterfaceField> {
+        self.fields().iter().find(|f| f.name() == name)
     }
 }
 

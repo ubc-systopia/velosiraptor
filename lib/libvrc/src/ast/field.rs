@@ -72,6 +72,14 @@ impl<'a> Field {
         self.length * 8
     }
 
+    pub fn offset(&self) -> u64 {
+        if let Some((_, offset)) = &self.stateref {
+            *offset
+        } else {
+            0
+        }
+    }
+
     pub fn location(&self) -> String {
         self.pos.location()
     }

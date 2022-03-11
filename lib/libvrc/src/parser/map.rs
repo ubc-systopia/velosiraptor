@@ -157,11 +157,7 @@ fn list_comprehension(input: TokenStream) -> IResult<TokenStream, Vec<MapEntry>>
 }
 
 #[cfg(test)]
-use crate::ast::BitSlice;
-#[cfg(test)]
 use crate::lexer::Lexer;
-#[cfg(test)]
-use crate::nom::Slice;
 
 #[test]
 fn test_map_simple() {

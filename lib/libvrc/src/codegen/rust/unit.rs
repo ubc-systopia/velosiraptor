@@ -25,6 +25,7 @@
 
 //! Unit Generation (Rust)
 
+use std::collections::HashSet;
 use std::path::Path;
 
 use codegen_rs as CG;
@@ -32,6 +33,7 @@ use codegen_rs as CG;
 use super::utils;
 use crate::ast::Unit;
 use crate::codegen::CodeGenError;
+use crate::synth::{OpExpr, Operation};
 
 /// adds the constants defined in the unit to the scope
 fn add_unit_constants(scope: &mut CG::Scope, unit: &Unit) {
@@ -76,6 +78,12 @@ fn add_constructor_function(imp: &mut CG::Impl, unit: &Unit) {
         .doc(&format!("Creates a new `{}` unit", unit.name))
         //.ret(CG::Type::new("Self"))
         .line("// TODO: SYNTHESIZE ME");
+
+    imp.new_fn("from_raw")
+        .vis("pub")
+        .doc(&format!("Creates a new `{}` unit", unit.name))
+        //.ret(CG::Type::new("Self"))
+        .line("// TODO: SYNTHESIZE ME");
 }
 
 fn add_translate_function(imp: &mut CG::Impl, unit: &Unit) {
@@ -86,12 +94,97 @@ fn add_translate_function(imp: &mut CG::Impl, unit: &Unit) {
         .line("// TODO: SYNTHESIZE ME");
 }
 
+fn oparg_to_rust_expr(op: &OpExpr) -> String {
+    match op {
+        OpExpr::None => String::new(),
+        OpExpr::Num(x) => format!("{:x}", x),
+        OpExpr::Var(x) => x.clone(),
+        OpExpr::Shl(x, y) => format!("({} << {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
+        OpExpr::Shr(x, y) => format!("({} >> {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
+        OpExpr::And(x, y) => format!("({} & {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
+        OpExpr::Or(x, y) => format!("({} | {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
+        OpExpr::Add(x, y) => format!("({} + {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
+        OpExpr::Sub(x, y) => format!("({} - {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
+        OpExpr::Mul(x, y) => format!("({} * {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
+        OpExpr::Div(x, y) => format!("({} / {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
+        OpExpr::Mod(x, y) => format!("({} % {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
+    }
+}
+
+fn op_to_rust_expr(op: &Operation) -> String {
+    match op {
+        Operation::Insert {
+            field,
+            slice: Some(slice),
+            arg,
+        } => {
+            format!("v_{}.insert_{}({});", field, slice, oparg_to_rust_expr(arg))
+        }
+        Operation::Insert {
+            field,
+            slice: None,
+            arg,
+        } => {
+            format!("v_{}.set_val({});", field, oparg_to_rust_expr(arg))
+        }
+        Operation::Extract {
+            field,
+            slice: Some(slice),
+        } => {
+            format!("v_{}.extract_{}();", field, slice)
+        }
+        Operation::Extract { field, slice: None } => {
+            format!("v_{}.get_val();", field)
+        }
+        Operation::WriteAction { field } => {
+            format!("self.interface.write_{}(v_{});", field, field)
+        }
+        Operation::ReadAction { field } => {
+            format!("self.interface.read_{}();", field)
+        }
+        Operation::Return => String::new(),
+    }
+}
+
 fn add_map_function(imp: &mut CG::Impl, unit: &Unit) {
-    imp.new_fn("map")
+    let mut fields = HashSet::new();
+    if let Some(ops) = &unit.map_ops {
+        for op in ops {
+            let fname = op.fieldname();
+            if fname.is_empty() {
+                continue;
+            }
+            fields.insert(String::from(fname));
+        }
+    }
+
+    let m = imp
+        .new_fn("map")
+        .arg_ref_self()
+        .arg("va", "u64")
+        .arg("pa", "u64")
+        .arg("flags", "u64")
         .vis("pub")
-        .doc(&format!("Creates a new {} unit", unit.name))
-        //.ret(CG::Type::new("Self"))
-        .line("// TODO: SYNTHESIZE ME");
+        .doc(&format!("Creates a new {} unit", unit.name));
+    //.ret(CG::Type::new("Self"))
+
+    m.line("// field variable definitions");
+    for f in fields {
+        m.line(format!(
+            "let mut v_{} = {}::new();",
+            f,
+            utils::to_struct_name(&f, Some("Field"))
+        ));
+    }
+
+    m.line("");
+    m.line("//operation sequence");
+
+    if let Some(ops) = &unit.map_ops {
+        for op in ops {
+            m.line(&op_to_rust_expr(op));
+        }
+    }
 }
 
 fn add_unmap_function(imp: &mut CG::Impl, unit: &Unit) {

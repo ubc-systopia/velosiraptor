@@ -32,82 +32,56 @@
  */
 
 // represents an x86 page table entry
-unit X86_pte(base : addr) : Segment {
+unit Simple(base : addr) : Segment {
     // the state
     state = Memory(base : addr) {
-        pte [base, 0, 4] {
-            // the following fields at starting bit, ending bit, name
-            0   0 present;
-            1   1 writable;
-            2   2 usermode;
-            3   3 writethrough;
-            4   4 nocache;
-            5   5 accessed;
-            6   6 dirty;
-            7   7 pat;
-            8   8 global;
-            9  11 ignored;
-           12  31 base;
+        address [base, 0, 8] {
+           0  63 base
+        };
+        sz [base, 8, 8] {
+            0  63 bytes
+        };
+        flags [base, 16, 8] {
+            0 0 present
         };
     };
 
     interface = Memory(base : addr) {
-        pte [base, 0, 4] {
+        address [base, 0, 8] {
             Layout {
-                // the following fields at starting bit, ending bit, name
-                0   0 present;
-                1   1 writable;
-                2   2 usermode;
-                3   3 writethrough;
-                4   4 nocache;
-                5   5 accessed;
-                6   6 dirty;
-                7   7 pat;
-                8   8 global;
-                9  11 ignored;
-                12  31 base;
+                0  63 base
             };
             ReadAction {
-                interface.pte <- state.pte;
+                interface.address <- state.address;
             };
             WriteAction {
-                interface.pte -> state.pte;
+                interface.address -> state.address;
             };
-
+        };
+        sz [base, 8, 8] {
+            Layout {
+                0  63 bytes
+            };
+            ReadAction {
+                interface.sz <- state.sz;
+            };
+            WriteAction {
+                interface.sz -> state.sz;
+            };
+        };
+        flags [base, 16, 8] {
+            Layout {
+                0 0 present
+            };
+            ReadAction {
+                interface.flags <- state.flags;
+            };
+            WriteAction {
+                interface.flags -> state.flags;
+            };
         };
     };
 
-    // the base address where this entry translate to
-    fn get_base() -> addr {
-        return state.pte.base << 12;
-    }
-
-
-    // here the size is fixed
-    fn get_size() -> size {
-        return 4096;
-    };
-
-
-    // matches a translation flags,
-    fn match_flags(flags : int) -> bool
-    {
-        if state.pte.present == 0 {
-            return false;
-        }
-
-        // need a way to express the flags
-        if (flags & !state.pte.writable) == 0 {
-            return false;
-        }
-        // need a way to express the flags
-        if (flags & !state.pte.usermode) == 0 {
-            return false;
-        }
-
-
-        return true;
-    }
 
     // unmapping an entry
     fn unmap(va: addr, sz: size) -> bool
@@ -123,6 +97,12 @@ unit X86_pte(base : addr) : Segment {
         // type(addr) == Memory || type(addr) == DevMemory;
         // type(addr) == DevMemory ==> flags & CACHE_DISABLED
         //
+        requires va == 0x0;
+        requires pa <= 0xffffffffffff;
+        requires pa + sz <= 0xffffffffffff;
+        requires sz <= 0xffffffff;
+        requires sz >= 16;
+
         ensures forall i : addr :: 0 <= i && i < sz && translate(va + i, flags) == pa + i;
         ensures translate(va, flags) == pa;
     ;
@@ -130,7 +110,7 @@ unit X86_pte(base : addr) : Segment {
 
     // protecting the entry, i.e., change its permission
     fn protect(flags: int) -> bool
-        ensures match_flags(flags);
+        //ensures match_flags(flags);
     {
         // update the entry
         // ensures match_flags(flags) ==> translate(a) == translate(a)
@@ -140,50 +120,9 @@ unit X86_pte(base : addr) : Segment {
 
     // the translation semantics, adding an option type?
     fn translate(va: addr, flags: int) -> addr
-        requires va < get_size();
-        requires match_flags(flags);
+        requires va < state.sz.bytes;
+        requires state.flags.present == 1;
     {
-        return va + get_base();
+        return va + state.address.base;
     }
 };
-
-
-// represents an x86 page table entry
-unit X86_pt(base : addr) : StaticMap {
-    staticmap = [ X86_pte(base + i * 4) for i in 0..1024 ];
-};
-
-
-/*
-unit X86PageTableEntry(base: addr) {
-    state = Memory(base: addr) {
-        entry [base, 0, 8] {
-             0  0 present;
-            // more fields omitted
-            12 63 frame_addr;
-        };
-    };
-    // the interface has the same
-    interface = Memory;
-
-    // the translation semantics
-    fn translate(va: addr, flags: int) -> addr
-      requires state.entry.present; // present bit must be set
-    {
-        return (state.frame_addr << 12) + va;
-    }
-};
-
-
-unit X86PageTable(base: addr) {
-    // the table itself doesn't have state or interface
-
-    // it has 512 entries expressed as a
-    staticmap = [ X86PageTableEntry(base + i * 8) for i in 0..512 ];
-
-    // translate basically forwards the translation to the entry
-    fn translate(va: addr, flags: int) -> addr {
-        return map[va / 4096].translate(va % 4096, flags);
-    }
-};
-*/

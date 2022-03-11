@@ -25,35 +25,110 @@
 
 //! C Code Generartion Backend
 
+use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
+
+use crustal as C;
 
 use crate::ast::AstRoot;
 use crate::codegen::CodeGenBackend;
 use crate::codegen::CodeGenError;
 
+use utils::{add_const_def, add_header};
+
+mod field;
+mod interface;
+mod unit;
+mod utils;
+
+/// The C backend
+///
+/// # Generated File Structure
+///
+///  - outdir/pkgname/Cargo.toml            the library cargo.toml
+///  - outdir/pkgname/src/lib.rs          the library file
+///  - outdir/pkgname/src/<unit>/mod.rs        the unit module
+///  - outdir/pkgname/src/<unit>/interface.rs  the interface
+///  - outdir/pkgname/src/<unit>/fields/<field>.rs
 pub struct BackendC {
-    //  outdir: PathBuf,
+    outdir: PathBuf,
+    pkgname: String,
 }
 
 impl BackendC {
-    pub fn new(_pkg: String, _outdir: &Path) -> Self {
-        BackendC {
-           // outdir: outdir.to_path_buf(),
-        }
+    pub fn new(pkgname: String, outdir: &Path) -> Self {
+        let outdir = outdir.join("clang");
+        BackendC { outdir, pkgname }
     }
 }
 
 impl CodeGenBackend for BackendC {
+    /// prepares the code generation for the C/CPP backend
+    ///
+    /// This will setup the output directories
     fn prepare(&self) -> Result<(), CodeGenError> {
+        // create the package path
+        fs::create_dir_all(&self.outdir)?;
         Ok(())
     }
-    fn generate_globals(&self, _ast: &AstRoot) -> Result<(), CodeGenError> {
+
+    /// generates the global definitions.
+    ///
+    /// This will produce a file with all the globally defined constant definitions.
+    /// The file won't be produced if there are no globally defined constants
+    fn generate_globals(&self, ast: &AstRoot) -> Result<(), CodeGenError> {
+        // the code generation scope
+        let mut scope = C::Scope::new();
+
+        // constant definitions
+        let title = format!("Global Constant Definitions for `{}` package", self.pkgname);
+        add_header(&mut scope, &title);
+
+        let hdrguard = format!("{}_CONSTS_H_", self.pkgname.to_uppercase());
+        let guard = scope.new_ifdef(&hdrguard);
+        let s = guard.guard().then_scope();
+
+        if ast.consts.is_empty() {
+            s.new_comment("No global constants defined");
+        }
+
+        // now add the constants
+        for c in &ast.consts {
+            add_const_def(s, c);
+        }
+
+        scope.set_filename("consts.h");
+        scope.to_file(&self.outdir, true)?;
+
         Ok(())
     }
-    fn generate_interfaces(&self, _ast: &AstRoot) -> Result<(), CodeGenError> {
+
+    fn generate_interfaces(&self, ast: &AstRoot) -> Result<(), CodeGenError> {
+        let mut srcdir = self.outdir.clone();
+
+        // get the source dir
+        for unit in &ast.units {
+            srcdir.push(unit.name.to_lowercase());
+            // the root directory as supplied by backend
+            fs::create_dir_all(&srcdir)?;
+            interface::generate(unit, &srcdir)?;
+            srcdir.pop();
+        }
         Ok(())
     }
-    fn generate_units(&self, _ast: &AstRoot) -> Result<(), CodeGenError> {
+
+    fn generate_units(&self, ast: &AstRoot) -> Result<(), CodeGenError> {
+        let mut srcdir = self.outdir.clone();
+        for unit in &ast.units {
+            srcdir.push(unit.name.to_lowercase());
+
+            // generate the unit
+            unit::generate(unit, &srcdir)?;
+
+            srcdir.pop();
+        }
+
         Ok(())
     }
     fn finalize(&self, _ast: &AstRoot) -> Result<(), CodeGenError> {

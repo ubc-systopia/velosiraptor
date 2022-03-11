@@ -23,6 +23,13 @@ itertools = "0.10.1"
 # rust code generation
 codegen-rs = { path = "../codegen" }
 
+# c code generation
+crustal = { path = "../crustal" }
+# crustal = "0.1.2"
+
+# synthesis
+rosettelang = { path = "../rosettelang" }
+
 # the parser combinators
 [dependencies.nom]
 version = "7"

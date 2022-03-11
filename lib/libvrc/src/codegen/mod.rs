@@ -59,11 +59,13 @@ pub enum CodeGen {
 
 impl CodeGen {
     pub fn new_rust(outdir: &Path, pkg: String) -> CodeGen {
-        CodeGen::Rust(BackendRust::new(pkg, outdir))
+        let path = outdir.join(pkg.as_str()).join("sw");
+        CodeGen::Rust(BackendRust::new(pkg, path.as_path()))
     }
 
     pub fn new_c(outdir: &Path, pkg: String) -> CodeGen {
-        CodeGen::C(BackendC::new(pkg, outdir))
+        let path = outdir.join(pkg.as_str()).join("sw");
+        CodeGen::C(BackendC::new(pkg, path.as_path()))
     }
 
     pub fn prepare(&self) -> Result<(), CodeGenError> {

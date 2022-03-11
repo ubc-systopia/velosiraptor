@@ -60,6 +60,19 @@ pub struct Method {
 }
 
 impl Method {
+    /// creates a new method without any associated TokenStream
+    pub fn new(name: String, rettype: Type, args: Vec<Param>) -> Self {
+        Method {
+            name,
+            rettype,
+            args,
+            requires: Vec::new(),
+            ensures: Vec::new(),
+            stmts: None,
+            pos: TokenStream::empty(),
+        }
+    }
+
     pub fn check_map(&self) -> Issues {
         Issues::ok()
     }

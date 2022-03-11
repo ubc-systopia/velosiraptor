@@ -94,6 +94,10 @@ impl Const {
             Boolean { .. } => Type::Boolean,
         }
     }
+
+    pub fn is_integer(&self) -> bool {
+        matches!(self, Const::Integer { .. })
+    }
 }
 
 /// implementation of the [fmt::Display] trait for the [Const]

@@ -14,7 +14,7 @@
  */
 
 // This defines an SMPT Entry
-unit DirectSegment(base : addr) : Segment {
+unit DirectSegment2(base : addr) : Segment {
 
     // let's assume the maximum size of the segment is 40 bits.
     // size = 40;
@@ -37,13 +37,13 @@ unit DirectSegment(base : addr) : Segment {
 
         base [base, 16, 8] {
             Layout {
-               0 63  address;
+               12 63  address;
             };
             ReadAction {
-                interface.base <- state.base;
+                interface.base.address <- state.base.address >> 12;
             };
             WriteAction {
-                interface.base -> state.base;
+                interface.base.address << 12 -> state.base.address;
             };
         };
 

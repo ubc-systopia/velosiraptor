@@ -45,7 +45,7 @@ pub fn to_struct_name(s: &str, suffix: Option<&str>) -> String {
         None => String::new(),
         Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
     }
-    .replace("_", "");
+    .replace('_', "");
 
     if let Some(x) = suffix {
         s.push_str(x);

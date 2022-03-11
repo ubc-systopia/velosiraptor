@@ -96,6 +96,9 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
             }),
             map,
             methods,
+            map_ops: None,
+            unmap_ops: None,
+            protect_ops: None,
             pos,
         },
     ))
