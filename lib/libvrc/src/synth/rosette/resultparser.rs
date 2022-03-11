@@ -64,7 +64,17 @@ fn parse_oparg_var(s: &str) -> IResult<&str, OpExpr> {
 /// parses a bitvector operator argument `(bvshl va size)`
 fn parse_oparg_bvop(s: &str) -> IResult<&str, OpExpr> {
     // the possible bi
-    let bvop = alt((tag("bvshl"), tag("bvlshr")));
+    let bvop = alt((
+        tag("bvshl"),
+        tag("bvlshr"),
+        tag("bvadd"),
+        tag("bvsub"),
+        tag("bvand"),
+        tag("bvor"),
+        tag("bvmul"),
+        tag("bvudiv"),
+        tag("bvurem"),
+    ));
 
     let bvop_parser = tuple((
         bvop,
@@ -78,6 +88,13 @@ fn parse_oparg_bvop(s: &str) -> IResult<&str, OpExpr> {
     match o {
         "bvshl" => Ok((r, OpExpr::Shl(Box::new(a1), Box::new(a2)))),
         "bvlshr" => Ok((r, OpExpr::Shr(Box::new(a1), Box::new(a2)))),
+        "bvadd" => Ok((r, OpExpr::Add(Box::new(a1), Box::new(a2)))),
+        "bvsub" => Ok((r, OpExpr::Sub(Box::new(a1), Box::new(a2)))),
+        "bvand" => Ok((r, OpExpr::And(Box::new(a1), Box::new(a2)))),
+        "bvor" => Ok((r, OpExpr::Or(Box::new(a1), Box::new(a2)))),
+        "bvmul" => Ok((r, OpExpr::Mul(Box::new(a1), Box::new(a2)))),
+        "bvudiv" => Ok((r, OpExpr::Div(Box::new(a1), Box::new(a2)))),
+        "bvurem" => Ok((r, OpExpr::Mod(Box::new(a1), Box::new(a2)))),
         _ => panic!("unexpected operator {}", o),
     }
 }

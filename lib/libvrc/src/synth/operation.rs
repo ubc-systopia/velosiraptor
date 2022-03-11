@@ -33,6 +33,13 @@ pub enum OpExpr {
     Var(String),
     Shl(Box<OpExpr>, Box<OpExpr>),
     Shr(Box<OpExpr>, Box<OpExpr>),
+    Add(Box<OpExpr>, Box<OpExpr>),
+    Sub(Box<OpExpr>, Box<OpExpr>),
+    And(Box<OpExpr>, Box<OpExpr>),
+    Or(Box<OpExpr>, Box<OpExpr>),
+    Mul(Box<OpExpr>, Box<OpExpr>),
+    Div(Box<OpExpr>, Box<OpExpr>),
+    Mod(Box<OpExpr>, Box<OpExpr>),
     None,
 }
 

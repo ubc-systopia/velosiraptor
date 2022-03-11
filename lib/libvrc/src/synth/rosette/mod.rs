@@ -32,7 +32,7 @@ use std::path::{Path, PathBuf};
 // the used libraries
 use crate::ast::{Action, AstRoot, BinOp, BitSlice, Expr, Interface, Method, State};
 use crate::synth::{SynthError, COPYRIGHT};
-use rosettelang::{FunctionDef, RExpr, RosetteFile, StructDef, VarDef};
+use rosettelang::{FunctionDef, RExpr, RosetteFile, StructDef};
 
 // the modules
 mod expr;

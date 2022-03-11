@@ -99,8 +99,15 @@ fn oparg_to_rust_expr(op: &OpExpr) -> String {
         OpExpr::None => String::new(),
         OpExpr::Num(x) => format!("{:x}", x),
         OpExpr::Var(x) => x.clone(),
-        OpExpr::Shl(x, y) => format!("{} << {}", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
-        OpExpr::Shr(x, y) => format!("{} >> {}", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
+        OpExpr::Shl(x, y) => format!("({} << {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
+        OpExpr::Shr(x, y) => format!("({} >> {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
+        OpExpr::And(x, y) => format!("({} & {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
+        OpExpr::Or(x, y) => format!("({} | {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
+        OpExpr::Add(x, y) => format!("({} + {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
+        OpExpr::Sub(x, y) => format!("({} - {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
+        OpExpr::Mul(x, y) => format!("({} * {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
+        OpExpr::Div(x, y) => format!("({} / {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
+        OpExpr::Mod(x, y) => format!("({} % {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
     }
 }
 

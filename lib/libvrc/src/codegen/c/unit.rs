@@ -134,6 +134,41 @@ fn oparg_to_rust_expr(op: &OpExpr) -> Option<C::Expr> {
             ">>",
             oparg_to_rust_expr(y).unwrap(),
         )),
+        OpExpr::And(x, y) => Some(C::Expr::binop(
+            oparg_to_rust_expr(x).unwrap(),
+            "&",
+            oparg_to_rust_expr(y).unwrap(),
+        )),
+        OpExpr::Or(x, y) => Some(C::Expr::binop(
+            oparg_to_rust_expr(x).unwrap(),
+            "|",
+            oparg_to_rust_expr(y).unwrap(),
+        )),
+        OpExpr::Add(x, y) => Some(C::Expr::binop(
+            oparg_to_rust_expr(x).unwrap(),
+            "+",
+            oparg_to_rust_expr(y).unwrap(),
+        )),
+        OpExpr::Sub(x, y) => Some(C::Expr::binop(
+            oparg_to_rust_expr(x).unwrap(),
+            "-",
+            oparg_to_rust_expr(y).unwrap(),
+        )),
+        OpExpr::Mul(x, y) => Some(C::Expr::binop(
+            oparg_to_rust_expr(x).unwrap(),
+            "*",
+            oparg_to_rust_expr(y).unwrap(),
+        )),
+        OpExpr::Div(x, y) => Some(C::Expr::binop(
+            oparg_to_rust_expr(x).unwrap(),
+            "/",
+            oparg_to_rust_expr(y).unwrap(),
+        )),
+        OpExpr::Mod(x, y) => Some(C::Expr::binop(
+            oparg_to_rust_expr(x).unwrap(),
+            "%",
+            oparg_to_rust_expr(y).unwrap(),
+        )),
     }
 }
 

@@ -122,7 +122,7 @@ fn generate_read_mmio_register(scope: &mut C::Scope, unit: &Unit, field: &Field)
     f.push_doc_str(&format!("reads the mmio register `{}`", field.name));
 
     let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::unit_type_name(unit)));
-    let p = f.new_param("unit", unittype.clone());
+    let p = f.new_param("unit", unittype);
     let unit_var = p.to_expr();
 
     //  let unit_var = C::Expr::from_fn_param(p);
