@@ -30,7 +30,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 // the used libraries
-use crate::ast::{Action, AstRoot, BitSlice, Expr, Interface, Method, State};
+use crate::ast::{Action, AstRoot, BinOp, BitSlice, Expr, Interface, Method, State};
 use crate::synth::{SynthError, COPYRIGHT};
 use rosettelang::{FunctionDef, RExpr, RosetteFile, StructDef, VarDef};
 
@@ -551,7 +551,7 @@ impl SynthRosette {
         let fname = format!("{}-{}-{}-read", ftype, fieldname, slice);
         let args = vec![stvar.clone()];
         let body = RExpr::fncall(
-            format!("{}-fields-load-{}", ftype, fieldname),
+            format!("{}-fields-{}-{}-read", ftype, fieldname, slice),
             vec![RExpr::fncall(
                 format!("model-get-{}", ftype),
                 vec![RExpr::var(stvar.clone())],
@@ -617,6 +617,37 @@ impl SynthRosette {
         }
     }
 
+    fn field_read_access_expr(e: &Expr, fieldwidth: u8, stvar: &str) -> RExpr {
+        match e {
+            Expr::Identifier { path, .. } => {
+                if path.len() == 2 {
+                    let ident = format!("{}-load-{}", path[0], path[1]);
+                    RExpr::fncall(ident, vec![RExpr::var(stvar.to_string())])
+                } else if path.len() == 3 {
+                    let ident = format!("{}-{}-{}-read", path[0], path[1], path[2]);
+                    RExpr::fncall(ident, vec![RExpr::var(stvar.to_string())])
+                } else {
+                    panic!("unexpected identifier lenght");
+                }
+            }
+            Expr::Number { value, .. } => RExpr::num(fieldwidth, *value),
+            Expr::Boolean { value: true, .. } => RExpr::num(fieldwidth, 1),
+            Expr::Boolean { value: false, .. } => RExpr::num(fieldwidth, 0),
+            Expr::BinaryOperation { op, lhs, rhs, .. } => match op {
+                BinOp::RShift => RExpr::bvshr(
+                    Self::field_read_access_expr(lhs, fieldwidth, stvar),
+                    Self::field_read_access_expr(rhs, fieldwidth, stvar),
+                ),
+                BinOp::LShift => RExpr::bvshl(
+                    Self::field_read_access_expr(lhs, fieldwidth, stvar),
+                    Self::field_read_access_expr(rhs, fieldwidth, stvar),
+                ),
+                a => RExpr::var(format!("UNKNOWN: {:?}", a)),
+            },
+            a => RExpr::var(format!("UNKNOWN: {:?}", a)),
+        }
+    }
+
     fn add_field_action(
         rkt: &mut RosetteFile,
         action: &Action,
@@ -639,31 +670,15 @@ impl SynthRosette {
                     if path.len() == 2 {
                         format!("{}-store-{}", path[0], path[1])
                     } else if path.len() == 3 {
-                        format!("{}-{}-{}-write", path[0], path[1], path[0])
+                        format!("{}-{}-{}-write", path[0], path[1], path[2])
                     } else {
                         panic!("unexpected identifier lenght");
                     }
                 }
-                _ => String::from("UNKNOWN"),
+                _ => String::from("UNKNOWN1"),
             };
 
-            let src = match &a.src {
-                Expr::Identifier { path, .. } => {
-                    if path.len() == 2 {
-                        let ident = format!("{}-load-{}", path[0], path[1]);
-                        RExpr::fncall(ident, vec![RExpr::var(stvar.clone())])
-                    } else if path.len() == 3 {
-                        let ident = format!("{}-{}-{}-read", path[0], path[1], path[0]);
-                        RExpr::fncall(ident, vec![RExpr::var(stvar.clone())])
-                    } else {
-                        panic!("unexpected identifier lenght");
-                    }
-                }
-                Expr::Number { value, .. } => RExpr::num(fieldwidth, *value),
-                Expr::Boolean { value: true, .. } => RExpr::num(fieldwidth, 1),
-                Expr::Boolean { value: false, .. } => RExpr::num(fieldwidth, 0),
-                _ => RExpr::var(String::from("UNKNOWN")),
-            };
+            let src = Self::field_read_access_expr(&a.src, fieldwidth, &stvar);
 
             defs.push((
                 newvar.clone(),
@@ -847,8 +862,8 @@ impl SynthRosette {
                 String::from("choose"),
                 vec![
                     RExpr::var(String::from("(valexpr)")),
-                    RExpr::var(String::from("(bvshl (binop) (valexpr))")),
-                    RExpr::var(String::from("(bvlshr (binop) (valexpr))")),
+                    RExpr::var(String::from("(bvshl (valexpr) (valexpr))")),
+                    RExpr::var(String::from("(bvlshr (valexpr) (valexpr))")),
                     RExpr::var(String::from(";(bvadd (binop) (valexpr))")),
                     RExpr::var(String::from(";(bvand (binop) (valexpr))")),
                     RExpr::var(String::from(";(bvor (binop) (valexpr))")),
@@ -1054,57 +1069,87 @@ impl SynthRosette {
         rkt.add_new_symbolic_var(String::from("size"), String::from("int64?"));
         rkt.add_new_symbolic_var(String::from("flags"), String::from("int64?"));
 
-        // the map function
-        let fname = String::from("do-synth");
-        let args = vec![
-            String::from("va"),
-            String::from("size"),
-            String::from("flags"),
-            String::from("pa"),
-        ];
-        let body = vec![RExpr::fncall(
-            String::from("ast-grammar"),
-            vec![
-                RExpr::var(String::from("va")),
-                RExpr::var(String::from("size")),
-                RExpr::var(String::from("flags")),
-                RExpr::var(String::from("pa")),
-                RExpr::param(String::from("depth")),
-                RExpr::var(String::from("6")),
-            ],
-        )];
-        let mut fdef = FunctionDef::new(fname, args, body);
-        fdef.add_comment(String::from("interprets the grammar"));
-        rkt.add_function_def(fdef);
+        // // the map function
+        // let fname = String::from("do-synth-one");
+        // let args = vec![
+        //     String::from("va"),
+        //     String::from("size"),
+        //     String::from("flags"),
+        //     String::from("pa"),
+        // ];
+        // let body = vec![RExpr::fncall(
+        //     String::from("ast-grammar"),
+        //     vec![
+        //         RExpr::var(String::from("va")),
+        //         RExpr::var(String::from("size")),
+        //         RExpr::var(String::from("flags")),
+        //         RExpr::var(String::from("pa")),
+        //         RExpr::param(String::from("depth")),
+        //         RExpr::var(String::from("1")),
+        //     ],
+        // )];
 
-        let body = RExpr::fncall(
-            String::from("synthesize"),
-            vec![
-                RExpr::param(String::from("forall")),
-                RExpr::fncall(
-                    String::from("list"),
-                    vec![
-                        RExpr::var(String::from("va")),
-                        RExpr::var(String::from("size")),
-                        RExpr::var(String::from("flags")),
-                        RExpr::var(String::from("pa")),
-                    ],
-                ),
-                RExpr::param(String::from("guarantee")),
-                RExpr::fncall(
-                    String::from("ast-check-translate"),
-                    vec![
-                        RExpr::var(String::from("do-synth")),
-                        RExpr::var(String::from("va")),
-                        RExpr::var(String::from("size")),
-                        RExpr::var(String::from("flags")),
-                        RExpr::var(String::from("pa")),
-                    ],
-                ),
-            ],
-        );
-        let vdef = VarDef::new(String::from("sol"), body);
-        rkt.add_var(vdef);
+        for i in 1..10 {
+            rkt.add_raw(format!(
+                "
+; interprets the grammar
+(define (do-synth-{i} va size flags pa)
+  (ast-grammar va size flags pa
+    #:depth {i}
+  )
+)
+; the solution with depth {i}
+(define sol-{i}
+  (synthesize
+    #:forall (list va size flags pa)
+    #:guarantee (ast-check-translate do-synth-{i} va size flags pa)
+  )
+)
+
+; check if we have a success
+(if (sat? sol-{i})
+  [
+    (my-print-forms sol-{i})
+    (exit)
+  ]
+  (printf \"\")
+)
+"
+            ))
+        }
+
+        // let mut fdef = FunctionDef::new(fname, args, body);
+        // fdef.add_comment(String::from("interprets the grammar"));
+        // rkt.add_function_def(fdef);
+
+        // let body = RExpr::fncall(
+        //     String::from("synthesize"),
+        //     vec![
+        //         RExpr::param(String::from("forall")),
+        //         RExpr::fncall(
+        //             String::from("list"),
+        //             vec![
+        //                 RExpr::var(String::from("va")),
+        //                 RExpr::var(String::from("size")),
+        //                 RExpr::var(String::from("flags")),
+        //                 RExpr::var(String::from("pa")),
+        //             ],
+        //         ),
+        //         RExpr::param(String::from("guarantee")),
+        //         RExpr::fncall(
+        //             String::from("ast-check-translate"),
+        //             vec![
+        //                 RExpr::var(String::from("do-synth")),
+        //                 RExpr::var(String::from("va")),
+        //                 RExpr::var(String::from("size")),
+        //                 RExpr::var(String::from("flags")),
+        //                 RExpr::var(String::from("pa")),
+        //             ],
+        //         ),
+        //     ],
+        // );
+        // let vdef = VarDef::new(String::from("sol-one"), body);
+        // rkt.add_var(vdef);
     }
 
     fn add_print_sol(rkt: &mut RosetteFile) {
@@ -1116,15 +1161,13 @@ impl SynthRosette {
     (for ([e (syntax->list f)])
       (let ([s  (format \"~a\" (syntax->datum e))])
         (if (string-prefix? s \"(Seq\")
-          (printf \"~a\\n\" s)
+          (printf \"~a\n\" s)
           (printf \"\")
         )
       )
     )
   )
 )
-;;pretty-print
-(my-print-forms sol)
 ",
         ))
     }
@@ -1164,8 +1207,9 @@ impl SynthRosette {
                 SynthRosette::add_check_translate(&mut rkt, m);
             }
 
-            SynthRosette::add_synthesis(&mut rkt);
             SynthRosette::add_print_sol(&mut rkt);
+            SynthRosette::add_synthesis(&mut rkt);
+
             // TODO: USE BEGIN
 
             rkt.save();
