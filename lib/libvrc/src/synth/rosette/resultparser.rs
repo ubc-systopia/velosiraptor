@@ -192,5 +192,4 @@ fn test_parser() {
 
     let s = "(Seq (Op-Iface-length-bytes-Insert (bv #x000000ffffffffff 64)) (Seq (Op-Iface-base-address-Insert (bvlshr pa (bv #x000000000000000c 64))) (Seq (Op-Iface-base-WriteAction) (Seq (Op-Iface-length-WriteAction) (Return)))))\n";
     parse_result(s);
-
 }
