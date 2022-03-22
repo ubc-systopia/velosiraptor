@@ -25,9 +25,11 @@
 
 //! Ast Module of the Velosiraptor Compiler
 
+use std::collections::{HashMap, HashSet};
+
 use crate::ast::{
-    utils, AstNode, AstNodeGeneric, Expr, Field, Issues, Param, Symbol, SymbolKind, SymbolTable,
-    Type,
+    utils, Action, ActionType, AstNode, AstNodeGeneric, Field, Issues, Param, Symbol, SymbolKind,
+    SymbolTable, Type,
 };
 use crate::error::VrsError;
 use crate::token::TokenStream;
@@ -117,6 +119,28 @@ impl<'a> Interface {
     pub fn field_by_name(&self, name: &str) -> Option<&InterfaceField> {
         self.fields().iter().find(|f| f.name() == name)
     }
+
+    // returns a list of all the fields with action that touch one of the state elements
+    pub fn fields_accessing_state(
+        &self,
+        state_syms: &HashSet<String>,
+        state_bits: &HashMap<String, u64>,
+    ) -> HashSet<String> {
+        let mut if_bits = HashMap::new();
+        for f in self.fields() {
+            for l in &f.field.layout {
+                let n = format!("interface.{}.{}", f.field.name, l.name);
+                if_bits.insert(n, l.mask_value());
+            }
+        }
+
+        let mut hs = HashSet::new();
+        for f in self.fields() {
+            let fhs = f.accessing_state(state_syms, state_bits, &if_bits);
+            hs.extend(fhs)
+        }
+        hs
+    }
 }
 
 /// Implementation of [AstNodeGeneric] for [Interface]
@@ -131,7 +155,7 @@ impl<'a> AstNodeGeneric<'a> for Interface {
         let bases = self.bases();
 
         // create a new symtable context, this is required for base checking in the fields
-        st.create_context(String::from("state"));
+        st.create_context(String::from("interface"));
 
         // Check 1: Fields
         // --------------------------------------------------------------------------------------
@@ -223,6 +247,10 @@ impl<'a> AstNodeGeneric<'a> for Interface {
             }
         }
 
+        println!("#--------------------------------------");
+        println!("{}", st);
+        println!("#--------------------------------------");
+
         // drop the symbol table context again
         st.drop_context();
 
@@ -294,6 +322,30 @@ impl<'a> InterfaceField {
             ));
         }
     }
+
+    pub fn accessing_state(
+        &'a self,
+        state_syms: &HashSet<String>,
+        state_bits: &HashMap<String, u64>,
+        if_bits: &HashMap<String, u64>,
+    ) -> HashSet<String> {
+        let mut res = HashSet::new();
+
+        res.extend(
+            self.readaction
+                .as_ref()
+                .map(|a| a.accessing_state(state_syms, state_bits, if_bits))
+                .unwrap_or(HashSet::new()),
+        );
+        res.extend(
+            self.writeaction
+                .as_ref()
+                .map(|a| a.accessing_state(state_syms, state_bits, if_bits))
+                .unwrap_or(HashSet::new()),
+        );
+
+        res
+    }
 }
 
 /// Implementation of [AstNodeGeneric] for [InterfaceField]
@@ -358,104 +410,4 @@ impl<'a> AstNodeGeneric<'a> for InterfaceField {
     fn loc(&self) -> &TokenStream {
         self.field.loc()
     }
-}
-
-/// Defines an action that is executed on the interface
-///
-/// An action defines a read access to the state or a write access to the state. The latter
-/// basically triggers a state transition.
-///
-/// Currently an action is basically an assignment that assigns the destination the value of the
-/// source. If the destination is a StateRef, then this
-///   src => dst
-#[derive(PartialEq, Clone, Debug)]
-pub struct ActionComponent {
-    /// the source operand of the action
-    pub src: Expr,
-    /// the destination operand of the action
-    pub dst: Expr,
-    /// the location where the action was defined
-    pub pos: TokenStream,
-}
-
-impl ActionComponent {
-    // TODO: Not sure we can actually take advantage of the SymbolTable here...
-    fn check(&self, _st: &mut SymbolTable) -> Issues {
-        let mut res = Issues::ok();
-
-        match &self.src {
-            Expr::Identifier { path: _, pos: _ } => {
-                // Not sure how to check that the Identifier is in the symbol
-                // table... ask RETO TODO
-                todo!("Verify that action component is valid");
-            }
-            Expr::Number { .. } => {}
-            _ => {
-                VrsError::new_err(
-                    &self.pos,
-                    String::from(
-                        "Source operand of Action Component \
-                    is of unsupported type",
-                    ),
-                    Some(String::from(
-                        "Currently we only support Source operands \
-                    of type Number and Identifier",
-                    )),
-                )
-                .print();
-                res.inc_err(1);
-            }
-        }
-
-        match &self.dst {
-            Expr::Identifier { path: _, pos: _ } => {
-                // I don't really know how to do this...
-                todo!("Verify that action component is valid");
-            }
-            _ => {
-                VrsError::new_err(
-                    &self.pos,
-                    String::from(
-                        "Destination operand of Action Component \
-                    is not of type Identifiere",
-                    ),
-                    None,
-                )
-                .print();
-                res.inc_err(1);
-            }
-        }
-
-        res
-    }
-}
-
-/// Represents the type of action
-///
-/// Currently the only supported action types are Read and Write but, we can imagine needing more
-/// types to support custom instructions needing to be executed to dump state to memory.
-#[derive(PartialEq, Clone, Debug)]
-pub enum ActionType {
-    Read,
-    Write,
-}
-
-/// Defines the collection of Action components that occur when a Read/Write operation is
-/// executed.
-///
-/// i.e:
-/// WriteAction {
-///     interface.size.npages => state.size.npages;
-///     1 => state.valid;
-///     0 => state.cache;
-///     1 => interface.status;
-/// }
-#[derive(PartialEq, Clone)]
-pub struct Action {
-    /// the type of the action (Read/Write)
-    pub action_type: ActionType,
-    /// the list of action components that are associated with this action
-    pub action_components: Vec<ActionComponent>,
-    /// the location where the action was defined
-    pub pos: TokenStream,
 }

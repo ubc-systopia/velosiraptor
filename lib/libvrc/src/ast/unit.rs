@@ -145,6 +145,7 @@ impl<'a> AstNodeGeneric<'a> for Unit {
         self.state.build_symboltable(st);
         self.interface.build_symboltable(st);
 
+
         // Check 1: Double defined constants
         // --------------------------------------------------------------------------------------
         // Type:        Error
@@ -189,8 +190,7 @@ impl<'a> AstNodeGeneric<'a> for Unit {
         // Description: Check that the state definition is fine
         // Notes:       --
         // --------------------------------------------------------------------------------------
-
-        // res = res + self.interface.check(st);
+        res = res + self.interface.check(st);
 
         // Check 6: Interface param check
         // --------------------------------------------------------------------------------------
