@@ -247,10 +247,6 @@ impl<'a> AstNodeGeneric<'a> for Interface {
             }
         }
 
-        println!("#--------------------------------------");
-        println!("{}", st);
-        println!("#--------------------------------------");
-
         // drop the symbol table context again
         st.drop_context();
 
