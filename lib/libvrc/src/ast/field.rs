@@ -30,6 +30,7 @@
 
 // used standard library functionality
 use std::cmp::min;
+use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // used library internal functionality
@@ -112,6 +113,20 @@ impl<'a> Field {
                 AstNode::BitSlice(s),
             ));
         }
+    }
+
+    pub fn referenced_field_bits(&self, refs: &HashSet<String>) -> u64 {
+        let mut bits = 0;
+        for s in &self.layout {
+            let n = format!("state.{}.{}", self.name, s.name);
+            if refs.contains(&n) {
+                println!("used-bits: {}", n);
+                bits |= s.mask_value()
+            } else {
+                println!("not used-bits: {}", n);
+            }
+        }
+        bits
     }
 }
 
