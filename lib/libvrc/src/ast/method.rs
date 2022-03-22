@@ -23,6 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+use std::collections::HashSet;
 ///! Method module
 // std lib imports
 use std::fmt;
@@ -87,6 +88,29 @@ impl Method {
             self.pos.clone(),
             AstNode::Method(self),
         )
+    }
+
+    /// returns a list of state references made by this method
+    pub fn get_state_references(&self) -> HashSet<String> {
+        let mut v = HashSet::new();
+
+        if let Some(stmts) = &self.stmts {
+            v.extend(stmts.get_state_references());
+        }
+
+        v.extend(
+            self.ensures
+                .iter()
+                .flat_map(|s| s.get_state_references())
+                .collect::<Vec<String>>(),
+        );
+        v.extend(
+            self.requires
+                .iter()
+                .flat_map(|s| s.get_state_references())
+                .collect::<Vec<String>>(),
+        );
+        v
     }
 }
 

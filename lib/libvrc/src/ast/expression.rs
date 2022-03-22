@@ -23,6 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+use std::collections::HashSet;
 ///! Ast Module of the Velosiraptor Compiler
 use std::fmt;
 
@@ -371,7 +372,7 @@ pub enum Expr {
 
 /// Implementation of [Expr]
 impl<'a> Expr {
-    /// returns ture if the expression is a constant expression
+    /// returns true if the expression is a constant expression
     ///
     /// it consults the symbol table to figure out whether the symbol / variable is constant
     pub fn is_const_expr(&self, st: &SymbolTable) -> bool {
@@ -395,6 +396,12 @@ impl<'a> Expr {
             // everything else is not constant
             _ => false,
         }
+    }
+
+    /// returns true if the expression is an lvalue
+    pub fn is_lvalue(&self) -> bool {
+        use Expr::*;
+        matches!(self, Identifier { .. } | Slice { .. } | Element { .. })
     }
 
     /// matches a symbol with a given type
@@ -645,6 +652,77 @@ impl<'a> Expr {
     /// checks if the types of the expression match
     pub fn check_types(&self, _st: &mut SymbolTable) -> Issues {
         Issues::ok()
+    }
+
+    fn path_to_hashset(path: &[String]) -> HashSet<String> {
+        let mut hs = HashSet::new();
+        hs.insert(path.join("."));
+        hs
+    }
+
+    /// obtains the state references of this expression
+    fn get_state_interface_references(&self, prefix: &str) -> HashSet<String> {
+        use Expr::*;
+        match self {
+            Identifier { path, .. } => {
+                if path[0] == prefix {
+                    Expr::path_to_hashset(path)
+                } else {
+                    HashSet::new()
+                }
+            }
+            Number { .. } => HashSet::new(),
+            Boolean { .. } => HashSet::new(),
+            BinaryOperation { lhs, rhs, .. } => {
+                let mut v = lhs.get_state_interface_references(prefix);
+                v.extend(rhs.get_state_interface_references(prefix));
+                v
+            }
+            UnaryOperation { val, .. } => val.get_state_interface_references(prefix),
+            FnCall { path, args, .. } => {
+                // TODO: recurse into the function
+                println!("WARN: not recursing into method call {}", path.join("."));
+                let a = args
+                    .iter()
+                    .flat_map(|s| s.get_state_interface_references(prefix))
+                    .collect::<Vec<String>>();
+                let mut s = HashSet::new();
+                s.extend(a);
+                s
+            }
+            Slice { path, slice, .. } => {
+                let mut v = if path[0] == prefix {
+                    Expr::path_to_hashset(path)
+                } else {
+                    HashSet::new()
+                };
+                v.extend(slice.get_state_interface_references(prefix));
+                v
+            }
+            Element { path, idx, .. } => {
+                if path[0] == prefix {
+                    let mut v = Expr::path_to_hashset(path);
+                    v.extend(idx.get_state_interface_references(prefix));
+                    v
+                } else {
+                    HashSet::new()
+                }
+            }
+            Range { start, end, .. } => {
+                let mut v = start.get_state_interface_references(prefix);
+                v.extend(end.get_state_interface_references(prefix));
+                v
+            }
+            Quantifier { expr, .. } => expr.get_state_interface_references(prefix),
+        }
+    }
+
+    pub fn get_state_references(&self) -> HashSet<String> {
+        self.get_state_interface_references("state")
+    }
+
+    pub fn get_interface_references(&self) -> HashSet<String> {
+        self.get_state_interface_references("interface")
     }
 }
 
