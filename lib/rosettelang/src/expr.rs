@@ -94,7 +94,7 @@ pub enum RExpr {
     },
     Comment {
         comment: String,
-    }
+    },
 }
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum BVOp {
@@ -143,7 +143,7 @@ impl RExpr {
     }
 
     pub fn comment(comment: String) -> Self {
-        RExpr::Comment {comment}
+        RExpr::Comment { comment }
     }
 
     pub fn neq(expr: RExpr) -> Self {
@@ -283,7 +283,7 @@ impl RExpr {
         use RExpr::*;
         match self {
             Variable { name } => format!("{}{}", istr, name),
-            Comment {comment} => format!("{}; {}\n", istr, comment),
+            Comment { comment } => format!("{}; {}\n", istr, comment),
             Text { text } => format!("{}\"{}\"", istr, text),
             Const { value, .. } => format!("{}(int #x{:x})", istr, value),
             Not { expr } => format!("{}(not\n {})", istr, expr.to_code(indent + 2)),

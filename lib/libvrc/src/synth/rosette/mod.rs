@@ -26,6 +26,7 @@
 //! Synthesis Module: Rosette
 
 // external libraries
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -68,6 +69,13 @@ impl SynthRosette {
             );
         }
 
+        let ident = String::from("int?");
+        let arg = String::from("68");
+        rkt.add_new_var(
+            ident,
+            RExpr::fncall(String::from("bitvector"), vec![RExpr::var(arg)]),
+        );
+
         for x in [64, 32, 16, 8] {
             let ident = format!("int{}", x);
             let arg = String::from("i");
@@ -81,6 +89,18 @@ impl SynthRosette {
                 )],
             );
         }
+
+        let ident = String::from("int");
+        let arg = String::from("i");
+        let arg2 = String::from("int?");
+        rkt.add_new_function_def(
+            ident,
+            vec![arg.clone()],
+            vec![RExpr::fncall(
+                String::from("bv"),
+                vec![RExpr::var(arg), RExpr::var(arg2)],
+            )],
+        );
     }
 
     fn add_requires(rkt: &mut RosetteFile) {
@@ -783,7 +803,12 @@ impl SynthRosette {
         rkt.add_new_function_def(String::from("translate"), args, body)
     }
 
-    fn add_grammar(rkt: &mut RosetteFile, iface: &Interface) {
+    fn add_grammar(
+        rkt: &mut RosetteFile,
+        iface: &Interface,
+        state_syms: &HashSet<String>,
+        state_bits: &HashMap<String, u64>,
+    ) {
         rkt.add_section(String::from("Grammar Definition"));
 
         rkt.add_subsection(String::from("Sequencing"));
@@ -800,9 +825,23 @@ impl SynthRosette {
         );
 
         rkt.add_subsection(String::from("Grammar Elements"));
+        // filter
 
+        let st_access_fields = iface.fields_accessing_state(state_syms, state_bits);
         for f in iface.fields() {
+            //let fieldref = format!("interface.{}", f.field.name);
+            // if !st_access_fields.contains(&fieldref) {
+            //     println!("skipping: {}", fieldref);
+            //     continue;
+            // }
+
             for b in &f.field.layout {
+                //let n = format!("interface.{}.{}", f.field.name, b.name);
+                // if !st_access_fields.contains(&n) {
+                //     println!("skipping2: {}", n);
+                //     continue;
+                // }
+
                 let arg = String::from("arg");
                 let ident = format!("Op-Iface-{}-{}-Insert", f.field.name, b.name);
                 rkt.add_new_struct_def(ident, vec![arg], String::from("#:transparent"));
@@ -840,7 +879,19 @@ impl SynthRosette {
 
         let mut ops = Vec::new();
         for f in iface.fields() {
+            let fieldref = format!("interface.{}", f.field.name);
+            if !st_access_fields.contains(&fieldref) {
+                ops.push(RExpr::comment(format!("skipped: {}", fieldref)));
+                continue;
+            }
+
             for b in &f.field.layout {
+                let n = format!("interface.{}.{}", f.field.name, b.name);
+                if !st_access_fields.contains(&n) {
+                    ops.push(RExpr::comment(format!("skipped: {}", n)));
+                    continue;
+                }
+
                 // let arg = String::from("arg");
                 let ident = format!("Op-Iface-{}-{}-Insert", f.field.name, b.name);
                 let args = RExpr::fncall(String::from("binop"), vec![]);
@@ -883,7 +934,7 @@ impl SynthRosette {
                     RExpr::var(String::from("pa")),
                     RExpr::var(String::from("size")),
                     RExpr::var(String::from("flags")),
-                    RExpr::var(String::from("(?? int64?)")),
+                    RExpr::var(String::from("(?? int?)")),
                     // RExpr::var(String::from("(?? int32?)")),
                     // RExpr::var(String::from("(?? int16?)")),
                     // RExpr::var(String::from("(?? int8?)")),
@@ -1064,10 +1115,10 @@ impl SynthRosette {
 
         rkt.add_subsection(String::from("Symbolic Variables"));
         // TODO: check the types here?
-        rkt.add_new_symbolic_var(String::from("va"), String::from("int64?"));
-        rkt.add_new_symbolic_var(String::from("pa"), String::from("int64?"));
-        rkt.add_new_symbolic_var(String::from("size"), String::from("int64?"));
-        rkt.add_new_symbolic_var(String::from("flags"), String::from("int64?"));
+        rkt.add_new_symbolic_var(String::from("va"), String::from("int?"));
+        rkt.add_new_symbolic_var(String::from("pa"), String::from("int?"));
+        rkt.add_new_symbolic_var(String::from("size"), String::from("int?"));
+        rkt.add_new_symbolic_var(String::from("flags"), String::from("int?"));
 
         // // the map function
         // let fname = String::from("do-synth-one");
@@ -1178,6 +1229,11 @@ impl SynthRosette {
 
         for unit in &mut ast.units {
             println!("synthesizing map: for {} in {:?}", unit.name, self.outdir);
+
+            let m = unit.get_method("translate").unwrap();
+            let state_syms = m.get_state_references();
+            let state_bits = unit.state.referenced_field_bits(&state_syms);
+
             let rktfilepath = self.outdir.join(format!("{}.rkt", unit.name));
             let doc = format!("Unit: {}, Function: map()", unit.name);
 
@@ -1200,7 +1256,7 @@ impl SynthRosette {
                 SynthRosette::add_translate(&mut rkt, m);
             }
 
-            SynthRosette::add_grammar(&mut rkt, &unit.interface);
+            SynthRosette::add_grammar(&mut rkt, &unit.interface, &state_syms, &state_bits);
             SynthRosette::add_interp_function(&mut rkt, &unit.interface);
 
             if let Some(m) = unit.get_method("map") {

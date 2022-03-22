@@ -62,6 +62,7 @@ pub fn expr_to_rosette(e: &Expr) -> RExpr {
                 BinOp::Le => RExpr::bvle(lhs, rhs),
                 BinOp::Ge => RExpr::bvge(lhs, rhs),
                 BinOp::Gt => RExpr::bvgt(lhs, rhs),
+                BinOp::Ne => RExpr::bvne(lhs, rhs),
                 _ => {
                     println!("{:?}", op);
                     unimplemented!()
@@ -98,13 +99,13 @@ pub fn stmt_to_rosette(s: &Stmt) -> RExpr {
             lhs: _,
             rhs: _,
             ..
-        } => unimplemented!(),
+        } => RExpr::text(String::from("let Unimplemented!")),
         Stmt::IfElse {
             cond: _,
             then: _,
             other: _,
             ..
-        } => unimplemented!(),
+        } => RExpr::text(String::from("IfElse Unimplemented!")), //runimplemented!(),
         Stmt::Return { expr, .. } => expr_to_rosette(expr),
         Stmt::Assert { expr, .. } => RExpr::assert(expr_to_rosette(expr)),
     }
