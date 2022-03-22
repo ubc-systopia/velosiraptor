@@ -26,6 +26,7 @@
 //! State Ast Node
 
 // used standard library functionality
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result};
 
 // used library internal functionality
@@ -101,6 +102,15 @@ impl<'a> State {
             State::MemoryState { bases, .. } => bases.as_slice(),
             _ => &[],
         }
+    }
+
+    pub fn referenced_field_bits(&self, refs: &HashSet<String>) -> HashMap<String, u64> {
+        let mut hs = HashMap::new();
+        for f in self.fields() {
+            let n = format!("state.{}", f.name);
+            hs.insert(n, f.referenced_field_bits(refs));
+        }
+        hs
     }
 }
 
