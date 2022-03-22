@@ -120,10 +120,7 @@ impl<'a> Field {
         for s in &self.layout {
             let n = format!("state.{}.{}", self.name, s.name);
             if refs.contains(&n) {
-                println!("used-bits: {}", n);
                 bits |= s.mask_value()
-            } else {
-                println!("not used-bits: {}", n);
             }
         }
         bits

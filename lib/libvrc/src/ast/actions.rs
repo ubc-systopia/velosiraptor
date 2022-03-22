@@ -236,10 +236,8 @@ impl<'a> ActionComponent {
                 let bits = state_bits.get(dst_ref).unwrap();
                 for (fld, b) in if_bits {
                     if bits & b != 0 {
-                        println!("inserting: {}", fld);
                         res.insert(fld.clone());
                     } else {
-                        println!("not inserting: {}", fld);
                     }
                 }
                 res

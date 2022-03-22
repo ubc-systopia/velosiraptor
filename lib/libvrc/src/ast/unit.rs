@@ -145,7 +145,6 @@ impl<'a> AstNodeGeneric<'a> for Unit {
         self.state.build_symboltable(st);
         self.interface.build_symboltable(st);
 
-
         // Check 1: Double defined constants
         // --------------------------------------------------------------------------------------
         // Type:        Error

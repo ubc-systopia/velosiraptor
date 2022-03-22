@@ -56,6 +56,9 @@ pub enum RExpr {
         lhs: Box<RExpr>,
         rhs: Box<RExpr>,
     },
+    Not {
+        expr: Box<RExpr>,
+    },
     // Constant Bitvector Values
     Const {
         width: u8,
@@ -89,6 +92,9 @@ pub enum RExpr {
     Begin {
         exprs: Vec<RExpr>,
     },
+    Comment {
+        comment: String,
+    }
 }
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum BVOp {
@@ -135,6 +141,17 @@ impl RExpr {
         // TODO: check that this makes sense
         RExpr::Const { width, value }
     }
+
+    pub fn comment(comment: String) -> Self {
+        RExpr::Comment {comment}
+    }
+
+    pub fn neq(expr: RExpr) -> Self {
+        RExpr::Not {
+            expr: Box::new(expr),
+        }
+    }
+
     pub fn text(text: String) -> Self {
         RExpr::Text { text }
     }
@@ -144,6 +161,13 @@ impl RExpr {
             lhs: Box::new(lhs),
             rhs: Box::new(rhs),
         }
+    }
+    pub fn bvne(lhs: RExpr, rhs: RExpr) -> Self {
+        RExpr::neq(RExpr::BVBinOp {
+            op: BVOp::BVEq,
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+        })
     }
     pub fn bvlt(lhs: RExpr, rhs: RExpr) -> Self {
         RExpr::BVBinOp {
@@ -259,8 +283,10 @@ impl RExpr {
         use RExpr::*;
         match self {
             Variable { name } => format!("{}{}", istr, name),
+            Comment {comment} => format!("{}; {}\n", istr, comment),
             Text { text } => format!("{}\"{}\"", istr, text),
-            Const { width, value } => format!("{}(int{} #x{:x})", istr, width, value),
+            Const { value, .. } => format!("{}(int #x{:x})", istr, value),
+            Not { expr } => format!("{}(not\n {})", istr, expr.to_code(indent + 2)),
             BVBinOp { op, lhs, rhs } => format!(
                 "{}({}\n{}\n{}\n{})",
                 istr,
