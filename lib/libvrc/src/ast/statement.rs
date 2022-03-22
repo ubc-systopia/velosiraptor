@@ -23,6 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+use std::collections::HashSet;
 ///! Statement module
 // std lib imports
 use std::fmt;
@@ -112,6 +113,27 @@ impl Stmt {
                 // check the return type
                 expr.match_type(ty, st)
             }
+        }
+    }
+
+    /// returns a list of state references made by this statemet
+    pub fn get_state_references(&self) -> HashSet<String> {
+        use Stmt::*;
+        match self {
+            Block { stmts, .. } => stmts
+                .iter()
+                .flat_map(|s| s.get_state_references())
+                .collect(),
+            Let { rhs, .. } => rhs.get_state_references(),
+            IfElse { then, other, .. } => {
+                let mut v = then.get_state_references();
+                if let Some(b) = other.as_ref() {
+                    v.extend(b.get_state_references());
+                }
+                v
+            }
+            Return { expr, .. } => expr.get_state_references(),
+            Assert { expr, .. } => expr.get_state_references(),
         }
     }
 }
