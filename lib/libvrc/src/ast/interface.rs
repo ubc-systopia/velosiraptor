@@ -331,13 +331,13 @@ impl<'a> InterfaceField {
             self.readaction
                 .as_ref()
                 .map(|a| a.accessing_state(state_syms, state_bits, if_bits))
-                .unwrap_or(HashSet::new()),
+                .unwrap_or_default(),
         );
         res.extend(
             self.writeaction
                 .as_ref()
                 .map(|a| a.accessing_state(state_syms, state_bits, if_bits))
-                .unwrap_or(HashSet::new()),
+                .unwrap_or_default(),
         );
 
         res

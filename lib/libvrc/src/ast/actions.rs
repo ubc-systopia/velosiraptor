@@ -132,17 +132,13 @@ impl<'a> ActionComponent {
         // Description: The source and destination must be
         // Notes:       --
         // --------------------------------------------------------------------------------------
-
-        match (src_is_state, dst_is_state) {
-            (Some(a), Some(b)) => {
-                if a == b {
-                    let msg = String::from("invalid assignment");
-                    let hint = format!("can only move interface -> state or state -> interface");
-                    VrsError::new_err(&self.pos, msg, Some(hint)).print();
-                    res.inc_err(1);
-                }
+        if let (Some(a), Some(b)) = (src_is_state, dst_is_state) {
+            if a == b {
+                let msg = String::from("invalid assignment");
+                let hint = String::from("can only move interface -> state or state -> interface");
+                VrsError::new_err(&self.pos, msg, Some(hint)).print();
+                res.inc_err(1);
             }
-            _ => ( /* OK */),
         }
 
         // Check 6: No bit overflow (TODO)
@@ -174,13 +170,13 @@ impl<'a> ActionComponent {
         if_bits: &HashMap<String, u64>,
     ) -> HashSet<String> {
         let dst_refs = self.dst.get_state_references();
-        if dst_refs.len() == 0 {
+        if dst_refs.is_empty() {
             // there were no stare references
             return HashSet::new();
         }
 
         let src_refs = self.src.get_interface_references();
-        if src_refs.len() == 0 {
+        if src_refs.is_empty() {
             // there were no interface references
             return HashSet::new();
         }
