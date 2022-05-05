@@ -48,20 +48,12 @@ pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
 
     // now match the keywords
     let token = match ident.as_str() {
-        "true" => Token::new(TokenContent::BoolLiteral(true), ident),
-        "false" => Token::new(TokenContent::BoolLiteral(false), ident),
+        //
+        // language keywords
+        //
         "unit" => Token::new(TokenContent::Keyword(Keyword::Unit), ident),
-        "import" => Token::new(TokenContent::Keyword(Keyword::Import), ident),
-        "const" => Token::new(TokenContent::Keyword(Keyword::Const), ident),
-        "let" => Token::new(TokenContent::Keyword(Keyword::Let), ident),
-        "if" => Token::new(TokenContent::Keyword(Keyword::If), ident),
-        "else" => Token::new(TokenContent::Keyword(Keyword::Else), ident),
-        "for" => Token::new(TokenContent::Keyword(Keyword::For), ident),
-        "assert" => Token::new(TokenContent::Keyword(Keyword::Assert), ident),
         "state" => Token::new(TokenContent::Keyword(Keyword::State), ident),
-        "in" => Token::new(TokenContent::Keyword(Keyword::In), ident),
         "interface" => Token::new(TokenContent::Keyword(Keyword::Interface), ident),
-        "staticmap" => Token::new(TokenContent::Keyword(Keyword::StaticMap), ident),
         "Memory" => Token::new(TokenContent::Keyword(Keyword::Memory), ident),
         "MMIO" => Token::new(TokenContent::Keyword(Keyword::MMIO), ident),
         "Register" => Token::new(TokenContent::Keyword(Keyword::Register), ident),
@@ -69,16 +61,49 @@ pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
         "ReadAction" => Token::new(TokenContent::Keyword(Keyword::ReadAction), ident),
         "WriteAction" => Token::new(TokenContent::Keyword(Keyword::WriteAction), ident),
         "Layout" => Token::new(TokenContent::Keyword(Keyword::Layout), ident),
+        "staticmap" => Token::new(TokenContent::Keyword(Keyword::StaticMap), ident),
+
+        //
+        // control flow and expressions
+        //
+        "if" => Token::new(TokenContent::Keyword(Keyword::If), ident),
+        "else" => Token::new(TokenContent::Keyword(Keyword::Else), ident),
+        "for" => Token::new(TokenContent::Keyword(Keyword::For), ident),
+        "return" => Token::new(TokenContent::Keyword(Keyword::Return), ident),
+        "let" => Token::new(TokenContent::Keyword(Keyword::Let), ident),
+        "fn" => Token::new(TokenContent::Keyword(Keyword::Fn), ident),
+        "in" => Token::new(TokenContent::Keyword(Keyword::In), ident),
+
+        //
+        // types
+        //
         "addr" => Token::new(TokenContent::Keyword(Keyword::Addr), ident),
         "size" => Token::new(TokenContent::Keyword(Keyword::Size), ident),
         "int" => Token::new(TokenContent::Keyword(Keyword::Integer), ident),
         "bool" => Token::new(TokenContent::Keyword(Keyword::Boolean), ident),
+
+        //
+        // constraint keywords
+        //
         "requires" => Token::new(TokenContent::Keyword(Keyword::Requires), ident),
         "ensures" => Token::new(TokenContent::Keyword(Keyword::Ensures), ident),
-        "fn" => Token::new(TokenContent::Keyword(Keyword::Fn), ident),
-        "return" => Token::new(TokenContent::Keyword(Keyword::Return), ident),
+        "assert" => Token::new(TokenContent::Keyword(Keyword::Assert), ident),
         "forall" => Token::new(TokenContent::Keyword(Keyword::Forall), ident),
         "exists" => Token::new(TokenContent::Keyword(Keyword::Exists), ident),
+
+        //
+        // other keywords
+        //
+        "import" => Token::new(TokenContent::Keyword(Keyword::Import), ident),
+        "const" => Token::new(TokenContent::Keyword(Keyword::Const), ident),
+
+        //
+        // boolean values: true / false
+        //
+        "true" => Token::new(TokenContent::BoolLiteral(true), ident),
+        "false" => Token::new(TokenContent::BoolLiteral(false), ident),
+
+        // the remainig tokes will just be identifiers
         x => Token::new(TokenContent::Identifier(x.to_string()), ident),
     };
 
