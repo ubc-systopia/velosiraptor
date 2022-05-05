@@ -33,20 +33,11 @@ use crate::sourcepos::SourcePos;
 /// Represents the keywords we have
 #[derive(PartialEq, Debug, Clone)]
 pub enum Keyword {
-    /// constant values
-    Const,
+    //
+    // language keywords
+    //
     /// unit definitins
     Unit,
-    /// conditional statemt
-    If,
-    /// conditional else branch
-    Else,
-    /// for statements,
-    For,
-    /// inclusion statement,
-    In,
-    /// import statements
-    Import,
     /// state statement
     State,
     /// StaticMap
@@ -67,12 +58,28 @@ pub enum Keyword {
     WriteAction,
     /// Used in identifying the Bitslice layout of an Interface field
     Layout,
+
+    //
+    // control flow and expressions
+    //
+    /// conditional statemt
+    If,
+    /// conditional else branch
+    Else,
+    /// for statements,
+    For,
     /// defines a local variable
     Let,
+    /// inclusion statement,
+    In,
     /// represents a function
     Fn,
-    /// An assert statement
-    Assert,
+    /// the return keyword
+    Return,
+
+    //
+    // types
+    //
     /// represents an address value
     Addr,
     /// represents a size value
@@ -81,16 +88,28 @@ pub enum Keyword {
     Boolean,
     /// An integer value
     Integer,
+
+    //
+    // constraint keywords
+    //
     /// the requires clause
     Requires,
     /// the ensures clause
     Ensures,
-    /// the return keyword
-    Return,
+    /// An assert statement
+    Assert,
     /// the forall quantifier
     Forall,
     /// the existential quantifier
     Exists,
+
+    //
+    // other keywords
+    //
+    /// constant values
+    Const,
+    /// import statements
+    Import,
 }
 
 /// Implementation of the [std::fmt::Display] trait for [Token]
