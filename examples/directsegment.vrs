@@ -99,11 +99,32 @@ unit DirectSegment(base : addr) : Segment {
     }
 
 
+    // to be defined
+    fn checkflags(flags: int) -> bool {
+        return state.base.valid == 1
+    }
+
+    // to be defined
+    fn translate(va: addr) -> addr
+        requires va < state.length.bytes;
+    {
+        return va + state.base.address;
+    }
+
+    // implicit
+    fn remap(va: addr, flags: int) -> addr
+        requires checkflags(flags)
+    {
+        return translate(va)
+    }
+
+
     // the translation semantics, adding an option type?
     fn translate(va: addr, flags: int) -> addr
         requires va < state.length.bytes;
     {
         return va + state.base.address;
     }
+
 
  };
