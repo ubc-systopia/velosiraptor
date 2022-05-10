@@ -364,7 +364,7 @@ pub fn term_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
         ident_expr,
         // its a term in parenthesis
         preceded(lparen, cut(terminated(expr, rparen))),
-    ))(input.clone())
+    ))(input)
 }
 
 /// parses a range expression
