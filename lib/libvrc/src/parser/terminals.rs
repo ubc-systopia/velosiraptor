@@ -165,14 +165,14 @@ pub fn boolean(input: TokenStream) -> IResult<TokenStream, bool> {
 
 macro_rules! keywordparser (
     ($vis:vis $name:ident, $tag: expr) => (
-        $vis fn $name(input: TokenStream) -> IResult<TokenStream, TokenStream> {
+        $vis fn $name(input: TokenStream) -> IResult<TokenStream, Keyword> {
             let (rem, tok) = take(1usize)(input.clone())?;
             // we need at least one token
             if tok.is_empty() {
                 Err(Err::Incomplete(Needed::new(1)))
             } else {
                 if tok.peek().content == TokenContent::Keyword($tag) {
-                    Ok((rem, tok))
+                    Ok((rem, $tag))
                 } else {
                     Err(Err::Error(VrsError::from_token(input, TokenContent::Keyword($tag))))
                 }

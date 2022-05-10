@@ -40,8 +40,8 @@ pub enum Keyword {
     Unit,
     /// state statement
     State,
-    /// StaticMap
-    StaticMap,
+    ///
+    AddrWidth,
     /// interface statement
     Interface,
     /// Memory State and Interface statement
@@ -58,6 +58,8 @@ pub enum Keyword {
     WriteAction,
     /// Used in identifying the Bitslice layout of an Interface field
     Layout,
+    /// base type fo rstatic maps
+    StaticMap,
 
     //
     // control flow and expressions
@@ -128,6 +130,7 @@ impl fmt::Display for Keyword {
             Fn => "fn",
             Assert => "assert",
             State => "state",
+            AddrWidth => "addrwidth",
             StaticMap => "staticmap",
             Interface => "interface",
             Memory => "Memory",
@@ -310,6 +313,27 @@ impl TokenContent {
             TokenContent::Illegal => panic!("illegal token"),
         }
     }
+
+    /// returns true if the token is a keyword
+    pub fn is_keyword(&self) -> bool {
+        matches!(self, TokenContent::Keyword(_))
+    }
+
+    /// returns true if the token is a reserved identifier
+    pub fn is_reserved(&self) -> bool {
+        if let TokenContent::Identifier(ident) = self {
+            matches!(
+                ident.as_str(),
+                // reserved indentifiers
+                "Segment" | "StaticMap" |
+
+                // for future use
+                "abstract" | "while" | "matches"
+            )
+        } else {
+            false
+        }
+    }
 }
 
 impl fmt::Debug for TokenContent {
@@ -344,6 +368,16 @@ impl Token {
     /// Obtains the [SourcePos] of the token
     pub fn get_pos(&self) -> SourcePos {
         self.spos.clone()
+    }
+
+    /// returns true if the token is a keyword
+    pub fn is_keyword(&self) -> bool {
+        self.content.is_keyword()
+    }
+
+    /// returns true if the token is a reserved identifier
+    pub fn is_reserved(&self) -> bool {
+        self.content.is_reserved()
     }
 }
 

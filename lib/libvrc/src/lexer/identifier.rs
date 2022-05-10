@@ -61,6 +61,10 @@ pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
         "ReadAction" => Token::new(TokenContent::Keyword(Keyword::ReadAction), ident),
         "WriteAction" => Token::new(TokenContent::Keyword(Keyword::WriteAction), ident),
         "Layout" => Token::new(TokenContent::Keyword(Keyword::Layout), ident),
+
+        //
+        // base types for the units
+        //
         "staticmap" => Token::new(TokenContent::Keyword(Keyword::StaticMap), ident),
 
         //
@@ -208,32 +212,13 @@ fn identifier_test_underscores() {
 
 #[test]
 fn identifier_test_badbegin() {
-    // assert_eq!(
-    //     identifier(SourcePos::new("stdin", "1foo43")),
-    //     Err(Err::Error(Error {
-    //         input: SourcePos::new("stdin", "1foo43"),
-    //         code: ErrorKind::Tag
-    //     }))
-    // );
+    assert!(identifier(SourcePos::new("stdin", "1foo43")).is_err());
 }
 
 #[test]
 fn identifier_test_badchars() {
-    // assert_eq!(
-    //     identifier(SourcePos::new("stdin", "@bar")),
-    //     Err(Err::Error(Error {
-    //         input: SourcePos::new("stdin", "@bar"),
-    //         code: ErrorKind::Tag
-    //     }))
-    // );
-
-    // assert_eq!(
-    //     identifier(SourcePos::new("stdin", "#bar")),
-    //     Err(Err::Error(Error {
-    //         input: SourcePos::new("stdin", "#bar"),
-    //         code: ErrorKind::Tag
-    //     }))
-    // );
+    assert!(identifier(SourcePos::new("stdin", "@bar")).is_err());
+    assert!(identifier(SourcePos::new("stdin", "#bar")).is_err());
 }
 
 #[test]

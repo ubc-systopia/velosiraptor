@@ -35,17 +35,18 @@ use crate::error::{IResult, VrsError};
 use crate::sourcepos::SourcePos;
 use crate::token::{Token, TokenContent};
 
-/// parses and consumes an end of line comment '// foo
+/// parses and consumes an end of line comment `// foo`
 pub fn linecomment(input: SourcePos) -> IResult<SourcePos, Token> {
     // try to match the opening comment `//`, there is no match, return.
     let (input, _) = tag("//")(input)?;
 
-    // Matches a inline comment `// foobar`
+    // match the rest of the line
     let (input, c) = take_while(|f: char| f != '\n')(input)?;
-    Ok((
-        input,
-        Token::new(TokenContent::Comment(c.as_str().trim().to_string()), c),
-    ))
+
+    // trim the whitespace around the comments.
+    let comment = c.as_str().trim().to_string();
+
+    Ok((input, Token::new(TokenContent::Comment(comment), c)))
 }
 
 /// parses and consumes a block comment `/* bar */`
@@ -58,10 +59,11 @@ pub fn blockcomment(input: SourcePos) -> IResult<SourcePos, Token> {
 
     // now match the block comment and discard following whitespace characters
     match cut(terminated(take_until("*/"), tag("*/")))(i1) {
-        Ok((input, c)) => Ok((
-            input,
-            Token::new(TokenContent::Comment(c.as_str().trim().to_string()), c),
-        )),
+        Ok((input, c)) => {
+            // trim the whitespace around the comment
+            let comment = c.as_str().trim().to_string();
+            Ok((input, Token::new(TokenContent::Comment(comment), c)))
+        }
         Err(e) => {
             // somehow this needs type annotations here?
             let _e: nom::Err<nom::error::Error<SourcePos>> = e;
