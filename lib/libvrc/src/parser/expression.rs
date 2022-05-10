@@ -242,9 +242,9 @@ pub fn quantifier_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     let pos = input.expand_until(&i4);
 
     // get the quantifier
-    let kind = match quantifier.peek().content {
-        TokenContent::Keyword(Keyword::Forall) => Quantifier::Forall,
-        TokenContent::Keyword(Keyword::Exists) => Quantifier::Exists,
+    let kind = match quantifier {
+        Keyword::Forall => Quantifier::Forall,
+        Keyword::Exists => Quantifier::Exists,
         _ => panic!("should not happen!"),
     };
 
@@ -364,7 +364,7 @@ pub fn term_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
         ident_expr,
         // its a term in parenthesis
         preceded(lparen, cut(terminated(expr, rparen))),
-    ))(input)
+    ))(input.clone())
 }
 
 /// parses a range expression
@@ -458,6 +458,38 @@ pub fn slice_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     }
 }
 
+fn ident_path(input: TokenStream) -> IResult<TokenStream, (Vec<String>, TokenStream)> {
+    // we need to match on the state and interface keywords as well,
+    // so we are doing this manually here, try to take a single token
+    let (rem, tok) = take(1usize)(input.clone())?;
+    if tok.is_empty() {
+        return Err(Err::Incomplete(Needed::new(1)));
+    }
+
+    // now check what we've got, either a keyword or one of
+    let fst = match &tok.peek().content {
+        TokenContent::Keyword(Keyword::State) => String::from("state"),
+        TokenContent::Keyword(Keyword::Interface) => String::from("interface"),
+        TokenContent::Keyword(Keyword::StaticMap) => String::from("staticmap"),
+        TokenContent::Identifier(s) => String::from(s),
+        _ => {
+            return Err(Err::Error(VrsError::from_token(
+                input,
+                TokenContent::Identifier(String::new()),
+            )))
+        }
+    };
+    // recognize the `.ident` parts
+    let (i, mut ot) = many0(preceded(dot, cut(ident)))(rem)?;
+    // merge the path into one big vector
+    let mut path = Vec::from([fst]);
+    path.append(&mut ot);
+
+    let pos = input.expand_until(&i);
+
+    Ok((i, (path, pos)))
+}
+
 /// parses an identifier expression
 ///
 /// This parser recognizes identifiers includingthe special keywords `state` and `interface`.
@@ -471,31 +503,7 @@ pub fn slice_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
 ///  * State reference: `state.a`
 ///
 fn ident_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
-    // we need to match on the state and interface keywords as well,
-    // so we are doing this manually here, try to take a single token
-    let (rem, tok) = take(1usize)(input.clone())?;
-    if tok.is_empty() {
-        return Err(Err::Incomplete(Needed::new(1)));
-    }
-
-    // now check what we've got, either a keyword or one of
-    let fst = match &tok.peek().content {
-        TokenContent::Keyword(Keyword::State) => String::from("state"),
-        TokenContent::Keyword(Keyword::Interface) => String::from("interface"),
-        TokenContent::Identifier(s) => String::from(s),
-        _ => {
-            return Err(Err::Error(VrsError::from_token(
-                input,
-                TokenContent::Identifier(String::new()),
-            )))
-        }
-    };
-    // recognize the `.ident` parts
-    let (i, mut ot) = many0(preceded(dot, ident))(rem)?;
-    // merge the path into one big vector
-    let mut path = Vec::from([fst]);
-    path.append(&mut ot);
-    let pos = input.expand_until(&i);
+    let (i, (path, pos)) = ident_path(input)?;
     Ok((i, Expr::Identifier { path, pos }))
 }
 
@@ -520,6 +528,7 @@ pub fn expr_list(input: TokenStream) -> IResult<TokenStream, Vec<Expr>> {
 ///
 ///  * `a()`
 ///  * `b(a)`
+///  * `a.b(c)`
 ///
 fn fn_call_expr(input: TokenStream) -> IResult<TokenStream, Expr> {
     let (i, (path, args)) = pair(

@@ -55,7 +55,7 @@ pub struct Unit {
     /// the unit parameters
     pub params: Vec<Param>,
     /// the name of the derrived unit
-    pub derived: Option<String>,
+    pub derived: String,
     /// the size of the unit in bits
     pub size: Option<u64>,
     /// defined constants in this unit
@@ -282,10 +282,7 @@ impl<'a> AstNodeGeneric<'a> for Unit {
 /// implementation of the [fmt::Display] trait for the [Unit]
 impl Display for Unit {
     fn fmt(&self, f: &mut Formatter) -> Result {
-        match &self.derived {
-            Some(n) => writeln!(f, "Unit {} : {}  {{\nTODO\n}}", self.name, n),
-            None => writeln!(f, "Unit {} {{\nTODO\n}}", self.name),
-        }
+        writeln!(f, "Unit {} : {}  {{\nTODO\n}}", self.name, self.derived)
     }
 }
 
@@ -294,18 +291,11 @@ impl Debug for Unit {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let line = self.loc().line();
         let column = self.loc().column();
-        match &self.derived {
-            Some(n) => writeln!(
-                f,
-                "{:03}:{:03} | unit {} : {}  {{\nTODO\n}}",
-                line, column, self.name, n
-            ),
-            None => writeln!(
-                f,
-                "{:03}:{:03} | unit {} {{\nTODO\n}}",
-                line, column, self.name
-            ),
-        }
+        writeln!(
+            f,
+            "{:03}:{:03} | unit {} : {}  {{\nTODO\n}}",
+            line, column, self.name, self.derived
+        )
     }
 }
 
