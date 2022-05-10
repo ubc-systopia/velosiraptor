@@ -105,6 +105,39 @@ impl<'a> Unit {
         }
         None
     }
+
+    /// derives [Self] from the other unit
+    ///
+    /// This pulls in the definitions, constants, etc from the other unit.
+    /// Unit elements that are defined in [Self] will not be overwritten by the other unit.
+    pub fn derive(&mut self, other: &Unit) {
+        assert_eq!(self.derived, other.name);
+        println!("unit: {} deriving form {}", self.name, other.name);
+
+        // merge params
+        for p in other.params.iter() {
+            if !self.params.iter().any(|x| x.name == p.name) {
+                self.params.push(p.clone());
+            }
+        }
+
+        // merge methods
+        for m in other.methods.iter() {
+            if !self.methods.iter().any(|x| x.name == m.name) {
+                self.methods.push(m.clone());
+            }
+        }
+        // merge interface
+
+        // merge state
+    }
+
+    /// derives a new unit from self and another unit
+    pub fn derives_from(&self, other: &Unit) -> Unit {
+        let mut u = self.clone();
+        u.derive(other);
+        u
+    }
 }
 
 /// Implemetation of the [AstNodeGeneric] trait for [Unit]

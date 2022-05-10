@@ -55,6 +55,7 @@ custom_error! {#[derive(PartialEq)] pub AstError
     SymTableNotExists         = "The symbol does not exist in the table",
     SymTabError{i: Issues}    = "There was an error during creating the symbol table",
     ImportError{e:ParsErr}    = "The parser has failed",
+    DeriveError{i: Issues}     = "The unit drivation has failed",
     MergeError{i: Issues}     = "Merging of the ast has failed",
     CheckError{i: Issues}     = "There were warnings or errors",
 }
