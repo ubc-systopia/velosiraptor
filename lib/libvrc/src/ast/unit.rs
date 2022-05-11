@@ -49,45 +49,70 @@ use crate::token::TokenStream;
 /// Moreover, a translation unit may be derived from another unit, similar
 /// to inheritance in other languages.
 #[derive(PartialEq, Clone)]
-pub struct Unit {
-    /// the name of the unit (identifier)
-    pub name: String,
-    /// the unit parameters
-    pub params: Vec<Param>,
-    /// the name of the derrived unit
-    pub derived: String,
-    /// the size of the unit in bits
-    pub size: Option<u64>,
-    /// defined constants in this unit
-    pub consts: Vec<Const>,
-    /// the state of the unit
-    pub state: State,
-    /// the software visible interface of the unit
-    pub interface: Interface,
-    /// Optional map in the case of map UnitType
-    pub map: Option<Map>,
-    /// the methods defined by this unit
-    pub methods: Vec<Method>,
-    // TODO: maybe make the translate / constructors / map / ... explicit here?
-    /// synthesized map operations for this unit
-    pub map_ops: Option<Vec<Operation>>,
-    /// synthesizeed unmap operations for this unit
-    pub unmap_ops: Option<Vec<Operation>>,
-    /// synthesized protect operations for this unit
-    pub protect_ops: Option<Vec<Operation>>,
-    /// the position in the source tree where this unit is defined
-    pub pos: TokenStream,
+pub enum Unit {
+    StaticMap {
+        /// the name of the unit (identifier)
+        name: String,
+        /// the unit parameters
+        params: Vec<Param>,
+        /// the name of the derived unit
+        derived: String,
+        /// the size of the unit in bits
+        size: Option<u64>,
+        /// defined constants in this unit
+        consts: Vec<Const>,
+        /// Optional map in the case of map UnitType
+        map: Option<Map>,
+        /// the position in the source tree where this unit is defined
+        pos: TokenStream,
+    },
+    Segment {
+        /// the name of the unit (identifier)
+        name: String,
+        /// the unit parameters
+        params: Vec<Param>,
+        /// the name of the derrived unit
+        derived: String,
+        /// the size of the unit in bits
+        size: Option<u64>,
+        /// defined constants in this unit
+        consts: Vec<Const>,
+        /// the state of the unit
+        state: State,
+        /// the software visible interface of the unit
+        interface: Interface,
+        /// the methods defined by this unit
+        methods: Vec<Method>,
+        // TODO: maybe make the translate / constructors / map / ... explicit here?
+        /// synthesized map operations for this unit
+        map_ops: Option<Vec<Operation>>,
+        /// synthesizeed unmap operations for this unit
+        unmap_ops: Option<Vec<Operation>>,
+        /// synthesized protect operations for this unit
+        protect_ops: Option<Vec<Operation>>,
+        /// the position in the source tree where this unit is defined
+        pos: TokenStream,  
+    }
 }
 
 /// Implementation of [Unit]
 impl<'a> Unit {
+
     pub fn location(&self) -> String {
-        self.pos.location()
+        match self {
+            Unit::StaticMap { pos, ..  } => pos.location(),
+            Unit::Segment { pos, .. } => pos.location()
+        } 
     }
 
     pub fn to_symbol(&self) -> Symbol {
+        let name = match self {
+            Unit::StaticMap { name, .. } => name.clone(),
+            Unit::Segment { name, .. } => name.clone(),
+        };
+        
         Symbol::new(
-            self.name.clone(),
+            name, 
             Type::Unit,
             SymbolKind::Unit,
             self.loc().clone(),
@@ -98,191 +123,220 @@ impl<'a> Unit {
     /// obtains a method with a given anme
     pub fn get_method(&self, name: &str) -> Option<&Method> {
         // TODO: make this a hashmap!
-        for m in self.methods.iter() {
+        let methods = match self {
+            Unit::StaticMap { .. } => todo!(),
+            Unit::Segment { methods, .. } => methods,
+        };
+        for m in methods.iter() {
             if m.name == name {
                 return Some(m);
             }
         }
         None
     }
+
+    pub fn derived(&self) -> &str {
+        match self {
+            Unit::StaticMap { derived, .. } => &derived,
+            Unit::Segment { derived, .. } => &derived,
+        }
+    }
+
 }
 
 /// Implemetation of the [AstNodeGeneric] trait for [Unit]
 impl<'a> AstNodeGeneric<'a> for Unit {
     fn check(&'a self, st: &mut SymbolTable<'a>) -> Issues {
-        // all fine for now
-        let mut res = Issues::ok();
-
-        let name = self.name();
-        let pos = self.loc();
-
-        // set the current context
-        st.create_context(String::from(self.name()));
-
-        // adding the module paramters
-        for p in &self.params {
-            if !st.insert(p.to_symbol()) {
-                res.inc_err(1);
+        match self {
+            Unit::StaticMap { 
+                name, pos, params, derived, size, consts, map, 
+            } => {
+                todo!();
             }
-        }
+            Unit::Segment { 
+                name, params, derived, size, consts, state, interface, methods, map_ops, unmap_ops, protect_ops, pos 
+            } => {
+                // all fine for now
+                let mut res = Issues::ok();
 
-        // adding the constants
-        for c in &self.consts {
-            if !st.insert(c.to_symbol()) {
-                res.inc_err(1);
-            }
-        }
+                let name = self.name();
+                let pos = self.loc();
 
-        // add the methods to it
-        for m in &self.methods {
-            if !st.insert(m.to_symbol()) {
-                res.inc_err(1);
-            }
-        }
+                // set the current context
+                st.create_context(String::from(self.name()));
 
-        // add the state symbolds
-        // XXX: maybe we wan to do the symbol table building after checking the elements?
-        self.state.build_symboltable(st);
-        self.interface.build_symboltable(st);
-
-        // Check 1: Double defined constants
-        // --------------------------------------------------------------------------------------
-        // Type:        Error
-        // Description: Check that all constants of this field have distinct names
-        // Notes:       --
-        // --------------------------------------------------------------------------------------
-
-        let errors = utils::check_double_entries(&self.consts);
-        res.inc_err(errors);
-
-        // Check 2: Constants
-        // --------------------------------------------------------------------------------------
-        // Type:        Error/Warning
-        // Description: Check all defined constats of the Unit
-        // Notes:
-        // --------------------------------------------------------------------------------------
-        for c in &self.consts {
-            res = res + c.check(st);
-        }
-
-        // Check 3: State Check
-        // --------------------------------------------------------------------------------------
-        // Type:        Warning/Error
-        // Description: Check that the state definition is fine
-        // Notes:       --
-        // --------------------------------------------------------------------------------------
-
-        // check the state and interface
-        res = res + self.state.check(st);
-
-        // Check 4: State Param Check
-        // --------------------------------------------------------------------------------------
-        // Type:        Warning/Error
-        // Description: Check that the state refers to actual parameters
-        // Notes:       --
-        // --------------------------------------------------------------------------------------
-        // TODO: check params
-
-        // Check 5: Interface Check
-        // --------------------------------------------------------------------------------------
-        // Type:        Warning/Error
-        // Description: Check that the state definition is fine
-        // Notes:       --
-        // --------------------------------------------------------------------------------------
-        res = res + self.interface.check(st);
-
-        // Check 6: Interface param check
-        // --------------------------------------------------------------------------------------
-        // Type:        Warning/Error
-        // Description: Check that the interface refers to actual parameters
-        // Notes:       --
-        // --------------------------------------------------------------------------------------
-        // TODO: check params / field refs
-
-        // Check 7: Methods double defined
-        // --------------------------------------------------------------------------------------
-        // Type:        Warning/Error
-        // Description: Check double method definition
-        // Notes:       --
-        // --------------------------------------------------------------------------------------
-
-        let errors = utils::check_double_entries(&self.methods);
-        res.inc_err(errors);
-
-        // Check 8: Method check
-        // --------------------------------------------------------------------------------------
-        // Type:        Warning/Error
-        // Description: Check that the interface refers to actual parameters
-        // Notes:       --
-        // --------------------------------------------------------------------------------------
-
-        for m in &self.methods {
-            res = res + m.check(st);
-        }
-
-        // Check 9: Bases are defined
-        // --------------------------------------------------------------------------------------
-        // Type:        Warning
-        // Description: Check if the unit name is CamelCase
-        // Notes:       --
-        // --------------------------------------------------------------------------------------
-        res = res + utils::check_camel_case(name, pos);
-
-        // Check 10: Translate/Map methods defined
-        // --------------------------------------------------------------------------------------
-        // Type:        Error/Warning
-        // Description: Check all defined constats of the Unit
-        // Notes:
-        // --------------------------------------------------------------------------------------
-
-        let mut has_map = false;
-        let mut has_translate = false;
-        for m in &self.methods {
-            match m.name() {
-                "translate" => {
-                    res = res + m.check_translate();
-                    has_translate = true;
+                // adding the module paramters
+                for p in params {
+                    if !st.insert(p.to_symbol()) {
+                        res.inc_err(1);
+                    }
                 }
-                "map" => {
-                    res = res + m.check_map();
-                    has_map = true;
+
+                // adding the constants
+                for c in consts {
+                    if !st.insert(c.to_symbol()) {
+                        res.inc_err(1);
+                    }
                 }
-                _ => {}
+
+                // add the methods to it
+                for m in methods {
+                    if !st.insert(m.to_symbol()) {
+                        res.inc_err(1);
+                    }
+                }
+
+                // add the state symbolds
+                // XXX: maybe we wan to do the symbol table building after checking the elements?
+                state.build_symboltable(st);
+                interface.build_symboltable(st);
+
+                // Check 1: Double defined constants
+                // --------------------------------------------------------------------------------------
+                // Type:        Error
+                // Description: Check that all constants of this field have distinct names
+                // Notes:       --
+                // --------------------------------------------------------------------------------------
+
+                let errors = utils::check_double_entries(consts);
+                res.inc_err(errors);
+
+                // Check 2: Constants
+                // --------------------------------------------------------------------------------------
+                // Type:        Error/Warning
+                // Description: Check all defined constats of the Unit
+                // Notes:
+                // --------------------------------------------------------------------------------------
+                for c in consts {
+                    res = res + c.check(st);
+                }
+
+                // Check 3: State Check
+                // --------------------------------------------------------------------------------------
+                // Type:        Warning/Error
+                // Description: Check that the state definition is fine
+                // Notes:       --
+                // --------------------------------------------------------------------------------------
+
+                // check the state and interface
+                res = res + state.check(st);
+
+                // Check 4: State Param Check
+                // --------------------------------------------------------------------------------------
+                // Type:        Warning/Error
+                // Description: Check that the state refers to actual parameters
+                // Notes:       --
+                // --------------------------------------------------------------------------------------
+                // TODO: check params
+
+                // Check 5: Interface Check
+                // --------------------------------------------------------------------------------------
+                // Type:        Warning/Error
+                // Description: Check that the state definition is fine
+                // Notes:       --
+                // --------------------------------------------------------------------------------------
+                res = res + interface.check(st);
+
+                // Check 6: Interface param check
+                // --------------------------------------------------------------------------------------
+                // Type:        Warning/Error
+                // Description: Check that the interface refers to actual parameters
+                // Notes:       --
+                // --------------------------------------------------------------------------------------
+                // TODO: check params / field refs
+
+                // Check 7: Methods double defined
+                // --------------------------------------------------------------------------------------
+                // Type:        Warning/Error
+                // Description: Check double method definition
+                // Notes:       --
+                // --------------------------------------------------------------------------------------
+
+                let errors = utils::check_double_entries(methods);
+                res.inc_err(errors);
+
+                // Check 8: Method check
+                // --------------------------------------------------------------------------------------
+                // Type:        Warning/Error
+                // Description: Check that the interface refers to actual parameters
+                // Notes:       --
+                // --------------------------------------------------------------------------------------
+
+                for m in methods {
+                    res = res + m.check(st);
+                }
+
+                // Check 9: Bases are defined
+                // --------------------------------------------------------------------------------------
+                // Type:        Warning
+                // Description: Check if the unit name is CamelCase
+                // Notes:       --
+                // --------------------------------------------------------------------------------------
+                res = res + utils::check_camel_case(name, pos);
+
+                // Check 10: Translate/Map methods defined
+                // --------------------------------------------------------------------------------------
+                // Type:        Error/Warning
+                // Description: Check all defined constats of the Unit
+                // Notes:
+                // --------------------------------------------------------------------------------------
+
+                let mut has_map = false;
+                let mut has_translate = false;
+                for m in methods {
+                    match m.name() {
+                        "translate" => {
+                            res = res + m.check_translate();
+                            has_translate = true;
+                        }
+                        "map" => {
+                            res = res + m.check_map();
+                            has_map = true;
+                        }
+                        _ => {}
+                    }
+                }
+
+                if !has_translate {
+                    let msg = format!("translate() method not defined for unit `{}`", name);
+                    let hint = format!("implement the translate() method for unit `{}`", name);
+                    VrsError::new_err(pos.with_range(0..2), msg, Some(hint)).print();
+                    res.inc_err(1);
+                }
+                if !has_map {
+                    let msg = format!("map() method not defined for unit `{}`", name);
+                    let hint = format!("implement the map() method for unit `{}`", name);
+                    VrsError::new_err(pos.with_range(0..2), msg, Some(hint)).print();
+                    println!("{}", pos);
+                    res.inc_err(1);
+                }
+
+                st.drop_context();
+                res
             }
         }
-
-        if !has_translate {
-            let msg = format!("translate() method not defined for unit `{}`", self.name);
-            let hint = format!("implement the translate() method for unit `{}`", self.name);
-            VrsError::new_err(&self.pos.with_range(0..2), msg, Some(hint)).print();
-            res.inc_err(1);
-        }
-        if !has_map {
-            let msg = format!("map() method not defined for unit `{}`", self.name);
-            let hint = format!("implement the map() method for unit `{}`", self.name);
-            VrsError::new_err(&self.pos.with_range(0..2), msg, Some(hint)).print();
-            println!("{}", self.pos);
-            res.inc_err(1);
-        }
-
-        st.drop_context();
-
-        res
+        
     }
     ///
     fn name(&self) -> &str {
-        &self.name
+        match self {
+            Unit::StaticMap { name, .. } => &name,
+            Unit::Segment { name, .. } => &name,
+        }
     }
     /// returns the location of the current
     fn loc(&self) -> &TokenStream {
-        &self.pos
+        match self {
+            Unit::Segment { pos, .. } => &pos,
+            Unit::StaticMap { pos, .. } => &pos,
+        }
     }
 }
 
 /// implementation of the [fmt::Display] trait for the [Unit]
 impl Display for Unit {
     fn fmt(&self, f: &mut Formatter) -> Result {
-        writeln!(f, "Unit {} : {}  {{\nTODO\n}}", self.name, self.derived)
+        writeln!(f, "Unit {} : {}  {{\nTODO\n}}", self.name(), self.derived())
     }
 }
 
@@ -294,7 +348,7 @@ impl Debug for Unit {
         writeln!(
             f,
             "{:03}:{:03} | unit {} : {}  {{\nTODO\n}}",
-            line, column, self.name, self.derived
+            line, column, self.name(), self.derived()
         )
     }
 }

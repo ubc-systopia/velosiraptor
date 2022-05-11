@@ -63,8 +63,9 @@ pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
         "Layout" => Token::new(TokenContent::Keyword(Keyword::Layout), ident),
 
         //
-        // base types for the units
+        // funcdamental unit types
         //
+        "segment" => Token::new(TokenContent::Keyword(Keyword::Segment), ident),
         "staticmap" => Token::new(TokenContent::Keyword(Keyword::StaticMap), ident),
 
         //

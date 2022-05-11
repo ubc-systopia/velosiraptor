@@ -29,7 +29,7 @@
 
 // the used nom functionality
 use nom::{
-    branch::permutation,
+    branch::{permutation, alt},
     combinator::{cut, opt},
     multi::{many0, separated_list0},
     sequence::{delimited, terminated, tuple},
@@ -37,13 +37,13 @@ use nom::{
 };
 
 // the used library-internal functionaltity
-use crate::ast::{Interface, Param, State, Unit};
+use crate::{ast::{Interface, Param, State, Unit}};
 use crate::error::{IResult, VrsError};
 use crate::parser::{
     constdef, interface, method, parameter, state,
     terminals::{
-        assign, colon, comma, ident, kw_size, kw_unit, lbrace, lparen, num, rbrace, rparen,
-        semicolon,
+        assign, colon, comma, ident, kw_size, lbrace, lparen, num, rbrace, rparen,
+        semicolon, kw_staticmap, kw_segment
     },
 };
 use crate::token::TokenStream;
@@ -83,12 +83,16 @@ fn derived_clause(input: TokenStream) -> IResult<TokenStream, String> {
     }
 }
 
-/// parses and consumes an unit declaration (`unit foo {};`)
 pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
-    // try to match the input keyword, there is no match, return.
-    let (i1, _) = kw_unit(input.clone())?;
+    alt((unit_segment, unit_staticmap))(input)
+}
 
-    // we've seen the `unit` keyword, next there needs to be the unit identifier,
+/// parses and consumes a segment unit declaration (`segment foo(args) : derived {};`)
+fn unit_segment(input: TokenStream) -> IResult<TokenStream, Unit> {
+    // try to match the segment keyword, there is no match, return.
+    let (i1, _) = kw_segment(input.clone())?;
+
+    // we've seen the `segment` keyword, next there needs to be the unit identifier,
     // followed by some optional parameters and the derived clause.
     let (i2, (unitname, params, derived)) =
         cut(tuple((ident, opt(param_clause), derived_clause)))(i1)?;
@@ -99,18 +103,17 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
         opt(state),
         opt(interface),
         opt(size_clause),
-        opt(parse_map),
         many0(method),
     ));
 
     // then we have the unit block, wrapped in curly braces and a ;
-    let (i4, (consts, state, interface, size, map, methods)) =
+    let (i4, (consts, state, interface, size, methods)) =
         cut(terminated(delimited(lbrace, unit_body, rbrace), semicolon))(i2)?;
 
     let pos = input.expand_until(&i4);
     Ok((
         i4,
-        Unit {
+        Unit::Segment {
             name: unitname,
             params: params.unwrap_or_default(),
             derived,
@@ -120,7 +123,6 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
             interface: interface.unwrap_or(Interface::None {
                 pos: TokenStream::empty(),
             }),
-            map,
             methods,
             map_ops: None,
             unmap_ops: None,
@@ -130,26 +132,66 @@ pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
     ))
 }
 
+/// parses and consumes a staticmap unit declaration (`staticmap foo(args) : derived {};`)
+/// 
+/// TODO not sure if we need to have methods in static map declarations
+fn unit_staticmap(input: TokenStream) -> IResult<TokenStream, Unit> {
+    // try to match the staticmap keyword, if there is no match, return early.
+    let (i1, _) = kw_staticmap(input.clone())?;
+
+    // we've seen the `staticmap` keyword, next there needs to be the unit identifier,
+    // followed bby some optional parameters and the derived clause.
+    let (i2, (unitname, params, derived)) = cut(tuple((ident, opt(param_clause), derived_clause)))(i1)?;
+
+    // parse the unit body. this is a combination of the following
+    let unit_body = permutation((
+        many0(constdef),
+        opt(parse_map),
+        opt(size_clause),
+    ));
+
+    // then we have the unit block, wrapped in curly braces and a ;
+    let (i4, (consts, map, size)) = cut(terminated(delimited(lbrace, unit_body, rbrace), semicolon))(i2)?;
+
+    let pos = input.expand_until(&i4);
+    Ok((
+        i4,
+        Unit::StaticMap {
+            name: unitname,
+            params: params.unwrap_or_default(),
+            derived,
+            size,
+            consts,
+            map,
+            pos,
+        },
+    ))
+}
+
+// TODO parse map as XOR of unit type parsers.
+
+
 #[cfg(test)]
 use crate::lexer::Lexer;
 use crate::parser::map::parse_map;
+
 
 #[test]
 fn test_ok() {
     let tokens = Lexer::lex_string("stdio", "unit foo : Segment {};").unwrap();
     let ts = TokenStream::from_vec(tokens);
-    assert!(unit(ts).is_ok());
+    assert!(unit_segment(ts).is_ok());
 
     let tokens = Lexer::lex_string("stdio", "unit foo(base: addr) : Segment  {};").unwrap();
     let ts = TokenStream::from_vec(tokens);
-    assert!(unit(ts).is_ok());
+    assert!(unit_segment(ts).is_ok());
 
     let tokens =
         Lexer::lex_string("stdio", "unit foo : Segment  { const foo : int = 32; };").unwrap();
     let ts = TokenStream::from_vec(tokens);
-    assert!(unit(ts).is_ok());
+    assert!(unit_segment(ts).is_ok());
 
     let tokens = Lexer::lex_string("stdio", "unit foo : Segment  { size = 33; };").unwrap();
     let ts = TokenStream::from_vec(tokens);
-    assert!(unit(ts).is_ok());
+    assert!(unit_segment(ts).is_ok());
 }

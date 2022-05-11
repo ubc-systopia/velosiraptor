@@ -205,6 +205,7 @@ keywordparser!(pub kw_return, Keyword::Return);
 keywordparser!(pub kw_forall, Keyword::Forall);
 keywordparser!(pub kw_exists, Keyword::Exists);
 keywordparser!(pub kw_staticmap, Keyword::StaticMap);
+keywordparser!(pub kw_segment, Keyword::Segment);
 keywordparser!(pub kw_for, Keyword::For);
 keywordparser!(pub kw_in, Keyword::In);
 

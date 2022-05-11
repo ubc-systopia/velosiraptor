@@ -36,7 +36,10 @@ pub enum Keyword {
     //
     // language keywords
     //
-    /// unit definitins
+    /// This token was originally used for unit definitions, It's not in use 
+    /// under the new unit scheme, but we're choosing to keep it as a reserved
+    /// keyword for now.
+    /// TODO: Will need to revisit this at somepoint -Ilias
     Unit,
     /// state statement
     State,
@@ -58,8 +61,10 @@ pub enum Keyword {
     WriteAction,
     /// Used in identifying the Bitslice layout of an Interface field
     Layout,
-    /// base type fo rstatic maps
+    /// base type for static maps
     StaticMap,
+    /// base type for direct segments
+    Segment,
 
     //
     // control flow and expressions
@@ -132,6 +137,7 @@ impl fmt::Display for Keyword {
             State => "state",
             AddrWidth => "addrwidth",
             StaticMap => "staticmap",
+            Segment => "segment",
             Interface => "interface",
             Memory => "Memory",
             MMIO => "MMIO",
