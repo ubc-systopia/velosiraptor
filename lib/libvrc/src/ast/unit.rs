@@ -111,6 +111,13 @@ impl<'a> Unit {
             Unit::Segment(segment) => &segment.state(),
         }
     }
+
+    pub fn map_ops(&self) -> Option<&Vec<Operation>> {
+        match self {
+            Unit::StaticMap(staticmap) => staticmap.map_ops(),
+            Unit::Segment(segment) => segment.map_ops(),
+        }
+    }
 }
 
 /// implementation of the [fmt::Display] trait for the [Unit]
@@ -212,7 +219,7 @@ impl<'a> Segment {
             Type::Unit,
             SymbolKind::Unit,
             self.loc().clone(),
-            AstNode::Unit(self),
+            AstNode::Segment(self),
         )
     }
 
@@ -241,13 +248,17 @@ impl<'a> Segment {
     pub fn state(&self) -> &State {
         &self.state
     }
+
+    pub fn map_ops(&self) -> Option<&Vec<Operation>> {
+        self.map_ops.as_ref()
+    }
 }
 
 /// implementation of the [fmt::Display] trait for the [Segment]
 impl Display for Segment {
     fn fmt(&self, f: &mut Formatter) -> Result {
         writeln!(f, "Segment {}", self.name)?;
-        if let Some(d) = self.derived {
+        if let Some(d) = &self.derived {
             writeln!(f, " : {}", d)?;
         }
         writeln!(f, "{{\nTODO\n}}")
@@ -261,7 +272,7 @@ impl Debug for Segment {
         let column = self.loc().column();
 
         writeln!(f, "{:03}:{:03} | Segment {}", line, column, self.name)?;
-        if let Some(d) = self.derived {
+        if let Some(d) = &self.derived {
             writeln!(f, " : {}", d)?;
         }
         writeln!(f, "{{\nTODO\n}}")
@@ -281,21 +292,21 @@ impl<'a> AstNodeGeneric<'a> for Segment {
         st.create_context(String::from(self.name()));
 
         // adding the module paramters
-        for p in self.params {
+        for p in &self.params {
             if !st.insert(p.to_symbol()) {
                 res.inc_err(1);
             }
         }
 
         // adding the constants
-        for c in self.consts {
+        for c in &self.consts {
             if !st.insert(c.to_symbol()) {
                 res.inc_err(1);
             }
         }
 
         // add the methods to it
-        for m in self.methods {
+        for m in &self.methods {
             if !st.insert(m.to_symbol()) {
                 res.inc_err(1);
             }
@@ -322,7 +333,7 @@ impl<'a> AstNodeGeneric<'a> for Segment {
         // Description: Check all defined constats of the Unit
         // Notes:
         // --------------------------------------------------------------------------------------
-        for c in self.consts {
+        for c in &self.consts {
             res = res + c.check(st);
         }
 
@@ -377,7 +388,7 @@ impl<'a> AstNodeGeneric<'a> for Segment {
         // Notes:       --
         // --------------------------------------------------------------------------------------
 
-        for m in self.methods {
+        for m in &self.methods {
             res = res + m.check(st);
         }
 
@@ -398,7 +409,7 @@ impl<'a> AstNodeGeneric<'a> for Segment {
 
         let mut has_map = false;
         let mut has_translate = false;
-        for m in self.methods {
+        for m in &self.methods {
             match m.name() {
                 "translate" => {
                     res = res + m.check_translate();
@@ -444,21 +455,21 @@ impl<'a> AstNodeGeneric<'a> for Segment {
 #[derive(PartialEq, Clone)]
 pub struct StaticMap {
     /// the name of the unit (identifier)
-    name: String,
+    pub name: String,
     /// the unit parameters
-    params: Vec<Param>,
+    pub params: Vec<Param>,
     /// the name of the derived unit
-    derived: Option<String>,
+    pub derived: Option<String>,
     /// the size of the unit in bits
-    size: Option<u64>,
+    pub size: Option<u64>,
     /// defined constants in this unit
-    consts: Vec<Const>,
+    pub consts: Vec<Const>,
     /// Optional map in the case of map UnitType
-    map: Option<Map>,
+    pub map: Option<Map>,
     /// the methods defined by this unit
     pub methods: Vec<Method>,
     /// the position in the source tree where this unit is defined
-    pos: TokenStream,
+    pub pos: TokenStream,
 }
 
 /// Implementation of [Unit]
@@ -473,7 +484,7 @@ impl<'a> StaticMap {
             Type::Unit,
             SymbolKind::Unit,
             self.loc().clone(),
-            AstNode::Unit(Unit::StaticMap(self)),
+            AstNode::StaticMap(self),
         )
     }
 
@@ -491,11 +502,15 @@ impl<'a> StaticMap {
     }
 
     pub fn interface(&self) -> &Interface {
-        &Interface::None
+        &crate::ast::NONE_INTERFACE
     }
 
     pub fn state(&self) -> &State {
-        &State::None
+        &crate::ast::NONE_STATE
+    }
+
+    pub fn map_ops(&self) -> Option<&Vec<Operation>> {
+        None
     }
 }
 
@@ -503,7 +518,7 @@ impl<'a> StaticMap {
 impl Display for StaticMap {
     fn fmt(&self, f: &mut Formatter) -> Result {
         writeln!(f, "StaticMap {}", self.name)?;
-        if let Some(d) = self.derived {
+        if let Some(d) = &self.derived {
             writeln!(f, " : {}", d)?;
         }
         writeln!(f, "{{\nTODO\n}}")
@@ -517,7 +532,7 @@ impl Debug for StaticMap {
         let column = self.loc().column();
 
         writeln!(f, "{:03}:{:03} | StaticMap {}", line, column, self.name)?;
-        if let Some(d) = self.derived {
+        if let Some(d) = &self.derived {
             writeln!(f, " : {}", d)?;
         }
         writeln!(f, "{{\nTODO\n}}")
@@ -528,7 +543,95 @@ impl Debug for StaticMap {
 impl<'a> AstNodeGeneric<'a> for StaticMap {
     /// performs the ast checks for the StaticMap
     fn check(&'a self, st: &mut SymbolTable<'a>) -> Issues {
-        Issues::ok()
+        // all fine for now
+        let mut res = Issues::ok();
+
+        let name = self.name();
+        let pos = self.loc();
+
+        // set the current context
+        st.create_context(String::from(self.name()));
+
+        // adding the module paramters
+        for p in &self.params {
+            if !st.insert(p.to_symbol()) {
+                res.inc_err(1);
+            }
+        }
+
+        // adding the constants
+        for c in &self.consts {
+            if !st.insert(c.to_symbol()) {
+                res.inc_err(1);
+            }
+        }
+
+        // add the methods to it
+        for m in &self.methods {
+            if !st.insert(m.to_symbol()) {
+                res.inc_err(1);
+            }
+        }
+
+        // Check 1: Double defined constants
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check that all constants of this field have distinct names
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        let errors = utils::check_double_entries(&self.consts);
+        res.inc_err(errors);
+
+        // Check 2: Constants
+        // --------------------------------------------------------------------------------------
+        // Type:        Error/Warning
+        // Description: Check all defined constats of the Unit
+        // Notes:
+        // --------------------------------------------------------------------------------------
+        for c in &self.consts {
+            res = res + c.check(st);
+        }
+
+        // Check 4: State Param Check
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning/Error
+        // Description: Check that the state refers to actual parameters
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+        // TODO: check params
+
+        // Check 7: Methods double defined
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning/Error
+        // Description: Check double method definition
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        let errors = utils::check_double_entries(&self.methods);
+        res.inc_err(errors);
+
+        // Check 8: Method check
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning/Error
+        // Description: Check that the interface refers to actual parameters
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        for m in &self.methods {
+            res = res + m.check(st);
+        }
+
+        // Check 9: Bases are defined
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning
+        // Description: Check if the unit name is CamelCase
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+        res = res + utils::check_camel_case(name, pos);
+
+        st.drop_context();
+        return res;
     }
 
     /// returns the location of the StaticMap

@@ -32,6 +32,7 @@ use std::fmt::{Debug, Display, Formatter, Result};
 // used library internal functionality
 use crate::ast::{
     utils, AstNode, AstNodeGeneric, Field, Issues, Param, Symbol, SymbolKind, SymbolTable, Type,
+    TOKENSTREAM_DUMMY,
 };
 use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
@@ -64,10 +65,20 @@ pub enum State {
     // TODO state that may be combined
     //CombinedState {  },
     /// No state associated with this translation unit
-    None,
+    None { pos: TokenStream },
 }
 
+pub const NONE_STATE: State = State::None {
+    pos: TOKENSTREAM_DUMMY,
+};
+
 impl<'a> State {
+    pub fn new_none() -> Self {
+        State::None {
+            pos: TokenStream::empty(),
+        }
+    }
+
     /// builds the symboltable for the state related symbols
     pub fn build_symboltable(&'a self, st: &mut SymbolTable<'a>) {
         // create the 'state' symbol
@@ -139,7 +150,7 @@ impl Display for State {
                 })?;
                 writeln!(f, "}}")
             }
-            None => writeln!(f, "State(None)"),
+            None { .. } => writeln!(f, "State(None)"),
         }
     }
 }
@@ -173,8 +184,10 @@ impl Debug for State {
                 })?;
                 writeln!(f, "}}")
             }
-            None => {
-                writeln!(f, "        | State(None)")
+            None { pos } => {
+                let line = pos.line();
+                let column = pos.column();
+                writeln!(f, "{:03}:{:03} | State(None)", line, column)
             }
         }
     }
@@ -318,7 +331,7 @@ impl<'a> AstNodeGeneric<'a> for State {
                 pos,
             } => pos,
             RegisterState { fields: _, pos } => pos,
-            None => &TokenStream::empty(),
+            None { pos } => pos,
         }
     }
 }

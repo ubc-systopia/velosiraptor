@@ -278,12 +278,13 @@ impl<'a> AstRoot {
             Unit::Segment(s) => Some(s),
             _ => None,
         })
-        // self.units.iter().filter(|u| {
-        //     match u {
-        //         Unit::Segment(_) => true,
-        //         _ => false
-        //     }
-        // })
+    }
+
+    pub fn segment_units_mut(&mut self) -> impl Iterator<Item = &mut Segment> + '_ {
+        self.units.iter_mut().filter_map(|u| match u {
+            Unit::Segment(s) => Some(s),
+            _ => None,
+        })
     }
 
     pub fn staticmap_units(&self) -> impl Iterator<Item = &StaticMap> + '_ {
@@ -291,12 +292,13 @@ impl<'a> AstRoot {
             Unit::StaticMap(s) => Some(s),
             _ => None,
         })
-        // self.units.iter().filter(|u| {
-        //     match u {
-        //         Unit::Segment(_) => true,
-        //         _ => false
-        //     }
-        // })
+    }
+
+    pub fn staticmap_units_mut(&mut self) -> impl Iterator<Item = &mut StaticMap> + '_ {
+        self.units.iter_mut().filter_map(|u| match u {
+            Unit::StaticMap(s) => Some(s),
+            _ => None,
+        })
     }
 }
 

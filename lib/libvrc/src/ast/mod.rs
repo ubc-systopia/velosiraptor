@@ -47,7 +47,7 @@ mod utils;
 use custom_error::custom_error;
 
 use crate::parser::ParsErr;
-use crate::token::TokenStream;
+use crate::token::{TokenStream, TOKENSTREAM_DUMMY};
 
 // custom error definitions
 custom_error! {#[derive(PartialEq)] pub AstError
@@ -66,13 +66,13 @@ pub use consts::Const;
 pub use expression::{BinOp, Expr, Quantifier, UnOp};
 pub use field::Field;
 pub use import::Import;
-pub use interface::{Interface, InterfaceField};
+pub use interface::{Interface, InterfaceField, NONE_INTERFACE};
 pub use issues::Issues;
 pub use map::{Map, MapEntry};
 pub use method::Method;
 pub use param::Param;
 pub use root::AstRoot;
-pub use state::State;
+pub use state::{State, NONE_STATE};
 pub use statement::Stmt;
 pub use symboltable::{Symbol, SymbolKind, SymbolTable};
 pub use types::Type;
@@ -107,6 +107,9 @@ pub enum AstNode<'a> {
     Import(&'a Import),
     Const(&'a Const),
     Unit(&'a Unit),
+    Segment(&'a Segment),
+    StaticMap(&'a StaticMap),
+
     // state
     State(&'a State),
     Field(&'a Field),
@@ -134,6 +137,8 @@ impl<'a> AstNodeGeneric<'a> for AstNode<'a> {
             AstNode::Import(x) => x.name(),
             AstNode::Const(x) => x.name(),
             AstNode::Unit(x) => x.name(),
+            AstNode::Segment(x) => x.name(),
+            AstNode::StaticMap(x) => x.name(),
             AstNode::State(x) => x.name(),
             AstNode::Field(x) => x.name(),
             AstNode::BitSlice(x) => x.name(),
@@ -154,6 +159,8 @@ impl<'a> AstNodeGeneric<'a> for AstNode<'a> {
             AstNode::Import(x) => x.loc(),
             AstNode::Const(x) => x.loc(),
             AstNode::Unit(x) => x.loc(),
+            AstNode::Segment(x) => x.loc(),
+            AstNode::StaticMap(x) => x.loc(),
             AstNode::State(x) => x.loc(),
             AstNode::Field(x) => x.loc(),
             AstNode::BitSlice(x) => x.loc(),

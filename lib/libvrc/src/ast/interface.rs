@@ -29,7 +29,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::ast::{
     utils, Action, ActionType, AstNode, AstNodeGeneric, Field, Issues, Param, Symbol, SymbolKind,
-    SymbolTable, Type,
+    SymbolTable, Type, TOKENSTREAM_DUMMY,
 };
 use crate::error::VrsError;
 use crate::token::TokenStream;
@@ -65,11 +65,21 @@ pub enum Interface {
     // TODO interface may be a combination: e.g., Memory + MMIORegisters
     //CombinedState {  },
     /// No software interface associated with this translation unit
-    None,
+    None { pos: TokenStream },
 }
+
+pub const NONE_INTERFACE: Interface = Interface::None {
+    pos: TOKENSTREAM_DUMMY,
+};
 
 /// Implementation of the Interface
 impl<'a> Interface {
+    pub fn new_none() -> Self {
+        Interface::None {
+            pos: TokenStream::empty(),
+        }
+    }
+
     /// builds the symboltable for the interface related symbols
     pub fn build_symboltable(&'a self, st: &mut SymbolTable<'a>) {
         // create the 'interface' symbol
@@ -270,7 +280,7 @@ impl<'a> AstNodeGeneric<'a> for Interface {
             Interface::Memory { pos, .. } => pos,
             Interface::MMIORegisters { pos, .. } => pos,
             Interface::SpecialRegisters { pos, .. } => pos,
-            Interface::None => &TokenStream::empty(),
+            Interface::None { pos, .. } => pos,
         }
     }
 }
