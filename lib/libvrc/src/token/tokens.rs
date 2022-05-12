@@ -36,7 +36,7 @@ pub enum Keyword {
     //
     // language keywords
     //
-    /// This token was originally used for unit definitions, It's not in use 
+    /// This token was originally used for unit definitions, It's not in use
     /// under the new unit scheme, but we're choosing to keep it as a reserved
     /// keyword for now.
     /// TODO: Will need to revisit this at somepoint -Ilias
