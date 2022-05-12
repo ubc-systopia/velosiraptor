@@ -31,7 +31,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 // the used libraries
-use crate::ast::{Action, AstRoot, BinOp, BitSlice, Expr, Interface, Method, State};
+use crate::ast::{
+    Action, AstNodeGeneric, AstRoot, BinOp, BitSlice, Expr, Interface, Method, State,
+};
 use crate::synth::{SynthError, COPYRIGHT};
 use rosettelang::{FunctionDef, RExpr, RosetteFile, StructDef};
 
@@ -1227,7 +1229,7 @@ impl SynthRosette {
     pub fn synth_map(&self, ast: &mut AstRoot) -> Result<(), SynthError> {
         fs::create_dir_all(&self.outdir)?;
 
-        for unit in &mut ast.units {
+        for unit in &mut ast.segment_units() {
             println!("synthesizing map: for {} in {:?}", unit.name, self.outdir);
 
             let m = unit.get_method("translate").unwrap();
@@ -1282,8 +1284,8 @@ impl SynthRosette {
 
     /// synthesizes the 'unmap' function and returns an ast of it
     pub fn synth_unmap(&self, ast: &mut AstRoot) -> Result<(), SynthError> {
-        for unit in &mut ast.units {
-            println!("synthesizing map: for {} in {:?}", unit.name, self.outdir);
+        for unit in &mut ast.segment_units() {
+            println!("synthesizing map: for {} in {:?}", unit.name(), self.outdir);
             let ops = Vec::new();
             unit.unmap_ops = Some(ops);
         }
@@ -1291,8 +1293,8 @@ impl SynthRosette {
     }
 
     pub fn synth_protect(&self, ast: &mut AstRoot) -> Result<(), SynthError> {
-        for unit in &mut ast.units {
-            println!("synthesizing map: for {} in {:?}", unit.name, self.outdir);
+        for unit in &mut ast.segment_units() {
+            println!("synthesizing map: for {} in {:?}", unit.name(), self.outdir);
             let ops = Vec::new();
             unit.protect_ops = Some(ops);
         }
