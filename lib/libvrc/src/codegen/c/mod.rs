@@ -31,8 +31,7 @@ use std::path::PathBuf;
 
 use crustal as C;
 
-use crate::ast::AstRoot;
-use crate::ast::Unit;
+use crate::ast::{AstNodeGeneric, AstRoot, Unit};
 use crate::codegen::CodeGenBackend;
 use crate::codegen::CodeGenError;
 
@@ -129,7 +128,7 @@ impl CodeGenBackend for BackendC {
             // generate the unit
             match unit {
                 Unit::StaticMap(_) => todo!(),
-                Unit::Segment(segment) => segment::generate(segment, &srcdir)
+                Unit::Segment(segment) => segment::generate(segment, &srcdir),
             };
             srcdir.pop();
         }

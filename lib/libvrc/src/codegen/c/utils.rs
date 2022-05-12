@@ -29,7 +29,7 @@
 use crustal as C;
 
 //
-use crate::ast::{AstNodeGeneric, BitSlice, Const, Field, Unit, Segment};
+use crate::ast::{AstNodeGeneric, BitSlice, Const, Field, Segment, Unit};
 use crate::codegen::COPYRIGHT;
 
 pub fn unit_struct_name(unit_name: &str) -> String {

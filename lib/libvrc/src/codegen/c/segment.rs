@@ -58,7 +58,7 @@ use std::path::Path;
 use crustal as C;
 
 use super::utils;
-use crate::ast::Segment;
+use crate::ast::{AstNodeGeneric, Segment};
 use crate::codegen::CodeGenError;
 use crate::synth::{OpExpr, Operation};
 
@@ -83,7 +83,7 @@ fn add_unit_constants(scope: &mut C::Scope, unit: &Segment) {
 //     // field_name  --> struct FieldName {  val: u64 };
 
 //     // create the struct in the scope
-//     let st = scope.new_struct(&unit.name);
+//     let st = scope.new_struct(&unit.name());
 
 //     // make it public
 //     st.vis("pub");
@@ -91,7 +91,7 @@ fn add_unit_constants(scope: &mut C::Scope, unit: &Segment) {
 //     // add the doc field to the struct
 //     st.doc(&format!(
 //         "Represents the Unit type '{}'.\n@loc: {}",
-//         unit.name,
+//         unit.name(),
 //         unit.location()
 //     ));
 
@@ -100,7 +100,7 @@ fn add_unit_constants(scope: &mut C::Scope, unit: &Segment) {
 // }
 
 fn add_constructor_function(scope: &mut C::Scope, unit: &Segment) {
-    let fname = utils::constructor_fn_name(&unit.name);
+    let fname = utils::constructor_fn_name(unit.name());
     scope
         .new_function(&fname, C::Type::new_void())
         .set_static()
@@ -110,7 +110,7 @@ fn add_constructor_function(scope: &mut C::Scope, unit: &Segment) {
 }
 
 fn add_translate_function(scope: &mut C::Scope, unit: &Segment) {
-    let fname = utils::translate_fn_name(unit);
+    let fname = utils::translate_fn_name(unit.name());
     scope
         .new_function(&fname, C::Type::new_void())
         .set_static()
@@ -227,13 +227,13 @@ fn op_to_rust_expr(unit: &str, c: &mut C::Block, op: &Operation, vars: &HashMap<
 }
 
 fn add_map_function(scope: &mut C::Scope, unit: &Segment) {
-    let fname = utils::map_fn_name(&unit.name);
+    let fname = utils::map_fn_name(&unit.name());
 
     let mut fun = C::Function::with_string(fname, C::Type::new_bool());
     fun.set_static().set_inline();
 
     let mut field_vars = HashMap::new();
-    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::unit_type_name(&unit.name)));
+    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::unit_type_name(&unit.name())));
 
     let v = fun.new_param("unit", unittype);
     field_vars.insert(String::from("unit"), v.to_expr());
@@ -274,7 +274,7 @@ fn add_map_function(scope: &mut C::Scope, unit: &Segment) {
     if let Some(ops) = &unit.map_ops {
         fun.body().new_comment("configuration sequence");
         for op in ops {
-            op_to_rust_expr(&unit.name, fun.body(), op, &field_vars);
+            op_to_rust_expr(&unit.name(), fun.body(), op, &field_vars);
         }
     } else {
         fun.body().new_comment("there is no configuration sequence");
@@ -284,7 +284,7 @@ fn add_map_function(scope: &mut C::Scope, unit: &Segment) {
 }
 
 fn add_unmap_function(scope: &mut C::Scope, unit: &Segment) {
-    let fname = utils::unmap_fn_name(unit);
+    let fname = utils::unmap_fn_name(unit.name());
     scope
         .new_function(&fname, C::Type::new_void())
         .set_static()
@@ -294,7 +294,7 @@ fn add_unmap_function(scope: &mut C::Scope, unit: &Segment) {
 }
 
 fn add_protect_function(scope: &mut C::Scope, unit: &Segment) {
-    let fname = utils::protect_fn_name(unit);
+    let fname = utils::protect_fn_name(unit.name());
     scope
         .new_function(&fname, C::Type::new_void())
         .set_static()

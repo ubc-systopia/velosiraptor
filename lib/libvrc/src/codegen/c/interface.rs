@@ -205,7 +205,12 @@ fn generate_read_slice_mmio(scope: &mut C::Scope, unit: &Segment, field: &Field,
     scope.push_function(f);
 }
 
-fn generate_write_slice_mmio(scope: &mut C::Scope, unit: &Segment, field: &Field, slice: &BitSlice) {
+fn generate_write_slice_mmio(
+    scope: &mut C::Scope,
+    unit: &Segment,
+    field: &Field,
+    slice: &BitSlice,
+) {
     let fnname = utils::if_field_wr_slice_fn_name(unit, field, slice);
 
     let mut f = C::Function::with_string(fnname, C::Type::new_void());
