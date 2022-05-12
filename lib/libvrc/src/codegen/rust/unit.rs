@@ -148,7 +148,7 @@ fn op_to_rust_expr(op: &Operation) -> String {
 
 fn add_map_function(imp: &mut CG::Impl, unit: &Unit) {
     let mut fields = HashSet::new();
-    if let Some(ops) = &unit.map_ops {
+    if let Some(ops) = unit.map_ops() {
         for op in ops {
             let fname = op.fieldname();
             if fname.is_empty() {
@@ -180,7 +180,7 @@ fn add_map_function(imp: &mut CG::Impl, unit: &Unit) {
     m.line("");
     m.line("//operation sequence");
 
-    if let Some(ops) = &unit.map_ops {
+    if let Some(ops) = unit.map_ops() {
         for op in ops {
             m.line(&op_to_rust_expr(op));
         }
