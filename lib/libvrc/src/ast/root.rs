@@ -29,7 +29,9 @@ use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-use crate::ast::{utils, AstError, AstNodeGeneric, Const, Import, Issues, SymbolTable, Unit};
+use crate::ast::{
+    utils, AstError, AstNodeGeneric, Const, Import, Issues, Segment, StaticMap, SymbolTable, Unit,
+};
 use crate::error::VrsError;
 use crate::parser::ParserError;
 use crate::token::TokenStream;
@@ -264,6 +266,37 @@ impl<'a> AstRoot {
     // applies AST transformations
     pub fn apply_transformations(&mut self) -> Result<Issues, AstError> {
         Ok(Issues::ok())
+    }
+
+    ///
+    pub fn all_units(&self) -> &[Unit] {
+        &self.units
+    }
+
+    pub fn segment_units(&self) -> impl Iterator<Item = &Segment> + '_ {
+        self.units.iter().filter_map(|u| match u {
+            Unit::Segment(s) => Some(s),
+            _ => None,
+        })
+        // self.units.iter().filter(|u| {
+        //     match u {
+        //         Unit::Segment(_) => true,
+        //         _ => false
+        //     }
+        // })
+    }
+
+    pub fn staticmap_units(&self) -> impl Iterator<Item = &StaticMap> + '_ {
+        self.units.iter().filter_map(|u| match u {
+            Unit::StaticMap(s) => Some(s),
+            _ => None,
+        })
+        // self.units.iter().filter(|u| {
+        //     match u {
+        //         Unit::Segment(_) => true,
+        //         _ => false
+        //     }
+        // })
     }
 }
 

@@ -64,10 +64,7 @@ pub enum State {
     // TODO state that may be combined
     //CombinedState {  },
     /// No state associated with this translation unit
-    None {
-        /// the position where the state is defined
-        pos: TokenStream,
-    },
+    None,
 }
 
 impl<'a> State {
@@ -142,7 +139,7 @@ impl Display for State {
                 })?;
                 writeln!(f, "}}")
             }
-            None { pos: _ } => writeln!(f, "State(None)"),
+            None => writeln!(f, "State(None)"),
         }
     }
 }
@@ -176,10 +173,8 @@ impl Debug for State {
                 })?;
                 writeln!(f, "}}")
             }
-            None { pos } => {
-                let line = pos.line();
-                let column = pos.column();
-                writeln!(f, "{:03}:{:03} | State(None)", line, column)
+            None => {
+                writeln!(f, "        | State(None)")
             }
         }
     }
@@ -323,7 +318,7 @@ impl<'a> AstNodeGeneric<'a> for State {
                 pos,
             } => pos,
             RegisterState { fields: _, pos } => pos,
-            None { pos } => pos,
+            None => &TokenStream::empty(),
         }
     }
 }

@@ -65,7 +65,7 @@ pub enum Interface {
     // TODO interface may be a combination: e.g., Memory + MMIORegisters
     //CombinedState {  },
     /// No software interface associated with this translation unit
-    None { pos: TokenStream },
+    None,
 }
 
 /// Implementation of the Interface
@@ -270,7 +270,7 @@ impl<'a> AstNodeGeneric<'a> for Interface {
             Interface::Memory { pos, .. } => pos,
             Interface::MMIORegisters { pos, .. } => pos,
             Interface::SpecialRegisters { pos, .. } => pos,
-            Interface::None { pos, .. } => pos,
+            Interface::None => &TokenStream::empty(),
         }
     }
 }

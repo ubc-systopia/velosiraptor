@@ -29,21 +29,21 @@
 
 // the used nom functionality
 use nom::{
-    branch::{permutation, alt},
+    branch::{alt, permutation},
     combinator::{cut, opt},
     multi::{many0, separated_list0},
-    sequence::{delimited, terminated, tuple},
+    sequence::{delimited, preceded, terminated, tuple},
     Err,
 };
 
 // the used library-internal functionaltity
-use crate::{ast::{Interface, Param, State, Unit, Segment, StaticMap}};
+use crate::ast::{Interface, Param, Segment, State, StaticMap, Unit};
 use crate::error::{IResult, VrsError};
 use crate::parser::{
     constdef, interface, method, parameter, state,
     terminals::{
-        assign, colon, comma, ident, kw_size, lbrace, lparen, num, rbrace, rparen,
-        semicolon, kw_staticmap, kw_segment
+        assign, colon, comma, ident, kw_segment, kw_size, kw_staticmap, lbrace, lparen, num,
+        rbrace, rparen, semicolon,
     },
 };
 use crate::token::TokenStream;
@@ -60,7 +60,7 @@ fn size_clause(input: TokenStream) -> IResult<TokenStream, u64> {
 }
 
 /// parses and consumes the derived clause of a unit: `: IDENTIFIER | KW_SEGMENT | KW_STATICMAP`
-fn derived_clause(input: TokenStream) -> IResult<TokenStream, String> {
+fn derived_clause(input: TokenStream) -> IResult<TokenStream, Option<String>> {
     // this is a bit a hack, we need to return the derived clause as a string,
     // but `Segment` and `StaticMap` are keywords, not strings, so we need to map the
     // result of the parser to a string here.
@@ -69,18 +69,20 @@ fn derived_clause(input: TokenStream) -> IResult<TokenStream, String> {
     // });
 
     // let's try to parse the colon indicating the derived clause
-    match cut(colon)(input.clone()) {
-        Ok((i, _)) => ident(i),
-        Err(_) => {
-            // print a more helpful error message
-            let err = VrsError::new_err(
-                input,
-                String::from("missing derived from clause for unit"),
-                Some(String::from("add derived clause here \": Identifier)\"")),
-            );
-            Err(Err::Failure(err))
-        }
-    }
+    opt(preceded(colon, cut(ident)))(input)
+
+    // match (colon)(input.clone()) {
+    //     Ok((i, _)) => ident(i),
+    //     Err(_) => {
+    //         // print a more helpful error message
+    //         let err = VrsError::new_err(
+    //             input,
+    //             String::from("missing derived from clause for unit"),
+    //             Some(String::from("add derived clause here \": Identifier)\"")),
+    //         );
+    //         Err(Err::Failure(err))
+    //     }
+    // }
 }
 
 pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
@@ -118,10 +120,8 @@ fn unit_segment(input: TokenStream) -> IResult<TokenStream, Unit> {
         derived,
         size,
         consts,
-        state: state.unwrap_or(State::None { pos: pos.clone() }),
-        interface: interface.unwrap_or(Interface::None {
-            pos: TokenStream::empty(),
-        }),
+        state: state.unwrap_or(State::None),
+        interface: interface.unwrap_or(Interface::None),
         methods,
         map_ops: None,
         unmap_ops: None,
@@ -133,7 +133,7 @@ fn unit_segment(input: TokenStream) -> IResult<TokenStream, Unit> {
 }
 
 /// parses and consumes a staticmap unit declaration (`staticmap foo(args) : derived {};`)
-/// 
+///
 /// TODO not sure if we need to have methods in static map declarations
 fn unit_staticmap(input: TokenStream) -> IResult<TokenStream, Unit> {
     // try to match the staticmap keyword, if there is no match, return early.
@@ -141,17 +141,15 @@ fn unit_staticmap(input: TokenStream) -> IResult<TokenStream, Unit> {
 
     // we've seen the `staticmap` keyword, next there needs to be the unit identifier,
     // followed bby some optional parameters and the derived clause.
-    let (i2, (unitname, params, derived)) = cut(tuple((ident, opt(param_clause), derived_clause)))(i1)?;
+    let (i2, (unitname, params, derived)) =
+        cut(tuple((ident, opt(param_clause), derived_clause)))(i1)?;
 
     // parse the unit body. this is a combination of the following
-    let unit_body = permutation((
-        many0(constdef),
-        opt(parse_map),
-        opt(size_clause),
-    ));
+    let unit_body = permutation((many0(constdef), opt(parse_map), opt(size_clause)));
 
     // then we have the unit block, wrapped in curly braces and a ;
-    let (i4, (consts, map, size)) = cut(terminated(delimited(lbrace, unit_body, rbrace), semicolon))(i2)?;
+    let (i4, (consts, map, size)) =
+        cut(terminated(delimited(lbrace, unit_body, rbrace), semicolon))(i2)?;
 
     let pos = input.expand_until(&i4);
     let staticmap = StaticMap {
@@ -160,6 +158,7 @@ fn unit_staticmap(input: TokenStream) -> IResult<TokenStream, Unit> {
         derived,
         size,
         consts,
+        methods: Vec::new(),
         map,
         pos,
     };
@@ -169,11 +168,9 @@ fn unit_staticmap(input: TokenStream) -> IResult<TokenStream, Unit> {
 
 // TODO parse map as XOR of unit type parsers.
 
-
 #[cfg(test)]
 use crate::lexer::Lexer;
 use crate::parser::map::parse_map;
-
 
 #[test]
 fn test_ok() {
