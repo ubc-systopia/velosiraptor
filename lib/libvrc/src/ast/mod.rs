@@ -76,7 +76,7 @@ pub use state::State;
 pub use statement::Stmt;
 pub use symboltable::{Symbol, SymbolKind, SymbolTable};
 pub use types::Type;
-pub use unit::Unit;
+pub use unit::{Unit, StaticMap, Segment};
 
 /// Trait that checks the Ast nodes for consistency
 ///

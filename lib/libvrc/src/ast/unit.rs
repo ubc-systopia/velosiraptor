@@ -50,49 +50,55 @@ use crate::token::TokenStream;
 /// to inheritance in other languages.
 #[derive(PartialEq, Clone)]
 pub enum Unit {
-    StaticMap {
-        /// the name of the unit (identifier)
-        name: String,
-        /// the unit parameters
-        params: Vec<Param>,
-        /// the name of the derived unit
-        derived: String,
-        /// the size of the unit in bits
-        size: Option<u64>,
-        /// defined constants in this unit
-        consts: Vec<Const>,
-        /// Optional map in the case of map UnitType
-        map: Option<Map>,
-        /// the position in the source tree where this unit is defined
-        pos: TokenStream,
-    },
-    Segment {
-        /// the name of the unit (identifier)
-        name: String,
-        /// the unit parameters
-        params: Vec<Param>,
-        /// the name of the derrived unit
-        derived: String,
-        /// the size of the unit in bits
-        size: Option<u64>,
-        /// defined constants in this unit
-        consts: Vec<Const>,
-        /// the state of the unit
-        state: State,
-        /// the software visible interface of the unit
-        interface: Interface,
-        /// the methods defined by this unit
-        methods: Vec<Method>,
-        // TODO: maybe make the translate / constructors / map / ... explicit here?
-        /// synthesized map operations for this unit
-        map_ops: Option<Vec<Operation>>,
-        /// synthesizeed unmap operations for this unit
-        unmap_ops: Option<Vec<Operation>>,
-        /// synthesized protect operations for this unit
-        protect_ops: Option<Vec<Operation>>,
-        /// the position in the source tree where this unit is defined
-        pos: TokenStream,  
-    }
+    StaticMap(StaticMap),
+    Segment(Segment),
+}
+
+#[derive(PartialEq, Clone)]
+pub struct Segment {
+    /// the name of the unit (identifier)
+    pub name: String,
+    /// the unit parameters
+    pub params: Vec<Param>,
+    /// the name of the derrived unit
+    pub derived: String,
+    /// the size of the unit in bits
+    pub size: Option<u64>,
+    /// defined constants in this unit
+    pub consts: Vec<Const>,
+    /// the state of the unit
+    pub state: State,
+    /// the software visible interface of the unit
+    pub interface: Interface,
+    /// the methods defined by this unit
+    pub methods: Vec<Method>,
+    // TODO: maybe make the translate / constructors / map / ... explicit here?
+    /// synthesized map operations for this unit
+    pub map_ops: Option<Vec<Operation>>,
+    /// synthesizeed unmap operations for this unit
+    pub unmap_ops: Option<Vec<Operation>>,
+    /// synthesized protect operations for this unit
+    pub protect_ops: Option<Vec<Operation>>,
+    /// the position in the source tree where this unit is defined
+    pos: TokenStream,  
+}
+
+#[derive(PartialEq, Clone)]
+pub struct StaticMap {
+    /// the name of the unit (identifier)
+    name: String,
+    /// the unit parameters
+    params: Vec<Param>,
+    /// the name of the derived unit
+    derived: String,
+    /// the size of the unit in bits
+    size: Option<u64>,
+    /// defined constants in this unit
+    consts: Vec<Const>,
+    /// Optional map in the case of map UnitType
+    map: Option<Map>,
+    /// the position in the source tree where this unit is defined
+    pos: TokenStream,
 }
 
 /// Implementation of [Unit]
@@ -100,15 +106,15 @@ impl<'a> Unit {
 
     pub fn location(&self) -> String {
         match self {
-            Unit::StaticMap { pos, ..  } => pos.location(),
-            Unit::Segment { pos, .. } => pos.location()
+            Unit::StaticMap(staticmap) => staticmap.pos.location(),
+            Unit::Segment(segment) => segment.pos.location()
         } 
     }
 
     pub fn to_symbol(&self) -> Symbol {
         let name = match self {
-            Unit::StaticMap { name, .. } => name.clone(),
-            Unit::Segment { name, .. } => name.clone(),
+            Unit::StaticMap(staticmap) => staticmap.name.clone(),
+            Unit::Segment(segment) => segment.name.clone(),
         };
         
         Symbol::new(
@@ -125,7 +131,7 @@ impl<'a> Unit {
         // TODO: make this a hashmap!
         let methods = match self {
             Unit::StaticMap { .. } => todo!(),
-            Unit::Segment { methods, .. } => methods,
+            Unit::Segment(segment) => segment.methods,
         };
         for m in methods.iter() {
             if m.name == name {
@@ -137,8 +143,16 @@ impl<'a> Unit {
 
     pub fn derived(&self) -> &str {
         match self {
-            Unit::StaticMap { derived, .. } => &derived,
-            Unit::Segment { derived, .. } => &derived,
+            Unit::StaticMap(staticmap) => &staticmap.derived,
+            Unit::Segment(segment) => &segment.derived,
+        }
+    }
+    
+    ///
+    pub fn name(&self) -> &str {
+        match self {
+            Unit::StaticMap(staticmap) => &staticmap.name,
+            Unit::Segment(segment) => &segment.name,
         }
     }
 
@@ -148,14 +162,10 @@ impl<'a> Unit {
 impl<'a> AstNodeGeneric<'a> for Unit {
     fn check(&'a self, st: &mut SymbolTable<'a>) -> Issues {
         match self {
-            Unit::StaticMap { 
-                name, pos, params, derived, size, consts, map, 
-            } => {
+            Unit::StaticMap(staticmap) => {
                 todo!();
             }
-            Unit::Segment { 
-                name, params, derived, size, consts, state, interface, methods, map_ops, unmap_ops, protect_ops, pos 
-            } => {
+            Unit::Segment(segment) => {
                 // all fine for now
                 let mut res = Issues::ok();
 
@@ -166,21 +176,21 @@ impl<'a> AstNodeGeneric<'a> for Unit {
                 st.create_context(String::from(self.name()));
 
                 // adding the module paramters
-                for p in params {
+                for p in segment.params {
                     if !st.insert(p.to_symbol()) {
                         res.inc_err(1);
                     }
                 }
 
                 // adding the constants
-                for c in consts {
+                for c in segment.consts {
                     if !st.insert(c.to_symbol()) {
                         res.inc_err(1);
                     }
                 }
 
                 // add the methods to it
-                for m in methods {
+                for m in segment.methods {
                     if !st.insert(m.to_symbol()) {
                         res.inc_err(1);
                     }
@@ -188,8 +198,8 @@ impl<'a> AstNodeGeneric<'a> for Unit {
 
                 // add the state symbolds
                 // XXX: maybe we wan to do the symbol table building after checking the elements?
-                state.build_symboltable(st);
-                interface.build_symboltable(st);
+                segment.state.build_symboltable(st);
+                segment.interface.build_symboltable(st);
 
                 // Check 1: Double defined constants
                 // --------------------------------------------------------------------------------------
@@ -198,7 +208,7 @@ impl<'a> AstNodeGeneric<'a> for Unit {
                 // Notes:       --
                 // --------------------------------------------------------------------------------------
 
-                let errors = utils::check_double_entries(consts);
+                let errors = utils::check_double_entries(&segment.consts);
                 res.inc_err(errors);
 
                 // Check 2: Constants
@@ -207,7 +217,7 @@ impl<'a> AstNodeGeneric<'a> for Unit {
                 // Description: Check all defined constats of the Unit
                 // Notes:
                 // --------------------------------------------------------------------------------------
-                for c in consts {
+                for c in segment.consts {
                     res = res + c.check(st);
                 }
 
@@ -219,7 +229,7 @@ impl<'a> AstNodeGeneric<'a> for Unit {
                 // --------------------------------------------------------------------------------------
 
                 // check the state and interface
-                res = res + state.check(st);
+                res = res + segment.state.check(st);
 
                 // Check 4: State Param Check
                 // --------------------------------------------------------------------------------------
@@ -235,7 +245,7 @@ impl<'a> AstNodeGeneric<'a> for Unit {
                 // Description: Check that the state definition is fine
                 // Notes:       --
                 // --------------------------------------------------------------------------------------
-                res = res + interface.check(st);
+                res = res + segment.interface.check(st);
 
                 // Check 6: Interface param check
                 // --------------------------------------------------------------------------------------
@@ -252,7 +262,7 @@ impl<'a> AstNodeGeneric<'a> for Unit {
                 // Notes:       --
                 // --------------------------------------------------------------------------------------
 
-                let errors = utils::check_double_entries(methods);
+                let errors = utils::check_double_entries(&segment.methods);
                 res.inc_err(errors);
 
                 // Check 8: Method check
@@ -262,7 +272,7 @@ impl<'a> AstNodeGeneric<'a> for Unit {
                 // Notes:       --
                 // --------------------------------------------------------------------------------------
 
-                for m in methods {
+                for m in segment.methods {
                     res = res + m.check(st);
                 }
 
@@ -283,7 +293,7 @@ impl<'a> AstNodeGeneric<'a> for Unit {
 
                 let mut has_map = false;
                 let mut has_translate = false;
-                for m in methods {
+                for m in segment.methods {
                     match m.name() {
                         "translate" => {
                             res = res + m.check_translate();
@@ -312,23 +322,25 @@ impl<'a> AstNodeGeneric<'a> for Unit {
                 }
 
                 st.drop_context();
-                res
+                return res;
             }
         }
+
         
     }
-    ///
-    fn name(&self) -> &str {
-        match self {
-            Unit::StaticMap { name, .. } => &name,
-            Unit::Segment { name, .. } => &name,
-        }
-    }
+
     /// returns the location of the current
     fn loc(&self) -> &TokenStream {
         match self {
-            Unit::Segment { pos, .. } => &pos,
-            Unit::StaticMap { pos, .. } => &pos,
+            Unit::Segment(segment) => &segment.pos,
+            Unit::StaticMap(staticmap) => &staticmap.pos,
+        }
+    }
+
+    fn name(&self) -> &str {
+        match self {
+            Unit::Segment(segment) => &segment.name,
+            Unit::StaticMap(staticmap) => &staticmap.name,
         }
     }
 }
