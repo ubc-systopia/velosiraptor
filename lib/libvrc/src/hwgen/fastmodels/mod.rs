@@ -212,14 +212,16 @@ impl HWGenBackend for ArmFastModelsModule {
 
     /// generate the interface definitions
     fn generate_interface(&self, ast: &AstRoot) -> Result<(), HWGenError> {
-        generate_register_header(&self.pkgname, &ast.units[0].interface, &self.outdir)
-            .expect("failed to generate the interface header");
-        generate_register_impl(&self.pkgname, &ast.units[0].interface, &self.outdir)
-            .expect("failed to generate the interface header");
-        generate_interface_header(&self.pkgname, &ast.units[0].interface, &self.outdir)
-            .expect("failed to generate the interface header");
-        generate_interface_impl(&self.pkgname, &ast.units[0].interface, &self.outdir)
-            .expect("failed to generate the interface implementation");
+        for unit in ast.segment_units() {
+            generate_register_header(&self.pkgname, &unit.interface, &self.outdir)
+                .expect("failed to generate the interface header");
+            generate_register_impl(&self.pkgname, &unit.interface, &self.outdir)
+                .expect("failed to generate the interface header");
+            generate_interface_header(&self.pkgname, &unit.interface, &self.outdir)
+                .expect("failed to generate the interface header");
+            generate_interface_impl(&self.pkgname, &unit.interface, &self.outdir)
+                .expect("failed to generate the interface implementation");
+        }
         Ok(())
     }
 
@@ -227,14 +229,14 @@ impl HWGenBackend for ArmFastModelsModule {
     fn generate_state(&self, ast: &AstRoot) -> Result<(), HWGenError> {
         println!("GENERATING THE STATE!");
 
-        if !ast.units.is_empty() {
-            generate_field_header(&self.pkgname, &ast.units[0].state, &self.outdir)
+        for unit in ast.segment_units() {
+            generate_field_header(&self.pkgname, &unit.state, &self.outdir)
                 .expect("failed to generate the fields header");
-            generate_field_impl(&self.pkgname, &ast.units[0].state, &self.outdir)
+            generate_field_impl(&self.pkgname, &unit.state, &self.outdir)
                 .expect("failed to generate the fields implementation");
-            generate_state_header(&self.pkgname, &ast.units[0].state, &self.outdir)
+            generate_state_header(&self.pkgname, &unit.state, &self.outdir)
                 .expect("failed to generate the state header");
-            generate_state_impl(&self.pkgname, &ast.units[0].state, &self.outdir)
+            generate_state_impl(&self.pkgname, &unit.state, &self.outdir)
                 .expect("failed to generate the state implementation");
         }
 
