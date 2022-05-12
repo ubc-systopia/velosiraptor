@@ -33,12 +33,11 @@ use nom::{
     combinator::{cut, opt},
     multi::{many0, separated_list0},
     sequence::{delimited, preceded, terminated, tuple},
-    Err,
 };
 
 // the used library-internal functionaltity
 use crate::ast::{Interface, Param, Segment, State, StaticMap, Unit};
-use crate::error::{IResult, VrsError};
+use crate::error::IResult;
 use crate::parser::{
     constdef, interface, method, parameter, state,
     terminals::{
@@ -120,8 +119,8 @@ fn unit_segment(input: TokenStream) -> IResult<TokenStream, Unit> {
         derived,
         size,
         consts,
-        state: state.unwrap_or(State::None),
-        interface: interface.unwrap_or(Interface::None),
+        state: state.unwrap_or(State::new_none()),
+        interface: interface.unwrap_or(Interface::new_none()),
         methods,
         map_ops: None,
         unmap_ops: None,

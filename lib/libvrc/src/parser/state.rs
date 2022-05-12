@@ -72,9 +72,8 @@ fn memory_state(input: TokenStream) -> IResult<TokenStream, State> {
 /// parses and consumes [None] state of a unit
 fn none_state(input: TokenStream) -> IResult<TokenStream, State> {
     let (i1, _) = kw_none(input.clone())?;
-    let pos = input.expand_until(&i1);
 
-    Ok((i1, State::None))
+    Ok((i1, State::new_none()))
 }
 
 /// Parses and consumes a comma separated list of identifiers of the form "(ident, ..., ident)"
