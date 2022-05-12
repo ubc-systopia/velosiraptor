@@ -47,7 +47,7 @@ use nom::{
 ///
 /// # Results
 ///
-///  * OK:      the parser could successfully recognize the memory field blcok
+///  * OK:      the parser could successfully recognize the memory field block
 ///  * Error:   the parser could not recognize the memory field block
 ///  * Failure: the parser recognized the memory field block, but it did not properly parse
 ///

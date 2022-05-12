@@ -37,7 +37,7 @@ use nom::{
 };
 
 // the used library-internal functionaltity
-use crate::{ast::{Interface, Param, State, Unit}};
+use crate::{ast::{Interface, Param, State, Unit, Segment, StaticMap}};
 use crate::error::{IResult, VrsError};
 use crate::parser::{
     constdef, interface, method, parameter, state,
@@ -111,25 +111,25 @@ fn unit_segment(input: TokenStream) -> IResult<TokenStream, Unit> {
         cut(terminated(delimited(lbrace, unit_body, rbrace), semicolon))(i2)?;
 
     let pos = input.expand_until(&i4);
-    Ok((
-        i4,
-        Unit::Segment {
-            name: unitname,
-            params: params.unwrap_or_default(),
-            derived,
-            size,
-            consts,
-            state: state.unwrap_or(State::None { pos: pos.clone() }),
-            interface: interface.unwrap_or(Interface::None {
-                pos: TokenStream::empty(),
-            }),
-            methods,
-            map_ops: None,
-            unmap_ops: None,
-            protect_ops: None,
-            pos,
-        },
-    ))
+
+    let segment = Segment {
+        name: unitname,
+        params: params.unwrap_or_default(),
+        derived,
+        size,
+        consts,
+        state: state.unwrap_or(State::None { pos: pos.clone() }),
+        interface: interface.unwrap_or(Interface::None {
+            pos: TokenStream::empty(),
+        }),
+        methods,
+        map_ops: None,
+        unmap_ops: None,
+        protect_ops: None,
+        pos,
+    };
+
+    Ok((i4, Unit::Segment(segment)))
 }
 
 /// parses and consumes a staticmap unit declaration (`staticmap foo(args) : derived {};`)
@@ -154,18 +154,17 @@ fn unit_staticmap(input: TokenStream) -> IResult<TokenStream, Unit> {
     let (i4, (consts, map, size)) = cut(terminated(delimited(lbrace, unit_body, rbrace), semicolon))(i2)?;
 
     let pos = input.expand_until(&i4);
-    Ok((
-        i4,
-        Unit::StaticMap {
-            name: unitname,
-            params: params.unwrap_or_default(),
-            derived,
-            size,
-            consts,
-            map,
-            pos,
-        },
-    ))
+    let staticmap = StaticMap {
+        name: unitname,
+        params: params.unwrap_or_default(),
+        derived,
+        size,
+        consts,
+        map,
+        pos,
+    };
+
+    Ok((i4, Unit::StaticMap(staticmap)))
 }
 
 // TODO parse map as XOR of unit type parsers.
