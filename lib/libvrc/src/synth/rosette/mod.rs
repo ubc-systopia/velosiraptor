@@ -1229,7 +1229,7 @@ impl SynthRosette {
     pub fn synth_map(&self, ast: &mut AstRoot) -> Result<(), SynthError> {
         fs::create_dir_all(&self.outdir)?;
 
-        for unit in &mut ast.segment_units() {
+        for unit in &mut ast.segment_units_mut() {
             println!("synthesizing map: for {} in {:?}", unit.name, self.outdir);
 
             let m = unit.get_method("translate").unwrap();
@@ -1284,7 +1284,7 @@ impl SynthRosette {
 
     /// synthesizes the 'unmap' function and returns an ast of it
     pub fn synth_unmap(&self, ast: &mut AstRoot) -> Result<(), SynthError> {
-        for unit in &mut ast.segment_units() {
+        for unit in &mut &mut ast.segment_units_mut() {
             println!("synthesizing map: for {} in {:?}", unit.name(), self.outdir);
             let ops = Vec::new();
             unit.unmap_ops = Some(ops);
@@ -1293,7 +1293,7 @@ impl SynthRosette {
     }
 
     pub fn synth_protect(&self, ast: &mut AstRoot) -> Result<(), SynthError> {
-        for unit in &mut ast.segment_units() {
+        for unit in &mut ast.segment_units_mut() {
             println!("synthesizing map: for {} in {:?}", unit.name(), self.outdir);
             let ops = Vec::new();
             unit.protect_ops = Some(ops);
