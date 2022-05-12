@@ -80,7 +80,7 @@ pub struct Segment {
     /// synthesized protect operations for this unit
     pub protect_ops: Option<Vec<Operation>>,
     /// the position in the source tree where this unit is defined
-    pos: TokenStream,  
+    pub pos: TokenStream,  
 }
 
 #[derive(PartialEq, Clone)]

@@ -32,6 +32,7 @@ use std::path::PathBuf;
 use crustal as C;
 
 use crate::ast::AstRoot;
+use crate::ast::Unit;
 use crate::codegen::CodeGenBackend;
 use crate::codegen::CodeGenError;
 
@@ -39,7 +40,7 @@ use utils::{add_const_def, add_header};
 
 mod field;
 mod interface;
-mod unit;
+mod segment;
 mod utils;
 
 /// The C backend
@@ -109,11 +110,13 @@ impl CodeGenBackend for BackendC {
 
         // get the source dir
         for unit in &ast.units {
-            srcdir.push(unit.name.to_lowercase());
-            // the root directory as supplied by backend
-            fs::create_dir_all(&srcdir)?;
-            interface::generate(unit, &srcdir)?;
-            srcdir.pop();
+            if let Unit::Segment(segment) = unit {
+                srcdir.push(segment.name.to_lowercase());
+                // the root directory as supplied by backend
+                fs::create_dir_all(&srcdir)?;
+                interface::generate(segment, &srcdir)?;
+                srcdir.pop();
+            }
         }
         Ok(())
     }
@@ -121,11 +124,13 @@ impl CodeGenBackend for BackendC {
     fn generate_units(&self, ast: &AstRoot) -> Result<(), CodeGenError> {
         let mut srcdir = self.outdir.clone();
         for unit in &ast.units {
-            srcdir.push(unit.name.to_lowercase());
+            srcdir.push(unit.name().to_lowercase());
 
             // generate the unit
-            unit::generate(unit, &srcdir)?;
-
+            match unit {
+                Unit::StaticMap(_) => todo!(),
+                Unit::Segment(segment) => segment::generate(segment, &srcdir)
+            };
             srcdir.pop();
         }
 

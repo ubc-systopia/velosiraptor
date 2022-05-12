@@ -31,11 +31,11 @@ use std::path::Path;
 use crustal as C;
 
 use super::utils;
-use crate::ast::{BitSlice, Field, Interface, Unit};
+use crate::ast::{BitSlice, Field, Interface, Segment};
 use crate::codegen::c::field;
 use crate::codegen::CodeGenError;
 
-pub fn generate_memory_interface(_scope: &mut C::Scope, _unit: &Unit) {
+pub fn generate_memory_interface(_scope: &mut C::Scope, _unit: &Segment) {
     //     let ifname = interface_type(unit);
 
     //     // Step 1:  add the struct definition, here we need to add all the fields
@@ -112,7 +112,7 @@ pub fn generate_memory_interface(_scope: &mut C::Scope, _unit: &Unit) {
 ///    return val;
 /// }
 /// ```
-fn generate_read_mmio_register(scope: &mut C::Scope, unit: &Unit, field: &Field) {
+fn generate_read_mmio_register(scope: &mut C::Scope, unit: &Segment, field: &Field) {
     // adding the get value function
     let fnname = utils::if_field_rd_fn_name(unit, field);
     let fieldtype = C::Type::new_typedef(&utils::field_type_name(unit, field));
@@ -121,7 +121,7 @@ fn generate_read_mmio_register(scope: &mut C::Scope, unit: &Unit, field: &Field)
     f.set_static().set_inline();
     f.push_doc_str(&format!("reads the mmio register `{}`", field.name));
 
-    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::unit_type_name(unit)));
+    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::segment_type_name(unit)));
     let p = f.new_param("unit", unittype);
     let unit_var = p.to_expr();
 
@@ -143,7 +143,7 @@ fn generate_read_mmio_register(scope: &mut C::Scope, unit: &Unit, field: &Field)
 
 /// Generates the
 ///
-fn generate_write_mmio_register(scope: &mut C::Scope, unit: &Unit, field: &Field) {
+fn generate_write_mmio_register(scope: &mut C::Scope, unit: &Segment, field: &Field) {
     // adding the set value function
     let fnname = utils::if_field_wr_fn_name(unit, field);
     let mut f = C::Function::with_string(fnname, C::Type::new_void());
@@ -151,7 +151,7 @@ fn generate_write_mmio_register(scope: &mut C::Scope, unit: &Unit, field: &Field
     f.set_static().set_inline();
     f.push_doc_str(&format!("writes the mmio register `{}`", field.name));
 
-    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::unit_type_name(unit)));
+    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::segment_type_name(unit)));
     let p = f.new_param("unit", unittype);
     let unit_var = p.to_expr();
     let fieldtype = C::Type::new_typedef(&utils::field_type_name(unit, field));
@@ -172,7 +172,7 @@ fn generate_write_mmio_register(scope: &mut C::Scope, unit: &Unit, field: &Field
     scope.push_function(f);
 }
 
-fn generate_read_slice_mmio(scope: &mut C::Scope, unit: &Unit, field: &Field, slice: &BitSlice) {
+fn generate_read_slice_mmio(scope: &mut C::Scope, unit: &Segment, field: &Field, slice: &BitSlice) {
     let fnname = utils::if_field_rd_slice_fn_name(unit, field, slice);
 
     let mut f = C::Function::with_string(fnname, C::Type::new_int(field.nbits()));
@@ -185,7 +185,7 @@ fn generate_read_slice_mmio(scope: &mut C::Scope, unit: &Unit, field: &Field, sl
         field.name, slice.name
     ));
 
-    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::unit_type_name(unit)));
+    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::segment_type_name(unit)));
     let p = f.new_param("unit", unittype);
     let unit_var = p.to_expr();
 
@@ -205,7 +205,7 @@ fn generate_read_slice_mmio(scope: &mut C::Scope, unit: &Unit, field: &Field, sl
     scope.push_function(f);
 }
 
-fn generate_write_slice_mmio(scope: &mut C::Scope, unit: &Unit, field: &Field, slice: &BitSlice) {
+fn generate_write_slice_mmio(scope: &mut C::Scope, unit: &Segment, field: &Field, slice: &BitSlice) {
     let fnname = utils::if_field_wr_slice_fn_name(unit, field, slice);
 
     let mut f = C::Function::with_string(fnname, C::Type::new_void());
@@ -218,7 +218,7 @@ fn generate_write_slice_mmio(scope: &mut C::Scope, unit: &Unit, field: &Field, s
         field.name, slice.name
     ));
 
-    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::unit_type_name(unit)));
+    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::segment_type_name(unit)));
     let p = f.new_param("unit", unittype);
     let unit_var = p.to_expr();
 
@@ -247,7 +247,7 @@ fn generate_write_slice_mmio(scope: &mut C::Scope, unit: &Unit, field: &Field, s
     scope.push_function(f);
 }
 
-pub fn generate_mmio_interface(scope: &mut C::Scope, unit: &Unit) {
+pub fn generate_mmio_interface(scope: &mut C::Scope, unit: &Segment) {
     for if_field in unit.interface.fields() {
         let field = &if_field.field;
 
@@ -263,7 +263,7 @@ pub fn generate_mmio_interface(scope: &mut C::Scope, unit: &Unit) {
     }
 }
 
-pub fn generate_register_interface(_scope: &mut C::Scope, _unit: &Unit) {
+pub fn generate_register_interface(_scope: &mut C::Scope, _unit: &Segment) {
     // there is not really an interface here, so an empty struct
     // let st = scope.new_struct(&interface_type(unit));
     // st.vis("pub");
@@ -275,7 +275,7 @@ pub fn generate_register_interface(_scope: &mut C::Scope, _unit: &Unit) {
 }
 
 /// generates the field types for the interface
-pub fn generate_interface_fields(unit: &Unit, outdir: &Path) -> Result<(), CodeGenError> {
+pub fn generate_interface_fields(unit: &Segment, outdir: &Path) -> Result<(), CodeGenError> {
     let fields = unit.interface.fields();
 
     let res: Result<(), CodeGenError> = Ok(());
@@ -289,7 +289,7 @@ pub fn generate_interface_fields(unit: &Unit, outdir: &Path) -> Result<(), CodeG
     })
 }
 
-fn generate_unit_struct(scope: &mut C::Scope, unit: &Unit) {
+fn generate_unit_struct(scope: &mut C::Scope, unit: &Segment) {
     let fields = unit
         .params
         .iter()
@@ -299,24 +299,24 @@ fn generate_unit_struct(scope: &mut C::Scope, unit: &Unit) {
         })
         .collect();
 
-    let sn = utils::unit_struct_name(unit);
+    let sn = utils::segment_struct_name(unit);
     let mut s = C::Struct::with_fields(&sn, fields);
 
     s.push_doc_str(&format!("Unit Type `{}`", unit.name));
     s.push_doc_str("");
-    s.push_doc_str(&format!("@loc: {}", unit.location()));
+    s.push_doc_str(&format!("@loc: {}", unit.pos.location()));
 
     let stype = s.to_type();
 
     scope.push_struct(s);
 
     // adding a type def;
-    let fieldtype = utils::unit_type_name(unit);
+    let fieldtype = utils::segment_type_name(unit);
     scope.new_typedef(&fieldtype, stype);
 }
 
 /// generates the Unit definitions
-pub fn generate(unit: &Unit, outdir: &Path) -> Result<(), CodeGenError> {
+pub fn generate(unit: &Segment, outdir: &Path) -> Result<(), CodeGenError> {
     // the code generation scope
     let mut scope = C::Scope::new();
 

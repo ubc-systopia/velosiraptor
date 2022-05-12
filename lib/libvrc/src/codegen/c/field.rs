@@ -31,14 +31,14 @@ use std::path::Path;
 // get the code generator
 use crustal as C;
 
-use crate::ast::{BitSlice, Field, Unit};
+use crate::ast::{BitSlice, Field, Segment};
 use crate::codegen::CodeGenError;
 
 // library internal includes
 use super::utils;
 
 /// adding a constant value for the mask : const FIELD_MASK : type = value;
-fn add_field_constants(scope: &mut C::Scope, unit: &Unit, field: &Field) {
+fn add_field_constants(scope: &mut C::Scope, unit: &Segment, field: &Field) {
     // construct the constant name
     let maskname = utils::field_mask_name(unit, field);
 
@@ -69,7 +69,7 @@ pub fn if_field_header_path(name: &str) -> String {
     format!("{}_field.h", name)
 }
 
-fn add_struct_definition(scope: &mut C::Scope, unit: &Unit, field: &Field) {
+fn add_struct_definition(scope: &mut C::Scope, unit: &Segment, field: &Field) {
     let sn = utils::field_struct_name(unit, field);
     let mut s = C::Struct::with_fields(
         &sn,
@@ -125,7 +125,7 @@ fn add_struct_definition(scope: &mut C::Scope, unit: &Unit, field: &Field) {
 }
 
 /// adds an extraction function
-fn add_extract_fn(scope: &mut C::Scope, unit: &Unit, field: &Field, sl: &BitSlice) {
+fn add_extract_fn(scope: &mut C::Scope, unit: &Segment, field: &Field, sl: &BitSlice) {
     let fieldtype = utils::field_type_name(unit, field);
 
     // adding the get value function
@@ -161,7 +161,7 @@ fn add_extract_fn(scope: &mut C::Scope, unit: &Unit, field: &Field, sl: &BitSlic
 }
 
 /// Generates an insert function taht sets the value of a field value
-fn add_insert_fn(scope: &mut C::Scope, unit: &Unit, field: &Field, sl: &BitSlice) {
+fn add_insert_fn(scope: &mut C::Scope, unit: &Segment, field: &Field, sl: &BitSlice) {
     let fieldtype = utils::field_type_name(unit, field);
 
     let fnname = utils::field_slice_insert_fn_name(unit, field, sl);
@@ -201,7 +201,7 @@ fn add_insert_fn(scope: &mut C::Scope, unit: &Unit, field: &Field, sl: &BitSlice
 }
 
 /// generates the field value interface
-pub fn generate(unit: &Unit, field: &Field, outdir: &Path) -> Result<(), CodeGenError> {
+pub fn generate(unit: &Segment, field: &Field, outdir: &Path) -> Result<(), CodeGenError> {
     // the code generation scope
     let mut scope = C::Scope::new();
 
