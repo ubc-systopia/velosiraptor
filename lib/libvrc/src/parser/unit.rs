@@ -173,20 +173,20 @@ use crate::parser::map::parse_map;
 
 #[test]
 fn test_ok() {
-    let tokens = Lexer::lex_string("stdio", "unit foo : Segment {};").unwrap();
+    let tokens = Lexer::lex_string("stdio", "segment foo {};").unwrap();
     let ts = TokenStream::from_vec(tokens);
     assert!(unit_segment(ts).is_ok());
 
-    let tokens = Lexer::lex_string("stdio", "unit foo(base: addr) : Segment  {};").unwrap();
+    let tokens = Lexer::lex_string("stdio", "segment foo(base: addr) : bar {};").unwrap();
     let ts = TokenStream::from_vec(tokens);
     assert!(unit_segment(ts).is_ok());
 
     let tokens =
-        Lexer::lex_string("stdio", "unit foo : Segment  { const foo : int = 32; };").unwrap();
+        Lexer::lex_string("stdio", "segment foo : bar { const foo : int = 32; };").unwrap();
     let ts = TokenStream::from_vec(tokens);
     assert!(unit_segment(ts).is_ok());
 
-    let tokens = Lexer::lex_string("stdio", "unit foo : Segment  { size = 33; };").unwrap();
+    let tokens = Lexer::lex_string("stdio", "segment foo : bar { size = 33; };").unwrap();
     let ts = TokenStream::from_vec(tokens);
     assert!(unit_segment(ts).is_ok());
 }
