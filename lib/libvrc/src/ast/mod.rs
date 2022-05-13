@@ -62,7 +62,7 @@ custom_error! {#[derive(PartialEq)] pub AstError
 // rexports
 pub use actions::{Action, ActionComponent, ActionType};
 pub use bitslice::BitSlice;
-pub use consts::Const;
+pub use consts::{Const, ConstValue};
 pub use expression::{BinOp, Expr, Quantifier, UnOp};
 pub use field::Field;
 pub use import::Import;
@@ -97,7 +97,9 @@ pub trait AstNodeGeneric<'a> {
     fn name(&self) -> &str;
 
     /// returns the location of the AstNodeGeneric
-    fn loc(&self) -> &TokenStream;
+    fn loc(&self) -> &TokenStream {
+        &TOKENSTREAM_DUMMY
+    }
 }
 
 /// enum of all AstNodes

@@ -32,7 +32,7 @@ use nom::{
 };
 
 // lexer / parser imports
-use crate::ast::{Const, Type};
+use crate::ast::{Const, ConstValue, Type};
 use crate::error::IResult;
 use crate::parser::{
     expression::{arith_expr, bool_expr},
@@ -63,34 +63,25 @@ pub fn constdef(input: TokenStream) -> IResult<TokenStream, Const> {
     let (i1, _) = kw_const(input.clone())?;
 
     // parse tye type information `IDENT : TYPE =`
-    let (i2, (id, ti)) = cut(pair(ident, delimited(colon, typeinfo, assign)))(i1)?;
+    let (i2, (ident, ti)) = cut(pair(ident, delimited(colon, typeinfo, assign)))(i1)?;
 
     // parse a numeric literal for now. TODO: make this a constant expression
-    let (i3, value) = match ti {
+    let (i3, valexpr) = match ti {
         Type::Boolean => cut(terminated(bool_expr, semicolon))(i2),
         _ => cut(terminated(arith_expr, semicolon))(i2),
     }?;
 
+    let value = match ti {
+        Type::Boolean => ConstValue::with_bool_expr(valexpr),
+        Type::Integer => ConstValue::with_int_expr(valexpr),
+        Type::Address => ConstValue::with_int_expr(valexpr),
+        Type::Size => ConstValue::with_int_expr(valexpr),
+        _ => todo!("handle the other types: {:?}", ti),
+    };
+
     // create the token stream covering the entire const def
     let pos = input.expand_until(&i3);
-    match ti {
-        Type::Boolean => Ok((
-            i3,
-            Const::Boolean {
-                ident: id,
-                value,
-                pos,
-            },
-        )),
-        _ => Ok((
-            i3,
-            Const::Integer {
-                ident: id,
-                value,
-                pos,
-            },
-        )),
-    }
+    Ok((i3, Const { ident, value, pos }))
 }
 
 #[cfg(test)]
@@ -114,12 +105,12 @@ fn test_ok() {
         constdef(ts.clone()),
         Ok((
             ts.slice(7..8),
-            Const::Integer {
+            Const {
                 ident: "FOO".to_string(),
-                value: Expr::Number {
+                value: ConstValue::with_int_expr(Expr::Number {
                     value: 1234,
                     pos: ts.slice(5..6)
-                },
+                }),
                 pos: ts.slice(0..7)
             }
         ))
