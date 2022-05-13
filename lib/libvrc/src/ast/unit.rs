@@ -87,28 +87,28 @@ impl<'a> Unit {
     pub fn methods(&self) -> &[Method] {
         match self {
             Unit::StaticMap(staticmap) => staticmap.methods(),
-            Unit::Segment(segment) => &segment.methods(),
+            Unit::Segment(segment) => segment.methods(),
         }
     }
 
     pub fn consts(&self) -> &[Const] {
         match self {
             Unit::StaticMap(staticmap) => staticmap.consts(),
-            Unit::Segment(segment) => &segment.consts(),
+            Unit::Segment(segment) => segment.consts(),
         }
     }
 
     pub fn interface(&self) -> &Interface {
         match self {
             Unit::StaticMap(staticmap) => staticmap.interface(),
-            Unit::Segment(segment) => &segment.interface(),
+            Unit::Segment(segment) => segment.interface(),
         }
     }
 
     pub fn state(&self) -> &State {
         match self {
             Unit::StaticMap(staticmap) => staticmap.state(),
-            Unit::Segment(segment) => &segment.state(),
+            Unit::Segment(segment) => segment.state(),
         }
     }
 
@@ -438,7 +438,7 @@ impl<'a> AstNodeGeneric<'a> for Segment {
         }
 
         st.drop_context();
-        return res;
+        res
     }
 
     /// returns the location of the current
@@ -631,7 +631,7 @@ impl<'a> AstNodeGeneric<'a> for StaticMap {
         res = res + utils::check_camel_case(name, pos);
 
         st.drop_context();
-        return res;
+        res
     }
 
     /// returns the location of the StaticMap

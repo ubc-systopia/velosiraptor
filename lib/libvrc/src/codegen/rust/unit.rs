@@ -56,7 +56,7 @@ fn add_struct_definition(scope: &mut CG::Scope, unit: &Unit) {
     // field_name  --> struct FieldName {  val: u64 };
 
     // create the struct in the scope
-    let st = scope.new_struct(&unit.name());
+    let st = scope.new_struct(unit.name());
 
     // make it public
     st.vis("pub");
@@ -205,7 +205,7 @@ fn add_protect_function(imp: &mut CG::Impl, unit: &Unit) {
 
 fn add_struct_impl(scope: &mut CG::Scope, unit: &Unit) {
     // new implementation
-    let imp = scope.new_impl(&unit.name());
+    let imp = scope.new_impl(unit.name());
 
     // add the new() function
     add_constructor_function(imp, unit);

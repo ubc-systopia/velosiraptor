@@ -37,7 +37,7 @@ use crate::codegen::CodeGenError;
 
 /// returns the string of the field type
 pub fn interface_type(unit: &Unit) -> String {
-    utils::to_struct_name(&unit.name(), Some("Interface"))
+    utils::to_struct_name(unit.name(), Some("Interface"))
 }
 
 pub fn generate_memory_interface(scope: &mut CG::Scope, unit: &Unit) {
@@ -236,7 +236,7 @@ pub fn generate_interface_fields(unit: &Unit, outdir: &Path) -> Result<(), CodeG
 
     let res: Result<(), CodeGenError> = Ok(());
     fields.iter().fold(res, |res: Result<(), CodeGenError>, e| {
-        let r = field::generate(&unit.name(), &e.field, &fieldsdir);
+        let r = field::generate(unit.name(), &e.field, &fieldsdir);
         if res.is_err() {
             res
         } else {

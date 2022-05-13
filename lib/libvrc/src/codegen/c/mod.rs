@@ -126,10 +126,15 @@ impl CodeGenBackend for BackendC {
             srcdir.push(unit.name().to_lowercase());
 
             // generate the unit
-            match unit {
+            let err = match unit {
                 Unit::StaticMap(_) => todo!(),
                 Unit::Segment(segment) => segment::generate(segment, &srcdir),
             };
+
+            if err.is_err() {
+                panic!("TODO: handle code generation failed:  {:?}\n", err)
+            }
+
             srcdir.pop();
         }
 

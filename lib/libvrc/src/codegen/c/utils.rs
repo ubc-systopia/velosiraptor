@@ -37,7 +37,7 @@ pub fn unit_struct_name(unit_name: &str) -> String {
 }
 
 pub fn segment_struct_name(unit: &Segment) -> String {
-    unit.name().to_lowercase()
+    unit_struct_name(&unit.name)
 }
 
 pub fn unit_type_name(unit_name: &str) -> String {
