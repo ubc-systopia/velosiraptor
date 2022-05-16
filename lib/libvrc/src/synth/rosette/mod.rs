@@ -1167,7 +1167,8 @@ impl SynthRosette {
   ]
   (printf \"\")
 )
-", i=i
+",
+                i = i
             ))
         }
 
