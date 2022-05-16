@@ -519,8 +519,18 @@ impl ErrorLocation for TokenStream {
 
     /// the length of the token
     fn length(&self) -> usize {
+        match &self.tokens {
+            Some(tokens) => {
+                let mut sz = 0;
+                for i in self.range.clone() {
+                    sz += tokens[i].spos.length();
+                }
+                //self.peek().spos.length()
+                sz
+            }
+            None => 0,
+        }
         // TODO: figure out the right thing here!
-        self.peek().spos.length()
     }
 
     /// the context (stdin or filename)
