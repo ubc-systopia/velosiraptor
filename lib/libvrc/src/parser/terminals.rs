@@ -43,7 +43,7 @@ macro_rules! terminalparser (
                 if tok.peek().content == $tag {
                     Ok((rem, $tag))
                 } else {
-                    Err(Err::Error(VrsError::from_token(input, $tag)))
+                    Err(Err::Error(VrsError::from_token(input.with_range(0..1), $tag)))
                 }
             }
         }
@@ -122,7 +122,7 @@ pub fn ident(input: TokenStream) -> IResult<TokenStream, String> {
         match &id.content {
             TokenContent::Identifier(s) => Ok((rem, s.clone())),
             _ => Err(Err::Error(VrsError::from_token(
-                input,
+                input.with_range(0..1),
                 TokenContent::Identifier(String::new()),
             ))),
         }
@@ -139,7 +139,7 @@ pub fn num(input: TokenStream) -> IResult<TokenStream, u64> {
         match &id.content {
             TokenContent::IntLiteral(s) => Ok((rem, *s)),
             _ => Err(Err::Error(VrsError::from_token(
-                input,
+                input.with_range(0..1),
                 TokenContent::IntLiteral(0),
             ))),
         }
@@ -156,7 +156,7 @@ pub fn boolean(input: TokenStream) -> IResult<TokenStream, bool> {
         match &id.content {
             TokenContent::BoolLiteral(s) => Ok((rem, *s)),
             _ => Err(Err::Error(VrsError::from_token(
-                input,
+                input.with_range(0..1),
                 TokenContent::BoolLiteral(false),
             ))),
         }
@@ -174,7 +174,7 @@ macro_rules! keywordparser (
                 if tok.peek().content == TokenContent::Keyword($tag) {
                     Ok((rem, $tag))
                 } else {
-                    Err(Err::Error(VrsError::from_token(input, TokenContent::Keyword($tag))))
+                    Err(Err::Error(VrsError::from_token(input.with_range(0..1), TokenContent::Keyword($tag))))
                 }
             }
         }
@@ -224,9 +224,10 @@ pub fn typeinfo(input: TokenStream) -> IResult<TokenStream, Type> {
         TokenContent::Keyword(Keyword::Addr) => Ok((rem, Type::Address)),
         TokenContent::Keyword(Keyword::Boolean) => Ok((rem, Type::Boolean)),
         TokenContent::Keyword(Keyword::Integer) => Ok((rem, Type::Integer)),
+        TokenContent::Keyword(Keyword::Flags) => Ok((rem, Type::Flags)),
         // TODO: make this more type specifc
         _ => Err(Err::Error(VrsError::from_token(
-            input,
+            input.with_range(0..1),
             TokenContent::Keyword(Keyword::Size),
         ))),
     }

@@ -86,6 +86,7 @@ pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
         "size" => Token::new(TokenContent::Keyword(Keyword::Size), ident),
         "int" => Token::new(TokenContent::Keyword(Keyword::Integer), ident),
         "bool" => Token::new(TokenContent::Keyword(Keyword::Boolean), ident),
+        "flags" => Token::new(TokenContent::Keyword(Keyword::Flags), ident),
 
         //
         // constraint keywords

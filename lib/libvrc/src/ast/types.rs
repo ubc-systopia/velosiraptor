@@ -45,8 +45,10 @@ pub enum Type {
     State,
     /// the interface of a unit
     Interface,
-    ///
+    /// represents the the unit
     Unit,
+    /// the flags of a unit
+    Flags,
 }
 
 /// Implementation for [Type]
@@ -59,6 +61,7 @@ impl Type {
             Integer => true,
             Address => true,
             Size => true,
+            Flags => true,
             State => false,
             Interface => false,
             Unit => false,
@@ -72,6 +75,7 @@ impl Type {
             Boolean => true,
             Integer => false,
             Address => false,
+            Flags => false,
             Size => false,
             State => false,
             Interface => false,
@@ -86,6 +90,7 @@ impl Type {
             Boolean => "boolean",
             Integer => "numeric",
             Address => "numeric",
+            Flags => "flags",
             Size => "numeric",
             State => "state",
             Interface => "interface",
@@ -107,6 +112,7 @@ impl fmt::Display for Type {
             Boolean => write!(f, "bool"),
             Integer => write!(f, "int"),
             Address => write!(f, "addr"),
+            Flags => write!(f, "flags"),
             Size => write!(f, "size"),
             State => write!(f, "state"),
             Interface => write!(f, "interface"),

@@ -95,6 +95,8 @@ pub enum Keyword {
     Boolean,
     /// An integer value
     Integer,
+    /// Represents the permission flags
+    Flags,
 
     //
     // constraint keywords
@@ -157,6 +159,7 @@ impl fmt::Display for Keyword {
             Size => "size",
             Boolean => "bool",
             Integer => "int",
+            Flags => "flags",
         };
         write!(f, "{}", kwstr)
     }
