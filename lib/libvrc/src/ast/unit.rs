@@ -409,16 +409,19 @@ impl<'a> AstNodeGeneric<'a> for Segment {
 
         let mut has_map = false;
         let mut has_translate = false;
+        let mut has_matchflags = false;
         for m in &self.methods {
             match m.name() {
                 "translate" => {
-                    res = res + m.check_translate();
                     has_translate = true;
                 }
                 "map" => {
-                    res = res + m.check_map();
                     has_map = true;
                 }
+                "matchflags" => {
+                    has_matchflags = true;
+                }
+                "remap" => {}
                 _ => {}
             }
         }
@@ -429,11 +432,18 @@ impl<'a> AstNodeGeneric<'a> for Segment {
             VrsError::new_err(pos.with_range(0..2), msg, Some(hint)).print();
             res.inc_err(1);
         }
+
+        if !has_matchflags {
+            let msg = format!("matchflags() method not defined for unit `{}`", name);
+            let hint = format!("implement the matchflags() method for unit `{}`", name);
+            VrsError::new_err(pos.with_range(0..2), msg, Some(hint)).print();
+            res.inc_err(1);
+        }
+
         if !has_map {
             let msg = format!("map() method not defined for unit `{}`", name);
             let hint = format!("implement the map() method for unit `{}`", name);
             VrsError::new_err(pos.with_range(0..2), msg, Some(hint)).print();
-            println!("{}", pos);
             res.inc_err(1);
         }
 
