@@ -154,7 +154,12 @@ impl<'a> SymbolTableContext<'a> {
             }
             Some(x) => {
                 // ther was already such a symbol. Show an erryr
-                VrsError::new_double(sym.name.clone(), sym.loc.with_range(0..2), x.loc.with_range(0..2)).print();
+                VrsError::new_double(
+                    sym.name.clone(),
+                    sym.loc.with_range(0..2),
+                    x.loc.with_range(0..2),
+                )
+                .print();
                 false
             }
         }
@@ -230,7 +235,12 @@ impl<'a> SymbolTable<'a> {
             }
             Some(x) => {
                 // not warning here...
-                VrsError::new_double(sym.name.clone(), sym.loc.with_range(0..2), x.loc.with_range(0..2)).print();
+                VrsError::new_double(
+                    sym.name.clone(),
+                    sym.loc.with_range(0..2),
+                    x.loc.with_range(0..2),
+                )
+                .print();
 
                 false
             }

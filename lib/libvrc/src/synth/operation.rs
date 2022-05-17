@@ -121,5 +121,3 @@ impl Operation {
         ops
     }
 }
-
-

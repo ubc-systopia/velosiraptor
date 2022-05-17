@@ -43,12 +43,12 @@ use std::path::{Path, PathBuf};
 use std::thread;
 
 // rosette language library imports
-use rosettelang::{RosetteFile};
+use rosettelang::RosetteFile;
 
 // the used libraries
-use crate::ast::{AstNodeGeneric, AstRoot, Segment, Method};
-use crate::synth::SynthError;
 use super::Operation;
+use crate::ast::{AstNodeGeneric, AstRoot, Method, Segment};
+use crate::synth::SynthError;
 
 // re-exports
 use resultparser::parse_result;
@@ -103,7 +103,6 @@ impl SynthRosette {
         fs::create_dir_all(&self.outdir)?;
 
         for unit in &mut ast.segment_units_mut() {
-
             // translate part
 
             println!("synthesizing map: for {} in {:?}", unit.name, self.outdir);
@@ -115,7 +114,6 @@ impl SynthRosette {
                 let res_translate = rkt_translate.exec();
                 parse_result(&res_translate)
             });
-
 
             let res_matchflags = rkt_matchflags.exec();
             let ops_matchflags = parse_result(&res_matchflags);
