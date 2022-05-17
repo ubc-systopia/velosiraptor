@@ -207,8 +207,8 @@ impl<'a> AstNodeGeneric<'a> for Interface {
                 if sym.kind != SymbolKind::Parameter || !sym.typeinfo.compatible(b.ptype) {
                     VrsError::new_double_kind(
                         String::from(b.name()),
-                        b.loc().clone(),
-                        sym.loc.clone(),
+                        b.loc().with_range(0..2),
+                        sym.loc.with_range(0..2),
                     )
                     .print();
                     res.inc_err(1);
