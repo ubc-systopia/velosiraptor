@@ -176,6 +176,10 @@ fn parse_res(s: &str) -> IResult<&str, Vec<Operation>> {
 
 /// parse and validate the result from Rosette
 pub fn parse_result(output: &str) -> Vec<Operation> {
+    if output.is_empty() {
+        panic!("empty output");
+    }
+
     // we want to consume all of the output on a single line.
     let ops = match all_consuming(terminated(parse_seq, newline))(output) {
         Ok((_, v)) => v,

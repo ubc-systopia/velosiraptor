@@ -24,25 +24,40 @@
 // SOFTWARE.
 
 //! Operations
+//!
+//! This module defines a set of possible operations that can occur in the
+//! map/unmap/protect operations.
 
+/// Represents an operation expression such as `a + b`
 #[derive(PartialEq, Clone, Debug)]
 pub enum OpExpr {
     /// a constant number
     Num(u64),
     /// a variable
     Var(String),
+    /// shift left
     Shl(Box<OpExpr>, Box<OpExpr>),
+    /// logic shift right
     Shr(Box<OpExpr>, Box<OpExpr>),
+    /// addition
     Add(Box<OpExpr>, Box<OpExpr>),
+    /// subtraction
     Sub(Box<OpExpr>, Box<OpExpr>),
+    /// bitwise and
     And(Box<OpExpr>, Box<OpExpr>),
+    /// bitwise or
     Or(Box<OpExpr>, Box<OpExpr>),
+    /// multiplication
     Mul(Box<OpExpr>, Box<OpExpr>),
+    /// division
     Div(Box<OpExpr>, Box<OpExpr>),
+    /// modulus
     Mod(Box<OpExpr>, Box<OpExpr>),
+    /// no expression
     None,
 }
 
+/// represents an operation
 #[derive(PartialEq, Clone, Debug)]
 pub enum Operation {
     Insert {
@@ -100,4 +115,11 @@ impl Operation {
             Operation::Return => "",
         }
     }
+
+    pub fn merge(mut ops: Vec<Operation>, mut other: Vec<Operation>) -> Vec<Operation> {
+        ops.append(&mut other);
+        ops
+    }
 }
+
+
