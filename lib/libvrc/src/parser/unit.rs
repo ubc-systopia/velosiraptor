@@ -30,45 +30,81 @@
 // the used nom functionality
 use nom::{
     branch::{alt, permutation},
-    combinator::{cut, opt},
+    combinator::{cut, map, opt},
     multi::{many0, separated_list0},
-    sequence::{delimited, preceded, terminated, tuple},
+    sequence::{delimited, preceded, tuple},
 };
 
 // the used library-internal functionaltity
-use crate::ast::{Interface, Param, Segment, State, StaticMap, Unit};
+use crate::ast::{Param, Segment, StaticMap, Unit};
 use crate::error::IResult;
 use crate::parser::{
     constdef, interface, method, parameter, state,
     terminals::{
-        assign, colon, comma, ident, kw_segment, kw_size, kw_staticmap, lbrace, lparen, num,
-        rbrace, rparen, semicolon,
+        assign, colon, comma, ident, kw_inbitwidth, kw_outbitwidth, kw_segment, kw_staticmap,
+        lbrace, lparen, num, rbrace, rparen, semicolon,
     },
 };
 use crate::token::TokenStream;
 
-/// parses and consumes the unit parameters `(foo: bar, bar: baz)`
+/// parses the unit parameters
+///
+/// # Arguments
+///
+///  * `input`  - token stream representing the current input position
+///
+/// # Return Value
+///
+/// Result type wrapping a vector of [Param] and the remaining [TokenStream] if the parser succeeded,
+/// or an error wrapping the input position if the parser failed.
+///
+/// # Grammar
+///
+/// `PARAM_CLAUSE := COLON IDENTIFIER`
+///
+/// # Example
+///
+///  * `: FooBar`
+///
+/// # Notes
+///
+///  * None
 fn param_clause(input: TokenStream) -> IResult<TokenStream, Vec<Param>> {
-    delimited(lparen, separated_list0(comma, cut(parameter)), cut(rparen))(input)
+    let params = delimited(lparen, separated_list0(comma, cut(parameter)), cut(rparen));
+    map(opt(params), |r| r.unwrap_or_default())(input)
 }
 
-/// parses and consumes a size statement in a unit (`size = number`)
-fn size_clause(input: TokenStream) -> IResult<TokenStream, u64> {
-    let (i1, _) = kw_size(input)?;
-    cut(delimited(assign, num, semicolon))(i1)
-}
+/// parses the derived clause of a unit
+///
+/// # Arguments
+///
+///  * `input`  - token stream representing the current input position
+///
+/// # Return Value
+///
+/// Result type wrapping a [String] and the remaining [TokenStream] if the parser succeeded,
+/// or an error wrapping the input position if the parser failed.
+///
+/// # Grammar
+///
+/// `DERIVED_CLAUSE := COLON IDENTIFIER`
+///
+/// # Example
+///
+///  * `: FooBar`
+///
+/// # Notes
+///
+///  * None
+fn derived_clause(input: TokenStream) -> IResult<TokenStream, String> {
+    preceded(colon, cut(ident))(input)
 
-/// parses and consumes the derived clause of a unit: `: IDENTIFIER | KW_SEGMENT | KW_STATICMAP`
-fn derived_clause(input: TokenStream) -> IResult<TokenStream, Option<String>> {
     // this is a bit a hack, we need to return the derived clause as a string,
     // but `Segment` and `StaticMap` are keywords, not strings, so we need to map the
     // result of the parser to a string here.
     // let smap_seg = map(alt((kw_segment, kw_staticmap)), |s: Keyword| {
     //     format!("{}", s)
     // });
-
-    // let's try to parse the colon indicating the derived clause
-    opt(preceded(colon, cut(ident)))(input)
 
     // match (colon)(input.clone()) {
     //     Ok((i, _)) => ident(i),
@@ -84,8 +120,87 @@ fn derived_clause(input: TokenStream) -> IResult<TokenStream, Option<String>> {
     // }
 }
 
-pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
-    alt((unit_segment, unit_staticmap))(input)
+/// type definition for the unit header parser
+type UnitHeader = (String, Vec<Param>, Option<String>);
+
+/// parses the unit header
+///
+/// # Arguments
+///
+///  * `input`  - token stream representing the current input position
+///
+/// # Return Value
+///
+/// Result type wrapping a [UnitHeader] and the remaining [TokenStream] if the parser succeeded,
+/// or an error wrapping the input position if the parser failed.
+///
+/// # Grammar
+///
+/// `UNIT_HEADER := IDENTIFIER (LPAREN PARAM_CLAUSE RPAREN)? (DERIVED_CLAUSE)?`
+///
+/// # Example
+///
+///  * `Foo (bar: baz) : FooBar`
+///
+/// # Notes
+///
+///  * None
+fn unit_header(input: TokenStream) -> IResult<TokenStream, UnitHeader> {
+    tuple((ident, param_clause, opt(derived_clause)))(input)
+}
+
+/// parses the input bitwidth clause of the unit
+///
+/// # Arguments
+///
+///  * `input`  - token stream representing the current input position
+///
+/// # Return Value
+///
+/// Result type wrapping a [u64] and the remaining [TokenStream] if the parser succeeded,
+/// or an error wrapping the input position if the parser failed.
+///
+/// # Grammar
+///
+/// `INBITWIDTH_CLAUSE := KW_INBITWIDTH ASSIGN NUM SEMICOLON`
+///
+/// # Example
+///
+///  * `inbitwidth = 32;`
+///
+/// # Notes
+///
+///  * None
+fn inbitwidth_clause(input: TokenStream) -> IResult<TokenStream, u64> {
+    let (i1, _) = kw_inbitwidth(input)?;
+    cut(delimited(assign, num, semicolon))(i1)
+}
+
+/// parses the output bitwidth clause of the unit
+///
+/// # Arguments
+///
+///  * `input`  - token stream representing the current input position
+///
+/// # Return Value
+///
+/// Result type wrapping a [u64] and the remaining [TokenStream] if the parser succeeded,
+/// or an error wrapping the input position if the parser failed.
+///
+/// # Grammar
+///
+/// `OUTBITWIDTH_CLAUSE := KW_OUTBITWIDTH ASSIGN NUM SEMICOLON`
+///
+/// # Example
+///
+///  * `outbitwidth = 32;`
+///
+/// # Notes
+///
+///  * None
+fn outbitwidth_clause(input: TokenStream) -> IResult<TokenStream, u64> {
+    let (i1, _) = kw_outbitwidth(input)?;
+    cut(delimited(assign, num, semicolon))(i1)
 }
 
 /// parses and consumes a segment unit declaration (`segment foo(args) : derived {};`)
@@ -95,43 +210,60 @@ fn unit_segment(input: TokenStream) -> IResult<TokenStream, Unit> {
 
     // we've seen the `segment` keyword, next there needs to be the unit identifier,
     // followed by some optional parameters and the derived clause.
-    let (i2, (unitname, params, derived)) =
-        cut(tuple((ident, opt(param_clause), derived_clause)))(i1)?;
+    let (i2, (unitname, params, derived)) = cut(unit_header)(i1)?;
 
     // parse the unit body. this is a combination of the following
     let unit_body = permutation((
         many0(constdef),
         opt(state),
         opt(interface),
-        opt(size_clause),
+        opt(inbitwidth_clause),
+        opt(outbitwidth_clause),
         many0(method),
     ));
 
     // then we have the unit block, wrapped in curly braces and a ;
-    let (i4, (consts, state, interface, size, methods)) =
-        cut(terminated(delimited(lbrace, unit_body, rbrace), semicolon))(i2)?;
+    let (i4, (consts, state, interface, inbitwidth, outbitwidth, methods)) =
+        cut(delimited(lbrace, unit_body, rbrace))(i2)?;
 
-    let pos = input.expand_until(&i4);
+    // unwrap the state and interfaces, create the none value
+    let state = state.unwrap_or_default();
+    let interface = interface.unwrap_or_default();
 
-    let segment = Segment {
-        name: unitname,
-        params: params.unwrap_or_default(),
-        derived,
-        size,
-        consts,
-        state: state.unwrap_or_else(State::new_none),
-        interface: interface.unwrap_or_else(Interface::new_none),
-        methods,
-        map_ops: None,
-        unmap_ops: None,
-        protect_ops: None,
-        pos,
-    };
+    // build the segment
+    let seg = Segment::new(unitname, params, input)
+        .set_inbitwidth(inbitwidth)
+        .set_outbitwidth(outbitwidth)
+        .set_derived(derived)
+        .set_state(state)
+        .set_interface(interface)
+        .add_consts(consts)
+        .add_methods(methods)
+        .finalize(&i4);
 
-    Ok((i4, Unit::Segment(segment)))
+    Ok((i4, Unit::Segment(seg)))
 }
 
-/// parses and consumes a staticmap unit declaration (`staticmap foo(args) : derived {};`)
+/// parses and consumes a staticmap unit declaration
+///
+/// # Arguments
+///
+///  * `input`  - token stream representing the current input position
+///
+/// # Return Value
+///
+/// Result type wrapping a [Unit] and the remaining [TokenStream] if the parser succeeded,
+/// or an error wrapping the input position if the parser failed.
+///
+/// # Grammar
+///
+/// UNIT_STATICMAP := KW_STATICMAP
+///
+/// # Example
+///
+/// `staticmap foo(args) : derived {};`
+///
+/// # Notes
 ///
 /// TODO not sure if we need to have methods in static map declarations
 fn unit_staticmap(input: TokenStream) -> IResult<TokenStream, Unit> {
@@ -140,32 +272,55 @@ fn unit_staticmap(input: TokenStream) -> IResult<TokenStream, Unit> {
 
     // we've seen the `staticmap` keyword, next there needs to be the unit identifier,
     // followed bby some optional parameters and the derived clause.
-    let (i2, (unitname, params, derived)) =
-        cut(tuple((ident, opt(param_clause), derived_clause)))(i1)?;
+    let (i2, (unitname, params, derived)) = cut(unit_header)(i1)?;
 
     // parse the unit body. this is a combination of the following
-    let unit_body = permutation((many0(constdef), opt(parse_map), opt(size_clause)));
+    let unit_body = permutation((
+        many0(constdef),
+        opt(inbitwidth_clause),
+        opt(outbitwidth_clause),
+        opt(parse_map),
+        many0(method),
+    ));
 
     // then we have the unit block, wrapped in curly braces and a ;
-    let (i4, (consts, map, size)) =
-        cut(terminated(delimited(lbrace, unit_body, rbrace), semicolon))(i2)?;
+    let (i4, (consts, inbitwidth, outbitwidth, mapdef, methods)) =
+        cut(delimited(lbrace, unit_body, rbrace))(i2)?;
 
-    let pos = input.expand_until(&i4);
-    let staticmap = StaticMap {
-        name: unitname,
-        params: params.unwrap_or_default(),
-        derived,
-        size,
-        consts,
-        methods: Vec::new(),
-        map,
-        pos,
-    };
+    // build the static map
+    let staticmap = StaticMap::new(unitname, params, input)
+        .set_inbitwidth(inbitwidth)
+        .set_outbitwidth(outbitwidth)
+        .set_derived(derived)
+        .set_map(mapdef)
+        .add_consts(consts)
+        .add_methods(methods)
+        .finalize(&i4);
 
     Ok((i4, Unit::StaticMap(staticmap)))
 }
 
-// TODO parse map as XOR of unit type parsers.
+/// parses and consumes a unit definition with its state, interface etc.
+///
+/// # Arguments
+///
+///  * `input`  - token stream representing the current input position
+///
+/// # Return Value
+///
+/// Result type wrapping a [Unit] and the remaining [TokenStream] if the parser succeeded,
+/// or an error wrapping the input position if the parser failed.
+///
+/// # Notes
+///
+/// The parser regcognizes the two fundamental unit types:
+///
+///  * `segment`
+///  * `staticmap
+///
+pub fn unit(input: TokenStream) -> IResult<TokenStream, Unit> {
+    alt((unit_segment, unit_staticmap))(input)
+}
 
 #[cfg(test)]
 use crate::lexer::Lexer;
