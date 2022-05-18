@@ -208,6 +208,8 @@ keywordparser!(pub kw_staticmap, Keyword::StaticMap);
 keywordparser!(pub kw_segment, Keyword::Segment);
 keywordparser!(pub kw_for, Keyword::For);
 keywordparser!(pub kw_in, Keyword::In);
+keywordparser!(pub kw_inbitwidth, Keyword::OutBitWidth);
+keywordparser!(pub kw_outbitwidth, Keyword::InBitWidth);
 
 /// parses a type expression
 ///

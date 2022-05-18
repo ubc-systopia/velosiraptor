@@ -65,6 +65,10 @@ pub enum Keyword {
     StaticMap,
     /// base type for direct segments
     Segment,
+    /// the unit input bitwidth
+    InBitWidth,
+    /// the unit output bitwidth
+    OutBitWidth,
 
     //
     // control flow and expressions
@@ -151,6 +155,8 @@ impl fmt::Display for Keyword {
             Exists => "exists",
             Return => "return",
             Layout => "Layout",
+            InBitWidth => "inbitwidth",
+            OutBitWidth => "outbitwidth",
             // ActionTypes
             ReadAction => "ReadAction",
             WriteAction => "WriteAction",
