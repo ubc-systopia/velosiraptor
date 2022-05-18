@@ -153,6 +153,14 @@ impl<'a> Interface {
     }
 }
 
+impl Default for Interface {
+    fn default() -> Self {
+        Interface::None {
+            pos: TokenStream::empty(),
+        }
+    }
+}
+
 /// Implementation of [AstNodeGeneric] for [Interface]
 impl<'a> AstNodeGeneric<'a> for Interface {
     // checks the node and returns the number of errors and warnings encountered

@@ -41,6 +41,8 @@ use crate::error::{ErrorLocation, VrsError};
 use crate::synth::Operation;
 use crate::token::TokenStream;
 
+pub const CFG_DEFAULT_BITWIDTH: u64 = 64;
+
 /// Defines a translation unit
 ///
 /// A translation unit is either a [StaticMap] or a [Segment] and describes the personality
@@ -186,8 +188,10 @@ pub struct Segment {
     pub params: Vec<Param>,
     /// the name of the derrived unit
     pub derived: Option<String>,
-    /// the size of the unit in bits
-    pub size: Option<u64>,
+    /// the input bitwidth of the unit
+    pub inbitwidth: u64,
+    /// the output bitwidth of the unit
+    pub outbitwidth: u64,
     /// defined constants in this unit
     pub consts: Vec<Const>,
     /// the state of the unit
@@ -209,6 +213,68 @@ pub struct Segment {
 
 /// Implementation of [Segment]
 impl<'a> Segment {
+    /// creates a new Segment node
+    pub fn new(name: String, params: Vec<Param>, pos: TokenStream) -> Self {
+        Segment {
+            name,
+            params,
+            derived: None,
+            inbitwidth: 0,
+            outbitwidth: 0,
+            consts: Vec::new(),
+            state: State::new_none(),
+            interface: Interface::new_none(),
+            methods: Vec::new(),
+            map_ops: None,
+            unmap_ops: None,
+            protect_ops: None,
+            pos,
+        }
+    }
+
+    /// sets the input addressing bit width
+    pub fn set_inbitwidth(mut self, inbitwidth: Option<u64>) -> Self {
+        self.inbitwidth = inbitwidth.unwrap_or(CFG_DEFAULT_BITWIDTH);
+        self
+    }
+
+    /// sets the output addressing bit width
+    pub fn set_outbitwidth(mut self, outbitwidth: Option<u64>) -> Self {
+        self.outbitwidth = outbitwidth.unwrap_or(CFG_DEFAULT_BITWIDTH);
+        self
+    }
+
+    pub fn set_derived(mut self, derived: Option<String>) -> Self {
+        self.derived = derived;
+        self
+    }
+
+    pub fn set_state(mut self, state: State) -> Self {
+        self.state = state;
+        self
+    }
+
+    pub fn set_interface(mut self, interface: Interface) -> Self {
+        self.interface = interface;
+        self
+    }
+
+    pub fn add_consts(mut self, consts: Vec<Const>) -> Self {
+        self.consts.extend(consts);
+        self
+    }
+
+    pub fn add_methods(mut self, methods: Vec<Method>) -> Self {
+        self.methods.extend(methods);
+        self
+    }
+
+    /// finalized the unit
+    pub fn finalize(mut self, pos: &TokenStream) -> Self {
+        self.pos = self.pos.expand_until(pos);
+        self
+    }
+
     pub fn location(&self) -> String {
         self.pos.location()
     }
@@ -344,6 +410,13 @@ impl<'a> AstNodeGeneric<'a> for Segment {
         // Notes:       --
         // --------------------------------------------------------------------------------------
 
+        if self.state.is_none() {
+            let msg = format!("missing state definition for unit `segment {}`", self.name);
+            let hint = String::from("add the state definition `state = Register | Memory` here");
+            VrsError::new_err(self.pos.with_range(0..2), msg, Some(hint)).print();
+            res.inc_err(1);
+        }
+
         // check the state and interface
         res = res + self.state.check(st);
 
@@ -361,6 +434,18 @@ impl<'a> AstNodeGeneric<'a> for Segment {
         // Description: Check that the state definition is fine
         // Notes:       --
         // --------------------------------------------------------------------------------------
+
+        if self.interface.is_none() {
+            let msg = format!(
+                "missing interface definition for unit `segment {}`",
+                self.name
+            );
+            let hint =
+                String::from("add the interface definition `interface = Register | Memory` here");
+            VrsError::new_err(self.pos.with_range(0..2), msg, Some(hint)).print();
+            res.inc_err(1);
+        }
+
         res = res + self.interface.check(st);
 
         // Check 6: Interface param check
@@ -470,8 +555,10 @@ pub struct StaticMap {
     pub params: Vec<Param>,
     /// the name of the derived unit
     pub derived: Option<String>,
-    /// the size of the unit in bits
-    pub size: Option<u64>,
+    /// the input bit width of the unit
+    pub inbitwidth: u64,
+    /// the outbit width with of the unit
+    pub outbitwidth: u64,
     /// defined constants in this unit
     pub consts: Vec<Const>,
     /// Optional map in the case of map UnitType
@@ -484,6 +571,59 @@ pub struct StaticMap {
 
 /// Implementation of [Unit]
 impl<'a> StaticMap {
+    /// creates a new Segment node
+    pub fn new(name: String, params: Vec<Param>, pos: TokenStream) -> Self {
+        StaticMap {
+            name,
+            params,
+            derived: None,
+            inbitwidth: 0,
+            outbitwidth: 0,
+            consts: Vec::new(),
+            methods: Vec::new(),
+            map: None,
+            pos,
+        }
+    }
+
+    /// sets the input addressing bit width
+    pub fn set_inbitwidth(mut self, inbitwidth: Option<u64>) -> Self {
+        self.inbitwidth = inbitwidth.unwrap_or(CFG_DEFAULT_BITWIDTH);
+        self
+    }
+
+    /// sets the output addressing bit width
+    pub fn set_outbitwidth(mut self, outbitwidth: Option<u64>) -> Self {
+        self.outbitwidth = outbitwidth.unwrap_or(CFG_DEFAULT_BITWIDTH);
+        self
+    }
+
+    pub fn set_derived(mut self, derived: Option<String>) -> Self {
+        self.derived = derived;
+        self
+    }
+
+    pub fn set_map(mut self, map: Option<Map>) -> Self {
+        self.map = map;
+        self
+    }
+
+    pub fn add_consts(mut self, consts: Vec<Const>) -> Self {
+        self.consts.extend(consts);
+        self
+    }
+
+    pub fn add_methods(mut self, methods: Vec<Method>) -> Self {
+        self.methods.extend(methods);
+        self
+    }
+
+    /// finalized the unit
+    pub fn finalize(mut self, pos: &TokenStream) -> Self {
+        self.pos = self.pos.expand_until(pos);
+        self
+    }
+
     pub fn location(&self) -> String {
         self.pos.location()
     }

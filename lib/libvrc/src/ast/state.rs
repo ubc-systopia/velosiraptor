@@ -79,6 +79,10 @@ impl<'a> State {
         }
     }
 
+    pub fn is_none(&self) -> bool {
+        matches!(self, State::None { .. })
+    }
+
     /// builds the symboltable for the state related symbols
     pub fn build_symboltable(&'a self, st: &mut SymbolTable<'a>) {
         // create the 'state' symbol
@@ -119,6 +123,14 @@ impl<'a> State {
             hs.insert(n, f.referenced_field_bits(refs));
         }
         hs
+    }
+}
+
+impl Default for State {
+    fn default() -> Self {
+        State::None {
+            pos: TokenStream::empty(),
+        }
     }
 }
 
