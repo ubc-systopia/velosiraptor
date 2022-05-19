@@ -25,6 +25,9 @@
 
 //! Rosette Expressions
 
+// stdlib
+use std::fmt;
+
 /// Represents a constante definition
 ///
 /// # Example
@@ -130,7 +133,36 @@ impl BVOp {
     }
 }
 
+impl fmt::Display for BVOp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        let opstr = match *self {
+            BVOp::BVShl => "<",
+            BVOp::BVEq => "=",
+            BVOp::BVAnd => "&",
+            BVOp::BVOr => "|",
+            BVOp::BVShr => ">",
+            BVOp::BVAdd => "+",
+            BVOp::BVSub => "-",
+            BVOp::BVLt => "<",
+            BVOp::BVLe => "<=",
+            BVOp::BVGt => ">",
+            BVOp::BVGe => ">=",
+        };
+
+        write!(f, "{}", opstr)
+    }
+}
+
 impl RExpr {
+    pub fn constraint(var: String, op: BVOp, value: u64) -> RExpr {
+        println!("adding constraint: {} {} {}", var, op, value);
+        RExpr::assume(RExpr::BVBinOp {
+            op,
+            lhs: Box::new(RExpr::var(var)),
+            rhs: Box::new(RExpr::num(64, value)),
+        })
+    }
+
     pub fn param(param: String) -> Self {
         RExpr::Param { param }
     }
@@ -339,10 +371,10 @@ impl RExpr {
                 )
             }
             Assume { test } => {
-                format!("{}(assume\n{}\n{})", istr, test.to_code(indent + 2), istr)
+                format!("{}(assume\n{}\n{})\n", istr, test.to_code(indent + 2), istr)
             }
             Assert { test } => {
-                format!("{}(assert\n{}\n{})", istr, test.to_code(indent + 2), istr)
+                format!("{}(assert\n{}\n{})\n", istr, test.to_code(indent + 2), istr)
             }
             Begin { exprs } => {
                 let mut s = String::new();
