@@ -26,6 +26,7 @@
 //! Synthesis Module: Rosette
 
 // declare the modules
+mod consts;
 mod context;
 mod expr;
 mod fields;
@@ -69,6 +70,7 @@ impl SynthRosette {
     fn synth_create(&self, file: PathBuf, unit: &Segment, method: &Method) -> RosetteFile {
         let mut rkt = context::prepare_context(&unit.name, file);
 
+        consts::add_consts(&mut rkt, unit);
         // adding state, interace and model
         state::add_state_def(&mut rkt, &unit.state);
         interface::add_interface_def(&mut rkt, &unit.interface);
