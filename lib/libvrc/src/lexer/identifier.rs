@@ -62,7 +62,7 @@ pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
         "WriteAction" => Token::new(TokenContent::Keyword(Keyword::WriteAction), ident),
         "Layout" => Token::new(TokenContent::Keyword(Keyword::Layout), ident),
         "inbitwidth" => Token::new(TokenContent::Keyword(Keyword::InBitWidth), ident),
-        "outbitwidth" => Token::new(TokenContent::Keyword(Keyword::InBitWidth), ident),
+        "outbitwidth" => Token::new(TokenContent::Keyword(Keyword::OutBitWidth), ident),
         //
         // funcdamental unit types
         //

@@ -603,8 +603,8 @@ impl<'a> StaticMap {
         self
     }
 
-    pub fn set_map(mut self, map: Option<Map>) -> Self {
-        self.map = map;
+    pub fn set_map(mut self, map: Map) -> Self {
+        self.map = Some(map);
         self
     }
 

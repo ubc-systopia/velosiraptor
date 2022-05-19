@@ -29,7 +29,7 @@
 
 // the used nom functionality
 use nom::{
-    branch::{alt, permutation},
+    branch::alt,
     combinator::{cut, map, opt},
     multi::{many0, separated_list0},
     sequence::{delimited, preceded, tuple},
@@ -39,7 +39,7 @@ use nom::{
 use crate::ast::{Param, Segment, StaticMap, Unit};
 use crate::error::IResult;
 use crate::parser::{
-    constdef, interface, method, parameter, state,
+    constdef, flags, interface, method, parameter, state,
     terminals::{
         assign, colon, comma, ident, kw_inbitwidth, kw_outbitwidth, kw_segment, kw_staticmap,
         lbrace, lparen, num, rbrace, rparen, semicolon,
@@ -213,22 +213,19 @@ fn unit_segment(input: TokenStream) -> IResult<TokenStream, Unit> {
     let (i2, (unitname, params, derived)) = cut(unit_header)(i1)?;
 
     // parse the unit body. this is a combination of the following
-    let unit_body = permutation((
+    let unit_body = tuple((
         many0(constdef),
-        opt(state),
-        opt(interface),
         opt(inbitwidth_clause),
         opt(outbitwidth_clause),
+        opt(flags),
+        state,
+        interface,
         many0(method),
     ));
 
     // then we have the unit block, wrapped in curly braces and a ;
-    let (i4, (consts, state, interface, inbitwidth, outbitwidth, methods)) =
+    let (i4, (consts, inbitwidth, outbitwidth, _flags, state, interface, methods)) =
         cut(delimited(lbrace, unit_body, rbrace))(i2)?;
-
-    // unwrap the state and interfaces, create the none value
-    let state = state.unwrap_or_default();
-    let interface = interface.unwrap_or_default();
 
     // build the segment
     let seg = Segment::new(unitname, params, input)
@@ -275,11 +272,11 @@ fn unit_staticmap(input: TokenStream) -> IResult<TokenStream, Unit> {
     let (i2, (unitname, params, derived)) = cut(unit_header)(i1)?;
 
     // parse the unit body. this is a combination of the following
-    let unit_body = permutation((
+    let unit_body = tuple((
         many0(constdef),
         opt(inbitwidth_clause),
         opt(outbitwidth_clause),
-        opt(parse_map),
+        parse_map,
         many0(method),
     ));
 
