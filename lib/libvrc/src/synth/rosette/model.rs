@@ -409,6 +409,29 @@ pub fn add_translate(rkt: &mut RosetteFile, translate: &Method) {
     rkt.add_new_function_def(String::from("translate"), args, body)
 }
 
+pub fn add_matchflags(rkt: &mut RosetteFile, matchflags: &Method) {
+    rkt.add_section(String::from("Matchflags Function"));
+
+    // let's add the arguments
+    let mut args = vec![String::from("st")];
+    for a in matchflags.args.iter() {
+        args.push(a.name.clone());
+    }
+
+    // add the requires as assert
+    let mut body = Vec::new();
+    for p in matchflags.requires.iter() {
+        body.push(RExpr::assert(expr::expr_to_rosette(p)));
+    }
+
+    // convert statements into rosette statements
+    if let Some(stmts) = &matchflags.stmts {
+        body.push(expr::stmt_to_rosette(stmts))
+    }
+
+    rkt.add_new_function_def(String::from("matchflags"), args, body)
+}
+
 pub fn add_model_def(rkt: &mut RosetteFile, state: &State, iface: &Interface) {
     add_model(rkt);
     add_model_state_accessors(rkt, state);

@@ -26,11 +26,72 @@
 //! State Synthesis Module: Rosette
 
 // rosette language library imports
-use rosettelang::{FunctionDef, RExpr, RosetteFile};
+use rosettelang::{BVOp, FunctionDef, RExpr, RosetteFile};
 
 // crate imports
 use super::expr;
-use crate::ast::Method;
+use crate::ast::{Method, Segment};
+
+fn add_check_matchflags(rkt: &mut RosetteFile, m: &Method) {
+    rkt.add_section(String::from("Correctness Property"));
+
+    // add assumes clauses for va, pa, size, flags
+    // w.r.t: sizes, alignments, etc.
+    // those can come from the requires clauses from the map method
+
+    let mut body = Vec::new();
+    for c in &m.requires {
+        body.push(RExpr::assume(expr::expr_to_rosette(c)))
+    }
+
+    let args = m
+        .args
+        .iter()
+        .map(|a| RExpr::var(a.name.clone()))
+        .collect::<Vec<RExpr>>();
+
+    body.push(RExpr::letstart(
+        vec![
+            (
+                String::from("st0"),
+                RExpr::fncall(String::from("make-model"), vec![]),
+            ),
+            (
+                String::from("st1"),
+                RExpr::fncall(
+                    String::from("ast-interpret"),
+                    vec![
+                        RExpr::fncall(String::from("impl"), args),
+                        RExpr::var(String::from("st0")),
+                    ],
+                ),
+            ),
+        ],
+        vec![RExpr::assert(RExpr::fncall(
+            String::from("matchflags"),
+            vec![
+                RExpr::var(String::from("st1")),
+                //RExpr::var(String::from("va")),
+                RExpr::var(String::from("flgs")),
+            ],
+        ))],
+    ));
+
+    let mut args = vec![String::from("impl")];
+    args.extend(m.args.iter().map(|a| a.name.clone()));
+
+    let fdef = FunctionDef::new(String::from("ast-check-translate"), args, body);
+
+    rkt.add_function_def(fdef);
+    // add a let expr
+    //     (let ([st (make-model)])
+    //     ; evaluate the implementation, update the state
+    //     (set! st (ast-interpret (impl st va pa size flags) st))
+
+    //     ; now check if the translation is right
+    //     (assert (bveq (translate st va 0) pa))
+    //   )
+}
 
 fn add_check_translate(rkt: &mut RosetteFile, m: &Method) {
     rkt.add_section(String::from("Correctness Property"));
@@ -74,7 +135,7 @@ fn add_check_translate(rkt: &mut RosetteFile, m: &Method) {
                     vec![
                         RExpr::var(String::from("st1")),
                         RExpr::var(String::from("va")),
-                        RExpr::var(String::from("flags")),
+                        //RExpr::var(String::from("flags")),
                     ],
                 ),
                 RExpr::var(String::from("pa")),
@@ -91,7 +152,7 @@ fn add_check_translate(rkt: &mut RosetteFile, m: &Method) {
                             ),
                             RExpr::num(64, 1),
                         ),
-                        RExpr::var(String::from("flags")),
+                        // RExpr::var(String::from("flags")),
                     ],
                 ),
                 RExpr::bvsub(
@@ -121,14 +182,23 @@ fn add_check_translate(rkt: &mut RosetteFile, m: &Method) {
     //   )
 }
 
-fn add_synthesis_def(rkt: &mut RosetteFile) {
+fn add_synthesis_def(rkt: &mut RosetteFile, inmax: u64, outmax: u64) {
     rkt.add_section(String::from("Solving / Synthesis"));
 
     rkt.add_subsection(String::from("Symbolic Variables"));
     // TODO: check the types here?
     rkt.add_new_symbolic_var(String::from("va"), String::from("int?"));
+    rkt.add_expr(RExpr::constraint(String::from("va"), BVOp::BVGe, 0));
+    rkt.add_expr(RExpr::constraint(String::from("va"), BVOp::BVLt, inmax));
+
     rkt.add_new_symbolic_var(String::from("pa"), String::from("int?"));
+    rkt.add_expr(RExpr::constraint(String::from("pa"), BVOp::BVGe, 0));
+    rkt.add_expr(RExpr::constraint(String::from("pa"), BVOp::BVLt, outmax));
+
     rkt.add_new_symbolic_var(String::from("size"), String::from("int?"));
+    rkt.add_expr(RExpr::constraint(String::from("size"), BVOp::BVGe, 0));
+    rkt.add_expr(RExpr::constraint(String::from("size"), BVOp::BVLt, outmax));
+
     rkt.add_new_symbolic_var(String::from("flags"), String::from("int?"));
 
     // // the map function
@@ -156,23 +226,20 @@ fn add_synthesis_def(rkt: &mut RosetteFile) {
             "
 ; interprets the grammar
 (define (do-synth-{i} va size flags pa)
-(ast-grammar va size flags pa
-#:depth {i}
-)
+  (ast-grammar va size flags pa #:depth {i})
 )
 ; the solution with depth {i}
 (define sol-{i}
-(synthesize
-#:forall (list va size flags pa)
-#:guarantee (ast-check-translate do-synth-{i} va size flags pa)
-)
+  (synthesize
+    #:forall (list va size flags pa)
+    #:guarantee (ast-check-translate do-synth-{i} va size flags pa)
+  )
 )
 
 ; check if we have a success
-(if (sat? sol-{i})
-[
-(my-print-forms sol-{i})
-(exit)
+(if (sat? sol-{i}) [
+  (my-print-forms sol-{i})
+  (exit)
 ]
 (printf \"\")
 )
@@ -180,6 +247,8 @@ fn add_synthesis_def(rkt: &mut RosetteFile) {
             i = i
         ))
     }
+
+    rkt.add_raw(String::from("(printf \"No solution found!\")"));
 
     // let mut fdef = FunctionDef::new(fname, args, body);
     // fdef.add_comment(String::from("interprets the grammar"));
@@ -220,23 +289,29 @@ fn add_print_sol(rkt: &mut RosetteFile) {
         "
 ; Pretty-prints the result of (generate-forms sol).
 (define (my-print-forms sol)
-(for ([f (generate-forms sol)])
-(for ([e (syntax->list f)])
-  (let ([s  (format \"~a\" (syntax->datum e))])
-    (if (string-prefix? s \"(Seq\")
-      (printf \"~a\n\" s)
-      (printf \"\")
+  (for ([f (generate-forms sol)])
+    (for ([e (syntax->list f)])
+      (let ([s  (format \"~a\" (syntax->datum e))])
+        (if (string-prefix? s \"(Seq\")
+          (printf \"~a\n\" s)
+          (printf \"\")
+        )
+      )
     )
   )
-)
-)
 )
 ",
     ))
 }
 
-pub fn add_synthesis(rkt: &mut RosetteFile, m: &Method) {
-    add_check_translate(rkt, m);
-    add_synthesis_def(rkt);
+pub fn add_synthesis(rkt: &mut RosetteFile, part: &str, unit: &Segment, m: &Method) {
+    if part == "matchflags" {
+        add_check_matchflags(rkt, m);
+    } else {
+        add_check_translate(rkt, m);
+    }
     add_print_sol(rkt);
+
+    println!("\nadding synthesis for {}", part);
+    add_synthesis_def(rkt, unit.vaddr_max(), unit.paddr_max());
 }

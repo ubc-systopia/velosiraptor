@@ -26,7 +26,7 @@
 //! Const Synthesis Module: Rosette
 
 // rosette language library imports
-use rosettelang::{RosetteFile};
+use rosettelang::RosetteFile;
 
 // crate imports
 use crate::ast::{ConstValue, Expr, Segment};

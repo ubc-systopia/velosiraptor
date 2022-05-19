@@ -38,6 +38,7 @@ pub fn add_methods(rkt: &mut RosetteFile, methods: &[Method]) {
     for m in methods {
         match m.name.as_str() {
             "translate" => continue,
+            "matchflags" => continue,
             "map" => continue,
             "unmap" => continue,
             "protect" => continue,

@@ -76,7 +76,11 @@ impl SynthRosette {
         interface::add_interface_def(&mut rkt, &unit.interface);
         methods::add_methods(&mut rkt, &unit.methods);
         model::add_model_def(&mut rkt, &unit.state, &unit.interface);
-        model::add_translate(&mut rkt, method);
+
+        let m = unit.get_method("translate").unwrap();
+        model::add_translate(&mut rkt, m);
+        let m = unit.get_method("matchflags").unwrap();
+        model::add_matchflags(&mut rkt, m);
 
         let state_syms = method.get_state_references();
         let state_bits = unit.state.referenced_field_bits(&state_syms);
@@ -94,7 +98,7 @@ impl SynthRosette {
         let mut rkt = self.synth_create(rktfilepath, unit, m);
 
         let m = unit.get_method("map").unwrap();
-        synth::add_synthesis(&mut rkt, m);
+        synth::add_synthesis(&mut rkt, part, unit, m);
 
         rkt.save();
         rkt
