@@ -120,6 +120,20 @@ impl<'a> Unit {
             Unit::Segment(segment) => segment.map_ops(),
         }
     }
+
+    pub fn vaddr_max(&self) -> u64 {
+        match self {
+            Unit::StaticMap(staticmap) => staticmap.vaddr_max(),
+            Unit::Segment(segment) => segment.vaddr_max(),
+        }
+    }
+
+    pub fn paddr_max(&self) -> u64 {
+        match self {
+            Unit::StaticMap(staticmap) => staticmap.paddr_max(),
+            Unit::Segment(segment) => segment.paddr_max(),
+        }
+    }
 }
 
 /// implementation of the [fmt::Display] trait for the [Unit]
@@ -317,6 +331,22 @@ impl<'a> Segment {
 
     pub fn map_ops(&self) -> Option<&Vec<Operation>> {
         self.map_ops.as_ref()
+    }
+
+    pub fn vaddr_max(&self) -> u64 {
+        if self.inbitwidth < 64 {
+            (1u64 << self.inbitwidth) - 1
+        } else {
+            u64::MAX
+        }
+    }
+
+    pub fn paddr_max(&self) -> u64 {
+        if self.outbitwidth < 64 {
+            (1u64 << self.outbitwidth) - 1
+        } else {
+            u64::MAX
+        }
     }
 }
 
@@ -661,6 +691,13 @@ impl<'a> StaticMap {
 
     pub fn map_ops(&self) -> Option<&Vec<Operation>> {
         None
+    }
+
+    pub fn vaddr_max(&self) -> u64 {
+        todo!("need to figure out teh maps first");
+    }
+    pub fn paddr_max(&self) -> u64 {
+        todo!("need to figure out teh maps first");
     }
 }
 

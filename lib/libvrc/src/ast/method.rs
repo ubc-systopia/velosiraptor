@@ -89,6 +89,14 @@ impl Method {
         }
     }
 
+    pub fn is_translate(&self) -> bool {
+        self.name == "translate"
+    }
+
+    pub fn is_matchflags(&self) -> bool {
+        self.name == "matchflags"
+    }
+
     /// converts the [Method] into a [Symbol] for the symbol table
     ///
     /// # Arguments
