@@ -3,7 +3,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2021 Systopia Lab, Computer Science, University of British Columbia
+// Copyright (c) 2022 Systopia Lab, Computer Science, University of British Columbia
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -26,15 +26,22 @@
 //! State definition parsing
 
 // the used nom components
-use nom::{branch::alt, combinator::cut, multi::separated_list1, sequence::delimited};
+use nom::{
+    branch::alt,
+    combinator::{cut, opt},
+    multi::separated_list1,
+    sequence::delimited,
+};
 
 // lexer, parser terminals and ast
 use crate::ast::{Param, State};
 use crate::error::IResult;
-use crate::parser::field::{mem_field_block, reg_field_block};
-use crate::parser::parameter;
-use crate::parser::terminals::{
-    assign, comma, kw_memory, kw_none, kw_register, kw_state, lparen, rparen, semicolon,
+use crate::parser::{
+    field::{mem_field_block, reg_field_block},
+    parameter,
+    terminals::{
+        assign, comma, kw_memory, kw_none, kw_register, kw_state, lparen, rparen, semicolon,
+    },
 };
 use crate::token::TokenStream;
 
@@ -46,7 +53,7 @@ pub fn state(input: TokenStream) -> IResult<TokenStream, State> {
     cut(delimited(
         assign,
         alt((register_state, memory_state, none_state)),
-        semicolon,
+        opt(semicolon),
     ))(i1)
 }
 

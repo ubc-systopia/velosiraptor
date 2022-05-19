@@ -80,7 +80,7 @@ pub fn interface(input: TokenStream) -> IResult<TokenStream, Interface> {
             register_interface,
             none_interface,
         )),
-        semicolon,
+        opt(semicolon),
     ))(i1)
 }
 
@@ -261,7 +261,7 @@ fn interfacefield(input: TokenStream) -> IResult<TokenStream, InterfaceField> {
         cut(lbrace),
         // XXX: that doesn't quite work like this here!
         permutation((opt(layout), opt(readaction), opt(writeaction))),
-        cut(tuple((rbrace, semicolon))),
+        cut(tuple((rbrace, opt(semicolon)))),
     )(i2)?;
 
     // if there were bitslices parsed unwrap them, otherwise create an empty vector

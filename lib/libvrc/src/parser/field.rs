@@ -100,7 +100,7 @@ pub fn mem_field(input: TokenStream) -> IResult<TokenStream, Field> {
     let (i1, (name, (stateref, length))) = pair(ident, cut(mem_field_params))(input.clone())?;
 
     // now recognize the optional bitslices, and the semicolon.
-    let (rem, bitslices) = terminated(opt(bitslice_block), cut(semicolon))(i1)?;
+    let (rem, bitslices) = terminated(opt(bitslice_block), opt(semicolon))(i1)?;
 
     // calculate the position of the bitslice
     let pos = input.expand_until(&rem);
@@ -137,7 +137,7 @@ pub fn reg_field(input: TokenStream) -> IResult<TokenStream, Field> {
     let (i1, (name, length)) = pair(ident, cut(reg_field_params))(input.clone())?;
 
     // now recognize the optional bitslices, and the semicolon.
-    let (rem, bitslices) = terminated(opt(bitslice_block), cut(semicolon))(i1)?;
+    let (rem, bitslices) = terminated(opt(bitslice_block), opt(semicolon))(i1)?;
 
     // calculate the position of the bitslice
     let pos = input.expand_until(&rem);

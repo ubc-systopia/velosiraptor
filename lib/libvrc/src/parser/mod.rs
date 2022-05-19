@@ -138,7 +138,7 @@ impl Parser {
             Err(_) => {
                 let msg = String::from("unexpected junk at the end of the file");
                 let hint = String::from("remove these characters");
-                let error = VrsError::new_err(i3, msg, Some(hint));
+                let error = VrsError::new_err(i3.with_range(0..1), msg, Some(hint));
                 Err(ParserError::ParserIncomplete { error })
             }
         }

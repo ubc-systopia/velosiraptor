@@ -32,7 +32,7 @@ use nom::{
     branch::alt,
     combinator::{cut, map, opt},
     multi::{many0, separated_list0},
-    sequence::{delimited, preceded, tuple},
+    sequence::{delimited, preceded, terminated, tuple},
 };
 
 // the used library-internal functionaltity
@@ -225,7 +225,7 @@ fn unit_segment(input: TokenStream) -> IResult<TokenStream, Unit> {
 
     // then we have the unit block, wrapped in curly braces and a ;
     let (i4, (consts, inbitwidth, outbitwidth, _flags, state, interface, methods)) =
-        cut(delimited(lbrace, unit_body, rbrace))(i2)?;
+        terminated(cut(delimited(lbrace, unit_body, rbrace)), opt(semicolon))(i2)?;
 
     // build the segment
     let seg = Segment::new(unitname, params, input)
@@ -282,7 +282,7 @@ fn unit_staticmap(input: TokenStream) -> IResult<TokenStream, Unit> {
 
     // then we have the unit block, wrapped in curly braces and a ;
     let (i4, (consts, inbitwidth, outbitwidth, mapdef, methods)) =
-        cut(delimited(lbrace, unit_body, rbrace))(i2)?;
+        terminated(cut(delimited(lbrace, unit_body, rbrace)), opt(semicolon))(i2)?;
 
     // build the static map
     let staticmap = StaticMap::new(unitname, params, input)

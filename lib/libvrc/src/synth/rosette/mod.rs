@@ -87,7 +87,7 @@ impl SynthRosette {
     fn synth_map_part(&self, part: &str, unit: &Segment) -> RosetteFile {
         // create the context
         let rktfilepath = self.outdir.join(format!("{}_map_{}.rkt", unit.name, part));
-        let m = unit.get_method("translate").unwrap();
+        let m = unit.get_method(part).unwrap();
 
         let mut rkt = self.synth_create(rktfilepath, unit, m);
 
@@ -111,11 +111,16 @@ impl SynthRosette {
             let mut rkt_matchflags = self.synth_map_part("matchflags", unit);
 
             let translate_thread = thread::spawn(move || {
+                println!("translate thread start!\n");
                 let res_translate = rkt_translate.exec();
+                println!("translate thread done: {}", res_translate);
                 parse_result(&res_translate)
             });
 
+            println!("matchflags thread start!\n");
             let res_matchflags = rkt_matchflags.exec();
+            println!("matchflags thread done: {}", res_matchflags);
+
             let ops_matchflags = parse_result(&res_matchflags);
             let ops_translate = translate_thread.join().unwrap();
 
