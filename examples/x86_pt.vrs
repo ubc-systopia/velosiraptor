@@ -102,10 +102,9 @@ segment X86PageTableEntry(base : addr) : Segment {
     // mapping an entry
     fn map(va: addr, sz: size, flgs: flags, pa : addr) -> bool
         requires va == 0;
-        requires sz == PAGE_SIZE;
-        requires pa & (PAGE_SIZE - 1) == 0;
+        requires sz == 4096;
+        requires (pa & 0xfff) == 0;
 
-        //requires (addr %  4096) == 0;
         // need a way to express types:
         // type(addr) == Memory || type(addr) == DevMemory;
         // type(addr) == DevMemory ==> flgs & CACHE_DISABLED
@@ -138,10 +137,10 @@ segment X86PageTableEntry(base : addr) : Segment {
 
     // the translation semantics, adding an option type?
     fn translate(va: addr) -> addr
-        requires va < PAGE_SIZE;
+        requires va < 4096;
         requires state.pte.present == 1;
     {
-        return va + state.pte.base << 12;
+        return va + (state.pte.base << 12);
     }
 }
 
