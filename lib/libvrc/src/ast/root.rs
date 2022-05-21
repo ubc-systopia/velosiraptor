@@ -258,7 +258,7 @@ impl<'a> AstRoot {
                     Some(Some(derived)) => derived,
                     Some(None) => {
                         break;
-                    },
+                    }
                     None => {
                         let msg = format!("unknown unit in derives clause of unit {}", unit.name());
                         let loc = unit.loc().with_range(1..5);
@@ -279,7 +279,8 @@ impl<'a> AstRoot {
                     if !s.is_empty() {
                         let msg = format!(
                             "circular dependency on unit derivations detected:  {} -> {}",
-                            s, unit.name()
+                            s,
+                            unit.name()
                         );
                         let loc = unit.loc().with_range(1..5);
                         VrsError::new_err(loc, msg, None).print();
@@ -300,7 +301,8 @@ impl<'a> AstRoot {
             if derived_from != "Segment" && derived_from != "StaticMap" {
                 let msg = format!(
                     "unit '{}' is not derived from 'StaticMap' or 'Segment' ({})",
-                    unit.name(), derived_from
+                    unit.name(),
+                    derived_from
                 );
                 let loc = unit.loc().with_range(1..5);
                 VrsError::new_err(loc, msg, None).print();

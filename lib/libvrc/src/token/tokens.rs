@@ -515,7 +515,6 @@ use std::convert::TryInto;
 
 #[test]
 fn test_enum_str() {
-
     // probably something like this would be enough:
     assert_eq!(Keyword::Unit.as_str().try_into(), Ok(Keyword::Unit));
 

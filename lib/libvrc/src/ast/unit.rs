@@ -147,8 +147,12 @@ impl<'a> Unit {
 
     pub fn derives_from(self, other: &Unit) -> Self {
         match (self, other) {
-            (Unit::StaticMap(staticmap), Unit::StaticMap(other)) => Unit::StaticMap(staticmap.derives_from(other)),
-            (Unit::Segment(segment), Unit::Segment(other)) => Unit::Segment(segment.derives_from(other)),
+            (Unit::StaticMap(staticmap), Unit::StaticMap(other)) => {
+                Unit::StaticMap(staticmap.derives_from(other))
+            }
+            (Unit::Segment(segment), Unit::Segment(other)) => {
+                Unit::Segment(segment.derives_from(other))
+            }
             _ => {
                 panic!("Derivation type mismatch!")
             }
