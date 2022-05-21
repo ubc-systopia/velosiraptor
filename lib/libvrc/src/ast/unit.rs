@@ -134,6 +134,26 @@ impl<'a> Unit {
             Unit::Segment(segment) => segment.paddr_max(),
         }
     }
+
+    pub fn derive(&mut self, other: &Unit) {
+        match (self, other) {
+            (Unit::StaticMap(staticmap), Unit::StaticMap(other)) => staticmap.derive(other),
+            (Unit::Segment(segment), Unit::Segment(other)) => segment.derive(other),
+            _ => {
+                panic!("Derivation type mismatch!")
+            }
+        }
+    }
+
+    pub fn derives_from(self, other: &Unit) -> Self {
+        match (self, other) {
+            (Unit::StaticMap(staticmap), Unit::StaticMap(other)) => Unit::StaticMap(staticmap.derives_from(other)),
+            (Unit::Segment(segment), Unit::Segment(other)) => Unit::Segment(segment.derives_from(other)),
+            _ => {
+                panic!("Derivation type mismatch!")
+            }
+        }
+    }
 }
 
 /// implementation of the [fmt::Display] trait for the [Unit]
@@ -347,6 +367,40 @@ impl<'a> Segment {
         } else {
             u64::MAX
         }
+    }
+
+    /// derives [Self] from the other unit
+    ///
+    /// This pulls in the definitions, constants, etc from the other unit.
+    /// Unit elements that are defined in [Self] will not be overwritten by the other unit.
+    pub fn derive(&mut self, other: &Segment) {
+        assert!(self.derived.is_some());
+        assert_eq!(self.derived.as_ref().unwrap(), other.name.as_str());
+        println!("unit: {} deriving form {}", self.name, other.name());
+
+        // merge params
+        for p in other.params.iter() {
+            if !self.params.iter().any(|x| x.name == p.name) {
+                self.params.push(p.clone());
+            }
+        }
+
+        // merge methods
+        for m in other.methods.iter() {
+            if !self.methods.iter().any(|x| x.name == m.name) {
+                self.methods.push(m.clone());
+            }
+        }
+        // merge interface
+
+        // merge state
+    }
+
+    /// derives a new unit from self and another unit
+    pub fn derives_from(&self, other: &Segment) -> Self {
+        let mut u = self.clone();
+        u.derive(other);
+        u
     }
 }
 
@@ -698,6 +752,40 @@ impl<'a> StaticMap {
     }
     pub fn paddr_max(&self) -> u64 {
         todo!("need to figure out teh maps first");
+    }
+
+    /// derives [Self] from the other unit
+    ///
+    /// This pulls in the definitions, constants, etc from the other unit.
+    /// Unit elements that are defined in [Self] will not be overwritten by the other unit.
+    pub fn derive(&mut self, other: &StaticMap) {
+        assert!(self.derived.is_some());
+        assert_eq!(self.derived.as_ref().unwrap(), other.name.as_str());
+        println!("unit: {} deriving form {}", self.name, other.name());
+
+        // merge params
+        for p in other.params.iter() {
+            if !self.params.iter().any(|x| x.name == p.name) {
+                self.params.push(p.clone());
+            }
+        }
+
+        // merge methods
+        for m in other.methods.iter() {
+            if !self.methods.iter().any(|x| x.name == m.name) {
+                self.methods.push(m.clone());
+            }
+        }
+        // merge interface
+
+        // merge state
+    }
+
+    /// derives a new unit from self and another unit
+    pub fn derives_from(&self, other: &StaticMap) -> Self {
+        let mut u = self.clone();
+        u.derive(other);
+        u
     }
 }
 

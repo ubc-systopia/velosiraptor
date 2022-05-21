@@ -240,6 +240,14 @@ fn main() {
         ast.imports.len(),
     );
 
+    match ast.resolve_unit_inheritance() {
+        Ok(()) => (),
+        _ => {
+            abort(infile, Issues::err());
+            return;
+        }
+    }
+
     log::info!("AST:");
     log::info!("----------------------------");
     log::info!("{}", ast);

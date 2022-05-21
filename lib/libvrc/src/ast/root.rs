@@ -229,6 +229,131 @@ impl<'a> AstRoot {
         self.merge_imports()
     }
 
+    pub fn resolve_unit_inheritance(&mut self) -> Result<(), AstError> {
+        // build the resolution hashmap.
+
+        let mut derives = HashMap::new();
+        for unit in &self.units {
+            if unit.name() == "Segment" || unit.name() == "StaticMap" {
+                let msg = String::from("Unit names 'Segment' and 'StaticMap' are reserved.");
+                let hint = String::from("change the name of the unit to something else.");
+                let loc = unit.loc().with_range(1..2);
+                VrsError::new_err(loc, msg, Some(hint)).print();
+                return Err(AstError::DeriveError {
+                    i: Issues::new(1, 0),
+                });
+            }
+
+            match unit.derived() {
+                Some(d) => derives.insert(unit.name().to_string(), Some(d.clone())),
+                None => derives.insert(unit.name().to_string(), None),
+            };
+        }
+
+        for unit in &self.units {
+            let mut path = vec![unit.name()];
+            let mut derived_from = unit.name();
+            loop {
+                derived_from = match derives.get(derived_from) {
+                    Some(Some(derived)) => derived,
+                    Some(None) => {
+                        break;
+                    },
+                    None => {
+                        let msg = format!("unknown unit in derives clause of unit {}", unit.name());
+                        let loc = unit.loc().with_range(1..5);
+                        VrsError::new_err(loc, msg, None).print();
+                        return Err(AstError::DeriveError {
+                            i: Issues::new(1, 0),
+                        });
+                    }
+                };
+                if path.contains(&derived_from) {
+                    // we have a circular dependency
+                    let it = path.iter().skip_while(|e| *e != &unit.name());
+                    // now convert to string
+                    let s = it
+                        .map(|s| s.to_string())
+                        .collect::<Vec<String>>()
+                        .join(" -> ");
+                    if !s.is_empty() {
+                        let msg = format!(
+                            "circular dependency on unit derivations detected:  {} -> {}",
+                            s, unit.name()
+                        );
+                        let loc = unit.loc().with_range(1..5);
+                        VrsError::new_err(loc, msg, None).print();
+                    }
+                    // TODO: actually return an error
+                    return Err(AstError::DeriveError {
+                        i: Issues::new(1, 0),
+                    });
+                }
+
+                path.push(derived_from);
+
+                if derived_from == "Segment" || derived_from == "StaticMap" {
+                    break;
+                }
+            }
+
+            if derived_from != "Segment" && derived_from != "StaticMap" {
+                let msg = format!(
+                    "unit '{}' is not derived from 'StaticMap' or 'Segment' ({})",
+                    unit.name(), derived_from
+                );
+                let loc = unit.loc().with_range(1..5);
+                VrsError::new_err(loc, msg, None).print();
+                return Err(AstError::DeriveError {
+                    i: Issues::new(1, 0),
+                });
+            }
+        }
+
+        let mut derives_inv: HashMap<String, Vec<String>> = HashMap::new();
+        for (name, derived) in derives.drain() {
+            if let Some(derived) = derived {
+                match derives_inv.get_mut(&derived) {
+                    Some(v) => {
+                        v.push(name);
+                    }
+                    None => {
+                        derives_inv.insert(derived, vec![name]);
+                    }
+                }
+            }
+        }
+
+        let mut tasks = vec!["Segment", "StaticMap"];
+
+        let mut units = HashMap::new();
+        for unit in self.units.drain(..) {
+            units.insert(unit.name().to_string(), unit);
+        }
+
+        while !tasks.is_empty() {
+            let task = tasks.pop().unwrap();
+            if let Some(derived) = derives_inv.get(task) {
+                for d in derived {
+                    let mut u = units.remove(d).unwrap();
+                    if task == "Segment" || task == "StaticMap" {
+                        // TODO: derive from Segment or StaticMap
+                        println!("unit: {} skipping derivation from {}", u.name(), task);
+                    } else {
+                        let other = self.get_unit(task).unwrap();
+                        u.derive(other);
+                    }
+
+                    // add the derived unit to the ast and push the task to the queue
+                    self.units.push(u);
+                    tasks.push(d);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn build_symboltable(&self) -> Result<SymbolTable, AstError> {
         let mut err = Issues::ok();
         let mut st = SymbolTable::new();
@@ -299,6 +424,15 @@ impl<'a> AstRoot {
             Unit::StaticMap(s) => Some(s),
             _ => None,
         })
+    }
+
+    /// obtains the unit with a given name
+    pub fn get_unit(&self, name: &str) -> Option<&Unit> {
+        self.units.iter().find(|u| u.name() == name)
+    }
+
+    pub fn get_unit_mut(&mut self, name: &str) -> Option<&mut Unit> {
+        self.units.iter_mut().find(|u| u.name() == name)
     }
 }
 
