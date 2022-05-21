@@ -32,7 +32,16 @@ use crate::ast::{
     utils, AstNode, AstNodeGeneric, Expr, Issues, Param, Stmt, Symbol, SymbolKind, SymbolTable,
     Type,
 };
+use crate::error::VrsError;
 use crate::token::TokenStream;
+
+/// the signature of the translate function
+const FN_SIG_TRANSLATE: &str = "fn translate(va: addr) -> addr";
+const FN_SIG_MATCHFLAGS: &str = "fn matchflags(flags: int) -> bool";
+const FN_SIG_MAP: &str = "fn map(va: addr, sz: size, flgs: flags, pa: addr)";
+const FN_SIG_UNMAP: &str = "fn unmap(va: addr, sz: size)";
+const FN_SIG_PROTECT: &str = "fn protect(va: addr, sz: size, flgs: flags)";
+//const FN_SIG_INIT: &str = "fn `";
 
 /// Defines a Method inside a unit
 ///
@@ -62,6 +71,12 @@ pub struct Method {
 
 impl Method {
     /// creates a new method without any associated TokenStream
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - the name of the method
+    /// * `rettype` - the return type of the method
+    /// * `args` - a list of function arguments
     pub fn new(name: String, rettype: Type, args: Vec<Param>) -> Self {
         Method {
             name,
@@ -74,12 +89,28 @@ impl Method {
         }
     }
 
-    pub fn check_map(&self) -> Issues {
-        Issues::ok()
+    pub fn is_translate(&self) -> bool {
+        self.name == "translate"
     }
-    pub fn check_translate(&self) -> Issues {
-        Issues::ok()
+
+    pub fn is_matchflags(&self) -> bool {
+        self.name == "matchflags"
     }
+
+    /// converts the [Method] into a [Symbol] for the symbol table
+    ///
+    /// # Arguments
+    ///
+    ///  * `self`  - reference to the method
+    ///
+    /// # Return Value
+    ///
+    /// Symbol representing the method
+    ///
+    /// # Notes
+    ///
+    /// The type of the symbol as used in expressions is the method's return value.
+    ///
     pub fn to_symbol(&self) -> Symbol {
         Symbol::new(
             self.name.clone(),
@@ -90,7 +121,288 @@ impl Method {
         )
     }
 
-    /// returns a list of state references made by this method
+    /// checks whether the method parameters match the given signature
+    ///
+    /// # Arguments
+    ///
+    /// * `sig`    - the signature of the method (just a string)
+    /// * `param`  - the [Param] struct representing the method's parameter
+    /// * `name`   - the expected name of the parameter (produces warning)
+    /// * `ty`     - the expected type of the parameter (produces error)
+    ///
+    /// # Return Value
+    ///
+    /// The number of issues found with the parameter
+    ///
+    /// # Notes
+    ///
+    /// * The supplied signature string is not interpreted and is only used for printing
+    ///
+    pub fn check_param(sig: &str, param: &Param, name: &str, ty: Type) -> Issues {
+        let mut res = Issues::ok();
+
+        if param.ptype != ty {
+            let msg = format!(
+                "argument type mismatch. expected `{}` but was `{}`",
+                ty, param.ptype
+            );
+            let hint = format!(
+                "change this argument to type `{}` to match function signature `{}`",
+                ty, sig
+            );
+            VrsError::new_err(param.pos.clone(), msg, Some(hint)).print();
+            res.inc_err(1);
+        }
+
+        // we just raise a warning for the name at the moment
+        if param.name != name {
+            let msg = format!(
+                "argument name mismatch. expected `{}` but was `{}`",
+                name, param.name
+            );
+            let hint = format!(
+                "change this argument name to `{}` to match function signature `{}`",
+                name, sig
+            );
+            VrsError::new_warn(param.pos.clone(), msg, Some(hint)).print();
+            res.inc_warn(1)
+        }
+
+        res
+    }
+
+    /// checks whether the method's return type match the given signature
+    ///
+    /// # Arguments
+    ///
+    /// * `self`  - reference of the method
+    /// * `sig`   - the signature of the method (just a string)
+    /// * `ty`    - the expected return type of the parameter (produces error)
+    ///
+    /// # Return Value
+    ///
+    /// The number of issues found with the return type
+    ///
+    fn check_rettype(&self, sig: &str, ty: Type) -> Issues {
+        if self.rettype != ty {
+            let msg = String::from("function signature mismatch: wrong return type");
+            let hint = format!(
+                "change return type to match expected function signature: `{}`",
+                sig
+            );
+            let r = 6 + self.args.len() * 3;
+            VrsError::new_err(self.pos.with_range(r..r + 1), msg, Some(hint)).print();
+            Issues::err()
+        } else {
+            Issues::ok()
+        }
+    }
+
+    /// checks whether the method's number of arguments matched the expected count
+    ///
+    /// # Arguments
+    ///
+    /// * `self`   - reference of the method
+    /// * `sig`    - the signature of the method (just a string)
+    /// * `nargs`  - the expected return type of the parameter (produces error)
+    ///
+    /// # Return Value
+    ///
+    /// The number of issues found with the arguments
+    ///
+    fn check_argnum(&self, sig: &str, nargs: usize) -> Issues {
+        if self.args.len() != nargs {
+            let msg = String::from("function signature mismatch: wrong number of arguments");
+            let hint = format!(
+                "change arguments to match expected function  signature: `{}`",
+                sig
+            );
+            VrsError::new_err(
+                self.pos.with_range(3..(6 + self.args.len() * 3)),
+                msg,
+                Some(hint),
+            )
+            .print();
+            Issues::err()
+        } else {
+            Issues::ok()
+        }
+    }
+
+    /// checks the `translate` method for compliance
+    ///
+    /// The `translate` method defines the translation part of the
+    /// Unit's remapping functionality, and in particular produces
+    /// a result if there is some mode of access that may result in
+    /// a successful remapping
+    ///
+    /// # Arguments
+    ///
+    /// * `self`   - reference of the method
+    /// * `st`     - the symbol table
+    ///
+    /// # Return Value
+    ///
+    /// The number of issues found with the method
+    ///
+    /// # Expecte Form
+    ///
+    ///   fn translate(va: addr) -> addr
+    ///
+    fn check_translate(&self, _st: &mut SymbolTable) -> Issues {
+        assert_eq!(self.name, "translate");
+
+        let mut res = Issues::ok();
+
+        res = res + self.check_rettype(FN_SIG_TRANSLATE, Type::Address);
+        res = res + self.check_argnum(FN_SIG_TRANSLATE, 1);
+
+        if !self.args.is_empty() {
+            res = res + Self::check_param(FN_SIG_TRANSLATE, &self.args[0], "va", Type::Address);
+        }
+
+        res
+    }
+
+    /// checks the `matchflags` method for compliance
+    ///
+    /// The `matchflags` methods defines the permission part of the
+    /// unit's remapping functionality, and in particular produces
+    /// a boolean value whether the set permissions of match the
+    /// flags
+    ///
+    /// # Arguments
+    ///
+    /// * `self`   - reference of the method
+    /// * `st`     - the symbol table
+    ///
+    /// # Expected Form
+    ///
+    ///   fn matchflags(flgs: flags) -> bool
+    ///
+    fn check_matchflags(&self, _st: &mut SymbolTable) -> Issues {
+        assert_eq!(self.name, "matchflags");
+
+        let mut res = Issues::ok();
+
+        res = res + self.check_rettype(FN_SIG_MATCHFLAGS, Type::Boolean);
+        res = res + self.check_argnum(FN_SIG_MATCHFLAGS, 1);
+
+        if !self.args.is_empty() {
+            res = res + Self::check_param(FN_SIG_MATCHFLAGS, &self.args[0], "flgs", Type::Flags);
+        }
+
+        res
+    }
+
+    /// checks the `map` method for compliance
+    ///
+    /// The `map` methods defines the constraints on creating a new
+    /// mapping (or a reconfiguration of) the unit's remapping functionality,
+    /// and produces a boolean value whether the change in configuration
+    /// succeeded
+    ///
+    /// # Arguments
+    ///
+    /// * `self`   - reference of the method
+    /// * `st`     - the symbol table
+    ///
+    /// # Expected Form
+    ///
+    ///   fn map(va: addr, sz: size, flgs: flags, pa: addr) -> bool
+    ///
+    fn check_map(&self, _st: &mut SymbolTable) -> Issues {
+        assert_eq!(self.name, "map");
+        let mut res = Issues::ok();
+
+        res = res + self.check_rettype(FN_SIG_MAP, Type::Boolean);
+        res = res + self.check_argnum(FN_SIG_MAP, 4);
+
+        if !self.args.is_empty() {
+            res = res + Self::check_param(FN_SIG_MAP, &self.args[0], "va", Type::Address);
+        }
+        if !self.args.len() >= 2 {
+            res = res + Self::check_param(FN_SIG_MAP, &self.args[1], "sz", Type::Size);
+        }
+        if !self.args.len() >= 3 {
+            res = res + Self::check_param(FN_SIG_MAP, &self.args[2], "flgs", Type::Flags);
+        }
+        if !self.args.len() >= 4 {
+            res = res + Self::check_param(FN_SIG_MAP, &self.args[3], "pa", Type::Address);
+        }
+
+        res
+    }
+
+    /// checks the `unmap` method for compliance
+    ///
+    /// The `unmap` methods defines the constraints on removing an existing
+    /// mapping (or a reconfiguration of) the unit's remapping functionality,
+    /// and produces a boolean value whether the change in configuration
+    /// succeeded
+    ///
+    /// # Arguments
+    ///
+    /// * `self`   - reference of the method
+    /// * `st`     - the symbol table
+    ///
+    /// # Expected Form
+    ///
+    ///   fn unmap(va: addr, sz: size) -> bool
+    ///
+    fn check_unmap(&self, _st: &mut SymbolTable) -> Issues {
+        assert_eq!(self.name, "unmap");
+        let mut res = Issues::ok();
+
+        res = res + self.check_rettype(FN_SIG_UNMAP, Type::Boolean);
+        res = res + self.check_argnum(FN_SIG_UNMAP, 2);
+        if !self.args.is_empty() {
+            res = res + Self::check_param(FN_SIG_MAP, &self.args[0], "va", Type::Address);
+        }
+        if !self.args.len() >= 2 {
+            res = res + Self::check_param(FN_SIG_MAP, &self.args[1], "sz", Type::Size);
+        }
+        res
+    }
+
+    /// checks the `protect` method for compliance
+    ///
+    /// The `protect` methods defines the constraints on changing the permissions
+    /// of an existing mapping (or a reconfiguration of) the unit's remapping functionality,
+    /// and produces a boolean value whether the change in configuration
+    /// succeeded
+    ///
+    /// # Arguments
+    ///
+    /// * `self`   - reference of the method
+    /// * `st`     - the symbol table
+    ///
+    /// # Expected Form
+    ///
+    ///   fn protect(va: addr, sz: size, flgs: flags) -> bool
+    ///
+    fn check_protect(&self, _st: &mut SymbolTable) -> Issues {
+        assert_eq!(self.name, "protect");
+        let mut res = Issues::ok();
+
+        res = res + self.check_rettype(FN_SIG_PROTECT, Type::Boolean);
+
+        res
+    }
+
+    /// returns a set of state references made by this method
+    ///
+    /// This includes references made by the statements of the method body,
+    /// and the ensures and requires clauses by the methods
+    ///
+    /// # Arguments
+    ///
+    /// * `self`  -  reference of the method
+    ///
+    /// # Return Value
+    ///
+    /// Hash set of strings containing all state references
+    ///
     pub fn get_state_references(&self) -> HashSet<String> {
         let mut v = HashSet::new();
 
@@ -161,6 +473,25 @@ impl<'a> AstNodeGeneric<'a> for Method {
         // Description: Check if all parameters have the right type
         // Notes:       --
         // --------------------------------------------------------------------------------------
+
+        match self.name.as_str() {
+            "translate" => {
+                res = res + self.check_translate(st);
+            }
+            "matchflags" => {
+                res = res + self.check_matchflags(st);
+            }
+            "map" => {
+                res = res + self.check_map(st);
+            }
+            "unmap" => {
+                res = res + self.check_unmap(st);
+            }
+            "protect" => {
+                res = res + self.check_protect(st);
+            }
+            _ => {}
+        }
 
         // create a new symbol table context
         st.create_context(self.name.clone());

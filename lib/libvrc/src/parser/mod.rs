@@ -30,9 +30,10 @@ pub mod bitslice;
 pub mod constdef;
 pub mod expression;
 pub mod field;
+pub mod flags;
 pub mod import;
 pub mod interface;
-mod map;
+pub mod map;
 pub mod method;
 pub mod param;
 pub mod state;
@@ -52,8 +53,8 @@ use crate::ast::AstRoot;
 use crate::error::VrsError;
 use crate::lexer::{Lexer, LexerError};
 use crate::parser::{
-    constdef::constdef, import::import, interface::interface, method::method, param::parameter,
-    state::state, terminals::eof, unit::unit,
+    constdef::constdef, flags::flags, import::import, interface::interface, method::method,
+    param::parameter, state::state, terminals::eof, unit::unit,
 };
 use crate::token::{Token, TokenStream};
 
@@ -137,7 +138,7 @@ impl Parser {
             Err(_) => {
                 let msg = String::from("unexpected junk at the end of the file");
                 let hint = String::from("remove these characters");
-                let error = VrsError::new_err(i3, msg, Some(hint));
+                let error = VrsError::new_err(i3.with_range(0..1), msg, Some(hint));
                 Err(ParserError::ParserIncomplete { error })
             }
         }

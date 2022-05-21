@@ -29,7 +29,9 @@ use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-use crate::ast::{utils, AstError, AstNodeGeneric, Const, Import, Issues, SymbolTable, Unit};
+use crate::ast::{
+    utils, AstError, AstNodeGeneric, Const, Import, Issues, Segment, StaticMap, SymbolTable, Unit,
+};
 use crate::error::VrsError;
 use crate::parser::ParserError;
 use crate::token::TokenStream;
@@ -232,7 +234,7 @@ impl<'a> AstRoot {
 
         let mut derives = HashMap::new();
         for unit in &self.units {
-            if unit.name == "Segment" || unit.name == "StaticMap" {
+            if unit.name() == "Segment" || unit.name() == "StaticMap" {
                 let msg = String::from("Unit names 'Segment' and 'StaticMap' are reserved.");
                 let hint = String::from("change the name of the unit to something else.");
                 let loc = unit.loc().with_range(1..2);
@@ -242,17 +244,23 @@ impl<'a> AstRoot {
                 });
             }
 
-            derives.insert(unit.name.clone(), unit.derived.clone());
+            match unit.derived() {
+                Some(d) => derives.insert(unit.name().to_string(), Some(d.clone())),
+                None => derives.insert(unit.name().to_string(), None),
+            };
         }
 
         for unit in &self.units {
-            let mut path = vec![unit.name.as_str()];
-            let mut derived_from = unit.name.as_str();
+            let mut path = vec![unit.name()];
+            let mut derived_from = unit.name();
             loop {
                 derived_from = match derives.get(derived_from) {
-                    Some(derived) => derived,
+                    Some(Some(derived)) => derived,
+                    Some(None) => {
+                        break;
+                    }
                     None => {
-                        let msg = format!("unknown unit in derives clause of unit {}", unit.name);
+                        let msg = format!("unknown unit in derives clause of unit {}", unit.name());
                         let loc = unit.loc().with_range(1..5);
                         VrsError::new_err(loc, msg, None).print();
                         return Err(AstError::DeriveError {
@@ -262,7 +270,7 @@ impl<'a> AstRoot {
                 };
                 if path.contains(&derived_from) {
                     // we have a circular dependency
-                    let it = path.iter().skip_while(|e| *e != &unit.name.as_str());
+                    let it = path.iter().skip_while(|e| *e != &unit.name());
                     // now convert to string
                     let s = it
                         .map(|s| s.to_string())
@@ -271,7 +279,8 @@ impl<'a> AstRoot {
                     if !s.is_empty() {
                         let msg = format!(
                             "circular dependency on unit derivations detected:  {} -> {}",
-                            s, unit.name
+                            s,
+                            unit.name()
                         );
                         let loc = unit.loc().with_range(1..5);
                         VrsError::new_err(loc, msg, None).print();
@@ -292,7 +301,8 @@ impl<'a> AstRoot {
             if derived_from != "Segment" && derived_from != "StaticMap" {
                 let msg = format!(
                     "unit '{}' is not derived from 'StaticMap' or 'Segment' ({})",
-                    unit.name, derived_from
+                    unit.name(),
+                    derived_from
                 );
                 let loc = unit.loc().with_range(1..5);
                 VrsError::new_err(loc, msg, None).print();
@@ -304,12 +314,14 @@ impl<'a> AstRoot {
 
         let mut derives_inv: HashMap<String, Vec<String>> = HashMap::new();
         for (name, derived) in derives.drain() {
-            match derives_inv.get_mut(&derived) {
-                Some(v) => {
-                    v.push(name);
-                }
-                None => {
-                    derives_inv.insert(derived, vec![name]);
+            if let Some(derived) = derived {
+                match derives_inv.get_mut(&derived) {
+                    Some(v) => {
+                        v.push(name);
+                    }
+                    None => {
+                        derives_inv.insert(derived, vec![name]);
+                    }
                 }
             }
         }
@@ -318,7 +330,7 @@ impl<'a> AstRoot {
 
         let mut units = HashMap::new();
         for unit in self.units.drain(..) {
-            units.insert(unit.name.clone(), unit);
+            units.insert(unit.name().to_string(), unit);
         }
 
         while !tasks.is_empty() {
@@ -328,7 +340,7 @@ impl<'a> AstRoot {
                     let mut u = units.remove(d).unwrap();
                     if task == "Segment" || task == "StaticMap" {
                         // TODO: derive from Segment or StaticMap
-                        println!("unit: {} skipping derivation from {}", u.name, task);
+                        println!("unit: {} skipping derivation from {}", u.name(), task);
                     } else {
                         let other = self.get_unit(task).unwrap();
                         u.derive(other);
@@ -383,13 +395,46 @@ impl<'a> AstRoot {
         Ok(Issues::ok())
     }
 
+    ///
+    pub fn all_units(&self) -> &[Unit] {
+        &self.units
+    }
+
+    pub fn segment_units(&self) -> impl Iterator<Item = &Segment> + '_ {
+        self.units.iter().filter_map(|u| match u {
+            Unit::Segment(s) => Some(s),
+            _ => None,
+        })
+    }
+
+    pub fn segment_units_mut(&mut self) -> impl Iterator<Item = &mut Segment> + '_ {
+        self.units.iter_mut().filter_map(|u| match u {
+            Unit::Segment(s) => Some(s),
+            _ => None,
+        })
+    }
+
+    pub fn staticmap_units(&self) -> impl Iterator<Item = &StaticMap> + '_ {
+        self.units.iter().filter_map(|u| match u {
+            Unit::StaticMap(s) => Some(s),
+            _ => None,
+        })
+    }
+
+    pub fn staticmap_units_mut(&mut self) -> impl Iterator<Item = &mut StaticMap> + '_ {
+        self.units.iter_mut().filter_map(|u| match u {
+            Unit::StaticMap(s) => Some(s),
+            _ => None,
+        })
+    }
+
     /// obtains the unit with a given name
     pub fn get_unit(&self, name: &str) -> Option<&Unit> {
-        self.units.iter().find(|u| u.name == name)
+        self.units.iter().find(|u| u.name() == name)
     }
 
     pub fn get_unit_mut(&mut self, name: &str) -> Option<&mut Unit> {
-        self.units.iter_mut().find(|u| u.name == name)
+        self.units.iter_mut().find(|u| u.name() == name)
     }
 }
 

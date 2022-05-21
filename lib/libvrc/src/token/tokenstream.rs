@@ -47,11 +47,16 @@ use crate::token::{Token, TokenContent};
 #[derive(Clone, PartialEq)]
 pub struct TokenStream {
     /// a reference counted vector of tokens
-    tokens: Rc<Vec<Token>>,
+    tokens: Option<Rc<Vec<Token>>>,
 
     /// Holds the valid range within the [Token] vector
     range: Range<usize>,
 }
+
+pub const TOKENSTREAM_DUMMY: TokenStream = TokenStream {
+    tokens: None,
+    range: 0..0,
+};
 
 /// Implementation of the [TokenStream]
 impl TokenStream {
@@ -61,7 +66,7 @@ impl TokenStream {
     pub fn from_vec(tokens: Vec<Token>) -> Self {
         let len = tokens.len();
         TokenStream {
-            tokens: Rc::new(tokens),
+            tokens: Some(Rc::new(tokens)),
             range: 0..len,
         }
     }
@@ -142,7 +147,7 @@ impl TokenStream {
     /// Creates an empty TokenStream.
     pub fn empty() -> Self {
         TokenStream {
-            tokens: Rc::new(Vec::new()),
+            tokens: None,
             range: 0..0,
         }
     }
@@ -163,18 +168,20 @@ impl TokenStream {
 
     /// Returns the current slice of Tokens backed by this [TokenStream]
     pub fn as_slice(&self) -> &[Token] {
-        &self.tokens[self.range.clone()]
+        self.tokens.as_ref().unwrap().as_slice()
     }
 
     /// Returns the first [Token] in the [TokenStream]
     pub fn peek(&self) -> &Token {
         assert!(!self.is_empty());
-        &self.tokens[self.range.start]
+        assert!(self.tokens.is_some());
+        &self.tokens.as_ref().unwrap()[self.range.start]
     }
 
     pub fn last(&self) -> &Token {
         assert!(!self.is_empty());
-        &self.tokens[self.range.end - 1]
+        assert!(self.tokens.is_some());
+        &self.tokens.as_ref().unwrap()[self.range.end - 1]
     }
 
     /// Obtains the [SourcePos] of the current [Token] in the [TokenStream]
@@ -199,7 +206,10 @@ impl TokenStream {
 
     /// Returns a slice covering the entire input tokens.
     pub fn input_tokens(&self) -> &[Token] {
-        &self.tokens
+        match &self.tokens {
+            Some(tokens) => &tokens[..],
+            None => &[],
+        }
     }
 
     /// returns a string with the position information
@@ -211,7 +221,10 @@ impl TokenStream {
 /// Implements the [Display] trait for [TokenStream]
 impl Display for TokenStream {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
-        write!(f, "{}", self.tokens[self.range.start])
+        match &self.tokens {
+            Some(tokens) => write!(f, "{}", tokens[self.range.start]),
+            None => write!(f, "No Tokens",),
+        }
     }
 }
 
@@ -220,9 +233,15 @@ impl Debug for TokenStream {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         let len = std::cmp::min(self.input_len(), 5);
         let mut tok = String::new();
-        for i in &self.tokens[self.range.start..self.range.start + len] {
-            tok.push_str(&format!("    - {}\n", i))
+        match &self.tokens {
+            Some(tokens) => {
+                for i in &tokens[self.range.start..self.range.start + len] {
+                    tok.push_str(&format!("    - {}\n", i))
+                }
+            }
+            None => tok.push_str("No Tokens"),
         }
+
         if self.input_len() > 5 {
             tok.push_str("    - ...\n")
         }
@@ -446,13 +465,19 @@ impl InputIter for TokenStream {
     /// Returns an iterator over the elements and their byte offsets
     #[inline]
     fn iter_indices(&self) -> Self::Iter {
-        TokenStreamIndices::new(self.tokens.clone(), self.range.clone())
+        match &self.tokens {
+            Some(tokens) => TokenStreamIndices::new(tokens.clone(), self.range.clone()),
+            None => TokenStreamIndices::new(Rc::new(Vec::new()), self.range.clone()),
+        }
     }
 
     /// Returns an iterator over the elements
     #[inline]
     fn iter_elements(&self) -> Self::IterElem {
-        TokenStreamIter::new(self.tokens.clone(), self.range.clone())
+        match &self.tokens {
+            Some(tokens) => TokenStreamIter::new(tokens.clone(), self.range.clone()),
+            None => TokenStreamIter::new(Rc::new(Vec::new()), self.range.clone()),
+        }
     }
 
     /// Finds the byte position of the element
@@ -461,9 +486,12 @@ impl InputIter for TokenStream {
     where
         P: Fn(Self::Item) -> bool,
     {
-        self.tokens[self.range.clone()]
-            .iter()
-            .position(|b| predicate(b.clone()))
+        match &self.tokens {
+            Some(t) => t[self.range.clone()]
+                .iter()
+                .position(|b| predicate(b.clone())),
+            None => None,
+        }
     }
 
     /// Get the byte offset from the element's position in the stream
@@ -491,8 +519,18 @@ impl ErrorLocation for TokenStream {
 
     /// the length of the token
     fn length(&self) -> usize {
+        match &self.tokens {
+            Some(tokens) => {
+                let mut sz = 0;
+                for i in self.range.clone() {
+                    sz += tokens[i].spos.length();
+                }
+                //self.peek().spos.length()
+                sz
+            }
+            None => 0,
+        }
         // TODO: figure out the right thing here!
-        self.peek().spos.length()
     }
 
     /// the context (stdin or filename)
@@ -541,10 +579,10 @@ impl ErrorLocation for &TokenStream {
 impl From<SourcePos> for TokenStream {
     fn from(spos: SourcePos) -> Self {
         TokenStream {
-            tokens: Rc::new(vec![Token {
+            tokens: Some(Rc::new(vec![Token {
                 content: TokenContent::Illegal,
                 spos,
-            }]),
+            }])),
             range: 0..0,
         }
     }

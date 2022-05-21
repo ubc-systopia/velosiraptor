@@ -35,6 +35,25 @@ pub struct Map {
     pub pos: TokenStream,
 }
 
+impl Map {
+    pub fn new(pos: TokenStream) -> Self {
+        Map {
+            entries: Vec::new(),
+            pos,
+        }
+    }
+
+    pub fn add_entries(mut self, entries: Vec<MapEntry>) -> Self {
+        self.entries.extend(entries);
+        self
+    }
+
+    pub fn finalize(mut self, pos: &TokenStream) -> Self {
+        self.pos = self.pos.expand_until(pos);
+        self
+    }
+}
+
 /// Implementation of [AstNodeGeneric] for [Map]
 impl<'a> AstNodeGeneric<'a> for Map {
     // checks the node and returns the number of errors and warnings encountered

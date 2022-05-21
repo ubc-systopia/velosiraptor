@@ -30,6 +30,7 @@ mod bitslice;
 mod consts;
 mod expression;
 mod field;
+mod flags;
 mod import;
 mod interface;
 mod issues;
@@ -47,7 +48,7 @@ mod utils;
 use custom_error::custom_error;
 
 use crate::parser::ParsErr;
-use crate::token::TokenStream;
+use crate::token::{TokenStream, TOKENSTREAM_DUMMY};
 
 // custom error definitions
 custom_error! {#[derive(PartialEq)] pub AstError
@@ -63,21 +64,22 @@ custom_error! {#[derive(PartialEq)] pub AstError
 // rexports
 pub use actions::{Action, ActionComponent, ActionType};
 pub use bitslice::BitSlice;
-pub use consts::Const;
+pub use consts::{Const, ConstValue};
 pub use expression::{BinOp, Expr, Quantifier, UnOp};
 pub use field::Field;
+pub use flags::{Flag, Flags};
 pub use import::Import;
-pub use interface::{Interface, InterfaceField};
+pub use interface::{Interface, InterfaceField, NONE_INTERFACE};
 pub use issues::Issues;
 pub use map::{Map, MapEntry};
 pub use method::Method;
 pub use param::Param;
 pub use root::AstRoot;
-pub use state::State;
+pub use state::{State, NONE_STATE};
 pub use statement::Stmt;
 pub use symboltable::{Symbol, SymbolKind, SymbolTable};
 pub use types::Type;
-pub use unit::Unit;
+pub use unit::{Segment, StaticMap, Unit, CFG_DEFAULT_BITWIDTH};
 
 /// Trait that checks the Ast nodes for consistency
 ///
@@ -98,7 +100,9 @@ pub trait AstNodeGeneric<'a> {
     fn name(&self) -> &str;
 
     /// returns the location of the AstNodeGeneric
-    fn loc(&self) -> &TokenStream;
+    fn loc(&self) -> &TokenStream {
+        &TOKENSTREAM_DUMMY
+    }
 }
 
 /// enum of all AstNodes
@@ -108,6 +112,9 @@ pub enum AstNode<'a> {
     Import(&'a Import),
     Const(&'a Const),
     Unit(&'a Unit),
+    Segment(&'a Segment),
+    StaticMap(&'a StaticMap),
+
     // state
     State(&'a State),
     Field(&'a Field),
@@ -135,6 +142,8 @@ impl<'a> AstNodeGeneric<'a> for AstNode<'a> {
             AstNode::Import(x) => x.name(),
             AstNode::Const(x) => x.name(),
             AstNode::Unit(x) => x.name(),
+            AstNode::Segment(x) => x.name(),
+            AstNode::StaticMap(x) => x.name(),
             AstNode::State(x) => x.name(),
             AstNode::Field(x) => x.name(),
             AstNode::BitSlice(x) => x.name(),
@@ -155,6 +164,8 @@ impl<'a> AstNodeGeneric<'a> for AstNode<'a> {
             AstNode::Import(x) => x.loc(),
             AstNode::Const(x) => x.loc(),
             AstNode::Unit(x) => x.loc(),
+            AstNode::Segment(x) => x.loc(),
+            AstNode::StaticMap(x) => x.loc(),
             AstNode::State(x) => x.loc(),
             AstNode::Field(x) => x.loc(),
             AstNode::BitSlice(x) => x.loc(),

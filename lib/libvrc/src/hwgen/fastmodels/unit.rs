@@ -475,7 +475,7 @@ pub fn generate_unit_header(name: &str, unit: &Unit, outdir: &Path) -> Result<()
     c.new_attribute("_interface", iface_ptr_type);
 
     // TODO: handle the methods!
-    for m in &unit.methods {
+    for m in unit.methods() {
         add_method(c, m);
     }
 
@@ -524,7 +524,7 @@ pub fn generate_unit_impl(name: &str, unit: &Unit, outdir: &Path) -> Result<(), 
      */
 
     // TODO: handle the methods!
-    for m in &unit.methods {
+    for m in unit.methods() {
         add_method(c, m)
     }
 

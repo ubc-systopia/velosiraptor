@@ -14,20 +14,30 @@
  */
 
 // This defines an SMPT Entry
-unit DirectSegment(base : addr) : Segment {
+segment DirectSegment(base : addr) : Segment {
 
     // let's assume the maximum size of the segment is 40 bits.
-    // size = 40;
+    inbitwidth= 40;
+
+    // let's assume the maximum output bit size is 64 bits
+    outbitwidth = 64;
 
     // the state will be two registers:
     state = Register {
 
-        base [8] {
+        address [8] {
              0 63  address;
         };
 
         length [8] {
             0 39 bytes;
+        };
+
+        perms [1] {
+            0 0 enabled;
+            1 1 read;
+            2 2 write;
+            3 3 execute;
         };
     };
 
@@ -35,15 +45,15 @@ unit DirectSegment(base : addr) : Segment {
     // called `base` and `size`. They can be updated using load/store instructions
     interface = MMIO(base : addr) {
 
-        base [base, 16, 8] {
+        address [base, 0, 8] {
             Layout {
                0 63  address;
             };
             ReadAction {
-                interface.base <- state.base;
+                interface.address <- state.address;
             };
             WriteAction {
-                interface.base -> state.base;
+                interface.address -> state.address;
             };
         };
 
@@ -58,6 +68,21 @@ unit DirectSegment(base : addr) : Segment {
                 interface.length -> state.length;
             };
         };
+
+        perms [base, 16, 1] {
+            Layout {
+                0 0 enabled;
+                1 1 read;
+                2 2 write;
+                3 3 execute;
+            };
+            ReadAction {
+                interface.perms <- state.perms;
+            };
+            WriteAction {
+                interface.perms -> state.perms;
+            };
+        };
     };
 
     // unmapping an entry
@@ -68,7 +93,7 @@ unit DirectSegment(base : addr) : Segment {
     ;
 
     // mapping an entry
-    fn map(va: addr, sz: size, flags: int, pa : addr) -> bool
+    fn map(va: addr, sz: size, flgs: flags, pa : addr) -> bool
         //requires (addr %  4096) == 0;
         // need a way to express types:
         // type(addr) == Memory || type(addr) == DevMemory;
@@ -85,13 +110,13 @@ unit DirectSegment(base : addr) : Segment {
         requires (pa >> 12) << 12 == pa;
         requires pa <= 0xff_ffff_ffff;
 
-        ensures forall i : addr :: 0 <= i && i < sz && translate(va + i, flags) == pa + i;
-        ensures translate(va, flags) == pa;
+        ensures forall i : addr :: 0 <= i && i < sz && remap(va + i, flgs) == pa + i;
+        ensures remap(va, flgs) == pa;
     ;
 
 
     // protecting the entry, i.e., change its permission
-    fn protect(flags: int) -> bool
+    fn protect(flgs: flags) -> bool
     {
         // update the entry
         // ensures match_flags(flags) ==> translate(a) == translate(a)
@@ -99,11 +124,24 @@ unit DirectSegment(base : addr) : Segment {
     }
 
 
-    // the translation semantics, adding an option type?
-    fn translate(va: addr, flags: int) -> addr
-        requires va < state.length.bytes;
-    {
-        return va + state.base.address;
+    // to be defined
+    fn matchflags(flgs: flags) -> bool {
+        return state.perms.enabled == 1;
     }
 
- };
+    // the translation semantics, adding an option type?
+    fn translate(va: addr) -> addr
+        requires va < state.length.bytes;
+    {
+        return va + state.address.address;
+    }
+
+
+    // implicit
+    fn remap(va: addr, flgs: flags) -> addr
+        requires matchflags(flgs);
+    {
+        return translate(va);
+    }
+
+ }

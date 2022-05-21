@@ -50,7 +50,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Unit Generation (Rust)
+//! Segment Generation (Rust)
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -58,12 +58,12 @@ use std::path::Path;
 use crustal as C;
 
 use super::utils;
-use crate::ast::Unit;
+use crate::ast::{AstNodeGeneric, Segment};
 use crate::codegen::CodeGenError;
 use crate::synth::{OpExpr, Operation};
 
 /// adds the constants defined in the unit to the scope
-fn add_unit_constants(scope: &mut C::Scope, unit: &Unit) {
+fn add_unit_constants(scope: &mut C::Scope, unit: &Segment) {
     scope.new_comment("Defined unit constants");
     if unit.consts.is_empty() {
         scope.new_comment("The unit does not define any constants");
@@ -83,7 +83,7 @@ fn add_unit_constants(scope: &mut C::Scope, unit: &Unit) {
 //     // field_name  --> struct FieldName {  val: u64 };
 
 //     // create the struct in the scope
-//     let st = scope.new_struct(&unit.name);
+//     let st = scope.new_struct(unit.name());
 
 //     // make it public
 //     st.vis("pub");
@@ -91,7 +91,7 @@ fn add_unit_constants(scope: &mut C::Scope, unit: &Unit) {
 //     // add the doc field to the struct
 //     st.doc(&format!(
 //         "Represents the Unit type '{}'.\n@loc: {}",
-//         unit.name,
+//         unit.name(),
 //         unit.location()
 //     ));
 
@@ -99,8 +99,8 @@ fn add_unit_constants(scope: &mut C::Scope, unit: &Unit) {
 //     //st.field("val", to_rust_type(field.nbits()));
 // }
 
-fn add_constructor_function(scope: &mut C::Scope, unit: &Unit) {
-    let fname = utils::constructor_fn_name(unit);
+fn add_constructor_function(scope: &mut C::Scope, unit: &Segment) {
+    let fname = utils::constructor_fn_name(unit.name());
     scope
         .new_function(&fname, C::Type::new_void())
         .set_static()
@@ -109,8 +109,8 @@ fn add_constructor_function(scope: &mut C::Scope, unit: &Unit) {
         .new_comment("TODO: SYNTHESIZE ME");
 }
 
-fn add_translate_function(scope: &mut C::Scope, unit: &Unit) {
-    let fname = utils::translate_fn_name(unit);
+fn add_translate_function(scope: &mut C::Scope, unit: &Segment) {
+    let fname = utils::translate_fn_name(unit.name());
     scope
         .new_function(&fname, C::Type::new_void())
         .set_static()
@@ -226,14 +226,14 @@ fn op_to_rust_expr(unit: &str, c: &mut C::Block, op: &Operation, vars: &HashMap<
     }
 }
 
-fn add_map_function(scope: &mut C::Scope, unit: &Unit) {
-    let fname = utils::map_fn_name(unit);
+fn add_map_function(scope: &mut C::Scope, unit: &Segment) {
+    let fname = utils::map_fn_name(unit.name());
 
     let mut fun = C::Function::with_string(fname, C::Type::new_bool());
     fun.set_static().set_inline();
 
     let mut field_vars = HashMap::new();
-    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::unit_type_name(unit)));
+    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::unit_type_name(unit.name())));
 
     let v = fun.new_param("unit", unittype);
     field_vars.insert(String::from("unit"), v.to_expr());
@@ -274,7 +274,7 @@ fn add_map_function(scope: &mut C::Scope, unit: &Unit) {
     if let Some(ops) = &unit.map_ops {
         fun.body().new_comment("configuration sequence");
         for op in ops {
-            op_to_rust_expr(&unit.name, fun.body(), op, &field_vars);
+            op_to_rust_expr(unit.name(), fun.body(), op, &field_vars);
         }
     } else {
         fun.body().new_comment("there is no configuration sequence");
@@ -283,8 +283,8 @@ fn add_map_function(scope: &mut C::Scope, unit: &Unit) {
     scope.push_function(fun);
 }
 
-fn add_unmap_function(scope: &mut C::Scope, unit: &Unit) {
-    let fname = utils::unmap_fn_name(unit);
+fn add_unmap_function(scope: &mut C::Scope, unit: &Segment) {
+    let fname = utils::unmap_fn_name(unit.name());
     scope
         .new_function(&fname, C::Type::new_void())
         .set_static()
@@ -293,8 +293,8 @@ fn add_unmap_function(scope: &mut C::Scope, unit: &Unit) {
         .new_comment("TODO: SYNTHESIZE ME");
 }
 
-fn add_protect_function(scope: &mut C::Scope, unit: &Unit) {
-    let fname = utils::protect_fn_name(unit);
+fn add_protect_function(scope: &mut C::Scope, unit: &Segment) {
+    let fname = utils::protect_fn_name(unit.name());
     scope
         .new_function(&fname, C::Type::new_void())
         .set_static()
@@ -303,21 +303,21 @@ fn add_protect_function(scope: &mut C::Scope, unit: &Unit) {
         .new_comment("TODO: SYNTHESIZE ME");
 }
 
-/// generates the Unit definitions
-pub fn generate(unit: &Unit, outdir: &Path) -> Result<(), CodeGenError> {
+/// generates the Segment definitions
+pub fn generate(unit: &Segment, outdir: &Path) -> Result<(), CodeGenError> {
     // the code generation scope
     let mut scope = C::Scope::new();
 
     // constant definitions
-    let title = format!("Unit Definitions for `{}`", unit.name);
+    let title = format!("Unit Definitions for `{}`", unit.name());
     utils::add_header(&mut scope, &title);
 
-    let hdrguard = format!("{}_UNIT_H_", unit.name.to_uppercase());
+    let hdrguard = format!("{}_UNIT_H_", unit.name().to_uppercase());
     let guard = scope.new_ifdef(&hdrguard);
     let s = guard.guard().then_scope();
 
     // add the header comments
-    let title = format!("`{}` Unit definition ", unit.name);
+    let title = format!("`{}` Unit definition ", unit.name());
     utils::add_header(s, &title);
 
     s.new_include("interface.h", false);

@@ -41,8 +41,12 @@ pub fn collect_list<'a, T: AstNodeGeneric<'a>>(
         match hmap.get(key) {
             Some(prev) => {
                 errors += 1;
-                VrsError::new_double(key.to_string(), elm.loc().clone(), prev.loc().clone())
-                    .print();
+                VrsError::new_double(
+                    key.to_string(),
+                    elm.loc().with_range(0..2),
+                    prev.loc().with_range(0..2),
+                )
+                .print();
             }
             None => {
                 // insert the elemement into the hashmap
@@ -65,8 +69,12 @@ pub fn check_double_entries<'a, T: AstNodeGeneric<'a>>(nodelist: &[T]) -> u32 {
             Some(previdx) => {
                 errors += 1;
                 let prev: &T = nodelist.get(*previdx).unwrap();
-                VrsError::new_double(key.to_string(), elm.loc().clone(), prev.loc().clone())
-                    .print();
+                VrsError::new_double(
+                    key.to_string(),
+                    elm.loc().with_range(0..2),
+                    prev.loc().with_range(0..2),
+                )
+                .print();
             }
             None => {
                 // insert the elemement into the hashmap

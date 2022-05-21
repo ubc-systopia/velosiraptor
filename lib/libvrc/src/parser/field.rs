@@ -47,7 +47,7 @@ use nom::{
 ///
 /// # Results
 ///
-///  * OK:      the parser could successfully recognize the memory field blcok
+///  * OK:      the parser could successfully recognize the memory field block
 ///  * Error:   the parser could not recognize the memory field block
 ///  * Failure: the parser recognized the memory field block, but it did not properly parse
 ///
@@ -100,7 +100,7 @@ pub fn mem_field(input: TokenStream) -> IResult<TokenStream, Field> {
     let (i1, (name, (stateref, length))) = pair(ident, cut(mem_field_params))(input.clone())?;
 
     // now recognize the optional bitslices, and the semicolon.
-    let (rem, bitslices) = terminated(opt(bitslice_block), cut(semicolon))(i1)?;
+    let (rem, bitslices) = terminated(opt(bitslice_block), opt(semicolon))(i1)?;
 
     // calculate the position of the bitslice
     let pos = input.expand_until(&rem);
@@ -137,7 +137,7 @@ pub fn reg_field(input: TokenStream) -> IResult<TokenStream, Field> {
     let (i1, (name, length)) = pair(ident, cut(reg_field_params))(input.clone())?;
 
     // now recognize the optional bitslices, and the semicolon.
-    let (rem, bitslices) = terminated(opt(bitslice_block), cut(semicolon))(i1)?;
+    let (rem, bitslices) = terminated(opt(bitslice_block), opt(semicolon))(i1)?;
 
     // calculate the position of the bitslice
     let pos = input.expand_until(&rem);
@@ -280,11 +280,6 @@ fn test_ok() {
 fn test_err() {
     // no semicolon in the end
     let content = "foo [ base, 0, 1 ] { 0 15 foobar, 16 31 foobar2 }";
-    let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());
-    assert!(mem_field(ts).is_err());
-
-    // no semicolon in the end
-    let content = "foo [ base, 0, 1 ]";
     let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());
     assert!(mem_field(ts).is_err());
 

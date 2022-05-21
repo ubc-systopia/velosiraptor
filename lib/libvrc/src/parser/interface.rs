@@ -80,7 +80,7 @@ pub fn interface(input: TokenStream) -> IResult<TokenStream, Interface> {
             register_interface,
             none_interface,
         )),
-        semicolon,
+        opt(semicolon),
     ))(i1)
 }
 
@@ -101,9 +101,9 @@ pub fn interface(input: TokenStream) -> IResult<TokenStream, Interface> {
 ///
 fn none_interface(input: TokenStream) -> IResult<TokenStream, Interface> {
     // try parse the none keyword and return
-    let (i1, _) = kw_none(input.clone())?;
-    let pos = input.expand_until(&i1);
-    Ok((i1, Interface::None { pos }))
+    let (i1, _) = kw_none(input)?;
+
+    Ok((i1, Interface::new_none()))
 }
 
 /// parses the mmio interface definition
@@ -131,7 +131,7 @@ fn none_interface(input: TokenStream) -> IResult<TokenStream, Interface> {
 ///
 fn mmio_interface(input: TokenStream) -> IResult<TokenStream, Interface> {
     // try to barse the MMIO keyword
-    let (i1, _) = kw_mmio(input.clone())?;
+    let (i1, _) = kw_mmiointerface(input.clone())?;
 
     // try to parse the arguments, must succeed
     let (i2, bases) = cut(argument_parser)(i1)?;
@@ -170,7 +170,7 @@ fn mmio_interface(input: TokenStream) -> IResult<TokenStream, Interface> {
 ///
 fn register_interface(input: TokenStream) -> IResult<TokenStream, Interface> {
     // try parse the registe rkeyword or return
-    let (i1, _) = kw_register(input.clone())?;
+    let (i1, _) = kw_cpuregisterinterface(input.clone())?;
 
     // try to parse the arguments, must succeed
     let (i2, _bases) = cut(argument_parser)(i1)?;
@@ -209,7 +209,7 @@ fn register_interface(input: TokenStream) -> IResult<TokenStream, Interface> {
 ///
 fn memory_interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
     // try parse the memory keyword, or return
-    let (i1, _) = kw_memory(_input.clone())?;
+    let (i1, _) = kw_memoryinterface(_input.clone())?;
 
     // if the memory interface is a true identity, then we're done here, otherwise we are
     // constructing an normal interface definition with fields
@@ -261,7 +261,7 @@ fn interfacefield(input: TokenStream) -> IResult<TokenStream, InterfaceField> {
         cut(lbrace),
         // XXX: that doesn't quite work like this here!
         permutation((opt(layout), opt(readaction), opt(writeaction))),
-        cut(tuple((rbrace, semicolon))),
+        cut(tuple((rbrace, opt(semicolon)))),
     )(i2)?;
 
     // if there were bitslices parsed unwrap them, otherwise create an empty vector

@@ -29,61 +29,69 @@
 use crustal as C;
 
 //
-use crate::ast::{AstNodeGeneric, BitSlice, Const, Field, Unit};
+use crate::ast::{AstNodeGeneric, BitSlice, Const, Field, Segment};
 use crate::codegen::COPYRIGHT;
 
-pub fn unit_struct_name(unit: &Unit) -> String {
-    unit.name.to_lowercase()
+pub fn unit_struct_name(unit_name: &str) -> String {
+    unit_name.to_lowercase()
 }
 
-pub fn unit_type_name(unit: &Unit) -> String {
-    format!("{}_t", unit.name.to_lowercase())
+pub fn segment_struct_name(unit: &Segment) -> String {
+    unit_struct_name(&unit.name)
+}
+
+pub fn unit_type_name(unit_name: &str) -> String {
+    format!("{}_t", unit_name.to_lowercase())
+}
+
+pub fn segment_type_name(unit: &Segment) -> String {
+    format!("{}_t", unit.name().to_lowercase())
 }
 
 /// constructs the struct type name
-pub fn field_struct_name(unit: &Unit, field: &Field) -> String {
-    format!("{}_{}", unit.name.to_lowercase(), field.name)
+pub fn field_struct_name(segment: &Segment, field: &Field) -> String {
+    format!("{}_{}", segment.name.to_lowercase(), field.name)
 }
 
 /// constructs the field type name for a given field.
-pub fn field_type_name(unit: &Unit, field: &Field) -> String {
-    format!("{}__t", field_struct_name(unit, field))
+pub fn field_type_name(segment: &Segment, field: &Field) -> String {
+    format!("{}__t", field_struct_name(segment, field))
 }
 
-pub fn field_mask_name(unit: &Unit, field: &Field) -> String {
+pub fn field_mask_name(segment: &Segment, field: &Field) -> String {
     format!(
         "{}_{}__MASK",
-        unit.name.to_uppercase(),
+        segment.name.to_uppercase(),
         field.name.to_uppercase()
     )
 }
 
-pub fn if_field_wr_fn_name_str(unit: &str, field: &str) -> String {
-    format!("{}_{}__wr", unit.to_lowercase(), field)
+pub fn if_field_wr_fn_name_str(unit_name: &str, field: &str) -> String {
+    format!("{}_{}__wr", unit_name.to_lowercase(), field)
 }
 
-pub fn if_field_wr_fn_name(unit: &Unit, field: &Field) -> String {
-    if_field_wr_fn_name_str(&unit.name, &field.name)
+pub fn if_field_wr_fn_name(segment: &Segment, field: &Field) -> String {
+    if_field_wr_fn_name_str(&segment.name, &field.name)
 }
 
 pub fn if_field_rd_fn_name_str(unit: &str, field: &str) -> String {
     format!("{}_{}__rd", unit.to_lowercase(), field)
 }
 
-pub fn if_field_rd_fn_name(unit: &Unit, field: &Field) -> String {
-    if_field_rd_fn_name_str(&unit.name, &field.name)
+pub fn if_field_rd_fn_name(segment: &Segment, field: &Field) -> String {
+    if_field_rd_fn_name_str(&segment.name, &field.name)
 }
 
-pub fn if_field_wr_slice_fn_name(unit: &Unit, field: &Field, sl: &BitSlice) -> String {
+pub fn if_field_wr_slice_fn_name(segment: &Segment, field: &Field, sl: &BitSlice) -> String {
     format!(
         "{}_{}_{}__wr",
-        unit.name.to_lowercase(),
+        segment.name.to_lowercase(),
         field.name,
         sl.name
     )
 }
 
-pub fn if_field_rd_slice_fn_name(unit: &Unit, field: &Field, sl: &BitSlice) -> String {
+pub fn if_field_rd_slice_fn_name(unit: &Segment, field: &Field, sl: &BitSlice) -> String {
     format!(
         "{}_{}_{}__rd",
         unit.name.to_lowercase(),
@@ -96,7 +104,7 @@ pub fn field_slice_extract_fn_name_str(unit: &str, field: &str, sl: &str) -> Str
     format!("{}_{}__extract_{}", unit.to_lowercase(), field, sl)
 }
 
-pub fn field_slice_extract_fn_name(unit: &Unit, field: &Field, sl: &BitSlice) -> String {
+pub fn field_slice_extract_fn_name(unit: &Segment, field: &Field, sl: &BitSlice) -> String {
     field_slice_extract_fn_name_str(&unit.name, &field.name, &sl.name)
 }
 
@@ -109,7 +117,7 @@ pub fn field_slice_insert_fn_name_str(unit: &str, field: &str, sl: &str) -> Stri
     )
 }
 
-pub fn field_slice_insert_fn_name(unit: &Unit, field: &Field, sl: &BitSlice) -> String {
+pub fn field_slice_insert_fn_name(unit: &Segment, field: &Field, sl: &BitSlice) -> String {
     field_slice_insert_fn_name_str(&unit.name, &field.name, &sl.name)
 }
 
@@ -117,7 +125,7 @@ pub fn field_get_raw_fn_name_str(unit: &str, field: &str) -> String {
     format!("{}_{}__get_raw", unit.to_lowercase(), field)
 }
 
-pub fn field_get_raw_fn_name(unit: &Unit, field: &Field) -> String {
+pub fn field_get_raw_fn_name(unit: &Segment, field: &Field) -> String {
     field_get_raw_fn_name_str(&unit.name, &field.name)
 }
 
@@ -125,28 +133,28 @@ pub fn field_set_raw_fn_name_str(unit: &str, field: &str) -> String {
     format!("{}_{}__set_raw", unit.to_lowercase(), field.to_lowercase())
 }
 
-pub fn field_set_raw_fn_name(unit: &Unit, field: &Field) -> String {
+pub fn field_set_raw_fn_name(unit: &Segment, field: &Field) -> String {
     field_set_raw_fn_name_str(&unit.name, &field.name)
 }
 
-pub fn protect_fn_name(unit: &Unit) -> String {
-    format!("{}_protect", unit.name.to_lowercase())
+pub fn protect_fn_name(unit_name: &str) -> String {
+    format!("{}_protect", unit_name.to_lowercase())
 }
 
-pub fn unmap_fn_name(unit: &Unit) -> String {
-    format!("{}_unmap", unit.name.to_lowercase())
+pub fn unmap_fn_name(unit_name: &str) -> String {
+    format!("{}_unmap", unit_name.to_lowercase())
 }
 
-pub fn map_fn_name(unit: &Unit) -> String {
-    format!("{}_map", unit.name.to_lowercase())
+pub fn map_fn_name(unit_name: &str) -> String {
+    format!("{}_map", unit_name.to_lowercase())
 }
 
-pub fn translate_fn_name(unit: &Unit) -> String {
-    format!("{}_resolve", unit.name.to_lowercase())
+pub fn translate_fn_name(unit_name: &str) -> String {
+    format!("{}_resolve", unit_name.to_lowercase())
 }
 
-pub fn constructor_fn_name(unit: &Unit) -> String {
-    format!("{}_init", unit.name.to_lowercase())
+pub fn constructor_fn_name(unit_name: &str) -> String {
+    format!("{}_init", unit_name.to_lowercase())
 }
 
 pub fn mmio_register_read_fn(unit_var: &C::Expr, field: &Field) -> C::Expr {

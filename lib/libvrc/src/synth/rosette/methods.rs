@@ -1,4 +1,4 @@
-// Velosiraptor Compiler
+// Velosiraptor Code Generator
 //
 //
 // MIT License
@@ -23,11 +23,45 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! The Token module
+//! State Synthesis Module: Rosette
 
-mod tokens;
-mod tokenstream;
+// rosette language library imports
+use rosettelang::{RExpr, RosetteFile};
 
-// re-export
-pub use tokens::{Keyword, Token, TokenContent};
-pub use tokenstream::{TokenStream, TOKENSTREAM_DUMMY};
+// crate imports
+use super::expr;
+use crate::ast::Method;
+
+pub fn add_methods(rkt: &mut RosetteFile, methods: &[Method]) {
+    rkt.add_section(String::from("Methods"));
+
+    for m in methods {
+        match m.name.as_str() {
+            "translate" => continue,
+            "matchflags" => continue,
+            "map" => continue,
+            "unmap" => continue,
+            "protect" => continue,
+            _ => (),
+        }
+
+        // let's add the arguments
+        let mut args = vec![String::from("st")];
+        for a in m.args.iter() {
+            args.push(a.name.clone());
+        }
+
+        // add the requires as assert
+        let mut body = Vec::new();
+        for p in m.requires.iter() {
+            body.push(RExpr::assert(expr::expr_to_rosette(p)));
+        }
+
+        // convert statements into rosette statements
+        if let Some(stmts) = &m.stmts {
+            body.push(expr::stmt_to_rosette(stmts))
+        }
+
+        rkt.add_new_function_def(m.name.clone(), args, body)
+    }
+}

@@ -43,7 +43,7 @@ macro_rules! terminalparser (
                 if tok.peek().content == $tag {
                     Ok((rem, $tag))
                 } else {
-                    Err(Err::Error(VrsError::from_token(input, $tag)))
+                    Err(Err::Error(VrsError::from_token(input.with_range(0..1), $tag)))
                 }
             }
         }
@@ -122,7 +122,7 @@ pub fn ident(input: TokenStream) -> IResult<TokenStream, String> {
         match &id.content {
             TokenContent::Identifier(s) => Ok((rem, s.clone())),
             _ => Err(Err::Error(VrsError::from_token(
-                input,
+                input.with_range(0..1),
                 TokenContent::Identifier(String::new()),
             ))),
         }
@@ -139,7 +139,7 @@ pub fn num(input: TokenStream) -> IResult<TokenStream, u64> {
         match &id.content {
             TokenContent::IntLiteral(s) => Ok((rem, *s)),
             _ => Err(Err::Error(VrsError::from_token(
-                input,
+                input.with_range(0..1),
                 TokenContent::IntLiteral(0),
             ))),
         }
@@ -156,7 +156,7 @@ pub fn boolean(input: TokenStream) -> IResult<TokenStream, bool> {
         match &id.content {
             TokenContent::BoolLiteral(s) => Ok((rem, *s)),
             _ => Err(Err::Error(VrsError::from_token(
-                input,
+                input.with_range(0..1),
                 TokenContent::BoolLiteral(false),
             ))),
         }
@@ -174,7 +174,7 @@ macro_rules! keywordparser (
                 if tok.peek().content == TokenContent::Keyword($tag) {
                     Ok((rem, $tag))
                 } else {
-                    Err(Err::Error(VrsError::from_token(input, TokenContent::Keyword($tag))))
+                    Err(Err::Error(VrsError::from_token(input.with_range(0..1), TokenContent::Keyword($tag))))
                 }
             }
         }
@@ -189,13 +189,15 @@ keywordparser!(pub kw_if, Keyword::If);
 keywordparser!(pub kw_else, Keyword::Else);
 keywordparser!(pub kw_state, Keyword::State);
 keywordparser!(pub kw_interface, Keyword::Interface);
-keywordparser!(pub kw_memory, Keyword::Memory);
-keywordparser!(pub kw_mmio, Keyword::MMIO);
-keywordparser!(pub kw_register, Keyword::Register);
+keywordparser!(pub kw_memorystate, Keyword::MemoryState);
+keywordparser!(pub kw_registerstate, Keyword::RegisterState);
+keywordparser!(pub kw_memoryinterface, Keyword::MemoryInterface);
+keywordparser!(pub kw_mmiointerface, Keyword::MMIOInterface);
+keywordparser!(pub kw_cpuregisterinterface, Keyword::CPURegisterInterface);
 keywordparser!(pub kw_none, Keyword::None);
 keywordparser!(pub kw_layout, Keyword::Layout);
 keywordparser!(pub kw_fn, Keyword::Fn);
-keywordparser!(pub kw_size, Keyword::Size);
+keywordparser!(pub kw_size, Keyword::SizeType);
 keywordparser!(pub kw_readaction, Keyword::ReadAction);
 keywordparser!(pub kw_writeaction, Keyword::WriteAction);
 keywordparser!(pub kw_requires, Keyword::Requires);
@@ -205,8 +207,12 @@ keywordparser!(pub kw_return, Keyword::Return);
 keywordparser!(pub kw_forall, Keyword::Forall);
 keywordparser!(pub kw_exists, Keyword::Exists);
 keywordparser!(pub kw_staticmap, Keyword::StaticMap);
+keywordparser!(pub kw_segment, Keyword::Segment);
 keywordparser!(pub kw_for, Keyword::For);
 keywordparser!(pub kw_in, Keyword::In);
+keywordparser!(pub kw_inbitwidth, Keyword::InBitWidth);
+keywordparser!(pub kw_outbitwidth, Keyword::OutBitWidth);
+keywordparser!(pub kw_flags, Keyword::FlagsType);
 
 /// parses a type expression
 ///
@@ -219,14 +225,15 @@ pub fn typeinfo(input: TokenStream) -> IResult<TokenStream, Type> {
     }
 
     match tok.peek().content {
-        TokenContent::Keyword(Keyword::Size) => Ok((rem, Type::Size)),
-        TokenContent::Keyword(Keyword::Addr) => Ok((rem, Type::Address)),
-        TokenContent::Keyword(Keyword::Boolean) => Ok((rem, Type::Boolean)),
-        TokenContent::Keyword(Keyword::Integer) => Ok((rem, Type::Integer)),
+        TokenContent::Keyword(Keyword::SizeType) => Ok((rem, Type::Size)),
+        TokenContent::Keyword(Keyword::AddrType) => Ok((rem, Type::Address)),
+        TokenContent::Keyword(Keyword::BooleanType) => Ok((rem, Type::Boolean)),
+        TokenContent::Keyword(Keyword::IntegerType) => Ok((rem, Type::Integer)),
+        TokenContent::Keyword(Keyword::FlagsType) => Ok((rem, Type::Flags)),
         // TODO: make this more type specifc
         _ => Err(Err::Error(VrsError::from_token(
-            input,
-            TokenContent::Keyword(Keyword::Size),
+            input.with_range(0..1),
+            TokenContent::Keyword(Keyword::SizeType),
         ))),
     }
 }

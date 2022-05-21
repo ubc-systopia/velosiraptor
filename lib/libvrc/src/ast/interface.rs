@@ -29,7 +29,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::ast::{
     utils, Action, ActionType, AstNode, AstNodeGeneric, Field, Issues, Param, Symbol, SymbolKind,
-    SymbolTable, Type,
+    SymbolTable, Type, TOKENSTREAM_DUMMY,
 };
 use crate::error::VrsError;
 use crate::token::TokenStream;
@@ -68,8 +68,18 @@ pub enum Interface {
     None { pos: TokenStream },
 }
 
+pub const NONE_INTERFACE: Interface = Interface::None {
+    pos: TOKENSTREAM_DUMMY,
+};
+
 /// Implementation of the Interface
 impl<'a> Interface {
+    pub fn new_none() -> Self {
+        Interface::None {
+            pos: TokenStream::empty(),
+        }
+    }
+
     /// builds the symboltable for the interface related symbols
     pub fn build_symboltable(&'a self, st: &mut SymbolTable<'a>) {
         // create the 'interface' symbol
@@ -143,6 +153,14 @@ impl<'a> Interface {
     }
 }
 
+impl Default for Interface {
+    fn default() -> Self {
+        Interface::None {
+            pos: TokenStream::empty(),
+        }
+    }
+}
+
 /// Implementation of [AstNodeGeneric] for [Interface]
 impl<'a> AstNodeGeneric<'a> for Interface {
     // checks the node and returns the number of errors and warnings encountered
@@ -197,8 +215,8 @@ impl<'a> AstNodeGeneric<'a> for Interface {
                 if sym.kind != SymbolKind::Parameter || !sym.typeinfo.compatible(b.ptype) {
                     VrsError::new_double_kind(
                         String::from(b.name()),
-                        b.loc().clone(),
-                        sym.loc.clone(),
+                        b.loc().with_range(0..2),
+                        sym.loc.with_range(0..2),
                     )
                     .print();
                     res.inc_err(1);

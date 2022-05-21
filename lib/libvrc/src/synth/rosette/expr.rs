@@ -63,6 +63,7 @@ pub fn expr_to_rosette(e: &Expr) -> RExpr {
                 BinOp::Ge => RExpr::bvge(lhs, rhs),
                 BinOp::Gt => RExpr::bvgt(lhs, rhs),
                 BinOp::Ne => RExpr::bvne(lhs, rhs),
+                BinOp::Minus => RExpr::bvsub(lhs, rhs),
                 _ => {
                     println!("{:?}", op);
                     unimplemented!()

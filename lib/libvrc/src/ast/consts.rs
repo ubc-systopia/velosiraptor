@@ -39,40 +39,141 @@ use crate::ast::{
 use crate::error::VrsError;
 use crate::token::TokenStream;
 
+/// Defines the value of the [Constant]
+///
+/// There are two types of constants: boolean and integer values.
+/// Both can have either an expression or an integer value.
+#[derive(PartialEq, Clone)]
+pub enum ConstValue {
+    IntegerValue(u64),
+    IntegerExpr(Expr),
+    BooleanValue(bool),
+    BooleanExpr(Expr),
+}
+
+impl ConstValue {
+    /// creates a new constant value with a boolean expression
+    pub fn with_bool_expr(expr: Expr) -> Self {
+        ConstValue::BooleanExpr(expr)
+    }
+
+    /// creates a new constant value with a integer expression
+    pub fn with_int_expr(expr: Expr) -> Self {
+        ConstValue::IntegerExpr(expr)
+    }
+
+    /// Return the type information of the constant value
+    pub fn to_type(&self) -> Type {
+        match self {
+            ConstValue::IntegerValue(_) => Type::Integer,
+            ConstValue::IntegerExpr(_) => Type::Integer,
+            ConstValue::BooleanValue(_) => Type::Boolean,
+            ConstValue::BooleanExpr(_) => Type::Boolean,
+        }
+    }
+}
+
+/// implementation of the [fmt::Display] trait for the [ConstValue] enum
+impl Display for ConstValue {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        use self::ConstValue::*;
+        match self {
+            IntegerValue(v) => write!(f, "{}", v),
+            IntegerExpr(e) => write!(f, "{}", e),
+            BooleanValue(v) => write!(f, "{}", v),
+            BooleanExpr(e) => write!(f, "{}", e),
+        }
+    }
+}
+
+/// implementation of the [fmt::Debug] trait for the [ConstValue] enum
+impl Debug for ConstValue {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        use self::ConstValue::*;
+        match self {
+            IntegerValue(v) => write!(f, "{}", v),
+            IntegerExpr(e) => write!(f, "{}", e),
+            BooleanValue(v) => write!(f, "{}", v),
+            BooleanExpr(e) => write!(f, "{}", e),
+        }
+    }
+}
+
+/// implementation of [AstNodeGeneric] for [ConstValue]
+impl<'a> AstNodeGeneric<'a> for ConstValue {
+    fn check(&'a self, st: &mut SymbolTable<'a>) -> Issues {
+        let mut res = Issues::ok();
+
+        // Check 1: Expression is Valid
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: The expression value is consisting of valid symbols.
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        res = res
+            + match self {
+                ConstValue::IntegerExpr(e) => e.check(st),
+                ConstValue::BooleanExpr(e) => e.check(st),
+                _ => Issues::ok(),
+            };
+
+        // Check 2: Value is constant
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: The value assigned to the constant must be a constant expression.
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        let (is_const, pos) = match self {
+            ConstValue::IntegerExpr(e) => (e.is_const_expr(st), Some(e.loc())),
+            ConstValue::BooleanExpr(e) => (e.is_const_expr(st), Some(e.loc())),
+            _ => (true, None),
+        };
+
+        if !is_const {
+            let msg = String::from("not a constant expression");
+            let hint = String::from("convert the expression to a constant");
+            VrsError::new_err(pos.unwrap(), msg, Some(hint)).print();
+            res.inc_err(1);
+        }
+
+        res
+    }
+
+    fn name(&self) -> &str {
+        "constant"
+    }
+}
+
 /// Defines a [Constant] statement node
 ///
-/// The constants statement defines and delcares specific symbols
+/// The constants statement defines and declares specific symbols
 /// with constant values to be used throughout the definitions.
 ///
 /// The constant can be defined as part of the file global definitions
 /// or within a unit context.
+///
+/// A constant must have a valuet that can be calculated at compile time.
 #[derive(PartialEq, Clone)]
-pub enum Const {
-    /// Represents an integer constant.
-    ///
-    /// This corresponds to an Integer literal
-    Integer {
-        ident: String,
-        value: Expr,
-        pos: TokenStream,
-    },
-    /// Represents an boolean constant
-    ///
-    /// This corresponds to an Boolean literal
-    Boolean {
-        ident: String,
-        value: Expr,
-        pos: TokenStream,
-    }, // TODO: add address / size constants here as well?
+pub struct Const {
+    /// the identifier of the constant
+    pub ident: String,
+    /// the value the constant has
+    pub value: ConstValue,
+    /// position where the constant was defined in the source file
+    pub pos: TokenStream,
 }
 
 impl Const {
     /// returns the expression that defines the value
     pub fn value(&self) -> &Expr {
-        use self::Const::*;
-        match self {
-            Integer { value, .. } => value,
-            Boolean { value, .. } => value,
+        use ConstValue::*;
+        match &self.value {
+            IntegerValue(_v) => todo!("handle this!"),
+            BooleanValue(_v) => todo!("handle this!"),
+            BooleanExpr(e) => e,
+            IntegerExpr(e) => e,
         }
     }
 
@@ -87,52 +188,49 @@ impl Const {
         )
     }
 
+    /// obtains the type of the constant
     pub fn to_type(&self) -> Type {
-        use self::Const::*;
-        match self {
-            Integer { .. } => Type::Integer,
-            Boolean { .. } => Type::Boolean,
-        }
+        self.value.to_type()
     }
 
+    /// checks whether this constant is of integer type
     pub fn is_integer(&self) -> bool {
-        matches!(self, Const::Integer { .. })
+        self.value.to_type() == Type::Integer
+    }
+
+    /// checks whether this constant is of boolean type
+    pub fn is_boolean(&self) -> bool {
+        self.value.to_type() == Type::Boolean
     }
 }
 
 /// implementation of the [fmt::Display] trait for the [Const]
 impl Display for Const {
     fn fmt(&self, f: &mut Formatter) -> Result {
-        use self::Const::*;
-        match self {
-            Integer { ident, value, .. } => write!(f, "const {} : int  = {};", ident, value),
-            Boolean { ident, value, .. } => write!(f, "const {} : bool = {};", ident, value),
-        }
+        // TODO: make sure the type information is the right one!
+        write!(
+            f,
+            "const {} : {}  = {};",
+            self.ident,
+            self.value.to_type(),
+            self.value
+        )
     }
 }
 
 /// implementation of the [fmt::Debug] trait for the [Const]
 impl Debug for Const {
     fn fmt(&self, f: &mut Formatter) -> Result {
-        use self::Const::*;
-        match self {
-            Integer { ident, value, pos } => {
-                let (line, column) = pos.input_sourcepos().input_pos();
-                write!(
-                    f,
-                    "{:03}:{:03} | const {} :  int = {:?};, {:?}",
-                    line, column, ident, value, pos
-                )
-            }
-            Boolean { ident, value, pos } => {
-                let (line, column) = pos.input_sourcepos().input_pos();
-                write!(
-                    f,
-                    "{:03}:{:03} | const {} : bool = {};",
-                    line, column, ident, value
-                )
-            }
-        }
+        let (line, column) = self.pos.input_sourcepos().input_pos();
+        write!(
+            f,
+            "{:03}:{:03} | const {} : {} = {:?};",
+            line,
+            column,
+            self.ident,
+            self.value.to_type(),
+            self.value
+        )
     }
 }
 
@@ -152,7 +250,6 @@ impl<'a> AstNodeGeneric<'a> for Const {
 
         let name = self.name();
         let pos = self.loc();
-        let val = self.value();
 
         // Check 1: Expression is Valid
         // --------------------------------------------------------------------------------------
@@ -161,23 +258,9 @@ impl<'a> AstNodeGeneric<'a> for Const {
         // Notes:       --
         // --------------------------------------------------------------------------------------
 
-        res = res + val.check(st);
+        res = res + self.value.check(st);
 
-        // Check 2: Value is constant
-        // --------------------------------------------------------------------------------------
-        // Type:        Error
-        // Description: The value assigned to the constant must be a constant expression.
-        // Notes:       --
-        // --------------------------------------------------------------------------------------
-
-        if !val.is_const_expr(st) {
-            let msg = String::from("not a constant expression");
-            let hint = String::from("convert the expression to a constant");
-            VrsError::new_err(val.loc(), msg, Some(hint)).print();
-            res.inc_err(1);
-        }
-
-        // Check 3: Identifier is ASCII
+        // Check 2: Identifier is ASCII
         // --------------------------------------------------------------------------------------
         // Type:        Error
         // Description: The name of the constant must be in ASCII characters.
@@ -194,7 +277,7 @@ impl<'a> AstNodeGeneric<'a> for Const {
             res.inc_err(1)
         }
 
-        // Check 4:
+        // Check 3:
         // --------------------------------------------------------------------------------------
         // Type:        Warning
         // Description: The name of the constant should be all upper-case
@@ -205,27 +288,11 @@ impl<'a> AstNodeGeneric<'a> for Const {
     }
 
     fn name(&self) -> &str {
-        use self::Const::*;
-        match self {
-            Integer { ident, .. } => ident,
-            Boolean { ident, .. } => ident,
-        }
+        &self.ident
     }
 
     /// returns the location of the current
     fn loc(&self) -> &TokenStream {
-        use self::Const::*;
-        match self {
-            Integer {
-                ident: _,
-                value: _,
-                pos,
-            } => pos,
-            Boolean {
-                ident: _,
-                value: _,
-                pos,
-            } => pos,
-        }
+        &self.pos
     }
 }

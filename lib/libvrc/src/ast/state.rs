@@ -32,6 +32,7 @@ use std::fmt::{Debug, Display, Formatter, Result};
 // used library internal functionality
 use crate::ast::{
     utils, AstNode, AstNodeGeneric, Field, Issues, Param, Symbol, SymbolKind, SymbolTable, Type,
+    TOKENSTREAM_DUMMY,
 };
 use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
@@ -64,13 +65,24 @@ pub enum State {
     // TODO state that may be combined
     //CombinedState {  },
     /// No state associated with this translation unit
-    None {
-        /// the position where the state is defined
-        pos: TokenStream,
-    },
+    None { pos: TokenStream },
 }
 
+pub const NONE_STATE: State = State::None {
+    pos: TOKENSTREAM_DUMMY,
+};
+
 impl<'a> State {
+    pub fn new_none() -> Self {
+        State::None {
+            pos: TokenStream::empty(),
+        }
+    }
+
+    pub fn is_none(&self) -> bool {
+        matches!(self, State::None { .. })
+    }
+
     /// builds the symboltable for the state related symbols
     pub fn build_symboltable(&'a self, st: &mut SymbolTable<'a>) {
         // create the 'state' symbol
@@ -114,6 +126,14 @@ impl<'a> State {
     }
 }
 
+impl Default for State {
+    fn default() -> Self {
+        State::None {
+            pos: TokenStream::empty(),
+        }
+    }
+}
+
 /// implementation of the [Display] trait for the [State]
 impl Display for State {
     fn fmt(&self, f: &mut Formatter) -> Result {
@@ -142,7 +162,7 @@ impl Display for State {
                 })?;
                 writeln!(f, "}}")
             }
-            None { pos: _ } => writeln!(f, "State(None)"),
+            None { .. } => writeln!(f, "State(None)"),
         }
     }
 }
@@ -243,8 +263,8 @@ impl<'a> AstNodeGeneric<'a> for State {
                 if sym.kind != SymbolKind::Parameter {
                     VrsError::new_double_kind(
                         String::from(b.name()),
-                        b.loc().clone(),
-                        sym.loc.clone(),
+                        b.loc().with_range(0..2),
+                        sym.loc.with_range(0..2),
                     )
                     .print();
                     res.inc_err(1);
@@ -253,8 +273,8 @@ impl<'a> AstNodeGeneric<'a> for State {
                 if !sym.typeinfo.compatible(b.ptype) {
                     VrsError::new_double_type(
                         String::from(b.name()),
-                        b.loc().clone(),
-                        sym.loc.clone(),
+                        b.loc().with_range(0..2),
+                        sym.loc.with_range(0..2),
                     )
                     .print();
                     res.inc_err(1);

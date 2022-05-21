@@ -34,7 +34,7 @@ use std::path::PathBuf;
 
 use codegen_rs as CG;
 
-use crate::ast::AstRoot;
+use crate::ast::{AstNodeGeneric, AstRoot};
 use crate::codegen::CodeGenBackend;
 use crate::codegen::CodeGenError;
 
@@ -158,7 +158,7 @@ impl CodeGenBackend for BackendRust {
         let mut srcdir = self.outdir.join("src");
 
         for unit in &ast.units {
-            srcdir.push(unit.name.to_lowercase());
+            srcdir.push(unit.name().to_lowercase());
             // the root directory as supplied by backend
             fs::create_dir_all(&srcdir)?;
             interface::generate(unit, &srcdir)?;
@@ -173,7 +173,7 @@ impl CodeGenBackend for BackendRust {
         let mut srcdir = self.outdir.join("src");
 
         for unit in &ast.units {
-            srcdir.push(unit.name.to_lowercase());
+            srcdir.push(unit.name().to_lowercase());
 
             // generate the unit
             unit::generate(unit, &srcdir)?;
@@ -181,7 +181,7 @@ impl CodeGenBackend for BackendRust {
             // construct the scope
             let mut scope = CG::Scope::new();
 
-            let title = format!("{} translation unit module", unit.name);
+            let title = format!("{} translation unit module", unit.name());
             add_header(&mut scope, &title);
 
             // the fields
@@ -241,7 +241,7 @@ impl CodeGenBackend for BackendRust {
         scope.new_comment("import the unit modules");
         if !ast.units.is_empty() {
             for unit in &ast.units {
-                scope.raw(&format!("pub mod {};", unit.name.to_lowercase()));
+                scope.raw(&format!("pub mod {};", unit.name().to_lowercase()));
             }
         } else {
             scope.new_comment("no unit definitions to import");
@@ -252,8 +252,8 @@ impl CodeGenBackend for BackendRust {
         for unit in &ast.units {
             scope.raw(&format!(
                 "pub use {}::{};",
-                unit.name.to_lowercase(),
-                unit.name
+                unit.name().to_lowercase(),
+                unit.name()
             ));
         }
 

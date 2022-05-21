@@ -25,6 +25,9 @@
 
 //! Parses identifiers
 
+//
+use std::convert::TryInto;
+
 // the used nom componets
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -36,7 +39,7 @@ use nom::sequence::pair;
 use crate::error::IResult;
 
 use crate::sourcepos::SourcePos;
-use crate::token::{Keyword, Token, TokenContent};
+use crate::token::{Token, TokenContent};
 
 /// parses a rust-like identifiers
 pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
@@ -46,74 +49,21 @@ pub fn identifier(input: SourcePos) -> IResult<SourcePos, Token> {
     let otherchar = alt((alphanumeric1, tag("_")));
     let (rem, ident) = recognize(pair(firstchar, many0(otherchar)))(input)?;
 
-    // now match the keywords
-    let token = match ident.as_str() {
-        //
-        // language keywords
-        //
-        "unit" => Token::new(TokenContent::Keyword(Keyword::Unit), ident),
-        "state" => Token::new(TokenContent::Keyword(Keyword::State), ident),
-        "interface" => Token::new(TokenContent::Keyword(Keyword::Interface), ident),
-        "Memory" => Token::new(TokenContent::Keyword(Keyword::Memory), ident),
-        "MMIO" => Token::new(TokenContent::Keyword(Keyword::MMIO), ident),
-        "Register" => Token::new(TokenContent::Keyword(Keyword::Register), ident),
-        "None" => Token::new(TokenContent::Keyword(Keyword::None), ident),
-        "ReadAction" => Token::new(TokenContent::Keyword(Keyword::ReadAction), ident),
-        "WriteAction" => Token::new(TokenContent::Keyword(Keyword::WriteAction), ident),
-        "Layout" => Token::new(TokenContent::Keyword(Keyword::Layout), ident),
-
-        //
-        // base types for the units
-        //
-        "staticmap" => Token::new(TokenContent::Keyword(Keyword::StaticMap), ident),
-
-        //
-        // control flow and expressions
-        //
-        "if" => Token::new(TokenContent::Keyword(Keyword::If), ident),
-        "else" => Token::new(TokenContent::Keyword(Keyword::Else), ident),
-        "for" => Token::new(TokenContent::Keyword(Keyword::For), ident),
-        "return" => Token::new(TokenContent::Keyword(Keyword::Return), ident),
-        "let" => Token::new(TokenContent::Keyword(Keyword::Let), ident),
-        "fn" => Token::new(TokenContent::Keyword(Keyword::Fn), ident),
-        "in" => Token::new(TokenContent::Keyword(Keyword::In), ident),
-
-        //
-        // types
-        //
-        "addr" => Token::new(TokenContent::Keyword(Keyword::Addr), ident),
-        "size" => Token::new(TokenContent::Keyword(Keyword::Size), ident),
-        "int" => Token::new(TokenContent::Keyword(Keyword::Integer), ident),
-        "bool" => Token::new(TokenContent::Keyword(Keyword::Boolean), ident),
-
-        //
-        // constraint keywords
-        //
-        "requires" => Token::new(TokenContent::Keyword(Keyword::Requires), ident),
-        "ensures" => Token::new(TokenContent::Keyword(Keyword::Ensures), ident),
-        "assert" => Token::new(TokenContent::Keyword(Keyword::Assert), ident),
-        "forall" => Token::new(TokenContent::Keyword(Keyword::Forall), ident),
-        "exists" => Token::new(TokenContent::Keyword(Keyword::Exists), ident),
-
-        //
-        // other keywords
-        //
-        "import" => Token::new(TokenContent::Keyword(Keyword::Import), ident),
-        "const" => Token::new(TokenContent::Keyword(Keyword::Const), ident),
-
-        //
-        // boolean values: true / false
-        //
-        "true" => Token::new(TokenContent::BoolLiteral(true), ident),
-        "false" => Token::new(TokenContent::BoolLiteral(false), ident),
-
-        // the remainig tokes will just be identifiers
-        x => Token::new(TokenContent::Identifier(x.to_string()), ident),
-    };
-
-    Ok((rem, token))
+    match ident.as_str().try_into() {
+        Ok(t) => Ok((rem, Token::new(TokenContent::Keyword(t), ident))),
+        Err(x) => match x {
+            "true" => Ok((rem, Token::new(TokenContent::BoolLiteral(true), ident))),
+            "false" => Ok((rem, Token::new(TokenContent::BoolLiteral(false), ident))),
+            x => Ok((
+                rem,
+                Token::new(TokenContent::Identifier(x.to_string()), ident),
+            )),
+        },
+    }
 }
 
+#[cfg(test)]
+use crate::token::Keyword;
 #[cfg(test)]
 use nom::Slice;
 

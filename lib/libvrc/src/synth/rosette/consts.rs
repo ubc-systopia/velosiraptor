@@ -1,4 +1,4 @@
-// Velosiraptor Compiler
+// Velosiraptor Code Generator
 //
 //
 // MIT License
@@ -23,11 +23,26 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! The Token module
+//! Const Synthesis Module: Rosette
 
-mod tokens;
-mod tokenstream;
+// rosette language library imports
+use rosettelang::RosetteFile;
 
-// re-export
-pub use tokens::{Keyword, Token, TokenContent};
-pub use tokenstream::{TokenStream, TOKENSTREAM_DUMMY};
+// crate imports
+use crate::ast::{ConstValue, Expr, Segment};
+
+pub fn add_consts(rkt: &mut RosetteFile, unit: &Segment) {
+    rkt.add_section(format!("Constants for unit {}", unit.name));
+    for c in unit.consts() {
+        match &c.value {
+            ConstValue::IntegerValue(u) => {
+                rkt.add_raw(format!("(define {} (int {}))\n", c.ident, u))
+            }
+            ConstValue::BooleanValue(u) => rkt.add_raw(format!("(define {} {})\n", c.ident, u)),
+            ConstValue::IntegerExpr(Expr::Number { value, .. }) => {
+                rkt.add_raw(format!("(define {} (int {}))\n", c.ident, value))
+            }
+            x => unimplemented!("{:?}", x),
+        }
+    }
+}
