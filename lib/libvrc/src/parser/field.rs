@@ -283,11 +283,6 @@ fn test_err() {
     let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());
     assert!(mem_field(ts).is_err());
 
-    // no semicolon in the end
-    let content = "foo [ base, 0, 1 ]";
-    let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());
-    assert!(mem_field(ts).is_err());
-
     // incomplete base definition
     let content = "foo [ base, 1 ] { 0 16 foobar }";
     let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());

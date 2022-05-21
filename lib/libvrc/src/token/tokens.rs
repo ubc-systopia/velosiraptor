@@ -25,13 +25,18 @@
 
 //! Velosiraptor Lexer Tokens
 
-use nom::InputLength;
+// used standard library modules
+use std::convert::TryFrom;
 use std::fmt;
 
+// used nome components
+use nom::InputLength;
+
+// used crate modules
 use crate::sourcepos::SourcePos;
 
-/// Represents the keywords we have
-#[derive(PartialEq, Debug, Clone)]
+/// Enumeration of all keywords in the language
+#[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Keyword {
     //
     // language keywords
@@ -41,34 +46,50 @@ pub enum Keyword {
     /// keyword for now.
     /// TODO: Will need to revisit this at somepoint -Ilias
     Unit,
-    /// state statement
+    /// base type for static maps
+    StaticMap,
+    /// base type for direct segments
+    Segment,
+
+    //
+    // Unit "fields"
+    //
+    /// the unit input bitwidth
+    InBitWidth,
+    /// the unit output bitwidth
+    OutBitWidth,
+    /// represents the "state field"
     State,
-    ///
-    AddrWidth,
     /// interface statement
     Interface,
-    /// Memory State and Interface statement
-    Memory,
-    /// Memory Mapped Interface statement
-    MMIO,
-    /// Register State and Interface statement
-    Register,
-    /// Null-like value used for State and Interface
-    None,
+
+    //
+    // State Kinds
+    //
+    /// in-memory state
+    MemoryState,
+    /// register backed state
+    RegisterState,
+
+    //
+    // Interface Kinds
+    //
+    /// in-memory data structure interface
+    MemoryInterface,
+    /// memory mapped registers interface
+    MMIOInterface,
+    /// special purpose cpu register interface
+    CPURegisterInterface,
+
+    //
+    // Interface descriptions
+    //
     /// A read action from the interface on the state
     ReadAction,
     /// A write action from the interface on the state
     WriteAction,
     /// Used in identifying the Bitslice layout of an Interface field
     Layout,
-    /// base type for static maps
-    StaticMap,
-    /// base type for direct segments
-    Segment,
-    /// the unit input bitwidth
-    InBitWidth,
-    /// the unit output bitwidth
-    OutBitWidth,
 
     //
     // control flow and expressions
@@ -92,15 +113,15 @@ pub enum Keyword {
     // types
     //
     /// represents an address value
-    Addr,
+    AddrType,
     /// represents a size value
-    Size,
+    SizeType,
     /// A boolean type
-    Boolean,
+    BooleanType,
     /// An integer value
-    Integer,
+    IntegerType,
     /// Represents the permission flags
-    Flags,
+    FlagsType,
 
     //
     // constraint keywords
@@ -115,6 +136,8 @@ pub enum Keyword {
     Forall,
     /// the existential quantifier
     Exists,
+    /// the invariant keyword
+    Invariant,
 
     //
     // other keywords
@@ -123,51 +146,118 @@ pub enum Keyword {
     Const,
     /// import statements
     Import,
+    /// Null-like value
+    None,
+}
+
+impl Keyword {
+    pub const fn as_str(&self) -> &str {
+        match self {
+            Keyword::Unit => "unit",
+            Keyword::StaticMap => "staticmap",
+            Keyword::Segment => "segment",
+            //
+            Keyword::InBitWidth => "inbitwidth",
+            Keyword::OutBitWidth => "outbitwidth",
+            Keyword::State => "state",
+            Keyword::Interface => "interface",
+            //
+            Keyword::MemoryState => "MemoryState",
+            Keyword::RegisterState => "RegisterState",
+            Keyword::MemoryInterface => "MemoryInterface",
+            Keyword::MMIOInterface => "MMIOInterface",
+            Keyword::CPURegisterInterface => "CPURegisterInterface",
+            //
+            Keyword::ReadAction => "ReadAction",
+            Keyword::WriteAction => "WriteAction",
+            Keyword::Layout => "Layout",
+
+            Keyword::If => "if",
+            Keyword::Else => "else",
+            Keyword::For => "for",
+            Keyword::Let => "let",
+            Keyword::In => "in",
+            Keyword::Fn => "fn",
+            Keyword::Return => "return",
+            //
+            Keyword::AddrType => "addr",
+            Keyword::SizeType => "size",
+            Keyword::BooleanType => "bool",
+            Keyword::IntegerType => "int",
+            Keyword::FlagsType => "flags",
+            //
+            Keyword::Requires => "requires",
+            Keyword::Ensures => "ensures",
+            Keyword::Assert => "assert",
+            Keyword::Forall => "forall",
+            Keyword::Exists => "exists",
+            Keyword::Invariant => "invariant",
+            //
+            Keyword::Const => "const",
+            Keyword::Import => "import",
+            //
+            Keyword::None => "None",
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Keyword {
+    type Error = &'a str;
+
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        match value {
+            "unit" => Ok(Keyword::Unit),
+            "staticmap" => Ok(Keyword::StaticMap),
+            "segment" => Ok(Keyword::Segment),
+            //
+            "inbitwidth" => Ok(Keyword::InBitWidth),
+            "outbitwidth" => Ok(Keyword::OutBitWidth),
+            "state" => Ok(Keyword::State),
+            "interface" => Ok(Keyword::Interface),
+            //
+            "MemoryState" => Ok(Keyword::MemoryState),
+            "RegisterState" => Ok(Keyword::RegisterState),
+            "MemoryInterface" => Ok(Keyword::MemoryInterface),
+            "MMIOInterface" => Ok(Keyword::MMIOInterface),
+            "CPURegisterInterface" => Ok(Keyword::CPURegisterInterface),
+            //
+            "ReadAction" => Ok(Keyword::ReadAction),
+            "WriteAction" => Ok(Keyword::WriteAction),
+            "Layout" => Ok(Keyword::Layout),
+            //
+            "if" => Ok(Keyword::If),
+            "else" => Ok(Keyword::Else),
+            "for" => Ok(Keyword::For),
+            "let" => Ok(Keyword::Let),
+            "in" => Ok(Keyword::In),
+            "fn" => Ok(Keyword::Fn),
+            "return" => Ok(Keyword::Return),
+            //
+            "addr" => Ok(Keyword::AddrType),
+            "size" => Ok(Keyword::SizeType),
+            "bool" => Ok(Keyword::BooleanType),
+            "int" => Ok(Keyword::IntegerType),
+            "flags" => Ok(Keyword::FlagsType),
+            "requires" => Ok(Keyword::Requires),
+            "ensures" => Ok(Keyword::Ensures),
+            "assert" => Ok(Keyword::Assert),
+            "forall" => Ok(Keyword::Forall),
+            "exists" => Ok(Keyword::Exists),
+            "invariant" => Ok(Keyword::Invariant),
+            //
+            "const" => Ok(Keyword::Const),
+            "import" => Ok(Keyword::Import),
+            //
+            "None" => Ok(Keyword::None),
+            _ => Err(value),
+        }
+    }
 }
 
 /// Implementation of the [std::fmt::Display] trait for [Token]
 impl fmt::Display for Keyword {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use self::Keyword::*;
-        let kwstr = match self {
-            Const => "const",
-            Unit => "unit",
-            If => "if",
-            Else => "else",
-            For => "for",
-            In => "in",
-            Import => "import",
-            Let => "let",
-            Fn => "fn",
-            Assert => "assert",
-            State => "state",
-            AddrWidth => "addrwidth",
-            StaticMap => "staticmap",
-            Segment => "segment",
-            Interface => "interface",
-            Memory => "Memory",
-            MMIO => "MMIO",
-            Register => "Register",
-            None => "None",
-            Requires => "requires",
-            Ensures => "ensures",
-            Forall => "forall",
-            Exists => "exists",
-            Return => "return",
-            Layout => "Layout",
-            InBitWidth => "inbitwidth",
-            OutBitWidth => "outbitwidth",
-            // ActionTypes
-            ReadAction => "ReadAction",
-            WriteAction => "WriteAction",
-            // types
-            Addr => "addr",
-            Size => "size",
-            Boolean => "bool",
-            Integer => "int",
-            Flags => "flags",
-        };
-        write!(f, "{}", kwstr)
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -418,4 +508,101 @@ impl InputLength for Token {
     fn input_len(&self) -> usize {
         1
     }
+}
+
+#[cfg(test)]
+use std::convert::TryInto;
+
+#[test]
+fn test_enum_str() {
+
+    // probably something like this would be enough:
+    assert_eq!(Keyword::Unit.as_str().try_into(), Ok(Keyword::Unit));
+
+    assert_eq!("unit".try_into(), Ok(Keyword::Unit));
+    assert_eq!(Keyword::Unit.as_str(), "unit");
+    assert_eq!("segment".try_into(), Ok(Keyword::Segment));
+    assert_eq!(Keyword::Segment.as_str(), "segment");
+    assert_eq!("staticmap".try_into(), Ok(Keyword::StaticMap));
+    assert_eq!(Keyword::StaticMap.as_str(), "staticmap");
+
+    assert_eq!("inbitwidth".try_into(), Ok(Keyword::InBitWidth));
+    assert_eq!(Keyword::InBitWidth.as_str(), "inbitwidth");
+    assert_eq!("outbitwidth".try_into(), Ok(Keyword::OutBitWidth));
+    assert_eq!(Keyword::OutBitWidth.as_str(), "outbitwidth");
+    assert_eq!("state".try_into(), Ok(Keyword::State));
+    assert_eq!(Keyword::State.as_str(), "state");
+    assert_eq!("interface".try_into(), Ok(Keyword::Interface));
+    assert_eq!(Keyword::Interface.as_str(), "interface");
+
+    assert_eq!("MemoryState".try_into(), Ok(Keyword::MemoryState));
+    assert_eq!(Keyword::MemoryState.as_str(), "MemoryState");
+    assert_eq!("RegisterState".try_into(), Ok(Keyword::RegisterState));
+    assert_eq!(Keyword::RegisterState.as_str(), "RegisterState");
+
+    assert_eq!("MemoryInterface".try_into(), Ok(Keyword::MemoryInterface));
+    assert_eq!(Keyword::MemoryInterface.as_str(), "MemoryInterface");
+    assert_eq!("MMIOInterface".try_into(), Ok(Keyword::MMIOInterface));
+    assert_eq!(Keyword::MMIOInterface.as_str(), "MMIOInterface");
+    assert_eq!(
+        "CPURegisterInterface".try_into(),
+        Ok(Keyword::CPURegisterInterface)
+    );
+    assert_eq!(
+        Keyword::CPURegisterInterface.as_str(),
+        "CPURegisterInterface"
+    );
+
+    assert_eq!("ReadAction".try_into(), Ok(Keyword::ReadAction));
+    assert_eq!(Keyword::ReadAction.as_str(), "ReadAction");
+    assert_eq!("WriteAction".try_into(), Ok(Keyword::WriteAction));
+    assert_eq!(Keyword::WriteAction.as_str(), "WriteAction");
+    assert_eq!("Layout".try_into(), Ok(Keyword::Layout));
+    assert_eq!(Keyword::Layout.as_str(), "Layout");
+
+    assert_eq!("if".try_into(), Ok(Keyword::If));
+    assert_eq!(Keyword::If.as_str(), "if");
+    assert_eq!("else".try_into(), Ok(Keyword::Else));
+    assert_eq!(Keyword::Else.as_str(), "else");
+    assert_eq!("for".try_into(), Ok(Keyword::For));
+    assert_eq!(Keyword::For.as_str(), "for");
+    assert_eq!("let".try_into(), Ok(Keyword::Let));
+    assert_eq!(Keyword::Let.as_str(), "let");
+    assert_eq!("in".try_into(), Ok(Keyword::In));
+    assert_eq!(Keyword::In.as_str(), "in");
+    assert_eq!("fn".try_into(), Ok(Keyword::Fn));
+    assert_eq!(Keyword::Fn.as_str(), "fn");
+    assert_eq!("return".try_into(), Ok(Keyword::Return));
+    assert_eq!(Keyword::Return.as_str(), "return");
+
+    assert_eq!("addr".try_into(), Ok(Keyword::AddrType));
+    assert_eq!(Keyword::AddrType.as_str(), "addr");
+    assert_eq!("size".try_into(), Ok(Keyword::SizeType));
+    assert_eq!(Keyword::SizeType.as_str(), "size");
+    assert_eq!("bool".try_into(), Ok(Keyword::BooleanType));
+    assert_eq!(Keyword::BooleanType.as_str(), "bool");
+    assert_eq!("int".try_into(), Ok(Keyword::IntegerType));
+    assert_eq!(Keyword::IntegerType.as_str(), "int");
+    assert_eq!("flags".try_into(), Ok(Keyword::FlagsType));
+    assert_eq!(Keyword::FlagsType.as_str(), "flags");
+
+    assert_eq!("requires".try_into(), Ok(Keyword::Requires));
+    assert_eq!(Keyword::Requires.as_str(), "requires");
+    assert_eq!("ensures".try_into(), Ok(Keyword::Ensures));
+    assert_eq!(Keyword::Ensures.as_str(), "ensures");
+    assert_eq!("invariant".try_into(), Ok(Keyword::Invariant));
+    assert_eq!(Keyword::Invariant.as_str(), "invariant");
+    assert_eq!("assert".try_into(), Ok(Keyword::Assert));
+    assert_eq!(Keyword::Assert.as_str(), "assert");
+    assert_eq!("forall".try_into(), Ok(Keyword::Forall));
+    assert_eq!(Keyword::Forall.as_str(), "forall");
+    assert_eq!("exists".try_into(), Ok(Keyword::Exists));
+    assert_eq!(Keyword::Exists.as_str(), "exists");
+
+    assert_eq!("const".try_into(), Ok(Keyword::Const));
+    assert_eq!(Keyword::Const.as_str(), "const");
+    assert_eq!("import".try_into(), Ok(Keyword::Import));
+    assert_eq!(Keyword::Import.as_str(), "import");
+    assert_eq!("None".try_into(), Ok(Keyword::None));
+    assert_eq!(Keyword::None.as_str(), "None");
 }

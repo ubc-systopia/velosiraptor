@@ -189,13 +189,15 @@ keywordparser!(pub kw_if, Keyword::If);
 keywordparser!(pub kw_else, Keyword::Else);
 keywordparser!(pub kw_state, Keyword::State);
 keywordparser!(pub kw_interface, Keyword::Interface);
-keywordparser!(pub kw_memory, Keyword::Memory);
-keywordparser!(pub kw_mmio, Keyword::MMIO);
-keywordparser!(pub kw_register, Keyword::Register);
+keywordparser!(pub kw_memorystate, Keyword::MemoryState);
+keywordparser!(pub kw_registerstate, Keyword::RegisterState);
+keywordparser!(pub kw_memoryinterface, Keyword::MemoryInterface);
+keywordparser!(pub kw_mmiointerface, Keyword::MMIOInterface);
+keywordparser!(pub kw_cpuregisterinterface, Keyword::CPURegisterInterface);
 keywordparser!(pub kw_none, Keyword::None);
 keywordparser!(pub kw_layout, Keyword::Layout);
 keywordparser!(pub kw_fn, Keyword::Fn);
-keywordparser!(pub kw_size, Keyword::Size);
+keywordparser!(pub kw_size, Keyword::SizeType);
 keywordparser!(pub kw_readaction, Keyword::ReadAction);
 keywordparser!(pub kw_writeaction, Keyword::WriteAction);
 keywordparser!(pub kw_requires, Keyword::Requires);
@@ -210,7 +212,7 @@ keywordparser!(pub kw_for, Keyword::For);
 keywordparser!(pub kw_in, Keyword::In);
 keywordparser!(pub kw_inbitwidth, Keyword::InBitWidth);
 keywordparser!(pub kw_outbitwidth, Keyword::OutBitWidth);
-keywordparser!(pub kw_flags, Keyword::Flags);
+keywordparser!(pub kw_flags, Keyword::FlagsType);
 
 /// parses a type expression
 ///
@@ -223,15 +225,15 @@ pub fn typeinfo(input: TokenStream) -> IResult<TokenStream, Type> {
     }
 
     match tok.peek().content {
-        TokenContent::Keyword(Keyword::Size) => Ok((rem, Type::Size)),
-        TokenContent::Keyword(Keyword::Addr) => Ok((rem, Type::Address)),
-        TokenContent::Keyword(Keyword::Boolean) => Ok((rem, Type::Boolean)),
-        TokenContent::Keyword(Keyword::Integer) => Ok((rem, Type::Integer)),
-        TokenContent::Keyword(Keyword::Flags) => Ok((rem, Type::Flags)),
+        TokenContent::Keyword(Keyword::SizeType) => Ok((rem, Type::Size)),
+        TokenContent::Keyword(Keyword::AddrType) => Ok((rem, Type::Address)),
+        TokenContent::Keyword(Keyword::BooleanType) => Ok((rem, Type::Boolean)),
+        TokenContent::Keyword(Keyword::IntegerType) => Ok((rem, Type::Integer)),
+        TokenContent::Keyword(Keyword::FlagsType) => Ok((rem, Type::Flags)),
         // TODO: make this more type specifc
         _ => Err(Err::Error(VrsError::from_token(
             input.with_range(0..1),
-            TokenContent::Keyword(Keyword::Size),
+            TokenContent::Keyword(Keyword::SizeType),
         ))),
     }
 }

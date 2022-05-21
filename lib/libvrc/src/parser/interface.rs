@@ -131,7 +131,7 @@ fn none_interface(input: TokenStream) -> IResult<TokenStream, Interface> {
 ///
 fn mmio_interface(input: TokenStream) -> IResult<TokenStream, Interface> {
     // try to barse the MMIO keyword
-    let (i1, _) = kw_mmio(input.clone())?;
+    let (i1, _) = kw_mmiointerface(input.clone())?;
 
     // try to parse the arguments, must succeed
     let (i2, bases) = cut(argument_parser)(i1)?;
@@ -170,7 +170,7 @@ fn mmio_interface(input: TokenStream) -> IResult<TokenStream, Interface> {
 ///
 fn register_interface(input: TokenStream) -> IResult<TokenStream, Interface> {
     // try parse the registe rkeyword or return
-    let (i1, _) = kw_register(input.clone())?;
+    let (i1, _) = kw_cpuregisterinterface(input.clone())?;
 
     // try to parse the arguments, must succeed
     let (i2, _bases) = cut(argument_parser)(i1)?;
@@ -209,7 +209,7 @@ fn register_interface(input: TokenStream) -> IResult<TokenStream, Interface> {
 ///
 fn memory_interface(_input: TokenStream) -> IResult<TokenStream, Interface> {
     // try parse the memory keyword, or return
-    let (i1, _) = kw_memory(_input.clone())?;
+    let (i1, _) = kw_memoryinterface(_input.clone())?;
 
     // if the memory interface is a true identity, then we're done here, otherwise we are
     // constructing an normal interface definition with fields

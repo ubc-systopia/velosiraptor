@@ -40,7 +40,8 @@ use crate::parser::{
     field::{mem_field_block, reg_field_block},
     parameter,
     terminals::{
-        assign, comma, kw_memory, kw_none, kw_register, kw_state, lparen, rparen, semicolon,
+        assign, comma, kw_memorystate, kw_none, kw_registerstate, kw_state, lparen, rparen,
+        semicolon,
     },
 };
 use crate::token::TokenStream;
@@ -59,7 +60,7 @@ pub fn state(input: TokenStream) -> IResult<TokenStream, State> {
 
 /// parses and consumes [RegisterState] of a unit
 fn register_state(input: TokenStream) -> IResult<TokenStream, State> {
-    let (i1, _) = kw_register(input.clone())?;
+    let (i1, _) = kw_registerstate(input.clone())?;
     let (i2, fields) = reg_field_block(i1)?;
 
     let pos = input.expand_until(&i2);
@@ -68,7 +69,7 @@ fn register_state(input: TokenStream) -> IResult<TokenStream, State> {
 
 /// parses and consumes [MemoryState] of a unit
 fn memory_state(input: TokenStream) -> IResult<TokenStream, State> {
-    let (i1, _) = kw_memory(input.clone())?;
+    let (i1, _) = kw_memorystate(input.clone())?;
     let (i2, bases) = argument_parser(i1)?;
     let (i3, fields) = mem_field_block(i2)?;
 
@@ -95,7 +96,7 @@ use nom::Slice;
 // TODO ask Reto about current source pos assignment.
 #[test]
 fn memory_state_parser_test() {
-    let state_string = "state = Memory(base : addr) {\
+    let state_string = "state = MemoryState(base : addr) {\
     pte [base, 0, 4] {\
         0   0   present;\
         1   1   writable;\
@@ -146,7 +147,7 @@ fn none_state_parser_test() {
 
 #[test]
 fn register_state_parser_test() {
-    let state_string = "state = Register {\
+    let state_string = "state = RegisterState {\
         base [1] {\
             0  0 enabled;\
             1  1 read;\
@@ -185,7 +186,7 @@ fn fake_field_type_test() {
 
 #[test]
 fn missing_semicolon_test() {
-    let state_string = "state = Register {\
+    let state_string = "state = RegisterState {\
         base [_, 0, 1] {\
             0  0 enabled;\
             1  1 read;\
