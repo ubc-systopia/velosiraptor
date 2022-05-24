@@ -30,12 +30,12 @@ use std::fmt;
 use crate::ast::{AstNode, AstNodeGeneric, Issues, Symbol, SymbolKind, SymbolTable, Type};
 use crate::token::TokenStream;
 
-/// Defines a Method inside a unit
+/// Defines a method or unit parameter
 #[derive(PartialEq, Clone)]
 pub struct Param {
-    /// the name of the method
+    /// the name of the parameter
     pub name: String,
-    /// the return type of the method
+    /// the type of the method
     pub ptype: Type,
     /// the position where the method was defined
     pub pos: TokenStream,
