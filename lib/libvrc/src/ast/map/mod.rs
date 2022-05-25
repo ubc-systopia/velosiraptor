@@ -48,18 +48,27 @@ impl Map {}
 /// Implementation of [AstNodeGeneric] for [Map]
 impl<'a> AstNodeGeneric<'a> for Map {
     // checks the node and returns the number of errors and warnings encountered
-    fn check(&self, _st: &mut SymbolTable) -> Issues {
-        todo!()
+    fn check(&'a self, st: &mut SymbolTable<'a>) -> Issues {
+        match self {
+            Map::Explicit(map) => map.check(st),
+            Map::ListComprehension(map) => map.check(st),
+        }
     }
 
     /// rewrite the ast
-    fn rewrite(&mut self, _st: &mut SymbolTable) {
-        // no-op
+    fn rewrite(&'a mut self, st: &mut SymbolTable<'a>) {
+        match self {
+            Map::Explicit(map) => map.rewrite(st),
+            Map::ListComprehension(map) => map.rewrite(st),
+        };
     }
 
     /// returns a printable string representation of the ast node
     fn name(&self) -> &str {
-        "map"
+        match self {
+            Map::Explicit(map) => map.name(),
+            Map::ListComprehension(map) => map.name(),
+        }
     }
 
     /// returns the location of the AstNodeGeneric
