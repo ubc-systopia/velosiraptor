@@ -3,7 +3,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2021 Systopia Lab, Computer Science, University of British Columbia
+// Copyright (c) 2022 Systopia Lab, Computer Science, University of British Columbia
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -28,12 +28,12 @@
 //  2. List Comprehension that split the address space equally amongst them.
 //  3. List Comprehension with explicit address ranges.
 
-use crate::ast::{Expr, Map, MapEntry};
+use crate::ast::{ExplicitMap, Expr, ListComprehensionMap, Map, MapEntry};
 use crate::error::IResult;
 use crate::parser::expression::{expr, expr_list, range_expr};
 use crate::parser::terminals::{
-    assign, at, comma, dotdot, fatarrow, ident, kw_for, kw_in, kw_staticmap, lbrack, lparen, num,
-    rbrack, rparen, semicolon,
+    assign, at, comma, fatarrow, ident, kw_for, kw_in, kw_staticmap, lbrack, lparen, rbrack,
+    rparen, semicolon,
 };
 use crate::token::TokenStream;
 
@@ -42,16 +42,67 @@ use nom::combinator::{cut, opt};
 use nom::multi::separated_list1;
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
 
-// Parses Map Statements
+/// Parses a map statement
+///
+/// # Grammar
+///
+/// MAP := KW_MAP ASSIGN LBRACK (LISTCOMPREHENSIONMAP | EXPLICITMAP) RBRACK
+///
+/// # Example
+///
+///  - `map = [UnitA(), UnitB()]`
+///  - `map = [UnitA(x) for x in 1..2]`
+///
 pub fn parse_map(input: TokenStream) -> IResult<TokenStream, Map> {
     let (i1, _) = kw_staticmap(input.clone())?;
-    let (i2, entries) = cut(delimited(
-        pair(assign, lbrack),
-        alt((list_comprehension, entry_list)),
-        pair(rbrack, semicolon),
-    ))(i1)?;
-    let pos = input.expand_until(&i2);
-    Ok((i2, Map { entries, pos }))
+    let maps = alt((explicitmap, listcomprehensionmap));
+    cut(delimited(assign, maps, opt(semicolon)))(i1)
+}
+
+/// Parses the body of an explicit map list
+///
+/// # Grammar
+///
+/// EXPLICITMAP :=  [ MAP_ELEMENT (, MAP_ELEMENT)* ]
+///
+/// # Example
+///
+///  - `UnitA(), UnitB()`
+///
+fn explicitmap(input: TokenStream) -> IResult<TokenStream, Map> {
+    let (i1, elms) = delimited(
+        lbrack,
+        separated_list1(comma, cut(map_element)),
+        rbrack, // can't use cut here
+    )(input.clone())?;
+
+    let map = ExplicitMap::new(input).add_entries(elms).finalize(&i1);
+    Ok((i1, Map::Explicit(map)))
+}
+
+/// Parses the body of a list comprehension map
+///
+/// # Grammar
+///
+/// LISTCOMPREHENSIONMAP :=  MAP_ELEMENT KW_FOR IDENT KW_IN RANGE_EXPR
+///
+/// # Example
+///
+///  - `[UnitA(x) for x in 1..2]`
+///
+fn listcomprehensionmap(input: TokenStream) -> IResult<TokenStream, Map> {
+    let (i1, (elm, id, expr)) = delimited(
+        lbrack,
+        tuple((
+            cut(map_element),
+            delimited(kw_for, cut(ident), cut(kw_in)),
+            cut(range_expr),
+        )),
+        cut(rbrack),
+    )(input.clone())?;
+
+    let map = ListComprehensionMap::new(elm, id, expr, input).finalize(&i1);
+    Ok((i1, Map::ListComprehension(map)))
 }
 
 /// parses a map elemenet
@@ -67,18 +118,15 @@ pub fn parse_map(input: TokenStream) -> IResult<TokenStream, Map> {
 ///  - `0..0x1000 => UnitA()`
 ///  - `0..0x1000 => UnitA() @ 0x10`
 fn map_element(input: TokenStream) -> IResult<TokenStream, MapEntry> {
-    let (i1, (src, (dst, args, offset))) = pair(opt(map_src), map_dst)(input)?;
+    let (i1, (src, (dst, args, offset))) = pair(opt(map_src), map_dst)(input.clone())?;
 
-    Ok((
-        i1,
-        MapEntry {
-            range: src,
-            unit_name: dst,
-            unit_params: args,
-            offset,
-            iteration: None,
-        },
-    ))
+    let elm = MapEntry::new(input, dst)
+        .set_range(src)
+        .set_offset(offset)
+        .add_unit_params(args)
+        .finalize(&i1);
+
+    Ok((i1, elm))
 }
 
 /// parses a map source description
@@ -114,46 +162,6 @@ fn map_dst(input: TokenStream) -> IResult<TokenStream, (String, Vec<Expr>, Optio
     let (i3, offset) = opt(preceded(at, expr))(i2)?;
 
     Ok((i3, (unitname, unitargs, offset)))
-}
-
-/// parses a list of map entries
-///
-/// # Grammar
-///
-/// `ENTRY_LIST := MAP_ELEMENT (COMMA MAP_ELEMENT)*`
-///
-/// # Example
-///
-/// - `0..0x1000 => UnitA() @ 0x10, 0x2000..0x3000 => UnitA() @ 0x20`
-fn entry_list(input: TokenStream) -> IResult<TokenStream, Vec<MapEntry>> {
-    separated_list1(comma, map_element)(input)
-}
-
-/// parses a list comprehension of map entries
-///
-/// # Grammar
-///
-/// `LIST_COMPREHENSION := MAP_ELEMENT FOR IDENT IN RANGE_EXPR`
-///
-/// # Example
-///
-///  - `UnitA() for i in 0..512`
-///
-fn list_comprehension(input: TokenStream) -> IResult<TokenStream, Vec<MapEntry>> {
-    let (i1, elm) = map_element(input)?;
-
-    let (i2, (list_itterator, (lower, _, upper))) = tuple((
-        preceded(kw_for, cut(ident)),
-        preceded(cut(kw_in), cut(tuple((num, dotdot, num)))),
-    ))(i1)?;
-
-    let mut map_entries: Vec<MapEntry> = vec![];
-    for i in lower..=upper {
-        let mut entry = elm.clone();
-        entry.iteration = Some((list_itterator.clone(), i));
-        map_entries.push(entry);
-    }
-    Ok((i2, map_entries))
 }
 
 #[cfg(test)]

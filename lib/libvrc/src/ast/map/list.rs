@@ -3,7 +3,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2021 Systopia Lab, Computer Science, University of British Columbia
+// Copyright (c) 2022 Systopia Lab, Computer Science, University of British Columbia
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -28,23 +28,46 @@
 use crate::ast::{AstNodeGeneric, Expr, Issues, SymbolTable};
 use crate::token::TokenStream;
 
-/// Defines a mapping between addresses and units
+use super::MapEntry;
+
+/// Represents a list comprehension map `map = [Unit(args) @ offset for x in 0..1024]`
 #[derive(PartialEq, Debug, Clone)]
-pub struct Map {
-    pub entries: Vec<MapEntry>,
+pub struct ListComprehensionMap {
+    /// the entries in the explicit map
+    pub entry: MapEntry,
+
+    /// the iterator variable
+    pub var: String,
+
+    /// the possible range the variable [var] may take
+    pub range: Expr,
+
+    /// the position of the map in the source code
     pub pos: TokenStream,
 }
 
-impl Map {
-    pub fn new(pos: TokenStream) -> Self {
-        Map {
-            entries: Vec::new(),
+impl ListComprehensionMap {
+    pub fn new(entry: MapEntry, var: String, range: Expr, pos: TokenStream) -> Self {
+        ListComprehensionMap {
+            entry,
+            var,
+            range,
             pos,
         }
     }
 
-    pub fn add_entries(mut self, entries: Vec<MapEntry>) -> Self {
-        self.entries.extend(entries);
+    pub fn set_entry(mut self, entry: MapEntry) -> Self {
+        self.entry = entry;
+        self
+    }
+
+    pub fn set_var(mut self, var: String) -> Self {
+        self.var = var;
+        self
+    }
+
+    pub fn set_range(mut self, range: Expr) -> Self {
+        self.range = range;
         self
     }
 
@@ -55,7 +78,7 @@ impl Map {
 }
 
 /// Implementation of [AstNodeGeneric] for [Map]
-impl<'a> AstNodeGeneric<'a> for Map {
+impl<'a> AstNodeGeneric<'a> for ListComprehensionMap {
     // checks the node and returns the number of errors and warnings encountered
     fn check(&self, _st: &mut SymbolTable) -> Issues {
         todo!()
@@ -75,18 +98,4 @@ impl<'a> AstNodeGeneric<'a> for Map {
     fn loc(&self) -> &TokenStream {
         &self.pos
     }
-}
-
-/// Defines the parameters for constructing a Unit as a component
-/// of a given map
-/// TODO:
-///     Might need to add an AstNodeGeneric Trait Implementation for
-///     the MapEntry struct
-#[derive(Default, PartialEq, Debug, Clone)]
-pub struct MapEntry {
-    pub range: Option<Expr>,
-    pub unit_name: String,
-    pub unit_params: Vec<Expr>,
-    pub offset: Option<Expr>,
-    pub iteration: Option<(String, u64)>,
 }
