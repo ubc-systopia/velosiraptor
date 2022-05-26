@@ -43,7 +43,7 @@ pub enum Map {
     /// explicit map
     Explicit(ExplicitMap),
     /// list comprehension map
-    ListComprehension(ListComprehensionMap),
+    ListComprehension(Box<ListComprehensionMap>),
 }
 
 impl Map {}
@@ -104,6 +104,8 @@ pub struct MapEntry {
     pub pos: TokenStream,
 }
 
+use std::ops::Range;
+
 impl MapEntry {
     pub fn new(pos: TokenStream, unit: String) -> Self {
         Self {
@@ -138,6 +140,21 @@ impl MapEntry {
     pub fn finalize(mut self, pos: &TokenStream) -> Self {
         self.pos = self.pos.expand_until(pos);
         self
+    }
+
+    pub fn has_range(&self) -> bool {
+        self.range.is_some()
+    }
+
+    pub fn eval_range(&self, _var: &str, _val: u64, _st: &mut SymbolTable) -> Range<u64> {
+        if self.range.is_none() {
+            println!("warning: no range specified for map entry");
+            return 0..0;
+        }
+
+        // set the current context
+
+        0..0
     }
 }
 

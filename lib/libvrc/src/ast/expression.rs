@@ -355,7 +355,7 @@ pub enum Expr {
         idx: Box<Expr>,
         pos: TokenStream,
     },
-    /// Reprsents a range  `start..end`
+    /// Represents a range  `start..end`
     Range {
         start: Box<Expr>,
         end: Box<Expr>,

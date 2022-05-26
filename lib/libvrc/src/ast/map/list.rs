@@ -125,16 +125,60 @@ impl<'a> AstNodeGeneric<'a> for ListComprehensionMap {
         // Notes:       We need to do this *before* we add the variable to the symbol table
         // --------------------------------------------------------------------------------------
 
-        if let Expr::Range { .. } = &self.range {
+        let (start, end) = if let Expr::Range { start, end, .. } = &self.range {
             // check the range expression
             res = res + self.range.check(st);
+
+            if !start.is_const_expr(st) {
+                let msg = String::from("start of range expression is not constant");
+                let hint = String::from("make this expression constant");
+                VrsError::new_err(start.loc().clone(), msg, Some(hint)).print();
+                res.inc_err(1);
+            }
+
+            if !end.is_const_expr(st) {
+                let msg = String::from("end of range expression is not constant");
+                let hint = String::from("make this expression constant");
+                VrsError::new_err(start.loc().clone(), msg, Some(hint)).print();
+                res.inc_err(1);
+            }
+
+            let start = if let Expr::Number { value, .. } = start.clone().fold_constants() {
+                value
+            } else {
+                panic!("constant expression `{}` didn't fold into a number!", start);
+            };
+
+            let end = if let Expr::Number { value, .. } = end.clone().fold_constants() {
+                value
+            } else {
+                panic!("constant expression `{}` didn't fold into a number!", end);
+            };
+
+            if start == end {
+                let msg = String::from("empty range expression with start == end.");
+                let hint = String::from("define range with start < end");
+                VrsError::new_warn(self.range.loc().clone(), msg, Some(hint)).print();
+                res.inc_warn(1);
+            }
+
+            if start > end {
+                let msg = String::from("start of range is larger than end of range");
+                let hint = String::from("define range with start < end");
+                VrsError::new_err(self.range.loc().clone(), msg, Some(hint)).print();
+                res.inc_err(1);
+            }
+
+            (start, end)
         } else {
             let msg = String::from("expression is not a range expression.");
             let hint =
                 String::from("convert exprssion into a range expression of format `start..end`");
             VrsError::new_err(self.pos.clone(), msg, Some(hint)).print();
             res.inc_err(1);
-        }
+
+            (0, 0) // we just return the zero interval ehre
+        };
 
         // now add the iterator variable to the symbol table
 
@@ -167,6 +211,41 @@ impl<'a> AstNodeGeneric<'a> for ListComprehensionMap {
         // --------------------------------------------------------------------------------------
 
         res = res + utils::check_snake_case(self.var.as_str(), &self.pos);
+
+        // Check 4: Range over lap
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check if the input address ranges may overlap
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        // we only need to do the check if the range is not empty, otherwise it's non-overlapping
+        // by construction
+        if self.entry.has_range() {
+            // collect all ranges
+            let mut ranges = Vec::new();
+            for i in start..end {
+                let range = self.entry.eval_range(&self.var, i, st);
+                ranges.push((i, range));
+            }
+
+            let ranges_overlap = utils::check_ranges_overlap(&mut ranges);
+
+            for (i, j) in ranges_overlap {
+                let msg = format!(
+                    "range overlap: {}:{}..{} overlaps with {}:{}..{}",
+                    ranges[i].0,
+                    ranges[i].1.start,
+                    ranges[i].1.end,
+                    ranges[j].0,
+                    ranges[j].1.start,
+                    ranges[j].1.end
+                );
+                let hint = String::from("change input address range ");
+                VrsError::new_err(self.pos.clone(), msg, Some(hint)).print();
+                res.inc_err(1);
+            }
+        }
 
         // drop the context again
         st.drop_context();

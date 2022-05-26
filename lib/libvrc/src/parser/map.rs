@@ -54,7 +54,7 @@ use nom::sequence::{delimited, pair, preceded, terminated, tuple};
 ///  - `map = [UnitA(x) for x in 1..2]`
 ///
 pub fn parse_map(input: TokenStream) -> IResult<TokenStream, Map> {
-    let (i1, _) = kw_staticmap(input.clone())?;
+    let (i1, _) = kw_staticmap(input)?;
     let maps = alt((explicitmap, listcomprehensionmap));
     cut(delimited(assign, maps, opt(semicolon)))(i1)
 }
@@ -102,7 +102,7 @@ fn listcomprehensionmap(input: TokenStream) -> IResult<TokenStream, Map> {
     )(input.clone())?;
 
     let map = ListComprehensionMap::new(elm, id, expr, input).finalize(&i1);
-    Ok((i1, Map::ListComprehension(map)))
+    Ok((i1, Map::ListComprehension(Box::new(map))))
 }
 
 /// parses a map elemenet
