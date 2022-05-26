@@ -280,6 +280,16 @@ impl<'a> AstNodeGeneric<'a> for StaticMap {
             res = res + c.check(st);
         }
 
+        // Check 3: Map definition
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check the static map definition
+        // Notes:
+        // --------------------------------------------------------------------------------------
+        if let Some(m) = &self.map {
+            res = res + m.check(st);
+        }
+
         // Check 4: State Param Check
         // --------------------------------------------------------------------------------------
         // Type:        Warning/Error

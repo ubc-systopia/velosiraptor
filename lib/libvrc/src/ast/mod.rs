@@ -106,7 +106,7 @@ pub trait AstNodeGeneric<'a> {
 }
 
 /// enum of all AstNodes
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum AstNode<'a> {
     Root(&'a AstRoot),
     Import(&'a Import),

@@ -265,7 +265,7 @@ pub enum ActionType {
 ///     0 => state.cache;
 ///     1 => interface.status;
 /// }
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Action {
     /// the type of the action (Read/Write)
     pub action_type: ActionType,

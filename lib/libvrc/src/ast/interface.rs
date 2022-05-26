@@ -41,7 +41,7 @@ use crate::token::TokenStream;
 ///   - MMIORegisters: load/store to memory-mapped device registers
 ///   - CPURegisters: load/store to CPU registers
 ///   - SpecialRegisters: use of special instructions (no load/store) to those
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Interface {
     /// Defines a load/store interface to memory
     Memory {
@@ -297,7 +297,7 @@ impl<'a> AstNodeGeneric<'a> for Interface {
 ///
 /// A field may represent a 8, 16, 32, 64 bit region in the state with a
 /// specific bit layout and an additional collection of  actions.
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct InterfaceField {
     // The field itself
     pub field: Field,

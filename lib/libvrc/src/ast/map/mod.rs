@@ -195,7 +195,20 @@ impl<'a> AstNodeGeneric<'a> for MapEntry {
         // all fine for now
         let mut res = Issues::ok();
 
-        // Check 1: See whether the unit has been defined
+        println!("MapEntry: checking!");
+
+        // Check 1: Check whether the unit parameters are well-formed
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check the expressions of the unit parameteres
+        // Notes:
+        // --------------------------------------------------------------------------------------
+
+        for p in &self.unit_params {
+            res = res + p.check(st);
+        }
+
+        // Check 2: See whether the unit has been defined
         // --------------------------------------------------------------------------------------
         // Type:        Error
         // Description: Check that the unit exists
@@ -210,7 +223,7 @@ impl<'a> AstNodeGeneric<'a> for MapEntry {
             res.inc_err(1);
         }
 
-        // Check 2: Match the unit parameters
+        // Check 3: Match the unit parameters
         // --------------------------------------------------------------------------------------
         // Type:        Error
         // Description: Check the unit parameters
@@ -218,18 +231,21 @@ impl<'a> AstNodeGeneric<'a> for MapEntry {
         // --------------------------------------------------------------------------------------
 
         if let Some(unit) = unit {
-            if let AstNode::StaticMap(u) = unit.ast_node {
-                for (i, p) in self.unit_params.iter().enumerate() {
-                    if i >= u.params.len() {
-                        let msg = format!("excess parameter for unit '{}'", self.unit_name);
-                        let hint = String::from("remove this parameter");
-                        VrsError::new_err(self.loc().clone(), msg, Some(hint)).print();
-                        res.inc_err(1);
-                        continue;
-                    }
+            let uparams = match unit.ast_node {
+                AstNode::StaticMap(u) => u.params.as_slice(),
+                AstNode::Segment(u) => u.params.as_slice(),
+                _ => &[],
+            };
 
-                    res = res + p.match_type(u.params[i].ptype, st);
+            for (i, p) in self.unit_params.iter().enumerate() {
+                if i >= uparams.len() {
+                    let msg = format!("excess parameter for unit '{}'", self.unit_name);
+                    let hint = String::from("remove this parameter");
+                    VrsError::new_err(self.loc().clone(), msg, Some(hint)).print();
+                    res.inc_err(1);
+                    continue;
                 }
+                res = res + p.match_type(uparams[i].ptype, st);
             }
         }
 
