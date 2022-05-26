@@ -28,7 +28,8 @@
 // standard library includes
 use std::fmt::{Debug, Display, Formatter, Result};
 
-use crate::ast::{AstNodeGeneric, Expr, Issues, SymbolTable};
+use crate::ast::{AstNode, AstNodeGeneric, Expr, Issues, SymbolKind, SymbolTable};
+use crate::error::VrsError;
 use crate::token::TokenStream;
 
 mod explicit;
@@ -190,8 +191,63 @@ impl Debug for MapEntry {
 /// Implementation of [AstNodeGeneric] for [Map]
 impl<'a> AstNodeGeneric<'a> for MapEntry {
     // checks the node and returns the number of errors and warnings encountered
-    fn check(&self, _st: &mut SymbolTable) -> Issues {
-        todo!()
+    fn check(&'a self, st: &mut SymbolTable<'a>) -> Issues {
+        // all fine for now
+        let mut res = Issues::ok();
+
+        // Check 1: See whether the unit has been defined
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check that the unit exists
+        // Notes:
+        // --------------------------------------------------------------------------------------
+
+        let unit = st.lookup_with_kind(&self.unit_name, &[SymbolKind::Unit]);
+        if unit.is_none() {
+            let msg = format!("reference to unknown unit '{}'", self.unit_name);
+            let hint = String::from("define this unit or import unit definition.");
+            VrsError::new_err(self.loc().clone(), msg, Some(hint)).print();
+            res.inc_err(1);
+        }
+
+        // Check 2: Match the unit parameters
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check the unit parameters
+        // Notes:
+        // --------------------------------------------------------------------------------------
+
+        if let Some(unit) = unit {
+            if let AstNode::StaticMap(u) = unit.ast_node {
+                for (i, p) in self.unit_params.iter().enumerate() {
+                    if i >= u.params.len() {
+                        let msg = format!("excess parameter for unit '{}'", self.unit_name);
+                        let hint = String::from("remove this parameter");
+                        VrsError::new_err(self.loc().clone(), msg, Some(hint)).print();
+                        res.inc_err(1);
+                        continue;
+                    }
+
+                    res = res + p.match_type(u.params[i].ptype, st);
+                }
+            }
+        }
+
+        // Check 3: Validate offset expression
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check the offset expression
+        // Notes:
+        // --------------------------------------------------------------------------------------
+
+        // Check 4: Check the range expression
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Validates the range expression
+        // Notes:
+        // --------------------------------------------------------------------------------------
+
+        res
     }
 
     /// rewrite the ast

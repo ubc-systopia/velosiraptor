@@ -62,6 +62,16 @@ impl Param {
             ast_node: AstNode::Parameter(self),
         }
     }
+
+    /// returns true whether the parameter is of boolean type
+    pub fn is_boolean(&self) -> bool {
+        self.ptype.is_boolean()
+    }
+
+    /// returns true whether the parameter is of integer type
+    pub fn is_numeric(&self) -> bool {
+        self.ptype.is_numeric()
+    }
 }
 
 /// Implementation of the [fmt::Display] trait for [Param]
