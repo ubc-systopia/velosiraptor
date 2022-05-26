@@ -25,6 +25,9 @@
 
 //! MAP ast node
 
+// standard library includes
+use std::fmt::{Debug, Display, Formatter, Result};
+
 use crate::ast::{AstNodeGeneric, Expr, Issues, SymbolTable};
 use crate::token::TokenStream;
 
@@ -87,7 +90,7 @@ impl<'a> AstNodeGeneric<'a> for Map {
 ///   - INPUT RANGE is optional
 ///   - arglist may be empty
 ///   - offset is optional
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct MapEntry {
     /// range expressiong of the input address range that this entry maps
     pub range: Option<Expr>,
@@ -135,6 +138,35 @@ impl MapEntry {
     pub fn finalize(mut self, pos: &TokenStream) -> Self {
         self.pos = self.pos.expand_until(pos);
         self
+    }
+}
+
+/// implementation of the [fmt::Display] trait for the [Segment]
+impl Display for MapEntry {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        if let Some(range) = &self.range {
+            write!(f, "{} => ", range)?;
+        }
+
+        let params = self
+            .unit_params
+            .iter()
+            .map(|p| p.to_string())
+            .collect::<Vec<String>>()
+            .join(", ");
+        write!(f, " {}({})", self.unit_name, params)?;
+
+        if let Some(offset) = &self.offset {
+            write!(f, " @ {}", offset)?;
+        }
+        Ok(())
+    }
+}
+
+/// implementation of the [fmt::Debug] trait for the [Segment]
+impl Debug for MapEntry {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        Display::fmt(self, f)
     }
 }
 

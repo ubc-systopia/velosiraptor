@@ -25,13 +25,19 @@
 
 //! MAP ast node
 
-use crate::ast::{AstNodeGeneric, Expr, Issues, SymbolTable};
+// std library imports
+use std::fmt::{Debug, Display, Formatter, Result};
+
+use crate::ast::{
+    utils, AstNode, AstNodeGeneric, Expr, Issues, Symbol, SymbolKind, SymbolTable, Type,
+};
+use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
 use super::MapEntry;
 
 /// Represents a list comprehension map `map = [Unit(args) @ offset for x in 0..1024]`
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct ListComprehensionMap {
     /// the entries in the explicit map
     pub entry: MapEntry,
@@ -77,11 +83,95 @@ impl ListComprehensionMap {
     }
 }
 
+/// implementation of the [fmt::Display] trait for the [Segment]
+impl Display for ListComprehensionMap {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        writeln!(
+            f,
+            "map = [{} for {} in {}]",
+            self.entry, self.var, self.range
+        )
+    }
+}
+
+/// implementation of the [fmt::Debug] trait for the [Segment]
+impl Debug for ListComprehensionMap {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        let line = self.loc().line();
+        let column = self.loc().column();
+
+        writeln!(
+            f,
+            "{:03}:{:03} | map = [{} for {} in {}]",
+            line, column, self.entry, self.var, self.range
+        )
+    }
+}
+
 /// Implementation of [AstNodeGeneric] for [Map]
 impl<'a> AstNodeGeneric<'a> for ListComprehensionMap {
     // checks the node and returns the number of errors and warnings encountered
-    fn check(&self, _st: &mut SymbolTable) -> Issues {
-        todo!()
+    fn check(&'a self, st: &mut SymbolTable<'a>) -> Issues {
+        // all fine for now
+        let mut res = Issues::ok();
+
+        // set the current context
+        st.create_context(String::from("listcomprehension"));
+
+        // Check 1: Check the range expression for defined symbols
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check that the range expression is well-defined
+        // Notes:       We need to do this *before* we add the variable to the symbol table
+        // --------------------------------------------------------------------------------------
+
+        if let Expr::Range { .. } = &self.range {
+            // check the range expression
+            res = res + self.range.check(st);
+        } else {
+            let msg = String::from("expression is not a range expression.");
+            let hint =
+                String::from("convert exprssion into a range expression of format `start..end`");
+            VrsError::new_err(self.pos.clone(), msg, Some(hint)).print();
+            res.inc_err(1);
+        }
+
+        // now add the iterator variable to the symbol table
+
+        let varsym = Symbol::new(
+            self.var.clone(),
+            Type::Integer,
+            SymbolKind::Variable,
+            self.pos.clone(),
+            AstNode::Expression(&self.range),
+        );
+
+        // try to insert the variable into the symbol table
+        if !st.insert(varsym) {
+            res.inc_err(1);
+        }
+
+        // Check 2: Check the entry for well-formedness
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check that the entry is well-defined
+        // Notes:
+        // --------------------------------------------------------------------------------------
+        res = res + self.entry.check(st);
+
+        // Check 3: Variable name
+        // --------------------------------------------------------------------------------------
+        // Type:        Warning
+        // Description: Check if the unit name is snake case.
+        // Notes:       --
+        // --------------------------------------------------------------------------------------
+
+        res = res + utils::check_snake_case(self.var.as_str(), &self.pos);
+
+        // drop the context again
+        st.drop_context();
+
+        res
     }
 
     /// rewrite the ast
