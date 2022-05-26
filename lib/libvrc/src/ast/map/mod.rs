@@ -28,7 +28,7 @@
 // standard library includes
 use std::fmt::{Debug, Display, Formatter, Result};
 
-use crate::ast::{AstNode, AstNodeGeneric, Expr, Issues, SymbolKind, SymbolTable};
+use crate::ast::{AstNode, AstNodeGeneric, Expr, Issues, SymbolKind, SymbolTable, Type};
 use crate::error::VrsError;
 use crate::token::TokenStream;
 
@@ -240,12 +240,27 @@ impl<'a> AstNodeGeneric<'a> for MapEntry {
         // Notes:
         // --------------------------------------------------------------------------------------
 
+        if let Some(offset) = &self.offset {
+            res = res + offset.check(st) + offset.match_type(Type::Integer, st);
+        }
+
         // Check 4: Check the range expression
         // --------------------------------------------------------------------------------------
         // Type:        Error
         // Description: Validates the range expression
         // Notes:
         // --------------------------------------------------------------------------------------
+
+        if let Some(range) = &self.range {
+            res = res + range.check(st);
+            if let Expr::Range { .. } = range {
+            } else {
+                let msg = format!("range expression expected, found: {}", range);
+                let hint = String::from("convert this to a range expression: `start..end`");
+                VrsError::new_err(self.loc().clone(), msg, Some(hint)).print();
+                res.inc_err(1)
+            }
+        }
 
         res
     }
