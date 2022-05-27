@@ -30,12 +30,12 @@ use std::fmt;
 use crate::ast::{AstNode, AstNodeGeneric, Issues, Symbol, SymbolKind, SymbolTable, Type};
 use crate::token::TokenStream;
 
-/// Defines a Method inside a unit
+/// Defines a method or unit parameter
 #[derive(PartialEq, Clone)]
 pub struct Param {
-    /// the name of the method
+    /// the name of the parameter
     pub name: String,
-    /// the return type of the method
+    /// the type of the method
     pub ptype: Type,
     /// the position where the method was defined
     pub pos: TokenStream,
@@ -61,6 +61,16 @@ impl Param {
             loc: self.pos.clone(),
             ast_node: AstNode::Parameter(self),
         }
+    }
+
+    /// returns true whether the parameter is of boolean type
+    pub fn is_boolean(&self) -> bool {
+        self.ptype.is_boolean()
+    }
+
+    /// returns true whether the parameter is of integer type
+    pub fn is_numeric(&self) -> bool {
+        self.ptype.is_numeric()
     }
 }
 

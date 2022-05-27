@@ -144,3 +144,31 @@ pub fn check_camel_case(name: &str, loc: &TokenStream) -> Issues {
         Issues::ok()
     }
 }
+
+use std::ops::Range;
+
+pub fn check_ranges_overlap(ranges: &mut Vec<(u64, Range<u64>)>) -> Vec<(usize, usize)> {
+    let mut res = Vec::new();
+    if ranges.is_empty() {
+        return res;
+    }
+
+    // make sure the ranges are sorted
+    ranges.sort_by(|a, b| a.1.start.cmp(&b.1.start));
+
+    // a simple overlap check: just do a linear scan
+    let mut endaddr = ranges.first().unwrap().1.end;
+    let mut endidx = 0;
+    for (i, (_, e)) in ranges.iter().enumerate().skip(1) {
+        if endaddr > e.start {
+            res.push((i, endidx));
+        }
+
+        if endaddr < e.end {
+            endaddr = e.end;
+            endidx = i;
+        }
+    }
+
+    res
+}

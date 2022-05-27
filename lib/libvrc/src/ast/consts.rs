@@ -71,6 +71,16 @@ impl ConstValue {
             ConstValue::BooleanExpr(_) => Type::Boolean,
         }
     }
+
+    // convers the value to an expression
+    pub fn to_expr(&self, pos: TokenStream) -> Expr {
+        match self {
+            ConstValue::IntegerValue(v) => Expr::Number { value: *v, pos },
+            ConstValue::IntegerExpr(e) => e.clone(),
+            ConstValue::BooleanValue(v) => Expr::Boolean { value: *v, pos },
+            ConstValue::BooleanExpr(e) => e.clone(),
+        }
+    }
 }
 
 /// implementation of the [fmt::Display] trait for the [ConstValue] enum
@@ -191,6 +201,10 @@ impl Const {
     /// obtains the type of the constant
     pub fn to_type(&self) -> Type {
         self.value.to_type()
+    }
+
+    pub fn to_expr(&self) -> Expr {
+        self.value.to_expr(self.pos.clone())
     }
 
     /// checks whether this constant is of integer type

@@ -71,7 +71,7 @@ pub use flags::{Flag, Flags};
 pub use import::Import;
 pub use interface::{Interface, InterfaceField, NONE_INTERFACE};
 pub use issues::Issues;
-pub use map::{Map, MapEntry};
+pub use map::{ExplicitMap, ListComprehensionMap, Map, MapEntry};
 pub use method::Method;
 pub use param::Param;
 pub use root::AstRoot;
@@ -106,7 +106,7 @@ pub trait AstNodeGeneric<'a> {
 }
 
 /// enum of all AstNodes
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum AstNode<'a> {
     Root(&'a AstRoot),
     Import(&'a Import),

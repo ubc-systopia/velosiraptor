@@ -48,7 +48,7 @@ segment X86PageTableEntry(base : addr) : Segment {
     }
 
     // the state
-    state = Memory(base : addr) {
+    state = MemoryState(base : addr) {
         pte [base, 0, 4] {
             // the following fields at starting bit, ending bit, name
             0   0 present;
@@ -65,7 +65,7 @@ segment X86PageTableEntry(base : addr) : Segment {
         }
     }
 
-    interface = Memory(base : addr) {
+    interface = MemoryInterface(base : addr) {
         pte [base, 0, 4] {
             Layout {
                 // the following fields at starting bit, ending bit, name
@@ -88,6 +88,26 @@ segment X86PageTableEntry(base : addr) : Segment {
                 interface.pte -> state.pte;
             };
         }
+    }
+
+
+    // matches a translation flags,
+    fn matchflags(flgs : flags) -> bool
+        requires state.pte.present == 1;
+    {
+/*
+        return ((flgs & FLAGS_WRITABLE) || !state.pte.writable)
+            && ((flgs & FLAGS_USERMODE) || !state.pte.usermode);
+*/
+        return true;
+    }
+
+    // the translation semantics, adding an option type?
+    fn translate(va: addr) -> addr
+        requires va < 4096;
+        requires state.pte.present == 1;
+    {
+        return va + (state.pte.base << 12);
     }
 
     // unmapping an entry
@@ -121,26 +141,6 @@ segment X86PageTableEntry(base : addr) : Segment {
         // update the entry
         // ensures matchflags(flgs) ==> translate(a) == translate(a)
         return true;
-    }
-
-
-    // matches a translation flags,
-    fn matchflags(flgs : flags) -> bool
-        requires state.pte.present == 1;
-    {
-/*
-        return ((flgs & FLAGS_WRITABLE) || !state.pte.writable)
-            && ((flgs & FLAGS_USERMODE) || !state.pte.usermode);
-*/
-        return true;
-    }
-
-    // the translation semantics, adding an option type?
-    fn translate(va: addr) -> addr
-        requires va < 4096;
-        requires state.pte.present == 1;
-    {
-        return va + (state.pte.base << 12);
     }
 }
 

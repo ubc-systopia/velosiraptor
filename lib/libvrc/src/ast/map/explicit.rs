@@ -25,22 +25,30 @@
 
 //! MAP ast node
 
-use crate::ast::{AstNodeGeneric, Expr, Issues, SymbolTable};
+use super::MapEntry;
+use crate::ast::{utils, AstNodeGeneric, Issues, SymbolTable};
+use crate::error::VrsError;
 use crate::token::TokenStream;
 
-/// Defines a mapping between addresses and units
+/// Represents an explicit map `map = [0x0...0x1000 => Unit(args) @ offset, ... ]`
 #[derive(PartialEq, Debug, Clone)]
-pub struct Map {
+pub struct ExplicitMap {
+    /// the entries in the explicit map
     pub entries: Vec<MapEntry>,
+    /// the position of the map in the source code
     pub pos: TokenStream,
 }
 
-impl Map {
+impl ExplicitMap {
     pub fn new(pos: TokenStream) -> Self {
-        Map {
+        Self {
             entries: Vec::new(),
             pos,
         }
+    }
+
+    pub fn add_entry(&mut self, entry: MapEntry) {
+        self.entries.push(entry);
     }
 
     pub fn add_entries(mut self, entries: Vec<MapEntry>) -> Self {
@@ -54,11 +62,45 @@ impl Map {
     }
 }
 
-/// Implementation of [AstNodeGeneric] for [Map]
-impl<'a> AstNodeGeneric<'a> for Map {
+/// Implementation of [AstNodeGeneric] for [ExplicitMap]
+impl<'a> AstNodeGeneric<'a> for ExplicitMap {
     // checks the node and returns the number of errors and warnings encountered
-    fn check(&self, _st: &mut SymbolTable) -> Issues {
-        todo!()
+    fn check(&'a self, st: &mut SymbolTable<'a>) -> Issues {
+        // all fine for now
+        let mut res = Issues::ok();
+
+        // Check 1: Check that all entries are well-formed
+        // --------------------------------------------------------------------------------------
+        // Type:        Error
+        // Description: Check that the entry is well-defined
+        // Notes:
+        // --------------------------------------------------------------------------------------
+        for e in &self.entries {
+            res = res + e.check(st);
+        }
+
+        let mut ranges = Vec::new();
+        for (i, e) in self.entries.iter().enumerate() {
+            let range = e.eval_range("_", i as u64, st);
+            ranges.push((i as u64, range));
+        }
+
+        let ranges_overlap = utils::check_ranges_overlap(&mut ranges);
+        for (i, j) in ranges_overlap {
+            let msg = format!(
+                "range overlap: {}:{}..{} overlaps with {}:{}..{}",
+                ranges[i].0,
+                ranges[i].1.start,
+                ranges[i].1.end,
+                ranges[j].0,
+                ranges[j].1.start,
+                ranges[j].1.end
+            );
+            let hint = String::from("change input address range ");
+            VrsError::new_err(self.entries[j].loc().clone(), msg, Some(hint)).print();
+            res.inc_err(1);
+        }
+        res
     }
 
     /// rewrite the ast
@@ -75,18 +117,4 @@ impl<'a> AstNodeGeneric<'a> for Map {
     fn loc(&self) -> &TokenStream {
         &self.pos
     }
-}
-
-/// Defines the parameters for constructing a Unit as a component
-/// of a given map
-/// TODO:
-///     Might need to add an AstNodeGeneric Trait Implementation for
-///     the MapEntry struct
-#[derive(Default, PartialEq, Debug, Clone)]
-pub struct MapEntry {
-    pub range: Option<Expr>,
-    pub unit_name: String,
-    pub unit_params: Vec<Expr>,
-    pub offset: Option<Expr>,
-    pub iteration: Option<(String, u64)>,
 }
