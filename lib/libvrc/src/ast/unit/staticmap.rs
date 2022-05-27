@@ -246,19 +246,7 @@ impl<'a> AstNodeGeneric<'a> for StaticMap {
             }
         }
 
-        // adding the constants
-        for c in &self.consts {
-            if !st.insert(c.to_symbol()) {
-                res.inc_err(1);
-            }
-        }
-
-        // add the methods to it
-        for m in &self.methods {
-            if !st.insert(m.to_symbol()) {
-                res.inc_err(1);
-            }
-        }
+        // NOTE: we do not add the constants and methods to the symbol table here
 
         // Check 1: Double defined constants
         // --------------------------------------------------------------------------------------
@@ -278,6 +266,10 @@ impl<'a> AstNodeGeneric<'a> for StaticMap {
         // --------------------------------------------------------------------------------------
         for c in &self.consts {
             res = res + c.check(st);
+
+            if !st.insert(c.to_symbol()) {
+                res.inc_err(1);
+            }
         }
 
         // Check 3: Map definition
@@ -317,6 +309,10 @@ impl<'a> AstNodeGeneric<'a> for StaticMap {
 
         for m in &self.methods {
             res = res + m.check(st);
+
+            if !st.insert(m.to_symbol()) {
+                res.inc_err(1);
+            }
         }
 
         // Check 9: Bases are defined

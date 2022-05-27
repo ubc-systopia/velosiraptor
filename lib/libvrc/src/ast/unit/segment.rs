@@ -280,19 +280,7 @@ impl<'a> AstNodeGeneric<'a> for Segment {
             }
         }
 
-        // adding the constants
-        for c in &self.consts {
-            if !st.insert(c.to_symbol()) {
-                res.inc_err(1);
-            }
-        }
-
-        // add the methods to it
-        for m in &self.methods {
-            if !st.insert(m.to_symbol()) {
-                res.inc_err(1);
-            }
-        }
+        // NOTE: we do not add the constants and methods to the symbol table here
 
         // add the state symbolds
         // XXX: maybe we wan to do the symbol table building after checking the elements?
@@ -317,6 +305,10 @@ impl<'a> AstNodeGeneric<'a> for Segment {
         // --------------------------------------------------------------------------------------
         for c in &self.consts {
             res = res + c.check(st);
+
+            if !st.insert(c.to_symbol()) {
+                res.inc_err(1);
+            }
         }
 
         // Check 3: State Check
@@ -391,6 +383,10 @@ impl<'a> AstNodeGeneric<'a> for Segment {
 
         for m in &self.methods {
             res = res + m.check(st);
+
+            if !st.insert(m.to_symbol()) {
+                res.inc_err(1);
+            }
         }
 
         // Check 9: Bases are defined
