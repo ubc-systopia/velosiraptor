@@ -90,6 +90,26 @@ segment X86PageTableEntry(base : addr) : Segment {
         }
     }
 
+
+    // matches a translation flags,
+    fn matchflags(flgs : flags) -> bool
+        requires state.pte.present == 1;
+    {
+/*
+        return ((flgs & FLAGS_WRITABLE) || !state.pte.writable)
+            && ((flgs & FLAGS_USERMODE) || !state.pte.usermode);
+*/
+        return true;
+    }
+
+    // the translation semantics, adding an option type?
+    fn translate(va: addr) -> addr
+        requires va < 4096;
+        requires state.pte.present == 1;
+    {
+        return va + (state.pte.base << 12);
+    }
+
     // unmapping an entry
     fn unmap(va: addr, sz: size) -> bool
         requires va == 0;
@@ -121,26 +141,6 @@ segment X86PageTableEntry(base : addr) : Segment {
         // update the entry
         // ensures matchflags(flgs) ==> translate(a) == translate(a)
         return true;
-    }
-
-
-    // matches a translation flags,
-    fn matchflags(flgs : flags) -> bool
-        requires state.pte.present == 1;
-    {
-/*
-        return ((flgs & FLAGS_WRITABLE) || !state.pte.writable)
-            && ((flgs & FLAGS_USERMODE) || !state.pte.usermode);
-*/
-        return true;
-    }
-
-    // the translation semantics, adding an option type?
-    fn translate(va: addr) -> addr
-        requires va < 4096;
-        requires state.pte.present == 1;
-    {
-        return va + (state.pte.base << 12);
     }
 }
 
