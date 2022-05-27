@@ -26,6 +26,7 @@
 //! MAP ast node
 
 // std library imports
+use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 use crate::ast::{
@@ -143,13 +144,15 @@ impl<'a> AstNodeGeneric<'a> for ListComprehensionMap {
                 res.inc_err(1);
             }
 
-            let start = if let Expr::Number { value, .. } = start.clone().fold_constants() {
-                value
-            } else {
-                panic!("constant expression `{}` didn't fold into a number!", start);
-            };
+            let novars = HashMap::new();
+            let start =
+                if let Expr::Number { value, .. } = start.clone().fold_constants(st, &novars) {
+                    value
+                } else {
+                    panic!("constant expression `{}` didn't fold into a number!", start);
+                };
 
-            let end = if let Expr::Number { value, .. } = end.clone().fold_constants() {
+            let end = if let Expr::Number { value, .. } = end.clone().fold_constants(st, &novars) {
                 value
             } else {
                 panic!("constant expression `{}` didn't fold into a number!", end);
@@ -233,7 +236,7 @@ impl<'a> AstNodeGeneric<'a> for ListComprehensionMap {
 
             for (i, j) in ranges_overlap {
                 let msg = format!(
-                    "range overlap: {}:{}..{} overlaps with {}:{}..{}",
+                    "range overlap: input address range of element {} ({:x}..{:x}) overlaps with element {} ({:x}..{:x})",
                     ranges[i].0,
                     ranges[i].1.start,
                     ranges[i].1.end,
@@ -241,8 +244,8 @@ impl<'a> AstNodeGeneric<'a> for ListComprehensionMap {
                     ranges[j].1.start,
                     ranges[j].1.end
                 );
-                let hint = String::from("change input address range ");
-                VrsError::new_err(self.pos.clone(), msg, Some(hint)).print();
+                let hint = String::from("change input address range to non-overlapping values");
+                VrsError::new_err(self.entry.loc().clone(), msg, Some(hint)).print();
                 res.inc_err(1);
             }
         }

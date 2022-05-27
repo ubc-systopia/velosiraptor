@@ -26,6 +26,7 @@
 //! MAP ast node
 
 // standard library includes
+use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter, Result};
 
 use crate::ast::{AstNode, AstNodeGeneric, Expr, Issues, SymbolKind, SymbolTable, Type};
@@ -147,15 +148,25 @@ impl MapEntry {
         self.range.is_some()
     }
 
-    pub fn eval_range(&self, _var: &str, _val: u64, _st: &mut SymbolTable) -> Range<u64> {
-        if self.range.is_none() {
+    pub fn eval_range(&self, var: &str, val: u64, st: &mut SymbolTable) -> Range<u64> {
+        if let Some(range) = &self.range {
+            let mut vars = HashMap::new();
+            vars.insert(var.to_string(), val);
+
+            if let Expr::Range { start, end, .. } = range.fold_constants(st, &vars) {
+                match (*start, *end) {
+                    (Expr::Number { value: s, .. }, Expr::Number { value: e, .. }) => s..e,
+                    (s, e) => {
+                        panic!("range expressions not numbers: {}..{}", s, e);
+                    }
+                }
+            } else {
+                panic!("unexpected expression! {}", range);
+            }
+        } else {
             println!("warning: no range specified for map entry");
-            return 0..0;
+            0..0
         }
-
-        // set the current context
-
-        0..0
     }
 }
 

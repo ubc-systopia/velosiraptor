@@ -23,11 +23,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use std::collections::HashSet;
 ///! Ast Module of the Velosiraptor Compiler
+use std::collections::{HashMap, HashSet};
+
 use std::fmt;
 
-use crate::ast::{utils, AstNodeGeneric, Issues, Param, SymbolKind, SymbolTable, Type};
+use crate::ast::{utils, AstNode, AstNodeGeneric, Issues, Param, SymbolKind, SymbolTable, Type};
 use crate::error::VrsError;
 use crate::token::TokenStream;
 
@@ -372,6 +373,97 @@ pub enum Expr {
 
 /// Implementation of [Expr]
 impl<'a> Expr {
+    /// applies constant folding
+    pub fn fold_constants(&self, st: &SymbolTable, vars: &HashMap<String, u64>) -> Self {
+        use Expr::*;
+        match self {
+            Number { value, pos } => Number {
+                value: *value,
+                pos: pos.clone(),
+            },
+            Boolean { value, pos } => Boolean {
+                value: *value,
+                pos: pos.clone(),
+            },
+            Identifier { path, pos } => {
+                let v = path.join(".");
+                if let Some(val) = vars.get(&v) {
+                    Number {
+                        value: *val,
+                        pos: pos.clone(),
+                    }
+                } else if let Some(val) = st.lookup(&v) {
+                    if let AstNode::Const(c) = val.ast_node {
+                        c.to_expr().fold_constants(st, vars)
+                    } else {
+                        panic!("{} is not a constant", v)
+                    }
+                } else {
+                    panic!("{} is not defined", v)
+                }
+            }
+            BinaryOperation { op, lhs, rhs, pos } => {
+                let lhs = lhs.fold_constants(st, vars);
+                let rhs = rhs.fold_constants(st, vars);
+                op.eval(lhs, rhs, pos.clone())
+            }
+            UnaryOperation { op, val, pos } => {
+                let val = val.fold_constants(st, vars);
+                op.eval(val, pos.clone())
+            }
+            FnCall { path, args, pos } => {
+                let args = args
+                    .iter()
+                    .map(|e| e.fold_constants(st, vars))
+                    .collect();
+                FnCall {
+                    path: path.clone(),
+                    args,
+                    pos: pos.clone(),
+                }
+            }
+            Slice { path, slice, pos } => {
+                let slice = slice.fold_constants(st, vars);
+                Slice {
+                    path: path.clone(),
+                    slice: Box::new(slice),
+                    pos: pos.clone(),
+                }
+            }
+            Element { path, idx, pos } => {
+                let idx = idx.fold_constants(st, vars);
+                Element {
+                    path: path.clone(),
+                    idx: Box::new(idx),
+                    pos: pos.clone(),
+                }
+            }
+            Range { start, end, pos } => {
+                let start = start.fold_constants(st, vars);
+                let end = end.fold_constants(st, vars);
+                Range {
+                    start: Box::new(start),
+                    end: Box::new(end),
+                    pos: pos.clone(),
+                }
+            }
+            Quantifier {
+                kind,
+                vars: lvars,
+                expr,
+                pos,
+            } => {
+                let expr = expr.fold_constants(st, vars);
+                Quantifier {
+                    kind: *kind,
+                    vars: lvars.clone(),
+                    expr: Box::new(expr),
+                    pos: pos.clone(),
+                }
+            }
+        }
+    }
+
     /// returns true if the expression is a constant expression
     ///
     /// it consults the symbol table to figure out whether the symbol / variable is constant
@@ -520,39 +612,6 @@ impl<'a> Expr {
                 VrsError::new_err(x.loc(), msg, Some(hint)).print();
                 Issues::err()
             }
-        }
-    }
-
-    /// applies constant folding
-    pub fn fold_constants(self) -> Self {
-        use Expr::*;
-        match self {
-            BinaryOperation { op, lhs, rhs, pos } => {
-                let lhs = lhs.fold_constants();
-                let rhs = rhs.fold_constants();
-                op.eval(lhs, rhs, pos)
-            }
-            UnaryOperation { op, val, pos } => {
-                let val = val.fold_constants();
-                op.eval(val, pos)
-            }
-            Slice { path, slice, pos } => {
-                let slice = slice.fold_constants();
-                Slice {
-                    path,
-                    slice: Box::new(slice),
-                    pos,
-                }
-            }
-            Element { path, idx, pos } => {
-                let idx = idx.fold_constants();
-                Element {
-                    path,
-                    idx: Box::new(idx),
-                    pos,
-                }
-            }
-            id => id,
         }
     }
 
