@@ -861,7 +861,7 @@ macro_rules! parse_equal (
         let ts = TokenStream::from_vec(tokens);
         let (_, ex) = $parser(ts.clone()).unwrap();
         assert_eq!(
-            format!("{}", ex.fold_constants()),
+            format!("{}", ex.fold_constants(&SymbolTable::new(), &HashMap::new())),
             String::from($rhs)
         );
     )
