@@ -412,10 +412,7 @@ impl<'a> Expr {
                 op.eval(val, pos.clone())
             }
             FnCall { path, args, pos } => {
-                let args = args
-                    .iter()
-                    .map(|e| e.fold_constants(st, vars))
-                    .collect();
+                let args = args.iter().map(|e| e.fold_constants(st, vars)).collect();
                 FnCall {
                     path: path.clone(),
                     args,
