@@ -73,12 +73,31 @@ fn add_unit_constants(scope: &mut C::Scope, unit: &StaticMap) {
 
 fn add_constructor_function(scope: &mut C::Scope, unit: &StaticMap) {
     let fname = utils::constructor_fn_name(unit.name());
-    scope
-        .new_function(&fname, C::Type::new_void())
-        .set_static()
-        .set_inline()
-        .body()
-        .new_comment("TODO: SYNTHESIZE ME");
+
+    let unittype = C::Type::new_typedef(&utils::unit_type_name(unit.name()));
+
+    let mut fun = C::Function::with_string(fname, unittype.clone());
+    fun.set_static().set_inline();
+
+    let mut params = Vec::new();
+    for p in &unit.params {
+        let param = fun.new_param(p.name(), C::Type::new_uint64()).to_expr();
+        params.push((&p.name, param));
+    }
+
+    let body = fun.body();
+
+    let unittype = C::Type::new_typedef(&utils::unit_type_name(&unit.name));
+    let tunit = body.new_variable("targetunit", unittype).to_expr();
+
+    for (name, p) in params {
+        let n = utils::unit_struct_field_name(name);
+        body.assign(C::Expr::field_access(&tunit, &n), p);
+    }
+
+    body.return_expr(tunit);
+
+    scope.push_function(fun);
 }
 
 fn add_translate_function(scope: &mut C::Scope, unit: &StaticMap) {
