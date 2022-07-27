@@ -146,6 +146,6 @@ segment X86PageTableEntry(base : addr) : Segment {
 
 
 // represents an x86 page table entry
-staticmap X86PageTablet(base : addr) : StaticMap {
+staticmap X86PageTable(base : addr) : StaticMap {
     staticmap = [ X86PageTableEntry(base + i * 4) for i in 0..1024 ];
 }
