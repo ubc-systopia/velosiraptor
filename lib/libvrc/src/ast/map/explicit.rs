@@ -25,6 +25,8 @@
 
 //! MAP ast node
 
+use std::collections::HashSet;
+
 use super::MapEntry;
 use crate::ast::{utils, AstNodeGeneric, Issues, SymbolTable};
 use crate::error::VrsError;
@@ -59,6 +61,18 @@ impl ExplicitMap {
     pub fn finalize(mut self, pos: &TokenStream) -> Self {
         self.pos = self.pos.expand_until(pos);
         self
+    }
+
+    pub fn get_unit_names(&self) -> Vec<String> {
+        let mut units = HashSet::new();
+
+        for entry in &self.entries {
+            let unitname = entry.get_unit_name();
+            if !units.contains(unitname) {
+                units.insert(unitname.to_string());
+            }
+        }
+        units.into_iter().collect()
     }
 }
 

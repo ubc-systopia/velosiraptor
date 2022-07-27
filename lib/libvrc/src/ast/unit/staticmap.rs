@@ -66,7 +66,7 @@ pub struct StaticMap {
 }
 
 /// Implementation of [Unit]
-impl<'a> StaticMap {
+impl StaticMap {
     /// creates a new Segment node
     pub fn new(name: String, params: Vec<Param>, pos: TokenStream) -> Self {
         StaticMap {

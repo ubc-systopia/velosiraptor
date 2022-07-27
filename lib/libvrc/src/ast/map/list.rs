@@ -82,6 +82,23 @@ impl ListComprehensionMap {
         self.pos = self.pos.expand_until(pos);
         self
     }
+
+    pub fn get_unit_names(&self) -> Vec<String> {
+        vec![self.entry.get_unit_name().to_string()]
+    }
+
+    pub fn get_range_max(&self) -> u64 {
+        match &self.range {
+            Expr::Range { end, .. } => {
+                if let Expr::Number { value, .. } = end.as_ref() {
+                    *value
+                } else {
+                    panic!("not a fixed number.");
+                }
+            }
+            _ => panic!("unsupported range expression"),
+        }
+    }
 }
 
 /// implementation of the [fmt::Display] trait for the [Segment]

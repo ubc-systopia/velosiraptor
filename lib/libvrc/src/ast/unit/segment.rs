@@ -78,7 +78,7 @@ pub struct Segment {
 }
 
 /// Implementation of [Segment]
-impl<'a> Segment {
+impl Segment {
     /// creates a new Segment node
     pub fn new(name: String, params: Vec<Param>, pos: TokenStream) -> Self {
         Segment {

@@ -59,7 +59,7 @@ pub enum Unit {
 }
 
 /// Implementation of [Unit]
-impl<'a> Unit {
+impl Unit {
     pub fn location(&self) -> String {
         match self {
             Unit::StaticMap(staticmap) => staticmap.location(),

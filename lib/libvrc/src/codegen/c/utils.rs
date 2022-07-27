@@ -29,8 +29,12 @@
 use crustal as C;
 
 //
-use crate::ast::{AstNodeGeneric, BitSlice, Const, Field, Segment};
+use crate::ast::{AstNodeGeneric, BitSlice, Const, Field, Segment, StaticMap};
 use crate::codegen::COPYRIGHT;
+
+pub fn unit_struct_field_name(name: &str) -> String {
+    format!("_{}", name.to_ascii_lowercase())
+}
 
 pub fn unit_struct_name(unit_name: &str) -> String {
     unit_name.to_lowercase()
@@ -40,12 +44,20 @@ pub fn segment_struct_name(unit: &Segment) -> String {
     unit_struct_name(&unit.name)
 }
 
+pub fn staticmap_struct_name(unit: &StaticMap) -> String {
+    unit_struct_name(&unit.name)
+}
+
 pub fn unit_type_name(unit_name: &str) -> String {
     format!("{}_t", unit_name.to_lowercase())
 }
 
 pub fn segment_type_name(unit: &Segment) -> String {
-    format!("{}_t", unit.name().to_lowercase())
+    unit_type_name(unit.name())
+}
+
+pub fn staticmap_type_name(unit: &StaticMap) -> String {
+    unit_type_name(unit.name())
 }
 
 /// constructs the struct type name

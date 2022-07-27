@@ -31,7 +31,7 @@
 
 // used standard library functionality
 use std::cmp::Ordering;
-use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+use std::fmt::{Debug, Display, Formatter, Result as FmtResult, Write};
 use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 use std::rc::Rc;
 
@@ -236,7 +236,7 @@ impl Debug for TokenStream {
         match &self.tokens {
             Some(tokens) => {
                 for i in &tokens[self.range.start..self.range.start + len] {
-                    tok.push_str(&format!("    - {}\n", i))
+                    let _ = writeln!(tok, "    - {}", i);
                 }
             }
             None => tok.push_str("No Tokens"),

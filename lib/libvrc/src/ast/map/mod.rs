@@ -48,7 +48,14 @@ pub enum Map {
     ListComprehension(Box<ListComprehensionMap>),
 }
 
-impl Map {}
+impl Map {
+    pub fn get_unit_names(&self) -> Vec<String> {
+        match self {
+            Map::Explicit(explicit) => explicit.get_unit_names(),
+            Map::ListComprehension(list) => list.get_unit_names(),
+        }
+    }
+}
 
 /// Implementation of [AstNodeGeneric] for [Map]
 impl<'a> AstNodeGeneric<'a> for Map {
@@ -167,6 +174,10 @@ impl MapEntry {
             println!("warning: no range specified for map entry");
             0..0
         }
+    }
+
+    pub fn get_unit_name(&self) -> &str {
+        &self.unit_name
     }
 }
 
