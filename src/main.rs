@@ -159,7 +159,7 @@ fn main() {
     let pkgname = matches.value_of("name").unwrap_or("mpu").to_string();
     log::info!("package name: {}", pkgname);
 
-    let backend = matches.value_of("backend").unwrap_or("rust");
+    let backend = matches.value_of("backend").unwrap_or("c");
     log::info!("codegen backend: {}", backend);
 
     let platform = matches.value_of("platform").unwrap_or("fastmodels");
