@@ -83,6 +83,10 @@ impl<'a> State {
         matches!(self, State::None { .. })
     }
 
+    pub fn is_memory(&self) -> bool {
+        matches!(self, State::MemoryState { .. })
+    }
+
     /// builds the symboltable for the state related symbols
     pub fn build_symboltable(&'a self, st: &mut SymbolTable<'a>) {
         // create the 'state' symbol

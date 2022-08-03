@@ -60,7 +60,6 @@ pub enum Unit {
 
 /// Implementation of [Unit]
 impl Unit {
-
     pub fn is_static_map(&self) -> bool {
         matches!(self, Unit::StaticMap(_))
     }
