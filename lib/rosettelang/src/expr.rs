@@ -59,7 +59,18 @@ pub enum RExpr {
         lhs: Box<RExpr>,
         rhs: Box<RExpr>,
     },
-    Not {
+    LAnd {
+        lhs: Box<RExpr>,
+        rhs: Box<RExpr>,
+    },
+    LOr {
+        lhs: Box<RExpr>,
+        rhs: Box<RExpr>,
+    },
+    LNot {
+        expr: Box<RExpr>,
+    },
+    BVNot {
         expr: Box<RExpr>,
     },
     // Constant Bitvector Values
@@ -179,7 +190,27 @@ impl RExpr {
     }
 
     pub fn neq(expr: RExpr) -> Self {
-        RExpr::Not {
+        RExpr::BVNot {
+            expr: Box::new(expr),
+        }
+    }
+
+    pub fn land(lhs: RExpr, rhs: RExpr) -> Self {
+        RExpr::LAnd {
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+        }
+    }
+
+    pub fn lor(lhs: RExpr, rhs: RExpr) -> Self {
+        RExpr::LOr {
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+        }
+    }
+
+    pub fn lnot(expr: RExpr) -> Self {
+        RExpr::LNot {
             expr: Box::new(expr),
         }
     }
@@ -318,7 +349,12 @@ impl RExpr {
             Comment { comment } => format!("{}; {}\n", istr, comment),
             Text { text } => format!("{}\"{}\"", istr, text),
             Const { value, .. } => format!("{}(int #x{:x})", istr, value),
-            Not { expr } => format!("{}(not\n {})", istr, expr.to_code(indent + 2)),
+            BVNot { expr } => format!("{}(not\n {})", istr, expr.to_code(indent + 2)),
+
+            LOr { lhs, rhs } => format!("{}(||\n {}\n {})", istr, lhs.to_code(indent + 2), rhs.to_code(indent + 2)),
+            LAnd { lhs, rhs } => format!("{}(&&\n {}\n {})", istr, lhs.to_code(indent + 2), rhs.to_code(indent + 2)),
+            LNot { expr } => format!("{}(!\n {})", istr, expr.to_code(indent + 2)),
+
             BVBinOp { op, lhs, rhs } => format!(
                 "{}({}\n{}\n{}\n{})",
                 istr,
