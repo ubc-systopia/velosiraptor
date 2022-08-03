@@ -40,9 +40,10 @@ fn add_check_matchflags(rkt: &mut RosetteFile, m: &Method) {
     // those can come from the requires clauses from the map method
 
     let mut body = Vec::new();
-    for c in &m.requires {
-        body.push(RExpr::assume(expr::expr_to_rosette(c)))
-    }
+    // we only need to add the preconditions concerning the map methods
+    // for c in &m.requires {
+    //     body.push(RExpr::assume(expr::expr_to_rosette(c)))
+    // }
 
     let args = m
         .args
