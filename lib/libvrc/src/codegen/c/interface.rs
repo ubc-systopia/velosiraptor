@@ -35,70 +35,92 @@ use crate::ast::{BitSlice, Field, Interface, Segment};
 use crate::codegen::c::field;
 use crate::codegen::CodeGenError;
 
-pub fn generate_memory_interface(_scope: &mut C::Scope, _unit: &Segment) {
-    //     let ifname = interface_type(unit);
+/// Generates the method to read
+///
+/// ## Generate function:
+///
+/// ```c
+/// field_type_t read_mmio_register(unit_t *unit) {
+///    field_type_t val;
+///    val = field_set_raw(mmio_register_read(addr, offset));
+///    return val;
+/// }
+/// ```
+fn generate_read_memory(scope: &mut C::Scope, unit: &Segment, field: &Field) {
+    // adding the get value function
+    let fnname = utils::if_field_rd_fn_name(unit, field);
+    let fieldtype = C::Type::new_typedef(&utils::field_type_name(unit, field));
+    let mut f = C::Function::with_string(fnname, fieldtype.clone());
 
-    //     // Step 1:  add the struct definition, here we need to add all the fields
+    f.set_static().set_inline();
+    f.push_doc_str(&format!("reads the mmio register `{}`", field.name));
 
-    //     let st = scope.new_struct(&ifname);
-    //     st.vis("pub");
-    //     st.doc(&format!(
-    //         "Represents the interface of unit '{}' (memory).\n@loc: {}",
-    //         unit.name,
-    //         unit.location()
-    //     ));
-    //     // c representation
-    //     st.repr("C");
+    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::segment_type_name(unit)));
+    let p = f.new_param("unit", unittype);
+    let unit_var = p.to_expr();
 
-    //     for f in unit.interface.fields() {
-    //         let doc = format!("Field '{}' in unit '{}'", f.field.name, unit.name);
-    //         let loc = format!("@loc: {}", f.field.location());
-    //         let mut f = CG::Field::new(&f.field.name, field::field_type_name(&f.field));
-    //         f.doc(vec![&doc, &loc]);
-    //         st.push_field(f);
-    //     }
+    //  let unit_var = C::Expr::from_fn_param(p);
+    let field_var_decl = C::Variable::new("val", fieldtype);
+    let field_var = field_var_decl.to_expr();
 
-    //     // Step 2:  add the implementation
-    //     let imp = scope.new_impl(&ifname);
+    let set_val_fn = utils::field_set_raw_fn_name(unit, field);
+    let reg_read_fn = utils::mmio_register_read_fn(&unit_var, field);
+    f.body()
+        .variable(field_var_decl)
+        .assign(
+            field_var.clone(),
+            C::Expr::fn_call(&set_val_fn, vec![reg_read_fn]),
+        )
+        .return_expr(field_var);
+    scope.push_function(f);
+}
 
-    //     let iftyperef = format!("&'static {}", ifname);
-    //     imp.new_fn("from_addr")
-    //         .vis("pub")
-    //         .arg("base", "u64")
-    //         .doc(&format!(
-    //             "creates a new reference to a {} interface",
-    //             unit.name
-    //         ))
-    //         .ret(CG::Type::new(&iftyperef))
-    //         .set_unsafe(true)
-    //         .line(format!("let ptr = base as *mut {};", iftyperef))
-    //         .line("ptr.as_ref().unwrap()");
+/// Generates the
+///
+fn generate_write_memory(scope: &mut C::Scope, unit: &Segment, field: &Field) {
+    // adding the set value function
+    let fnname = utils::if_field_wr_fn_name(unit, field);
+    let mut f = C::Function::with_string(fnname, C::Type::new_void());
 
-    //     for f in unit.interface.fields() {
-    //         let fname = format!("write_{}", f.field.name);
-    //         let body = format!("self.{} = val;", f.field.name);
-    //         imp.new_fn(&fname)
-    //             .vis("pub")
-    //             .doc(&format!(
-    //                 "writes value 'val' into interface field '{}'",
-    //                 f.field.name
-    //             ))
-    //             .arg_mut_self()
-    //             .arg("val", field::field_type_name(&f.field))
-    //             .line(body);
+    f.set_static().set_inline();
+    f.push_doc_str(&format!("writes the mmio register `{}`", field.name));
 
-    //         let fname = format!("read_{}", f.field.name);
-    //         let body = format!("self.{}", f.field.name);
-    //         imp.new_fn(&fname)
-    //             .vis("pub")
-    //             .doc(&format!(
-    //                 "writes value 'val' into interface field '{}'",
-    //                 f.field.name
-    //             ))
-    //             .arg_mut_self()
-    //             .ret(CG::Type::new(&field::field_type_name(&f.field)))
-    //             .line(body);
-    //     }
+    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::segment_type_name(unit)));
+    let p = f.new_param("unit", unittype);
+    let unit_var = p.to_expr();
+    let fieldtype = C::Type::new_typedef(&utils::field_type_name(unit, field));
+    let v = f.new_param("val", fieldtype);
+    let val_var = v.to_expr();
+
+    let get_val_fn = utils::field_get_raw_fn_name(unit, field);
+    f.body().raw_expr(utils::mmio_register_write_fn(
+        &unit_var,
+        field,
+        &C::Expr::fn_call(&get_val_fn, vec![val_var]),
+    ));
+
+    // let p = f.new_param("field");
+    // let lhs = C::Expr::from_fn_param(p);
+    // let v = f.new_param("val", C::Type::new_uint(field.nbits()));
+    // let rhs = C::Expr::from_fn_param(v);
+    scope.push_function(f);
+}
+
+pub fn generate_memory_interface(scope: &mut C::Scope, unit: &Segment) {
+
+    for if_field in unit.interface.fields() {
+        let field = &if_field.field;
+
+        generate_read_memory(scope, unit, field);
+        for sl in &field.layout {
+            generate_read_slice_mmio(scope, unit, field, sl)
+        }
+
+        generate_write_memory(scope, unit, field);
+        for sl in &field.layout {
+            generate_write_slice_mmio(scope, unit, field, sl);
+        }
+    }
 }
 
 /// Generates the method to read

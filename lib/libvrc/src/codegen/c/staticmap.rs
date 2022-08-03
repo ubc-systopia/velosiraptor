@@ -425,6 +425,9 @@ pub fn generate(unit: &StaticMap, outdir: &Path) -> Result<(), CodeGenError> {
     let title = format!("`{}` Unit definition ", unit.name());
     utils::add_header(s, &title);
 
+    s.new_include("stddef.h", true);
+    s.new_include("assert.h", true);
+
     // find all the used other units in the static map
     if let Some(m) = &unit.map {
         s.new_comment("include refernces to the used units");
