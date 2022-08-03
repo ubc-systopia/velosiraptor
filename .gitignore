@@ -13,3 +13,4 @@ Cargo.lock
 .vscode/*
 test-logs
 test-logs
+targetdir
