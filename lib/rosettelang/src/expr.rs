@@ -351,8 +351,18 @@ impl RExpr {
             Const { value, .. } => format!("{}(int #x{:x})", istr, value),
             BVNot { expr } => format!("{}(not\n {})", istr, expr.to_code(indent + 2)),
 
-            LOr { lhs, rhs } => format!("{}(||\n {}\n {})", istr, lhs.to_code(indent + 2), rhs.to_code(indent + 2)),
-            LAnd { lhs, rhs } => format!("{}(&&\n {}\n {})", istr, lhs.to_code(indent + 2), rhs.to_code(indent + 2)),
+            LOr { lhs, rhs } => format!(
+                "{}(||\n {}\n {})",
+                istr,
+                lhs.to_code(indent + 2),
+                rhs.to_code(indent + 2)
+            ),
+            LAnd { lhs, rhs } => format!(
+                "{}(&&\n {}\n {})",
+                istr,
+                lhs.to_code(indent + 2),
+                rhs.to_code(indent + 2)
+            ),
             LNot { expr } => format!("{}(!\n {})", istr, expr.to_code(indent + 2)),
 
             BVBinOp { op, lhs, rhs } => format!(

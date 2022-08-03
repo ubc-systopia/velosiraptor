@@ -27,7 +27,7 @@
 
 use rosettelang::RExpr;
 
-use crate::ast::{BinOp, Expr, UnOp, Stmt};
+use crate::ast::{BinOp, Expr, Stmt, UnOp};
 
 pub fn expr_to_rosette(e: &Expr) -> RExpr {
     use Expr::*;
