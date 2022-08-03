@@ -60,6 +60,15 @@ pub enum Unit {
 
 /// Implementation of [Unit]
 impl Unit {
+
+    pub fn is_static_map(&self) -> bool {
+        matches!(self, Unit::StaticMap(_))
+    }
+
+    pub fn is_ssegment(&self) -> bool {
+        matches!(self, Unit::Segment(_))
+    }
+
     pub fn location(&self) -> String {
         match self {
             Unit::StaticMap(staticmap) => staticmap.location(),
