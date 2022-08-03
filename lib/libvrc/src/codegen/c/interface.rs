@@ -107,7 +107,6 @@ fn generate_write_memory(scope: &mut C::Scope, unit: &Segment, field: &Field) {
 }
 
 pub fn generate_memory_interface(scope: &mut C::Scope, unit: &Segment) {
-
     for if_field in unit.interface.fields() {
         let field = &if_field.field;
 

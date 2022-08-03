@@ -94,22 +94,20 @@ pub fn if_field_rd_fn_name(segment: &Segment, field: &Field) -> String {
     if_field_rd_fn_name_str(&segment.name, &field.name)
 }
 
+pub fn if_field_wr_slice_fn_name_str(unit: &str, field: &str, slice: &str) -> String {
+    format!("{}_{}_{}__wr", unit.to_lowercase(), field, slice)
+}
+
 pub fn if_field_wr_slice_fn_name(segment: &Segment, field: &Field, sl: &BitSlice) -> String {
-    format!(
-        "{}_{}_{}__wr",
-        segment.name.to_lowercase(),
-        field.name,
-        sl.name
-    )
+    if_field_wr_slice_fn_name_str(&segment.name, &field.name, &sl.name)
+}
+
+pub fn if_field_rd_slice_fn_name_str(unit: &str, field: &str, slice: &str) -> String {
+    format!("{}_{}_{}__rd", unit.to_lowercase(), field, slice)
 }
 
 pub fn if_field_rd_slice_fn_name(unit: &Segment, field: &Field, sl: &BitSlice) -> String {
-    format!(
-        "{}_{}_{}__rd",
-        unit.name.to_lowercase(),
-        field.name,
-        sl.name
-    )
+    if_field_rd_slice_fn_name_str(&unit.name, &field.name, &sl.name)
 }
 
 pub fn field_slice_extract_fn_name_str(unit: &str, field: &str, sl: &str) -> String {

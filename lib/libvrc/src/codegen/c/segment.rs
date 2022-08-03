@@ -31,7 +31,7 @@ use std::path::Path;
 use crustal as C;
 
 use super::utils;
-use crate::ast::{AstNodeGeneric, Segment};
+use crate::ast::{AstNodeGeneric, Expr, Segment, Stmt};
 use crate::codegen::CodeGenError;
 use crate::synth::{OpExpr, Operation};
 
@@ -101,14 +101,148 @@ fn add_constructor_function(scope: &mut C::Scope, unit: &Segment) {
     scope.push_function(fun);
 }
 
+fn state_field_access(unit: &str, path: &[String]) -> C::Expr {
+    let unit_var = C::Expr::new_var("unit", C::Type::new_void());
+    if path.len() == 1 {
+        let fname = utils::if_field_rd_fn_name_str(unit, &path[0]);
+        return C::Expr::fn_call(&fname, vec![unit_var]);
+    }
+
+    if path.len() == 2 {
+        let fname = utils::if_field_rd_slice_fn_name_str(unit, &path[0], &path[1]);
+        return C::Expr::fn_call(&fname, vec![unit_var]);
+    }
+
+    panic!("unhandled!")
+}
+
+fn expr_to_cpp(unit: &str, expr: &Expr) -> C::Expr {
+    use Expr::*;
+    match expr {
+        Identifier { path, .. } => {
+            match path[0].as_str() {
+                "state" => {
+                    // this->_state.control_field()
+                    state_field_access(unit, &path[1..])
+                }
+                "interface" => panic!("state not implemented"),
+                p => C::Expr::new_var(p, C::Type::new_int(64)),
+            }
+        }
+        Number { value, .. } => C::Expr::new_num(*value),
+        Boolean { value: true, .. } => C::Expr::btrue(),
+        Boolean { value: false, .. } => C::Expr::bfalse(),
+        BinaryOperation { op, lhs, rhs, .. } => {
+            let o = format!("{}", op);
+            let e = expr_to_cpp(unit, lhs);
+            let e2 = expr_to_cpp(unit, rhs);
+            C::Expr::binop(e, &o, e2)
+        }
+        UnaryOperation { op, val, .. } => {
+            let o = format!("{}", op);
+            let e = expr_to_cpp(unit, val);
+            C::Expr::uop(&o, e)
+        }
+        FnCall { path, args, .. } => {
+            if path.len() != 1 {
+                panic!("TODO: handle multiple path components");
+            }
+            C::Expr::method_call(
+                &C::Expr::this(),
+                &path[0],
+                args.iter().map(|x| expr_to_cpp(unit, x)).collect(),
+            )
+        }
+        Slice { .. } => panic!("don't know how to handle slice"),
+        Element { .. } => panic!("don't know how to handle element"),
+        Range { .. } => panic!("don't know how to handle range"),
+        Quantifier { .. } => panic!("don't know how to handle quantifier"),
+    }
+}
+
+fn stmt_to_cpp(unit: &str, s: &Stmt) -> C::Block {
+    use Stmt::*;
+    match s {
+        Block { stmts, .. } => stmts.iter().fold(C::Block::new(), |mut acc, x| {
+            acc.merge(stmt_to_cpp(unit, x));
+            acc
+        }),
+        Return { expr, .. } => {
+            let mut b = C::Block::new();
+
+            let t = C::Type::new_uint64().to_ptr();
+            let v = C::Expr::new_var("pa", t);
+            b.assign(C::Expr::deref(&v), expr_to_cpp(unit, expr));
+            b.return_expr(C::Expr::btrue());
+            b
+        }
+        Let { .. } => panic!("not handled yet!"),
+        Assert { .. } => panic!("not handled yet!"),
+        IfElse {
+            cond,
+            then,
+            other,
+            pos: _,
+        } => {
+            let mut b = C::Block::new();
+            let mut ifelse = C::IfElse::with_expr(expr_to_cpp(unit, cond));
+            if let Some(other) = other.as_ref() {
+                ifelse.set_other(stmt_to_cpp(unit, other));
+            }
+            ifelse.set_then(stmt_to_cpp(unit, then));
+            b.ifelse(ifelse);
+            b
+        }
+    }
+}
+
 fn add_translate_function(scope: &mut C::Scope, unit: &Segment) {
     let fname = utils::translate_fn_name(unit.name());
-    scope
-        .new_function(&fname, C::Type::new_void())
-        .set_static()
-        .set_inline()
-        .body()
-        .new_comment("TODO: SYNTHESIZE ME");
+
+    let mut fun = C::Function::with_string(fname, C::Type::new_bool());
+    fun.set_static().set_inline();
+
+    let mut field_vars = HashMap::new();
+    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::unit_type_name(unit.name())));
+
+    let v = fun.new_param("unit", unittype);
+    field_vars.insert(String::from("unit"), v.to_expr());
+    fun.new_param("va", C::Type::new_uint64());
+    fun.new_param("pa", C::Type::new_uint64().to_ptr());
+
+    if !unit.state().is_memory() {
+        fun.body().return_expr(C::Expr::bfalse());
+        scope.push_function(fun);
+        return;
+    }
+
+    if let Some(f) = unit.get_method("translate") {
+        let body = fun.body();
+
+        for c in &f.requires {
+            body.new_ifelse(&C::Expr::not(expr_to_cpp(unit.name(), c)))
+                .then_branch()
+                .new_return(Some(&C::Expr::bfalse()));
+        }
+
+        if let Some(stmt) = &f.stmts {
+            body.merge(stmt_to_cpp(unit.name(), stmt));
+        }
+    } else {
+        fun.body().new_comment("there was no translate method");
+    }
+
+    // if !(va < 4096) || state.pte.present != 1 {
+    //    return false;
+    // }
+    // *pa = va + (state.pte.base << 12);
+    // return true;
+
+    // fun.new_param("size", C::Type::new_size());
+    // fun.new_param("pa", C::Type::new_uint64());
+    // fun.new_param("flags", C::Type::new_int(64));
+
+    scope.push_function(fun);
 }
 
 fn oparg_to_rust_expr(op: &OpExpr) -> Option<C::Expr> {

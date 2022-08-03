@@ -100,14 +100,64 @@ fn add_constructor_function(scope: &mut C::Scope, unit: &StaticMap) {
     scope.push_function(fun);
 }
 
+fn add_list_comp_translate_body(
+    scope: &mut C::Block,
+    lcm: &ListComprehensionMap,
+    unit: &StaticMap,
+) {
+    let (tunit, targetva) = generic_list_comp_body(scope, lcm, unit);
+
+    let mname = utils::translate_fn_name(&lcm.entry.unit_name);
+    scope.new_comment("4) resolve(u, targetva);");
+
+    scope.return_expr(C::Expr::fn_call(
+        &mname,
+        vec![
+            C::Expr::addr_of(&tunit),
+            targetva,
+            // C::Expr::new_var("size", C::Type::new_uint64()),
+            // C::Expr::new_var("pa", C::Type::new_uint64()),
+            // C::Expr::new_var("flags", C::Type::new_uint64()),
+        ],
+    ));
+
+    scope.new_comment("5) todo: handle loops?");
+}
+
+fn add_explicit_translate_body(scope: &mut C::Block, _lcm: &ExplicitMap, _unit: &StaticMap) {
+    scope.new_comment("1) find which entry to read...");
+
+    scope.new_comment("2) construct the state pointer of the entry...");
+
+    scope.new_comment("3) construct the new address to map");
+
+    scope.new_comment("4) call translate");
+}
+
 fn add_translate_function(scope: &mut C::Scope, unit: &StaticMap) {
     let fname = utils::translate_fn_name(unit.name());
-    scope
-        .new_function(&fname, C::Type::new_void())
-        .set_static()
-        .set_inline()
-        .body()
-        .new_comment("TODO: SYNTHESIZE ME");
+
+    let mut fun = C::Function::with_string(fname, C::Type::new_bool());
+    fun.set_static().set_inline();
+
+    let mut field_vars = HashMap::new();
+    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::unit_type_name(unit.name())));
+
+    let v = fun.new_param("unit", unittype);
+    field_vars.insert(String::from("unit"), v.to_expr());
+    fun.new_param("va", C::Type::new_uint64());
+    // fun.new_param("size", C::Type::new_size());
+    fun.new_param("pa", C::Type::new_uint64().to_ptr());
+
+    // fun.new_param("flags", C::Type::new_int(64));
+
+    match &unit.map {
+        Some(Map::Explicit(m)) => add_explicit_translate_body(fun.body(), m, unit),
+        Some(Map::ListComprehension(m)) => add_list_comp_translate_body(fun.body(), m, unit),
+        None => (),
+    }
+
+    scope.push_function(fun);
 }
 
 fn ast_expr_to_c_expr(e: &Expr) -> C::Expr {
