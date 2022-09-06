@@ -32,11 +32,13 @@ use std::path::Path;
 // the code generation backends
 mod operation;
 mod rosette;
+mod z3;
 
 // the used library modules
 use crate::ast::AstRoot;
 pub use crate::synth::operation::{OpExpr, Operation};
 use crate::synth::rosette::SynthRosette;
+use crate::synth::z3::SynthZ3;
 
 const COPYRIGHT: &str = "2021 Systopia Lab, Computer Science, University of British Columbia";
 
@@ -56,7 +58,7 @@ impl std::convert::From<std::io::Error> for SynthError {
 /// the
 pub enum Synthesisizer {
     Rosette(SynthRosette),
-    Z3,
+    Z3(SynthZ3),
 }
 
 impl Synthesisizer {
@@ -65,8 +67,8 @@ impl Synthesisizer {
         Synthesisizer::Rosette(SynthRosette::new(outdir, pkg))
     }
 
-    pub fn new_z3(_outdir: &Path, _pkg: String) -> Synthesisizer {
-        Synthesisizer::Z3
+    pub fn new_z3(outdir: &Path, pkg: String) -> Synthesisizer {
+        Synthesisizer::Z3(SynthZ3::new(outdir, pkg))
     }
 
     /// synthesizes the `map` function and returns an ast of it
@@ -74,7 +76,7 @@ impl Synthesisizer {
         use Synthesisizer::*;
         match self {
             Rosette(r) => r.synth_map(ast),
-            Z3 => panic!("support for z3 NYI."),
+            Z3(r) => r.synth_map(ast),
         }
     }
 
@@ -83,7 +85,7 @@ impl Synthesisizer {
         use Synthesisizer::*;
         match self {
             Rosette(r) => r.synth_unmap(ast),
-            Z3 => panic!("support for z3 NYI."),
+            Z3(r) => r.synth_unmap(ast),
         }
     }
 
@@ -91,7 +93,7 @@ impl Synthesisizer {
         use Synthesisizer::*;
         match self {
             Rosette(r) => r.synth_protect(ast),
-            Z3 => panic!("support for z3 NYI."),
+            Z3(r) => r.synth_protect(ast),
         }
     }
 }
