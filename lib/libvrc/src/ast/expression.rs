@@ -780,6 +780,48 @@ impl<'a> Expr {
     pub fn get_interface_references(&self) -> HashSet<String> {
         self.get_state_interface_references("interface")
     }
+
+    pub fn has_state_interface_references(&self, prefix: &str) -> bool {
+        use Expr::*;
+        match self {
+            Identifier { path, .. } => path[0] == prefix,
+            Number { .. } => false,
+            Boolean { .. } => false,
+            BinaryOperation { lhs, rhs, .. } => {
+                lhs.has_state_interface_references(prefix)
+                    | rhs.has_state_interface_references(prefix)
+            }
+            UnaryOperation { val, .. } => val.has_state_interface_references(prefix),
+            FnCall { args, .. } => {
+                for a in args {
+                    if a.has_state_interface_references(prefix) {
+                        return true;
+                    }
+                }
+                // TODO: recurse into the function
+                false
+            }
+            Slice { path, slice, .. } => {
+                (path[0] == prefix) | slice.has_state_interface_references(prefix)
+            }
+            Element { path, idx, .. } => {
+                (path[0] == prefix) | idx.has_state_interface_references(prefix)
+            }
+            Range { start, end, .. } => {
+                start.has_state_interface_references(prefix)
+                    | end.has_state_interface_references(prefix)
+            }
+            Quantifier { expr, .. } => expr.has_state_interface_references(prefix),
+        }
+    }
+
+    pub fn has_interface_references(&self) -> bool {
+        self.has_state_interface_references("interface")
+    }
+
+    pub fn has_state_references(&self) -> bool {
+        self.has_state_interface_references("state")
+    }
 }
 
 impl fmt::Display for Expr {

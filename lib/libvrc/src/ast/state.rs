@@ -104,6 +104,11 @@ impl<'a> State {
         }
     }
 
+    /// returns the number of fields in the state
+    pub fn nfields(&self) -> usize {
+        self.fields().len()
+    }
+
     /// returns a slice of fields
     pub fn fields(&self) -> &[Field] {
         match self {

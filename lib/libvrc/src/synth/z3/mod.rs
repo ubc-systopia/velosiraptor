@@ -25,6 +25,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::thread;
 
 use smt2::Smt2File;
@@ -98,16 +99,60 @@ impl SynthZ3 {
             let translate = self.synth_map_part("translate", unit);
             let mut matchflags = self.synth_map_part("matchflags", unit);
 
-            let translate_thread = thread::spawn(move || {
-                println!("translate thread start!\n");
-                translate.save();
-                //println!("translate thread done: {}", res_translate);
-                //parse_result(&res_translate)
-            });
+            translate.save();
+            let output = Command::new("z3")
+                .args(["-smt2", translate.file().to_str().unwrap()])
+                .output()
+                .expect("failed to execute process");
 
-            matchflags.save();
+            // grab the stdout
+            let s = match String::from_utf8(output.stdout) {
+                Ok(v) => v,
+                Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+            };
 
-            translate_thread.join().unwrap();
+            // if it's empty, assume error
+            if s.is_empty() {
+                let e = match String::from_utf8(output.stderr) {
+                    Ok(v) => v,
+                    Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+                };
+            }
+
+            println!("smt output:\n\n{}\n\n", s);
+
+            // let translate_thread = thread::spawn(move || {
+            //     println!("translate thread start!\n");
+            //     translate.save();
+
+            //     let output = Command::new("z3")
+            //         .args(["-smt2", translate.file().to_str().unwrap()])
+            //         .output()
+            //         .expect("failed to execute process");
+
+            //     // grab the stdout
+            //     let s = match String::from_utf8(output.stdout) {
+            //         Ok(v) => v,
+            //         Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+            //     };
+
+            //     // if it's empty, assume error
+            //     if s.is_empty() {
+            //         let e = match String::from_utf8(output.stderr) {
+            //             Ok(v) => v,
+            //             Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+            //         };
+            //         println!("rosette failure!");
+            //         println!("{}", e);
+            //     }
+
+            //     //println!("translate thread done: {}", res_translate);
+            //     //parse_result(&res_translate)
+            // });
+
+            // matchflags.save();
+
+            // translate_thread.join().unwrap();
 
             let ops = Vec::new();
             unit.map_ops = Some(ops);

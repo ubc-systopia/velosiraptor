@@ -98,6 +98,11 @@ impl<'a> Interface {
         }
     }
 
+    /// returns the number of fields in the state
+    pub fn nfields(&self) -> usize {
+        self.fields().len()
+    }
+
     pub fn fields(&self) -> &[InterfaceField] {
         match self {
             Interface::CPURegisters { fields, .. } => fields,

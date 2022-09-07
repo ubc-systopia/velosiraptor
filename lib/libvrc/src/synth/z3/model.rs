@@ -163,7 +163,6 @@ fn add_field_action(
             _ => panic!("should not happen here! {}", &a.dst),
         };
 
-        println!("dst: {}", dst);
         let src = expr_to_smt2(&a.src, &stvar);
 
         let fcall = Expr::fn_apply(dst, vec![Expr::ident(stvar.clone()), src]);
