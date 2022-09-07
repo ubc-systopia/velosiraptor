@@ -25,19 +25,21 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::thread;
 
 use smt2::Smt2File;
 
 use crate::ast::{AstNodeGeneric, AstRoot, Method, Segment};
 use crate::synth::SynthError;
 
+mod consts;
+mod expr;
 mod field;
 mod interface;
-mod model;
-mod expr;
-mod state;
 mod method;
-mod consts;
+mod model;
+mod state;
+mod task;
 
 pub struct SynthZ3 {
     outdir: PathBuf,
@@ -52,19 +54,14 @@ impl SynthZ3 {
         }
     }
 
-    fn synth_create(&self, file: PathBuf, unit: &Segment,  method: &Method) -> Smt2File {
+    fn synth_create(&self, file: PathBuf, unit: &Segment) -> Smt2File {
         let mut z3file = smt2::Smt2File::new(file, String::new());
 
         consts::add_consts(&mut z3file, unit);
         state::add_state_def(&mut z3file, &unit.state);
         interface::add_interface_def(&mut z3file, &unit.interface);
-        // TODO: add methods
         model::add_model_def(&mut z3file, &unit.state, &unit.interface);
-
-        // TODO:
-        // add translate
-        // add matchflags
-
+        method::add_methods(&mut z3file, &unit.methods);
         return z3file;
     }
 
@@ -73,8 +70,7 @@ impl SynthZ3 {
         let smtfile = self.outdir.join(format!("{}_map_{}.smt2", unit.name, part));
         let m = unit.get_method(part).unwrap();
 
-        let mut smt = self.synth_create(smtfile, unit, m);
-
+        let mut smt = self.synth_create(smtfile, unit);
         let m = unit.get_method("map").unwrap();
         // synth::add_synthesis(&mut rkt, part, unit, m);
         smt
@@ -85,7 +81,7 @@ impl SynthZ3 {
         let smtfile = self.outdir.join(format!("{}_unmap.smt2", unit.name));
         let m = unit.get_method("translate").unwrap();
 
-        let mut smt = self.synth_create(smtfile, unit, m);
+        let mut smt = self.synth_create(smtfile, unit);
 
         // let's pass in the map function here, as we want to invert it's effects
         let m = unit.get_method("map").unwrap();
@@ -99,15 +95,19 @@ impl SynthZ3 {
         for unit in &mut ast.segment_units_mut() {
             println!("synthesizing map: for {} in {:?}", unit.name(), self.outdir);
 
-            let mut translate = self.synth_map_part("translate", unit);
+            let translate = self.synth_map_part("translate", unit);
             let mut matchflags = self.synth_map_part("matchflags", unit);
 
-            // let state_syms = method.get_state_references();
-            // let state_bits = unit.state.referenced_field_bits(&state_syms);
+            let translate_thread = thread::spawn(move || {
+                println!("translate thread start!\n");
+                translate.save();
+                //println!("translate thread done: {}", res_translate);
+                //parse_result(&res_translate)
+            });
 
-            // spin off multi threaded synthesis...
-            translate.save();
             matchflags.save();
+
+            translate_thread.join().unwrap();
 
             let ops = Vec::new();
             unit.map_ops = Some(ops);
@@ -120,7 +120,11 @@ impl SynthZ3 {
     pub fn synth_unmap(&self, ast: &mut AstRoot) -> Result<(), SynthError> {
         fs::create_dir_all(&self.outdir)?;
         for unit in &mut ast.segment_units_mut() {
-            println!("synthesizing unmap: for {} in {:?}", unit.name(), self.outdir);
+            println!(
+                "synthesizing unmap: for {} in {:?}",
+                unit.name(),
+                self.outdir
+            );
 
             let mut translate = self.synth_unmap_part(unit);
 

@@ -25,17 +25,16 @@
 
 //! Synthesis Module: Smt2 Expressions
 
-use smt2;
 use crate::ast::{BinOp, Expr, Stmt, UnOp};
+use smt2;
 
-fn p2p(i: &str) -> &'static str {
+pub fn p2p(i: &str) -> &'static str {
     match i {
         "state" => "State",
         "interface" => "IFace",
         _ => panic!("uknown case: {}", i),
     }
 }
-
 
 pub fn expr_to_smt2(e: &Expr, stvar: &str) -> smt2::Expr {
     use Expr::*;

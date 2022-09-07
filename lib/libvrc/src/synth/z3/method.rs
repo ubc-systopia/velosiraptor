@@ -40,7 +40,6 @@ fn type_to_smt2(ty: &Type) -> String {
     }
 }
 
-
 pub fn add_methods(smt: &mut Smt2File, methods: &[Method]) {
     smt.add_section(String::from("Methods"));
 
@@ -54,10 +53,7 @@ pub fn add_methods(smt: &mut Smt2File, methods: &[Method]) {
             _ => (),
         }
 
-        let f = Function::new(
-            m.name.clone(),
-            type_to_smt2(&m.rettype),
-        );
+        let f = Function::new(m.name.clone(), type_to_smt2(&m.rettype));
 
         // // let's add the arguments
         // let mut args = vec![String::from("st")];
@@ -78,5 +74,4 @@ pub fn add_methods(smt: &mut Smt2File, methods: &[Method]) {
 
         smt.add_function(f);
     }
-
 }

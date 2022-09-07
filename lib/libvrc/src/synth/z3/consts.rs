@@ -26,13 +26,13 @@
 //! Const Synthesis Module: Rosette
 
 // rosette language library imports
-use smt2::{Smt2File, Expr};
+use smt2::{Expr, Smt2File};
 
 // crate imports
 use crate::ast;
 use crate::ast::{ConstValue, Segment};
 
-pub fn add_consts(smt: &mut Smt2File , unit: &Segment) {
+pub fn add_consts(smt: &mut Smt2File, unit: &Segment) {
     smt.add_section(format!("Constants for unit {}", unit.name));
     for c in unit.consts() {
         match &c.value {

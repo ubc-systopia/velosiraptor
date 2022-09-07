@@ -25,6 +25,7 @@
 
 //! Model Synthesis Module: Z3
 
+use super::expr::{expr_to_smt2, p2p};
 use crate::ast;
 use crate::ast::{Action, AstNodeGeneric, Interface, State};
 use smt2::{DataType, Expr, Function, LetBinding, Smt2File};
@@ -127,45 +128,6 @@ fn add_model_iface_accessors(smt: &mut Smt2File, iface: &Interface) {
     }
 }
 
-fn p2p(i: &str) -> &'static str {
-    match i {
-        "state" => "State",
-        "interface" => "IFace",
-        _ => panic!("uknown case: {}", i),
-    }
-}
-
-fn field_read_access_expr(e: &ast::Expr, fieldwidth: u8, stvar: &str) -> Expr {
-    match e {
-        ast::Expr::Identifier { path, .. } => {
-            if path.len() == 2 {
-                let ident = format!("Model.{}.{}.get", p2p(&path[0]), path[1]);
-                Expr::fn_apply(ident, vec![Expr::ident(stvar.to_string())])
-            } else if path.len() == 3 {
-                let ident = format!("Model.{}.{}.{}.get", p2p(&path[0]), path[1], path[2]);
-                Expr::fn_apply(ident, vec![Expr::ident(stvar.to_string())])
-            } else {
-                panic!("unexpected identifier lenght");
-            }
-        }
-        ast::Expr::Number { value, .. } => Expr::num(*value),
-        ast::Expr::Boolean { value, .. } => Expr::binary(*value),
-        ast::Expr::BinaryOperation { op, lhs, rhs, .. } => match op {
-            // BinOp::RShift => RExpr::bvshr(
-            //     field_read_access_expr(lhs, fieldwidth, stvar),
-            //     field_read_access_expr(rhs, fieldwidth, stvar),
-            // ),
-            // BinOp::LShift => RExpr::bvshl(
-            //     field_read_access_expr(lhs, fieldwidth, stvar),
-            //     field_read_access_expr(rhs, fieldwidth, stvar),
-            // ),
-            // a => RExpr::var(format!("UNKNOWN: {:?}", a)),
-            a => panic!("unhandled binary op rhs expression {:?}", a),
-        },
-        a => panic!("unhandled rhs expression {:?}", a),
-    }
-}
-
 fn add_field_action(
     smt: &mut Smt2File,
     action: &Action,
@@ -201,7 +163,8 @@ fn add_field_action(
             _ => panic!("should not happen here! {}", &a.dst),
         };
 
-        let src = field_read_access_expr(&a.src, fieldwidth, &stvar);
+        println!("dst: {}", dst);
+        let src = expr_to_smt2(&a.src, &stvar);
 
         let fcall = Expr::fn_apply(dst, vec![Expr::ident(stvar.clone()), src]);
 
