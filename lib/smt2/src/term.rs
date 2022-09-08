@@ -180,8 +180,8 @@ pub enum Term {
     Identifier(String),
     QualifiedIdentifier(SortedVar),
     FunctionApplication(String, Vec<Term>),
-    Forall(Vec<VarBinding>, Box<Term>),
-    Exists(Vec<VarBinding>, Box<Term>),
+    Forall(Vec<SortedVar>, Box<Term>),
+    Exists(Vec<SortedVar>, Box<Term>),
     Let(Vec<VarBinding>, Box<Term>),
     Match(Box<Term>, Vec<MatchCase>),
     // AttributedTerm(Box<Term>, Vec<Attribute>),
@@ -288,6 +288,21 @@ impl Term {
         Term::FunctionApplication("=>".to_string(), vec![self, other])
     }
 
+    pub fn forall(vars: Vec<SortedVar>, expr: Term) -> Self {
+        Term::Forall(vars, Box::new(expr))
+    }
+
+    pub fn is_literal(&self) -> bool {
+        match self {
+            Term::Numeral(_)
+            | Term::Decimal(_)
+            | Term::String(_)
+            | Term::Binary(_)
+            | Term::Identifier(_) => true,
+            _ => false,
+        }
+    }
+
     /// Formats the variant using the given formatter.
     pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
         match self {
@@ -307,38 +322,56 @@ impl Term {
                 write!(fmt, "(as {} {})", s.ident, s.sort)
             }
             Term::FunctionApplication(s, args) => {
-                write!(fmt, "({} ", s)?;
-                for (i, arg) in args.iter().enumerate() {
-                    if i > 0 {
-                        write!(fmt, " ")?;
+                // let oneline = args.len() < 4 && args.iter().all(|a| a.is_literal());
+                // if oneline {
+                //     write!(fmt, "({} ", s)?;
+                // } else {
+                //     writeln!(fmt, "({} ", s)?;
+                // }
+                writeln!(fmt, "({} ", s)?;
+                fmt.indent(|fmt| {
+                    for (i, arg) in args.iter().enumerate() {
+                        // if oneline && i > 0 {
+                        //     write!(fmt, " ")?;
+                        // }
+                        arg.fmt(fmt)?;
+                        // if !oneline {
+                        writeln!(fmt)?;
+                        // }
                     }
-                    arg.fmt(fmt)?;
-                }
+                    Ok(())
+                })?;
                 write!(fmt, ")")
             }
             Term::Forall(vars, term) => {
                 writeln!(fmt, "(forall (")?;
-                for (i, var) in vars.iter().enumerate() {
-                    if i > 0 {
-                        write!(fmt, " ")?;
+                fmt.indent(|fmt| {
+                    for (i, var) in vars.iter().enumerate() {
+                        if i > 0 {
+                            write!(fmt, " ")?;
+                        }
+                        var.fmt(fmt, true)?;
                     }
-                    var.fmt(fmt)?;
-                }
-                write!(fmt, ")")?;
-                term.fmt(fmt)?;
-                write!(fmt, ")")
+                    Ok(())
+                })?;
+                writeln!(fmt, ") ")?;
+                fmt.indent(|fmt| term.fmt(fmt))?;
+                write!(fmt, "\n)")
             }
             Term::Exists(vars, term) => {
                 writeln!(fmt, "(exists (")?;
-                for (i, var) in vars.iter().enumerate() {
-                    if i > 0 {
-                        write!(fmt, " ")?;
+                fmt.indent(|fmt| {
+                    for (i, var) in vars.iter().enumerate() {
+                        if i > 0 {
+                            write!(fmt, " ")?;
+                        }
+                        var.fmt(fmt, true)?;
                     }
-                    var.fmt(fmt)?;
-                }
-                write!(fmt, ")")?;
-                term.fmt(fmt)?;
-                write!(fmt, ")")
+                    Ok(())
+                })?;
+                write!(fmt, ") ")?;
+                fmt.indent(|fmt| term.fmt(fmt))?;
+                write!(fmt, "\n)")
             }
             Term::Let(vars, expr) => {
                 writeln!(fmt, "(let (")?;

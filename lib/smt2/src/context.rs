@@ -233,9 +233,9 @@ impl Smt2Context {
         for cmd in &self.commands {
             match cmd {
                 Assert(term) => {
-                    write!(fmt, "(assert ")?;
-                    term.fmt(fmt)?;
-                    writeln!(fmt, ")")?;
+                    writeln!(fmt, "(assert ")?;
+                    fmt.indent(|fmt| term.fmt(fmt))?;
+                    writeln!(fmt, "\n)")?;
                 }
                 CheckSat => writeln!(fmt, "(check-sat)")?,
                 CheckSatAssuming(prop_literals) => {

@@ -34,7 +34,7 @@
 use std::fmt::{self, Write};
 
 /// defines the default indentation level
-const DEFAULT_INDENT: usize = 4;
+const DEFAULT_INDENT: usize = 2;
 
 /// Formatter for a scope.
 #[derive(Debug)]
@@ -57,19 +57,19 @@ impl<'a> Formatter<'a> {
     }
 
     /// Wraps the given function in a a C block. { ...}
-    pub fn block<F>(&mut self, f: F) -> fmt::Result
-    where
-        F: FnOnce(&mut Self) -> fmt::Result,
-    {
-        if !self.is_start_of_line() {
-            write!(self, " ")?;
-        }
+    // pub fn block<F>(&mut self, f: F) -> fmt::Result
+    // where
+    //     F: FnOnce(&mut Self) -> fmt::Result,
+    // {
+    //     if !self.is_start_of_line() {
+    //         write!(self, " ")?;
+    //     }
 
-        writeln!(self, "{{")?;
-        self.indent(f)?;
-        write!(self, "}}")?;
-        Ok(())
-    }
+    //     writeln!(self, "{{")?;
+    //     self.indent(f)?;
+    //     write!(self, "}}")?;
+    //     Ok(())
+    // }
 
     /// Formats the function with an increased indentation level
     pub fn indent<F, R>(&mut self, f: F) -> R
