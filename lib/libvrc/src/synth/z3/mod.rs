@@ -28,7 +28,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::thread;
 
-use smt2::{Smt2Context, Smt2File, VarDecl};
+use smt2::{Function, Smt2Context, Smt2File, SortedVar, Term, VarDecl};
 
 use crate::ast::{AstNodeGeneric, AstRoot, Segment};
 use crate::synth::SynthError;
@@ -114,8 +114,53 @@ impl SynthZ3 {
 
             // model::add_goal(&mut smt, m);
 
+            let mut f = Function::new(String::from("map"), String::from("Model_t"));
+            f.add_arg(String::from("st"), types::model());
+            f.add_body(Term::fn_apply(
+                String::from("Model.State.pte.present.set"),
+                vec![Term::ident(String::from("st")), Term::num(1)],
+            ));
+            smt.function(f);
+
+            let mut f = Function::new(String::from("assms"), types::boolean());
+            f.add_arg(String::from("st"), types::model());
+            f.add_arg(String::from("va"), types::num());
+            f.add_body(Term::land(
+                Term::bvlt(Term::ident(String::from("va")), Term::num(0x1000)),
+                Term::bvge(Term::ident(String::from("va")), Term::num(0)),
+            ));
+            smt.function(f);
+
             smt.subsection(String::from("Verification"));
             smt.comment(String::from("TODO: operations to check"));
+
+            let vars = vec![
+                SortedVar::new(String::from("st!0"), String::from("Model_t")),
+                SortedVar::new(String::from("va"), types::num()),
+                SortedVar::new(String::from("size"), types::num()),
+                SortedVar::new(String::from("flags"), types::flags()),
+                SortedVar::new(String::from("pa"), types::num()),
+            ];
+
+            let term = Term::fn_apply(
+                String::from("assms"),
+                vec![
+                    Term::ident(String::from("st!0")),
+                    Term::ident(String::from("va")),
+                ],
+            )
+            .implies(Term::fn_apply(
+                String::from("translate.pre"),
+                vec![
+                    Term::fn_apply(String::from("map"), vec![Term::ident(String::from("st!0"))]),
+                    Term::ident(String::from("va")),
+                ],
+            ));
+
+            let t = Term::forall(vars, term);
+            smt.assert(t);
+
+            smt.check_sat();
 
             translate.extend_and_save(&smt);
 

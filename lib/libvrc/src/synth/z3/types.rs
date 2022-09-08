@@ -30,6 +30,10 @@ use crate::ast::Type;
 /// the numeric type to be used
 const NUMTYPE: &'static str = "(_ BitVec 64)";
 
+pub fn model() -> String {
+    String::from("Model_t")
+}
+
 pub fn num() -> String {
     NUMTYPE.to_string()
 }
@@ -38,12 +42,16 @@ pub fn boolean() -> String {
     String::from("Bool")
 }
 
+pub fn flags() -> String {
+    NUMTYPE.to_string()
+}
+
 pub fn type_to_smt2(ty: &Type) -> String {
     match ty {
         Type::Boolean => boolean(),
         Type::Integer => num(),
         Type::Address => num(),
-        Type::Flags => String::from("Flags"),
+        Type::Flags => flags(),
         _ => panic!("unhandled type {}", ty),
     }
 }
