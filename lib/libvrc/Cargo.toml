@@ -29,6 +29,7 @@ crustal = { path = "../crustal" }
 
 # synthesis
 rosettelang = { path = "../rosettelang" }
+smt2 = { path = "../smt2" }
 
 # the parser combinators
 [dependencies.nom]
