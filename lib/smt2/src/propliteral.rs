@@ -1,4 +1,4 @@
-// Rosette Code Generation - Requires Clauses
+// SMTLIB2 Code Generation Library
 //
 //
 // MIT License
@@ -23,44 +23,40 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Require Clause
+//! Smt2 Code: Prop Literals
 
-/// Represents a 'require' clause in rosette
-///
-/// # Example
-///
-/// ; include the syntax module
-/// (require rosette/lib/synthax)
-///
-pub struct Require {
-    /// the path of the module to be included (e.g., rosette/lib/syntax)
-    path: String,
-    /// a comment string for the requires clause
-    comment: Option<String>,
+use std::fmt;
+use std::fmt::Write;
+
+use super::Formatter;
+
+/// prop literals
+pub enum PropLiteral {
+    True(String),
+    Not(String),
 }
 
-impl Require {
-    /// creates a new requires expression
-    pub fn new(path: String) -> Self {
-        Require {
-            path,
-            comment: None,
-        }
+impl PropLiteral {
+    pub fn new_true(name: String) -> Self {
+        Self::True(name)
     }
 
-    // adds a comment to the requires expression
-    pub fn add_comment(&mut self, comment: String) {
-        self.comment = Some(comment.replace("\n", ";\n"));
+    pub fn new_not(name: String) -> Self {
+        Self::Not(name)
     }
 
-    /// formats the requires block into code
-    pub fn to_code(&self) -> String {
-        let req = format!("(require {})\n", self.path);
-        if let Some(c) = &self.comment {
-            let mut comment = format!("; {}\n", c);
-            comment.push_str(req.as_str());
-            return comment;
+    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::True(s) => write!(fmt, "{}", s),
+            Self::Not(s) => write!(fmt, "(not {})", s),
         }
-        req
+    }
+}
+
+impl fmt::Display for PropLiteral {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut ret = String::new();
+        self.fmt(&mut Formatter::new(&mut ret))?;
+        write!(f, "{}", ret)
     }
 }

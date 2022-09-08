@@ -1,4 +1,4 @@
-// Rosette Code Generation - Const Definitions
+// SMTLIB2 Code Generation Library
 //
 //
 // MIT License
@@ -23,33 +23,44 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Const Definitions
+//! Smt2 Code: Options
 
-use crate::expr::RExpr;
+use std::fmt;
+use std::fmt::Write;
 
-/// Represents a constante definition
-///
-/// # Example
-///
-/// ; the maximum depth
-/// (define maxdepth 5)
-///
-pub struct VarDef {
-    /// the identifier of th e struct
-    ident: String,
-    /// the struct attributes
-    value: RExpr,
+use super::Formatter;
+
+pub enum InfoFlag {
+    AllStatistics,
+    AssertionStackLevels,
+    Authors,
+    ErrorBehaviour,
+    Name,
+    ReasonUnknown,
+    Version,
+    Keyword(String),
 }
 
-/// implementation
-impl VarDef {
-    /// creates a new variable definition
-    pub fn new(ident: String, value: RExpr) -> Self {
-        VarDef { ident, value }
+impl InfoFlag {
+    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        use InfoFlag::*;
+        match self {
+            AllStatistics => write!(fmt, ":all-statistics"),
+            AssertionStackLevels => write!(fmt, ":assertion-stack-levels"),
+            Authors => write!(fmt, ":authors"),
+            ErrorBehaviour => write!(fmt, ":error-behaviour"),
+            Name => write!(fmt, ":name"),
+            ReasonUnknown => write!(fmt, ":reason-unknown"),
+            Version => write!(fmt, ":version"),
+            Keyword(s) => write!(fmt, ":{}", s),
+        }
     }
+}
 
-    /// formats corresponding rosette code
-    pub fn to_code(&self) -> String {
-        format!("(define {} \n{}\n)\n", self.ident, self.value.to_code(2))
+impl fmt::Display for InfoFlag {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut ret = String::new();
+        self.fmt(&mut Formatter::new(&mut ret))?;
+        write!(f, "{}", ret)
     }
 }

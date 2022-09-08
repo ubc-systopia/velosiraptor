@@ -1,4 +1,4 @@
-// Rosette Code Generation - Symbolic Variable Definitions
+// SMTLIB2 Code Generation Library
 //
 //
 // MIT License
@@ -23,36 +23,27 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Symbolic Var Definitions
+//! Smt2 Code: Prop Literals
 
-/// Represents a symbolic variable definition
-///
-/// # Example
-///
-/// ; the maximum depth
-/// (define-symbolic va int64?)
-///
-pub struct SymbolicVar {
-    /// the identifier of th e struct
-    ident: String,
-    /// the struct attributes
-    ty: String,
-    ///
-    len: Option<usize>
+use std::fmt;
+use std::fmt::Write;
+
+use super::Formatter;
+
+/// prop literals
+pub struct Sort {}
+
+impl Sort {
+    // formats the current context into smtlib2 syntax
+    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        write!(fmt, "(declare-sort )")
+    }
 }
 
-impl SymbolicVar {
-    /// defines a new symbolic variable
-    pub fn new(ident: String, ty: String, len: Option<usize>) -> Self {
-        SymbolicVar { ident, ty, len }
-    }
-
-    /// formats corresponding rosette code
-    pub fn to_code(&self) -> String {
-        if let Some(l) = self.len {
-            format!("(define-symbolic {} {} #:length {})\n", self.ident, self.ty, l)
-        } else {
-            format!("(define-symbolic {} {})\n", self.ident, self.ty)
-        }
+impl fmt::Display for Sort {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut ret = String::new();
+        self.fmt(&mut Formatter::new(&mut ret))?;
+        write!(f, "{}", ret)
     }
 }

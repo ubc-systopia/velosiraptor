@@ -27,8 +27,8 @@
 
 use std::fmt::{self, Display, Write};
 
-use super::Expr;
 use super::Formatter;
+use super::{SortedVar, Term};
 
 /// Represents a function declaration in SMT2
 ///
@@ -41,11 +41,11 @@ pub struct Function {
     /// the name of the datatype
     name: String,
     /// the number of type parameters
-    argtypes: Vec<String>,
+    args: Vec<SortedVar>,
     /// the fields of the datatype
     rettype: String,
     /// the body of the expression
-    body: Option<Expr>,
+    body: Option<Term>,
     /// a comment string for the requires clause
     comment: Option<String>,
 }
@@ -55,7 +55,7 @@ impl Function {
     pub fn new(name: String, rettype: String) -> Self {
         Function {
             name,
-            argtypes: Vec::new(),
+            args: Vec::new(),
             rettype,
             body: None,
             comment: None,
@@ -69,13 +69,13 @@ impl Function {
     }
 
     /// adds a field to the datatype
-    pub fn add_arg(&mut self, ty: String) -> &mut Self {
-        self.argtypes.push(ty);
+    pub fn add_arg(&mut self, name: String, ty: String) -> &mut Self {
+        self.args.push(SortedVar::new(name, ty));
         self
     }
 
     /// adds a body to the function
-    pub fn add_body(&mut self, body: Expr) -> &mut Self {
+    pub fn add_body(&mut self, body: Term) -> &mut Self {
         self.body = Some(body);
         self
     }
@@ -92,14 +92,14 @@ impl Function {
             write!(fmt, "(declare-fun {} (", self.name)?;
         }
 
-        for (i, arg) in self.argtypes.iter().enumerate() {
+        for (i, arg) in self.args.iter().enumerate() {
             if i > 0 {
                 write!(fmt, " ")?;
             }
             if self.body.is_some() {
-                write!(fmt, "(x!{} {})", i, arg)?;
+                arg.fmt(fmt, true)?;
             } else {
-                write!(fmt, "{}", arg)?;
+                arg.fmt(fmt, false)?;
             }
         }
 

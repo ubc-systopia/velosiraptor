@@ -26,61 +26,36 @@
 //! Smt2 Code Generation Library
 
 use std::fmt;
-use std::fmt::Write;
-use std::fs;
+use std::fmt::Write as _;
+use std::fs::File;
+use std::io::Write as _;
 use std::path::PathBuf;
-use std::process::Command;
 
 // modules
+mod context;
 mod datatype;
-mod expr;
 mod formatter;
 mod function;
-// mod functiondef;
-// mod require;
-// mod structdef;
-// mod symbolic;
-// mod vardef;
+mod infoflag;
+mod options;
+mod propliteral;
+mod sort;
+mod term;
+mod variable;
 
-use formatter::Formatter;
-
-// public re-exports
+pub use context::Smt2Context;
 pub use datatype::DataType;
-pub use expr::{Expr, LetBinding};
+use formatter::Formatter;
 pub use function::Function;
+pub use infoflag::InfoFlag;
+pub use options::Attribute;
+pub use options::Smt2Option;
+pub use propliteral::PropLiteral;
+pub use sort::Sort;
+pub use term::{MatchCase, Pattern, SortedVar, Term, VarBinding};
+pub use variable::VarDecl;
 
-// pub use crate::expr::{BVOp, RExpr};
-// pub use crate::functiondef::FunctionDef;
-// pub use crate::require::Require;
-// pub use crate::structdef::StructDef;
-// pub use crate::symbolic::SymbolicVar;
-// pub use crate::vardef::VarDef;
-
-/// defines a rosette expression
-enum Smt2Stmt {
-    DataType(DataType),
-    // // a requires clause
-    // Require(Require),
-    // // structure definition
-    // Struct(StructDef),
-    // // a function/procedure definition
-    Function(Function),
-    // // a symbolic variable definition
-    // Symbolic(SymbolicVar),
-    // // a variable definition
-    // Var(VarDef),
-    // // a rosette expression
-    // Expr(RExpr),
-
-    // adds a section comment to the file
-    Section(String),
-    // adds a subsection comment to the file
-    SubSection(String),
-    // some normal comment
-    Comment(String),
-    // some raw rosette code
-    Raw(String),
-}
+/// defines a smtlib2 expression
 
 /// defines a rosette file
 pub struct Smt2File {
@@ -89,7 +64,7 @@ pub struct Smt2File {
     /// the document string
     doc: String,
     // the statemetns
-    stmts: Vec<Smt2Stmt>,
+    context: Smt2Context,
 }
 
 /// implementation of the Smt2File
@@ -99,146 +74,75 @@ impl Smt2File {
         Smt2File {
             path,
             doc,
-            stmts: Vec::new(),
+            context: Smt2Context::new(),
         }
     }
 
-    /// adds a new section to the file
-    pub fn add_section(&mut self, s: String) {
-        self.stmts.push(Smt2Stmt::Section(s));
-    }
+    pub fn with_default_opts(path: PathBuf, doc: String) -> Self {
+        let mut context = Smt2Context::new();
 
-    /// adds a new section to the file
-    pub fn add_subsection(&mut self, s: String) {
-        self.stmts.push(Smt2Stmt::SubSection(s));
-    }
+        let options = vec![
+            ":auto_config false",
+            ":smt.mbqi false",
+            ":smt.case_split 3",
+            ":smt.qi.eager_threshold 100.0",
+            ":smt.delay_units true",
+            ":smt.arith.solver 2",
+            ":smt.arith.nl false",
+        ];
 
-    /// adds a comment to the file
-    pub fn add_comment(&mut self, comment: String) {
-        self.stmts.push(Smt2Stmt::Comment(comment));
-    }
-
-    /// adds a comment to the file
-    pub fn add_datatype(&mut self, datatype: DataType) {
-        self.stmts.push(Smt2Stmt::DataType(datatype));
-    }
-
-    /// adds a new struct to the file
-    pub fn add_new_function(
-        &mut self,
-        ident: String,
-        rettype: String,
-        args: Vec<String>,
-        expr: Option<Expr>,
-    ) {
-        let mut f = Function::new(ident, rettype);
-        if let Some(e) = expr {
-            f.add_body(e);
+        for o in options {
+            context.set_option(Smt2Option::Attribute(Attribute::new_keyword(String::from(
+                o,
+            ))));
         }
-        self.add_function(f);
+
+        Smt2File { path, doc, context }
     }
 
-    /// adds a function definition to the file
-    pub fn add_function(&mut self, f: Function) {
-        self.stmts.push(Smt2Stmt::Function(f));
+    pub fn file(&self) -> &PathBuf {
+        &self.path
     }
 
-    pub fn add_const(&mut self, ident: String, ty: String, val: Expr) {
-        let mut f = Function::new(ident, ty);
-        f.add_body(val);
-        self.add_function(f);
+    pub fn get_context(&self) -> &Smt2Context {
+        &self.context
     }
 
-    // /// defines a new symbolic variable
-    // pub fn add_new_symbolic_var(&mut self, ident: String, ty: String) {
-    //     let v = SymbolicVar::new(ident, ty, None);
-    //     self.add_symbolic_var(v);
-    // }
-
-    // pub fn add_new_symbolic_var_list(&mut self, ident: String, ty: String, length: usize) {
-    //     let v = SymbolicVar::new(ident, ty, Some(length));
-    //     self.add_symbolic_var(v);
-    // }
-
-    // /// adds a symbolic variable to the file
-    // pub fn add_symbolic_var(&mut self, v: SymbolicVar) {
-    //     self.stmts.push(Smt2Stmt::Symbolic(v));
-    // }
-
-    // /// adds a new variable definition
-    // pub fn add_new_var(&mut self, ident: String, ty: RExpr) {
-    //     let v = VarDef::new(ident, ty);
-    //     self.add_var(v);
-    // }
-
-    // /// adds a variable to the file
-    // pub fn add_var(&mut self, v: VarDef) {
-    //     self.stmts.push(Smt2Stmt::Var(v));
-    // }
-
-    // /// adds an expression  to the file
-    // pub fn add_expr(&mut self, e: RExpr) {
-    //     self.stmts.push(Smt2Stmt::Expr(e))
-    // }
-
-    // /// adds a type definition  to the file
-    // pub fn add_type_def(&mut self) {}
-
-    /// adds some raw code to the file
-    pub fn add_raw(&mut self, code: String) {
-        self.stmts.push(Smt2Stmt::Raw(code))
+    pub fn get_context_mut(&mut self) -> &mut Smt2Context {
+        &mut self.context
     }
 
     // formats the current context into smtlib2 syntax
     pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
-        write!(fmt, "; {}\n\n\n\n", self.doc)?;
-
-        writeln!(fmt, "; preamble")?;
-
-        writeln!(fmt, "(set-option :auto_config false)")?;
-        writeln!(fmt, "(set-option :smt.mbqi false)")?;
-        writeln!(fmt, "(set-option :smt.case_split 3)")?;
-        writeln!(fmt, "(set-option :smt.qi.eager_threshold 100.0)")?;
-        writeln!(fmt, "(set-option :smt.delay_units true)")?;
-        writeln!(fmt, "(set-option :smt.arith.solver 2)")?;
-        writeln!(fmt, "(set-option :smt.arith.nl false)")?;
-
-        //write!(fmt, "(set-logic QF_BV)\n")?;
-
-        for stmt in &self.stmts {
-            use Smt2Stmt::*;
-            match stmt {
-                DataType(d) => d.fmt(fmt)?,
-                Raw(s) => writeln!(fmt, "{}", s)?,
-                Comment(s) => writeln!(fmt, "; {}", s)?,
-                Section(s) => {
-                    let sep = ";".repeat(100);
-                    writeln!(fmt, "\n;{}\n; {}\n;{}\n", sep, s, sep)?;
-                }
-                SubSection(s) => {
-                    let sep = "-".repeat(100);
-                    writeln!(fmt, "\n; {}\n;{}", s, sep)?;
-                }
-                Function(f) => f.fmt(fmt)?,
-            }
+        if self.doc.len() > 0 {
+            write!(fmt, "; {}\n\n\n", self.doc)?;
         }
-        writeln!(fmt, "\n\n\n\n")?;
-        writeln!(fmt, "(set-option :rlimit 150000000)")?;
-        writeln!(fmt, "(check-sat)")?;
-        writeln!(fmt, "(set-option :rlimit 0)")
+
+        self.context.fmt(fmt)
     }
 
-    /// formats the current file into rosette code
-    pub fn to_code(&self) -> String {
-        let mut ret = String::new();
-        self.fmt(&mut Formatter::new(&mut ret)).unwrap();
-        ret
+    pub fn extend_and_save(&self, other: &Smt2Context) {
+        self.extend_and_save_as(other, &self.path);
+    }
+
+    pub fn extend_and_save_as(&self, other: &Smt2Context, path: &PathBuf) {
+        let mut file = File::create(path).expect("failed to create the file");
+
+        let mut buf = String::new();
+        self.fmt(&mut Formatter::new(&mut buf))
+            .expect("failed to format smtlib2 file");
+        other
+            .fmt(&mut Formatter::new(&mut buf))
+            .expect("failed to format smtlib2 file");
+
+        file.write_all(buf.as_bytes())
+            .expect("failed to write to file");
+        file.sync_all().expect("failed to sync the file");
     }
 
     /// saves the rosette file
     pub fn save(&self) {
         // write the file, return IOError otherwise
-        fs::write(&self.path, self.to_code()).expect("failed to execute process");
 
         // // grab the stdout
         // let s = match String::from_utf8(output.stdout) {
