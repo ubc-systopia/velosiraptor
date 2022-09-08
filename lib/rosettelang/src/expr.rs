@@ -174,6 +174,27 @@ impl RExpr {
         })
     }
 
+    pub fn listelm(var: String, idx: u64) -> RExpr {
+        let fname = match idx {
+            1 => String::from("first"),
+            2 => String::from("second"),
+            3 => String::from("third"),
+            4 => String::from("fourth"),
+            5 => String::from("fifth"),
+            6 => String::from("sixth"),
+            7 => String::from("seventh"),
+            8 => String::from("eighth"),
+            9 => String::from("ninth"),
+            10 => String::from("tenth"),
+            _ => panic!("can't handle more! {}", idx),
+        };
+
+        RExpr::FnCall {
+            ident: fname,
+            args: vec![RExpr::var(var)],
+        }
+    }
+
     pub fn param(param: String) -> Self {
         RExpr::Param { param }
     }
@@ -363,7 +384,7 @@ impl RExpr {
                 lhs.to_code(indent + 2),
                 rhs.to_code(indent + 2)
             ),
-            LNot { expr } => format!("{}(!\n {})", istr, expr.to_code(indent + 2)),
+            LNot { expr } => format!("{}(not\n {})", istr, expr.to_code(indent + 2)),
 
             BVBinOp { op, lhs, rhs } => format!(
                 "{}({}\n{}\n{}\n{})",

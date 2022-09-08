@@ -143,7 +143,12 @@ impl RosetteFile {
 
     /// defines a new symbolic variable
     pub fn add_new_symbolic_var(&mut self, ident: String, ty: String) {
-        let v = SymbolicVar::new(ident, ty);
+        let v = SymbolicVar::new(ident, ty, None);
+        self.add_symbolic_var(v);
+    }
+
+    pub fn add_new_symbolic_var_list(&mut self, ident: String, ty: String, length: usize) {
+        let v = SymbolicVar::new(ident, ty, Some(length));
         self.add_symbolic_var(v);
     }
 
