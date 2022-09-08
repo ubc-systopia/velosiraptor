@@ -104,6 +104,20 @@ impl SynthRosette {
         rkt
     }
 
+    fn synth_unmap_part(&self, unit: &Segment) -> RosetteFile {
+        // create the context
+        let rktfilepath = self.outdir.join(format!("{}_unmap.rkt", unit.name));
+        let m = unit.get_method("translate").unwrap();
+        let mut rkt = self.synth_create(rktfilepath, unit, m);
+
+        // let's pass in the map function here, as we want to invert it's effects
+        let m = unit.get_method("map").unwrap();
+        synth::add_synthesis(&mut rkt, "unmap", unit, m);
+
+        rkt.save();
+        rkt
+    }
+
     /// synthesizes the `map` function and returns an ast of it
     pub fn synth_map(&self, ast: &mut AstRoot) -> Result<(), SynthError> {
         fs::create_dir_all(&self.outdir)?;
@@ -141,9 +155,16 @@ impl SynthRosette {
     /// synthesizes the 'unmap' function and returns an ast of it
     pub fn synth_unmap(&self, ast: &mut AstRoot) -> Result<(), SynthError> {
         for unit in &mut &mut ast.segment_units_mut() {
-            println!("synthesizing map: for {} in {:?}", unit.name(), self.outdir);
-            let ops = Vec::new();
-            unit.unmap_ops = Some(ops);
+            println!(
+                "synthesizing unmap: for {} in {:?}",
+                unit.name(),
+                self.outdir
+            );
+
+            let mut rkt_translate = self.synth_unmap_part(unit);
+            let res_translate = rkt_translate.exec();
+            let ops_translate = parse_result(&res_translate);
+            unit.unmap_ops = Some(ops_translate);
         }
         Ok(())
     }

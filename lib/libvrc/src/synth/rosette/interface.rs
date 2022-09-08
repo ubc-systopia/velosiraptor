@@ -62,10 +62,31 @@ pub fn add_interface_def(rkt: &mut RosetteFile, iface: &Interface) {
         iface
             .fields()
             .iter()
-            .map(|f| RExpr::num((f.field.length * 8) as u8, 0))
+            .enumerate()
+            //.map(|(i, _f)| RExpr::listelm(String::from("v"), (i + 1) as u64))
+            .map(|_| RExpr::num(64, 0))
             .collect::<Vec<RExpr>>(),
     );
-    let mut f = FunctionDef::new(String::from("make-iface-fields"), Vec::new(), vec![body]);
+
+    // let body = iface
+    //     .fields()
+    //     .iter()
+    //     .fold(RExpr::var(String::from("#hash()")), |acc, x| {
+    //         RExpr::fncall(
+    //             String::from("dict-set"),
+    //             vec![
+    //                 acc,
+    //                 RExpr::var(format!("'{}", x.field.name)),
+    //                 RExpr::num(64, 0),
+    //             ],
+    //         )
+    //     });
+
+    let mut f = FunctionDef::new(
+        String::from("make-iface-fields"),
+        vec![String::from("v")],
+        vec![body],
+    );
     f.add_comment(String::from("Interface Constructor"));
     rkt.add_function_def(f);
 
@@ -74,6 +95,7 @@ pub fn add_interface_def(rkt: &mut RosetteFile, iface: &Interface) {
 
         let fname = format!("interface-fields-load-{}", f.field.name);
         let args = vec![statevar.clone()];
+
         let sfields = iface
             .fields()
             .iter()
@@ -98,6 +120,9 @@ pub fn add_interface_def(rkt: &mut RosetteFile, iface: &Interface) {
                 ),
             ],
         );
+        // let body = RExpr::fncall(String::from("dict-ref"),
+        //     vec![RExpr::var(statevar.clone()), RExpr::var(format!("'{}", f.field.name)),
+        //     ]);
         let mut fdef = FunctionDef::new(fname, args, vec![body]);
         fdef.add_comment(String::from("Field accessor"));
         rkt.add_function_def(fdef);
@@ -112,6 +137,12 @@ pub fn add_interface_def(rkt: &mut RosetteFile, iface: &Interface) {
                 RExpr::block(vec![(f.field.name.clone(), RExpr::var(valvar.clone()))]),
             ],
         );
+
+        // let body = RExpr::fncall(String::from("dict-set"),
+        //             vec![RExpr::var(statevar.clone()), RExpr::var(format!("'{}", f.field.name)),
+        //             RExpr::var(valvar.clone())
+        //             ]);
+
         let mut fdef = FunctionDef::new(fname, args, vec![body]);
         fdef.add_comment(String::from("Field update"));
         rkt.add_function_def(fdef);

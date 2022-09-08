@@ -53,7 +53,7 @@ pub fn expr_to_rosette(e: &Expr) -> RExpr {
             let rhs = expr_to_rosette(rhs);
             match op {
                 BinOp::And => RExpr::bvand(lhs, rhs),
-                BinOp::Or => RExpr::bvand(lhs, rhs),
+                BinOp::Or => RExpr::bvor(lhs, rhs),
                 BinOp::LShift => RExpr::bvshl(lhs, rhs),
                 BinOp::RShift => RExpr::bvshr(lhs, rhs),
                 BinOp::Eq => RExpr::bveq(lhs, rhs),
