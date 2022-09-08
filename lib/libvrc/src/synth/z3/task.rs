@@ -28,7 +28,7 @@ use std::sync::Arc;
 use std::thread;
 use std::thread::JoinHandle;
 
-use smt2::Smt2File;
+use smt2::{Smt2Context, Smt2File};
 
 use crate::synth::Operation;
 
@@ -54,7 +54,7 @@ impl Z3Task {
         //self.base.add_comment("foooobar");
 
         let path = PathBuf::from("foo.smt2");
-        let mut smt = Smt2File::empty();
+        let mut smt = Smt2Context::new();
 
         self.base.extend_and_save_as(&smt, &path);
 

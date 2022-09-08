@@ -27,15 +27,15 @@
 
 use super::field::{add_iface_field, add_iface_field_accessors};
 use crate::ast::{AstNodeGeneric, Interface};
-use smt2::{DataType, Smt2File};
+use smt2::{DataType, Smt2Context};
 
-pub fn add_interface_def(smt: &mut Smt2File, state: &Interface) {
-    smt.add_section(String::from("Interface Fields"));
+pub fn add_interface_def(smt: &mut Smt2Context, state: &Interface) {
+    smt.section(String::from("Interface Fields"));
     for field in state.fields() {
         add_iface_field(smt, field);
     }
 
-    smt.add_section(String::from("Interface"));
+    smt.section(String::from("Interface"));
 
     let mut dt = DataType::new(String::from("IFace"), 0);
     dt.add_comment(format!("Interface Definition, {}", state.loc()));
@@ -45,7 +45,7 @@ pub fn add_interface_def(smt: &mut Smt2File, state: &Interface) {
             format!("IFaceField.{}_t", field.name()),
         );
     }
-    smt.add_datatype(dt);
+    smt.datatype(dt);
 
     for field in state.fields() {
         add_iface_field_accessors(smt, field);

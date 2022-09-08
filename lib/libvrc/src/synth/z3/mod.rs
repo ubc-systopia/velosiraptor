@@ -28,9 +28,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::thread;
 
-use smt2::Smt2File;
+use smt2::{Smt2Context, Smt2File, VarDecl};
 
-use crate::ast::{AstNodeGeneric, AstRoot, Method, Segment};
+use crate::ast::{AstNodeGeneric, AstRoot, Segment};
 use crate::synth::SynthError;
 
 mod consts;
@@ -41,6 +41,7 @@ mod method;
 mod model;
 mod state;
 mod task;
+mod types;
 
 pub struct SynthZ3 {
     outdir: PathBuf,
@@ -58,11 +59,11 @@ impl SynthZ3 {
     fn synth_create(&self, file: PathBuf, unit: &Segment) -> Smt2File {
         let mut z3file = smt2::Smt2File::new(file, String::new());
 
-        consts::add_consts(&mut z3file, unit);
-        state::add_state_def(&mut z3file, &unit.state);
-        interface::add_interface_def(&mut z3file, &unit.interface);
-        model::add_model_def(&mut z3file, &unit.state, &unit.interface);
-        method::add_methods(&mut z3file, &unit.methods);
+        consts::add_consts(z3file.get_context_mut(), unit);
+        state::add_state_def(z3file.get_context_mut(), &unit.state);
+        interface::add_interface_def(z3file.get_context_mut(), &unit.interface);
+        model::add_model_def(z3file.get_context_mut(), &unit.state, &unit.interface);
+        method::add_methods(z3file.get_context_mut(), &unit.methods);
         return z3file;
     }
 
@@ -96,8 +97,33 @@ impl SynthZ3 {
         for unit in &mut ast.segment_units_mut() {
             println!("synthesizing map: for {} in {:?}", unit.name(), self.outdir);
 
-            let translate = self.synth_map_part("translate", unit);
+            // do the translate part
+            let mut translate = self.synth_map_part("translate", unit);
+
+            let t_fn = unit.get_method("translate").unwrap();
+            method::add_translate_or_match_flags_fn(translate.get_context_mut(), t_fn);
+
+            let m_fn = unit.get_method("map").unwrap();
+            let mut smt = Smt2Context::new();
+
+            // add the model state
+            smt.section(String::from("Synthesis"));
+
+            smt.subsection(String::from("State operations"));
+            smt.variable(VarDecl::new(String::from("st!0"), String::from("Model_t")));
+
+            // model::add_goal(&mut smt, m);
+
+            smt.subsection(String::from("Verification"));
+            smt.comment(String::from("TODO: operations to check"));
+
+            translate.extend_and_save(&smt);
+
+            // do the match flags part
             let mut matchflags = self.synth_map_part("matchflags", unit);
+
+            let t_fn = unit.get_method("matchflags").unwrap();
+            method::add_translate_or_match_flags_fn(translate.get_context_mut(), t_fn);
 
             translate.save();
             let output = Command::new("z3")

@@ -23,31 +23,27 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! State Synthesis Module: Z3
+//! Synthesis Module: Smt2 Expressions
 
-use super::field::{add_state_field, add_state_field_accessors};
-use crate::ast::{AstNodeGeneric, State};
-use smt2::{DataType, Smt2Context};
+use crate::ast::Type;
 
-pub fn add_state_def(smt: &mut Smt2Context, state: &State) {
-    smt.section(String::from("State Fields"));
-    for field in state.fields() {
-        add_state_field(smt, field);
-    }
+/// the numeric type to be used
+const NUMTYPE: &'static str = "(_ BitVec 64)";
 
-    smt.section(String::from("State"));
+pub fn num() -> String {
+    NUMTYPE.to_string()
+}
 
-    let mut dt = DataType::new(String::from("State"), 0);
-    dt.add_comment(format!("State Definition, {}", state.loc()));
-    for field in state.fields() {
-        dt.add_field(
-            format!("State.{}", field.name),
-            format!("StateField.{}_t", field.name),
-        );
-    }
-    smt.datatype(dt);
+pub fn boolean() -> String {
+    String::from("Bool")
+}
 
-    for field in state.fields() {
-        add_state_field_accessors(smt, field);
+pub fn type_to_smt2(ty: &Type) -> String {
+    match ty {
+        Type::Boolean => boolean(),
+        Type::Integer => num(),
+        Type::Address => num(),
+        Type::Flags => String::from("Flags"),
+        _ => panic!("unhandled type {}", ty),
     }
 }

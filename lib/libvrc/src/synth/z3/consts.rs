@@ -26,24 +26,25 @@
 //! Const Synthesis Module: Rosette
 
 // rosette language library imports
-use smt2::{Expr, Smt2File};
+use smt2::{Smt2Context, Term};
 
 // crate imports
+use super::types;
 use crate::ast;
 use crate::ast::{ConstValue, Segment};
 
-pub fn add_consts(smt: &mut Smt2File, unit: &Segment) {
-    smt.add_section(format!("Constants for unit {}", unit.name));
+pub fn add_consts(smt: &mut Smt2Context, unit: &Segment) {
+    smt.section(format!("Constants for unit {}", unit.name));
     for c in unit.consts() {
         match &c.value {
             ConstValue::IntegerValue(u) => {
-                smt.add_const(c.ident.clone(), String::from("Int"), Expr::num(*u))
+                smt.constant(c.ident.clone(), types::num(), Term::num(*u));
             }
             ConstValue::BooleanValue(u) => {
-                smt.add_const(c.ident.clone(), String::from("Int"), Expr::binary(*u))
+                smt.constant(c.ident.clone(), types::num(), Term::binary(*u));
             }
             ConstValue::IntegerExpr(ast::Expr::Number { value, .. }) => {
-                smt.add_const(c.ident.clone(), String::from("Int"), Expr::num(*value))
+                smt.constant(c.ident.clone(), types::num(), Term::num(*value));
             }
             x => unimplemented!("{:?}", x),
         }
