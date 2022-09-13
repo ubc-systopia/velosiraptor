@@ -27,10 +27,12 @@
 
 use std::fmt;
 use std::fmt::Write;
+use std::hash::Hash;
 
 use super::Formatter;
 
 /// prop literals
+#[derive(Hash)]
 pub enum PropLiteral {
     True(String),
     Not(String),

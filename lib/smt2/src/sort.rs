@@ -23,27 +23,108 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Smt2 Code: Prop Literals
+//! Smt2 Code: Sorts
 
 use std::fmt;
 use std::fmt::Write;
+use std::hash::Hash;
 
 use super::Formatter;
 
-/// prop literals
-pub struct Sort {}
+#[derive(Hash)]
+pub struct SortDecl {
+    pub name: String,
+    pub arity: usize,
+}
 
-impl Sort {
+impl SortDecl {
+    pub fn new(name: String, arity: usize) -> Self {
+        Self { name, arity }
+    }
+
     // formats the current context into smtlib2 syntax
     pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
-        write!(fmt, "(declare-sort )")
+        write!(fmt, "(declare-sort {} {})", self.name, self.arity)
+    }
+}
+
+impl fmt::Display for SortDecl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut ret = String::new();
+        self.fmt(&mut Formatter::new(&mut ret))?;
+        writeln!(f, "{}", ret)
+    }
+}
+
+#[derive(Hash)]
+pub struct SortDef {
+    pub name: String,
+    pub params: Vec<String>,
+    pub def: String,
+}
+
+impl SortDef {
+    pub fn new(name: String, def: String) -> Self {
+        Self {
+            name,
+            params: Vec::new(),
+            def,
+        }
+    }
+
+    pub fn add_param(&mut self, param: String) -> &mut Self {
+        self.params.push(param);
+        self
+    }
+
+    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        write!(fmt, "(define-sort {} (", self.name)?;
+        for param in &self.params {
+            write!(fmt, "({})", param)?;
+        }
+        writeln!(fmt, ") {})", self.def)
+    }
+}
+
+impl fmt::Display for SortDef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut ret = String::new();
+        self.fmt(&mut Formatter::new(&mut ret))?;
+        write!(f, "{}", ret)
+    }
+}
+
+/// prop literals
+#[derive(Hash)]
+pub enum Sort {
+    Declare(SortDecl),
+    Define(SortDef),
+    // (define-sort R () Real)
+}
+
+impl Sort {
+    pub fn new_def(name: String, def: String) -> Self {
+        Sort::Define(SortDef::new(name, def))
+    }
+
+    pub fn new_decl(name: String, arity: usize) -> Self {
+        Sort::Declare(SortDecl::new(name, arity))
+    }
+
+    // formats the current context into smtlib2 syntax
+    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Sort::Declare(sort) => sort.fmt(fmt),
+            Sort::Define(sort) => sort.fmt(fmt),
+        }
     }
 }
 
 impl fmt::Display for Sort {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut ret = String::new();
-        self.fmt(&mut Formatter::new(&mut ret))?;
-        write!(f, "{}", ret)
+        match self {
+            Sort::Declare(sort) => write!(f, "{}", sort),
+            Sort::Define(sort) => write!(f, "{}", sort),
+        }
     }
 }

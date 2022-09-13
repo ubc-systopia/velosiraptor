@@ -26,9 +26,11 @@
 //! Function Variable
 
 use std::fmt::{self, Display, Write};
+use std::hash::Hash;
 
 use super::Formatter;
 
+#[derive(Hash)]
 pub struct VarDecl {
     pub name: String,
     pub ty: String,

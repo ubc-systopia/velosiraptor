@@ -27,9 +27,11 @@
 
 use std::fmt;
 use std::fmt::Write;
+use std::hash::Hash;
 
 use super::Formatter;
 
+#[derive(Hash)]
 pub enum InfoFlag {
     AllStatistics,
     AssertionStackLevels,

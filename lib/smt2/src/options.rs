@@ -27,9 +27,11 @@
 
 use std::fmt;
 use std::fmt::Write;
+use std::hash::Hash;
 
 use super::Formatter;
 
+#[derive(Hash)]
 pub enum Attribute {
     Keyword(String),
     KeywordValue(String, String),
@@ -52,6 +54,7 @@ impl Attribute {
     }
 }
 
+#[derive(Hash)]
 pub enum Smt2Option {
     DiagnosticOutputChannel(String),
     GlobalDeclarations(bool),

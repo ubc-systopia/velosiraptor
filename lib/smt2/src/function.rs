@@ -26,6 +26,7 @@
 //! Function Declaration
 
 use std::fmt::{self, Display, Write};
+use std::hash::Hash;
 
 use super::Formatter;
 use super::{SortedVar, Term};
@@ -37,6 +38,7 @@ use super::{SortedVar, Term};
 /// ; data type
 /// (declare-fun x () Bool)
 ///
+#[derive(Hash)]
 pub struct Function {
     /// the name of the datatype
     name: String,

@@ -43,7 +43,7 @@ mod sort;
 mod term;
 mod variable;
 
-pub use context::Smt2Context;
+pub use context::{Smt2Command, Smt2Context};
 pub use datatype::DataType;
 use formatter::Formatter;
 pub use function::Function;
@@ -51,7 +51,7 @@ pub use infoflag::InfoFlag;
 pub use options::Attribute;
 pub use options::Smt2Option;
 pub use propliteral::PropLiteral;
-pub use sort::Sort;
+pub use sort::{Sort, SortDecl, SortDef};
 pub use term::{MatchCase, Pattern, SortedVar, Term, VarBinding};
 pub use variable::VarDecl;
 
@@ -78,17 +78,21 @@ impl Smt2File {
         }
     }
 
+    pub fn with_context(path: PathBuf, doc: String, context: Smt2Context) -> Self {
+        Smt2File { path, doc, context }
+    }
+
     pub fn with_default_opts(path: PathBuf, doc: String) -> Self {
         let mut context = Smt2Context::new();
 
         let options = vec![
-            ":auto_config false",
-            ":smt.mbqi false",
-            ":smt.case_split 3",
-            ":smt.qi.eager_threshold 100.0",
-            ":smt.delay_units true",
-            ":smt.arith.solver 2",
-            ":smt.arith.nl false",
+            "auto_config false",
+            "smt.mbqi false",
+            "smt.case_split 3",
+            "smt.qi.eager_threshold 100.0",
+            "smt.delay_units true",
+            "smt.arith.solver 2",
+            "smt.arith.nl false",
         ];
 
         for o in options {
@@ -104,12 +108,16 @@ impl Smt2File {
         &self.path
     }
 
-    pub fn get_context(&self) -> &Smt2Context {
+    pub fn as_context(&self) -> &Smt2Context {
         &self.context
     }
 
-    pub fn get_context_mut(&mut self) -> &mut Smt2Context {
+    pub fn as_context_mut(&mut self) -> &mut Smt2Context {
         &mut self.context
+    }
+
+    pub fn to_context(self) -> Smt2Context {
+        self.context
     }
 
     // formats the current context into smtlib2 syntax

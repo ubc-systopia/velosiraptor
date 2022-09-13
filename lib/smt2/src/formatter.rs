@@ -31,7 +31,7 @@
 //! This code is based on the `formatter` module of `codegen-rs`.
 
 // the standard formatter types
-use std::fmt::{self, Write};
+use std::fmt;
 
 /// defines the default indentation level
 const DEFAULT_INDENT: usize = 2;

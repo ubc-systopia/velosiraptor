@@ -27,12 +27,15 @@
 
 use std::fmt;
 use std::fmt::Write;
+use std::hash::Hash;
 
 use super::{
-    DataType, Formatter, Function, InfoFlag, PropLiteral, Smt2Option, Sort, Term, VarDecl,
+    Attribute, DataType, Formatter, Function, InfoFlag, PropLiteral, Smt2Option, Sort, Term,
+    VarDecl,
 };
 
-enum Smt2Command {
+#[derive(Hash)]
+pub enum Smt2Command {
     Assert(Term),
     CheckSat,
     CheckSatAssuming(Vec<PropLiteral>),
@@ -63,6 +66,7 @@ enum Smt2Command {
     Raw(String),
 }
 
+#[derive(Hash)]
 pub struct Smt2Context {
     commands: Vec<Smt2Command>,
 }
@@ -75,9 +79,32 @@ impl Smt2Context {
     }
 
     pub fn with_default_options() -> Self {
-        Self {
-            commands: Vec::new(),
+        let mut ctx = Self::new();
+        let options = vec![
+            "auto_config false",
+            "smt.mbqi false",
+            "smt.case_split 3",
+            "smt.qi.eager_threshold 100.0",
+            "smt.delay_units true",
+            "smt.arith.solver 2",
+            "smt.arith.nl false",
+        ];
+
+        for o in options {
+            ctx.set_option(Smt2Option::Attribute(Attribute::new_keyword(String::from(
+                o,
+            ))));
         }
+        ctx
+    }
+
+    pub fn add_command(&mut self, cmd: Smt2Command) -> &mut Self {
+        self.commands.push(cmd);
+        self
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.commands.is_empty()
     }
 
     pub fn assert(&mut self, term: Term) -> &mut Self {

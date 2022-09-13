@@ -26,9 +26,11 @@
 //! Datatype Declaration
 
 use std::fmt::{self, Display, Write};
+use std::hash::Hash;
 
 use super::Formatter;
 
+#[derive(Hash)]
 struct DatatTypeField {
     name: String,
     ty: String,
@@ -60,6 +62,7 @@ impl Display for DatatTypeField {
 /// ; data type
 /// (declare-datatypes ((State 0))) ((State/State (State/State/Field Int)))
 ///
+#[derive(Hash)]
 pub struct DataType {
     /// the name of the datatype
     name: String,

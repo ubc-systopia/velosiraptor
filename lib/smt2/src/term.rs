@@ -26,6 +26,7 @@
 //! Function Declaration
 
 use std::fmt::{self, Write};
+use std::hash::Hash;
 
 use super::Formatter;
 
@@ -46,7 +47,7 @@ use super::Formatter;
 // an attributed expression: ( ! <expr> <attribute>+)
 
 /// Binds the expression to a variable
-#[derive(Clone)]
+#[derive(Clone, Hash)]
 pub struct VarBinding {
     symbol: String,
     term: Term,
@@ -73,7 +74,7 @@ impl fmt::Display for VarBinding {
 }
 
 /// Defines a variable with a type
-#[derive(Clone)]
+#[derive(Clone, Hash)]
 pub struct SortedVar {
     pub ident: String,
     pub sort: String,
@@ -101,7 +102,7 @@ impl fmt::Display for SortedVar {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Hash)]
 pub struct Pattern {
     pub symbols: Vec<String>,
 }
@@ -135,7 +136,7 @@ impl fmt::Display for Pattern {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Hash)]
 pub struct MatchCase {
     pattern: Pattern,
     term: Term,
@@ -170,10 +171,10 @@ impl fmt::Display for MatchCase {
 /// ; expression
 /// (+ a b)
 ///
-#[derive(Clone)]
+#[derive(Clone, Hash)]
 pub enum Term {
     Numeral(u64),
-    Decimal(f64),
+    // Decimal(f64),
     String(String),
     Binary(bool),
     // Hex(String),
@@ -192,16 +193,17 @@ impl Term {
         Term::Numeral(num)
     }
 
-    pub fn decimal(num: f64) -> Self {
-        Term::Decimal(num)
-    }
-
     pub fn string(s: String) -> Self {
         Term::String(s)
     }
 
     pub fn binary(b: bool) -> Self {
         Term::Binary(b)
+    }
+
+    pub fn bv_zero_extend(term: Term, num: u64) -> Self {
+        let ident = format!("(_ zero_extend {})", num);
+        Term::FunctionApplication(ident, vec![term])
     }
 
     pub fn ident(s: String) -> Self {
@@ -295,7 +297,7 @@ impl Term {
     pub fn is_literal(&self) -> bool {
         match self {
             Term::Numeral(_)
-            | Term::Decimal(_)
+            // | Term::Decimal(_)
             | Term::String(_)
             | Term::Binary(_)
             | Term::Identifier(_) => true,
@@ -307,7 +309,7 @@ impl Term {
     pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Term::Numeral(n) => write!(fmt, "#x{:016x}", n),
-            Term::Decimal(n) => write!(fmt, "{}", n),
+            // Term::Decimal(n) => write!(fmt, "{}", n),
             Term::String(s) => write!(fmt, "\"{}\"", s),
             Term::Binary(b) => {
                 if *b {
@@ -330,7 +332,7 @@ impl Term {
                 // }
                 writeln!(fmt, "({} ", s)?;
                 fmt.indent(|fmt| {
-                    for (i, arg) in args.iter().enumerate() {
+                    for (_i, arg) in args.iter().enumerate() {
                         // if oneline && i > 0 {
                         //     write!(fmt, " ")?;
                         // }
