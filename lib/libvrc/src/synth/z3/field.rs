@@ -95,5 +95,5 @@ pub fn add_iface_field_accessors(smt: &mut Smt2Context, field: &InterfaceField) 
 }
 
 pub fn add_state_field_accessors(smt: &mut Smt2Context, field: &Field) {
-    add_field_accessors_common(smt, "State", &field);
+    add_field_accessors_common(smt, "State", field);
 }

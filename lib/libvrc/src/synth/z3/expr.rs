@@ -25,8 +25,11 @@
 
 //! Synthesis Module: Smt2 Expressions
 
-use crate::ast::{BinOp, Expr, Stmt, UnOp};
 use smt2;
+
+use crate::ast::{BinOp, Expr, Stmt, UnOp};
+
+use super::types;
 
 pub fn p2p(i: &str) -> &'static str {
     match i {
@@ -89,7 +92,7 @@ pub fn expr_to_smt2(e: &Expr, stvar: &str) -> smt2::Term {
                 }
             }
         }
-        FnCall { path, args, .. } => {
+        FnCall { path, .. } => {
             if path.len() != 1 {
                 panic!("unexpected identifier lenght");
             }

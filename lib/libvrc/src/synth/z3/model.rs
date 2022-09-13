@@ -28,15 +28,15 @@
 use super::expr::{expr_to_smt2, p2p};
 use super::types;
 use crate::ast;
-use crate::ast::{Action, Interface, State};
+use crate::ast::{Action, Interface, Method, Segment, State, Type};
 use smt2::{DataType, Function, Smt2Context, Term, VarBinding};
 
 fn add_model(smt: &mut Smt2Context) {
     smt.section(String::from("Model"));
     let mut dt = DataType::new(String::from("Model"), 0);
-    dt.add_comment(format!("Model Definition"));
-    dt.add_field(format!("Model.State"), format!("State_t"));
-    dt.add_field(format!("Model.IFace"), format!("IFace_t"));
+    dt.add_comment("Model Definition".to_string());
+    dt.add_field("Model.State".to_string(), "State_t".to_string());
+    dt.add_field("Model.IFace".to_string(), "IFace_t".to_string());
     smt.datatype(dt);
     smt.section(String::from("Model"));
 }
@@ -137,7 +137,7 @@ fn add_field_action(
     action: &Action,
     fieldname: &str,
     ty: &str,
-    fieldwidth: u8,
+    _fieldwidth: u8,
 ) {
     let name = format!("Model.IFace.{}.{}action", fieldname, ty);
     let mut f = Function::new(name, String::from("Model_t"));
@@ -147,12 +147,11 @@ fn add_field_action(
     let mut defs = Vec::new();
 
     let mut stvar = String::from("st");
-    let mut newvar = String::from("st_1");
 
     // body = Term::letexpr(vec![VarBinding::new(newvar.clone(), f)], Term::ident(stvar));
 
     for (i, a) in action.action_components.iter().enumerate() {
-        newvar = format!("st_{}", i + 1);
+        let newvar = format!("st_{}", i + 1);
 
         let dst = match &a.dst {
             ast::Expr::Identifier { path, .. } => {
@@ -200,15 +199,104 @@ fn add_actions(smt: &mut Smt2Context, iface: &Interface) {
     }
 }
 
-pub fn add_model_def(smt: &mut Smt2Context, state: &State, iface: &Interface) {
-    add_model(smt);
-    add_model_state_accessors(smt, state);
-    add_model_iface_accessors(smt, iface);
-    add_actions(smt, iface)
+fn add_fn_arg_assms(m: &Method, inbitwidth: u64, outbitwidth: u64) -> Vec<Term> {
+    let mut conds = Vec::new();
+
+    // the minimum bitwidth of the unit
+    let minbits = if inbitwidth < outbitwidth {
+        inbitwidth
+    } else {
+        outbitwidth
+    };
+
+    let mut szarg = String::new();
+    for a in m.args.iter() {
+        if matches!(a.ptype, Type::Size) {
+            szarg = a.name.clone();
+        }
+    }
+
+    // the following requires on a specific
+    for a in m.args.iter() {
+        match a.ptype {
+            Type::VirtualAddress => {
+                let maxvaddr = if inbitwidth < 64 {
+                    (1u64 << inbitwidth) - 1
+                } else {
+                    0xffff_ffff_ffff_ffff
+                };
+                // should be the vaddr position: va <= 0 <= MAX_VADDR
+                conds.push(Term::bvge(Term::ident(a.name.clone()), Term::num(0)));
+                conds.push(Term::bvle(Term::ident(a.name.clone()), Term::num(maxvaddr)));
+
+                // overflow: va + sz <= MAX_VADDR  ==> va <= MAX_VADDR - sz
+                conds.push(Term::bvle(
+                    Term::ident(a.name.clone()),
+                    Term::bvsub(Term::num(maxvaddr), Term::ident(szarg.clone())),
+                ));
+            }
+            Type::PhysicalAddress => {
+                // should be the paddr position
+                let maxpaddr = if outbitwidth < 64 {
+                    (1u64 << outbitwidth) - 1
+                } else {
+                    0xffff_ffff_ffff_ffff
+                };
+                // should be the paddr position: va <= 0 <= MAX_VADDR
+                conds.push(Term::bvge(Term::ident(a.name.clone()), Term::num(0)));
+                conds.push(Term::bvle(Term::ident(a.name.clone()), Term::num(maxpaddr)));
+
+                // overflow: va + sz <= MAX_PADDR  ==> va <= MAX_PADDR - sz
+                conds.push(Term::bvle(
+                    Term::ident(a.name.clone()),
+                    Term::bvsub(Term::num(maxpaddr), Term::ident(szarg.clone())),
+                ));
+            }
+            Type::Size => {
+                let maxsize = if minbits < 64 {
+                    (1u64 << minbits) - 1
+                } else {
+                    0xffff_ffff_ffff_ffff
+                };
+                conds.push(Term::bvge(Term::ident(a.name.clone()), Term::num(0)));
+                conds.push(Term::bvle(Term::ident(a.name.clone()), Term::num(maxsize)));
+            }
+            Type::Flags => (), // nothing here yet
+            _ => (),
+        }
+    }
+
+    conds
 }
 
-pub fn add_goal(smt: &mut Smt2Context, m: &ast::Method) {
-    // smt.function(tf);
+fn add_assms(smt: &mut Smt2Context, unit: &Segment) {
+    smt.section(String::from("Assumptions"));
 
-    smt.section("Goal".to_string());
+    let fun = unit.get_method("map").unwrap();
+
+    let mut f = Function::new(String::from("map.assms"), types::boolean());
+
+    f.add_arg(String::from("st"), types::model());
+    for p in fun.args.iter() {
+        f.add_arg(p.name.clone(), types::type_to_smt2(&p.ptype));
+    }
+
+    let mut conds = add_fn_arg_assms(fun, unit.inbitwidth, unit.outbitwidth);
+    for c in &fun.requires {
+        conds.push(expr_to_smt2(c, "st"));
+    }
+
+    let body = conds
+        .drain(..)
+        .fold(Term::binary(true), |acc, x| Term::land(acc, x));
+    f.add_body(body);
+
+    smt.function(f);
+}
+
+pub fn add_model_def(smt: &mut Smt2Context, unit: &Segment) {
+    add_model(smt);
+    add_model_state_accessors(smt, &unit.state);
+    add_model_iface_accessors(smt, &unit.interface);
+    add_actions(smt, &unit.interface)
 }
