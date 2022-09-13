@@ -44,7 +44,7 @@ const COPYRIGHT: &str =
     "Copyright (c) 2022 The University of British Columbia, Vancouver, BC, Canada";
 
 // custom error definitions for the hardware generation
-custom_error! {#[derive(PartialEq)] pub HWGenError
+custom_error! {#[derive(PartialEq, Eq)] pub HWGenError
     IOError           = "The input file could not be read.",
     FmtError          = "Could not format in buffer"
 }

@@ -190,7 +190,7 @@ impl Method {
                 "change return type to match expected function signature: `{}`",
                 sig
             );
-            let r = 6 + self.args.len() * 3;
+            let r = 5 + self.args.len() * 3;
             VrsError::new_err(self.pos.with_range(r..r + 1), msg, Some(hint)).print();
             Issues::err()
         } else {
@@ -254,11 +254,12 @@ impl Method {
 
         let mut res = Issues::ok();
 
-        res = res + self.check_rettype(FN_SIG_TRANSLATE, Type::Address);
+        res = res + self.check_rettype(FN_SIG_TRANSLATE, Type::PhysicalAddress);
         res = res + self.check_argnum(FN_SIG_TRANSLATE, 1);
 
         if !self.args.is_empty() {
-            res = res + Self::check_param(FN_SIG_TRANSLATE, &self.args[0], "va", Type::Address);
+            res = res
+                + Self::check_param(FN_SIG_TRANSLATE, &self.args[0], "va", Type::VirtualAddress);
         }
 
         res

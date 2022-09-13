@@ -178,4 +178,10 @@ impl SynthRosette {
 
         Ok(())
     }
+
+    pub fn synth_map_unmap_protect(&self, ast: &mut AstRoot) -> Result<(), SynthError> {
+        self.synth_map(ast)?;
+        self.synth_unmap(ast)?;
+        self.synth_protect(ast)
+    }
 }

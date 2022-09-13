@@ -31,12 +31,16 @@ use std::fmt;
 ///
 /// The type of a an expression, parameter or value defines the set of
 /// operations that are allowed to be carried out with it.
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Type {
     /// a boolean type (true / false)
     Boolean,
     /// An integer type
     Integer,
+    /// represents the virtual addres (input address)
+    VirtualAddress,
+    /// represents the physical address (output address)
+    PhysicalAddress,
     /// Represents an address value
     Address,
     /// The size defines the number of addresses within a range
@@ -59,6 +63,8 @@ impl Type {
         match self {
             Boolean => false,
             Integer => true,
+            VirtualAddress => true,
+            PhysicalAddress => true,
             Address => true,
             Size => true,
             Flags => true,
@@ -75,6 +81,8 @@ impl Type {
             Boolean => true,
             Integer => false,
             Address => false,
+            VirtualAddress => false,
+            PhysicalAddress => false,
             Flags => false,
             Size => false,
             State => false,
@@ -90,6 +98,8 @@ impl Type {
             Boolean => "boolean",
             Integer => "numeric",
             Address => "numeric",
+            VirtualAddress => "numeric",
+            PhysicalAddress => "numeric",
             Flags => "flags",
             Size => "numeric",
             State => "state",
@@ -111,6 +121,8 @@ impl fmt::Display for Type {
         match self {
             Boolean => write!(f, "bool"),
             Integer => write!(f, "int"),
+            VirtualAddress => write!(f, "vaddr"),
+            PhysicalAddress => write!(f, "paddr"),
             Address => write!(f, "addr"),
             Flags => write!(f, "flags"),
             Size => write!(f, "size"),

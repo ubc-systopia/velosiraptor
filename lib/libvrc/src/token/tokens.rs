@@ -36,7 +36,7 @@ use nom::InputLength;
 use crate::sourcepos::SourcePos;
 
 /// Enumeration of all keywords in the language
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Keyword {
     //
     // language keywords
@@ -112,13 +112,17 @@ pub enum Keyword {
     //
     // types
     //
-    /// represents an address value
-    AddrType,
-    /// represents a size value
+    /// represents the generic address type
+    AddressType,
+    /// represents a virtual address value type
+    VAddrType,
+    /// represents a physical address value type
+    PAddrType,
+    /// represents a size value type
     SizeType,
     /// A boolean type
     BooleanType,
-    /// An integer value
+    /// An generic integer value type
     IntegerType,
     /// Represents the permission flags
     FlagsType,
@@ -180,7 +184,9 @@ impl Keyword {
             Keyword::Fn => "fn",
             Keyword::Return => "return",
             //
-            Keyword::AddrType => "addr",
+            Keyword::AddressType => "addr",
+            Keyword::VAddrType => "vaddr",
+            Keyword::PAddrType => "paddr",
             Keyword::SizeType => "size",
             Keyword::BooleanType => "bool",
             Keyword::IntegerType => "int",
@@ -233,7 +239,9 @@ impl<'a> TryFrom<&'a str> for Keyword {
             "fn" => Ok(Keyword::Fn),
             "return" => Ok(Keyword::Return),
             //
-            "addr" => Ok(Keyword::AddrType),
+            "addr" => Ok(Keyword::AddressType),
+            "vaddr" => Ok(Keyword::VAddrType),
+            "paddr" => Ok(Keyword::PAddrType),
             "size" => Ok(Keyword::SizeType),
             "bool" => Ok(Keyword::BooleanType),
             "int" => Ok(Keyword::IntegerType),
@@ -262,7 +270,7 @@ impl fmt::Display for Keyword {
 }
 
 /// Represents the content of a token
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum TokenContent {
     // end of file
     Eof,
@@ -429,9 +437,6 @@ impl TokenContent {
         if let TokenContent::Identifier(ident) = self {
             matches!(
                 ident.as_str(),
-                // reserved indentifiers
-                "Segment" | "StaticMap" |
-
                 // for future use
                 "abstract" | "while" | "matches"
             )
@@ -574,8 +579,12 @@ fn test_enum_str() {
     assert_eq!("return".try_into(), Ok(Keyword::Return));
     assert_eq!(Keyword::Return.as_str(), "return");
 
-    assert_eq!("addr".try_into(), Ok(Keyword::AddrType));
-    assert_eq!(Keyword::AddrType.as_str(), "addr");
+    assert_eq!("addr".try_into(), Ok(Keyword::AddressType));
+    assert_eq!(Keyword::AddressType.as_str(), "addr");
+    assert_eq!("vaddr".try_into(), Ok(Keyword::VAddrType));
+    assert_eq!(Keyword::AddrType.as_str(), "vaddr");
+    assert_eq!("paddr".try_into(), Ok(Keyword::PAddrType));
+    assert_eq!(Keyword::PAddrType.as_str(), "paddr");
     assert_eq!("size".try_into(), Ok(Keyword::SizeType));
     assert_eq!(Keyword::SizeType.as_str(), "size");
     assert_eq!("bool".try_into(), Ok(Keyword::BooleanType));

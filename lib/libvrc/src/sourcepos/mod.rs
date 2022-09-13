@@ -56,7 +56,7 @@ pub type Element = char;
 /// This structures keeps track of the context (e.g., file name) as well as the
 /// current range of the SourcePos within the lexing context as a range of bytes.
 /// Moreover, we keep track on the line and column.
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct SourcePos {
     /// The context of the SourcePos. This might be a file name or "STDIO"
     context: Rc<String>,

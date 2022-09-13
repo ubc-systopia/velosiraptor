@@ -44,7 +44,7 @@ use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
 /// represents the kind of a symbol
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SymbolKind {
     /// this symbol is a constant definition
     Const,
