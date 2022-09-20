@@ -276,7 +276,7 @@ impl Smt2Context {
                 DataType(datatype) => datatype.fmt(fmt)?,
                 Function(function) => function.fmt(fmt)?,
                 Sort(sort) => sort.fmt(fmt)?,
-                Echo(message) => writeln!(fmt, "(echo {})", message)?,
+                Echo(message) => writeln!(fmt, "(echo \"{}\")", message)?,
                 Exit => writeln!(fmt, "(exit)")?,
                 GetAssertions => writeln!(fmt, "(get-assertions)")?,
                 GetAssignment => writeln!(fmt, "(get-assignment)")?,
@@ -295,18 +295,21 @@ impl Smt2Context {
                 GetUnsatAssumptions => writeln!(fmt, "(get-unsat-assumptions)")?,
                 GetUnsatCore => writeln!(fmt, "(get-unsat-core)")?,
                 GetValue(terms) => {
-                    write!(fmt, "(get-value ")?;
-                    for t in terms {
+                    write!(fmt, "(get-value (")?;
+                    for (i, t) in terms.iter().enumerate() {
+                        if i != 0 {
+                            write!(fmt, " ")?;
+                        }
                         t.fmt(fmt)?;
                     }
-                    writeln!(fmt, ")")?;
+                    writeln!(fmt, "))")?;
                 }
                 Level(smt2_context) => {
-                    writeln!(fmt, "(push)")?;
+                    writeln!(fmt, "\n(push)")?;
                     smt2_context.fmt(fmt)?;
-                    writeln!(fmt, "(pop)")?;
+                    writeln!(fmt, "(pop)\n")?;
                 }
-                Reset => writeln!(fmt, "(reset)")?,
+                Reset => writeln!(fmt, "\n\n(reset)\n\n")?,
                 ResetAssertions => writeln!(fmt, "(reset-assertions)")?,
                 SetInfo(info_flag) => {
                     write!(fmt, "(set-info ")?;
