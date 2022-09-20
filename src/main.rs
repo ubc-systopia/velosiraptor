@@ -332,13 +332,12 @@ fn main() {
     // Step 5: Transform AST
     // ===========================================================================================
 
-    let issues = match ast.apply_transformations() {
-        Ok(i) => issues + i,
-        Err(_) => {
-            abort(infile, Issues::err());
-            return;
-        }
-    };
+    eprintln!(
+        "{:>8}: performing AST rewrites...\n",
+        "rewrite".bold().green(),
+    );
+
+    ast.apply_rewrites();
 
     // ===========================================================================================
     // Step 6: Generate OS code
