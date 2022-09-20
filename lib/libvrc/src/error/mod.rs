@@ -106,6 +106,14 @@ pub enum VrsError<I: ErrorLocation> {
         mismatch: Mismatch,
     },
     /// represents a custom error
+    Unsatisfiable {
+        message: String,
+        /// the location where the error happened
+        current: I,
+        /// site of the previous definition
+        previous: I,
+    },
+    /// represents a custom error
     RangeOverlap {
         /// error message
         bit: u64,
@@ -189,6 +197,15 @@ impl<I: ErrorLocation + fmt::Display> VrsError<I> {
             previous,
         }
     }
+
+    pub fn new_unsat(message: String, current: I, previous: I) -> Self {
+        VrsError::Unsatisfiable {
+            message,
+            current,
+            previous,
+        }
+    }
+
     pub fn stack(location: I, message: String, other: VrsError<I>) -> Self {
         VrsError::Stack {
             message,
@@ -329,6 +346,18 @@ impl<I: ErrorLocation + fmt::Display> fmt::Display for VrsError<I> {
                 Self::fmtctx(f, false, current, Some(&hint))?;
                 Self::fmtloc(f, previous)?;
                 let hint = String::from("the previous definition was here");
+                Self::fmtctx(f, false, previous, Some(&hint))
+            }
+            VrsError::Unsatisfiable {
+                message,
+                current,
+                previous,
+            } => {
+                let typ = applycolor(false)("error");
+                Self::fmthdr(f, typ, current, &message)?;
+                Self::fmtctx(f, false, current, None)?;
+                Self::fmtloc(f, previous)?;
+                let hint = String::from("this expression cannot be satisfied");
                 Self::fmtctx(f, false, previous, Some(&hint))
             }
             VrsError::RangeOverlap {
