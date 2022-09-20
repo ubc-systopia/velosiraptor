@@ -122,6 +122,18 @@ impl From<Z3Query> for Smt2Context {
     }
 }
 
+impl fmt::Display for Z3Query {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Query: {}", self.smt)
+    }
+}
+
+impl fmt::Debug for Z3Query {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Query: {}", self.smt)
+    }
+}
+
 /// represents a result obtained from executing a Z3 query
 pub struct Z3Result {
     /// returns the task again

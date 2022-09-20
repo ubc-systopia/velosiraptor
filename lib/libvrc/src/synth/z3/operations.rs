@@ -148,7 +148,7 @@ impl Program {
             smtops.push((fname, None));
         }
 
-        println!("smtops: {:?}", smtops);
+
         // define the variables
         symvar.add_to_context(&mut smt);
 

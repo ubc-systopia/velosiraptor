@@ -434,8 +434,24 @@ impl Z3WorkerPool {
             if self.workers_busy.is_empty() {
                 break;
             }
-            thread::sleep(Duration::from_millis(1));
+            thread::sleep(Duration::from_millis(10));
         }
+    }
+
+    pub fn wait_for_result(&mut self, id: Z3Ticket) -> Z3Result {
+        loop {
+            let res = self.get_result(id);
+            if res.is_some() {
+                return res.unwrap();
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    pub fn get_result(&mut self, id: Z3Ticket) -> Option<Z3Result> {
+        self.check_completed_tasks();
+        self.try_send_tasks();
+        self.results.remove(&id)
     }
 
     pub fn reset(&mut self) {
