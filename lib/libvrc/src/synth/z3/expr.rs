@@ -29,8 +29,6 @@ use smt2;
 
 use crate::ast::{BinOp, Expr, Stmt, UnOp};
 
-use super::types;
-
 pub fn p2p(i: &str) -> &'static str {
     match i {
         "state" => "State",

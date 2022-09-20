@@ -56,17 +56,6 @@ pub fn add_methods(smt: &mut Smt2Context, methods: &[Method]) {
             f.add_body(expr::stmt_to_smt2(stmt, "st!0"));
         }
 
-        // // add the requires as assert
-        // let mut body = Vec::new();
-        // for p in m.requires.iter() {
-        //     body.push(RTerm::assert(expr::expr_to_rosette(p)));
-        // }
-
-        // // convert statements into rosette statements
-        // if let Some(stmts) = &m.stmts {
-        //     body.push(expr::stmt_to_rosette(stmts))
-        // }
-
         smt.function(f);
     }
 }
@@ -92,6 +81,31 @@ pub fn add_translate_or_match_flags_fn(smt: &mut Smt2Context, method: &Method) {
 
     // add the state pre-conditions of the function
     // this includes only pre-conditions that have state references.
+
+    for (i, pre) in method
+        .requires
+        .iter()
+        .filter(|p| p.has_state_references())
+        .enumerate()
+    {
+        let name = format!("{}.pre.{}", method.name, i);
+        let mut f = Function::new(name, types::boolean());
+        f.add_comment(format!(
+            "Function Preconditions part {}: {}, {}",
+            i,
+            method.name,
+            method.loc().input_sourcepos()
+        ));
+
+        f.add_arg(String::from("st!0"), String::from("Model_t"));
+        for a in method.args.iter() {
+            f.add_arg(a.name.clone(), types::type_to_smt2(&a.ptype));
+        }
+
+        f.add_body(expr::expr_to_smt2(pre, "st!0"));
+        smt.function(f);
+    }
+
     let name = format!("{}.pre", method.name);
     let mut f = Function::new(name, types::boolean());
     f.add_comment(format!(
@@ -130,7 +144,7 @@ pub fn add_translate_or_match_flags_fn(smt: &mut Smt2Context, method: &Method) {
         f.add_arg(a.name.clone(), types::type_to_smt2(&a.ptype));
     }
 
-    /// add the type constraints on the function parameters
+    // add the type constraints on the function parameters
     let a = method.args.iter().fold(Term::Binary(true), |e, a| {
         Term::land(e, types::type_to_assms_fn(&a.ptype, a.name.clone()))
     });
@@ -166,13 +180,52 @@ pub fn add_translate_result_check(smt: &mut Smt2Context, method: &Method) {
         Term::bvlt(Term::ident(varstr.clone()), Term::ident("sz".to_string())),
     );
 
+    let mut args = vec![Term::ident(String::from("st!0"))];
+    for a in &method.args {
+        args.push(Term::bvadd(
+            Term::ident(a.name.clone()),
+            Term::ident(varstr.clone()),
+        ));
+    }
+
     let check = Term::bveq(
-        Term::fn_apply(method.name.clone(), vec![Term::ident(String::from("st!0"))]),
+        Term::fn_apply(method.name.clone(), args),
         Term::bvadd(Term::ident(String::from("pa")), Term::ident(varstr)),
     );
 
     let body = Term::forall(forallvars, constr.implies(check));
     f.add_body(body);
+
+    smt.function(f);
+}
+
+pub fn add_map_unmap_protect_assms(smt: &mut Smt2Context, method: &Method) {
+    let fname = format!("{}.assms", method.name);
+
+    let mut f = Function::new(fname, types::boolean());
+    f.add_comment(format!(
+        "Function Assumptions: {}, {}",
+        method.name,
+        method.loc().input_sourcepos()
+    ));
+
+    f.add_arg(String::from("st!0"), String::from("Model_t"));
+    for a in method.args.iter() {
+        f.add_arg(a.name.clone(), types::type_to_smt2(&a.ptype));
+    }
+
+    // add the type constraints on the function parameters
+    let a = method.args.iter().fold(Term::Binary(true), |e, a| {
+        Term::land(e, types::type_to_assms_fn(&a.ptype, a.name.clone()))
+    });
+
+    let expr = method
+        .requires
+        .iter()
+        .filter(|p| !p.has_state_references())
+        .fold(a, |e, p| Term::land(e, expr::expr_to_smt2(p, "st!0")));
+
+    f.add_body(expr);
 
     smt.function(f);
 }
