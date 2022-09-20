@@ -822,6 +822,26 @@ impl<'a> Expr {
     pub fn has_state_references(&self) -> bool {
         self.has_state_interface_references("state")
     }
+
+    /// trying to split the expressions of the form `E and E`
+    pub fn split_and(self) -> Vec<Expr> {
+        match self {
+            Expr::BinaryOperation {
+                lhs,
+                rhs,
+                op: BinOp::Land,
+                ..
+            } => {
+                // println!("Splitting: {}", self);
+                let mut v = lhs.split_and();
+                v.extend(rhs.split_and());
+                v
+            }
+            _ => {
+                vec![self]
+            }
+        }
+    }
 }
 
 impl fmt::Display for Expr {
