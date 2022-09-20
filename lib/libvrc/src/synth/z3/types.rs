@@ -110,7 +110,7 @@ pub fn type_to_smt2(ty: &Type) -> String {
     match ty {
         Type::Boolean => boolean(),
         Type::Integer => num(),
-        Type::Address => num(),
+        Type::Address => addr(),
         Type::VirtualAddress => vaddr(),
         Type::PhysicalAddress => paddr(),
         Type::Flags => flags(),
