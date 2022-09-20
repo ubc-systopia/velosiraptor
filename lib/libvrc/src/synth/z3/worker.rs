@@ -34,13 +34,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::sync::Arc;
 use std::thread;
+use std::time::Duration;
 //use std::collections::hash_map::DefaultHasher;
 //use std::hash::Hasher
 use std::collections::HashMap;
 // use std::hash::Hash;
-
-// external library improts
-use smt2::Smt2Context;
 
 // own create imports
 use super::instance::Z3Instance;
@@ -76,7 +74,7 @@ impl Z3Worker {
     }
 
     pub fn with_context(wid: usize, logpath: Option<&PathBuf>, task: Arc<Z3Query>) -> Self {
-        println!("[z3-worker-{}] creating new", wid);
+        // println!("[z3-worker-{}] creating new", wid);
 
         // create the running flag
         let running = Arc::new(AtomicBool::new(true));
@@ -96,12 +94,12 @@ impl Z3Worker {
         let thread = thread::Builder::new()
             .name(format!("z3-worker-{}", wid))
             .spawn(move || {
-                println!("[z3-worker-{}] starting...", wid);
+                // println!("[z3-worker-{}] starting...", wid);
                 while running_clone.load(Ordering::Relaxed) {
                     let msg = task_rx.recv();
                     let result = match msg {
                         Ok(Z3QueryMsg::Query(id, query)) => {
-                            println!("[z3-worker-{}] new query...", wid);
+                            // println!("[z3-worker-{}] new query...", wid);
                             match z3.exec(&query) {
                                 Ok(mut result) => {
                                     result.set_query(query);
@@ -123,7 +121,7 @@ impl Z3Worker {
                             continue;
                         }
                         Ok(Z3QueryMsg::Terminate) => {
-                            println!("[z3-worker-{}] terminating Z3 instance...", wid);
+                            // println!("[z3-worker-{}] terminating Z3 instance...", wid);
                             // terminate the z3 instance
                             z3.terminate();
                             running_clone.store(false, Ordering::Relaxed);
@@ -131,22 +129,22 @@ impl Z3Worker {
                         }
                         Err(_) => {
                             // channel closed, exit
-                            println!("[z3-worker-{}] channel closed...", wid);
+                            // println!("[z3-worker-{}] channel closed...", wid);
                             running_clone.store(false, Ordering::Relaxed);
                             z3.terminate();
                             break;
                         }
                     };
 
-                    println!("[z3-worker-{}] sending result", wid);
+                    // println!("[z3-worker-{}] sending result", wid);
                     let msg = result_tx.send(result);
                     if msg.is_err() {
-                        println!("[z3-worker-{}] channel closed exiting", wid);
+                        // println!("[z3-worker-{}] channel closed exiting", wid);
                         running_clone.store(false, Ordering::Relaxed);
                         break;
                     }
                 }
-                println!("[z3-worker-{}] exiting...", wid);
+                // println!("[z3-worker-{}] exiting...", wid);
             })
             .unwrap();
 
@@ -174,7 +172,7 @@ impl Z3Worker {
         // set the termintation flag
         self.running.store(false, Ordering::Relaxed);
         if self.task_q.send(Z3QueryMsg::Terminate).is_err() {
-            println!("[z3-worker-{}] channel closed", self.id);
+            // println!("[z3-worker-{}] channel closed", self.id);
         }
         if let Some(thread) = self.thread.take() {
             thread.join().expect("thread join failed");
@@ -307,9 +305,9 @@ impl Z3Worker {
 
 impl Drop for Z3Worker {
     fn drop(&mut self) {
-        println!("[z3-worker-{}] dropping...", self.id);
+        // println!("[z3-worker-{}] dropping...", self.id);
         self.terminate();
-        println!("[z3-worker-{}] dropped...", self.id);
+        // println!("[z3-worker-{}] dropped...", self.id);
     }
 }
 
@@ -330,7 +328,7 @@ impl Z3WorkerPool {
     }
 
     pub fn with_num_workers(num_workers: usize, logpath: Option<&PathBuf>) -> Self {
-        println!("[z3-pool] initializing with {} workers", num_workers);
+        // println!("[z3-pool] initializing with {} workers", num_workers);
 
         let mut workers_idle = Vec::with_capacity(num_workers);
         for i in 1..=num_workers {
@@ -358,10 +356,10 @@ impl Z3WorkerPool {
         logpath: Option<&PathBuf>,
         ctx: Z3Query,
     ) -> Self {
-        println!(
-            "[z3-pool] initializing with {} workers, and context",
-            num_workers
-        );
+        // println!(
+        //     "[z3-pool] initializing with {} workers, and context",
+        //     num_workers
+        // );
 
         let ctx = Arc::new(ctx);
         let mut workers_idle = Vec::with_capacity(num_workers);
@@ -391,19 +389,10 @@ impl Z3WorkerPool {
         self.workers_busy = busy_workers;
     }
 
-    pub fn submit_task(&mut self, task: Z3Query) -> Result<Z3Ticket, Z3Query> {
-        // use some hashing stuff to do caching of queries...
-        // let mut s = DefaultHasher::new();
-        // task.hash(&mut s);
-        // let id = s.finish();
-        self.check_completed_tasks();
-
-        // get the ticket
-        self.num_queries += 1;
-        let id = Z3Ticket(self.num_queries);
-
-        // add the task to the queue
-        self.taskq.push_back((id, task));
+    fn try_send_tasks(&mut self) {
+        if self.taskq.is_empty() {
+            return;
+        }
 
         if let Some(mut w) = self.workers_idle.pop() {
             let (id, task) = self.taskq.pop_front().unwrap();
@@ -418,7 +407,35 @@ impl Z3WorkerPool {
                 }
             }
         }
+    }
+
+    pub fn submit_query(&mut self, task: Z3Query) -> Result<Z3Ticket, Z3Query> {
+        // use some hashing stuff to do caching of queries...
+        // let mut s = DefaultHasher::new();
+        // task.hash(&mut s);
+        // let id = s.finish();
+        self.check_completed_tasks();
+
+        // get the ticket
+        self.num_queries += 1;
+        let id = Z3Ticket(self.num_queries);
+
+        // add the task to the queue
+        self.taskq.push_back((id, task));
+        self.try_send_tasks();
+        // no workers available, that's ok.
         Ok(id)
+    }
+
+    pub fn wait_for_completion(&mut self) {
+        loop {
+            self.check_completed_tasks();
+            self.try_send_tasks();
+            if self.workers_busy.is_empty() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(1));
+        }
     }
 
     pub fn reset(&mut self) {

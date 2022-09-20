@@ -46,7 +46,7 @@ pub struct Z3Instance {
 impl Z3Instance {
     /// creates a new z3 instance with the given identifier
     pub fn new(id: usize) -> Self {
-        println!("[z3-inst-{}] creating new", id);
+        // println!("[z3-inst-{}] creating new", id);
 
         Z3Instance {
             id,
@@ -57,11 +57,11 @@ impl Z3Instance {
 
     /// creates a new Z3 instace with the supplied log path
     pub fn with_logpath(id: usize, logpath: &PathBuf) -> Self {
-        println!(
-            "[z3-inst-{}] creating new with log {}",
-            id,
-            logpath.display()
-        );
+        // println!(
+        //     "[z3-inst-{}] creating new with log {}",
+        //     id,
+        //     logpath.display()
+        // );
 
         // create the log directory if it does not exist
         fs::create_dir_all(logpath).expect("failed to create the log directory");
@@ -71,7 +71,7 @@ impl Z3Instance {
         let logfile = match File::create(p) {
             Ok(f) => Some(f),
             Err(e) => {
-                println!("[z3-inst-{}] failed to create the file: {}", id, e);
+                // println!("[z3-inst-{}] failed to create the file: {}", id, e);
                 None
             }
         };
@@ -117,7 +117,7 @@ impl Z3Instance {
             match self.exec(&Z3Query::reset()) {
                 Ok(r) => Ok(()),
                 Err(e) => {
-                    println!("[z3-inst-{}] failed to reset", self.id);
+                    // println!("[z3-inst-{}] failed to reset", self.id);
                     Err(())
                 }
             }
@@ -126,7 +126,7 @@ impl Z3Instance {
 
     ///executes the query
     pub fn exec(&mut self, query: &Z3Query) -> Result<Z3Result, ()> {
-        println!("[z3-inst-{}] writing commands", self.id);
+        // println!("[z3-inst-{}] writing commands", self.id);
 
         // write the commands to the z3 process' stdin
         if let Some(z3_stdin) = self.z3_proc.stdin.as_mut() {
@@ -150,7 +150,7 @@ impl Z3Instance {
         }
 
         // read back the results from stdout
-        println!("[z3-inst-{}] reading results...", self.id);
+        // println!("[z3-inst-{}] reading results...", self.id);
 
         let result = if let Some(z3_stdout) = self.z3_proc.stdout.as_mut() {
             // create a buffer reader for the z3_stdout
@@ -174,7 +174,7 @@ impl Z3Instance {
             String::new()
         };
 
-        println!("[z3-inst-{}] result '{}'", self.id, result);
+        // println!("[z3-inst-{}] result '{}'", self.id, result);
         Ok(Z3Result::new(result))
     }
 }
