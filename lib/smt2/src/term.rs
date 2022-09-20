@@ -164,6 +164,44 @@ impl fmt::Display for MatchCase {
     }
 }
 
+#[derive(Clone, Hash)]
+pub struct Attribute {
+    keyword: String,
+    value: Option<String>,
+}
+
+impl Attribute {
+    pub fn new(keyword: String) -> Self {
+        Self {
+            keyword,
+            value: None,
+        }
+    }
+
+    pub fn with_value(keyword: String, value: String) -> Self {
+        Self {
+            keyword,
+            value: Some(value),
+        }
+    }
+
+    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        write!(fmt, ":{} ", self.keyword)?;
+        if let Some(value) = &self.value {
+            write!(fmt, "{}", value)?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for Attribute {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut ret = String::new();
+        self.fmt(&mut Formatter::new(&mut ret)).unwrap();
+        write!(f, "{}", ret)
+    }
+}
+
 /// Represents an expression in SMT2
 ///
 /// # Example
@@ -185,7 +223,7 @@ pub enum Term {
     Exists(Vec<SortedVar>, Box<Term>),
     Let(Vec<VarBinding>, Box<Term>),
     Match(Box<Term>, Vec<MatchCase>),
-    // AttributedTerm(Box<Term>, Vec<Attribute>),
+    AttributedTerm(Box<Term>, Vec<Attribute>),
 }
 
 impl Term {
@@ -208,6 +246,13 @@ impl Term {
 
     pub fn ident(s: String) -> Self {
         Term::Identifier(s)
+    }
+
+    pub fn named(term: Term, name: String) -> Self {
+        Term::AttributedTerm(
+            Box::new(term),
+            vec![Attribute::with_value(String::from("named"), name)],
+        )
     }
 
     pub fn letexpr(vars: Vec<VarBinding>, expr: Term) -> Self {
@@ -401,7 +446,18 @@ impl Term {
                 })?;
                 writeln!(fmt, " )")?;
                 write!(fmt, ")")
-            } // Term::AttributedTerm(vars, expr) => {}
+            }
+            Term::AttributedTerm(term, attrs) => {
+                writeln!(fmt, "(! ")?;
+                fmt.indent(|f| term.fmt(f))?;
+                for (i, a) in attrs.iter().enumerate() {
+                    if i != 0 {
+                        write!(fmt, " ")?;
+                    }
+                    a.fmt(fmt)?;
+                }
+                writeln!(fmt, ")")
+            }
         }
     }
 }
