@@ -68,10 +68,10 @@ impl<'a> AstNodeGeneric<'a> for Map {
     }
 
     /// rewrite the ast
-    fn rewrite(&'a mut self, st: &mut SymbolTable<'a>) {
+    fn rewrite(&'a mut self) {
         match self {
-            Map::Explicit(map) => map.rewrite(st),
-            Map::ListComprehension(map) => map.rewrite(st),
+            Map::Explicit(map) => map.rewrite(),
+            Map::ListComprehension(map) => map.rewrite(),
         };
     }
 
@@ -217,8 +217,6 @@ impl<'a> AstNodeGeneric<'a> for MapEntry {
         // all fine for now
         let mut res = Issues::ok();
 
-        println!("MapEntry: checking!");
-
         // Check 1: Check whether the unit parameters are well-formed
         // --------------------------------------------------------------------------------------
         // Type:        Error
@@ -301,11 +299,6 @@ impl<'a> AstNodeGeneric<'a> for MapEntry {
         }
 
         res
-    }
-
-    /// rewrite the ast
-    fn rewrite(&mut self, _st: &mut SymbolTable) {
-        // no-op
     }
 
     /// returns a printable string representation of the ast node

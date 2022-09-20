@@ -320,7 +320,7 @@ impl Method {
         res = res + self.check_argnum(FN_SIG_MAP, 4);
 
         if !self.args.is_empty() {
-            res = res + Self::check_param(FN_SIG_MAP, &self.args[0], "va", Type::Address);
+            res = res + Self::check_param(FN_SIG_MAP, &self.args[0], "va", Type::VirtualAddress);
         }
         if !self.args.len() >= 2 {
             res = res + Self::check_param(FN_SIG_MAP, &self.args[1], "sz", Type::Size);
@@ -329,7 +329,7 @@ impl Method {
             res = res + Self::check_param(FN_SIG_MAP, &self.args[2], "flgs", Type::Flags);
         }
         if !self.args.len() >= 4 {
-            res = res + Self::check_param(FN_SIG_MAP, &self.args[3], "pa", Type::Address);
+            res = res + Self::check_param(FN_SIG_MAP, &self.args[3], "pa", Type::PhysicalAddress);
         }
 
         res
@@ -417,6 +417,27 @@ impl Method {
                 .flat_map(|s| s.get_state_references())
                 .collect::<Vec<String>>(),
         );
+        v.extend(
+            self.requires
+                .iter()
+                .flat_map(|s| s.get_state_references())
+                .collect::<Vec<String>>(),
+        );
+        v
+    }
+
+    pub fn get_state_references_body(&self) -> HashSet<String> {
+        let mut v = HashSet::new();
+
+        if let Some(stmts) = &self.stmts {
+            v.extend(stmts.get_state_references());
+        }
+
+        v
+    }
+
+    pub fn get_state_references_pre(&self) -> HashSet<String> {
+        let mut v = HashSet::new();
         v.extend(
             self.requires
                 .iter()
@@ -573,5 +594,13 @@ impl<'a> AstNodeGeneric<'a> for Method {
     /// returns the location of the current
     fn loc(&self) -> &TokenStream {
         &self.pos
+    }
+
+    fn rewrite(&'a mut self) {
+        let mut preconditions = Vec::new();
+        for e in self.requires.drain(..) {
+            preconditions.extend(e.split_and());
+        }
+        self.requires = preconditions;
     }
 }

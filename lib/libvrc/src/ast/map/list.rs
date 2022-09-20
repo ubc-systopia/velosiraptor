@@ -273,11 +273,6 @@ impl<'a> AstNodeGeneric<'a> for ListComprehensionMap {
         res
     }
 
-    /// rewrite the ast
-    fn rewrite(&mut self, _st: &mut SymbolTable) {
-        // no-op
-    }
-
     /// returns a printable string representation of the ast node
     fn name(&self) -> &str {
         "map"

@@ -448,6 +448,17 @@ impl<'a> AstNodeGeneric<'a> for Segment {
         res
     }
 
+    fn rewrite(&'a mut self) {
+        println!("rewriting segment {}", self.name);
+        for c in &mut self.consts {
+            c.rewrite();
+        }
+
+        for m in &mut self.methods {
+            m.rewrite();
+        }
+    }
+
     /// returns the location of the current
     fn loc(&self) -> &TokenStream {
         &self.pos

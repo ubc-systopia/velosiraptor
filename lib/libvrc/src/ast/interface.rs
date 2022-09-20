@@ -276,11 +276,6 @@ impl<'a> AstNodeGeneric<'a> for Interface {
         res
     }
 
-    // rewrite the ast
-    fn rewrite(&mut self, _st: &mut SymbolTable) {
-        // no-op
-    }
-
     /// returns a printable string representing the ast node
     fn name(&self) -> &str {
         "interface"

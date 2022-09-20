@@ -92,7 +92,7 @@ pub trait AstNodeGeneric<'a> {
     }
 
     // reqrite the ast
-    fn rewrite(&'a mut self, _st: &mut SymbolTable<'a>) {
+    fn rewrite(&'a mut self) {
         // no-op
     }
 

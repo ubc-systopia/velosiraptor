@@ -64,8 +64,15 @@ impl Unit {
         matches!(self, Unit::StaticMap(_))
     }
 
-    pub fn is_ssegment(&self) -> bool {
+    pub fn is_segment(&self) -> bool {
         matches!(self, Unit::Segment(_))
+    }
+
+    pub fn as_segment(&self) -> Option<&Segment> {
+        match self {
+            Unit::Segment(s) => Some(s),
+            _ => None,
+        }
     }
 
     pub fn location(&self) -> String {
@@ -205,6 +212,14 @@ impl<'a> AstNodeGeneric<'a> for Unit {
         match self {
             Unit::StaticMap(staticmap) => staticmap.check(st),
             Unit::Segment(segment) => segment.check(st),
+        }
+    }
+
+    // reqrite the ast
+    fn rewrite(&'a mut self) {
+        match self {
+            Unit::StaticMap(staticmap) => staticmap.rewrite(),
+            Unit::Segment(segment) => segment.rewrite(),
         }
     }
 
