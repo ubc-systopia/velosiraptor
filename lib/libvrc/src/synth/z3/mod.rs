@@ -26,12 +26,13 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use smt2::{Smt2Context, Smt2File};
+use smt2::{Smt2Context, Smt2File, SortedVar, Term};
 
-use crate::ast::{AstNodeGeneric, AstRoot, Segment};
+use crate::ast::{AstNodeGeneric, AstRoot, Method, Segment};
 use crate::synth::SynthError;
 
-use self::query::Z3Query;
+use self::operations::Program;
+use self::query::{Z3Query, Z3Ticket};
 use self::worker::Z3WorkerPool;
 
 mod consts;
@@ -59,7 +60,7 @@ impl SynthZ3 {
         let outdir = outdir.join(&pkg).join("synth");
         fs::create_dir_all(&outdir).expect("Failed to create synth directory");
 
-        let mut workerpool = if parallelism > 0 {
+        let workerpool = if parallelism > 0 {
             Z3WorkerPool::with_num_workers(parallelism, Some(&outdir))
         } else {
             Z3WorkerPool::new(Some(&outdir))
@@ -80,7 +81,7 @@ impl SynthZ3 {
     }
 
     fn create_unit_context(&self, unit: &Segment) -> Smt2Context {
-        let mut smt = Smt2Context::with_default_options();
+        let mut smt = Smt2Context::new();
 
         // general definitions
 
@@ -94,12 +95,21 @@ impl SynthZ3 {
         method::add_methods(&mut smt, &unit.methods);
 
         smt.section(String::from("Translate and Matchflags"));
-        let t_fn = unit.get_method("translate").unwrap();
-        method::add_translate_or_match_flags_fn(&mut smt, t_fn);
-        method::add_translate_result_check(&mut smt, t_fn);
+        let m = unit.get_method("translate").unwrap();
+        method::add_translate_or_match_flags_fn(&mut smt, m);
+        method::add_translate_result_check(&mut smt, m);
 
-        let t_fn = unit.get_method("matchflags").unwrap();
-        method::add_translate_or_match_flags_fn(&mut smt, t_fn);
+        let m = unit.get_method("matchflags").unwrap();
+        method::add_translate_or_match_flags_fn(&mut smt, m);
+
+        let m = unit.get_method("map").unwrap();
+        method::add_map_unmap_protect_assms(&mut smt, m);
+
+        let m = unit.get_method("unmap").unwrap();
+        method::add_map_unmap_protect_assms(&mut smt, m);
+
+        let m = unit.get_method("protect").unwrap();
+        method::add_map_unmap_protect_assms(&mut smt, m);
 
         smt
     }
@@ -117,18 +127,287 @@ impl SynthZ3 {
         z3file
     }
 
-    fn synth_map_part(&mut self, part: &str, unit: &Segment) -> Smt2File {
-        // create the context
-        let smtfile = self.outdir.join(format!("{}_map_{}.smt2", unit.name, part));
-        let _m = unit.get_method(part).unwrap();
+    fn add_requires_tasks(&mut self, unit: &Segment, m: &Method) {}
 
-        let smt = self.synth_create(smtfile, unit);
-        let _m = unit.get_method("map").unwrap();
-        // synth::add_synthesis(&mut rkt, part, unit, m);
-        smt
+    fn add_synth_map_translate_tasks(&mut self, unit: &mut Segment) {
+        // get the map functions
+        let m_fn = unit.get_method("map").unwrap();
+        // get the translate function
+        let t_fn = unit.get_method("translate").unwrap();
     }
 
-    fn add_synth_map_tasks(&mut self, _unit: &mut Segment) {}
+    // fn add_synth_map_matchflags_tasks(&mut self, unit: &mut Segment) {
+    //     // get the map functions
+    //     let m_fn = unit.get_method("map").unwrap();
+    //     // get the translate function
+    //     let t_fn = unit.get_method("matchflags").unwrap();
+
+    //     /* preconditions */
+    // }
+
+    fn add_check_for_precondition(
+        &mut self,
+        m_fn: &Method,
+        progs: &mut Vec<Program>,
+    ) -> Vec<Z3Ticket> {
+        for (i, prog) in progs.drain(..).enumerate() {
+            println!("____ PROGRAM");
+
+            let (mut smt, symvars) = prog.to_smt2("map", m_fn.args.as_slice());
+
+            smt.echo(format!("map-program-{}", i));
+
+            let mut vars = vec![SortedVar::new(
+                String::from("st!0"),
+                String::from("Model_t"),
+            )];
+            for a in &m_fn.args {
+                vars.push(SortedVar::new(
+                    a.name.clone(),
+                    types::type_to_smt2(&a.ptype),
+                ));
+            }
+
+            let pre = Term::fn_apply(
+                String::from("translate.assms"),
+                vec![
+                    Term::ident(String::from("st!0")),
+                    Term::ident(String::from("va")),
+                ],
+            );
+
+            let mut map_fn_args = vec![Term::ident(String::from("st!0"))];
+            for v in m_fn.args.iter() {
+                map_fn_args.push(Term::ident(v.name.clone()));
+            }
+
+            let check = Term::fn_apply(
+                String::from("translate.pre"),
+                vec![
+                    Term::fn_apply(String::from("map"), map_fn_args),
+                    Term::ident(String::from("va")),
+                ],
+            );
+
+            let t = Term::forall(vars, pre.implies(check));
+
+            smt.assert(t);
+            smt.check_sat();
+
+            symvars.add_get_values(&mut smt);
+
+            let mut smtctx = Smt2Context::new();
+            smtctx.subsection(String::from("Verification"));
+            smtctx.level(smt);
+
+            let mut query = Z3Query::from(smtctx);
+            query.set_program(prog);
+
+            match self.workerpool.submit_query(query) {
+                Ok(t) => {
+                    println!("Submitted query: {}", t);
+                }
+                Err(e) => {
+                    println!("Failed to submit query.");
+                }
+            }
+        }
+        Vec::new()
+    }
+
+    fn add_synth_map_tasks(&mut self, unit: &mut Segment) {
+        // get the map functions
+        let m_fn = unit.get_method("map").unwrap();
+        // get the translate function
+        let t_fn = unit.get_method("translate").unwrap();
+        // get the translate function
+        let f_fn = unit.get_method("matchflags").unwrap();
+
+        // --------------------------------------------------------------------------------------
+        // Translate: Check whether the pre-conditions can be satisfied
+        // --------------------------------------------------------------------------------------
+
+        // --------------------------------------------------------------------------------------
+        // Matchflags: Check whether the pre-conditions can be satisfied
+        // --------------------------------------------------------------------------------------
+
+        // --------------------------------------------------------------------------------------
+        // Translate: Add a query for each of the pre-conditions of the function
+        // --------------------------------------------------------------------------------------
+
+        for (i, pre) in t_fn
+            .requires
+            .iter()
+            .filter(|p| p.has_state_references())
+            .enumerate()
+        {
+            let state_syms = pre.get_state_references();
+
+            let state_bits = unit.state.referenced_field_bits(&state_syms);
+            let mut st_access_fields = unit
+                .interface
+                .fields_accessing_state(&state_syms, &state_bits);
+
+            // construct the program builder
+            let mut builder = operations::ProgramsBuilder::new();
+            for v in m_fn.args.iter() {
+                builder.add_var(v.name.clone());
+            }
+
+            for f in st_access_fields.iter() {
+                let mut parts = f.split(".");
+                let _ = parts.next();
+                let field = parts.next().unwrap();
+                let slice = parts.next().unwrap();
+
+                builder.add_field_slice(field, slice);
+            }
+
+            let mut progs = builder.construct_programs(false);
+            // let mut progs = builder.construct_programs(true);
+
+            // TODO: construct the task
+        }
+
+        // --------------------------------------------------------------------------------------
+        // Translate: check translation result
+        // --------------------------------------------------------------------------------------
+
+        // --------------------------------------------------------------------------------------
+        // Matchflags: Add a query for each of the pre-conditions of the function
+        // --------------------------------------------------------------------------------------
+
+        for (i, pre) in f_fn
+            .requires
+            .iter()
+            .filter(|p| p.has_state_references())
+            .enumerate()
+        {
+            let state_syms = pre.get_state_references();
+
+            let state_bits = unit.state.referenced_field_bits(&state_syms);
+            let mut st_access_fields = unit
+                .interface
+                .fields_accessing_state(&state_syms, &state_bits);
+
+            // construct the program builder
+            let mut builder = operations::ProgramsBuilder::new();
+            for v in m_fn.args.iter() {
+                builder.add_var(v.name.clone());
+            }
+
+            for f in st_access_fields.iter() {
+                let mut parts = f.split(".");
+                let _ = parts.next();
+                let field = parts.next().unwrap();
+                let slice = parts.next().unwrap();
+
+                builder.add_field_slice(field, slice);
+            }
+
+            let mut progs = builder.construct_programs(false);
+            let mut progs = builder.construct_programs(true);
+
+            // TODO: construct the task
+        }
+
+        // --------------------------------------------------------------------------------------
+        // Collect and combine the results of the queries, verify again
+        // --------------------------------------------------------------------------------------
+
+        // --------------------------------------------------------------------------------------
+        // Add a query for each of the pre-conditions of the function
+        // --------------------------------------------------------------------------------------
+
+        // get the state references for the pre-condition
+        let state_syms = t_fn.get_state_references_pre();
+
+        let state_bits = unit.state.referenced_field_bits(&state_syms);
+        let mut st_access_fields = unit
+            .interface
+            .fields_accessing_state(&state_syms, &state_bits);
+
+        // construct the program builder
+        let mut builder = operations::ProgramsBuilder::new();
+        for v in m_fn.args.iter() {
+            builder.add_var(v.name.clone());
+        }
+
+        for f in st_access_fields.iter() {
+            let mut parts = f.split(".");
+            let _ = parts.next();
+            let field = parts.next().unwrap();
+            let slice = parts.next().unwrap();
+
+            builder.add_field_slice(field, slice);
+        }
+
+        let mut progs = builder.construct_programs(false);
+        for (i, prog) in progs.drain(..).enumerate() {
+            println!("____ PROGRAM");
+
+            let (mut smt, symvars) = prog.to_smt2("map", m_fn.args.as_slice());
+
+            smt.echo(format!("map-program-{}", i));
+
+            let mut vars = vec![SortedVar::new(
+                String::from("st!0"),
+                String::from("Model_t"),
+            )];
+            for a in &m_fn.args {
+                vars.push(SortedVar::new(
+                    a.name.clone(),
+                    types::type_to_smt2(&a.ptype),
+                ));
+            }
+
+            let pre = Term::fn_apply(
+                String::from("translate.assms"),
+                vec![
+                    Term::ident(String::from("st!0")),
+                    Term::ident(String::from("va")),
+                ],
+            );
+
+            let mut map_fn_args = vec![Term::ident(String::from("st!0"))];
+            for v in m_fn.args.iter() {
+                map_fn_args.push(Term::ident(v.name.clone()));
+            }
+
+            let check = Term::fn_apply(
+                String::from("translate.pre"),
+                vec![
+                    Term::fn_apply(String::from("map"), map_fn_args),
+                    Term::ident(String::from("va")),
+                ],
+            );
+
+            let t = Term::forall(vars, pre.implies(check));
+
+            smt.assert(t);
+            smt.check_sat();
+
+            symvars.add_get_values(&mut smt);
+
+            let mut smtctx = Smt2Context::new();
+            smtctx.subsection(String::from("Verification"));
+            smtctx.level(smt);
+
+            let mut query = Z3Query::from(smtctx);
+            query.set_program(prog);
+
+            match self.workerpool.submit_query(query) {
+                Ok(t) => {
+                    println!("Submitted query: {}", t);
+                }
+                Err(e) => {
+                    println!("Failed to submit query.");
+                }
+            }
+        }
+
+        self.workerpool.wait_for_completion();
+    }
 
     /// synthesizes the `map` function and returns an ast of it
     pub fn synth_map(&mut self, ast: &mut AstRoot) -> Result<(), SynthError> {
@@ -144,166 +423,13 @@ impl SynthZ3 {
         }
 
         return Ok(());
-
-        // let _m_fn = unit.get_method("map").unwrap();
-        // let mut smt = Smt2Context::new();
-
-        // smt.subsection(String::from("State operations"));
-        // smt.variable(VarDecl::new(String::from("st!0"), String::from("Model_t")));
-
-        // // model::add_goal(&mut smt, m);
-
-        // let mut f = Function::new(String::from("map"), String::from("Model_t"));
-        // f.add_arg(String::from("st"), types::model());
-        // f.add_body(Term::fn_apply(
-        //     String::from("Model.State.pte.present.set"),
-        //     vec![Term::ident(String::from("st")), Term::num(1)],
-        // ));
-        // smt.function(f);
-
-        // let mut f = Function::new(String::from("assms"), types::boolean());
-        // f.add_arg(String::from("st"), types::model());
-        // f.add_arg(String::from("va"), types::num());
-        // f.add_body(Term::land(
-        //     Term::bvlt(Term::ident(String::from("va")), Term::num(0x1000)),
-        //     Term::bvge(Term::ident(String::from("va")), Term::num(0)),
-        // ));
-        // smt.function(f);
-
-        // smt.subsection(String::from("Verification"));
-        // smt.comment(String::from("TODO: operations to check"));
-
-        // let vars = vec![
-        //     SortedVar::new(String::from("st!0"), String::from("Model_t")),
-        //     SortedVar::new(String::from("va"), types::num()),
-        //     SortedVar::new(String::from("size"), types::num()),
-        //     SortedVar::new(String::from("flags"), types::flags()),
-        //     SortedVar::new(String::from("pa"), types::num()),
-        // ];
-
-        // let term = Term::fn_apply(
-        //     String::from("assms"),
-        //     vec![
-        //         Term::ident(String::from("st!0")),
-        //         Term::ident(String::from("va")),
-        //     ],
-        // )
-        // .implies(Term::fn_apply(
-        //     String::from("translate.pre"),
-        //     vec![
-        //         Term::fn_apply(String::from("map"), vec![Term::ident(String::from("st!0"))]),
-        //         Term::ident(String::from("va")),
-        //     ],
-        // ));
-
-        // let t = Term::forall(vars, term);
-        // smt.assert(t);
-
-        // smt.check_sat();
-
-        // let mut w = worker::Z3Worker::new(1);
-
-        // let t = worker::Z3Task::from(translate);
-        // w.send_task(t);
-        // if let Some(r) = w.recv_result() {
-        //     println!("Got result: {}", r.result);
-        // } else {
-        //     panic!("no result");
-        // }
-
-        // let t = worker::Z3Task::from(smt);
-        // w.send_task(t);
-
-        // if let Some(r) = w.recv_result() {
-        //     println!("Got result: {}", r.result);
-        // } else {
-        //     panic!("no result");
-        // }
-
-        // do the match flags part
-        // let matchflags = self.synth_map_part("matchflags", unit);
-
-        // let t_fn = unit.get_method("matchflags").unwrap();
-        // method::add_translate_or_match_flags_fn(translate.as_context_mut(), t_fn);
-
-        // translate.save();
-        // let output = Command::new("z3")
-        //     .args(["-smt2", translate.file().to_str().unwrap()])
-        //     .output()
-        //     .expect("failed to execute process");
-
-        // // grab the stdout
-        // let s = match String::from_utf8(output.stdout) {
-        //     Ok(v) => v,
-        //     Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-        // };
-
-        // // if it's empty, assume error
-        // if s.is_empty() {
-        //     let e = match String::from_utf8(output.stderr) {
-        //         Ok(v) => v,
-        //         Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-        //     };
-        // }
-
-        // println!("smt output:\n\n{}\n\n", s);
-
-        // let translate_thread = thread::spawn(move || {
-        //     println!("translate thread start!\n");
-        //     translate.save();
-
-        //     let output = Command::new("z3")
-        //         .args(["-smt2", translate.file().to_str().unwrap()])
-        //         .output()
-        //         .expect("failed to execute process");
-
-        //     // grab the stdout
-        //     let s = match String::from_utf8(output.stdout) {
-        //         Ok(v) => v,
-        //         Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-        //     };
-
-        //     // if it's empty, assume error
-        //     if s.is_empty() {
-        //         let e = match String::from_utf8(output.stderr) {
-        //             Ok(v) => v,
-        //             Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-        //         };
-        //         println!("rosette failure!");
-        //         println!("{}", e);
-        //     }
-
-        //     //println!("translate thread done: {}", res_translate);
-        //     //parse_result(&res_translate)
-        // });
-
-        // matchflags.save();
-
-        // translate_thread.join().unwrap();
-
-        //     let ops = Vec::new();
-        //     unit.map_ops = Some(ops);
-        // }
-    }
-
-    fn synth_unmap_part(&mut self, unit: &Segment) -> Smt2File {
-        // create the context
-        let smtfile = self.outdir.join(format!("{}_unmap.smt2", unit.name));
-        let _m = unit.get_method("translate").unwrap();
-
-        let smt = self.synth_create(smtfile, unit);
-
-        // let's pass in the map function here, as we want to invert it's effects
-        let _m = unit.get_method("map").unwrap();
-        // synth::add_synthesis(&mut rkt, "unmap", unit, m);
-        smt
     }
 
     fn add_synth_unmap_tasks(&mut self, unit: &Segment) {
-        let translate = self.synth_unmap_part(unit);
-
-        // spin off multi threaded synthesis...
-        translate.save();
+        // get the unmap functions
+        let m_fn = unit.get_method("unmap").unwrap();
+        // get the translate function
+        let t_fn = unit.get_method("translate").unwrap();
     }
 
     /// synthesizes the 'unmap' function and returns an ast of it
@@ -315,13 +441,13 @@ impl SynthZ3 {
                 self.outdir
             );
 
-            // create the base unit context that provides the framework for synthesis
-            let ctx = self.create_unit_context(unit);
+            // // create the base unit context that provides the framework for synthesis
+            // let ctx = self.create_unit_context(unit);
 
-            // perform worker reset and init with the given context
-            self.workerpool.reset_with_context(Z3Query::from(ctx));
+            // // perform worker reset and init with the given context
+            // self.workerpool.reset_with_context(Z3Query::from(ctx));
 
-            self.add_synth_unmap_tasks(unit);
+            // self.add_synth_unmap_tasks(unit);
 
             let ops = Vec::new();
             unit.unmap_ops = Some(ops);
@@ -340,13 +466,13 @@ impl SynthZ3 {
                 self.outdir
             );
 
-            // create the base unit context that provides the framework for synthesis
-            let ctx = self.create_unit_context(unit);
+            // // create the base unit context that provides the framework for synthesis
+            // let ctx = self.create_unit_context(unit);
 
-            // perform worker reset and init with the given context
-            self.workerpool.reset_with_context(Z3Query::from(ctx));
+            // // perform worker reset and init with the given context
+            // self.workerpool.reset_with_context(Z3Query::from(ctx));
 
-            self.add_synth_protect_tasks(unit);
+            // self.add_synth_protect_tasks(unit);
 
             // perform search
 
