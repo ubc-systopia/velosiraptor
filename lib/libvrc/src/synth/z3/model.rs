@@ -145,7 +145,6 @@ fn add_field_action(
     f.add_comment(format!("performs the write actions of {}", fieldname));
 
     let mut defs = Vec::new();
-
     let mut stvar = String::from("st");
 
     // body = Term::letexpr(vec![VarBinding::new(newvar.clone(), f)], Term::ident(stvar));

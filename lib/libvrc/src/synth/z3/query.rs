@@ -30,7 +30,7 @@ use std::fmt;
 use smt2::{Smt2Command, Smt2Context};
 
 // own crate imports
-use crate::synth::Operation;
+use super::operations::Program;
 
 /// represents a query ticket / identifier
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -45,7 +45,7 @@ impl fmt::Display for Z3Ticket {
 /// represents a Z3 smt query
 pub struct Z3Query {
     /// the operations of this query for bookkeeping purposes
-    ops: Option<Vec<Operation>>,
+    prog: Option<Program>,
 
     /// the statements to be executed
     smt: Smt2Context,
@@ -59,7 +59,7 @@ impl Z3Query {
 
     /// Creates a new Z3 Query with the given SMT context
     pub fn with_context(smt: Smt2Context) -> Self {
-        Self { ops: None, smt }
+        Self { prog: None, smt }
     }
 
     /// whether the query is emtpy
@@ -73,22 +73,12 @@ impl Z3Query {
         let mut smt = Smt2Context::new();
         smt.reset();
 
-        Z3Query { ops: None, smt }
+        Z3Query { prog: None, smt }
     }
 
     /// sets the operations field of the query (book keeping purpose)
-    pub fn set_ops(&mut self, ops: Vec<Operation>) -> &mut Self {
-        self.ops = Some(ops);
-        self
-    }
-
-    /// adds the operation to the existing operations
-    pub fn add_op(&mut self, op: Operation) -> &mut Self {
-        if let Some(ops) = &mut self.ops {
-            ops.push(op);
-        } else {
-            self.ops = Some(vec![op]);
-        }
+    pub fn set_program(&mut self, p: Program) -> &mut Self {
+        self.prog = Some(p);
         self
     }
 
@@ -115,8 +105,8 @@ impl Z3Query {
     }
 
     /// obtains a reference to the operations of this query
-    pub fn ops(&self) -> Option<&Vec<Operation>> {
-        self.ops.as_ref()
+    pub fn ops(&self) -> Option<&Program> {
+        self.prog.as_ref()
     }
 }
 
