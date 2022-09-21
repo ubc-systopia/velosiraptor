@@ -33,7 +33,7 @@ use crate::error::VrsError;
 use crate::synth::SynthError;
 
 use self::operations::Program;
-use self::query::{Z3Query, Z3Ticket};
+use self::query::{Z3Query, Z3Result, Z3Ticket};
 use self::worker::Z3WorkerPool;
 
 mod consts;
@@ -158,8 +158,6 @@ impl SynthZ3 {
             println!("____ PROGRAM");
 
             let (mut smt, symvars) = prog.to_smt2("map", m_fn.args.as_slice());
-
-            smt.echo(format!("map-program-{}", i));
 
             let mut vars = vec![SortedVar::new(
                 String::from("st!0"),
@@ -302,14 +300,12 @@ impl SynthZ3 {
         &mut self,
         m_fn: &Method,
         g_fn: &Method,
-        idx: usize,
+        idx: Option<usize>,
         mut progs: Vec<Program>,
     ) -> Vec<Z3Ticket> {
         let mut tickets = Vec::new();
         for (i, prog) in progs.drain(..).enumerate() {
             let (mut smt, symvars) = prog.to_smt2(&m_fn.name, m_fn.args.as_slice());
-
-            smt.echo(format!("program-{}-{}-{}-{}", m_fn.name, g_fn.name, idx, i));
 
             let mut vars = vec![SortedVar::new(
                 String::from("st!0"),
@@ -340,7 +336,11 @@ impl SynthZ3 {
                 check_args.push(Term::ident(a.name.clone()));
             }
 
-            let check = Term::fn_apply(format!("{}.pre.{}", g_fn.name, idx), check_args);
+            let check = if let Some(i) = idx {
+                Term::fn_apply(format!("{}.pre.{}", g_fn.name, i), check_args)
+            } else {
+                Term::fn_apply(format!("{}.pre", g_fn.name), check_args)
+            };
 
             let t = Term::forall(vars, pre.implies(check));
 
@@ -366,6 +366,25 @@ impl SynthZ3 {
         tickets
     }
 
+    fn obtain_sat_results(&mut self, mut fn_tickets: Vec<Vec<Z3Ticket>>) -> Vec<Vec<Z3Result>> {
+        let mut fn_results = Vec::new();
+        for tickets in fn_tickets.drain(..) {
+            let mut results = Vec::new();
+            for t in tickets {
+                let res = self.workerpool.wait_for_result(t);
+                let mut reslines = res.result().lines();
+                if Some("sat") == reslines.next() {
+                    results.push(res);
+                }
+            }
+            if results.is_empty() {
+                println!("no sat program");
+            }
+            fn_results.push(results);
+        }
+        fn_results
+    }
+
     fn add_synth_map_tasks(&mut self, unit: &mut Segment) {
         // get the map functions
         let m_fn = unit.get_method("map").unwrap();
@@ -383,6 +402,8 @@ impl SynthZ3 {
         // --------------------------------------------------------------------------------------
         // Translate: Add a query for each of the pre-conditions of the function
         // --------------------------------------------------------------------------------------
+
+        let mut t_fn_tickets = Vec::new();
 
         for (i, pre) in t_fn
             .requires
@@ -414,7 +435,8 @@ impl SynthZ3 {
 
             let mut progs = builder.construct_programs(false);
 
-            self.check_programs(m_fn, t_fn, i, progs);
+            let tickets = self.check_programs(m_fn, t_fn, Some(i), progs);
+            t_fn_tickets.push(tickets);
 
             let mut progs = builder.construct_programs(true);
 
@@ -422,13 +444,10 @@ impl SynthZ3 {
         }
 
         // --------------------------------------------------------------------------------------
-        // Translate: check translation result
-        // --------------------------------------------------------------------------------------
-
-        // --------------------------------------------------------------------------------------
         // Matchflags: Add a query for each of the pre-conditions of the function
         // --------------------------------------------------------------------------------------
 
+        let mut f_fn_tickets = Vec::new();
         for (i, pre) in f_fn
             .requires
             .iter()
@@ -459,7 +478,8 @@ impl SynthZ3 {
 
             let mut progs = builder.construct_programs(false);
 
-            self.check_programs(m_fn, f_fn, i, progs);
+            let tickets = self.check_programs(m_fn, f_fn, Some(i), progs);
+            f_fn_tickets.push(tickets);
 
             let mut progs = builder.construct_programs(true);
 
@@ -467,14 +487,55 @@ impl SynthZ3 {
         }
 
         // --------------------------------------------------------------------------------------
+        // Translate: check translation result
+        // --------------------------------------------------------------------------------------
+
+        // --------------------------------------------------------------------------------------
         // Collect and combine the results of the queries, verify again
         // --------------------------------------------------------------------------------------
 
-        // --------------------------------------------------------------------------------------
-        // Add a query for each of the pre-conditions of the function
-        // --------------------------------------------------------------------------------------
+        let mut t_fn_results = self.obtain_sat_results(t_fn_tickets);
+        let mut f_fn_results = self.obtain_sat_results(f_fn_tickets);
 
-        self.workerpool.wait_for_completion();
+        let mut prog_fragments = Vec::new();
+        for p in t_fn_results.iter() {
+            if p.is_empty() {
+                println!("ERROR: no solution found for translate");
+                continue;
+            }
+            prog_fragments.push(p[0].query().program().unwrap());
+        }
+
+        for p in f_fn_results.iter() {
+            if p.is_empty() {
+                println!("ERROR: no solution found for translate");
+                continue;
+            }
+            prog_fragments.push(p[0].query().program().unwrap());
+        }
+
+        // merge the programs
+        let prog = prog_fragments
+            .iter_mut()
+            .fold(Program::new(), |mut acc, x| acc.merge(x));
+
+        let mut tickets = self.check_programs(m_fn, f_fn, None, vec![prog.clone()]);
+        tickets.extend(self.check_programs(m_fn, t_fn, None, vec![prog.clone()]));
+
+        for t in tickets {
+            let res = self.workerpool.wait_for_result(t);
+            let mut reslines = res.result().lines();
+            match reslines.next() {
+                Some("sat") => (),
+                _ => {
+                    println!("ERROR: combined solution doesn't hold!");
+                }
+            }
+        }
+
+        println!("found candidate program: {:?}", prog);
+
+        unit.map_ops = Some(prog.into());
     }
 
     /// synthesizes the `map` function and returns an ast of it

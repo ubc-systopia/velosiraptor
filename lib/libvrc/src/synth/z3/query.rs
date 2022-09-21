@@ -105,7 +105,7 @@ impl Z3Query {
     }
 
     /// obtains a reference to the operations of this query
-    pub fn ops(&self) -> Option<&Program> {
+    pub fn program(&self) -> Option<&Program> {
         self.prog.as_ref()
     }
 }
@@ -183,6 +183,18 @@ impl Z3Result {
     /// returns the result of the task
     pub fn result(&self) -> &str {
         &self.result
+    }
+}
+
+impl fmt::Display for Z3Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Result: {}", self.result)
+    }
+}
+
+impl fmt::Debug for Z3Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Result: {}", self.result)
     }
 }
 

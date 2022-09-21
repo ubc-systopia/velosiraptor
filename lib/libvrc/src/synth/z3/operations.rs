@@ -32,6 +32,7 @@ use std::sync::Arc;
 use smt2::{Function, Smt2Context, Term, VarBinding, VarDecl};
 
 use crate::ast::Param;
+use crate::synth::{OpExpr, Operation};
 
 use super::types;
 
@@ -48,11 +49,22 @@ enum ArgX {
     Var(Arc<String>),
 }
 
-#[derive(Debug)]
+impl From<&ArgX> for OpExpr {
+    fn from(prog: &ArgX) -> Self {
+        match prog {
+            ArgX::Num => panic!("not yet handled!"),
+            ArgX::Zero => OpExpr::Num(0),
+            ArgX::One => OpExpr::Num(1),
+            ArgX::Var(v) => OpExpr::Var(v.to_string()),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 struct FieldSliceOp(Arc<String>, ArgX);
 
 /// a field operation is either inserting a value into a field or its slice, or reading it
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum FieldOps {
     InsertField(ArgX),
     InsertFieldSlices(Vec<FieldSliceOp>),
@@ -60,10 +72,44 @@ pub enum FieldOps {
 }
 
 /// a field ops is a list of operations on a given field,
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct FieldOperations(Arc<String>, Arc<FieldOps>);
 
+impl From<&FieldOperations> for Vec<Operation> {
+    fn from(prog: &FieldOperations) -> Self {
+        let mut ops = Vec::new();
+        match prog.1.as_ref() {
+            FieldOps::InsertField(arg) => {
+                ops.push(Operation::Insert {
+                    field: prog.0.to_string(),
+                    slice: None,
+                    arg: arg.into(),
+                });
+            }
+            FieldOps::InsertFieldSlices(sliceops) => {
+                for s in sliceops.iter() {
+                    ops.push(Operation::Insert {
+                        field: prog.0.to_string(),
+                        slice: Some(s.0.to_string()),
+                        arg: (&s.1).into(),
+                    });
+                }
+            }
+            FieldOps::ReadAction => {
+                ops.push(Operation::ReadAction {
+                    field: prog.0.to_string(),
+                });
+            }
+        }
+        ops.push(Operation::WriteAction {
+            field: prog.0.to_string(),
+        });
+        ops
+    }
+}
+
 /// the operations are a vector of field ops
+#[derive(Clone, Debug)]
 pub struct Program {
     ops: Vec<Arc<FieldOperations>>,
 }
@@ -108,6 +154,10 @@ impl SymbolicVars {
 }
 
 impl Program {
+    pub fn new() -> Self {
+        Self { ops: Vec::new() }
+    }
+
     pub fn to_smt2(&self, fnname: &str, args: &[Param]) -> (Smt2Context, SymbolicVars) {
         let mut smt = Smt2Context::new();
 
@@ -148,7 +198,6 @@ impl Program {
             smtops.push((fname, None));
         }
 
-
         // define the variables
         symvar.add_to_context(&mut smt);
 
@@ -183,6 +232,28 @@ impl Program {
         smt.function(f);
 
         (smt, symvar)
+    }
+
+    pub fn merge(mut self, other: &Self) -> Self {
+        for op in other.ops.iter() {
+            if !self.ops.contains(&op) {
+                self.ops.push(op.clone());
+            }
+        }
+        self
+    }
+}
+
+impl From<Program> for Vec<Operation> {
+    fn from(mut prog: Program) -> Self {
+        let mut ops: Vec<Operation> = prog
+            .ops
+            .iter_mut()
+            .map(|o| <&FieldOperations as std::convert::Into<Vec<Operation>>>::into(o.as_ref()))
+            .flatten()
+            .collect();
+        ops.push(Operation::Return);
+        ops
     }
 }
 
