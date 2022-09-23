@@ -48,11 +48,10 @@ pub use datatype::DataType;
 use formatter::Formatter;
 pub use function::Function;
 pub use infoflag::InfoFlag;
-pub use options::Attribute;
 pub use options::Smt2Option;
 pub use propliteral::PropLiteral;
 pub use sort::{Sort, SortDecl, SortDef};
-pub use term::{MatchCase, Pattern, SortedVar, Term, VarBinding};
+pub use term::{Attribute, MatchCase, Pattern, SortedVar, Term, VarBinding};
 pub use variable::VarDecl;
 
 /// defines a smtlib2 expression
@@ -96,9 +95,7 @@ impl Smt2File {
         ];
 
         for o in options {
-            context.set_option(Smt2Option::Attribute(Attribute::new_keyword(String::from(
-                o,
-            ))));
+            context.set_option(Smt2Option::Attribute(Attribute::new(String::from(o))));
         }
 
         Smt2File { path, doc, context }

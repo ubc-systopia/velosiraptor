@@ -244,8 +244,21 @@ impl Term {
         Term::FunctionApplication(ident, vec![term])
     }
 
+    pub fn bv_extract(term: Term, s: u64, e: u64) -> Self {
+        let ident = format!("(_ extract {} {})", e, s);
+        Term::FunctionApplication(ident, vec![term])
+    }
+
+    pub fn bv_concat(bv: Vec<Term>) -> Self {
+        Term::FunctionApplication("concat".to_string(), bv)
+    }
+
     pub fn ident(s: String) -> Self {
         Term::Identifier(s)
+    }
+
+    pub fn attributed(term: Term, attrs: Vec<Attribute>) -> Self {
+        Term::AttributedTerm(Box::new(term), attrs)
     }
 
     pub fn named(term: Term, name: String) -> Self {
@@ -276,7 +289,7 @@ impl Term {
     }
 
     pub fn bvshr(lhs: Term, rhs: Term) -> Self {
-        Term::FunctionApplication("bvshr".to_string(), vec![lhs, rhs])
+        Term::FunctionApplication("bvlshr".to_string(), vec![lhs, rhs])
     }
 
     pub fn bveq(lhs: Term, rhs: Term) -> Self {

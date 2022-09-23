@@ -91,11 +91,13 @@ impl Smt2Context {
         ];
 
         for o in options {
-            ctx.set_option(Smt2Option::Attribute(Attribute::new_keyword(String::from(
-                o,
-            ))));
+            ctx.set_option(Smt2Option::Attribute(Attribute::new(String::from(o))));
         }
         ctx
+    }
+
+    pub fn merge(&mut self, mut other: Self) {
+        self.commands.append(&mut other.commands);
     }
 
     pub fn add_command(&mut self, cmd: Smt2Command) -> &mut Self {

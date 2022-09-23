@@ -29,30 +29,8 @@ use std::fmt;
 use std::fmt::Write;
 use std::hash::Hash;
 
+use super::Attribute;
 use super::Formatter;
-
-#[derive(Hash)]
-pub enum Attribute {
-    Keyword(String),
-    KeywordValue(String, String),
-}
-
-impl Attribute {
-    pub fn new_keyword(name: String) -> Self {
-        Self::Keyword(name)
-    }
-
-    pub fn new_keyword_value(name: String, value: String) -> Self {
-        Self::KeywordValue(name, value)
-    }
-
-    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Keyword(s) => write!(fmt, ":{}", s),
-            Self::KeywordValue(s, v) => write!(fmt, ":{} {}", s, v),
-        }
-    }
-}
 
 #[derive(Hash)]
 pub enum Smt2Option {
