@@ -45,7 +45,11 @@ pub fn add_interface_def(smt: &mut Smt2Context, state: &Interface) {
             format!("IFaceField.{}_t", field.name()),
         );
     }
+
+    let accessors = dt.to_field_accessor();
     smt.datatype(dt);
+
+    smt.merge(accessors);
 
     for field in state.fields() {
         add_iface_field_accessors(smt, field);

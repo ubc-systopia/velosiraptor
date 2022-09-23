@@ -161,14 +161,18 @@ pub fn add_translate_or_match_flags_fn(smt: &mut Smt2Context, method: &Method) {
 }
 
 pub fn add_translate_result_check(smt: &mut Smt2Context, method: &Method) {
-    let fname = format!("{}.result", method.name);
+    let fname = format!("{}.result.map", method.name);
     let mut f = Function::new(fname, types::boolean());
     f.add_comment(format!("Checking the {} function result", method.name));
 
     f.add_arg(String::from("st!0"), String::from("Model_t"));
-    for a in method.args.iter() {
-        f.add_arg(a.name.clone(), types::type_to_smt2(&a.ptype));
-    }
+    // for a in method.args.iter() {
+    //     f.add_arg(a.name.clone(), types::type_to_smt2(&a.ptype));
+    // }
+    f.add_arg(String::from("va"), String::from("VAddr_t"));
+    f.add_arg(String::from("sz"), String::from("Size_t"));
+    f.add_arg(String::from("flgs"), String::from("Flags_t"));
+    f.add_arg(String::from("pa"), String::from("PAddr_t"));
 
     let varstr = "i!0".to_string();
     let forallvars = vec![SortedVar::new(varstr.clone(), types::size())];
@@ -191,6 +195,51 @@ pub fn add_translate_result_check(smt: &mut Smt2Context, method: &Method) {
     let check = Term::bveq(
         Term::fn_apply(method.name.clone(), args),
         Term::bvadd(Term::ident(String::from("pa")), Term::ident(varstr)),
+    );
+
+    let body = Term::forall(forallvars, constr.implies(check));
+    f.add_body(body);
+
+    smt.function(f);
+
+    let fname = format!("{}.result.protect", method.name);
+    let mut f = Function::new(fname, types::boolean());
+    f.add_comment(format!("Checking the {} function result", method.name));
+
+    f.add_arg(String::from("st!0"), String::from("Model_t"));
+    f.add_arg(String::from("st!1"), String::from("Model_t"));
+    f.add_arg(String::from("va"), String::from("VAddr_t"));
+    f.add_arg(String::from("sz"), String::from("Size_t"));
+
+    let varstr = "i!0".to_string();
+    let forallvars = vec![SortedVar::new(varstr.clone(), types::size())];
+
+    // forall i | 0 <= i < size :: translate (st!0, va + i) == pa + i
+    // forall i :: 0 <= i < size ==> translate (st!0, va + i) == pa + i
+    let constr = Term::land(
+        Term::bvge(Term::num(0), Term::ident(varstr.clone())),
+        Term::bvlt(Term::ident(varstr.clone()), Term::ident("sz".to_string())),
+    );
+
+    let mut args_new = vec![Term::ident(String::from("st!0"))];
+    for a in &method.args {
+        args_new.push(Term::bvadd(
+            Term::ident(a.name.clone()),
+            Term::ident(varstr.clone()),
+        ));
+    }
+
+    let mut args_old = vec![Term::ident(String::from("st!1"))];
+    for a in &method.args {
+        args_old.push(Term::bvadd(
+            Term::ident(a.name.clone()),
+            Term::ident(varstr.clone()),
+        ));
+    }
+
+    let check = Term::bveq(
+        Term::fn_apply(method.name.clone(), args_new),
+        Term::fn_apply(method.name.clone(), args_old),
     );
 
     let body = Term::forall(forallvars, constr.implies(check));

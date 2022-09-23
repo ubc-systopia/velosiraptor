@@ -60,13 +60,31 @@ impl From<&ArgX> for OpExpr {
     }
 }
 
+/// the arguments are for either a symbolic variable (num) or a variable (var)
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ArgExpr {
+    Arg(ArgX),
+    RShift(ArgX, ArgX),
+}
+
+impl From<&ArgExpr> for OpExpr {
+    fn from(prog: &ArgExpr) -> Self {
+        match prog {
+            ArgExpr::Arg(x) => OpExpr::from(x),
+            ArgExpr::RShift(x, y) => {
+                OpExpr::Shr(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y)))
+            }
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
-struct FieldSliceOp(Arc<String>, ArgX);
+struct FieldSliceOp(Arc<String>, ArgExpr);
 
 /// a field operation is either inserting a value into a field or its slice, or reading it
 #[derive(Debug, PartialEq)]
 pub enum FieldOps {
-    InsertField(ArgX),
+    InsertField(ArgExpr),
     InsertFieldSlices(Vec<FieldSliceOp>),
     ReadAction,
 }
@@ -158,6 +176,26 @@ impl Program {
         Self { ops: Vec::new() }
     }
 
+    fn argx_to_string(arg: &ArgX, symvar: &mut SymbolicVars) -> Term {
+        match arg {
+            ArgX::Num => Term::ident(symvar.next()),
+            ArgX::Zero => Term::num(0),
+            ArgX::One => Term::num(1),
+            ArgX::Var(v) => Term::ident(format!("{}", v)),
+        }
+    }
+
+    fn argexpr_to_term(arg: &ArgExpr, symvar: &mut SymbolicVars) -> Term {
+        match arg {
+            ArgExpr::Arg(x) => Self::argx_to_string(x, symvar),
+            ArgExpr::RShift(x, y) => {
+                let x = Self::argx_to_string(x, symvar);
+                let y = Self::argx_to_string(y, symvar);
+                Term::bvshr(x, y)
+            }
+        }
+    }
+
     pub fn to_smt2(&self, fnname: &str, args: &[Param]) -> (Smt2Context, SymbolicVars) {
         let mut smt = Smt2Context::new();
 
@@ -167,24 +205,14 @@ impl Program {
         for fops in self.ops.iter() {
             match fops.1.deref() {
                 FieldOps::InsertField(arg) => {
-                    let arg = match arg {
-                        ArgX::Num => symvar.next(),
-                        ArgX::Zero => "#x0000000000000000".to_string(),
-                        ArgX::One => "#x0000000000000001".to_string(),
-                        ArgX::Var(v) => format!("{}", v),
-                    };
-                    let fname = format!("Model.IFace.{}.set", fops.0);
+                    let arg = Self::argexpr_to_term(arg, &mut symvar);
+                    let fname = format!("Model.IFace.{}.set!", fops.0);
                     smtops.push((fname, Some(arg)));
                 }
                 FieldOps::InsertFieldSlices(sliceops) => {
                     for sliceop in sliceops.iter() {
-                        let arg = match &sliceop.1 {
-                            ArgX::Num => symvar.next(),
-                            ArgX::Zero => "#x0000000000000000".to_string(),
-                            ArgX::One => "#x0000000000000001".to_string(),
-                            ArgX::Var(v) => format!("{}", v),
-                        };
-                        let fname = format!("Model.IFace.{}.{}.set", fops.0, sliceop.0);
+                        let arg = Self::argexpr_to_term(&sliceop.1, &mut symvar);
+                        let fname = format!("Model.IFace.{}.{}.set!", fops.0, sliceop.0);
                         smtops.push((fname, Some(arg)));
                     }
                 }
@@ -216,7 +244,7 @@ impl Program {
             let m = Term::ident(stvar.clone());
 
             let fcall = match a {
-                Some(a) => Term::fn_apply(f, vec![m, Term::ident(a)]),
+                Some(a) => Term::fn_apply(f, vec![m, a]),
                 None => Term::fn_apply(f, vec![m]),
             };
 
@@ -302,7 +330,7 @@ impl ProgramsBuilder {
         // now we loop over each field and slices to construct all possible operations
         for (field, slices) in &self.fields {
             // all programs that operate on the slices of this field
-            let mut slice_programs: Vec<Vec<ArgX>> = slices.iter().map(|op| vec![]).collect();
+            let mut slice_programs: Vec<Vec<ArgExpr>> = slices.iter().map(|op| vec![]).collect();
             for slice in slices {
                 // the new slice programs we've generated
                 let mut new_slice_programs = Vec::new();
@@ -312,21 +340,32 @@ impl ProgramsBuilder {
                     if !symbolic {
                         for var in &self.vars {
                             let mut program_new = program.clone();
-                            program_new.push(ArgX::Var(var.clone()));
+                            program_new.push(ArgExpr::Arg(ArgX::Var(var.clone())));
                             new_slice_programs.push(program_new);
                         }
+
                         let mut program_new = program.clone();
-                        program_new.push(ArgX::One);
+                        program_new.push(ArgExpr::Arg(ArgX::One));
                         new_slice_programs.push(program_new);
 
                         let mut program_new = program.clone();
-                        program_new.push(ArgX::Zero);
+                        program_new.push(ArgExpr::Arg(ArgX::Zero));
                         new_slice_programs.push(program_new);
                     } else {
                         // add the constant number as well
                         let mut program_new = program.clone();
-                        program_new.push(ArgX::Num);
+                        program_new.push(ArgExpr::Arg(ArgX::Num));
                         new_slice_programs.push(program_new);
+
+                        for var in &self.vars {
+                            let mut program_new = program.clone();
+                            program_new.push(ArgExpr::Arg(ArgX::Var(var.clone())));
+                            new_slice_programs.push(program_new);
+
+                            let mut program_new = program.clone();
+                            program_new.push(ArgExpr::RShift(ArgX::Var(var.clone()), ArgX::Num));
+                            new_slice_programs.push(program_new);
+                        }
                     }
                 }
                 // set them as the current programs

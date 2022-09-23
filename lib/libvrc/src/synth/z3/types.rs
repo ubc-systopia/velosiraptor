@@ -88,6 +88,26 @@ pub fn add_type_constraints(smt: &mut Smt2Context, name: String, maxbits: u64) {
     smt.function(f);
 }
 
+fn add_type_constraints_size(smt: &mut Smt2Context, name: String, maxbits: u64) {
+    let fnname = format!("{}.assms", name);
+    let mut f = Function::new(fnname, boolean());
+    f.add_comment(format!("Type constraints {}", name));
+    f.add_arg(String::from("v"), name);
+
+    let body = if maxbits == DEFAULT_BIT_WIDTH {
+        Term::binary(true)
+    } else {
+        let maxval = 1 << maxbits;
+        Term::land(
+            Term::bvge(Term::ident("v".to_string()), Term::num(0)),
+            Term::bvle(Term::ident("v".to_string()), Term::num(maxval)),
+        )
+    };
+
+    f.add_body(body);
+    smt.function(f);
+}
+
 pub fn add_type_defs(smt: &mut Smt2Context, inaddr: u64, outaddr: u64) {
     smt.section(String::from("Type Definitions"));
 
@@ -102,8 +122,9 @@ pub fn add_type_defs(smt: &mut Smt2Context, inaddr: u64, outaddr: u64) {
     add_type_constraints(smt, addr(), DEFAULT_BIT_WIDTH);
     add_type_constraints(smt, vaddr(), inaddr);
     add_type_constraints(smt, paddr(), outaddr);
-    add_type_constraints(smt, size(), std::cmp::min(inaddr, outaddr));
     add_type_constraints(smt, flags(), DEFAULT_BIT_WIDTH);
+
+    add_type_constraints_size(smt, size(), std::cmp::min(inaddr, outaddr));
 }
 
 pub fn type_to_smt2(ty: &Type) -> String {

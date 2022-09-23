@@ -351,6 +351,7 @@ impl<'a> InterfaceField {
                 .map(|a| a.accessing_state(state_syms, state_bits, if_bits))
                 .unwrap_or_default(),
         );
+
         res.extend(
             self.writeaction
                 .as_ref()

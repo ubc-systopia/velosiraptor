@@ -44,10 +44,10 @@ pub fn expr_to_smt2(e: &Expr, stvar: &str) -> smt2::Term {
             if path.len() == 1 {
                 smt2::Term::ident(path[0].to_string())
             } else if path.len() == 2 {
-                let ident = format!("Model.{}.{}.get", p2p(&path[0]), path[1]);
+                let ident = format!("Model.{}.{}.get!", p2p(&path[0]), path[1]);
                 smt2::Term::fn_apply(ident, vec![smt2::Term::ident(stvar.to_string())])
             } else if path.len() == 3 {
-                let ident = format!("Model.{}.{}.{}.get", p2p(&path[0]), path[1], path[2]);
+                let ident = format!("Model.{}.{}.{}.get!", p2p(&path[0]), path[1], path[2]);
                 smt2::Term::fn_apply(ident, vec![smt2::Term::ident(stvar.to_string())])
             } else {
                 panic!("unexpected identifier lenght: {:?}", path);

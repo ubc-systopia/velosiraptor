@@ -27,7 +27,7 @@
 
 use super::field::{add_state_field, add_state_field_accessors};
 use crate::ast::{AstNodeGeneric, State};
-use smt2::{DataType, Smt2Context};
+use smt2::{DataType, Function, Smt2Context, Term};
 
 pub fn add_state_def(smt: &mut Smt2Context, state: &State) {
     smt.section(String::from("State Fields"));
@@ -45,8 +45,13 @@ pub fn add_state_def(smt: &mut Smt2Context, state: &State) {
             format!("StateField.{}_t", field.name),
         );
     }
+
+    let accessors = dt.to_field_accessor();
     smt.datatype(dt);
 
+    smt.merge(accessors);
+
+    let s_get_fn_name = String::from("State.get!");
     for field in state.fields() {
         add_state_field_accessors(smt, field);
     }

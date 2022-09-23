@@ -228,7 +228,7 @@ impl<'a> ActionComponent {
             (2, 2) => {
                 // add the interface elements that actually match the used state elements.
                 let mut res = HashSet::new();
-                res.insert(src_ref.clone());
+                //res.insert(src_ref.clone());
                 let bits = state_bits.get(dst_ref).unwrap();
                 for (fld, b) in if_bits {
                     if bits & b != 0 {

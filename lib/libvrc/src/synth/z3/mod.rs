@@ -296,7 +296,82 @@ impl SynthZ3 {
         // TODO: return error if there was unsat
     }
 
-    fn check_programs(
+    fn check_programs_translate(
+        &mut self,
+        m_fn: &Method,
+        g_fn: &Method,
+        mut progs: Vec<Program>,
+    ) -> Vec<Z3Ticket> {
+        let mut tickets = Vec::new();
+        for (i, prog) in progs.drain(..).enumerate() {
+            println!("____ PROGRAM");
+
+            let (mut smt, symvars) = prog.to_smt2(&m_fn.name, m_fn.args.as_slice());
+
+            let mut vars = vec![SortedVar::new(
+                String::from("st!0"),
+                String::from("Model_t"),
+            )];
+
+            for a in &m_fn.args {
+                vars.push(SortedVar::new(
+                    a.name.clone(),
+                    types::type_to_smt2(&a.ptype),
+                ));
+            }
+
+            let mut assm_args = vec![Term::ident(String::from("st!0"))];
+            for a in g_fn.args.iter() {
+                assm_args.push(Term::ident(a.name.clone()));
+            }
+
+            let pre1 = Term::fn_apply(format!("{}.assms", g_fn.name), assm_args);
+
+            let mut assm_args = vec![Term::ident(String::from("st!0"))];
+            for a in m_fn.args.iter() {
+                assm_args.push(Term::ident(a.name.clone()));
+            }
+            let pre2 = Term::fn_apply(format!("{}.assms", m_fn.name), assm_args);
+
+            let pre = Term::land(pre1, pre2);
+
+            let mut fn_args = vec![Term::ident(String::from("st!0"))];
+            for v in m_fn.args.iter() {
+                fn_args.push(Term::ident(v.name.clone()));
+            }
+
+            let mut check_args = vec![Term::fn_apply(m_fn.name.clone(), fn_args)];
+            for a in m_fn.args.iter() {
+                check_args.push(Term::ident(a.name.clone()));
+            }
+
+            let check = Term::fn_apply(format!("{}.result.{}", g_fn.name, m_fn.name), check_args);
+
+            let t = Term::forall(vars, pre.implies(check));
+
+            smt.assert(t);
+            smt.check_sat();
+
+            symvars.add_get_values(&mut smt);
+
+            let mut smtctx = Smt2Context::new();
+            smtctx.subsection(String::from("Verification"));
+            smtctx.level(smt);
+
+            let mut query = Z3Query::from(smtctx);
+            query.set_program(prog);
+
+            let ticket = self
+                .workerpool
+                .submit_query(query)
+                .expect("failed to submit query");
+
+            tickets.push(ticket);
+        }
+        tickets
+    }
+
+    fn check_programs_precond(
         &mut self,
         m_fn: &Method,
         g_fn: &Method,
@@ -324,7 +399,15 @@ impl SynthZ3 {
                 assm_args.push(Term::ident(a.name.clone()));
             }
 
-            let pre = Term::fn_apply(format!("{}.assms", g_fn.name), assm_args);
+            let pre1 = Term::fn_apply(format!("{}.assms", g_fn.name), assm_args);
+
+            let mut assm_args = vec![Term::ident(String::from("st!0"))];
+            for a in m_fn.args.iter() {
+                assm_args.push(Term::ident(a.name.clone()));
+            }
+            let pre2 = Term::fn_apply(format!("{}.assms", m_fn.name), assm_args);
+
+            let pre = Term::land(pre1, pre2);
 
             let mut fn_args = vec![Term::ident(String::from("st!0"))];
             for v in m_fn.args.iter() {
@@ -428,14 +511,16 @@ impl SynthZ3 {
                 let mut parts = f.split(".");
                 let _ = parts.next();
                 let field = parts.next().unwrap();
-                let slice = parts.next().unwrap();
-
-                builder.add_field_slice(field, slice);
+                if let Some(slice) = parts.next() {
+                    builder.add_field_slice(field, slice);
+                } else {
+                    //builder.add_field(field);
+                }
             }
 
             let mut progs = builder.construct_programs(false);
 
-            let tickets = self.check_programs(m_fn, t_fn, Some(i), progs);
+            let tickets = self.check_programs_precond(m_fn, t_fn, Some(i), progs);
             t_fn_tickets.push(tickets);
 
             let mut progs = builder.construct_programs(true);
@@ -478,7 +563,7 @@ impl SynthZ3 {
 
             let mut progs = builder.construct_programs(false);
 
-            let tickets = self.check_programs(m_fn, f_fn, Some(i), progs);
+            let tickets = self.check_programs_precond(m_fn, f_fn, Some(i), progs);
             f_fn_tickets.push(tickets);
 
             let mut progs = builder.construct_programs(true);
@@ -490,17 +575,43 @@ impl SynthZ3 {
         // Translate: check translation result
         // --------------------------------------------------------------------------------------
 
+        let tr_res_tickets = {
+            let state_syms = t_fn.get_state_references_body();
+            let state_bits = unit.state.referenced_field_bits(&state_syms);
+            let mut st_access_fields = unit
+                .interface
+                .fields_accessing_state(&state_syms, &state_bits);
+
+            // construct the program builder
+            let mut builder = operations::ProgramsBuilder::new();
+            for v in m_fn.args.iter() {
+                builder.add_var(v.name.clone());
+            }
+
+            for f in st_access_fields.iter() {
+                let mut parts = f.split(".");
+                let _ = parts.next();
+                let field = parts.next().unwrap();
+                let slice = parts.next().unwrap();
+
+                builder.add_field_slice(field, slice);
+            }
+
+            let mut progs = builder.construct_programs(true);
+            println!("###### PROGS: {:?}", progs);
+            self.check_programs_translate(m_fn, t_fn, progs)
+        };
+
         // --------------------------------------------------------------------------------------
         // Collect and combine the results of the queries, verify again
         // --------------------------------------------------------------------------------------
-
         let mut t_fn_results = self.obtain_sat_results(t_fn_tickets);
         let mut f_fn_results = self.obtain_sat_results(f_fn_tickets);
 
         let mut prog_fragments = Vec::new();
         for p in t_fn_results.iter() {
             if p.is_empty() {
-                println!("ERROR: no solution found for translate");
+                println!("ERROR: no solution found for translate.pre");
                 continue;
             }
             prog_fragments.push(p[0].query().program().unwrap());
@@ -508,7 +619,16 @@ impl SynthZ3 {
 
         for p in f_fn_results.iter() {
             if p.is_empty() {
-                println!("ERROR: no solution found for translate");
+                println!("ERROR: no solution found for matchflags.pre");
+                continue;
+            }
+            prog_fragments.push(p[0].query().program().unwrap());
+        }
+
+        let mut tr_results = self.obtain_sat_results(vec![tr_res_tickets]);
+        for p in tr_results.iter() {
+            if p.is_empty() {
+                println!("ERROR: no solution found for translate.result");
                 continue;
             }
             prog_fragments.push(p[0].query().program().unwrap());
@@ -519,8 +639,9 @@ impl SynthZ3 {
             .iter_mut()
             .fold(Program::new(), |mut acc, x| acc.merge(x));
 
-        let mut tickets = self.check_programs(m_fn, f_fn, None, vec![prog.clone()]);
-        tickets.extend(self.check_programs(m_fn, t_fn, None, vec![prog.clone()]));
+        let mut tickets = self.check_programs_precond(m_fn, f_fn, None, vec![prog.clone()]);
+        tickets.extend(self.check_programs_precond(m_fn, t_fn, None, vec![prog.clone()]));
+        tickets.extend(self.check_programs_translate(m_fn, t_fn, vec![prog.clone()]));
 
         for t in tickets {
             let res = self.workerpool.wait_for_result(t);

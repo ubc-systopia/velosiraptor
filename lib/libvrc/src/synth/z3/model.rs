@@ -37,22 +37,27 @@ fn add_model(smt: &mut Smt2Context) {
     dt.add_comment("Model Definition".to_string());
     dt.add_field("Model.State".to_string(), "State_t".to_string());
     dt.add_field("Model.IFace".to_string(), "IFace_t".to_string());
+
+    let accessors = dt.to_field_accessor();
     smt.datatype(dt);
+
+    smt.merge(accessors);
+
     smt.section(String::from("Model"));
 }
 
 fn add_model_field_accessor(smt: &mut Smt2Context, ftype: &str, fieldname: &str) {
-    let name = format!("Model.{}.{}.get", ftype, fieldname);
+    let name = format!("Model.{}.{}.get!", ftype, fieldname);
     let mut f = Function::new(name, format!("{}Field.{}_t", ftype, fieldname));
     f.add_arg(String::from("st"), String::from("Model_t"));
 
     let arg = Term::ident(String::from("st"));
-    let st = Term::fn_apply(format!("Model.{}.get", ftype), vec![arg]);
-    let e = Term::fn_apply(format!("{}.{}.get", ftype, fieldname), vec![st]);
+    let st = Term::fn_apply(format!("Model.{}.get!", ftype), vec![arg]);
+    let e = Term::fn_apply(format!("{}.{}.get!", ftype, fieldname), vec![st]);
     f.add_body(e);
     smt.function(f);
 
-    let name = format!("Model.{}.{}.set", ftype, fieldname);
+    let name = format!("Model.{}.{}.set!", ftype, fieldname);
     let mut f = Function::new(name, String::from("Model_t"));
     f.add_arg(String::from("st"), String::from("Model_t"));
     f.add_arg(
@@ -63,27 +68,27 @@ fn add_model_field_accessor(smt: &mut Smt2Context, ftype: &str, fieldname: &str)
     let arg = Term::ident(String::from("st"));
     let arg2 = Term::ident(String::from("val"));
 
-    let st = Term::fn_apply(format!("Model.{}.get", ftype), vec![arg.clone()]);
-    let st = Term::fn_apply(format!("{}.{}.set", ftype, fieldname), vec![st, arg2]);
-    let e = Term::fn_apply(format!("Model.{}.set", ftype), vec![arg, st]);
+    let st = Term::fn_apply(format!("Model.{}.get!", ftype), vec![arg.clone()]);
+    let st = Term::fn_apply(format!("{}.{}.set!", ftype, fieldname), vec![st, arg2]);
+    let e = Term::fn_apply(format!("Model.{}.set!", ftype), vec![arg, st]);
     f.add_body(e);
 
     smt.function(f);
 }
 
 fn add_model_slice_accessor(smt: &mut Smt2Context, ftype: &str, fieldname: &str, slice: &str) {
-    let name = format!("Model.{}.{}.{}.get", ftype, fieldname, slice);
+    let name = format!("Model.{}.{}.{}.get!", ftype, fieldname, slice);
     let mut f = Function::new(name, types::num());
     f.add_arg(String::from("st"), String::from("Model_t"));
 
     let arg = Term::ident(String::from("st"));
-    let st = Term::fn_apply(format!("Model.{}.get", ftype), vec![arg]);
-    let e = Term::fn_apply(format!("{}.{}.{}.get", ftype, fieldname, slice), vec![st]);
+    let st = Term::fn_apply(format!("Model.{}.get!", ftype), vec![arg]);
+    let e = Term::fn_apply(format!("{}.{}.{}.get!", ftype, fieldname, slice), vec![st]);
     f.add_body(e);
 
     smt.function(f);
 
-    let name = format!("Model.{}.{}.{}.set", ftype, fieldname, slice);
+    let name = format!("Model.{}.{}.{}.set!", ftype, fieldname, slice);
     let mut f = Function::new(name, String::from("Model_t"));
     f.add_arg(String::from("st"), String::from("Model_t"));
     f.add_arg(String::from("val"), types::num());
@@ -91,17 +96,17 @@ fn add_model_slice_accessor(smt: &mut Smt2Context, ftype: &str, fieldname: &str,
     let arg = Term::ident(String::from("st"));
     let arg2 = Term::ident(String::from("val"));
 
-    let st = Term::fn_apply(format!("Model.{}.get", ftype), vec![arg.clone()]);
+    let st = Term::fn_apply(format!("Model.{}.get!", ftype), vec![arg.clone()]);
 
     // get the state
 
     // the field update (State.pte_t Int) State.pte_t)
     let st = Term::fn_apply(
-        format!("{}.{}.{}.set", ftype, fieldname, slice),
+        format!("{}.{}.{}.set!", ftype, fieldname, slice),
         vec![st, arg2],
     );
 
-    let e = Term::fn_apply(format!("Model.{}.set", ftype), vec![arg, st]);
+    let e = Term::fn_apply(format!("Model.{}.set!", ftype), vec![arg, st]);
     f.add_body(e);
 
     smt.function(f);
@@ -155,9 +160,9 @@ fn add_field_action(
         let dst = match &a.dst {
             ast::Expr::Identifier { path, .. } => {
                 if path.len() == 2 {
-                    format!("Model.{}.{}.set", p2p(&path[0]), path[1])
+                    format!("Model.{}.{}.set!", p2p(&path[0]), path[1])
                 } else if path.len() == 3 {
-                    format!("Model.{}.{}.{}.set", p2p(&path[0]), path[1], path[2])
+                    format!("Model.{}.{}.{}.set!", p2p(&path[0]), path[1], path[2])
                 } else {
                     panic!("unexpected identifier lenght");
                 }
