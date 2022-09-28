@@ -34,7 +34,7 @@ use crate::error::VrsError;
 use crate::token::TokenStream;
 
 /// Represents a statement
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Stmt {
     /// represents a block of statements
     Block { pos: TokenStream, stmts: Vec<Stmt> },

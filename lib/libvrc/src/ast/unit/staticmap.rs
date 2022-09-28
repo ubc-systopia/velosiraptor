@@ -43,7 +43,7 @@ use crate::token::TokenStream;
 use super::CFG_DEFAULT_BITWIDTH;
 
 /// Rep
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct StaticMap {
     /// the name of the unit (identifier)
     pub name: String,

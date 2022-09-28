@@ -42,7 +42,7 @@ use crate::token::TokenStream;
 ///   1. imports: references to other files
 ///   2. constants: pre-defined values
 ///   3. units: units defined in this file
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct AstRoot {
     /// the filename this ast represents
     pub filename: String,
@@ -65,9 +65,9 @@ impl<'a> AstRoot {
     ) -> Self {
         Self {
             filename,
-            imports: Vec::new(),
-            consts: consts,
-            units: units,
+            imports,
+            consts,
+            units,
         }
     }
 

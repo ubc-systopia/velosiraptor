@@ -33,7 +33,7 @@ use crate::error::VrsError;
 use crate::token::TokenStream;
 
 /// Binary operations for [Expr] <OP> [Expr]
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum BinOp {
     // arithmetic opreators
     Plus,
@@ -259,7 +259,7 @@ impl fmt::Display for BinOp {
 }
 
 /// Represents an unary operator
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum UnOp {
     // arithmetic operators
     Not,
@@ -298,7 +298,7 @@ impl fmt::Display for UnOp {
 }
 
 /// representation of a quantifier
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Quantifier {
     Forall,
     Exists,
@@ -317,7 +317,7 @@ impl fmt::Display for Quantifier {
 /// Represents an Expression
 ///
 /// The expressions form a trie that is the being evaluated bottom up.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     /// Represents an identifier. That may be qualified or not.  `a.b`
     Identifier { path: Vec<String>, pos: TokenStream },

@@ -35,7 +35,7 @@ use crate::error::{ErrorLocation, VrsError};
 use crate::token::TokenStream;
 
 /// represent a flag value
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct Flag {
     /// the name of the flag
     pub name: String,
@@ -150,7 +150,7 @@ impl<'a> AstNodeGeneric<'a> for Flag {
 }
 
 /// represent a flag value
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct Flags {
     /// the flags defined in this node
     pub flags: Vec<Flag>,

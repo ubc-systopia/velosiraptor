@@ -51,7 +51,7 @@ const FN_SIG_PROTECT: &str = "fn protect(va: addr, sz: size, flgs: flags)";
 ///
 ///  - Translate(): a method that translates an address (required)
 ///  - get_size(): a method that extracts the
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct Method {
     /// the name of the method
     pub name: String,

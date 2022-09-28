@@ -52,7 +52,7 @@ pub const CFG_DEFAULT_BITWIDTH: u64 = 64;
 ///
 /// Moreover, a translation unit may be derived from another unit, similar
 /// to inheritance in other languages.
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum Unit {
     StaticMap(StaticMap),
     Segment(Segment),

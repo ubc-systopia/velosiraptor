@@ -43,7 +43,7 @@ use crate::token::TokenStream;
 ///
 /// There are two types of constants: boolean and integer values.
 /// Both can have either an expression or an integer value.
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum ConstValue {
     IntegerValue(u64),
     IntegerExpr(Expr),
@@ -165,7 +165,7 @@ impl<'a> AstNodeGeneric<'a> for ConstValue {
 /// or within a unit context.
 ///
 /// A constant must have a valuet that can be calculated at compile time.
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct Const {
     /// the identifier of the constant
     pub ident: String,

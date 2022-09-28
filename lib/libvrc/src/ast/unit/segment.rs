@@ -46,7 +46,7 @@ use super::CFG_DEFAULT_BITWIDTH;
 ///
 /// This type of translation unit remaps a contiguous region of memory
 /// with a given size by adding a configurable offset to it.
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct Segment {
     /// the name of the unit (identifier)
     pub name: String,

@@ -33,7 +33,7 @@ use crate::error::VrsError;
 use crate::token::TokenStream;
 
 /// Represents an explicit map `map = [0x0...0x1000 => Unit(args) @ offset, ... ]`
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct ExplicitMap {
     /// the entries in the explicit map
     pub entries: Vec<MapEntry>,

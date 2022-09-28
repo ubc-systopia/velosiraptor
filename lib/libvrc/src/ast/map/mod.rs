@@ -40,7 +40,7 @@ pub use explicit::ExplicitMap;
 pub use list::ListComprehensionMap;
 
 /// Defines a mapping between addresses and units
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Map {
     /// explicit map
     Explicit(ExplicitMap),
@@ -99,7 +99,7 @@ impl<'a> AstNodeGeneric<'a> for Map {
 ///   - INPUT RANGE is optional
 ///   - arglist may be empty
 ///   - offset is optional
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct MapEntry {
     /// range expressiong of the input address range that this entry maps
     pub range: Option<Expr>,

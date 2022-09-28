@@ -40,7 +40,7 @@ use crate::token::TokenStream;
 ///
 /// The import statement declares that another file is imported
 /// and its definitions used by the current file.
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct Import {
     /// the filename to import
     pub name: String,

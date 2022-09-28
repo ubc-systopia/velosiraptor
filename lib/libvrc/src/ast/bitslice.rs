@@ -37,7 +37,7 @@ use crate::token::TokenStream;
 ///
 /// The field corresponds to the slice `[start, end]` of the [Field]
 /// The end bit is including `[start..=end]`
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct BitSlice {
     /// the start bit
     pub start: u64,

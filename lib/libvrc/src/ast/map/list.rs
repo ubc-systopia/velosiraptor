@@ -38,7 +38,7 @@ use crate::token::TokenStream;
 use super::MapEntry;
 
 /// Represents a list comprehension map `map = [Unit(args) @ offset for x in 0..1024]`
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct ListComprehensionMap {
     /// the entries in the explicit map
     pub entry: MapEntry,

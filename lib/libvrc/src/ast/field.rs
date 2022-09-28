@@ -44,7 +44,7 @@ use crate::token::TokenStream;
 ///
 /// A field may represent a 8, 16, 32, or 64 bit region in the state with a
 /// specific bit layout.
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct Field {
     /// the name of the field
     pub name: String,

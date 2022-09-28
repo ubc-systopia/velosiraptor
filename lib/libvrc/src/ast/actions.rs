@@ -39,7 +39,7 @@ use crate::token::TokenStream;
 /// Currently an action is basically an assignment that assigns the destination the value of the
 /// source. If the destination is a StateRef, then this
 ///   src => dst
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct ActionComponent {
     /// the source operand of the action
     pub src: Expr,
@@ -249,7 +249,7 @@ impl<'a> ActionComponent {
 ///
 /// Currently the only supported action types are Read and Write but, we can imagine needing more
 /// types to support custom instructions needing to be executed to dump state to memory.
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub enum ActionType {
     Read,
     Write,
@@ -265,7 +265,7 @@ pub enum ActionType {
 ///     0 => state.cache;
 ///     1 => interface.status;
 /// }
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Action {
     /// the type of the action (Read/Write)
     pub action_type: ActionType,
