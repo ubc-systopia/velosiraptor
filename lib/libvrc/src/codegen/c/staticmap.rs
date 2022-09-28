@@ -76,7 +76,7 @@ fn add_constructor_function(scope: &mut C::Scope, unit: &StaticMap) {
 
     let unittype = C::Type::new_typedef(&utils::unit_type_name(unit.name()));
 
-    let mut fun = C::Function::with_string(fname, unittype.clone());
+    let mut fun = C::Function::with_string(fname, unittype);
     fun.set_static().set_inline();
 
     let mut params = Vec::new();

@@ -41,7 +41,7 @@ use crate::codegen::rust::BackendRust;
 const COPYRIGHT: &str = "2021 Systopia Lab, Computer Science, University of British Columbia";
 
 // custom error definitions
-custom_error! {#[derive(PartialEq)] pub CodeGenError
+custom_error! {#[derive(PartialEq, Eq)] pub CodeGenError
     IOError           = "The input file could not be read.",
     FmtError          = "Could not format in buffer"
 }
