@@ -459,7 +459,7 @@ impl fmt::Debug for TokenContent {
 }
 
 /// Represents a lexed token.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Token {
     /// the content of the token, defining its type
     pub content: TokenContent,

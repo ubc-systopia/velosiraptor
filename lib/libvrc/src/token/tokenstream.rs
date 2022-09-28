@@ -44,7 +44,7 @@ use crate::sourcepos::SourcePos;
 use crate::token::{Token, TokenContent};
 
 /// A sequence of recognized tokens that is produced by the lexer
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct TokenStream {
     /// a reference counted vector of tokens
     tokens: Option<Rc<Vec<Token>>>,

@@ -29,6 +29,7 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 
 use super::query::{Z3Query, Z3Result};
+use super::Z3Error;
 
 /// flag whether we want to use a full restart when resetting z3
 const CONFIG_RESET_IS_RESTART: bool = false;
@@ -70,7 +71,7 @@ impl Z3Instance {
         let p = logpath.join(format!("z3-worker-{}-log.smt2", id));
         let logfile = match File::create(p) {
             Ok(f) => Some(f),
-            Err(e) => {
+            Err(_) => {
                 // println!("[z3-inst-{}] failed to create the file: {}", id, e);
                 None
             }
@@ -96,7 +97,9 @@ impl Z3Instance {
 
     /// terminates the z3 instance
     pub fn terminate(&mut self) {
-        self.z3_proc.kill();
+        if self.z3_proc.kill().is_ok() {
+            println!("[z3-inst-{}] forcefully terminated z3 instance", self.id);
+        }
         self.z3_proc
             .wait()
             .expect("waiting for process termination failed");
@@ -109,23 +112,23 @@ impl Z3Instance {
     }
 
     /// resets the z3 instance, by sending a `(reset)` command
-    pub fn reset(&mut self) -> Result<(), ()> {
+    pub fn reset(&mut self) -> Result<(), Z3Error> {
         if CONFIG_RESET_IS_RESTART {
             self.restart();
             Ok(())
         } else {
             match self.exec(&Z3Query::reset()) {
-                Ok(r) => Ok(()),
+                Ok(_) => Ok(()),
                 Err(e) => {
                     // println!("[z3-inst-{}] failed to reset", self.id);
-                    Err(())
+                    Err(e)
                 }
             }
         }
     }
 
     ///executes the query
-    pub fn exec(&mut self, query: &Z3Query) -> Result<Z3Result, ()> {
+    pub fn exec(&mut self, query: &Z3Query) -> Result<Z3Result, Z3Error> {
         // println!("[z3-inst-{}] writing commands", self.id);
 
         // write the commands to the z3 process' stdin
@@ -143,10 +146,11 @@ impl Z3Instance {
                 .unwrap();
 
             if let Some(f) = &mut self.logfile {
-                f.write_all(smt.as_bytes());
+                f.write_all(smt.as_bytes())
+                    .expect("writing the smt query failed.");
             }
         } else {
-            return Err(());
+            return Err(Z3Error::QueryError);
         }
 
         // read back the results from stdout

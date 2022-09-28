@@ -45,7 +45,7 @@ use super::instance::Z3Instance;
 use super::query::{Z3Query, Z3Result, Z3Ticket};
 
 /// Message type that is being sent to the worker thread
-enum Z3QueryMsg {
+pub enum Z3QueryMsg {
     Query(Z3Ticket, Z3Query),
     SharedQuery(Z3Ticket, Arc<Z3Query>),
     Reset,
@@ -53,7 +53,7 @@ enum Z3QueryMsg {
     Terminate,
 }
 
-enum Z3ResultMsg {
+pub enum Z3ResultMsg {
     Result(Z3Ticket, Z3Result),
     Error(Z3Ticket, Option<Z3Query>),
 }
@@ -110,10 +110,10 @@ impl Z3Worker {
                         }
                         Ok(Z3QueryMsg::SharedQuery(id, query)) => match z3.exec(query.deref()) {
                             Ok(result) => Z3ResultMsg::Result(id, result),
-                            Err(e) => Z3ResultMsg::Error(id, None),
+                            Err(_) => Z3ResultMsg::Error(id, None),
                         },
                         Ok(Z3QueryMsg::Reset) => {
-                            z3.reset();
+                            z3.reset().expect("resetting the Z3 instance failed");
                             continue;
                         }
                         Ok(Z3QueryMsg::Restart) => {
@@ -148,13 +148,12 @@ impl Z3Worker {
             })
             .unwrap();
 
-        if !task.is_empty() {
-            if task_tx
+        if !task.is_empty()
+            && task_tx
                 .send(Z3QueryMsg::SharedQuery(Z3Ticket(0), task))
                 .is_err()
-            {
-                panic!("failed to send task to worker");
-            };
+        {
+            panic!("failed to send task to worker");
         }
 
         Self {
@@ -165,6 +164,11 @@ impl Z3Worker {
             result_q: result_rx,
             running,
         }
+    }
+
+    // obtains the worker id
+    pub fn id(&self) -> usize {
+        self.id
     }
 
     /// stops the execution of the worker
@@ -398,7 +402,7 @@ impl Z3WorkerPool {
             let (id, task) = self.taskq.pop_front().unwrap();
 
             match w.send_query(task, id) {
-                Ok(r) => {
+                Ok(_) => {
                     self.workers_busy.push(w);
                 }
                 Err(t) => {
@@ -441,8 +445,8 @@ impl Z3WorkerPool {
     pub fn wait_for_result(&mut self, id: Z3Ticket) -> Z3Result {
         loop {
             let res = self.get_result(id);
-            if res.is_some() {
-                return res.unwrap();
+            if let Some(r) = res {
+                return r;
             }
             thread::sleep(Duration::from_millis(10));
         }

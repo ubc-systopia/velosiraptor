@@ -25,10 +25,10 @@
 
 //! Field Synthesis Module: Z3
 
-use smt2::{Attribute, DataType, Function, Smt2Context, Sort, SortedVar, Term};
+use smt2::{Attribute, Function, Smt2Context, Sort, SortedVar, Term};
 
 use super::types;
-use crate::ast::{AstNodeGeneric, Field, InterfaceField};
+use crate::ast::{Field, InterfaceField};
 
 fn add_field_common(smt: &mut Smt2Context, ctxt: &str, field: &Field) {
     // let mut dt = DataType::new(format!("{}Field.{}", ctxt, field.name), 0);

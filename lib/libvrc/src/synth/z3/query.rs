@@ -108,6 +108,16 @@ impl Z3Query {
     pub fn program(&self) -> Option<&Program> {
         self.prog.as_ref()
     }
+
+    pub fn program_mut(&mut self) -> &mut Program {
+        self.prog.as_mut().unwrap()
+    }
+}
+
+impl Default for Z3Query {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl From<Smt2Context> for Z3Query {
@@ -173,6 +183,10 @@ impl Z3Result {
     /// returns the associated query
     pub fn query(&self) -> &Z3Query {
         self.query.as_ref().unwrap()
+    }
+
+    pub fn query_mut(&mut self) -> &mut Z3Query {
+        self.query.as_mut().unwrap()
     }
 
     /// takes the query from the result

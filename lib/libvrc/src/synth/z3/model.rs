@@ -290,9 +290,7 @@ fn add_assms(smt: &mut Smt2Context, unit: &Segment) {
         conds.push(expr_to_smt2(c, "st"));
     }
 
-    let body = conds
-        .drain(..)
-        .fold(Term::binary(true), |acc, x| Term::land(acc, x));
+    let body = conds.drain(..).fold(Term::binary(true), Term::land);
     f.add_body(body);
 
     smt.function(f);
