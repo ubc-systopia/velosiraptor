@@ -30,9 +30,9 @@ use custom_error::custom_error;
 use std::path::Path;
 
 // the code generation backends
-mod operation;
-mod rosette;
-mod z3;
+pub mod operation;
+pub mod rosette;
+pub mod z3;
 
 // the used library modules
 use crate::ast::AstRoot;

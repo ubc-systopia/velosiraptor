@@ -59,7 +59,7 @@ pub trait ErrorLocation {
 }
 
 /// represents a double definition mismatch
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq)]
 pub enum Mismatch {
     // symbol exists, but a type mismatch
     Type,
@@ -354,7 +354,7 @@ impl<I: ErrorLocation + fmt::Display> fmt::Display for VrsError<I> {
                 previous,
             } => {
                 let typ = applycolor(false)("error");
-                Self::fmthdr(f, typ, current, &message)?;
+                Self::fmthdr(f, typ, current, message)?;
                 Self::fmtctx(f, false, current, None)?;
                 Self::fmtloc(f, previous)?;
                 let hint = String::from("this expression cannot be satisfied");
@@ -389,7 +389,7 @@ impl<I: ErrorLocation + fmt::Display> fmt::Display for VrsError<I> {
             } => {
                 write!(f, "{}", next)?;
                 writeln!(f, "      {}", pipe)?;
-                return writeln!(
+                writeln!(
                     f,
                     "      {} {} {}:{}:{}",
                     pipe,
@@ -397,7 +397,7 @@ impl<I: ErrorLocation + fmt::Display> fmt::Display for VrsError<I> {
                     l.context(),
                     l.line(),
                     l.column()
-                );
+                )
             }
         }
     }

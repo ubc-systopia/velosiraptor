@@ -29,7 +29,7 @@
 //! map/unmap/protect operations.
 
 /// Represents an operation expression such as `a + b`
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub enum OpExpr {
     /// a constant number
     Num(u64),
@@ -58,7 +58,7 @@ pub enum OpExpr {
 }
 
 /// represents an operation
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Operation {
     Insert {
         field: String,
