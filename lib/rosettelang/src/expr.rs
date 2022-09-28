@@ -35,7 +35,7 @@ use std::fmt;
 /// ; the maximum depth
 /// (define maxdepth 5)
 ///
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub enum RExpr {
     /// #:param
     Param {
@@ -110,7 +110,7 @@ pub enum RExpr {
         comment: String,
     },
 }
-#[derive(PartialEq, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum BVOp {
     BVAnd,
     BVOr,
