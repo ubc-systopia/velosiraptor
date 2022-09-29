@@ -69,12 +69,14 @@ pub enum Smt2Command {
 #[derive(Hash)]
 pub struct Smt2Context {
     commands: Vec<Smt2Command>,
+    numcmd: usize,
 }
 
 impl Smt2Context {
     pub fn new() -> Self {
         Self {
             commands: Vec::new(),
+            numcmd: 0,
         }
     }
 
@@ -97,6 +99,7 @@ impl Smt2Context {
     }
 
     pub fn merge(&mut self, mut other: Self) {
+        self.numcmd += other.numcmd;
         self.commands.append(&mut other.commands);
     }
 
@@ -207,6 +210,7 @@ impl Smt2Context {
     }
 
     pub fn level(&mut self, smt2_context: Smt2Context) -> &mut Self {
+        self.numcmd += smt2_context.numcmd;
         self.commands.push(Smt2Command::Level(smt2_context));
         self
     }
@@ -337,6 +341,14 @@ impl Smt2Context {
             }
         }
         Ok(())
+    }
+
+    /// creates a code
+    pub fn to_code(&self) -> String {
+        let mut ret = String::with_capacity((self.commands.len() + self.numcmd) * 200);
+        let mut fmt = Formatter::new(&mut ret);
+        self.fmt(&mut fmt);
+        ret
     }
 }
 
