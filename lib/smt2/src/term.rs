@@ -301,11 +301,11 @@ impl Term {
     }
 
     pub fn bvadd(lhs: Term, rhs: Term) -> Self {
-        Term::FunctionApplication("bvuadd".to_string(), vec![lhs, rhs])
+        Term::FunctionApplication("bvadd".to_string(), vec![lhs, rhs])
     }
 
     pub fn bvsub(lhs: Term, rhs: Term) -> Self {
-        Term::FunctionApplication("bvusub".to_string(), vec![lhs, rhs])
+        Term::FunctionApplication("bvsub".to_string(), vec![lhs, rhs])
     }
 
     pub fn bvdiv(lhs: Term, rhs: Term) -> Self {
@@ -313,7 +313,7 @@ impl Term {
     }
 
     pub fn bvmul(lhs: Term, rhs: Term) -> Self {
-        Term::FunctionApplication("bvumul".to_string(), vec![lhs, rhs])
+        Term::FunctionApplication("bvmul".to_string(), vec![lhs, rhs])
     }
 
     pub fn bvlt(lhs: Term, rhs: Term) -> Self {
