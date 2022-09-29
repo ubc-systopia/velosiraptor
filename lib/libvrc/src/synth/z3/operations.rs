@@ -94,6 +94,8 @@ pub enum ArgExpr {
     Mul(ArgX, ArgX),
     Add(ArgX, ArgX),
     Sub(ArgX, ArgX),
+    And(ArgX, ArgX),
+    Or(ArgX, ArgX),
 }
 
 impl ArgExpr {
@@ -117,6 +119,14 @@ impl ArgExpr {
                 b.replace_symbolic_values(vals),
             ),
             ArgExpr::Sub(a, b) => ArgExpr::Sub(
+                a.replace_symbolic_values(vals),
+                b.replace_symbolic_values(vals),
+            ),
+            ArgExpr::And(a, b) => ArgExpr::And(
+                a.replace_symbolic_values(vals),
+                b.replace_symbolic_values(vals),
+            ),
+            ArgExpr::Or(a, b) => ArgExpr::Or(
                 a.replace_symbolic_values(vals),
                 b.replace_symbolic_values(vals),
             ),
@@ -151,6 +161,16 @@ impl ArgExpr {
                 let y = y.to_term(symvar);
                 Term::bvsub(x, y)
             }
+            ArgExpr::And(x, y) => {
+                let x = x.to_term(symvar);
+                let y = y.to_term(symvar);
+                Term::bvand(x, y)
+            }
+            ArgExpr::Or(x, y) => {
+                let x = x.to_term(symvar);
+                let y = y.to_term(symvar);
+                Term::bvor(x, y)
+            }
         }
     }
 }
@@ -166,6 +186,8 @@ impl From<&ArgExpr> for OpExpr {
             ArgExpr::Mul(x, y) => OpExpr::Mul(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y))),
             ArgExpr::Add(x, y) => OpExpr::Add(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y))),
             ArgExpr::Sub(x, y) => OpExpr::Sub(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y))),
+            ArgExpr::And(x, y) => OpExpr::And(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y))),
+            ArgExpr::Or(x, y) => OpExpr::Or(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y))),
         }
     }
 }
@@ -541,6 +563,30 @@ impl ProgramsBuilder {
 
                             let mut program_new = program.clone();
                             program_new.push(ArgExpr::RShift(ArgX::Var(var.clone()), ArgX::Num));
+                            new_slice_programs.push(program_new);
+
+                            let mut program_new = program.clone();
+                            program_new.push(ArgExpr::Add(ArgX::Var(var.clone()), ArgX::Num));
+                            new_slice_programs.push(program_new);
+
+                            let mut program_new = program.clone();
+                            program_new.push(ArgExpr::Sub(ArgX::Var(var.clone()), ArgX::Num));
+                            new_slice_programs.push(program_new);
+
+                            let mut program_new = program.clone();
+                            program_new.push(ArgExpr::Mul(ArgX::Var(var.clone()), ArgX::Num));
+                            new_slice_programs.push(program_new);
+
+                            let mut program_new = program.clone();
+                            program_new.push(ArgExpr::Div(ArgX::Var(var.clone()), ArgX::Num));
+                            new_slice_programs.push(program_new);
+
+                            let mut program_new = program.clone();
+                            program_new.push(ArgExpr::And(ArgX::Var(var.clone()), ArgX::Num));
+                            new_slice_programs.push(program_new);
+
+                            let mut program_new = program.clone();
+                            program_new.push(ArgExpr::Or(ArgX::Var(var.clone()), ArgX::Num));
                             new_slice_programs.push(program_new);
                         }
                     }

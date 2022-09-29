@@ -117,7 +117,7 @@ impl Z3Instance {
             self.restart();
             Ok(())
         } else {
-            match self.exec(&Z3Query::reset()) {
+            match self.exec(&mut Z3Query::reset()) {
                 Ok(_) => Ok(()),
                 Err(e) => {
                     // println!("[z3-inst-{}] failed to reset", self.id);
@@ -128,7 +128,66 @@ impl Z3Instance {
     }
 
     ///executes the query
-    pub fn exec(&mut self, query: &Z3Query) -> Result<Z3Result, Z3Error> {
+    pub fn exec(&mut self, query: &mut Z3Query) -> Result<Z3Result, Z3Error> {
+        //  println!("[z3-inst-{}] writing commands", self.id);
+
+        // write the commands to the z3 process' stdin
+        if let Some(z3_stdin) = self.z3_proc.stdin.as_mut() {
+            // can we format/write this directly into the stdin?
+
+            // construt the smt2 context from the query
+            let smt = query.smt_context().to_code();
+            // query.timestamp("fmtsmt");
+
+            // send to the z3 process
+            z3_stdin.write_all(smt.as_bytes()).unwrap();
+
+            // adding an `(echo)` to have at least some output
+            z3_stdin
+                .write_all("\n(echo \"!remove\")\n".as_bytes())
+                .unwrap();
+
+            // query.timestamp("writesmt");
+            if let Some(f) = &mut self.logfile {
+                f.write_all(smt.as_bytes())
+                    .expect("writing the smt query failed.");
+            }
+            // query.timestamp("logging");
+        } else {
+            return Err(Z3Error::QueryError);
+        }
+
+        // read back the results from stdout
+        // println!("[z3-inst-{}] reading results...", self.id);
+
+        let result = if let Some(z3_stdout) = self.z3_proc.stdout.as_mut() {
+            // create a buffer reader for the z3_stdout
+            let mut z3_buf_reader = BufReader::new(z3_stdout);
+            // store the result here
+            let mut result = String::with_capacity(1024);
+
+            // loop over the result
+            loop {
+                let mut line = String::with_capacity(256);
+                z3_buf_reader.read_line(&mut line).unwrap();
+
+                // if it's our magic string, then we're done
+                if line.as_str() == "!remove\n" {
+                    break;
+                }
+                result.push_str(&line);
+            }
+            result
+        } else {
+            String::new()
+        };
+
+        // println!("[z3-inst-{}] result '{}'", self.id, result);
+        Ok(Z3Result::new(result))
+    }
+
+    ///executes the query
+    pub fn exec_shared(&mut self, query: &Z3Query) -> Result<Z3Result, Z3Error> {
         // println!("[z3-inst-{}] writing commands", self.id);
 
         // write the commands to the z3 process' stdin
@@ -164,6 +223,7 @@ impl Z3Instance {
 
             // loop over the result
             loop {
+                std::thread::yield_now();
                 let mut line = String::with_capacity(256);
                 z3_buf_reader.read_line(&mut line).unwrap();
 

@@ -25,6 +25,7 @@
 
 // standard library imports
 use std::fmt;
+use std::time::{Duration, Instant};
 
 // external library imports
 use smt2::{Smt2Command, Smt2Context};
@@ -49,6 +50,9 @@ pub struct Z3Query {
 
     /// the statements to be executed
     smt: Smt2Context,
+
+    /// the timestamps fo tracing
+    timestamps: Vec<(&'static str, Instant)>,
 }
 
 impl Z3Query {
@@ -59,7 +63,40 @@ impl Z3Query {
 
     /// Creates a new Z3 Query with the given SMT context
     pub fn with_context(smt: Smt2Context) -> Self {
-        Self { prog: None, smt }
+        Self {
+            prog: None,
+            smt,
+            timestamps: Vec::with_capacity(10),
+        }
+    }
+
+    /// takes the timestamp
+    pub fn timestamp(&mut self, name: &'static str) {
+        self.timestamps.push((name, Instant::now()));
+    }
+
+    pub fn print_timestamps(&self) {
+        if self.timestamps.is_empty() {
+            println!("stats: no timestamps");
+            return;
+        }
+
+        let (_, mut t_start) = self.timestamps[0];
+        let mut t_last = t_start;
+        for (i, (name, now)) in self.timestamps.iter().enumerate() {
+            let diff = now.saturating_duration_since(t_last);
+            t_last = *now;
+            if i == 0 {
+                continue;
+            }
+            print!("{}, {:7}, us,  ", name, diff.as_micros());
+        }
+        let diff = t_last.saturating_duration_since(t_start);
+        println!("elapsed, {:7}, us  ", diff.as_micros());
+        // if diff.as_micros() > 125000 {
+        //     println!("WARNING: query took more than 125ms");
+        //     println!("{:?}", self.program());
+        // }
     }
 
     /// whether the query is emtpy
@@ -73,7 +110,11 @@ impl Z3Query {
         let mut smt = Smt2Context::new();
         smt.reset();
 
-        Z3Query { prog: None, smt }
+        Z3Query {
+            prog: None,
+            smt,
+            timestamps: Vec::new(),
+        }
     }
 
     /// sets the operations field of the query (book keeping purpose)
@@ -167,6 +208,12 @@ impl Z3Result {
         Self {
             query: Some(query),
             result,
+        }
+    }
+
+    pub fn print_timestamps(&self) {
+        if let Some(query) = &self.query {
+            query.print_timestamps();
         }
     }
 

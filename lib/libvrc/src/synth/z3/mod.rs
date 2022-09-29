@@ -25,6 +25,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use custom_error::custom_error;
 
@@ -413,7 +414,6 @@ impl SynthZ3 {
             smt.check_sat();
 
             symvars.add_get_values(&mut smt);
-
             let mut smtctx = Smt2Context::new();
             smtctx.subsection(String::from("Verification"));
             smtctx.level(smt);
@@ -437,19 +437,22 @@ impl SynthZ3 {
             let mut results = Vec::new();
             for t in tickets {
                 let mut res = self.workerpool.wait_for_result(t);
+
+                res.print_timestamps();
+
                 let mut reslines = res.result().lines();
                 if Some("sat") == reslines.next() {
                     if let Some(s) = reslines.next() {
-                        let mut vars = resultparser::parse_result(s).expect(
-                            "
-                        failed to parse the result",
-                        );
-
-                        if !vars.is_empty() {
-                            println!("rewriting the program: {:?}\n", vars);
-                            res.query_mut()
-                                .program_mut()
-                                .replace_symbolic_values(&mut vars);
+                        match resultparser::parse_result(s) {
+                            Ok(mut vars) => {
+                                if !vars.is_empty() {
+                                    // println!("rewriting the program: {:?}\n", vars);
+                                    res.query_mut()
+                                        .program_mut()
+                                        .replace_symbolic_values(&mut vars);
+                                }
+                            }
+                            Err(e) => (),
                         }
                     }
                     results.push(res);
@@ -475,7 +478,11 @@ impl SynthZ3 {
         // Check whether the pre-conditions can be satisfied
         // --------------------------------------------------------------------------------------
 
+        let t_start = Instant::now();
         self.check_precondition_satisfiability(m_fn, t_fn, f_fn);
+        let now = Instant::now();
+        let diff = now.saturating_duration_since(t_start);
+        println!("map: precond satisfy, {:7}, us  ", diff.as_micros());
 
         // --------------------------------------------------------------------------------------
         // Translate: Add a query for each of the pre-conditions of the function
@@ -523,6 +530,10 @@ impl SynthZ3 {
             // TODO: construct the task
         }
 
+        let now = Instant::now();
+        let diff = now.saturating_duration_since(t_start);
+        println!("map: tfn precond, {:7}, us  ", diff.as_micros());
+
         // --------------------------------------------------------------------------------------
         // Matchflags: Add a query for each of the pre-conditions of the function
         // --------------------------------------------------------------------------------------
@@ -565,6 +576,9 @@ impl SynthZ3 {
 
             // TODO: construct the task
         }
+        let now = Instant::now();
+        let diff = now.saturating_duration_since(t_start);
+        println!("map: ffn precond, {:7}, us  ", diff.as_micros());
 
         // --------------------------------------------------------------------------------------
         // Translate: check translation result
@@ -596,6 +610,10 @@ impl SynthZ3 {
             self.check_programs_translate(m_fn, t_fn, progs)
         };
 
+        let now = Instant::now();
+        let diff = now.saturating_duration_since(t_start);
+        println!("map: translate, {:7}, us  ", diff.as_micros());
+
         // --------------------------------------------------------------------------------------
         // Matchflags: check the expression result
         // --------------------------------------------------------------------------------------
@@ -618,6 +636,10 @@ impl SynthZ3 {
             results.extend(tr_results);
             results
         };
+
+        let now = Instant::now();
+        let diff = now.saturating_duration_since(t_start);
+        println!("map: obtain results, {:7}, us  ", diff.as_micros());
 
         // the completed candidate program
         let mut candidate_programs: Vec<Vec<&Program>> = vec![Vec::new()];
@@ -644,6 +666,10 @@ impl SynthZ3 {
             .map(|p| p.iter_mut().fold(Program::new(), |acc, x| acc.merge(x)))
             .collect();
 
+        let now = Instant::now();
+        let diff = now.saturating_duration_since(t_start);
+        println!("map: verify start, {:7}, us  ", diff.as_micros());
+
         for prog in candidate_programs.drain(..) {
             let mut p_tickets =
                 self.check_programs_precond(m_fn, f_fn, None, false, vec![prog.clone()]);
@@ -662,6 +688,11 @@ impl SynthZ3 {
                 let mut reslines = res.result().lines();
                 all_sat &= reslines.next() == Some("sat");
             }
+
+            let now = Instant::now();
+            let diff = now.saturating_duration_since(t_start);
+            println!("map: check-candidate, {:7}, us  ", diff.as_micros());
+
             if all_sat {
                 println!("found candidate program: {:?}", prog);
                 unit.map_ops = Some(prog.into());

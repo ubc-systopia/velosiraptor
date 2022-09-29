@@ -98,9 +98,12 @@ impl Z3Worker {
                 while running_clone.load(Ordering::Relaxed) {
                     let msg = task_rx.recv();
                     let result = match msg {
-                        Ok(Z3QueryMsg::Query(id, query)) => {
+                        Ok(Z3QueryMsg::Query(id, mut query)) => {
                             // println!("[z3-worker-{}] new query...", wid);
-                            match z3.exec(&query) {
+                            query.timestamp("request");
+                            let result = z3.exec(&mut query);
+                            query.timestamp("smt");
+                            match result {
                                 Ok(mut result) => {
                                     result.set_query(query);
                                     Z3ResultMsg::Result(id, result)
@@ -108,10 +111,12 @@ impl Z3Worker {
                                 Err(_) => Z3ResultMsg::Error(id, Some(query)),
                             }
                         }
-                        Ok(Z3QueryMsg::SharedQuery(id, query)) => match z3.exec(query.deref()) {
-                            Ok(result) => Z3ResultMsg::Result(id, result),
-                            Err(_) => Z3ResultMsg::Error(id, None),
-                        },
+                        Ok(Z3QueryMsg::SharedQuery(id, query)) => {
+                            match z3.exec_shared(query.deref()) {
+                                Ok(result) => Z3ResultMsg::Result(id, result),
+                                Err(_) => Z3ResultMsg::Error(id, None),
+                            }
+                        }
                         Ok(Z3QueryMsg::Reset) => {
                             z3.reset().expect("resetting the Z3 instance failed");
                             continue;
@@ -373,16 +378,17 @@ impl Z3WorkerPool {
         Self {
             num_queries: 0,
             workers_idle,
-            workers_busy: Vec::new(),
+            workers_busy: Vec::with_capacity(num_workers),
             taskq: VecDeque::new(),
             results: HashMap::new(),
         }
     }
 
     pub fn check_completed_tasks(&mut self) {
-        let mut busy_workers = Vec::new();
+        let mut busy_workers = Vec::with_capacity(self.workers_busy.capacity());
         for mut w in self.workers_busy.drain(..) {
-            if let Some((id, r)) = w.try_recv_result() {
+            if let Some((id, mut r)) = w.try_recv_result() {
+                r.query_mut().timestamp("result");
                 self.results.insert(id, r);
                 self.workers_idle.push(w);
             } else {
@@ -393,14 +399,20 @@ impl Z3WorkerPool {
         self.workers_busy = busy_workers;
     }
 
+    fn maybe_check_completd_tasks(&mut self) {
+        if 7 * self.workers_busy.len() > 8 * self.workers_idle.len() {
+            self.check_completed_tasks();
+        }
+    }
+
     fn try_send_tasks(&mut self) {
         if self.taskq.is_empty() {
             return;
         }
 
         if let Some(mut w) = self.workers_idle.pop() {
-            let (id, task) = self.taskq.pop_front().unwrap();
-
+            let (id, mut task) = self.taskq.pop_front().unwrap();
+            task.timestamp("queue");
             match w.send_query(task, id) {
                 Ok(_) => {
                     self.workers_busy.push(w);
@@ -413,12 +425,15 @@ impl Z3WorkerPool {
         }
     }
 
-    pub fn submit_query(&mut self, task: Z3Query) -> Result<Z3Ticket, Z3Query> {
+    pub fn submit_query(&mut self, mut task: Z3Query) -> Result<Z3Ticket, Z3Query> {
         // use some hashing stuff to do caching of queries...
         // let mut s = DefaultHasher::new();
         // task.hash(&mut s);
         // let id = s.finish();
-        self.check_completed_tasks();
+
+        // take the timestamp
+        task.timestamp("submit");
+        self.maybe_check_completd_tasks();
 
         // get the ticket
         self.num_queries += 1;
@@ -448,13 +463,13 @@ impl Z3WorkerPool {
             if let Some(r) = res {
                 return r;
             }
-            thread::sleep(Duration::from_millis(10));
+            self.check_completed_tasks();
+            self.try_send_tasks();
+            thread::yield_now();
         }
     }
 
     pub fn get_result(&mut self, id: Z3Ticket) -> Option<Z3Result> {
-        self.check_completed_tasks();
-        self.try_send_tasks();
         self.results.remove(&id)
     }
 
