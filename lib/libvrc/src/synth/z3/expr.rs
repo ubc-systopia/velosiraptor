@@ -37,15 +37,20 @@ pub fn p2p(i: &str) -> &'static str {
     }
 }
 
-pub fn expr_to_smt2(e: &Expr, stvar: &str) -> smt2::Term {
+pub fn expr_to_smt2(e: &Expr, stvar: &str, flagsparam: &[&str]) -> smt2::Term {
     use Expr::*;
     match e {
         Expr::Identifier { path, .. } => {
             if path.len() == 1 {
                 smt2::Term::ident(path[0].to_string())
             } else if path.len() == 2 {
-                let ident = format!("Model.{}.{}.get!", p2p(&path[0]), path[1]);
-                smt2::Term::fn_apply(ident, vec![smt2::Term::ident(stvar.to_string())])
+                if flagsparam.contains(&path[0].as_str()) {
+                    let ident = format!("Flags.{}.get!", path[1]);
+                    smt2::Term::fn_apply(ident, vec![smt2::Term::ident(path[0].to_string())])
+                } else {
+                    let ident = format!("Model.{}.{}.get!", p2p(&path[0]), path[1]);
+                    smt2::Term::fn_apply(ident, vec![smt2::Term::ident(stvar.to_string())])
+                }
             } else if path.len() == 3 {
                 let ident = format!("Model.{}.{}.{}.get!", p2p(&path[0]), path[1], path[2]);
                 smt2::Term::fn_apply(ident, vec![smt2::Term::ident(stvar.to_string())])
@@ -56,8 +61,8 @@ pub fn expr_to_smt2(e: &Expr, stvar: &str) -> smt2::Term {
         Number { value, .. } => smt2::Term::num(*value),
         Boolean { value, .. } => smt2::Term::binary(*value),
         BinaryOperation { op, lhs, rhs, .. } => {
-            let lhs = expr_to_smt2(lhs, stvar);
-            let rhs = expr_to_smt2(rhs, stvar);
+            let lhs = expr_to_smt2(lhs, stvar, flagsparam);
+            let rhs = expr_to_smt2(rhs, stvar, flagsparam);
             match op {
                 BinOp::And => smt2::Term::bvand(lhs, rhs),
                 BinOp::Or => smt2::Term::bvor(lhs, rhs),
@@ -80,7 +85,7 @@ pub fn expr_to_smt2(e: &Expr, stvar: &str) -> smt2::Term {
             }
         }
         UnaryOperation { op, val, .. } => {
-            let val = expr_to_smt2(val, stvar);
+            let val = expr_to_smt2(val, stvar, flagsparam);
             match op {
                 UnOp::Not => smt2::Term::bvnot(val),
                 UnOp::LNot => smt2::Term::lnot(val),
@@ -108,17 +113,17 @@ pub fn expr_to_smt2(e: &Expr, stvar: &str) -> smt2::Term {
     }
 }
 
-pub fn stmt_to_smt2(stmt: &Stmt, stvar: &str) -> smt2::Term {
+pub fn stmt_to_smt2(stmt: &Stmt, stvar: &str, flagsparam: &[&str]) -> smt2::Term {
     match stmt {
         Stmt::Block { stmts, .. } => {
             if stmts.len() > 1 {
                 panic!("only one statement per block is supported");
             }
-            stmt_to_smt2(&stmts[0], stvar)
+            stmt_to_smt2(&stmts[0], stvar, flagsparam)
         }
         Stmt::Let { .. } => panic!("let not supported"),
         Stmt::IfElse { .. } => panic!("if-else not supported"),
-        Stmt::Return { expr, .. } => expr_to_smt2(expr, stvar),
+        Stmt::Return { expr, .. } => expr_to_smt2(expr, stvar, flagsparam),
         Stmt::Assert { .. } => panic!("assert not supported"),
     }
 }

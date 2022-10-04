@@ -53,6 +53,10 @@ pub enum OpExpr {
     Div(Box<OpExpr>, Box<OpExpr>),
     /// modulus
     Mod(Box<OpExpr>, Box<OpExpr>),
+    /// not
+    Not(Box<OpExpr>),
+    /// extracts the flags from the variable
+    Flags(String, String),
     /// no expression
     None,
 }

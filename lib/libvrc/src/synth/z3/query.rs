@@ -81,7 +81,7 @@ impl Z3Query {
             return;
         }
 
-        let (_, mut t_start) = self.timestamps[0];
+        let (_, t_start) = self.timestamps[0];
         let mut t_last = t_start;
         for (i, (name, now)) in self.timestamps.iter().enumerate() {
             let diff = now.saturating_duration_since(t_last);

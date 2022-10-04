@@ -170,7 +170,7 @@ fn add_field_action(
             _ => panic!("should not happen here! {}", &a.dst),
         };
 
-        let src = expr_to_smt2(&a.src, &stvar);
+        let src = expr_to_smt2(&a.src, &stvar, &[]);
 
         let fcall = Term::fn_apply(dst, vec![Term::ident(stvar.clone()), src]);
 
@@ -277,6 +277,7 @@ fn add_assms(smt: &mut Smt2Context, unit: &Segment) {
     smt.section(String::from("Assumptions"));
 
     let fun = unit.get_method("map").unwrap();
+    let flagsparam = fun.get_flag_params();
 
     let mut f = Function::new(String::from("map.assms"), types::boolean());
 
@@ -287,7 +288,7 @@ fn add_assms(smt: &mut Smt2Context, unit: &Segment) {
 
     let mut conds = add_fn_arg_assms(fun, unit.inbitwidth, unit.outbitwidth);
     for c in &fun.requires {
-        conds.push(expr_to_smt2(c, "st"));
+        conds.push(expr_to_smt2(c, "st", flagsparam.as_slice()));
     }
 
     let body = conds.drain(..).fold(Term::binary(true), Term::land);

@@ -49,12 +49,15 @@ pub enum ArgX {
     One,
     /// a variable
     Var(Arc<String>),
+    /// represents a flag  var.flag
+    Flag(Arc<String>, Arc<String>),
 }
 
 impl ArgX {
     pub fn replace_symbolic_values(&self, vals: &mut Vec<u64>) -> Self {
         match self {
             ArgX::Num => {
+                // the symvars have reverse order, so we can pop to get them in order.
                 let val = vals.pop().unwrap();
                 ArgX::Val(val)
             }
@@ -69,6 +72,10 @@ impl ArgX {
             ArgX::One => Term::num(1),
             ArgX::Var(v) => Term::ident(format!("{}", v)),
             ArgX::Val(v) => Term::num(*v),
+            ArgX::Flag(v, f) => Term::fn_apply(
+                format!("Flags.{}.get!", f),
+                vec![Term::ident(format!("{}", v))],
+            ),
         }
     }
 }
@@ -81,6 +88,7 @@ impl From<&ArgX> for OpExpr {
             ArgX::Zero => OpExpr::Num(0),
             ArgX::One => OpExpr::Num(1),
             ArgX::Var(v) => OpExpr::Var(v.to_string()),
+            ArgX::Flag(v, f) => OpExpr::Flags(v.to_string(), f.to_string()),
         }
     }
 }
@@ -96,6 +104,8 @@ pub enum ArgExpr {
     Sub(ArgX, ArgX),
     And(ArgX, ArgX),
     Or(ArgX, ArgX),
+    Not(ArgX),
+    ShiftMask(ArgX, ArgX, ArgX),
 }
 
 impl ArgExpr {
@@ -130,6 +140,12 @@ impl ArgExpr {
                 a.replace_symbolic_values(vals),
                 b.replace_symbolic_values(vals),
             ),
+            ArgExpr::ShiftMask(a, b, c) => ArgExpr::ShiftMask(
+                a.replace_symbolic_values(vals),
+                b.replace_symbolic_values(vals),
+                c.replace_symbolic_values(vals),
+            ),
+            ArgExpr::Not(a) => ArgExpr::Not(a.replace_symbolic_values(vals)),
         }
     }
 
@@ -171,6 +187,16 @@ impl ArgExpr {
                 let y = y.to_term(symvar);
                 Term::bvor(x, y)
             }
+            ArgExpr::ShiftMask(x, y, z) => {
+                let x = x.to_term(symvar);
+                let y = y.to_term(symvar);
+                let z = z.to_term(symvar);
+                Term::bvand(Term::bvshr(x, y), z)
+            }
+            ArgExpr::Not(x) => {
+                let x = x.to_term(symvar);
+                Term::bvnot(x)
+            }
         }
     }
 }
@@ -188,6 +214,14 @@ impl From<&ArgExpr> for OpExpr {
             ArgExpr::Sub(x, y) => OpExpr::Sub(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y))),
             ArgExpr::And(x, y) => OpExpr::And(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y))),
             ArgExpr::Or(x, y) => OpExpr::Or(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y))),
+            ArgExpr::ShiftMask(x, y, z) => OpExpr::And(
+                Box::new(OpExpr::Shr(
+                    Box::new(OpExpr::from(x)),
+                    Box::new(OpExpr::from(y)),
+                )),
+                Box::new(OpExpr::from(z)),
+            ),
+            ArgExpr::Not(x) => OpExpr::Not(Box::new(OpExpr::from(x))),
         }
     }
 }
@@ -409,7 +443,10 @@ impl Program {
 
         for op in other.ops.iter() {
             if let Some(x) = ops.get_mut(&op.0) {
-                x.push(op.1.clone());
+                if !x.contains(&op.1) {
+                    x.push(op.1.clone());
+                }
+            //    x.push(op.1.clone());
             } else {
                 ops.insert(op.0.clone(), vec![op.1.clone()]);
             }
@@ -489,6 +526,8 @@ pub struct ProgramsBuilder {
     fields: HashMap<Arc<String>, Vec<Arc<String>>>,
     /// variables we can chose from, plus the implicit flags variable
     vars: Vec<Arc<String>>,
+    /// some flags to chose from
+    flags: Vec<(Arc<String>, Arc<String>)>,
 }
 
 impl ProgramsBuilder {
@@ -496,6 +535,7 @@ impl ProgramsBuilder {
         Self {
             fields: HashMap::new(),
             vars: vec![],
+            flags: vec![],
         }
     }
 
@@ -508,10 +548,16 @@ impl ProgramsBuilder {
         self
     }
 
-    // adds a full field to the builder
+    /// adds a full field to the builder
     pub fn add_field(&mut self, field: String, slices: Vec<String>) -> &mut Self {
         let slices = slices.into_iter().map(Arc::new).collect();
         self.fields.insert(Arc::new(field), slices);
+        self
+    }
+
+    /// adds the possible flags to the builder
+    pub fn add_flags(&mut self, var: Arc<String>, flag: String) -> &mut Self {
+        self.flags.push((var, Arc::new(flag)));
         self
     }
 
@@ -550,6 +596,16 @@ impl ProgramsBuilder {
                             program_new.push(ArgExpr::Arg(ArgX::Var(var.clone())));
                             new_slice_programs.push(program_new);
                         }
+
+                        for (v, f) in &self.flags {
+                            let mut program_new = program.clone();
+                            program_new.push(ArgExpr::Arg(ArgX::Flag(v.clone(), f.clone())));
+                            new_slice_programs.push(program_new);
+
+                            let mut program_new = program.clone();
+                            program_new.push(ArgExpr::Not(ArgX::Flag(v.clone(), f.clone())));
+                            new_slice_programs.push(program_new);
+                        }
                     } else {
                         // add the constant number as well
                         let mut program_new = program.clone();
@@ -566,6 +622,14 @@ impl ProgramsBuilder {
                             new_slice_programs.push(program_new);
 
                             let mut program_new = program.clone();
+                            program_new.push(ArgExpr::ShiftMask(
+                                ArgX::Var(var.clone()),
+                                ArgX::Num,
+                                ArgX::Num,
+                            ));
+                            new_slice_programs.push(program_new);
+
+                            let mut program_new = program.clone();
                             program_new.push(ArgExpr::Add(ArgX::Var(var.clone()), ArgX::Num));
                             new_slice_programs.push(program_new);
 
@@ -577,9 +641,9 @@ impl ProgramsBuilder {
                             program_new.push(ArgExpr::Mul(ArgX::Var(var.clone()), ArgX::Num));
                             new_slice_programs.push(program_new);
 
-                            let mut program_new = program.clone();
-                            program_new.push(ArgExpr::Div(ArgX::Var(var.clone()), ArgX::Num));
-                            new_slice_programs.push(program_new);
+                            // let mut program_new = program.clone();
+                            // program_new.push(ArgExpr::Div(ArgX::Var(var.clone()), ArgX::Num));
+                            // new_slice_programs.push(program_new);
 
                             let mut program_new = program.clone();
                             program_new.push(ArgExpr::And(ArgX::Var(var.clone()), ArgX::Num));
@@ -587,6 +651,16 @@ impl ProgramsBuilder {
 
                             let mut program_new = program.clone();
                             program_new.push(ArgExpr::Or(ArgX::Var(var.clone()), ArgX::Num));
+                            new_slice_programs.push(program_new);
+                        }
+
+                        for (v, f) in &self.flags {
+                            let mut program_new = program.clone();
+                            program_new.push(ArgExpr::Arg(ArgX::Flag(v.clone(), f.clone())));
+                            new_slice_programs.push(program_new);
+
+                            let mut program_new = program.clone();
+                            program_new.push(ArgExpr::Not(ArgX::Flag(v.clone(), f.clone())));
                             new_slice_programs.push(program_new);
                         }
                     }

@@ -25,13 +25,14 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use custom_error::custom_error;
 
 use smt2::{Smt2Context, Smt2Option, SortedVar, Term, VarDecl};
 
-use crate::ast::{AstNodeGeneric, AstRoot, Expr, Method, Segment};
+use crate::ast::{AstNodeGeneric, AstRoot, Expr, Method, Segment, Type};
 use crate::error::VrsError;
 use crate::synth::SynthError;
 
@@ -42,6 +43,7 @@ use self::worker::Z3WorkerPool;
 pub mod consts;
 pub mod expr;
 pub mod field;
+pub mod flags;
 pub mod instance;
 pub mod interface;
 pub mod method;
@@ -103,6 +105,7 @@ impl SynthZ3 {
 
         // stuff
         consts::add_consts(&mut smt, unit);
+        flags::add_flags(&mut smt, unit);
         state::add_state_def(&mut smt, &unit.state);
         interface::add_interface_def(&mut smt, &unit.interface);
         model::add_model_def(&mut smt, unit);
@@ -207,19 +210,31 @@ impl SynthZ3 {
         for (i, p) in f_fn.requires.iter().enumerate() {
             smt.comment(format!("{}: {}", m_fn.name, p));
             let name = format!("f_fn-{}", i);
-            smt.assert(Term::named(expr::expr_to_smt2(p, "st"), name));
+            let flagsparam = f_fn.get_flag_params();
+            smt.assert(Term::named(
+                expr::expr_to_smt2(p, "st", flagsparam.as_slice()),
+                name,
+            ));
         }
 
         for (i, p) in t_fn.requires.iter().enumerate() {
             smt.comment(format!("{}: {}", t_fn.name, p));
             let name = format!("t_fn-{}", i);
-            smt.assert(Term::named(expr::expr_to_smt2(p, "st"), name));
+            let flagsparam = t_fn.get_flag_params();
+            smt.assert(Term::named(
+                expr::expr_to_smt2(p, "st", flagsparam.as_slice()),
+                name,
+            ));
         }
 
         for (i, p) in m_fn.requires.iter().enumerate() {
             smt.comment(format!("{}: {}", f_fn.name, p));
             let name = format!("m_fn-{}", i);
-            smt.assert(Term::named(expr::expr_to_smt2(p, "st"), name));
+            let flagsparam = m_fn.get_flag_params();
+            smt.assert(Term::named(
+                expr::expr_to_smt2(p, "st", flagsparam.as_slice()),
+                name,
+            ));
         }
 
         // smt.echo(String::from("preconditions"));
@@ -346,6 +361,79 @@ impl SynthZ3 {
         tickets
     }
 
+    fn check_programs_matchflags(
+        &mut self,
+        m_fn: &Method,
+        g_fn: &Method,
+        mut progs: Vec<Program>,
+    ) -> Vec<Z3Ticket> {
+        let mut tickets = Vec::new();
+        for (_i, prog) in progs.drain(..).enumerate() {
+            let (mut smt, symvars) = prog.to_smt2(&m_fn.name, m_fn.args.as_slice());
+
+            let mut vars = vec![SortedVar::new(
+                String::from("st!0"),
+                String::from("Model_t"),
+            )];
+
+            for a in &m_fn.args {
+                vars.push(SortedVar::new(
+                    a.name.clone(),
+                    types::type_to_smt2(&a.ptype),
+                ));
+            }
+
+            let mut assm_args = vec![Term::ident(String::from("st!0"))];
+            for a in g_fn.args.iter() {
+                assm_args.push(Term::ident(a.name.clone()));
+            }
+
+            let pre1 = Term::fn_apply(format!("{}.assms", g_fn.name), assm_args);
+
+            let mut assm_args = vec![Term::ident(String::from("st!0"))];
+            for a in m_fn.args.iter() {
+                assm_args.push(Term::ident(a.name.clone()));
+            }
+            let pre2 = Term::fn_apply(format!("{}.assms", m_fn.name), assm_args);
+
+            let pre = Term::land(pre1, pre2);
+
+            let mut fn_args = vec![Term::ident(String::from("st!0"))];
+            for v in m_fn.args.iter() {
+                fn_args.push(Term::ident(v.name.clone()));
+            }
+
+            let mut check_args = vec![Term::fn_apply(m_fn.name.clone(), fn_args)];
+            for a in g_fn.args.iter() {
+                check_args.push(Term::ident(a.name.clone()));
+            }
+
+            let check = Term::fn_apply(format!("{}", g_fn.name), check_args);
+
+            let t = Term::forall(vars, pre.implies(check));
+
+            smt.assert(t);
+            smt.check_sat();
+
+            symvars.add_get_values(&mut smt);
+
+            let mut smtctx = Smt2Context::new();
+            smtctx.subsection(String::from("Verification"));
+            smtctx.level(smt);
+
+            let mut query = Z3Query::from(smtctx);
+            query.set_program(prog);
+
+            let ticket = self
+                .workerpool
+                .submit_query(query)
+                .expect("failed to submit query");
+
+            tickets.push(ticket);
+        }
+        tickets
+    }
+
     fn check_programs_precond(
         &mut self,
         m_fn: &Method,
@@ -438,12 +526,14 @@ impl SynthZ3 {
             for t in tickets {
                 let mut res = self.workerpool.wait_for_result(t);
 
-                res.print_timestamps();
+                // res.print_timestamps();
 
-                let mut reslines = res.result().lines();
+                let output = res.result();
+
+                let mut reslines = output.lines();
                 if Some("sat") == reslines.next() {
-                    if let Some(s) = reslines.next() {
-                        match resultparser::parse_result(s) {
+                    if let Some(_) = reslines.next() {
+                        match resultparser::parse_result(&output[4..]) {
                             Ok(mut vars) => {
                                 if !vars.is_empty() {
                                     // println!("rewriting the program: {:?}\n", vars);
@@ -452,7 +542,7 @@ impl SynthZ3 {
                                         .replace_symbolic_values(&mut vars);
                                 }
                             }
-                            Err(e) => (),
+                            Err(_e) => (),
                         }
                     }
                     results.push(res);
@@ -618,7 +708,44 @@ impl SynthZ3 {
         // Matchflags: check the expression result
         // --------------------------------------------------------------------------------------
 
-        // todo
+        let mf_res_tickets = {
+            let state_syms = f_fn.get_state_references_body();
+            let state_bits = unit.state.referenced_field_bits(&state_syms);
+            let st_access_fields = unit
+                .interface
+                .fields_accessing_state(&state_syms, &state_bits);
+
+            // construct the program builder
+            let mut builder = operations::ProgramsBuilder::new();
+            for v in f_fn.args.iter() {
+                if v.ptype == Type::Flags {
+                    if let Some(flags) = &unit.flags {
+                        let var = Arc::new(v.name.clone());
+                        for f in flags.flags.iter() {
+                            builder.add_flags(var.clone(), f.name.clone());
+                        }
+                    }
+                } else {
+                    builder.add_var(v.name.clone());
+                }
+            }
+
+            for f in st_access_fields.iter() {
+                let mut parts = f.split('.');
+                let _ = parts.next();
+                let field = parts.next().unwrap();
+                let slice = parts.next().unwrap();
+                println!("BUILDER ADD: {} {}", field, slice);
+                builder.add_field_slice(field, slice);
+            }
+
+            let progs = builder.construct_programs(true);
+            self.check_programs_matchflags(m_fn, f_fn, progs)
+        };
+
+        let now = Instant::now();
+        let diff = now.saturating_duration_since(t_start);
+        println!("map: matchflags, {:7}, us  ", diff.as_micros());
 
         // --------------------------------------------------------------------------------------
         // Collect and combine the results of the queries, verify again
@@ -630,10 +757,11 @@ impl SynthZ3 {
             let t_fn_results = self.obtain_sat_results(t_fn_tickets);
             let f_fn_results = self.obtain_sat_results(f_fn_tickets);
             let tr_results = self.obtain_sat_results(vec![tr_res_tickets]);
-
+            let mf_results = self.obtain_sat_results(vec![mf_res_tickets]);
             results.extend(t_fn_results);
             results.extend(f_fn_results);
             results.extend(tr_results);
+            results.extend(mf_results);
             results
         };
 
@@ -671,6 +799,7 @@ impl SynthZ3 {
         println!("map: verify start, {:7}, us  ", diff.as_micros());
 
         for prog in candidate_programs.drain(..) {
+            println!("checking: {:?}", prog);
             let mut p_tickets =
                 self.check_programs_precond(m_fn, f_fn, None, false, vec![prog.clone()]);
             p_tickets.extend(self.check_programs_precond(
@@ -681,6 +810,7 @@ impl SynthZ3 {
                 vec![prog.clone()],
             ));
             p_tickets.extend(self.check_programs_translate(m_fn, t_fn, vec![prog.clone()]));
+            p_tickets.extend(self.check_programs_matchflags(m_fn, f_fn, vec![prog.clone()]));
 
             let mut all_sat = true;
             for t in p_tickets {
@@ -699,6 +829,7 @@ impl SynthZ3 {
                 return;
             }
         }
+        println!("no candidate program found");
     }
 
     /// synthesizes the `map` function and returns an ast of it
@@ -857,6 +988,7 @@ impl SynthZ3 {
             .collect();
 
         for prog in candidate_programs.drain(..) {
+            println!("checking: {:?}", prog);
             let mut p_tickets =
                 self.check_programs_precond(m_fn, f_fn, None, true, vec![prog.clone()]);
             p_tickets.extend(self.check_programs_precond(
@@ -879,6 +1011,7 @@ impl SynthZ3 {
                 return;
             }
         }
+        println!("no candidate program found");
     }
 
     /// synthesizes the 'unmap' function and returns an ast of it

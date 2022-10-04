@@ -31,7 +31,7 @@ use std::path::Path;
 use crustal as C;
 
 use super::utils;
-use crate::ast::{AstNodeGeneric, Expr, Segment, Stmt};
+use crate::ast::{AstNodeGeneric, Expr, Segment, Stmt, Type};
 use crate::codegen::CodeGenError;
 use crate::synth::{OpExpr, Operation};
 
@@ -47,6 +47,25 @@ fn add_unit_constants(scope: &mut C::Scope, unit: &Segment) {
     for c in &unit.consts {
         utils::add_const_def(scope, c);
     }
+}
+
+fn add_unit_flags(scope: &mut C::Scope, unit: &Segment) {
+    let structname = format!("{}_flags", unit.name);
+    if let Some(flags) = &unit.flags {
+        scope.new_comment("Defined unit flags");
+
+        let mut st = scope.new_struct(&structname);
+
+        for flag in &flags.flags {
+            let mut f = st.new_field(flag.name(), C::Type::new_uint64());
+            f.set_bitfield_width(1);
+        }
+    } else {
+        scope.new_comment("Unit has no defined flags");
+        scope.new_struct(&structname);
+    }
+    let tyname = format!("{}_t", structname);
+    scope.new_typedef(&tyname, C::Type::new_struct(&structname));
 }
 
 // /// adds the struct definition of the unit to the scope
@@ -295,6 +314,11 @@ fn oparg_to_rust_expr(op: &OpExpr) -> Option<C::Expr> {
             "%",
             oparg_to_rust_expr(y).unwrap(),
         )),
+        OpExpr::Not(x) => Some(C::Expr::uop("!", oparg_to_rust_expr(x).unwrap())),
+        OpExpr::Flags(v, f) => Some(C::Expr::field_access(
+            &C::Expr::new_var(&v, C::Type::new_typedef("dummy")),
+            &f,
+        )),
     }
 }
 
@@ -352,6 +376,16 @@ fn op_to_rust_expr(unit: &str, c: &mut C::Block, op: &Operation, vars: &HashMap<
     }
 }
 
+fn ptype_to_ctype(ptype: Type, unit: &Segment) -> C::Type {
+    match ptype {
+        Type::VirtualAddress => C::Type::new_typedef("vaddr_t"),
+        Type::PhysicalAddress => C::Type::new_typedef("paddr_t"),
+        Type::Size => C::Type::new_typedef("size_t"),
+        Type::Flags => C::Type::new_typedef(&utils::unit_flags_type(unit)),
+        _ => todo!(),
+    }
+}
+
 fn add_map_function(scope: &mut C::Scope, unit: &Segment) {
     let fname = utils::map_fn_name(unit.name());
 
@@ -363,10 +397,13 @@ fn add_map_function(scope: &mut C::Scope, unit: &Segment) {
 
     let v = fun.new_param("unit", unittype);
     field_vars.insert(String::from("unit"), v.to_expr());
-    fun.new_param("va", C::Type::new_uint64());
-    fun.new_param("size", C::Type::new_size());
-    fun.new_param("pa", C::Type::new_uint64());
-    fun.new_param("flags", C::Type::new_int(64));
+
+    // TODO: do this with the method!
+
+    let m_fn = unit.get_method("map").unwrap();
+    for f in m_fn.args.iter() {
+        fun.new_param(f.name(), ptype_to_ctype(f.ptype, unit));
+    }
 
     // find the fields
     let mut fields = HashSet::new();
@@ -493,6 +530,7 @@ pub fn generate(unit: &Segment, outdir: &Path) -> Result<(), CodeGenError> {
 
     // add the definitions
     add_unit_constants(s, unit);
+    add_unit_flags(s, unit);
     add_constructor_function(s, unit);
     add_map_function(s, unit);
     add_unmap_function(s, unit);

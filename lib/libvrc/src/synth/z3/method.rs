@@ -25,6 +25,8 @@
 
 //! State Synthesis Module: Rosette
 
+use std::fmt::Debug;
+
 // rosette language library imports
 use smt2::{Function, Smt2Context, SortedVar, Term};
 
@@ -52,8 +54,10 @@ pub fn add_methods(smt: &mut Smt2Context, methods: &[Method]) {
             f.add_arg(a.name.clone(), types::type_to_smt2(&a.ptype));
         }
 
+        let flagsparam = m.get_flag_params();
+
         if let Some(stmt) = &m.stmts {
-            f.add_body(expr::stmt_to_smt2(stmt, "st!0"));
+            f.add_body(expr::stmt_to_smt2(stmt, "st!0", flagsparam.as_slice()));
         }
 
         smt.function(f);
@@ -73,8 +77,10 @@ pub fn add_translate_or_match_flags_fn(smt: &mut Smt2Context, method: &Method) {
         f.add_arg(a.name.clone(), types::type_to_smt2(&a.ptype));
     }
 
+    let flagsparam = method.get_flag_params();
+
     if let Some(stmt) = &method.stmts {
-        f.add_body(expr::stmt_to_smt2(stmt, "st!0"));
+        f.add_body(expr::stmt_to_smt2(stmt, "st!0", flagsparam.as_slice()));
     }
 
     smt.function(f);
@@ -102,7 +108,7 @@ pub fn add_translate_or_match_flags_fn(smt: &mut Smt2Context, method: &Method) {
             f.add_arg(a.name.clone(), types::type_to_smt2(&a.ptype));
         }
 
-        f.add_body(expr::expr_to_smt2(pre, "st!0"));
+        f.add_body(expr::expr_to_smt2(pre, "st!0", flagsparam.as_slice()));
         smt.function(f);
     }
 
@@ -124,7 +130,9 @@ pub fn add_translate_or_match_flags_fn(smt: &mut Smt2Context, method: &Method) {
         .requires
         .iter()
         .filter(|p| p.has_state_references())
-        .fold(expr, |e, p| Term::land(e, expr::expr_to_smt2(p, "st!0")));
+        .fold(expr, |e, p| {
+            Term::land(e, expr::expr_to_smt2(p, "st!0", flagsparam.as_slice()))
+        });
 
     f.add_body(expr);
     smt.function(f);
@@ -153,7 +161,9 @@ pub fn add_translate_or_match_flags_fn(smt: &mut Smt2Context, method: &Method) {
         .requires
         .iter()
         .filter(|p| !p.has_state_references())
-        .fold(a, |e, p| Term::land(e, expr::expr_to_smt2(p, "st!0")));
+        .fold(a, |e, p| {
+            Term::land(e, expr::expr_to_smt2(p, "st!0", flagsparam.as_slice()))
+        });
 
     f.add_body(expr);
 
@@ -268,11 +278,15 @@ pub fn add_map_unmap_protect_assms(smt: &mut Smt2Context, method: &Method) {
         Term::land(e, types::type_to_assms_fn(&a.ptype, a.name.clone()))
     });
 
+    let flagsparam = method.get_flag_params();
+
     let expr = method
         .requires
         .iter()
         .filter(|p| !p.has_state_references())
-        .fold(a, |e, p| Term::land(e, expr::expr_to_smt2(p, "st!0")));
+        .fold(a, |e, p| {
+            Term::land(e, expr::expr_to_smt2(p, "st!0", flagsparam.as_slice()))
+        });
 
     f.add_body(expr);
 

@@ -25,14 +25,16 @@
 
 //! Parsing
 
+use std::cmp::Reverse;
+
 use super::Z3Error;
 
 /// the used nom parsing facilities
 use nom::{
     bytes::complete::tag,
-    character::complete::{digit1, hex_digit1, space1},
+    character::complete::{digit1, hex_digit1, multispace1, space1},
     combinator::all_consuming,
-    multi::many0,
+    multi::separated_list0,
     sequence::{delimited, preceded, tuple},
     IResult,
 };
@@ -64,11 +66,16 @@ pub fn parse_result(res: &str) -> Result<Vec<u64>, Z3Error> {
         return Err(Z3Error::ResulteParseError);
     }
 
-    let p = delimited(tag("("), many0(parse_symvar), tag(")"));
+    let p = delimited(
+        tag("("),
+        separated_list0(multispace1, parse_symvar),
+        tag(")\n"),
+    );
 
     match all_consuming(p)(res) {
         Ok((_, mut symvars)) => {
-            symvars.sort_by(|a, b| a.0.cmp(&b.0));
+            // reverse the order of the symvars, so we can pop later
+            symvars.sort_by_key(|a| Reverse(a.0));
             Ok(symvars.into_iter().map(|(_, v)| v).collect())
         }
         Err(e) => {

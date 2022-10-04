@@ -40,6 +40,10 @@ pub fn unit_struct_name(unit_name: &str) -> String {
     unit_name.to_lowercase()
 }
 
+pub fn unit_flags_type(unit: &Segment) -> String {
+    format!("{}_flags_t", unit.name)
+}
+
 pub fn segment_struct_name(unit: &Segment) -> String {
     unit_struct_name(&unit.name)
 }
@@ -223,6 +227,23 @@ pub fn add_header(scope: &mut C::Scope, title: &str) {
 }
 
 pub fn add_const_def(scope: &mut C::Scope, c: &Const) {
+    let mut m = C::Macro::new(c.name());
+    let e = c.value(); //.fold_constants();
+    if c.is_integer() {
+        m.set_value(&format!("(uint64_t)({})", e));
+    } else {
+        m.set_value(&format!("{}", e));
+    }
+
+    // add some documentation
+    m.doc_str(&format!("Defined constant `{}`", c.name()));
+    m.doc_str("");
+    m.doc_str(&format!("@loc: {}", c.loc().location()));
+
+    scope.push_macro(m);
+}
+
+pub fn add_flags_def(scope: &mut C::Scope, c: &Const) {
     let mut m = C::Macro::new(c.name());
     let e = c.value(); //.fold_constants();
     if c.is_integer() {
