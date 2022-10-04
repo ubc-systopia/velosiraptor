@@ -127,6 +127,10 @@ pub enum AstNode<'a> {
     // map
     Map(&'a Map),
 
+    // flags
+    Flag(&'a Flag),
+    Flags(&'a Flags),
+
     // methods
     Method(&'a Method),
     Parameter(&'a Param),
@@ -154,6 +158,8 @@ impl<'a> AstNodeGeneric<'a> for AstNode<'a> {
             AstNode::Parameter(x) => x.name(),
             AstNode::Statement(x) => x.name(),
             AstNode::Expression(x) => x.name(),
+            AstNode::Flag(x) => x.name(),
+            AstNode::Flags(x) => x.name(),
         }
     }
 
@@ -176,6 +182,8 @@ impl<'a> AstNodeGeneric<'a> for AstNode<'a> {
             AstNode::Parameter(x) => x.loc(),
             AstNode::Statement(x) => x.loc(),
             AstNode::Expression(x) => x.loc(),
+            AstNode::Flag(x) => x.loc(),
+            AstNode::Flags(x) => x.loc(),
         }
     }
 }

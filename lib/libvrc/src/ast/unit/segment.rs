@@ -33,7 +33,7 @@ use std::fmt::{Debug, Display, Formatter, Result};
 
 // the used crate-internal functionality
 use crate::ast::{
-    utils, AstNode, AstNodeGeneric, Const, Interface, Issues, Method, Param, State, Symbol,
+    utils, AstNode, AstNodeGeneric, Const, Flags, Interface, Issues, Method, Param, State, Symbol,
     SymbolKind, SymbolTable, Type,
 };
 use crate::error::{ErrorLocation, VrsError};
@@ -60,6 +60,8 @@ pub struct Segment {
     pub outbitwidth: u64,
     /// defined constants in this unit
     pub consts: Vec<Const>,
+    /// permission flags
+    pub flags: Option<Flags>,
     /// the state of the unit
     pub state: State,
     /// the software visible interface of the unit
@@ -88,6 +90,7 @@ impl Segment {
             inbitwidth: 0,
             outbitwidth: 0,
             consts: Vec::new(),
+            flags: None,
             state: State::new_none(),
             interface: Interface::new_none(),
             methods: Vec::new(),
@@ -127,6 +130,11 @@ impl Segment {
 
     pub fn add_consts(mut self, consts: Vec<Const>) -> Self {
         self.consts.extend(consts);
+        self
+    }
+
+    pub fn set_flags(mut self, flags: Option<Flags>) -> Self {
+        self.flags = flags;
         self
     }
 
@@ -382,11 +390,23 @@ impl<'a> AstNodeGeneric<'a> for Segment {
         // --------------------------------------------------------------------------------------
 
         for m in &self.methods {
+            // create a new symbol table context
+            st.create_context(m.name.clone());
+
+            if let Some(f) = &self.flags {
+                for p in m.get_flag_params() {
+                    f.build_symboltable(p, st);
+                }
+            }
+
             res = res + m.check(st);
 
             if !st.insert(m.to_symbol()) {
                 res.inc_err(1);
             }
+
+            // restore the symbol table again
+            st.drop_context();
         }
 
         // Check 9: Bases are defined

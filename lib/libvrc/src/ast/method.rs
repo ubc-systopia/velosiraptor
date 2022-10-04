@@ -27,6 +27,8 @@ use std::collections::HashSet;
 ///! Method module
 // std lib imports
 use std::fmt;
+use std::iter::Filter;
+use std::slice::Iter;
 
 use crate::ast::{
     utils, AstNode, AstNodeGeneric, Expr, Issues, Param, Stmt, Symbol, SymbolKind, SymbolTable,
@@ -446,6 +448,15 @@ impl Method {
         );
         v
     }
+
+    /// obtains the method parameters that are of the flags type
+    pub fn get_flag_params(&self) -> Vec<&str> {
+        self.args
+            .iter()
+            .filter(|x| x.ptype == Type::Flags)
+            .map(|x| x.name.as_str())
+            .collect()
+    }
 }
 
 /// Implementation of the [fmt::Display] trait for [Method]
@@ -516,7 +527,7 @@ impl<'a> AstNodeGeneric<'a> for Method {
         }
 
         // create a new symbol table context
-        st.create_context(self.name.clone());
+        // st.create_context(self.name.clone());
 
         // adding the parameters
         for p in &self.args {
@@ -580,8 +591,8 @@ impl<'a> AstNodeGeneric<'a> for Method {
 
         res = res + utils::check_snake_case(&self.name, &self.pos);
 
-        // restore the symbol table again
-        st.drop_context();
+        // // restore the symbol table again
+        // st.drop_context();
 
         // return the number of issues found
         res

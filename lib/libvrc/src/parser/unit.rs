@@ -226,7 +226,7 @@ fn unit_segment(input: TokenStream) -> IResult<TokenStream, Unit> {
     ));
 
     // then we have the unit block, wrapped in curly braces and a ;
-    let (i4, (consts, inbitwidth, outbitwidth, _flags, state, interface, methods)) =
+    let (i4, (consts, inbitwidth, outbitwidth, flags, state, interface, methods)) =
         terminated(cut(delimited(lbrace, unit_body, rbrace)), opt(semicolon))(i2)?;
 
     // build the segment
@@ -235,6 +235,7 @@ fn unit_segment(input: TokenStream) -> IResult<TokenStream, Unit> {
         .set_outbitwidth(outbitwidth)
         .set_derived(derived)
         .set_state(state)
+        .set_flags(flags)
         .set_interface(interface)
         .add_consts(consts)
         .add_methods(methods)

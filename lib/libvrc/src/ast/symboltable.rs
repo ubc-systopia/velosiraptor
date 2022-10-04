@@ -60,6 +60,8 @@ pub enum SymbolKind {
     Interface,
     /// This symbol is a unit (type)
     Unit,
+    /// this symbol is a flags type
+    Flags,
 }
 
 /// Implementation of the [Display] trait for [Symbol]
