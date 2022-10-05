@@ -30,8 +30,7 @@ use smt2::{Attribute, Function, Smt2Context, SortedVar, Term};
 
 // crate imports
 use super::types;
-use crate::ast;
-use crate::ast::{Flag, Flags, Segment};
+use crate::ast::Segment;
 
 pub fn add_flags(smt: &mut Smt2Context, unit: &Segment) {
     smt.section(format!("Flags for unit {}", unit.name));

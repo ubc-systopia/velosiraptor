@@ -25,8 +25,6 @@
 
 //! State Synthesis Module: Rosette
 
-use std::fmt::Debug;
-
 // rosette language library imports
 use smt2::{Function, Smt2Context, SortedVar, Term};
 

@@ -36,7 +36,7 @@ use crate::synth::{OpExpr, Operation};
 
 use super::types;
 
-/// the arguments are for either a symbolic variable (num) or a variable (var)
+/// the arguments are for either a symbolic variable (num) or a variable (var), or a flag access
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArgX {
     /// a constant number
@@ -93,7 +93,7 @@ impl From<&ArgX> for OpExpr {
     }
 }
 
-/// the arguments are for either a symbolic variable (num) or a variable (var)
+/// the argment expressions can be some of a few operations
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArgExpr {
     Arg(ArgX),
@@ -226,6 +226,7 @@ impl From<&ArgExpr> for OpExpr {
     }
 }
 
+/// the filed slice operation sets a value of a field slice
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct FieldSliceOp(Arc<String>, ArgExpr);
 
@@ -237,60 +238,70 @@ impl FieldSliceOp {
 
 /// a field operation is either inserting a value into a field or its slice, or reading it
 #[derive(Debug, PartialEq, Eq)]
-pub enum FieldOps {
+pub enum FieldOp {
     InsertField(ArgExpr),
     InsertFieldSlices(Vec<FieldSliceOp>),
     ReadAction,
+    WriteAction,
 }
 
-impl FieldOps {
-    pub fn replace_symbolic_values(ops: Arc<FieldOps>, vals: &mut Vec<u64>) -> Arc<FieldOps> {
+impl FieldOp {
+    pub fn replace_symbolic_values(ops: Arc<FieldOp>, vals: &mut Vec<u64>) -> Arc<FieldOp> {
         match ops.as_ref() {
-            FieldOps::InsertField(arg) => {
-                Arc::new(FieldOps::InsertField(arg.replace_symbolic_values(vals)))
+            FieldOp::InsertField(arg) => {
+                Arc::new(FieldOp::InsertField(arg.replace_symbolic_values(vals)))
             }
-            FieldOps::InsertFieldSlices(sliceops) => {
+            FieldOp::InsertFieldSlices(sliceops) => {
                 let sliceops = sliceops
                     .iter()
                     .map(|a| a.replace_symbolic_values(vals))
                     .collect();
-                Arc::new(FieldOps::InsertFieldSlices(sliceops))
+                Arc::new(FieldOp::InsertFieldSlices(sliceops))
             }
-            FieldOps::ReadAction => ops,
+            FieldOp::ReadAction => ops,
+            FieldOp::WriteAction => ops,
         }
     }
 }
 
 /// a field ops is a list of operations on a given field,
-#[derive(Debug, PartialEq)]
-struct FieldOperations(Arc<String>, Arc<FieldOps>);
+#[derive(Debug, PartialEq, Eq, Clone)]
+struct FieldOperations(Arc<String>, Vec<Arc<FieldOp>>);
 
 impl From<&FieldOperations> for Vec<Operation> {
     fn from(prog: &FieldOperations) -> Self {
         let mut ops = Vec::new();
-        match prog.1.as_ref() {
-            FieldOps::InsertField(arg) => {
-                ops.push(Operation::Insert {
-                    field: prog.0.to_string(),
-                    slice: None,
-                    arg: arg.into(),
-                });
-            }
-            FieldOps::InsertFieldSlices(sliceops) => {
-                for s in sliceops.iter() {
+        for op in &prog.1 {
+            match op.as_ref() {
+                FieldOp::InsertField(arg) => {
                     ops.push(Operation::Insert {
                         field: prog.0.to_string(),
-                        slice: Some(s.0.to_string()),
-                        arg: (&s.1).into(),
+                        slice: None,
+                        arg: arg.into(),
+                    });
+                }
+                FieldOp::InsertFieldSlices(sliceops) => {
+                    for s in sliceops.iter() {
+                        ops.push(Operation::Insert {
+                            field: prog.0.to_string(),
+                            slice: Some(s.0.to_string()),
+                            arg: (&s.1).into(),
+                        });
+                    }
+                }
+                FieldOp::ReadAction => {
+                    ops.push(Operation::ReadAction {
+                        field: prog.0.to_string(),
+                    });
+                }
+                FieldOp::WriteAction => {
+                    ops.push(Operation::WriteAction {
+                        field: prog.0.to_string(),
                     });
                 }
             }
-            FieldOps::ReadAction => {
-                ops.push(Operation::ReadAction {
-                    field: prog.0.to_string(),
-                });
-            }
         }
+        // and add the write action
         ops.push(Operation::WriteAction {
             field: prog.0.to_string(),
         });
@@ -358,7 +369,9 @@ impl Program {
         for op in self.ops.iter_mut() {
             *op = Arc::new(FieldOperations(
                 op.0.clone(),
-                FieldOps::replace_symbolic_values(op.1.clone(), vals),
+                op.1.iter()
+                    .map(|a| FieldOp::replace_symbolic_values(a.clone(), vals))
+                    .collect(),
             ));
         }
     }
@@ -370,22 +383,28 @@ impl Program {
 
         let mut symvar = SymbolicVars::new();
         for fops in self.ops.iter() {
-            match fops.1.deref() {
-                FieldOps::InsertField(arg) => {
-                    let arg = arg.to_term(&mut symvar);
-                    let fname = format!("Model.IFace.{}.set!", fops.0);
-                    smtops.push((fname, Some(arg)));
-                }
-                FieldOps::InsertFieldSlices(sliceops) => {
-                    for sliceop in sliceops.iter() {
-                        let arg = sliceop.1.to_term(&mut symvar);
-                        let fname = format!("Model.IFace.{}.{}.set!", fops.0, sliceop.0);
+            for op in &fops.1 {
+                match op.deref() {
+                    FieldOp::InsertField(arg) => {
+                        let arg = arg.to_term(&mut symvar);
+                        let fname = format!("Model.IFace.{}.set!", fops.0);
                         smtops.push((fname, Some(arg)));
                     }
-                }
-                FieldOps::ReadAction => {
-                    let fname = format!("Model.IFace.{}.readaction ", fops.0);
-                    smtops.push((fname, None));
+                    FieldOp::InsertFieldSlices(sliceops) => {
+                        for sliceop in sliceops.iter() {
+                            let arg = sliceop.1.to_term(&mut symvar);
+                            let fname = format!("Model.IFace.{}.{}.set!", fops.0, sliceop.0);
+                            smtops.push((fname, Some(arg)));
+                        }
+                    }
+                    FieldOp::ReadAction => {
+                        let fname = format!("Model.IFace.{}.readaction ", fops.0);
+                        smtops.push((fname, None));
+                    }
+                    FieldOp::WriteAction => {
+                        let fname = format!("Model.IFace.{}.writeaction ", fops.0);
+                        smtops.push((fname, None));
+                    }
                 }
             }
 
@@ -430,64 +449,79 @@ impl Program {
     }
 
     pub fn merge(mut self, other: &Self) -> Self {
-        let mut ops: HashMap<Arc<String>, Vec<Arc<FieldOps>>> = HashMap::new();
+        let mut ops: HashMap<Arc<String>, Vec<Arc<FieldOp>>> = HashMap::new();
 
-        // struct FieldOperations(Arc<String>, Arc<FieldOps>);
+        // struct FieldOperations(Arc<String>, Vec<Arc<FieldOp>>);
         for op in self.ops.iter() {
             if let Some(x) = ops.get_mut(&op.0) {
-                x.push(op.1.clone());
+                x.extend(op.1.clone());
             } else {
-                ops.insert(op.0.clone(), vec![op.1.clone()]);
+                ops.insert(op.0.clone(), op.1.clone());
             }
         }
 
         for op in other.ops.iter() {
             if let Some(x) = ops.get_mut(&op.0) {
-                if !x.contains(&op.1) {
-                    x.push(op.1.clone());
+                for o in op.1.iter() {
+                    if !x.contains(o) {
+                        x.push(o.clone());
+                    }
                 }
             //    x.push(op.1.clone());
             } else {
-                ops.insert(op.0.clone(), vec![op.1.clone()]);
+                ops.insert(op.0.clone(), op.1.clone());
             }
         }
 
         let mut newops = Vec::new();
-        let mut sliceops = Vec::new();
+
         for (fld, fops) in ops.iter_mut() {
+            let mut fieldops: Vec<Arc<FieldOp>> = Vec::new();
+            let mut sliceops = Vec::new();
             for fop in fops {
                 match fop.as_ref() {
-                    // FieldOps::InsertField(a) => {
+                    // FieldOp::InsertField(a) => {
                     //     if !sliceops.is_empty() {
-                    //         let sops = FieldOps::InsertFieldSlices(sliceops.clone());
+                    //         let sops = FieldOp::InsertFieldSlices(sliceops.clone());
                     //         newops.push(FieldOperations(fld.clone(), Arc::new(sops)));
                     //         sliceops.clear();
                     //     }
                     //     newops.push(Arc::new(FieldOperations(fld.clone(), fop.clone())));
                     // }
-                    FieldOps::InsertFieldSlices(slices) => {
+                    FieldOp::InsertFieldSlices(slices) => {
                         sliceops.extend(slices.clone());
                     }
+
                     _ => {
                         if !sliceops.is_empty() {
-                            let sops = FieldOps::InsertFieldSlices(sliceops.clone());
-                            newops.push(Arc::new(FieldOperations(fld.clone(), Arc::new(sops))));
+                            let sops = Arc::new(FieldOp::InsertFieldSlices(sliceops.clone()));
+                            fieldops.push(sops);
                             sliceops.clear();
-                        }
-                        if let Some(x) = newops.last() {
-                            if x.0.as_ref() == fld.as_ref() && x.1.as_ref() == fop.as_ref() {
+                        } else {
+                            if fieldops.contains(fop) {
                                 continue;
                             }
+                            fieldops.push(fop.clone());
                         }
-                        newops.push(Arc::new(FieldOperations(fld.clone(), fop.clone())));
+
+                        // if let Some(x) = fieldops.last() {
+                        //     if x.as_ref() == fld.as_ref() && x.1.contains(fop) {
+                        //         continue;
+                        //     }
+                        // } else {
+
+                        // }
+                        // newops.push(Arc::new(FieldOperations(fld.clone(), vec![fop.clone()])));
                     }
                 }
             }
 
             if !sliceops.is_empty() {
-                let sops = FieldOps::InsertFieldSlices(sliceops.clone());
-                newops.push(Arc::new(FieldOperations(fld.clone(), Arc::new(sops))));
+                let sops = Arc::new(FieldOp::InsertFieldSlices(sliceops));
+                fieldops.push(sops);
             }
+
+            newops.push(Arc::new(FieldOperations(fld.clone(), fieldops)));
         }
 
         self.ops = newops;
@@ -571,12 +605,15 @@ impl ProgramsBuilder {
         // a vector with an entry for each field that contains a vector for
         // all possible operations on this field
         let mut field_operations: Vec<Vec<Arc<FieldOperations>>> = Vec::new();
+        let mut field_operations_2: Vec<Vec<Arc<FieldOperations>>> = Vec::new();
+
+        // TODO: Revisit this!
 
         // now we loop over each field and slices to construct all possible operations
         for (field, slices) in &self.fields {
             // all programs that operate on the slices of this field
             let mut slice_programs: Vec<Vec<ArgExpr>> = slices.iter().map(|_| vec![]).collect();
-            for slice in slices {
+            for _slice in slices {
                 // the new slice programs we've generated
                 let mut new_slice_programs = Vec::new();
 
@@ -671,7 +708,8 @@ impl ProgramsBuilder {
 
             // now we construct the programs to manipulate the fields
             let mut field_programs = Vec::new();
-            field_programs.push(Arc::new(FieldOps::InsertField(ArgExpr::Arg(ArgX::Zero))));
+            //field_programs.push(Arc::new(FieldOp::ReadAction));
+            field_programs.push(Arc::new(FieldOp::InsertField(ArgExpr::Arg(ArgX::Zero))));
 
             for mut program in slice_programs.drain(..) {
                 let mut sliceops = Vec::new();
@@ -679,28 +717,44 @@ impl ProgramsBuilder {
                     sliceops.push(FieldSliceOp(slice.clone(), program.pop().unwrap()));
                 }
 
-                field_programs.push(Arc::new(FieldOps::InsertFieldSlices(sliceops)));
+                field_programs.push(Arc::new(FieldOp::InsertFieldSlices(sliceops)));
             }
 
             // add full field accesses as well
             // for var in &self.vars {
-            //     field_programs.push(Arc::new(FieldOps::InsertField(ArgX::Var(var.clone()))));
+            //     field_programs.push(Arc::new(FieldOp::InsertField(ArgX::Var(var.clone()))));
             // }
 
             // now add the variants to modify the build to the field operations
             let ops = field_programs
-                .into_iter()
-                .map(|p| Arc::new(FieldOperations(field.clone(), p)))
+                .iter()
+                .map(|p| Arc::new(FieldOperations(field.clone(), vec![p.clone()])))
                 .collect();
+
             field_operations.push(ops);
+
+            let ops = field_programs
+                .into_iter()
+                .map(|p| {
+                    Arc::new(FieldOperations(
+                        field.clone(),
+                        vec![Arc::new(FieldOp::ReadAction), p],
+                    ))
+                })
+                .collect();
+
+            field_operations_2.push(ops);
         }
 
         // now build any possible compinatins of the programs
 
+        let mut final_programs = Vec::new();
+
+        // we need to do something for each program
+
         let mut programs: Vec<Vec<Arc<FieldOperations>>> =
             self.fields.iter().map(|_| vec![]).collect();
 
-        // we need to do something for each program
         for fops in field_operations {
             let mut prog_new = Vec::new();
             for program in programs {
@@ -713,8 +767,30 @@ impl ProgramsBuilder {
             programs = prog_new;
         }
 
+        final_programs.extend(programs);
+
+        let mut programs: Vec<Vec<Arc<FieldOperations>>> =
+            self.fields.iter().map(|_| vec![]).collect();
+
+        for fops in field_operations_2 {
+            let mut prog_new = Vec::new();
+            for program in programs {
+                for fop in &fops {
+                    let mut program_new = program.clone();
+                    program_new.push(fop.clone());
+                    prog_new.push(program_new);
+                }
+            }
+            programs = prog_new;
+        }
+
+        final_programs.extend(programs);
+
         // and conver the programs into the final format
-        programs.into_iter().map(|p| Program { ops: p }).collect()
+        final_programs
+            .into_iter()
+            .map(|p| Program { ops: p })
+            .collect()
     }
 }
 

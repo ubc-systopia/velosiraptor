@@ -26,7 +26,6 @@
 //! Unit Generation (Rust)
 
 use std::collections::HashSet;
-use std::fmt::format;
 use std::path::Path;
 
 use codegen_rs as CG;
@@ -109,7 +108,7 @@ fn oparg_to_rust_expr(op: &OpExpr) -> String {
         OpExpr::Mul(x, y) => format!("({} * {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
         OpExpr::Div(x, y) => format!("({} / {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
         OpExpr::Mod(x, y) => format!("({} % {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
-        OpExpr::Flags(v, f) => todo!(),
+        OpExpr::Flags(_v, _f) => todo!(),
         OpExpr::Not(x) => format!("!{}", oparg_to_rust_expr(x)),
     }
 }

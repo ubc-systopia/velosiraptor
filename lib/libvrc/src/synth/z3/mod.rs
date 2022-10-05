@@ -23,10 +23,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use custom_error::custom_error;
 
@@ -203,8 +204,31 @@ impl SynthZ3 {
         // declare a variable for each
         smt.variable(VarDecl::new(String::from("st"), String::from("Model_t")));
 
-        for a in &m_fn.args {
-            smt.variable(VarDecl::new(a.name.clone(), types::type_to_smt2(&a.ptype)));
+        {
+            let mut vars = HashSet::new();
+            for a in &m_fn.args {
+                if vars.contains(&a.name) {
+                    continue;
+                }
+                smt.variable(VarDecl::new(a.name.clone(), types::type_to_smt2(&a.ptype)));
+                vars.insert(&a.name);
+            }
+
+            for a in &t_fn.args {
+                if vars.contains(&a.name) {
+                    continue;
+                }
+                smt.variable(VarDecl::new(a.name.clone(), types::type_to_smt2(&a.ptype)));
+                vars.insert(&a.name);
+            }
+
+            for a in &f_fn.args {
+                if vars.contains(&a.name) {
+                    continue;
+                }
+                smt.variable(VarDecl::new(a.name.clone(), types::type_to_smt2(&a.ptype)));
+                vars.insert(&a.name);
+            }
         }
 
         for (i, p) in f_fn.requires.iter().enumerate() {
@@ -272,7 +296,8 @@ impl SynthZ3 {
                         let i = t[5..].parse::<usize>().unwrap();
                         &m_fn.requires[i]
                     } else {
-                        unreachable!()
+                        println!("{}", result.result());
+                        panic!("unknown conflict: {}", t);
                     }
                 })
                 .collect::<Vec<&Expr>>();
@@ -434,6 +459,100 @@ impl SynthZ3 {
         tickets
     }
 
+    fn check_programs_protect(
+        &mut self,
+        p_fn: &Method,
+        f_fn: &Method,
+        t_fn: &Method,
+        mut progs: Vec<Program>,
+    ) -> Vec<Z3Ticket> {
+        let mut tickets = Vec::new();
+        for (_i, prog) in progs.drain(..).enumerate() {
+            let (mut smt, symvars) = prog.to_smt2(&p_fn.name, p_fn.args.as_slice());
+
+            let mut vars = vec![SortedVar::new(
+                String::from("st!0"),
+                String::from("Model_t"),
+            )];
+
+            for a in &p_fn.args {
+                vars.push(SortedVar::new(
+                    a.name.clone(),
+                    types::type_to_smt2(&a.ptype),
+                ));
+            }
+
+            let mut assm_args = vec![Term::ident(String::from("st!0"))];
+            for a in f_fn.args.iter() {
+                assm_args.push(Term::ident(a.name.clone()));
+            }
+
+            let pre1 = Term::fn_apply(format!("{}.assms", t_fn.name), assm_args);
+
+            let mut assm_args = vec![Term::ident(String::from("st!0"))];
+            for a in f_fn.args.iter() {
+                assm_args.push(Term::ident(a.name.clone()));
+            }
+            let pre2 = Term::fn_apply(format!("{}.assms", f_fn.name), assm_args);
+
+            let pre = Term::land(pre1, pre2);
+
+            let mut fn_args = vec![Term::ident(String::from("st!0"))];
+            for v in p_fn.args.iter() {
+                fn_args.push(Term::ident(v.name.clone()));
+            }
+
+            let mut check_args = vec![Term::fn_apply(p_fn.name.clone(), fn_args)];
+            for a in f_fn.args.iter() {
+                check_args.push(Term::ident(a.name.clone()));
+            }
+
+            let mut fn_args = vec![Term::ident(String::from("st!0"))];
+
+            //  ((st!0 Model_t) (st!1 Model_t) (va VAddr_t) (sz Size_t)) Bool
+            for v in p_fn.args.iter() {
+                fn_args.push(Term::ident(v.name.clone()));
+            }
+            let mut t_fn_check_args = vec![
+                Term::ident(String::from("st!0")),
+                Term::fn_apply(p_fn.name.clone(), fn_args),
+            ];
+            t_fn_check_args.push(Term::ident("va".to_string()));
+            t_fn_check_args.push(Term::ident("sz".to_string()));
+
+            // for a in t_fn.args.iter() {
+            //     t_fn_check_args.push(Term::ident(a.name.clone()));
+            // }
+
+            let check = Term::land(
+                Term::fn_apply(format!("{}", f_fn.name), check_args),
+                Term::fn_apply(format!("{}.result.protect", t_fn.name), t_fn_check_args),
+            );
+
+            let t = Term::forall(vars, pre.implies(check));
+
+            smt.assert(t);
+            smt.check_sat();
+
+            symvars.add_get_values(&mut smt);
+
+            let mut smtctx = Smt2Context::new();
+            smtctx.subsection(String::from("Verification"));
+            smtctx.level(smt);
+
+            let mut query = Z3Query::from(smtctx);
+            query.set_program(prog);
+
+            let ticket = self
+                .workerpool
+                .submit_query(query)
+                .expect("failed to submit query");
+
+            tickets.push(ticket);
+        }
+        tickets
+    }
+
     fn check_programs_precond(
         &mut self,
         m_fn: &Method,
@@ -556,7 +675,7 @@ impl SynthZ3 {
         fn_results
     }
 
-    fn add_synth_map_tasks(&mut self, unit: &mut Segment) {
+    fn add_synth_map_tasks(&mut self, unit: &mut Segment) -> Vec<Vec<Vec<Z3Ticket>>> {
         // get the map functions
         let m_fn = unit.get_method("map").unwrap();
         // get the translate function
@@ -735,7 +854,6 @@ impl SynthZ3 {
                 let _ = parts.next();
                 let field = parts.next().unwrap();
                 let slice = parts.next().unwrap();
-                println!("BUILDER ADD: {} {}", field, slice);
                 builder.add_field_slice(field, slice);
             }
 
@@ -747,27 +865,28 @@ impl SynthZ3 {
         let diff = now.saturating_duration_since(t_start);
         println!("map: matchflags, {:7}, us  ", diff.as_micros());
 
-        // --------------------------------------------------------------------------------------
-        // Collect and combine the results of the queries, verify again
-        // --------------------------------------------------------------------------------------
+        vec![
+            t_fn_tickets,
+            f_fn_tickets,
+            vec![tr_res_tickets],
+            vec![mf_res_tickets],
+        ]
+    }
 
-        let results = {
-            let mut results = Vec::new();
+    fn check_synth_map_tasks(&mut self, unit: &mut Segment, mut tickets: Vec<Vec<Vec<Z3Ticket>>>) {
+        // get the map functions
+        let m_fn = unit.get_method("map").unwrap();
+        // get the translate function
+        let t_fn = unit.get_method("translate").unwrap();
+        // get the translate function
+        let f_fn = unit.get_method("matchflags").unwrap();
 
-            let t_fn_results = self.obtain_sat_results(t_fn_tickets);
-            let f_fn_results = self.obtain_sat_results(f_fn_tickets);
-            let tr_results = self.obtain_sat_results(vec![tr_res_tickets]);
-            let mf_results = self.obtain_sat_results(vec![mf_res_tickets]);
-            results.extend(t_fn_results);
-            results.extend(f_fn_results);
-            results.extend(tr_results);
-            results.extend(mf_results);
-            results
-        };
-
-        let now = Instant::now();
-        let diff = now.saturating_duration_since(t_start);
-        println!("map: obtain results, {:7}, us  ", diff.as_micros());
+        let mut results = Arc::new(
+            tickets
+                .drain(..)
+                .flat_map(|t| self.obtain_sat_results(t))
+                .collect::<Vec<_>>(),
+        );
 
         // the completed candidate program
         let mut candidate_programs: Vec<Vec<&Program>> = vec![Vec::new()];
@@ -794,10 +913,6 @@ impl SynthZ3 {
             .map(|p| p.iter_mut().fold(Program::new(), |acc, x| acc.merge(x)))
             .collect();
 
-        let now = Instant::now();
-        let diff = now.saturating_duration_since(t_start);
-        println!("map: verify start, {:7}, us  ", diff.as_micros());
-
         for prog in candidate_programs.drain(..) {
             println!("checking: {:?}", prog);
             let mut p_tickets =
@@ -819,10 +934,6 @@ impl SynthZ3 {
                 all_sat &= reslines.next() == Some("sat");
             }
 
-            let now = Instant::now();
-            let diff = now.saturating_duration_since(t_start);
-            println!("map: check-candidate, {:7}, us  ", diff.as_micros());
-
             if all_sat {
                 println!("found candidate program: {:?}", prog);
                 unit.map_ops = Some(prog.into());
@@ -842,13 +953,14 @@ impl SynthZ3 {
             // perform worker reset and init with the given context
             self.workerpool.reset_with_context(Z3Query::from(ctx));
 
-            self.add_synth_map_tasks(unit);
+            let tickets = self.add_synth_map_tasks(unit);
+            self.check_synth_map_tasks(unit, tickets);
         }
 
         Ok(())
     }
 
-    fn add_synth_unmap_tasks(&mut self, unit: &mut Segment) {
+    fn add_synth_unmap_tasks(&mut self, unit: &mut Segment) -> Vec<Vec<Vec<Z3Ticket>>> {
         // get the map functions
         let m_fn = unit.get_method("unmap").unwrap();
         // get the translate function
@@ -951,16 +1063,25 @@ impl SynthZ3 {
             // TODO: construct the task
         }
 
-        let results = {
-            let mut results = Vec::new();
+        vec![t_fn_tickets, f_fn_tickets]
+    }
 
-            let t_fn_results = self.obtain_sat_results(t_fn_tickets);
-            let f_fn_results = self.obtain_sat_results(f_fn_tickets);
+    fn check_synth_unmap_tasks(
+        &mut self,
+        unit: &mut Segment,
+        mut tickets: Vec<Vec<Vec<Z3Ticket>>>,
+    ) {
+        // get the map functions
+        let m_fn = unit.get_method("unmap").unwrap();
+        // get the translate function
+        let t_fn = unit.get_method("translate").unwrap();
+        // get the translate function
+        let f_fn = unit.get_method("matchflags").unwrap();
 
-            results.extend(t_fn_results);
-            results.extend(f_fn_results);
-            results
-        };
+        let results = tickets
+            .drain(..)
+            .flat_map(|t| self.obtain_sat_results(t))
+            .collect::<Vec<_>>();
 
         // the completed candidate program
         let mut candidate_programs: Vec<Vec<&Program>> = vec![Vec::new()];
@@ -1029,13 +1150,133 @@ impl SynthZ3 {
             // perform worker reset and init with the given context
             self.workerpool.reset_with_context(Z3Query::from(ctx));
 
-            self.add_synth_unmap_tasks(unit);
+            let tickets = self.add_synth_unmap_tasks(unit);
+            self.check_synth_unmap_tasks(unit, tickets);
         }
 
         Ok(())
     }
 
-    fn add_synth_protect_tasks(&mut self, _unit: &mut Segment) {}
+    fn add_synth_protect_tasks(&mut self, unit: &mut Segment) -> Vec<Vec<Vec<Z3Ticket>>> {
+        // get the map functions
+        let p_fn = unit.get_method("protect").unwrap();
+        // get the translate function
+        let t_fn = unit.get_method("translate").unwrap();
+        // get the translate function
+        let f_fn = unit.get_method("matchflags").unwrap();
+
+        // --------------------------------------------------------------------------------------
+        // Check whether the pre-conditions can be satisfied
+        // --------------------------------------------------------------------------------------
+
+        self.check_precondition_satisfiability(p_fn, t_fn, f_fn);
+
+        // --------------------------------------------------------------------------------------
+        // Matchflags: check the expression result
+        // --------------------------------------------------------------------------------------
+        // TODO: that on here might be memoised...
+
+        let mf_res_tickets = {
+            let state_syms = f_fn.get_state_references_body();
+            let state_bits = unit.state.referenced_field_bits(&state_syms);
+            let st_access_fields = unit
+                .interface
+                .fields_accessing_state(&state_syms, &state_bits);
+
+            // construct the program builder
+            let mut builder = operations::ProgramsBuilder::new();
+            for v in f_fn.args.iter() {
+                if v.ptype == Type::Flags {
+                    if let Some(flags) = &unit.flags {
+                        let var = Arc::new(v.name.clone());
+                        for f in flags.flags.iter() {
+                            builder.add_flags(var.clone(), f.name.clone());
+                        }
+                    }
+                } else {
+                    builder.add_var(v.name.clone());
+                }
+            }
+
+            for f in st_access_fields.iter() {
+                let mut parts = f.split('.');
+                let _ = parts.next();
+                let field = parts.next().unwrap();
+                let slice = parts.next().unwrap();
+                builder.add_field_slice(field, slice);
+            }
+
+            let progs = builder.construct_programs(true);
+            self.check_programs_protect(p_fn, f_fn, t_fn, progs)
+        };
+
+        vec![vec![mf_res_tickets]]
+
+        // change permissions
+        //   post: matchflags(s') && translate(s') == translate(s)
+    }
+
+    fn check_synth_protect_tasks(
+        &mut self,
+        unit: &mut Segment,
+        mut tickets: Vec<Vec<Vec<Z3Ticket>>>,
+    ) {
+        // get the map functions
+        let p_fn = unit.get_method("protect").unwrap();
+        // get the translate function
+        let t_fn = unit.get_method("translate").unwrap();
+        // get the translate function
+        let f_fn = unit.get_method("matchflags").unwrap();
+
+        let results = tickets
+            .drain(..)
+            .flat_map(|t| self.obtain_sat_results(t))
+            .collect::<Vec<_>>();
+
+        // the completed candidate program
+        let mut candidate_programs: Vec<Vec<&Program>> = vec![Vec::new()];
+
+        for res in results.iter() {
+            // new candidate programs
+            let mut new_candidate_programs = Vec::new();
+
+            for prog in candidate_programs {
+                for r in res {
+                    // expand all candidate programs with the new program
+                    let mut new_prog = prog.clone();
+                    new_prog.push(r.query().program().unwrap());
+                    new_candidate_programs.push(new_prog);
+                }
+            }
+
+            // update the candidate programs
+            candidate_programs = new_candidate_programs;
+        }
+
+        let mut candidate_programs: Vec<Program> = candidate_programs
+            .iter_mut()
+            .map(|p| p.iter_mut().fold(Program::new(), |acc, x| acc.merge(x)))
+            .collect();
+
+        for prog in candidate_programs.drain(..) {
+            println!("checking: {:?}", prog);
+
+            let p_tickets = self.check_programs_protect(p_fn, f_fn, t_fn, vec![prog.clone()]);
+
+            let mut all_sat = true;
+            for t in p_tickets {
+                let res = self.workerpool.wait_for_result(t);
+                let mut reslines = res.result().lines();
+                all_sat &= reslines.next() == Some("sat");
+            }
+            if all_sat {
+                println!("found candidate program: {:?}", prog);
+                unit.protect_ops = Some(prog.into());
+                return;
+            }
+        }
+        println!("no candidate program found");
+    }
 
     pub fn synth_protect(&mut self, ast: &mut AstRoot) -> Result<(), SynthError> {
         for unit in &mut ast.segment_units_mut() {
@@ -1045,18 +1286,14 @@ impl SynthZ3 {
                 self.outdir
             );
 
-            // // create the base unit context that provides the framework for synthesis
-            // let ctx = self.create_unit_context(unit);
+            // create the base unit context that provides the framework for synthesis
+            let ctx = self.create_unit_context(unit);
 
-            // // perform worker reset and init with the given context
-            // self.workerpool.reset_with_context(Z3Query::from(ctx));
+            // perform worker reset and init with the given context
+            self.workerpool.reset_with_context(Z3Query::from(ctx));
 
-            // self.add_synth_protect_tasks(unit);
-
-            // perform search
-
-            let ops = Vec::new();
-            unit.protect_ops = Some(ops);
+            let tickets = self.add_synth_protect_tasks(unit);
+            self.check_synth_protect_tasks(unit, tickets);
         }
 
         Ok(())
@@ -1067,11 +1304,13 @@ impl SynthZ3 {
             let ctx = self.create_unit_context(unit);
             self.workerpool.reset_with_context(Z3Query::from(ctx));
 
-            self.add_synth_protect_tasks(unit);
-            self.add_synth_unmap_tasks(unit);
-            self.add_synth_map_tasks(unit);
+            let m_tickets = self.add_synth_map_tasks(unit);
+            let u_tickets = self.add_synth_unmap_tasks(unit);
+            let p_tickets = self.add_synth_protect_tasks(unit);
 
-            // do stuff
+            self.check_synth_map_tasks(unit, m_tickets);
+            self.check_synth_unmap_tasks(unit, u_tickets);
+            self.check_synth_protect_tasks(unit, p_tickets);
         }
         Ok(())
     }

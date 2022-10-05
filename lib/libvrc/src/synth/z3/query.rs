@@ -25,7 +25,7 @@
 
 // standard library imports
 use std::fmt;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 // external library imports
 use smt2::{Smt2Command, Smt2Context};

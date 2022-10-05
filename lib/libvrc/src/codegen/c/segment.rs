@@ -54,10 +54,10 @@ fn add_unit_flags(scope: &mut C::Scope, unit: &Segment) {
     if let Some(flags) = &unit.flags {
         scope.new_comment("Defined unit flags");
 
-        let mut st = scope.new_struct(&structname);
+        let st = scope.new_struct(&structname);
 
         for flag in &flags.flags {
-            let mut f = st.new_field(flag.name(), C::Type::new_uint64());
+            let f = st.new_field(flag.name(), C::Type::new_uint64());
             f.set_bitfield_width(1);
         }
     } else {
@@ -370,7 +370,9 @@ fn op_to_rust_expr(unit: &str, c: &mut C::Block, op: &Operation, vars: &HashMap<
         }
         Operation::ReadAction { field } => {
             let fname = utils::if_field_rd_fn_name_str(unit, field);
-            c.fn_call(&fname, vec![]);
+            let u = vars.get("unit").unwrap();
+            let f = vars.get(field).unwrap();
+            c.assign(f.clone(), C::Expr::fn_call(&fname, vec![u.clone()]));
         }
         Operation::Return => (),
     }
@@ -501,12 +503,60 @@ fn add_unmap_function(scope: &mut C::Scope, unit: &Segment) {
 
 fn add_protect_function(scope: &mut C::Scope, unit: &Segment) {
     let fname = utils::protect_fn_name(unit.name());
-    scope
-        .new_function(&fname, C::Type::new_void())
-        .set_static()
-        .set_inline()
-        .body()
-        .new_comment("TODO: SYNTHESIZE ME");
+
+    let mut fun = C::Function::with_string(fname, C::Type::new_bool());
+    fun.set_static().set_inline();
+
+    let mut field_vars = HashMap::new();
+    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::unit_type_name(unit.name())));
+
+    let v = fun.new_param("unit", unittype);
+    field_vars.insert(String::from("unit"), v.to_expr());
+
+    let m_fn = unit.get_method("protect").unwrap();
+    for f in m_fn.args.iter() {
+        fun.new_param(f.name(), ptype_to_ctype(f.ptype, unit));
+    }
+
+    // find the fields
+    let mut fields = HashSet::new();
+    if let Some(ops) = &unit.map_ops {
+        for op in ops {
+            let fname = op.fieldname();
+            if fname.is_empty() {
+                continue;
+            }
+            fields.insert(String::from(fname));
+        }
+    }
+
+    fun.body().new_comment("field variables");
+
+    for field in &fields {
+        if let Some(f) = unit.interface.field_by_name(field) {
+            // get the field from the unit
+            let field_type = utils::field_type_name(unit, &f.field);
+
+            let var = fun
+                .body()
+                .new_variable(field, C::Type::new_typedef(&field_type));
+
+            let fncall_name = utils::field_set_raw_fn_name(unit, &f.field);
+            var.set_value(C::Expr::fn_call(&fncall_name, vec![C::Expr::new_num(0)]));
+            field_vars.insert(field.clone(), var.to_expr());
+        }
+    }
+
+    if let Some(ops) = &unit.protect_ops {
+        fun.body().new_comment("configuration sequence");
+        for op in ops {
+            op_to_rust_expr(unit.name(), fun.body(), op, &field_vars);
+        }
+    } else {
+        fun.body().new_comment("there is no configuration sequence");
+    }
+
+    scope.push_function(fun);
 }
 
 /// generates the Segment definitions
