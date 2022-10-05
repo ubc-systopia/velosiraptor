@@ -433,7 +433,7 @@ impl SynthZ3 {
                 check_args.push(Term::ident(a.name.clone()));
             }
 
-            let check = Term::fn_apply(format!("{}", g_fn.name), check_args);
+            let check = Term::fn_apply(g_fn.name.to_string(), check_args);
 
             let t = Term::forall(vars, pre.implies(check));
 
@@ -525,7 +525,7 @@ impl SynthZ3 {
             // }
 
             let check = Term::land(
-                Term::fn_apply(format!("{}", f_fn.name), check_args),
+                Term::fn_apply(f_fn.name.to_string(), check_args),
                 Term::fn_apply(format!("{}.result.protect", t_fn.name), t_fn_check_args),
             );
 
@@ -651,7 +651,7 @@ impl SynthZ3 {
 
                 let mut reslines = output.lines();
                 if Some("sat") == reslines.next() {
-                    if let Some(_) = reslines.next() {
+                    if reslines.next().is_some() {
                         match resultparser::parse_result(&output[4..]) {
                             Ok(mut vars) => {
                                 if !vars.is_empty() {
@@ -881,7 +881,7 @@ impl SynthZ3 {
         // get the translate function
         let f_fn = unit.get_method("matchflags").unwrap();
 
-        let mut results = Arc::new(
+        let results = Arc::new(
             tickets
                 .drain(..)
                 .flat_map(|t| self.obtain_sat_results(t))

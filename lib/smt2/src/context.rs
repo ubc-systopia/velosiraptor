@@ -347,7 +347,7 @@ impl Smt2Context {
     pub fn to_code(&self) -> String {
         let mut ret = String::with_capacity((self.commands.len() + self.numcmd) * 200);
         let mut fmt = Formatter::new(&mut ret);
-        self.fmt(&mut fmt);
+        self.fmt(&mut fmt).expect("formatting failed");
         ret
     }
 }

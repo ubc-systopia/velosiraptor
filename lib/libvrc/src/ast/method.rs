@@ -27,8 +27,6 @@ use std::collections::HashSet;
 ///! Method module
 // std lib imports
 use std::fmt;
-use std::iter::Filter;
-use std::slice::Iter;
 
 use crate::ast::{
     utils, AstNode, AstNodeGeneric, Expr, Issues, Param, Stmt, Symbol, SymbolKind, SymbolTable,

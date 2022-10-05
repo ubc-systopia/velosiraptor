@@ -316,8 +316,8 @@ fn oparg_to_rust_expr(op: &OpExpr) -> Option<C::Expr> {
         )),
         OpExpr::Not(x) => Some(C::Expr::uop("!", oparg_to_rust_expr(x).unwrap())),
         OpExpr::Flags(v, f) => Some(C::Expr::field_access(
-            &C::Expr::new_var(&v, C::Type::new_typedef("dummy")),
-            &f,
+            &C::Expr::new_var(v, C::Type::new_typedef("dummy")),
+            f,
         )),
     }
 }
