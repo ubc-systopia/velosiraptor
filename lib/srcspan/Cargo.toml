@@ -1,0 +1,18 @@
+[package]
+name = "srcspan"
+description = "Library for capturing the spans within a source file for the nom crate."
+license = "MIT"
+version = "0.1.0"
+authors = ["Reto Achermann <achreto@cs.ubc.ca>"]
+edition = "2018"
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nom = "7.1.1"
+
+
+
+
+
