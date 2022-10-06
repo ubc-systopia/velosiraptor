@@ -35,17 +35,13 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 use std::rc::Rc;
 
-// used nom functionality
+// external dependencies
 use nom::{InputIter, InputLength, InputTake, Needed, Slice};
+pub use srcspan::{SrcLoc, SrcSpan};
 
-// used crate-internal functionality
-use srcspan::{SrcLoc, SrcSpan};
-
-// modules
+// crate modules
 mod token;
-
 pub use token::{Token, TokenKind};
-
 
 /// Represents a sequence of tokens
 #[derive(Clone, PartialEq, Eq)]
