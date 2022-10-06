@@ -33,7 +33,7 @@ use crate::error::VrsError;
 use crate::token::TokenStream;
 
 /// Binary operations for [Expr] <OP> [Expr]
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum BinOp {
     // arithmetic opreators
     Plus,
@@ -259,7 +259,7 @@ impl fmt::Display for BinOp {
 }
 
 /// Represents an unary operator
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum UnOp {
     // arithmetic operators
     Not,
@@ -298,7 +298,7 @@ impl fmt::Display for UnOp {
 }
 
 /// representation of a quantifier
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Quantifier {
     Forall,
     Exists,
@@ -317,7 +317,7 @@ impl fmt::Display for Quantifier {
 /// Represents an Expression
 ///
 /// The expressions form a trie that is the being evaluated bottom up.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     /// Represents an identifier. That may be qualified or not.  `a.b`
     Identifier { path: Vec<String>, pos: TokenStream },
@@ -779,6 +779,68 @@ impl<'a> Expr {
 
     pub fn get_interface_references(&self) -> HashSet<String> {
         self.get_state_interface_references("interface")
+    }
+
+    pub fn has_state_interface_references(&self, prefix: &str) -> bool {
+        use Expr::*;
+        match self {
+            Identifier { path, .. } => path[0] == prefix,
+            Number { .. } => false,
+            Boolean { .. } => false,
+            BinaryOperation { lhs, rhs, .. } => {
+                lhs.has_state_interface_references(prefix)
+                    | rhs.has_state_interface_references(prefix)
+            }
+            UnaryOperation { val, .. } => val.has_state_interface_references(prefix),
+            FnCall { args, .. } => {
+                for a in args {
+                    if a.has_state_interface_references(prefix) {
+                        return true;
+                    }
+                }
+                // TODO: recurse into the function
+                false
+            }
+            Slice { path, slice, .. } => {
+                (path[0] == prefix) | slice.has_state_interface_references(prefix)
+            }
+            Element { path, idx, .. } => {
+                (path[0] == prefix) | idx.has_state_interface_references(prefix)
+            }
+            Range { start, end, .. } => {
+                start.has_state_interface_references(prefix)
+                    | end.has_state_interface_references(prefix)
+            }
+            Quantifier { expr, .. } => expr.has_state_interface_references(prefix),
+        }
+    }
+
+    pub fn has_interface_references(&self) -> bool {
+        self.has_state_interface_references("interface")
+    }
+
+    pub fn has_state_references(&self) -> bool {
+        self.has_state_interface_references("state")
+    }
+
+    /// trying to split the expressions of the form `E and E`
+    pub fn split_and(self) -> Vec<Expr> {
+        match self {
+            Expr::BinaryOperation {
+                lhs,
+                rhs,
+                op: BinOp::Land,
+                ..
+            } => {
+                // println!("Splitting: {}", self);
+                let mut v = lhs.split_and();
+                v.extend(rhs.split_and());
+                v
+            }
+            _ => {
+                vec![self]
+            }
+        }
     }
 }
 

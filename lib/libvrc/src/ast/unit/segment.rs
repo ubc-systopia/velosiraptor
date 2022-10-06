@@ -33,7 +33,7 @@ use std::fmt::{Debug, Display, Formatter, Result};
 
 // the used crate-internal functionality
 use crate::ast::{
-    utils, AstNode, AstNodeGeneric, Const, Interface, Issues, Method, Param, State, Symbol,
+    utils, AstNode, AstNodeGeneric, Const, Flags, Interface, Issues, Method, Param, State, Symbol,
     SymbolKind, SymbolTable, Type,
 };
 use crate::error::{ErrorLocation, VrsError};
@@ -46,7 +46,7 @@ use super::CFG_DEFAULT_BITWIDTH;
 ///
 /// This type of translation unit remaps a contiguous region of memory
 /// with a given size by adding a configurable offset to it.
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct Segment {
     /// the name of the unit (identifier)
     pub name: String,
@@ -60,6 +60,8 @@ pub struct Segment {
     pub outbitwidth: u64,
     /// defined constants in this unit
     pub consts: Vec<Const>,
+    /// permission flags
+    pub flags: Option<Flags>,
     /// the state of the unit
     pub state: State,
     /// the software visible interface of the unit
@@ -78,7 +80,7 @@ pub struct Segment {
 }
 
 /// Implementation of [Segment]
-impl<'a> Segment {
+impl Segment {
     /// creates a new Segment node
     pub fn new(name: String, params: Vec<Param>, pos: TokenStream) -> Self {
         Segment {
@@ -88,6 +90,7 @@ impl<'a> Segment {
             inbitwidth: 0,
             outbitwidth: 0,
             consts: Vec::new(),
+            flags: None,
             state: State::new_none(),
             interface: Interface::new_none(),
             methods: Vec::new(),
@@ -127,6 +130,11 @@ impl<'a> Segment {
 
     pub fn add_consts(mut self, consts: Vec<Const>) -> Self {
         self.consts.extend(consts);
+        self
+    }
+
+    pub fn set_flags(mut self, flags: Option<Flags>) -> Self {
+        self.flags = flags;
         self
     }
 
@@ -382,11 +390,23 @@ impl<'a> AstNodeGeneric<'a> for Segment {
         // --------------------------------------------------------------------------------------
 
         for m in &self.methods {
+            // create a new symbol table context
+            st.create_context(m.name.clone());
+
+            if let Some(f) = &self.flags {
+                for p in m.get_flag_params() {
+                    f.build_symboltable(p, st);
+                }
+            }
+
             res = res + m.check(st);
 
             if !st.insert(m.to_symbol()) {
                 res.inc_err(1);
             }
+
+            // restore the symbol table again
+            st.drop_context();
         }
 
         // Check 9: Bases are defined
@@ -446,6 +466,17 @@ impl<'a> AstNodeGeneric<'a> for Segment {
 
         st.drop_context();
         res
+    }
+
+    fn rewrite(&'a mut self) {
+        println!("rewriting segment {}", self.name);
+        for c in &mut self.consts {
+            c.rewrite();
+        }
+
+        for m in &mut self.methods {
+            m.rewrite();
+        }
     }
 
     /// returns the location of the current

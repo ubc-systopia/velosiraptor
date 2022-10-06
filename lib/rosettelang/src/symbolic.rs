@@ -37,16 +37,25 @@ pub struct SymbolicVar {
     ident: String,
     /// the struct attributes
     ty: String,
+    ///
+    len: Option<usize>,
 }
 
 impl SymbolicVar {
     /// defines a new symbolic variable
-    pub fn new(ident: String, ty: String) -> Self {
-        SymbolicVar { ident, ty }
+    pub fn new(ident: String, ty: String, len: Option<usize>) -> Self {
+        SymbolicVar { ident, ty, len }
     }
 
     /// formats corresponding rosette code
     pub fn to_code(&self) -> String {
-        format!("(define-symbolic {} {})\n", self.ident, self.ty)
+        if let Some(l) = self.len {
+            format!(
+                "(define-symbolic {} {} #:length {})\n",
+                self.ident, self.ty, l
+            )
+        } else {
+            format!("(define-symbolic {} {})\n", self.ident, self.ty)
+        }
     }
 }

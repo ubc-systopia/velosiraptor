@@ -42,7 +42,7 @@ use crate::token::TokenStream;
 ///   1. imports: references to other files
 ///   2. constants: pre-defined values
 ///   3. units: units defined in this file
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct AstRoot {
     /// the filename this ast represents
     pub filename: String,
@@ -57,6 +57,20 @@ pub struct AstRoot {
 use crate::parser::Parser;
 
 impl<'a> AstRoot {
+    pub fn new(
+        filename: String,
+        imports: Vec<Import>,
+        consts: Vec<Const>,
+        units: Vec<Unit>,
+    ) -> Self {
+        Self {
+            filename,
+            imports,
+            consts,
+            units,
+        }
+    }
+
     /// resolves imports recursively
     ///
     /// Walks the import tree and tries to parse each import individually
@@ -391,8 +405,10 @@ impl<'a> AstRoot {
     }
 
     // applies AST transformations
-    pub fn apply_transformations(&mut self) -> Result<Issues, AstError> {
-        Ok(Issues::ok())
+    pub fn apply_rewrites(&mut self) {
+        for u in &mut self.units {
+            u.rewrite();
+        }
     }
 
     ///

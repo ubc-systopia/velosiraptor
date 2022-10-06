@@ -41,7 +41,7 @@ use crate::token::TokenStream;
 ///   - MMIORegisters: load/store to memory-mapped device registers
 ///   - CPURegisters: load/store to CPU registers
 ///   - SpecialRegisters: use of special instructions (no load/store) to those
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Interface {
     /// Defines a load/store interface to memory
     Memory {
@@ -96,6 +96,11 @@ impl<'a> Interface {
         for f in self.fields() {
             f.build_symboltable(st);
         }
+    }
+
+    /// returns the number of fields in the state
+    pub fn nfields(&self) -> usize {
+        self.fields().len()
     }
 
     pub fn fields(&self) -> &[InterfaceField] {
@@ -271,11 +276,6 @@ impl<'a> AstNodeGeneric<'a> for Interface {
         res
     }
 
-    // rewrite the ast
-    fn rewrite(&mut self, _st: &mut SymbolTable) {
-        // no-op
-    }
-
     /// returns a printable string representing the ast node
     fn name(&self) -> &str {
         "interface"
@@ -297,7 +297,7 @@ impl<'a> AstNodeGeneric<'a> for Interface {
 ///
 /// A field may represent a 8, 16, 32, 64 bit region in the state with a
 /// specific bit layout and an additional collection of  actions.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct InterfaceField {
     // The field itself
     pub field: Field,
@@ -351,6 +351,7 @@ impl<'a> InterfaceField {
                 .map(|a| a.accessing_state(state_syms, state_bits, if_bits))
                 .unwrap_or_default(),
         );
+
         res.extend(
             self.writeaction
                 .as_ref()

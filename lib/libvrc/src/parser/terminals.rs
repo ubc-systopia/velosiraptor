@@ -226,7 +226,9 @@ pub fn typeinfo(input: TokenStream) -> IResult<TokenStream, Type> {
 
     match tok.peek().content {
         TokenContent::Keyword(Keyword::SizeType) => Ok((rem, Type::Size)),
-        TokenContent::Keyword(Keyword::AddrType) => Ok((rem, Type::Address)),
+        TokenContent::Keyword(Keyword::VAddrType) => Ok((rem, Type::VirtualAddress)),
+        TokenContent::Keyword(Keyword::PAddrType) => Ok((rem, Type::PhysicalAddress)),
+        TokenContent::Keyword(Keyword::AddressType) => Ok((rem, Type::Address)),
         TokenContent::Keyword(Keyword::BooleanType) => Ok((rem, Type::Boolean)),
         TokenContent::Keyword(Keyword::IntegerType) => Ok((rem, Type::Integer)),
         TokenContent::Keyword(Keyword::FlagsType) => Ok((rem, Type::Flags)),

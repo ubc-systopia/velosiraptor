@@ -44,7 +44,7 @@ use crate::token::TokenStream;
 ///   - Memory: the state is *external* to the translation unit in some memory (e.g, RAM)
 ///   - Register: the state is *internal* to the translation unit
 ///   - None: there is no state associated with it.
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum State {
     /// defines a memory state (external to the unit)
     MemoryState {
@@ -83,6 +83,10 @@ impl<'a> State {
         matches!(self, State::None { .. })
     }
 
+    pub fn is_memory(&self) -> bool {
+        matches!(self, State::MemoryState { .. })
+    }
+
     /// builds the symboltable for the state related symbols
     pub fn build_symboltable(&'a self, st: &mut SymbolTable<'a>) {
         // create the 'state' symbol
@@ -98,6 +102,11 @@ impl<'a> State {
         for f in self.fields() {
             f.build_symboltable(st);
         }
+    }
+
+    /// returns the number of fields in the state
+    pub fn nfields(&self) -> usize {
+        self.fields().len()
     }
 
     /// returns a slice of fields

@@ -27,7 +27,7 @@
 
 use rosettelang::RExpr;
 
-use crate::ast::{BinOp, Expr, Stmt};
+use crate::ast::{BinOp, Expr, Stmt, UnOp};
 
 pub fn expr_to_rosette(e: &Expr) -> RExpr {
     use Expr::*;
@@ -53,7 +53,7 @@ pub fn expr_to_rosette(e: &Expr) -> RExpr {
             let rhs = expr_to_rosette(rhs);
             match op {
                 BinOp::And => RExpr::bvand(lhs, rhs),
-                BinOp::Or => RExpr::bvand(lhs, rhs),
+                BinOp::Or => RExpr::bvor(lhs, rhs),
                 BinOp::LShift => RExpr::bvshl(lhs, rhs),
                 BinOp::RShift => RExpr::bvshr(lhs, rhs),
                 BinOp::Eq => RExpr::bveq(lhs, rhs),
@@ -64,13 +64,25 @@ pub fn expr_to_rosette(e: &Expr) -> RExpr {
                 BinOp::Gt => RExpr::bvgt(lhs, rhs),
                 BinOp::Ne => RExpr::bvne(lhs, rhs),
                 BinOp::Minus => RExpr::bvsub(lhs, rhs),
+                BinOp::Land => RExpr::land(lhs, rhs),
+                BinOp::Lor => RExpr::lor(lhs, rhs),
                 _ => {
                     println!("{:?}", op);
                     unimplemented!()
                 }
             }
         }
-        UnaryOperation { op: _, val: _, .. } => unimplemented!(),
+        UnaryOperation { op, val, .. } => {
+            let val = expr_to_rosette(val);
+            match op {
+                UnOp::Not => RExpr::neq(val),
+                UnOp::LNot => RExpr::lnot(val),
+                _ => {
+                    println!("{:?}", op);
+                    unimplemented!()
+                }
+            }
+        }
         FnCall { path, args, .. } => {
             if path.len() != 1 {
                 panic!("unexpected identifier lenght");

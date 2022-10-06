@@ -56,7 +56,7 @@ pub type Element = char;
 /// This structures keeps track of the context (e.g., file name) as well as the
 /// current range of the SourcePos within the lexing context as a range of bytes.
 /// Moreover, we keep track on the line and column.
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct SourcePos {
     /// The context of the SourcePos. This might be a file name or "STDIO"
     context: Rc<String>,
@@ -455,7 +455,7 @@ impl InputIter for SourcePos {
 }
 
 /// Implementation of the [nom::InputTake] trait for [SourcePos]
-impl<'a> InputTake for SourcePos {
+impl InputTake for SourcePos {
     /// Returns a new [SourcePos] corresponding to the first `count` elements.
     ///
     /// # Panics
@@ -553,7 +553,7 @@ impl InputTakeAtPosition for SourcePos {
 }
 
 /// Implementation of the [nom::Slice] trait ([RangeFull]) for [SourcePos]
-impl<'a> Slice<RangeFull> for SourcePos {
+impl Slice<RangeFull> for SourcePos {
     /// Slices self according to the range argument
     #[inline]
     fn slice(&self, _: RangeFull) -> Self {
@@ -563,7 +563,7 @@ impl<'a> Slice<RangeFull> for SourcePos {
 }
 
 /// Implementation of the [nom::Slice] trait ([Range]) for [SourcePos]
-impl<'a> Slice<Range<usize>> for SourcePos {
+impl Slice<Range<usize>> for SourcePos {
     /// Slices self according to the range argument
     ///
     /// # Panics
@@ -578,7 +578,7 @@ impl<'a> Slice<Range<usize>> for SourcePos {
 }
 
 /// Implementation of the [nom::Slice] trait ([RangeTo]) for [SourcePos]
-impl<'a> Slice<RangeTo<usize>> for SourcePos {
+impl Slice<RangeTo<usize>> for SourcePos {
     /// Slices self according to the range argument
     ///
     /// # Panics
@@ -592,7 +592,7 @@ impl<'a> Slice<RangeTo<usize>> for SourcePos {
 }
 
 /// Implementation of the [nom::Slice] trait ([RangeFrom]) for [SourcePos]
-impl<'a> Slice<RangeFrom<usize>> for SourcePos {
+impl Slice<RangeFrom<usize>> for SourcePos {
     /// Slices self according to the range argument
     ///
     /// # Panics

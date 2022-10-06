@@ -52,11 +52,19 @@ fn add_model(rkt: &mut RosetteFile) {
     let body = RExpr::fncall(
         String::from(MODEL),
         vec![
-            RExpr::fncall(String::from("make-state-fields"), vec![]),
-            RExpr::fncall(String::from("make-iface-fields"), vec![]),
+            RExpr::fncall(
+                String::from("make-state-fields"),
+                vec![RExpr::var(String::from("st_vars"))],
+            ),
+            RExpr::fncall(
+                String::from("make-iface-fields"),
+                vec![RExpr::var(String::from("if_vars"))],
+            ),
         ],
     );
-    let mut f = FunctionDef::new(String::from("make-model"), Vec::new(), vec![body]);
+    let args = vec![String::from("st_vars"), String::from("if_vars")];
+
+    let mut f = FunctionDef::new(String::from("make-model"), args, vec![body]);
     f.add_comment(String::from("State Constructor"));
     rkt.add_function_def(f);
 

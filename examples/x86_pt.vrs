@@ -43,8 +43,10 @@ segment X86PageTableEntry(base : addr) : Segment {
     outbitwidth = 32;
 
     flags = {
-        WRITABLE = 1;
-        READABLE = 2;
+        writable,
+        readable,
+        devicemem,
+        usermode
     }
 
     // the state
@@ -93,17 +95,16 @@ segment X86PageTableEntry(base : addr) : Segment {
 
     // matches a translation flags,
     fn matchflags(flgs : flags) -> bool
-        requires state.pte.present == 1;
+        requires (state.pte.present == 1);
     {
-/*
-        return ((flgs & FLAGS_WRITABLE) || !state.pte.writable)
-            && ((flgs & FLAGS_USERMODE) || !state.pte.usermode);
-*/
-        return true;
+        return (state.pte.writable == flgs.writable)
+                // && (state.pte.usermode != flgs.usermode)
+                // && (state.pte.nocache == flgs.devicemem)
+                && (state.pte.global == 0);
     }
 
     // the translation semantics, adding an option type?
-    fn translate(va: addr) -> addr
+    fn translate(va: vaddr) -> paddr
         requires va < 4096;
         requires state.pte.present == 1;
     {
@@ -112,31 +113,25 @@ segment X86PageTableEntry(base : addr) : Segment {
 
     // unmapping an entry
     fn unmap(va: addr, sz: size) -> bool
-        requires va == 0;
+        requires (va == 0);
         requires sz == PAGE_SIZE;
-        // need a way to express:
-        // forall a | va <= a < va + sz :: fail(translate(a, ANY))
-        ensures translate(va, 0) == 0;
     ;
 
     // mapping an entry
-    fn map(va: addr, sz: size, flgs: flags, pa : addr) -> bool
+    fn map(va: vaddr, sz: size, flgs: flags, pa : paddr) -> bool
         requires va == 0;
-        requires sz == 4096;
+        requires sz == PAGE_SIZE;
         requires (pa & 0xfff) == 0;
 
         // need a way to express types:
         // type(addr) == Memory || type(addr) == DevMemory;
         // type(addr) == DevMemory ==> flgs & CACHE_DISABLED
         //
-        ensures forall i : addr :: 0 <= i && i < sz && translate(va + i, flgs) == pa + i;
-        ensures translate(va, flgs) == pa;
     ;
 
 
     // protecting the entry, i.e., change its permission
-    fn protect(flgs: flags) -> bool
-        ensures matchflags(flgs);
+    fn protect(va: vaddr, sz: size, flgs: flags) -> bool
     {
         // update the entry
         // ensures matchflags(flgs) ==> translate(a) == translate(a)
@@ -146,6 +141,6 @@ segment X86PageTableEntry(base : addr) : Segment {
 
 
 // represents an x86 page table entry
-staticmap X86PageTablet(base : addr) : StaticMap {
+staticmap X86PageTable(base : addr) : StaticMap {
     staticmap = [ X86PageTableEntry(base + i * 4) for i in 0..1024 ];
 }

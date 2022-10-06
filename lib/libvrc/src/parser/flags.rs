@@ -28,14 +28,15 @@
 // nom parser combinators
 use nom::{
     combinator::cut,
-    multi::many1,
-    sequence::{delimited, pair, preceded},
+    //multi::many1,
+    multi::separated_list1,
+    sequence::{delimited, preceded},
 };
 
 // lexer / parser imports
 use crate::ast::{Flag, Flags};
 use crate::error::IResult;
-use crate::parser::terminals::{assign, ident, kw_flags, lbrace, num, rbrace, semicolon};
+use crate::parser::terminals::{assign, comma, ident, kw_flags, lbrace, rbrace};
 use crate::token::TokenStream;
 
 /// parses the flag defintion
@@ -51,7 +52,7 @@ use crate::token::TokenStream;
 ///
 /// # Grammar
 ///
-/// `FLAG := IDENT = NUM SEMICOLON`
+/// `FLAG := IDENT [= NUM]`
 ///
 /// # Example
 ///
@@ -62,9 +63,9 @@ use crate::token::TokenStream;
 ///  * None
 ///
 pub fn flag(input: TokenStream) -> IResult<TokenStream, Flag> {
-    let (i, (name, value)) = pair(ident, cut(delimited(assign, num, semicolon)))(input.clone())?;
-
-    let f = Flag::new(name, input).set_value(value).finalize(&i);
+    //let (i, (name, value)) = pair(ident, opt(suceeded(assign, cut(num))))(input.clone())?;
+    let (i, name) = ident(input.clone())?;
+    let f = Flag::new(name, input).finalize(&i);
 
     Ok((i, f))
 }
@@ -97,7 +98,10 @@ pub fn flags(input: TokenStream) -> IResult<TokenStream, Flags> {
     let (i1, _) = kw_flags(input.clone())?;
 
     // parse the flags body
-    let (i2, flags) = cut(preceded(assign, delimited(lbrace, many1(flag), rbrace)))(i1)?;
+    let (i2, flags) = cut(preceded(
+        assign,
+        delimited(lbrace, separated_list1(comma, flag), rbrace),
+    ))(i1)?;
 
     let f = Flags::new(input).add_flags(flags).finalize(&i2);
 

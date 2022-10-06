@@ -29,14 +29,26 @@
 use crustal as C;
 
 //
-use crate::ast::{AstNodeGeneric, BitSlice, Const, Field, Segment};
+use crate::ast::{AstNodeGeneric, BitSlice, Const, Field, Segment, StaticMap};
 use crate::codegen::COPYRIGHT;
+
+pub fn unit_struct_field_name(name: &str) -> String {
+    format!("_{}", name.to_ascii_lowercase())
+}
 
 pub fn unit_struct_name(unit_name: &str) -> String {
     unit_name.to_lowercase()
 }
 
+pub fn unit_flags_type(unit: &Segment) -> String {
+    format!("{}_flags_t", unit.name)
+}
+
 pub fn segment_struct_name(unit: &Segment) -> String {
+    unit_struct_name(&unit.name)
+}
+
+pub fn staticmap_struct_name(unit: &StaticMap) -> String {
     unit_struct_name(&unit.name)
 }
 
@@ -45,7 +57,11 @@ pub fn unit_type_name(unit_name: &str) -> String {
 }
 
 pub fn segment_type_name(unit: &Segment) -> String {
-    format!("{}_t", unit.name().to_lowercase())
+    unit_type_name(unit.name())
+}
+
+pub fn staticmap_type_name(unit: &StaticMap) -> String {
+    unit_type_name(unit.name())
 }
 
 /// constructs the struct type name
@@ -82,22 +98,20 @@ pub fn if_field_rd_fn_name(segment: &Segment, field: &Field) -> String {
     if_field_rd_fn_name_str(&segment.name, &field.name)
 }
 
+pub fn if_field_wr_slice_fn_name_str(unit: &str, field: &str, slice: &str) -> String {
+    format!("{}_{}_{}__wr", unit.to_lowercase(), field, slice)
+}
+
 pub fn if_field_wr_slice_fn_name(segment: &Segment, field: &Field, sl: &BitSlice) -> String {
-    format!(
-        "{}_{}_{}__wr",
-        segment.name.to_lowercase(),
-        field.name,
-        sl.name
-    )
+    if_field_wr_slice_fn_name_str(&segment.name, &field.name, &sl.name)
+}
+
+pub fn if_field_rd_slice_fn_name_str(unit: &str, field: &str, slice: &str) -> String {
+    format!("{}_{}_{}__rd", unit.to_lowercase(), field, slice)
 }
 
 pub fn if_field_rd_slice_fn_name(unit: &Segment, field: &Field, sl: &BitSlice) -> String {
-    format!(
-        "{}_{}_{}__rd",
-        unit.name.to_lowercase(),
-        field.name,
-        sl.name
-    )
+    if_field_rd_slice_fn_name_str(&unit.name, &field.name, &sl.name)
 }
 
 pub fn field_slice_extract_fn_name_str(unit: &str, field: &str, sl: &str) -> String {
@@ -213,6 +227,23 @@ pub fn add_header(scope: &mut C::Scope, title: &str) {
 }
 
 pub fn add_const_def(scope: &mut C::Scope, c: &Const) {
+    let mut m = C::Macro::new(c.name());
+    let e = c.value(); //.fold_constants();
+    if c.is_integer() {
+        m.set_value(&format!("(uint64_t)({})", e));
+    } else {
+        m.set_value(&format!("{}", e));
+    }
+
+    // add some documentation
+    m.doc_str(&format!("Defined constant `{}`", c.name()));
+    m.doc_str("");
+    m.doc_str(&format!("@loc: {}", c.loc().location()));
+
+    scope.push_macro(m);
+}
+
+pub fn add_flags_def(scope: &mut C::Scope, c: &Const) {
     let mut m = C::Macro::new(c.name());
     let e = c.value(); //.fold_constants();
     if c.is_integer() {

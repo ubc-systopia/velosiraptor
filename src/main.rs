@@ -58,6 +58,14 @@ fn parse_cmdline() -> clap::ArgMatches<'static> {
                 .help("the package name to produce"),
         )
         .arg(
+            Arg::with_name("cpus")
+                .short("c")
+                .long("cpus")
+                .takes_value(true)
+                .default_value("1")
+                .help("the number of cpus to be used"),
+        )
+        .arg(
             Arg::with_name("backend")
                 .short("b")
                 .long("backend")
@@ -159,7 +167,7 @@ fn main() {
     let pkgname = matches.value_of("name").unwrap_or("mpu").to_string();
     log::info!("package name: {}", pkgname);
 
-    let backend = matches.value_of("backend").unwrap_or("rust");
+    let backend = matches.value_of("backend").unwrap_or("c");
     log::info!("codegen backend: {}", backend);
 
     let platform = matches.value_of("platform").unwrap_or("fastmodels");
@@ -167,6 +175,14 @@ fn main() {
 
     let synth = matches.value_of("synth").unwrap_or("rosette");
     log::info!("synthesis backend: {}", synth);
+
+    let numcpus = matches
+        .value_of("cpus")
+        .unwrap_or("1")
+        .parse::<usize>()
+        .unwrap();
+
+    log::info!("input file: {}", infile);
 
     log::debug!("Debug output enabled");
     log::trace!("Tracing output enabled");
@@ -316,13 +332,12 @@ fn main() {
     // Step 5: Transform AST
     // ===========================================================================================
 
-    let issues = match ast.apply_transformations() {
-        Ok(i) => issues + i,
-        Err(_) => {
-            abort(infile, Issues::err());
-            return;
-        }
-    };
+    eprintln!(
+        "{:>8}: performing AST rewrites...\n",
+        "rewrite".bold().green(),
+    );
+
+    ast.apply_rewrites();
 
     // ===========================================================================================
     // Step 6: Generate OS code
@@ -372,9 +387,9 @@ fn main() {
         }
     };
 
-    let synthsizer = match synth {
+    let mut synthsizer = match synth {
         "rosette" => Synthesisizer::new_rosette(outpath, pkgname.clone()),
-        "z3" => Synthesisizer::new_z3(outpath, pkgname.clone()),
+        "z3" => Synthesisizer::new_z3(outpath, pkgname.clone(), numcpus),
         s => {
             eprintln!(
                 "{}{} `{}`.\n",
@@ -430,6 +445,17 @@ fn main() {
         );
         abort(infile, issues);
     });
+
+    // synthsizer.synth_map_unmap_protect(&mut ast).unwrap_or_else(|e| {
+    //     eprintln!(
+    //         "{}{} `{}`.\n",
+    //         "error".bold().red(),
+    //         ": failure during interface generation".bold(),
+    //         e
+    //     );
+    //     abort(infile, issues);
+    //     panic!("s");
+    // });
 
     // generate the unit files that use the interface files
     eprintln!(

@@ -40,6 +40,7 @@ use utils::{add_const_def, add_header};
 mod field;
 mod interface;
 mod segment;
+mod staticmap;
 mod utils;
 
 /// The C backend
@@ -116,18 +117,27 @@ impl CodeGenBackend for BackendC {
                 interface::generate(segment, &srcdir)?;
                 srcdir.pop();
             }
+
+            if let Unit::StaticMap(staticmap) = unit {
+                srcdir.push(staticmap.name.to_lowercase());
+                fs::create_dir_all(&srcdir)?;
+                srcdir.pop();
+            }
         }
         Ok(())
     }
 
     fn generate_units(&self, ast: &AstRoot) -> Result<(), CodeGenError> {
         let mut srcdir = self.outdir.clone();
+        println!("## generating units...");
         for unit in &ast.units {
             srcdir.push(unit.name().to_lowercase());
 
+            println!("##### generat_units {}", unit.name());
+
             // generate the unit
             let err = match unit {
-                Unit::StaticMap(_) => todo!(),
+                Unit::StaticMap(staticmap) => staticmap::generate(staticmap, &srcdir),
                 Unit::Segment(segment) => segment::generate(segment, &srcdir),
             };
 

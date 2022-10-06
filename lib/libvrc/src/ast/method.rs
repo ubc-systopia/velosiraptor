@@ -51,7 +51,7 @@ const FN_SIG_PROTECT: &str = "fn protect(va: addr, sz: size, flgs: flags)";
 ///
 ///  - Translate(): a method that translates an address (required)
 ///  - get_size(): a method that extracts the
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct Method {
     /// the name of the method
     pub name: String,
@@ -190,7 +190,7 @@ impl Method {
                 "change return type to match expected function signature: `{}`",
                 sig
             );
-            let r = 6 + self.args.len() * 3;
+            let r = 5 + self.args.len() * 3;
             VrsError::new_err(self.pos.with_range(r..r + 1), msg, Some(hint)).print();
             Issues::err()
         } else {
@@ -254,11 +254,12 @@ impl Method {
 
         let mut res = Issues::ok();
 
-        res = res + self.check_rettype(FN_SIG_TRANSLATE, Type::Address);
+        res = res + self.check_rettype(FN_SIG_TRANSLATE, Type::PhysicalAddress);
         res = res + self.check_argnum(FN_SIG_TRANSLATE, 1);
 
         if !self.args.is_empty() {
-            res = res + Self::check_param(FN_SIG_TRANSLATE, &self.args[0], "va", Type::Address);
+            res = res
+                + Self::check_param(FN_SIG_TRANSLATE, &self.args[0], "va", Type::VirtualAddress);
         }
 
         res
@@ -319,7 +320,7 @@ impl Method {
         res = res + self.check_argnum(FN_SIG_MAP, 4);
 
         if !self.args.is_empty() {
-            res = res + Self::check_param(FN_SIG_MAP, &self.args[0], "va", Type::Address);
+            res = res + Self::check_param(FN_SIG_MAP, &self.args[0], "va", Type::VirtualAddress);
         }
         if !self.args.len() >= 2 {
             res = res + Self::check_param(FN_SIG_MAP, &self.args[1], "sz", Type::Size);
@@ -328,7 +329,7 @@ impl Method {
             res = res + Self::check_param(FN_SIG_MAP, &self.args[2], "flgs", Type::Flags);
         }
         if !self.args.len() >= 4 {
-            res = res + Self::check_param(FN_SIG_MAP, &self.args[3], "pa", Type::Address);
+            res = res + Self::check_param(FN_SIG_MAP, &self.args[3], "pa", Type::PhysicalAddress);
         }
 
         res
@@ -424,6 +425,36 @@ impl Method {
         );
         v
     }
+
+    pub fn get_state_references_body(&self) -> HashSet<String> {
+        let mut v = HashSet::new();
+
+        if let Some(stmts) = &self.stmts {
+            v.extend(stmts.get_state_references());
+        }
+
+        v
+    }
+
+    pub fn get_state_references_pre(&self) -> HashSet<String> {
+        let mut v = HashSet::new();
+        v.extend(
+            self.requires
+                .iter()
+                .flat_map(|s| s.get_state_references())
+                .collect::<Vec<String>>(),
+        );
+        v
+    }
+
+    /// obtains the method parameters that are of the flags type
+    pub fn get_flag_params(&self) -> Vec<&str> {
+        self.args
+            .iter()
+            .filter(|x| x.ptype == Type::Flags)
+            .map(|x| x.name.as_str())
+            .collect()
+    }
 }
 
 /// Implementation of the [fmt::Display] trait for [Method]
@@ -494,7 +525,7 @@ impl<'a> AstNodeGeneric<'a> for Method {
         }
 
         // create a new symbol table context
-        st.create_context(self.name.clone());
+        // st.create_context(self.name.clone());
 
         // adding the parameters
         for p in &self.args {
@@ -558,8 +589,8 @@ impl<'a> AstNodeGeneric<'a> for Method {
 
         res = res + utils::check_snake_case(&self.name, &self.pos);
 
-        // restore the symbol table again
-        st.drop_context();
+        // // restore the symbol table again
+        // st.drop_context();
 
         // return the number of issues found
         res
@@ -572,5 +603,13 @@ impl<'a> AstNodeGeneric<'a> for Method {
     /// returns the location of the current
     fn loc(&self) -> &TokenStream {
         &self.pos
+    }
+
+    fn rewrite(&'a mut self) {
+        let mut preconditions = Vec::new();
+        for e in self.requires.drain(..) {
+            preconditions.extend(e.split_and());
+        }
+        self.requires = preconditions;
     }
 }

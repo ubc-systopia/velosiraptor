@@ -43,7 +43,7 @@ use crate::token::TokenStream;
 use super::CFG_DEFAULT_BITWIDTH;
 
 /// Rep
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct StaticMap {
     /// the name of the unit (identifier)
     pub name: String,
@@ -66,7 +66,7 @@ pub struct StaticMap {
 }
 
 /// Implementation of [Unit]
-impl<'a> StaticMap {
+impl StaticMap {
     /// creates a new Segment node
     pub fn new(name: String, params: Vec<Param>, pos: TokenStream) -> Self {
         StaticMap {

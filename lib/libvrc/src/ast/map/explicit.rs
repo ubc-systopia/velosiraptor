@@ -25,13 +25,15 @@
 
 //! MAP ast node
 
+use std::collections::HashSet;
+
 use super::MapEntry;
 use crate::ast::{utils, AstNodeGeneric, Issues, SymbolTable};
 use crate::error::VrsError;
 use crate::token::TokenStream;
 
 /// Represents an explicit map `map = [0x0...0x1000 => Unit(args) @ offset, ... ]`
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct ExplicitMap {
     /// the entries in the explicit map
     pub entries: Vec<MapEntry>,
@@ -59,6 +61,18 @@ impl ExplicitMap {
     pub fn finalize(mut self, pos: &TokenStream) -> Self {
         self.pos = self.pos.expand_until(pos);
         self
+    }
+
+    pub fn get_unit_names(&self) -> Vec<String> {
+        let mut units = HashSet::new();
+
+        for entry in &self.entries {
+            let unitname = entry.get_unit_name();
+            if !units.contains(unitname) {
+                units.insert(unitname.to_string());
+            }
+        }
+        units.into_iter().collect()
     }
 }
 
@@ -101,11 +115,6 @@ impl<'a> AstNodeGeneric<'a> for ExplicitMap {
             res.inc_err(1);
         }
         res
-    }
-
-    /// rewrite the ast
-    fn rewrite(&mut self, _st: &mut SymbolTable) {
-        // no-op
     }
 
     /// returns a printable string representation of the ast node

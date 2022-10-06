@@ -172,6 +172,8 @@ impl CodeGenBackend for BackendRust {
         // get the source dir
         let mut srcdir = self.outdir.join("src");
 
+        println!("##### rust generat_units");
+
         for unit in &ast.units {
             srcdir.push(unit.name().to_lowercase());
 

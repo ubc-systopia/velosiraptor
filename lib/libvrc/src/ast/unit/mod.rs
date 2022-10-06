@@ -52,14 +52,29 @@ pub const CFG_DEFAULT_BITWIDTH: u64 = 64;
 ///
 /// Moreover, a translation unit may be derived from another unit, similar
 /// to inheritance in other languages.
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum Unit {
     StaticMap(StaticMap),
     Segment(Segment),
 }
 
 /// Implementation of [Unit]
-impl<'a> Unit {
+impl Unit {
+    pub fn is_static_map(&self) -> bool {
+        matches!(self, Unit::StaticMap(_))
+    }
+
+    pub fn is_segment(&self) -> bool {
+        matches!(self, Unit::Segment(_))
+    }
+
+    pub fn as_segment(&self) -> Option<&Segment> {
+        match self {
+            Unit::Segment(s) => Some(s),
+            _ => None,
+        }
+    }
+
     pub fn location(&self) -> String {
         match self {
             Unit::StaticMap(staticmap) => staticmap.location(),
@@ -197,6 +212,14 @@ impl<'a> AstNodeGeneric<'a> for Unit {
         match self {
             Unit::StaticMap(staticmap) => staticmap.check(st),
             Unit::Segment(segment) => segment.check(st),
+        }
+    }
+
+    // reqrite the ast
+    fn rewrite(&'a mut self) {
+        match self {
+            Unit::StaticMap(staticmap) => staticmap.rewrite(),
+            Unit::Segment(segment) => segment.rewrite(),
         }
     }
 

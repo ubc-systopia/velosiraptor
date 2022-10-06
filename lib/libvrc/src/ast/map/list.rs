@@ -38,7 +38,7 @@ use crate::token::TokenStream;
 use super::MapEntry;
 
 /// Represents a list comprehension map `map = [Unit(args) @ offset for x in 0..1024]`
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct ListComprehensionMap {
     /// the entries in the explicit map
     pub entry: MapEntry,
@@ -81,6 +81,23 @@ impl ListComprehensionMap {
     pub fn finalize(mut self, pos: &TokenStream) -> Self {
         self.pos = self.pos.expand_until(pos);
         self
+    }
+
+    pub fn get_unit_names(&self) -> Vec<String> {
+        vec![self.entry.get_unit_name().to_string()]
+    }
+
+    pub fn get_range_max(&self) -> u64 {
+        match &self.range {
+            Expr::Range { end, .. } => {
+                if let Expr::Number { value, .. } = end.as_ref() {
+                    *value
+                } else {
+                    panic!("not a fixed number.");
+                }
+            }
+            _ => panic!("unsupported range expression"),
+        }
     }
 }
 
@@ -254,11 +271,6 @@ impl<'a> AstNodeGeneric<'a> for ListComprehensionMap {
         st.drop_context();
 
         res
-    }
-
-    /// rewrite the ast
-    fn rewrite(&mut self, _st: &mut SymbolTable) {
-        // no-op
     }
 
     /// returns a printable string representation of the ast node

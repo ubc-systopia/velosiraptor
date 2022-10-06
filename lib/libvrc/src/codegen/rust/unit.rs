@@ -108,6 +108,8 @@ fn oparg_to_rust_expr(op: &OpExpr) -> String {
         OpExpr::Mul(x, y) => format!("({} * {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
         OpExpr::Div(x, y) => format!("({} / {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
         OpExpr::Mod(x, y) => format!("({} % {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
+        OpExpr::Flags(_v, _f) => todo!(),
+        OpExpr::Not(x) => format!("!{}", oparg_to_rust_expr(x)),
     }
 }
 

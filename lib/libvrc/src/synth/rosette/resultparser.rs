@@ -182,12 +182,10 @@ pub fn parse_result(output: &str) -> Vec<Operation> {
     }
 
     // we want to consume all of the output on a single line.
-    let ops = match all_consuming(terminated(parse_seq, newline))(output) {
+    match all_consuming(terminated(parse_seq, newline))(output) {
         Ok((_, v)) => v,
         Err(e) => panic!("parser did not finish: {:?}", e),
-    };
-
-    ops
+    }
 }
 
 #[test]

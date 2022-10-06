@@ -40,7 +40,7 @@ pub use explicit::ExplicitMap;
 pub use list::ListComprehensionMap;
 
 /// Defines a mapping between addresses and units
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Map {
     /// explicit map
     Explicit(ExplicitMap),
@@ -48,7 +48,14 @@ pub enum Map {
     ListComprehension(Box<ListComprehensionMap>),
 }
 
-impl Map {}
+impl Map {
+    pub fn get_unit_names(&self) -> Vec<String> {
+        match self {
+            Map::Explicit(explicit) => explicit.get_unit_names(),
+            Map::ListComprehension(list) => list.get_unit_names(),
+        }
+    }
+}
 
 /// Implementation of [AstNodeGeneric] for [Map]
 impl<'a> AstNodeGeneric<'a> for Map {
@@ -61,10 +68,10 @@ impl<'a> AstNodeGeneric<'a> for Map {
     }
 
     /// rewrite the ast
-    fn rewrite(&'a mut self, st: &mut SymbolTable<'a>) {
+    fn rewrite(&'a mut self) {
         match self {
-            Map::Explicit(map) => map.rewrite(st),
-            Map::ListComprehension(map) => map.rewrite(st),
+            Map::Explicit(map) => map.rewrite(),
+            Map::ListComprehension(map) => map.rewrite(),
         };
     }
 
@@ -92,7 +99,7 @@ impl<'a> AstNodeGeneric<'a> for Map {
 ///   - INPUT RANGE is optional
 ///   - arglist may be empty
 ///   - offset is optional
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct MapEntry {
     /// range expressiong of the input address range that this entry maps
     pub range: Option<Expr>,
@@ -168,6 +175,10 @@ impl MapEntry {
             0..0
         }
     }
+
+    pub fn get_unit_name(&self) -> &str {
+        &self.unit_name
+    }
 }
 
 /// implementation of the [fmt::Display] trait for the [Segment]
@@ -205,8 +216,6 @@ impl<'a> AstNodeGeneric<'a> for MapEntry {
     fn check(&'a self, st: &mut SymbolTable<'a>) -> Issues {
         // all fine for now
         let mut res = Issues::ok();
-
-        println!("MapEntry: checking!");
 
         // Check 1: Check whether the unit parameters are well-formed
         // --------------------------------------------------------------------------------------
@@ -290,11 +299,6 @@ impl<'a> AstNodeGeneric<'a> for MapEntry {
         }
 
         res
-    }
-
-    /// rewrite the ast
-    fn rewrite(&mut self, _st: &mut SymbolTable) {
-        // no-op
     }
 
     /// returns a printable string representation of the ast node

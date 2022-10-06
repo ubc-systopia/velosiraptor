@@ -31,7 +31,7 @@ use crate::ast::{AstNode, AstNodeGeneric, Issues, Symbol, SymbolKind, SymbolTabl
 use crate::token::TokenStream;
 
 /// Defines a method or unit parameter
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct Param {
     /// the name of the parameter
     pub name: String,

@@ -30,18 +30,20 @@ use custom_error::custom_error;
 use std::path::Path;
 
 // the code generation backends
-mod operation;
-mod rosette;
+pub mod operation;
+pub mod rosette;
+pub mod z3;
 
 // the used library modules
 use crate::ast::AstRoot;
 pub use crate::synth::operation::{OpExpr, Operation};
 use crate::synth::rosette::SynthRosette;
+use crate::synth::z3::SynthZ3;
 
 const COPYRIGHT: &str = "2021 Systopia Lab, Computer Science, University of British Columbia";
 
 // custom error definitions
-custom_error! {#[derive(PartialEq)] pub SynthError
+custom_error! {#[derive(PartialEq, Eq)] pub SynthError
     IOError           = "The output file could not be written",
     SynthError        = "The synthesizer returned an error",
     FmtError          = "Could not format in buffer"
@@ -56,7 +58,7 @@ impl std::convert::From<std::io::Error> for SynthError {
 /// the
 pub enum Synthesisizer {
     Rosette(SynthRosette),
-    Z3,
+    Z3(SynthZ3),
 }
 
 impl Synthesisizer {
@@ -65,33 +67,41 @@ impl Synthesisizer {
         Synthesisizer::Rosette(SynthRosette::new(outdir, pkg))
     }
 
-    pub fn new_z3(_outdir: &Path, _pkg: String) -> Synthesisizer {
-        Synthesisizer::Z3
+    pub fn new_z3(outdir: &Path, pkg: String, parallelism: usize) -> Synthesisizer {
+        Synthesisizer::Z3(SynthZ3::new(outdir, pkg, parallelism))
     }
 
     /// synthesizes the `map` function and returns an ast of it
-    pub fn synth_map(&self, ast: &mut AstRoot) -> Result<(), SynthError> {
+    pub fn synth_map(&mut self, ast: &mut AstRoot) -> Result<(), SynthError> {
         use Synthesisizer::*;
         match self {
             Rosette(r) => r.synth_map(ast),
-            Z3 => panic!("support for z3 NYI."),
+            Z3(r) => r.synth_map(ast),
         }
     }
 
     /// synthesizes the 'unmap' function and returns an ast of it
-    pub fn synth_unmap(&self, ast: &mut AstRoot) -> Result<(), SynthError> {
+    pub fn synth_unmap(&mut self, ast: &mut AstRoot) -> Result<(), SynthError> {
         use Synthesisizer::*;
         match self {
             Rosette(r) => r.synth_unmap(ast),
-            Z3 => panic!("support for z3 NYI."),
+            Z3(r) => r.synth_unmap(ast),
         }
     }
 
-    pub fn synth_protect(&self, ast: &mut AstRoot) -> Result<(), SynthError> {
+    pub fn synth_protect(&mut self, ast: &mut AstRoot) -> Result<(), SynthError> {
         use Synthesisizer::*;
         match self {
             Rosette(r) => r.synth_protect(ast),
-            Z3 => panic!("support for z3 NYI."),
+            Z3(r) => r.synth_protect(ast),
+        }
+    }
+
+    pub fn synth_map_unmap_protect(&mut self, ast: &mut AstRoot) -> Result<(), SynthError> {
+        use Synthesisizer::*;
+        match self {
+            Rosette(r) => r.synth_map_unmap_protect(ast),
+            Z3(r) => r.synth_map_unmap_protect(ast),
         }
     }
 }
