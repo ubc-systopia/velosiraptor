@@ -29,12 +29,13 @@
 
 // Standard library imports
 use std::fmt::{Display, Formatter, Result};
+use std::rc::Rc;
 
 /// Represents the source location
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct SrcLoc {
     /// The context of the SrcSpan. This might be a file name.
-    context: Option<String>,
+    context: Option<Rc<String>>,
 
     /// The current line of this SrcSpan relative to the context. Starting from 1.
     line: u32,
@@ -55,12 +56,12 @@ impl SrcLoc {
 
     /// Sets the context in the [SrcLoc]
     pub fn set_context(&mut self, context: String) {
-        self.context = Some(context);
+        self.context = Some(Rc::new(context));
     }
 
     /// Obtains the context from the [SrcLoc]
     pub fn context(&self) -> Option<&str> {
-        self.context.as_deref()
+        Some(self.context.as_deref()?.as_str())
     }
 
     /// Obtains the current line of the [SrcLoc]
