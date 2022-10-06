@@ -582,7 +582,7 @@ fn test_enum_str() {
     assert_eq!("addr".try_into(), Ok(Keyword::AddressType));
     assert_eq!(Keyword::AddressType.as_str(), "addr");
     assert_eq!("vaddr".try_into(), Ok(Keyword::VAddrType));
-    assert_eq!(Keyword::AddrType.as_str(), "vaddr");
+    assert_eq!(Keyword::VAddrType.as_str(), "vaddr");
     assert_eq!("paddr".try_into(), Ok(Keyword::PAddrType));
     assert_eq!(Keyword::PAddrType.as_str(), "paddr");
     assert_eq!("size".try_into(), Ok(Keyword::SizeType));
