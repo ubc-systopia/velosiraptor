@@ -31,13 +31,24 @@ use std::fmt::{Display, Formatter, Result};
 // used third-party libraries
 use srcspan::{SrcLoc, SrcSpan};
 
+/// Trait to be implemented by the TokenKind types
 pub trait TokenKind {
+    /// whether the token is a keyword
     fn is_keyword(&self) -> bool;
+
+    /// whether the token has a reserved value
     fn is_reserved(&self) -> bool;
+
+    /// whether the token is a comment
     fn is_comment(&self) -> bool;
-    fn is_whiltespace(&self) -> bool;
+
+    /// whether the token is a literal, string or number, keyword, ...
     fn is_literal(&self) -> bool;
+
+    /// whether the token is an identifier
     fn is_identifier(&self) -> bool;
+
+    /// whether the token represents a type
     fn is_type(&self) -> bool;
 }
 
