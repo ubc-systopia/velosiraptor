@@ -32,11 +32,17 @@
 //! The SrcSpan structure implements several traits used by Nom so we can simply pass
 //! the SrcSpan struct as input/outputs.
 
-// used standard library functionality
+// Standard library imports
 use std::cmp::Ordering;
 use std::fmt;
 use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 use std::rc::Rc;
+
+// modules
+mod loc;
+
+// public re-exports
+pub use loc::SrcLoc;
 
 // used nom functionality
 use nom::{
@@ -55,20 +61,14 @@ pub type Element = char;
 /// Moreover, we keep track on the line and column.
 #[derive(PartialEq, Eq, Clone)]
 pub struct SrcSpan {
-    /// The context of the SrcSpan. This might be a file name.
-    context: Option<String>,
-
     /// Content this source span covers.
     content: Rc<String>,
 
     /// Holds the valid range within the `content` string
     range: Range<usize>,
 
-    /// The current line of this SrcSpan relative to the context. Starting from 1.
-    line: u32,
-
-    /// The current column within the current line. Starting from 1.
-    column: u32,
+    /// Location within the source file
+    loc: SrcLoc,
 }
 
 /// The SrcSpan implemetation
@@ -101,11 +101,9 @@ impl SrcSpan {
         // TODO: maybe filter some of the non-printable characters out here?
         let len = content.len();
         SrcSpan {
-            context: None,
             content: Rc::new(content),
             range: 0..len,
-            line: 1,
-            column: 1,
+            loc: SrcLoc::new(),
         }
     }
 
@@ -125,7 +123,7 @@ impl SrcSpan {
     /// The function panics if the supplied string is non-ascii.
     pub fn with_context(content: String, context: String) -> Self {
         let mut span = SrcSpan::new(content);
-        span.context = Some(context);
+        span.loc.set_context(context);
         span
     }
 
@@ -148,7 +146,7 @@ impl SrcSpan {
     /// # Panics
     ///
     /// Panics if the supplied range is outside of the covered range by the [SrcSpan]
-    pub fn to_subrange(&self, range: Range<usize>) -> Self {
+    pub fn from_subrange(&self, range: Range<usize>) -> Self {
         if self.len() < range.end {
             panic!("Cannot create subrange outside of the current range");
         }
@@ -180,7 +178,7 @@ impl SrcSpan {
     ///
     /// If the two source positions are not related.
     pub fn expand_until(&mut self, other: &Self) {
-        if self.context != other.context || self.content != other.content {
+        if self.loc.context() != other.loc.context() || self.content != other.content {
             panic!("Cannot expand SrcSpan to unrelated SrcSpan");
         }
 
@@ -209,11 +207,11 @@ impl SrcSpan {
     ///
     /// If the two source positions are not related.
     pub fn expand_until_end(&mut self, other: &Self) {
-        if self.context != other.context || self.content != other.content {
+        if self.loc.context() != other.loc.context() || self.content != other.content {
             panic!("Cannot expand SrcSpan to unrelated SrcSpan");
         }
 
-        if other.range.start > self.content.len() {
+        if other.range.end > self.content.len() {
             panic!("Cannot expand SrcSpan beyond content length");
         }
 
@@ -227,12 +225,12 @@ impl SrcSpan {
 
     /// Sets the context of the [SrcSpan]
     pub fn set_context(&mut self, context: String) {
-        self.context = Some(context);
+        self.loc.set_context(context);
     }
 
     /// Obtains a reference to the context of the [SrcSpan]
     pub fn context(&self) -> Option<&str> {
-        self.context.as_deref()
+        self.loc.context()
     }
 
     /// Obtains a string slice to the entire source of the [SrcSpan]
@@ -240,23 +238,24 @@ impl SrcSpan {
         &self.content
     }
 
+    /// The length of the source span
     pub fn len(&self) -> usize {
         self.range.end - self.range.start
     }
 
-    /// Obtains the current position `(line, column)` of this SrcSpan in the source
-    pub fn pos(&self) -> (u32, u32) {
-        (self.line, self.column)
+    /// Obtains the current [SrcLoc] of this SrcSpan in the source
+    pub fn loc(&self) -> &SrcLoc {
+        &self.loc
     }
 
     /// Obtains the source line (starting from 1) of the current position within the source
     pub fn line(&self) -> u32 {
-        self.line
+        self.loc.line()
     }
 
     /// Obtains the source column (starting from 1) of the current position within the source
     pub fn column(&self) -> u32 {
-        self.column
+        self.loc.column()
     }
 
     /// Obtains the contents fo the current SrcSpan as a string slice.
@@ -279,8 +278,25 @@ impl SrcSpan {
     /// Returns the current range within the source for this SrcSpan.
     ///
     /// The range defines the current slice of the input content this SrcSpan represents.
-    pub fn range(&self) -> Range<usize> {
-        self.range.clone()
+    pub fn range(&self) -> &Range<usize> {
+        &self.range
+    }
+
+    /// Checks whether the other [SrcSpan] is a prefix of this [SrcSpan]
+    pub fn starts_with(&self, other: &Self) -> bool {
+        if self.loc.context() != other.loc.context() || self.content != other.content {
+            return false;
+        }
+
+        if self.range.start != other.range.start {
+            return false;
+        }
+
+        if self.range.end < other.range.end {
+            return false;
+        }
+
+        true
     }
 
     /// Moves the position to the next char of the SrcSpan.
@@ -293,10 +309,10 @@ impl SrcSpan {
 
         // if the current char is a newline, update the line and column
         if self.as_str().starts_with('\n') {
-            self.line += 1;
-            self.column = 1;
+            self.loc.inc_line(1);
+            self.loc.start_of_line();
         } else {
-            self.column += 1;
+            self.loc.inc_column(1);
         }
 
         self.range.start += 1;
@@ -314,30 +330,32 @@ impl SrcSpan {
 
         // if the current char is a newline, update the line and column
         if self.as_str().starts_with('\n') {
-            self.line -= 1;
-
+            self.loc.dec_line(1);
+            self.loc.start_of_line();
             let prefix = 0..self.range.start;
             for c in self.content[prefix].chars().rev() {
                 if c == '\n' {
                     break;
                 }
-                self.column += 1;
+                self.loc.inc_column(1);
             }
         } else {
-            self.column -= 1;
+            self.loc.dec_column(1);
         }
     }
 
+    /// Moves the position to the next line in the source
     pub fn pos_next_line(&mut self) {
-        let currentline = self.line;
-        while !self.is_empty() && self.line == currentline {
+        let currentline = self.loc.line();
+        while !self.is_empty() && self.loc.line() == currentline {
             self.pos_next();
         }
     }
 
+    /// Moves the position to the previous line in the source
     pub fn pos_prev_line(&mut self) {
-        let currentline = self.line;
-        while self.range.start > 0 && self.line == currentline {
+        let currentline = self.loc.line();
+        while self.range.start > 0 && self.loc.line() == currentline {
             self.pos_prev();
         }
     }
@@ -505,7 +523,7 @@ impl InputTake for SrcSpan {
     /// The function panics if `count` > [self.input_len()].
     #[inline]
     fn take(&self, count: usize) -> Self {
-        self.to_subrange(0..count)
+        self.from_subrange(0..count)
     }
 
     /// Splits the current SrcSpan at `count` returning two new [SrcSpan] objects.ErrorKind
@@ -516,8 +534,8 @@ impl InputTake for SrcSpan {
     #[inline]
     fn take_split(&self, count: usize) -> (Self, Self) {
         // create the new SrcSpan objects
-        let first = self.to_subrange(0..count);
-        let second = self.to_subrange(count..self.input_len());
+        let first = self.from_subrange(0..count);
+        let second = self.from_subrange(count..self.input_len());
 
         // we sould not lose any data
         debug_assert_eq!(first.input_len() + second.input_len(), self.input_len());
@@ -610,7 +628,7 @@ impl Slice<Range<usize>> for SrcSpan {
     /// The function panics if the range is out of bounds
     #[inline]
     fn slice(&self, range: Range<usize>) -> Self {
-        self.to_subrange(range)
+        self.from_subrange(range)
     }
 }
 
@@ -673,23 +691,7 @@ impl Offset for SrcSpan {
 impl fmt::Display for SrcSpan {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let line = self.as_str().lines().next().unwrap_or("");
-        if let Some(c) = &self.context {
-            write!(f, "{}:{}:{}  {}", c, self.line, self.column, line)
-        } else {
-            write!(f, "{}:{}  {}", self.line, self.column, line)
-        }
-    }
-}
-
-/// Implementation of the [std::fmt::Debug] trait for [SrcSpan]
-impl fmt::Debug for SrcSpan {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let line = self.as_str().lines().next().unwrap_or("");
-        if let Some(c) = &self.context {
-            write!(f, "{}:{}:{}  {}", c, self.line, self.column, line)
-        } else {
-            write!(f, "{}:{}  {}", self.line, self.column, line)
-        }
+        write!(f, "{}  {}", self.loc, line)
     }
 }
 
@@ -697,13 +699,13 @@ impl fmt::Debug for SrcSpan {
 impl PartialOrd for SrcSpan {
     /// This method returns an ordering between self and other values if one exists.
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let c = self.context.cmp(&other.context);
+        let c = self.loc.context().cmp(&other.loc().context());
         if c != Ordering::Equal {
             return Some(c);
         }
 
-        match self.line.cmp(&other.line) {
-            Ordering::Equal => Some(self.column.cmp(&other.column)),
+        match self.loc.line().cmp(&other.loc.line()) {
+            Ordering::Equal => Some(self.loc.column().cmp(&other.loc.column())),
             o => Some(o),
         }
     }
