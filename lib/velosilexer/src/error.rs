@@ -38,15 +38,15 @@ use nom::{
 use crate::SrcSpan;
 
 /// define the type of IResult
-pub type IResult<I, O> = std::result::Result<(I, O), Err<VelosiLexerError>>;
+pub type IResult<I, O> = std::result::Result<(I, O), Err<VelosiLexerErr>>;
 
-pub(crate) struct VelosiLexerErrorBuilder {
+pub(crate) struct VelosiLexerErrBuilder {
     message: String,
     hint: Option<String>,
     location: Option<SrcSpan>,
 }
 
-impl VelosiLexerErrorBuilder {
+impl VelosiLexerErrBuilder {
     pub fn new(message: String) -> Self {
         Self {
             message,
@@ -65,8 +65,8 @@ impl VelosiLexerErrorBuilder {
         self
     }
 
-    pub fn build(&mut self) -> VelosiLexerError {
-        VelosiLexerError {
+    pub fn build(&mut self) -> VelosiLexerErr {
+        VelosiLexerErr {
             message: self.message.clone(),
             kinds: Vec::new(),
             hint: self.hint.take(),
@@ -77,7 +77,7 @@ impl VelosiLexerErrorBuilder {
 
 /// Defines a Lexer Error
 #[derive(PartialEq, Eq, Debug)]
-pub struct VelosiLexerError {
+pub struct VelosiLexerErr {
     /// error message
     message: String,
     /// error kinds fron Nom
@@ -88,10 +88,10 @@ pub struct VelosiLexerError {
     location: SrcSpan,
 }
 
-impl VelosiLexerError {}
+impl VelosiLexerErr {}
 
-/// Implementation of [Display] for [VelosiLexerError]
-impl Display for VelosiLexerError {
+/// Implementation of [Display] for [VelosiLexerErr]
+impl Display for VelosiLexerErr {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         // closure for coloring
         let red = |s: &str| s.bright_red().bold();
@@ -167,11 +167,11 @@ impl Display for VelosiLexerError {
     }
 }
 
-/// Implementation of [nom:error::ParseError] for [VelosiLexerError]
-impl ParseError<SrcSpan> for VelosiLexerError {
+/// Implementation of [nom:error::ParseError] for [VelosiLexerErr]
+impl ParseError<SrcSpan> for VelosiLexerErr {
     /// Creates an error from the input position and an ErrorKind
     fn from_error_kind(input: SrcSpan, kind: ErrorKind) -> Self {
-        VelosiLexerError {
+        VelosiLexerErr {
             message: String::new(),
             hint: None,
             kinds: vec![kind],

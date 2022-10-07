@@ -36,7 +36,7 @@ use nom::{
     Err, InputLength, Slice,
 };
 
-use crate::error::{IResult, VelosiLexerErrorBuilder};
+use crate::error::{IResult, VelosiLexerErrBuilder};
 use crate::{SrcSpan, Token, VelosiToken, VelosiTokenKind};
 
 fn base10(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
@@ -63,7 +63,7 @@ fn base10(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
             )
         };
         let errmsg = "unsupported digit in number encountered.";
-        let err = VelosiLexerErrorBuilder::new(errmsg.to_string())
+        let err = VelosiLexerErrBuilder::new(errmsg.to_string())
             .add_hint(hint)
             .add_location(sp)
             .build();
@@ -76,7 +76,7 @@ fn base10(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
         Ok(i) => i,
         Err(_) => {
             let errmsg = "number too large to be stored as a 64-bit number.";
-            let err = VelosiLexerErrorBuilder::new(errmsg.to_string())
+            let err = VelosiLexerErrBuilder::new(errmsg.to_string())
                 .add_hint("reduce this number to fit within 64-bits.".to_string())
                 .add_location(rem1)
                 .build();
@@ -106,7 +106,7 @@ macro_rules! namedbase (
             // if it's not empty there will be some junk at the end of the number
             if ! rem1.is_empty() {
                 let errmsg = "unsupported digit in number encountered.";
-                let err = VelosiLexerErrorBuilder::new(errmsg.to_string())
+                let err = VelosiLexerErrBuilder::new(errmsg.to_string())
                     .add_hint("remove unsupported characters from this number.".to_string())
                     .add_location(rem1)
                     .build();
@@ -119,7 +119,7 @@ macro_rules! namedbase (
                 Ok(i) => Ok((rem, Token::new(VelosiTokenKind::IntLiteral(i), input.slice(0..numsp.input_len() + 2)))),
                 Err(_) => {
                     let errmsg = "number too large to be stored as a 64-bit number.";
-                    let err = VelosiLexerErrorBuilder::new(errmsg.to_string())
+                    let err = VelosiLexerErrBuilder::new(errmsg.to_string())
                         .add_hint("reduce this number to fit within 64-bits.".to_string())
                         .add_location(rem1)
                         .build();
