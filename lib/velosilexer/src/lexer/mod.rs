@@ -178,9 +178,9 @@ fn punctuation1(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
 fn any(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
     let (_, t) = take(1usize)(input)?;
 
-    let errmsg = format!("Not supported token encountered: `{}`", t);
+    let errmsg = format!("Not supported character encountered: `{}`", t.as_str());
     let err = VelosiLexerErrorBuilder::new(errmsg)
-        .add_hint("Remove this character".to_string())
+        .add_hint("Remove this unsupported character".to_string())
         .add_location(t)
         .build();
     Err(Err::Failure(err))
