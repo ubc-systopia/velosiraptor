@@ -125,7 +125,7 @@ impl Display for SrcLoc {
         if let Some(c) = &self.context {
             write!(f, "{}:{}:{}", c, self.line, self.column)
         } else {
-            write!(f, "{}:{}", self.line, self.column)
+            write!(f, "$buf:{}:{}", self.line, self.column)
         }
     }
 }
