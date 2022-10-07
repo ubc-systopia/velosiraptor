@@ -321,17 +321,17 @@ where
         let end = std::cmp::min(self.range.end + 5, self.tokens.len());
 
         if start == 0 {
-            writeln!(f, "      <SOF>")?;
+            writeln!(f, "      [     ]  <start-of-file>")?;
         } else {
-            writeln!(f, "      ...")?;
+            writeln!(f, "      [     ]  ...")?;
         }
 
         for i in start..end {
             let t = &self.tokens[i];
             if i == self.range.start {
-                writeln!(f, " ---> {}  {}", t.loc(), t)?;
+                writeln!(f, " ---> [{:>5}]  {}", i, t)?;
             } else {
-                writeln!(f, "      {}  {}", t.loc(), t)?;
+                writeln!(f, "      [{:>5}]  {}", i, t)?;
             }
         }
 
@@ -340,9 +340,9 @@ where
         }
 
         if end == self.tokens.len() {
-            writeln!(f, "      <EOF>")
+            writeln!(f, "      [     ]  <end-of-file>")
         } else {
-            writeln!(f, "      ...")
+            writeln!(f, "      [     ]  ...")
         }
     }
 }
@@ -353,15 +353,15 @@ where
     T: TokenKind + Display + PartialEq + Clone,
 {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
-        writeln!(f, "      <SOF>")?;
+        writeln!(f, "      [     ]  <start-of-file>")?;
         for (i, t) in self.tokens.iter().enumerate() {
             if i == self.range.start {
-                writeln!(f, " ---> {}  {}", t.loc(), t)?;
+                writeln!(f, " ---> {:>5}  {}", i, t)?;
             } else {
-                writeln!(f, "      {}  {}", t.loc(), t)?;
+                writeln!(f, "      {:>5}  {}", i, t)?;
             }
         }
-        writeln!(f, "      <EOF>")
+        writeln!(f, "      [     ]  <end-of-file>")
     }
 }
 
