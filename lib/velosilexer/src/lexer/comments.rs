@@ -32,7 +32,7 @@ use nom::{
     Err,
 };
 
-use crate::error::{IResult, VelosiLexerErrorBuilder};
+use crate::error::{IResult, VelosiLexerErrBuilder};
 use crate::{SrcSpan, Token, VelosiToken, VelosiTokenKind};
 
 /// parses and consumes an end of line comment `// foo`
@@ -67,7 +67,7 @@ pub fn blockcomment(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
         Err(e) => {
             let _e: Err<Error<SrcSpan>> = e;
             let errmsg = "unclosed block comment.";
-            let err = VelosiLexerErrorBuilder::new(errmsg.to_string())
+            let err = VelosiLexerErrBuilder::new(errmsg.to_string())
                 .add_hint("insert `*/` here to close the block comment.".to_string())
                 .add_location(c)
                 .build();

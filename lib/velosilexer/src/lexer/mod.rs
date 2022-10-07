@@ -34,7 +34,7 @@ use nom::{
     Err,
 };
 
-use crate::error::{IResult, VelosiLexerErrorBuilder};
+use crate::error::{IResult, VelosiLexerErrBuilder};
 use crate::{SrcSpan, Token, VelosiOpToken, VelosiToken, VelosiTokenKind};
 
 mod comments;
@@ -179,7 +179,7 @@ fn any(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
     let (_, t) = take(1usize)(input)?;
 
     let errmsg = format!("Not supported character encountered: `{}`", t.as_str());
-    let err = VelosiLexerErrorBuilder::new(errmsg)
+    let err = VelosiLexerErrBuilder::new(errmsg)
         .add_hint("Remove this unsupported character".to_string())
         .add_location(t)
         .build();
