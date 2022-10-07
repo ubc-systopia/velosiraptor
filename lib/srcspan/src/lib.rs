@@ -59,7 +59,7 @@ pub type Element = char;
 /// This structures keeps track of the context (e.g., file name) as well as the
 /// current range of the SrcSpan within the context as a range of characters in content string.
 /// Moreover, we keep track on the line and column.
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct SrcSpan {
     /// Content this source span covers.
     content: Rc<String>,
@@ -238,6 +238,32 @@ impl SrcSpan {
         &self.content
     }
 
+    /// Obtains the source line for the current position
+    pub fn srcline(&self) -> &str {
+        // find the start of the current line.
+        let mut start = self.range.start;
+        for c in self.content[0..start].chars().rev() {
+            if c as char == '\n' || start == 0 {
+                break;
+            }
+            start -= 1;
+        }
+        // discard the newline character, if any
+        if self.content[start..].starts_with('\n') {
+            start += 1;
+        }
+
+        // find the end of the line
+        let mut end = self.range.start;
+        for c in self.content[end..].chars() {
+            if c as char == '\n' {
+                break;
+            }
+            end += 1;
+        }
+        &self.content[start..end]
+    }
+
     /// The length of the source span
     pub fn len(&self) -> usize {
         self.range.end - self.range.start
@@ -273,6 +299,11 @@ impl SrcSpan {
     /// Checks whether the position of this [SrcSpan] is at the end of the source
     pub fn is_eof(&self) -> bool {
         self.range.end == self.content.len()
+    }
+
+    /// Checks whether the the SrcSpan is the default value
+    pub fn is_default(&self) -> bool {
+        self.content.is_empty()
     }
 
     /// Returns the current range within the source for this SrcSpan.
