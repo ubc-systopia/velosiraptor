@@ -47,15 +47,12 @@ pub trait TokenKind {
 
     /// whether the token is an identifier
     fn is_identifier(&self) -> bool;
-
-    /// whether the token represents a type
-    fn is_type(&self) -> bool;
 }
 
 /// Represents a Lexical Token
 ///
 /// The Token is parameterised
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Token<T>
 where
     T: TokenKind + Display + PartialEq + Clone,
