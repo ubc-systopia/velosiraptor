@@ -16,3 +16,10 @@ colored = "2.0.0"
 custom_error = "1.9.2"
 
 
+[lib]
+name = "velosilexer"
+path = "src/lib.rs"
+
+[[bin]]
+name = "velosilexer"
+path = "src/bin.rs"

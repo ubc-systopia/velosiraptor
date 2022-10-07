@@ -31,7 +31,7 @@ use std::fmt::{Display, Formatter, Result};
 // external dependencies
 use colored::*;
 use nom::{
-    error::{ContextError, Error, ErrorKind, FromExternalError, ParseError},
+    error::{ErrorKind, ParseError},
     Err,
 };
 
@@ -121,8 +121,8 @@ impl Display for VelosiLexerError {
                 let underline = (0..ulen).map(|_| "^").collect::<String>();
 
                 // the line context with highligted part that is wrong
-                writeln!(f, " {:>4} {}         {}", blue(&linenum), pipe, linectxt)?;
-                write!(f, "      {}         {}{}", pipe, indent, blue(&underline))?;
+                writeln!(f, " {:>4} {}  {}", blue(&linenum), pipe, linectxt)?;
+                write!(f, "      {}  {}{}", pipe, indent, red(&underline))?;
             } else {
                 // we're longer than 100 characters, so truncate the output
                 let col = self.location.column() as usize;
@@ -154,7 +154,7 @@ impl Display for VelosiLexerError {
                     "      {}             {}{}",
                     pipe,
                     indent,
-                    blue(&underline),
+                    red(&underline),
                 )?;
             };
         }
@@ -164,17 +164,6 @@ impl Display for VelosiLexerError {
             Some(h) => writeln!(f, " {}", red(h.as_str())),
             None => writeln!(f),
         }
-    }
-}
-
-/// Implementation of [nom::error::ContextError] for [VelosiLexerError]
-impl ContextError<SrcSpan> for VelosiLexerError {
-    /// Creates a new error from an input position, a static string and an existing error.
-    ///
-    /// This is used mainly in the context combinator, to add user friendly information
-    /// to errors when backtracking through a parse tree
-    fn add_context(_input: SrcSpan, _ctx: &'static str, _other: Self) -> Self {
-        panic!("adding context");
     }
 }
 
@@ -191,7 +180,8 @@ impl ParseError<SrcSpan> for VelosiLexerError {
     }
 
     /// Combines the existing error with a new one created at position
-    fn append(input: SrcSpan, kind: ErrorKind, mut other: Self) -> Self {
+    fn append(_input: SrcSpan, kind: ErrorKind, mut other: Self) -> Self {
+        assert_eq!(_input, other.location);
         other.kinds.push(kind);
         // handle source location ?
         other
@@ -203,28 +193,5 @@ impl ParseError<SrcSpan> for VelosiLexerError {
         }
         self.kinds.extend(other.kinds);
         self
-    }
-}
-
-/// Implementation of [nom::FromExternalError] for [VrsError]
-impl<E> FromExternalError<SrcSpan, E> for VelosiLexerError {
-    fn from_external_error(input: SrcSpan, kind: ErrorKind, _e: E) -> Self {
-        // VrsError::from_error_kind(input, kind)
-        panic!("from_external_error!");
-    }
-}
-
-/// Implementation of [std::convert::From] for [VrsError]
-///
-/// This converts from a nom error to a VrsError.
-impl From<Err<Error<SrcSpan>>> for VelosiLexerError {
-    fn from(e: nom::Err<Error<SrcSpan>>) -> Self {
-        panic!("from source span!");
-
-        // match e {
-        //     Err::Failure(e) => VrsError::from_error_kind(e.input, e.code),
-        //     Err::Error(e) => VrsError::from_error_kind(e.input, e.code),
-        //     _ => panic!("shoudl nto happend..."),
-        // }
     }
 }

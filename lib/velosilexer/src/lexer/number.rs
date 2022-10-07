@@ -53,10 +53,19 @@ fn base10(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
 
     // if it's not empty there will be some junk at the end of the number
     if !rem1.is_empty() {
+        let (sp, hint) = if rem1.as_str().chars().all(|x| x.is_ascii_hexdigit()) {
+            let hint = format!("Change this number to hex: `0x{}`", numsp.as_str());
+            (numsp, hint)
+        } else {
+            (
+                rem1,
+                "remove unsupported characters from this number.".to_string(),
+            )
+        };
         let errmsg = "unsupported digit in number encountered.";
         let err = VelosiLexerErrorBuilder::new(errmsg.to_string())
-            .add_hint("remove unsupported characters from this number.".to_string())
-            .add_location(rem1)
+            .add_hint(hint)
+            .add_location(sp)
             .build();
         return Err(Err::Failure(err));
     }
