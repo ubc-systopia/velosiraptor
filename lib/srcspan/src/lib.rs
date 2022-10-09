@@ -146,7 +146,7 @@ impl SrcSpan {
     /// # Panics
     ///
     /// Panics if the supplied range is outside of the covered range by the [SrcSpan]
-    pub fn from_subrange(&self, range: Range<usize>) -> Self {
+    pub fn from_self_with_subrange(&self, range: Range<usize>) -> Self {
         if self.len() < range.end {
             panic!("Cannot create subrange outside of the current range");
         }
@@ -165,10 +165,41 @@ impl SrcSpan {
         newspan
     }
 
+    /// Expands [self] to cover everything until but not including `pos`
+    ///
+    /// The new source position will have the same starting position as self.
+    /// but with an increased length up to but not including `pos.
+    ///
+    /// Note, this will not shrink the span if `pos` is before the end of `self`
+    ///
+    /// # Arguments
+    ///
+    ///  * `pos` - The position to expand to
+    ///
+    /// # Panics
+    ///
+    ///  * If the new end position would be before the current start
+    pub fn expand_until(&mut self, pos: usize) {
+        if pos < self.range.start {
+            panic!("Cannot expand before to the current start of SrcSpan.");
+        }
+
+        // don't expand beyond the end of the valid range
+        let pos = std::cmp::min(pos, self.content.len());
+
+        // update if we are actually expanding
+        if self.range.end <= pos {
+            self.range.end = pos;
+        }
+    }
+
     /// Expands [self] to cover everything until the start of `other`
     ///
     /// The new source position will have the same starting position as self.
     /// but with an increased length up to but not including the other one.
+    ///
+    /// Note, this will not shrink the span if the start of the other span
+    /// is before the end of the current span.
     ///
     /// # Arguments
     ///
@@ -176,22 +207,14 @@ impl SrcSpan {
     ///
     /// # Panics
     ///
-    /// If the two source positions are not related.
-    pub fn expand_until(&mut self, other: &Self) {
+    ///  * If the two SrcSpan are not related.
+    ///  * If the new end position would be before the current start
+    pub fn expand_until_start(&mut self, other: &Self) {
         if self.loc.context() != other.loc.context() || self.content != other.content {
             panic!("Cannot expand SrcSpan to unrelated SrcSpan");
         }
 
-        if other.range.start > self.content.len() {
-            panic!("Cannot expand SrcSpan beyond content length");
-        }
-
-        // nothing to expand here
-        if self.range.end > other.range.start {
-            return;
-        }
-
-        self.range.end = other.range.start;
+        self.expand_until(other.range.start);
     }
 
     /// Expands [self] to cover everything until the end of `other`
@@ -199,28 +222,96 @@ impl SrcSpan {
     /// The new source position will have the same starting position as self.
     /// but with an increased length up to and including the other one.
     ///
+    /// Note, this will not shrink the span if the start of the other span
+    /// is before the end of the current span.
+    ///
     /// # Arguments
     ///
     ///  * `other` - The other SrcSpan to expand to
     ///
     /// # Panics
     ///
-    /// If the two source positions are not related.
+    ///  * If the two SrcSpan are not related.
+    ///  * If the other SrcSpan is not after the current one.
     pub fn expand_until_end(&mut self, other: &Self) {
         if self.loc.context() != other.loc.context() || self.content != other.content {
             panic!("Cannot expand SrcSpan to unrelated SrcSpan");
         }
 
-        if other.range.end > self.content.len() {
-            panic!("Cannot expand SrcSpan beyond content length");
+        self.expand_until(other.range.end);
+    }
+
+    /// Adjusts [self] to cover everything until but not including `pos`
+    ///
+    /// The new source position will have the same starting position as self.
+    /// but with an increased length up to but not including `pos. This may shrink
+    /// the current SrcSpan.
+    ///
+    /// # Arguments
+    ///
+    ///  * `pos` - The position to expand to
+    ///
+    /// # Panics
+    ///
+    ///  * If the new end position would be before the current start
+    pub fn span_until(&mut self, pos: usize) {
+        if pos < self.range.start {
+            panic!("Cannot expand before to the current start of SrcSpan.");
         }
 
-        // nothing to expand here
-        if self.range.end > other.range.end {
-            return;
+        // don't expand beyond the end of the valid range
+        let pos = std::cmp::min(pos, self.content.len());
+
+        // update if we are actually expanding
+        self.range.end = pos;
+    }
+
+    /// Adjusts [self] to cover everything until the start of `other`
+    ///
+    /// The new source position will have the same starting position as self.
+    /// but with an increased length up to but not including the other one.
+    ///
+    /// If the start of the other SrcSpan is before the end of current then
+    /// the current will be shrunk.
+    ///
+    /// # Arguments
+    ///
+    ///  * `other` - The other SrcSpan to expand to
+    ///
+    /// # Panics
+    ///
+    ///  * If the two SrcSpan are not related.
+    ///  * If the new end position would be before the current start
+    pub fn span_until_start(&mut self, other: &Self) {
+        if self.loc.context() != other.loc.context() || self.content != other.content {
+            panic!("Cannot span SrcSpan to unrelated SrcSpan");
         }
 
-        self.range.end = other.range.end;
+        self.span_until(other.range.start);
+    }
+
+    /// Expands [self] to cover everything until the end of `other`
+    ///
+    /// The new source position will have the same starting position as self.
+    /// but with an increased length up to and including the other one.
+    ///
+    /// If the start of the other SrcSpan is before the end of current then
+    /// the current will be shrunk.
+    ///
+    /// # Arguments
+    ///
+    ///  * `other` - The other SrcSpan to expand to
+    ///
+    /// # Panics
+    ///
+    ///  * If the two SrcSpan are not related.
+    ///  * If the other SrcSpan is not after the current one.
+    pub fn span_until_end(&mut self, other: &Self) {
+        if self.loc.context() != other.loc.context() || self.content != other.content {
+            panic!("Cannot span SrcSpan to unrelated SrcSpan");
+        }
+
+        self.span_until(other.range.end);
     }
 
     /// Sets the context of the [SrcSpan]
@@ -554,7 +645,7 @@ impl InputTake for SrcSpan {
     /// The function panics if `count` > [self.input_len()].
     #[inline]
     fn take(&self, count: usize) -> Self {
-        self.from_subrange(0..count)
+        self.from_self_with_subrange(0..count)
     }
 
     /// Splits the current SrcSpan at `count` returning two new [SrcSpan] objects.ErrorKind
@@ -565,8 +656,8 @@ impl InputTake for SrcSpan {
     #[inline]
     fn take_split(&self, count: usize) -> (Self, Self) {
         // create the new SrcSpan objects
-        let first = self.from_subrange(0..count);
-        let second = self.from_subrange(count..self.input_len());
+        let first = self.from_self_with_subrange(0..count);
+        let second = self.from_self_with_subrange(count..self.input_len());
 
         // we sould not lose any data
         debug_assert_eq!(first.input_len() + second.input_len(), self.input_len());
@@ -659,7 +750,7 @@ impl Slice<Range<usize>> for SrcSpan {
     /// The function panics if the range is out of bounds
     #[inline]
     fn slice(&self, range: Range<usize>) -> Self {
-        self.from_subrange(range)
+        self.from_self_with_subrange(range)
     }
 }
 
