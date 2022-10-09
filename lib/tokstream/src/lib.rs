@@ -82,9 +82,31 @@ where
         }
     }
 
+    /// Creates a new [TokenStream] from the given vector of tokens
+    pub fn new_filtered(mut tokens: Vec<Token<T>>) -> Self {
+        // filter tokens that do not match the predicated
+        tokens.retain(|t| t.keep());
+        Self::new(tokens)
+    }
+
     /// Creates an empty [TokenStream]
     pub fn empty() -> Self {
         Self::new(Vec::new())
+    }
+
+    /// Filters out all tokens not matching the supplied predicated
+    ///
+    /// If there are multiple references to the underlying token stream
+    /// then this will clone the vector of the tokens, otherwise it will
+    /// just filter the existing vector in place retaining elements that
+    /// match the provided predicate.
+    pub fn with_retained<F>(self, pred: F) -> Self
+    where
+        F: Fn(&Token<T>) -> bool,
+    {
+        let mut tokens = Rc::try_unwrap(self.tokens).unwrap_or_else(|rc| (*rc).clone());
+        tokens.retain(|t| pred(t));
+        TokenStream::new(tokens)
     }
 
     /// Constructs a new [TokenStream] covering a subrange of [self]
@@ -98,7 +120,7 @@ where
     /// # Panics
     ///
     /// Panics if the supplied range is outside of the covered range by the  [TokenStream]
-    pub fn from_subrange(&self, range: Range<usize>) -> Self {
+    pub fn from_self_with_subrange(&self, range: Range<usize>) -> Self {
         if self.len() < range.end {
             panic!("Cannot create subrange outside of the current range");
         }
@@ -117,39 +139,75 @@ where
         newstream
     }
 
+    pub fn from_self_until_end(&self, other: &Self) -> Self {
+        let mut newstream = self.clone();
+        newstream.span_until_end(other);
+        newstream
+    }
+
+    pub fn from_self_until_start(&self, other: &Self) -> Self {
+        let mut newstream = self.clone();
+        newstream.span_until_end(other);
+        newstream
+    }
+
+    /// Expands [self] to cover everything until but not including `pos`
+    ///
+    /// The new TokenStream will have the same starting position as self.
+    /// but with an increased length up to but not including `pos`
+    ///
+    /// Note, this will not shrink `self` if `pos` is before the end of `self`
+    ///
+    /// # Arguments
+    ///
+    ///  * `pos` - The position to expand to
+    ///
+    /// # Panics
+    ///
+    ///  * If the new end position would be before the current start
+    pub fn expand_until(&mut self, pos: usize) {
+        if pos < self.range.start {
+            panic!("Cannot expand before to the current start of TokenStream. ");
+        }
+
+        // don't expand beyond the end of the valid range
+        let pos = std::cmp::min(pos, self.tokens.len());
+
+        // update if we are actually expanding
+        if self.range.end <= pos {
+            self.range.end = pos;
+            self.update_span();
+        }
+    }
+
     /// Expands [self] to cover everything until the start of `other`
     ///
     /// The new TokenStream will have the same starting position as self.
     /// but with an increased length up to but not including the other one.
     ///
+    /// Note, this will not shrink `self` if the start of `other` is before
+    /// the end of `self.
+    ///
     /// # Arguments
     ///
     ///  * `other` - The other TokenStream to expand to
     ///
     /// # Panics
     ///
-    /// If the two TokenStreams are not related.
-    pub fn expand_until(&mut self, other: &Self) {
+    ///  * If the two TokenStreams are not related.
+    ///  * If the new end position would be before the current start
+    pub fn expand_until_start(&mut self, other: &Self) {
         if self.tokens != other.tokens {
             panic!("Cannot expand TokenStream to unrelated TokenStream");
         }
 
-        if other.range.start > self.tokens.len() {
-            panic!("Cannot expand TokenStream beyond content TokenStream");
-        }
-
-        // nothing to expand here
-        if self.range.end > other.range.start {
-            return;
-        }
-        self.range.end = other.range.start;
-        self.update_span();
+        self.expand_until(other.range.start);
     }
 
     /// Expands [self] to cover everything until the end of `other`
     ///
-    /// The new TokenStream will have the same starting position as self.
-    /// but with an increased length up to and including the other one.
+    /// Note, this will not shrink `self` if the start of `other` is before
+    /// the end of `self.
     ///
     /// # Arguments
     ///
@@ -157,23 +215,83 @@ where
     ///
     /// # Panics
     ///
-    /// If the two source positions are not related.
+    ///  * If the two TokenStreams are not related.
+    ///  * If the new end position would be before the current start
     pub fn expand_until_end(&mut self, other: &Self) {
         if self.tokens != other.tokens {
             panic!("Cannot expand TokenStream to unrelated TokenStream");
         }
 
-        if other.range.end > self.tokens.len() {
-            panic!("Cannot expand TokenStream beyond content TokenStream");
+        self.expand_until(other.range.end);
+    }
+
+    /// Adjusts [self] to cover everything until `pos`
+    ///
+    /// The new TokenStream will have the same starting position as self.and an
+    /// adjusted length up to bu not including `pos`. This may shrink the current`
+    /// TokenStream
+    ///
+    /// # Arguments
+    ///
+    ///  * `pos` - Then position to adjust the span to
+    ///
+    /// # Panics
+    ///
+    ///  * If the new end position would be before the current start
+    pub fn span_until(&mut self, pos: usize) {
+        if pos < self.range.start {
+            panic!("Cannot span before to the current start of TokenStream. ");
         }
 
-        // nothing to expand here
-        if self.range.end > other.range.end {
-            return;
-        }
+        // don't expand beyond the end of the valid range
+        let pos = std::cmp::min(pos, self.tokens.len());
 
-        self.range.end = other.range.end;
+        self.range.end = pos;
         self.update_span();
+    }
+
+    /// Adjusts [self] to cover everything until the start of `other`
+    ///
+    /// The new TokenStream will have the same starting position as self.
+    /// but with an increased length up to but not including the other one.
+    /// This may shrink or expand the current span.
+    ///
+    /// # Arguments
+    ///
+    ///  * `other` - The other TokenStream to expand to
+    ///
+    /// # Panics
+    ///
+    ///  * If the two TokenStreams are not related.
+    ///  * If the new end position would be before the current start
+    pub fn span_until_start(&mut self, other: &Self) {
+        if self.tokens != other.tokens {
+            panic!("Cannot span TokenStream to unrelated TokenStream");
+        }
+
+        self.span_until(other.range.start);
+    }
+
+    /// Adjusts [self] to cover everything until the end of `other`
+    ///
+    /// The new TokenStream will have the same starting position as self.
+    /// but with an increased length up to but not including the other one.
+    /// This may shrink or expand the current span.
+    ///
+    /// # Arguments
+    ///
+    ///  * `other` - The other TokenStream to span to
+    ///
+    /// # Panics
+    ///
+    ///  * If the two TokenStreams are not related.
+    ///  * If the new end position would be before the current start
+    pub fn span_until_end(&mut self, other: &Self) {
+        if self.tokens != other.tokens {
+            panic!("Cannot span TokenStream to unrelated TokenStream");
+        }
+
+        self.span_until(other.range.end);
     }
 
     /// Obtains a string slice to the entire source of the [SrcSpan]
@@ -204,16 +322,23 @@ where
 
     /// Updates the current span
     fn update_span(&mut self) {
-        let span = self.tokens[self.range.start].span();
-        if self.span.starts_with(span) {
-            // the current span starts with the start token, so just expand
-            self.span
-                .expand_until_end(self.tokens[self.range.end - 1].span());
+        if self.range.start == self.tokens.len() {
+            // we've reached the end of the input, adjust
+            while !self.span.is_empty() {
+                self.span.pos_next()
+            }
         } else {
-            // we don't have a common start, so replace the span.
-            let mut span = self.tokens[self.range.start].span().clone();
-            span.expand_until_end(self.tokens[self.range.end - 1].span());
-            self.span = span;
+            let span = self.tokens[self.range.start].span();
+            if self.span.starts_with(span) {
+                // the current span starts with the start token, so just expand
+                self.span
+                    .span_until_end(self.tokens[self.range.end - 1].span());
+            } else {
+                // we don't have a common start, so replace the span.
+                let mut span = self.tokens[self.range.start].span().clone();
+                span.span_until_end(self.tokens[self.range.end - 1].span());
+                self.span = span;
+            }
         }
     }
 
@@ -290,13 +415,13 @@ where
     /// # Panics
     ///
     ///  The function panics if the two TokenStreams are not related
-    pub fn span_until(&self, other: &Self) -> SrcSpan {
+    pub fn to_span_until_start(&self, other: &Self) -> SrcSpan {
         if self.tokens != other.tokens {
             panic!("Cannot expand TokenStream to unrelated TokenStream");
         }
 
         let mut span = self.span.clone();
-        span.expand_until(other.span());
+        span.expand_until_start(other.span());
         span
     }
 
@@ -365,6 +490,15 @@ where
     }
 }
 
+impl<T> Default for TokenStream<T>
+where
+    T: TokenKind + Display + PartialEq + Clone,
+{
+    fn default() -> Self {
+        Self::new(Vec::new())
+    }
+}
+
 /// Implementation of the [nom::InputLength] trait for [TokenStream]
 impl<T> InputLength for TokenStream<T>
 where
@@ -390,7 +524,7 @@ where
     /// The function panics if count > self.input_len()
     fn take(&self, count: usize) -> Self {
         assert!(count <= self.input_len());
-        self.from_subrange(0..count)
+        self.from_self_with_subrange(0..count)
     }
 
     #[inline]
@@ -401,8 +535,8 @@ where
     fn take_split(&self, count: usize) -> (Self, Self) {
         assert!(count <= self.input_len());
 
-        let first = self.from_subrange(0..count);
-        let second = self.from_subrange(count..self.input_len());
+        let first = self.from_self_with_subrange(0..count);
+        let second = self.from_self_with_subrange(count..self.input_len());
 
         // we sould not lose any data
         assert_eq!(first.input_len(), count);
@@ -440,7 +574,7 @@ where
     /// input length of TokenStream.
     #[inline]
     fn slice(&self, range: Range<usize>) -> Self {
-        self.from_subrange(range)
+        self.from_self_with_subrange(range)
     }
 }
 
