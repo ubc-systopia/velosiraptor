@@ -483,7 +483,7 @@ pub enum VelosiTokenKind {
     Illegal,
 
     // literals, integers of booleans
-    IntLiteral(u64),   // 1234 0x134 0o1234 0b1111
+    NumLiteral(u64),   // 1234 0x134 0o1234 0b1111
     BoolLiteral(bool), // true | false
 
     // identifier
@@ -518,6 +518,23 @@ impl VelosiTokenKind {
             false
         }
     }
+
+    pub fn as_hint_str(&self) -> &'static str {
+        use VelosiTokenKind::*;
+        match self {
+            // illegal token
+            Illegal => "illegal token",
+            // literals, integers of booleans
+            NumLiteral(_) => "integer literal",
+            BoolLiteral(_) => "boolean literal",
+            Identifier(_) => "identifier",
+            // Keyword(keyword) => keyword.as_str(),
+            Comment(_) => "comment",
+            BlockComment(_) => "block comment",
+            OpToken(op_token) => op_token.as_str(),
+            _ => panic!("not yet implemented"),
+        }
+    }
 }
 
 impl Display for VelosiTokenKind {
@@ -525,7 +542,7 @@ impl Display for VelosiTokenKind {
         use VelosiTokenKind::*;
         match self {
             Illegal => write!(f, "Illegal"),
-            IntLiteral(n) => write!(f, "{}", n),
+            NumLiteral(n) => write!(f, "{}", n),
             BoolLiteral(n) => write!(f, "{}", n),
             Identifier(n) => write!(f, "{}", n),
             Keyword(n) => write!(f, "{}", n),
@@ -567,7 +584,7 @@ impl TokenKind for VelosiTokenKind {
     fn is_literal(&self) -> bool {
         matches!(
             self,
-            VelosiTokenKind::IntLiteral(_)
+            VelosiTokenKind::NumLiteral(_)
                 | VelosiTokenKind::BoolLiteral(_)
                 | VelosiTokenKind::Keyword(_)
         )
@@ -576,6 +593,11 @@ impl TokenKind for VelosiTokenKind {
     /// whether the token is an identifier
     fn is_identifier(&self) -> bool {
         matches!(self, VelosiTokenKind::Identifier(_))
+    }
+
+    /// whether or not to keep the token when filtering it
+    fn keep(&self) -> bool {
+        !self.is_comment()
     }
 }
 

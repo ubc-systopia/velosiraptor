@@ -29,16 +29,12 @@
 //! the parser to consume.
 
 // used standard library functionality
-
 use std::fs;
 use std::io::Error;
 
 // external dependencies
 use custom_error::custom_error;
-
-pub use tokstream::{SrcSpan, Token, TokenKind, TokenStream};
-
-// use crate::error::{IResult, VrsError};
+use tokstream::{Token, TokenStream};
 
 // crate modules
 mod error;
@@ -46,10 +42,10 @@ mod lexer;
 mod tokens;
 
 use crate::error::VelosiLexerErr;
-pub use tokens::{VelosiKeyword, VelosiOpToken, VelosiTokenKind};
 
-// /// define the lexer error type
-// pub type LexErr = VrsError<SourcePos>;
+// re-exports
+pub use tokens::{VelosiKeyword, VelosiOpToken, VelosiTokenKind};
+pub use tokstream::{SrcSpan, TokenKind};
 
 /// the type for the VelosiLexer tokens
 pub type VelosiToken = Token<VelosiTokenKind>;
@@ -60,7 +56,6 @@ custom_error! {pub VelosiLexerError
     ReadSourceFile {e: Error} = "Could not read the source file.",
     LexingFailure {r: VelosiLexerErr}   = "Lexing failed.",
     LexingIncomplete = "Needed more input to complete lexing."
-
 }
 
 /// represents the lexer state
@@ -72,7 +67,7 @@ impl VelosiLexer {
     /// This function will create a new `SrcSpan` from the supplied string.
     pub fn lex_srcspan(content: SrcSpan) -> Result<VelosiTokenStream, VelosiLexerError> {
         match lexer::lex(content) {
-            Ok((_, tokens)) => Ok(TokenStream::new(tokens)),
+            Ok((_, tokens)) => Ok(TokenStream::new_filtered(tokens)),
             Err(nom::Err::Error(r)) => Err(VelosiLexerError::LexingFailure { r }),
             Err(nom::Err::Failure(r)) => Err(VelosiLexerError::LexingFailure { r }),
             _ => Err(VelosiLexerError::LexingIncomplete),
