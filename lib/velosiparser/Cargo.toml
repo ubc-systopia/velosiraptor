@@ -1,0 +1,25 @@
+[package]
+name = "velosiparser"
+description = "Library for parsing the Velosiraptor Language"
+license = "MIT"
+version = "0.1.0"
+authors = ["Reto Achermann <achreto@cs.ubc.ca>"]
+edition = "2018"
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nom = "7.1.1"
+velosilexer = { path = "../velosilexer" }
+colored = "2.0.0"
+custom_error = "1.9.2"
+
+
+[lib]
+name = "velosiparser"
+path = "src/lib.rs"
+
+[[bin]]
+name = "velosiparser"
+path = "src/bin.rs"
