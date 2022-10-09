@@ -186,6 +186,7 @@ fn any(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
     Err(Err::Failure(err))
 }
 
+/// recognizes a token
 fn token(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
     delimited(
         multispace0,
@@ -202,6 +203,7 @@ fn token(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
     )(input)
 }
 
+/// lexes a source span into a list of tokens
 pub fn lex(input: SrcSpan) -> IResult<SrcSpan, Vec<VelosiToken>> {
     all_consuming(many0(token))(input)
 }
