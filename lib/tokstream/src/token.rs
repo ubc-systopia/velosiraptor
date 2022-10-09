@@ -47,6 +47,9 @@ pub trait TokenKind {
 
     /// whether the token is an identifier
     fn is_identifier(&self) -> bool;
+
+    /// whether or not to keep the token when filtering it
+    fn keep(&self) -> bool;
 }
 
 /// Represents a Lexical Token
@@ -97,6 +100,11 @@ where
     /// returns true if the token is a reserved identifier
     pub fn is_reserved(&self) -> bool {
         self.kind.is_reserved()
+    }
+
+    /// returns true if the token is to be retained when filtering
+    pub fn keep(&self) -> bool {
+        self.kind.keep()
     }
 }
 
