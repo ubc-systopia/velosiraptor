@@ -47,6 +47,13 @@ pub enum VelosiParseTreeUnitNode {
     Map,
 }
 
+/// Implement [Display] for [VelosiParseTreeUnitNode]
+impl Display for VelosiParseTreeUnitNode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        writeln!(f, "TODO: implement display for VelosiParseTreeUnitNode")
+    }
+}
+
 /// Represents a unit definition
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeUnitDef {
@@ -83,7 +90,25 @@ impl VelosiParseTreeUnitDef {
 /// Implement [Display] for [VelosiParseTreeUnitDef]
 impl Display for VelosiParseTreeUnitDef {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        writeln!(f, "foo")
+        write!(f, "{}", self.name)?;
+        if !self.params.is_empty() {
+            write!(f, "(")?;
+            for param in self.params.iter() {
+                write!(f, "{}, ", param)?;
+            }
+            write!(f, ")")?;
+        }
+
+        if let Some(derived) = &self.derived {
+            write!(f, " : {}", derived)?;
+        }
+
+        writeln!(f, " {{")?;
+        for n in self.nodes.iter() {
+            writeln!(f, "{}", n)?;
+        }
+
+        writeln!(f, "}}")
     }
 }
 
@@ -98,8 +123,14 @@ pub enum VelosiParseTreeUnit {
 impl Display for VelosiParseTreeUnit {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            VelosiParseTreeUnit::Segment(unit) => Display::fmt(&unit, f),
-            VelosiParseTreeUnit::StaticMap(unit) => Display::fmt(&unit, f),
+            VelosiParseTreeUnit::Segment(unit) => {
+                write!(f, "segment ")?;
+                Display::fmt(&unit, f)
+            }
+            VelosiParseTreeUnit::StaticMap(unit) => {
+                write!(f, "staticmap ")?;
+                Display::fmt(&unit, f)
+            }
         }
     }
 }

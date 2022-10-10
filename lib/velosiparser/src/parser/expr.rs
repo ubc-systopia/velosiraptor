@@ -332,6 +332,8 @@ pub fn term_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiP
         // slice_expr,
         // element expression returning a boolean
         // element_expr,
+        // if-then-else expression
+        if_else_expr,
         // it can be a identifier (variable)
         ident_expr,
         // its a term in parenthesis
@@ -365,6 +367,34 @@ pub fn term_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiP
 //         },
 //     ))
 // }
+
+/// parses an if-then-else expression
+///
+/// The if then else expression is used to specify a conditional expression, both branches must
+/// be present
+///
+/// # Grammar
+///
+/// `IF_THEN_ELSE := KW_IF EXPR LBRACE EXPR RBRACE KW_ELSE LBRACE EXPR RBRACE`
+///
+/// # Example
+///
+/// `if 3 > a { 1 } else { 2 }`
+///
+pub fn if_else_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
+    let mut pos = input.clone();
+
+    let (i1, _) = kw_if(input)?;
+    let (i2, cond) = cut(expr)(i1)?;
+    let (i3, then) = cut(delimited(lbrace, expr, rbrace))(i2)?;
+    let (i4, _) = cut(kw_else)(i3)?;
+    let (i5, other) = cut(delimited(lbrace, expr, rbrace))(i4)?;
+    pos.span_until_start(&i5);
+    Ok((
+        i5,
+        VelosiParseTreeExpr::IfElse(VelosiParseTreeIfElseExpr::new(cond, then, other, pos)),
+    ))
+}
 
 /// parses a numeric literal
 ///
