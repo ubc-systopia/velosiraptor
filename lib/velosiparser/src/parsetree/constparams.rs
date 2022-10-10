@@ -31,75 +31,65 @@
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 // use crate functionality
+use super::{VelosiParseTreeExpr, VelosiParseTreeType};
 use crate::VelosiTokenStream;
 
-pub mod constparams;
-pub mod expr;
-pub mod types;
-pub mod unit;
-
-pub use constparams::{VelosiParseTreeConstDef, VelosiParseTreeParam};
-pub use expr::VelosiParseTreeExpr;
-pub use types::{VelosiParseTreeType, VelosiParseTreeTypeInfo};
-pub use unit::{VelosiParseTreeUnit, VelosiParseTreeUnitDef, VelosiParseTreeUnitNode};
-
-/// Import clause in the root context
+/// A constant definition within the root or unit context
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct VelosiParseTreeImport {
-    /// name of the imported module
+pub struct VelosiParseTreeConstDef {
+    /// the name of the constant
     pub name: String,
+    /// the type of the constant
+    pub ctype: VelosiParseTreeType,
+    /// expression representing the value of the constnat
+    pub value: VelosiParseTreeExpr,
     /// the location of the import clause
     pub loc: VelosiTokenStream,
 }
 
-impl Display for VelosiParseTreeImport {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "import {};", self.name)
+impl VelosiParseTreeConstDef {
+    pub fn new(
+        name: String,
+        ctype: VelosiParseTreeType,
+        value: VelosiParseTreeExpr,
+        loc: VelosiTokenStream,
+    ) -> Self {
+        VelosiParseTreeConstDef {
+            name,
+            ctype,
+            value,
+            loc,
+        }
     }
 }
 
-/// Represents parse tree nodes
+/// Implementation of the [Display] trait for the [VelosiParseTreeConstDef] struct
+impl Display for VelosiParseTreeConstDef {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "const {} : {} = {};", self.name, self.ctype, self.value)
+    }
+}
+
+/// A parameter definition within the methods, unit, or quantifier context
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub enum VelosiParseTreeContextNode {
-    Const(VelosiParseTreeConstDef),
-    Import(VelosiParseTreeImport),
-    Unit(VelosiParseTreeUnit),
+pub struct VelosiParseTreeParam {
+    /// the name of the parameter
+    pub name: String,
+    /// the type of the param
+    pub ptype: VelosiParseTreeType,
+    /// the location of the import clause
+    pub loc: VelosiTokenStream,
 }
 
-/// Implement [Display] for [VelosiParseTree]
-impl Display for VelosiParseTreeContextNode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        use VelosiParseTreeContextNode::*;
-        match self {
-            Const(c) => Display::fmt(&c, f),
-            Import(i) => Display::fmt(&i, f),
-            Unit(u) => Display::fmt(&u, f),
-        }
+impl VelosiParseTreeParam {
+    pub fn new(name: String, ptype: VelosiParseTreeType, loc: VelosiTokenStream) -> Self {
+        VelosiParseTreeParam { name, ptype, loc }
     }
 }
 
-/// Represents the parse tree root for the velosiraptor language
-pub struct VelosiParseTree {
-    /// List of nodes in the current parse tree context
-    nodes: Vec<VelosiParseTreeContextNode>,
-    /// The current node context
-    context: String,
-}
-
-impl VelosiParseTree {
-    pub fn new(context: String, nodes: Vec<VelosiParseTreeContextNode>) -> Self {
-        Self { nodes, context }
-    }
-}
-
-/// Implement [Display] for [VelosiParseTree]
-impl Display for VelosiParseTree {
+/// Implementation of the [Display] trait for the [VelosiParseTreeParam] struct
+impl Display for VelosiParseTreeParam {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        writeln!(f, "VelosiParseTree({})", self.context)?;
-        writeln!(f, "---------------------------------------------")?;
-        for n in &self.nodes {
-            writeln!(f, "{}\n", n)?;
-        }
-        Ok(())
+        write!(f, "{}: {}", self.name, self.ptype)
     }
 }

@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! # VelisoParser -- Parse Tree Expressions
+//! # VelosiParser -- Parse Tree Expressions
 //!
 //! This module defines the expression nodes for the parse tree
 
