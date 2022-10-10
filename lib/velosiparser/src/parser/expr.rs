@@ -31,10 +31,8 @@ use nom::{
     branch::alt,
     bytes::complete::take,
     combinator::{cut, opt}, // fail,
-    multi::many0,
-    multi::{separated_list0, separated_list1},
-    sequence::delimited,              //tuple
-    sequence::{preceded, terminated}, // pair
+    multi::{many0, separated_list0, separated_list1},
+    sequence::{delimited, pair, preceded, terminated, tuple},
     Err,
     Needed,
 };
@@ -224,7 +222,7 @@ pub fn quantifier_expr(
 ) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
     let mut pos = input.clone();
     // try parse the keyword
-    let (i2, quantifier) = alt((kw_exists, kw_forall))(input.clone())?;
+    let (i2, quantifier) = alt((kw_exists, kw_forall))(input)?;
     // now we're in a quantifier, get the list of variables
     let (i3, vars) = cut(separated_list1(comma, parameter))(i2)?;
 
@@ -329,7 +327,7 @@ pub fn term_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiP
         // a function call expression returning a boolean
         fn_call_expr,
         // slice expression
-        // slice_expr,
+        slice_expr,
         // element expression returning a boolean
         // element_expr,
         // if-then-else expression
@@ -355,18 +353,19 @@ pub fn term_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiP
 /// `0..10` corresponds to the mathematical interval `[0, 10)`
 ///
 /// an arithmetic expression evalutes to a number a | b
-// pub fn range_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
-//     let (i, (s, _, e)) = tuple((arith_expr, dotdot, arith_expr))(input.clone())?;
-//     let pos = input.merge(&i);
-//     Ok((
-//         i,
-//         VelosiParseTreeExpr::Range {
-//             start: Box::new(s),
-//             end: Box::new(e),
-//             pos,
-//         },
-//     ))
-// }
+pub fn range_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
+    let mut pos = input.clone();
+    let (i, (s, _, e)) = tuple((num_lit_expr, dotdot, num_lit_expr))(input)?;
+    pos.span_until_start(&i);
+
+    match (s, e) {
+        (VelosiParseTreeExpr::NumLiteral(s), VelosiParseTreeExpr::NumLiteral(e)) => {
+            let range = VelosiParseTreeRangeExpr::new(s.value, e.value, pos);
+            Ok((i, VelosiParseTreeExpr::Range(range)))
+        }
+        _ => unreachable!(),
+    }
+}
 
 /// parses an if-then-else expression
 ///
@@ -445,26 +444,26 @@ pub fn bool_lit_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vel
 ///
 /// # Grammar
 ///
-/// SLICE_EXPR := IDENT_EXPR [ RANGE_EXPR ]
+/// SLICE_EXPR := IDENT_EXPR LBRACK RANGE_EXPR RBRACK
 ///
 /// # Example
 ///
 /// `foo[0..1]`
 ///
-// pub fn slice_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
-//     let (i, (p, e)) = pair(ident_expr, delimited(lbrack, range_expr, rbrack))(input)?;
-//     match p {
-//         VelosiParseTreeExpr::Identifier { path, pos } => Ok((
-//             i,
-//             VelosiParseTreeExpr::Slice {
-//                 path,
-//                 slice: Box::new(e),
-//                 pos,
-//             },
-//         )),
-//         _ => panic!("unexpected type"),
-//     }
-// }
+pub fn slice_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
+    let mut pos = input.clone();
+    let (i, (p, e)) = pair(ident_path, delimited(lbrack, cut(range_expr), cut(rbrack)))(input)?;
+    pos.span_until_start(&i);
+
+    if let VelosiParseTreeExpr::Range(r) = e {
+        Ok((
+            i,
+            VelosiParseTreeExpr::Slice(VelosiParseTreeSliceExpr::new(p, r, pos)),
+        ))
+    } else {
+        unreachable!()
+    }
+}
 
 fn ident_path(
     input: VelosiTokenStream,
@@ -612,9 +611,10 @@ fn test_literals() {
     parse_equal!(expr, "ident.path.expr", "ident.path.expr");
     parse_equal!(expr, "(1)", "1");
     //parse_equal!(expr, "foo[3]", "foo[3]");
+    parse_equal!(expr, "foo[3..4]", "foo[3..4]");
     parse_equal!(expr, "bar()", "bar()");
-    // parse_equal!(expr, "foo.bar[3]", "foo.bar[3]");
-    // parse_equal!(expr, "foo.bar[0..3]", "foo.bar[0..3]");
+    //parse_equal!(expr, "foo.bar[3]", "foo.bar[3]");
+    parse_equal!(expr, "foo.bar[0..3]", "foo.bar[0..3]");
     // unclosed
     parse_fail!(expr, "(1");
     parse_fail!(expr, "(1(");
@@ -665,27 +665,27 @@ fn test_boolean() {
     parse_equal!(expr, "a == true", "(a == true)");
 }
 
-// #[test]
-// fn test_range() {
-//     parse_equal!(range_expr, "a..b", "a..b");
-//     parse_equal!(range_expr, "1..2", "1..2");
-//     parse_equal! {
-//         range_expr,
-//         "a+b..1+5",
-//         "(a + b)..(1 + 5)"
-//     }
-// }
+#[test]
+fn test_range() {
+    // parse_equal!(range_expr, "a..b", "a..b");
+    parse_equal!(range_expr, "1..2", "1..2");
+    // parse_equal! {
+    //     range_expr,
+    //     "a+b..1+5",
+    //     "(a + b)..(1 + 5)"
+    // }
+}
 
-// #[test]
-// fn test_slice() {
-//     parse_equal!(slice_expr, "foo[1..2]", "foo[1..2]");
-//     parse_equal!(slice_expr, "foo[a..len]", "foo[a..len]");
-//     parse_equal! {
-//         slice_expr,
-//         "foo[a+4..len-1]",
-//         "foo[(a + 4)..(len - 1)]"
-//     }
-// }
+#[test]
+fn test_slice() {
+    parse_equal!(slice_expr, "foo[1..2]", "foo[1..2]");
+    // parse_equal!(slice_expr, "foo[a..len]", "foo[a..len]");
+    // parse_equal! {
+    //     slice_expr,
+    //     "foo[a+4..len-1]",
+    //     "foo[(a + 4)..(len - 1)]"
+    // }
+}
 
 #[test]
 fn test_fncall() {

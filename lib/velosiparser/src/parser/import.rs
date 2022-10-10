@@ -57,7 +57,7 @@ pub fn import(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPars
     let mut loc = input.clone();
 
     // try to match the input keyword, there is no match, return.
-    let (i1, _) = kw_import(input.clone())?;
+    let (i1, _) = kw_import(input)?;
 
     // We've seen the `import` keyword, so the next must be an identifier followed by a semicolon
     let (rem, name) = cut(terminated(ident, semicolon))(i1)?;
