@@ -155,7 +155,7 @@ pub enum VelosiKeyword {
 }
 
 impl VelosiKeyword {
-    pub const fn as_str(&self) -> &str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             VelosiKeyword::Unit => "unit",
             VelosiKeyword::StaticMap => "staticmap",
@@ -522,17 +522,14 @@ impl VelosiTokenKind {
     pub fn as_hint_str(&self) -> &'static str {
         use VelosiTokenKind::*;
         match self {
-            // illegal token
             Illegal => "illegal token",
-            // literals, integers of booleans
             NumLiteral(_) => "integer literal",
             BoolLiteral(_) => "boolean literal",
             Identifier(_) => "identifier",
-            // Keyword(keyword) => keyword.as_str(),
+            Keyword(keyword) => keyword.as_str(),
             Comment(_) => "comment",
             BlockComment(_) => "block comment",
             OpToken(op_token) => op_token.as_str(),
-            _ => panic!("not yet implemented"),
         }
     }
 }
