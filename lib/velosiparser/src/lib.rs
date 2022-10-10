@@ -34,7 +34,6 @@ use std::io::Error;
 
 // external dependencies
 use custom_error::custom_error;
-use nom;
 
 pub use velosilexer::{
     VelosiKeyword, VelosiLexer, VelosiLexerError, VelosiOpToken, VelosiTokenKind, VelosiTokenStream,
