@@ -44,9 +44,9 @@ mod expr;
 mod import;
 // mod interface;
 // mod map;
-// mod method;
+mod method;
 mod param;
-// mod state;
+mod state;
 // mod statement;
 mod terminals;
 mod unit;
@@ -55,6 +55,7 @@ mod unit;
 use constdef::constdef;
 use expr::expr;
 use import::import;
+use state::state;
 use unit::unit;
 
 /// Parses a VelosiTokenStream into a VelosiParseTree

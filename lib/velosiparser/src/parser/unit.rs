@@ -32,16 +32,17 @@ use nom::{
     branch::alt,
     combinator::{cut, map, opt},
     multi::{many0, separated_list0},
-    sequence::{delimited, preceded, terminated, tuple},
+    sequence::{delimited, preceded, tuple},
 };
 
 // the used library-internal functionaltity
 use crate::error::IResult;
 use crate::parser::{
     constdef,
-    // flags, interface,
+    state,
+    // flags, interface, state
     // map::parse_map,
-    // method, parameter, state,
+    method::method,
     param::parameter,
     terminals::{
         assign, colon, comma, ident, kw_inbitwidth, kw_outbitwidth, kw_segment, kw_staticmap,
@@ -49,7 +50,8 @@ use crate::parser::{
     },
 };
 use crate::parsetree::{
-    VelosiParseTreeParam, VelosiParseTreeUnit, VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,
+    VelosiParseTreeConstDef, VelosiParseTreeParam, VelosiParseTreeUnit, VelosiParseTreeUnitDef,
+    VelosiParseTreeUnitNode,
 };
 use crate::VelosiTokenStream;
 
@@ -202,7 +204,15 @@ fn outbitwidth_clause(
 ///                FLAGS_CLAUSE | STATICMAP_CLAUSE)*`
 ///
 fn unit_body(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vec<VelosiParseTreeUnitNode>> {
-    many0(alt((inbitwidth_clause, outbitwidth_clause)))(input)
+    many0(alt((
+        inbitwidth_clause,
+        outbitwidth_clause,
+        method,
+        state,
+        map(constdef, |s: VelosiParseTreeConstDef| {
+            VelosiParseTreeUnitNode::Const(s)
+        }),
+    )))(input)
 }
 
 /// parses and consumes a segment unit declaration
