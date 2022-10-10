@@ -326,20 +326,21 @@ impl ParseError<VelosiTokenStream> for VelosiParserErr {
     fn or(mut self, other: Self) -> Self {
         use VelosiParserErr::*;
         let mut other = other;
-        match (&mut self, &mut other) {
+        let ret = match (&mut self, &mut other) {
             (Expected(s), Expected(o)) => {
                 for k in o.kind.drain(..) {
                     if !s.kind.contains(&k) {
                         s.kind.push(k);
                     }
                 }
+                self
             }
-            (Expected(s), Kind(ErrorKind::Eof)) => (),
-            (Kind(ErrorKind::Eof), Expected(s)) => (),
-            (Kind(_), Kind(_)) => (),
+            (Expected(s), Kind(ErrorKind::Eof)) => self,
+            (Kind(ErrorKind::Eof), Expected(s)) => other,
+            (Kind(a), Kind(_)) => self,
             _ => panic!("not yet implemented: {:?} {:?}", self, other),
-        }
+        };
 
-        self
+        ret
     }
 }
