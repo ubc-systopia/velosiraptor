@@ -347,6 +347,46 @@ impl Display for VelosiParseTreeFnCallExpr {
     }
 }
 
+/// Represents an unary operation
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct VelosiParseTreeIfElseExpr {
+    cond: Box<VelosiParseTreeExpr>,
+    then: Box<VelosiParseTreeExpr>,
+    other: Box<VelosiParseTreeExpr>,
+    loc: VelosiTokenStream,
+}
+
+impl VelosiParseTreeIfElseExpr {
+    pub fn new(
+        cond: VelosiParseTreeExpr,
+        then: VelosiParseTreeExpr,
+        other: VelosiParseTreeExpr,
+        loc: VelosiTokenStream,
+    ) -> Self {
+        Self {
+            cond: Box::new(cond),
+            then: Box::new(then),
+            other: Box::new(other),
+            loc,
+        }
+    }
+
+    pub fn loc(&self) -> &VelosiTokenStream {
+        &self.loc
+    }
+}
+
+/// Implementation of [Display] for [VelosiParseTreeIfElseExpr]
+impl Display for VelosiParseTreeIfElseExpr {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        write!(
+            format,
+            "if {} {{ {} }} else {{ {} }}",
+            self.cond, self.then, self.other
+        )
+    }
+}
+
 /// Represents an expression in the parse tree
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum VelosiParseTreeExpr {
@@ -357,6 +397,7 @@ pub enum VelosiParseTreeExpr {
     UnOp(VelosiParseTreeUnOpExpr),
     Quantifier(VelosiParseTreeQuantifierExpr),
     FnCall(VelosiParseTreeFnCallExpr),
+    IfElse(VelosiParseTreeIfElseExpr),
 }
 
 impl VelosiParseTreeExpr {
@@ -370,6 +411,7 @@ impl VelosiParseTreeExpr {
             UnOp(i) => i.loc(),
             Quantifier(i) => i.loc(),
             FnCall(i) => i.loc(),
+            IfElse(i) => i.loc(),
         }
     }
 }
@@ -385,6 +427,7 @@ impl Display for VelosiParseTreeExpr {
             VelosiParseTreeExpr::UnOp(i) => Display::fmt(&i, format),
             VelosiParseTreeExpr::Quantifier(i) => Display::fmt(&i, format),
             VelosiParseTreeExpr::FnCall(i) => Display::fmt(&i, format),
+            VelosiParseTreeExpr::IfElse(i) => Display::fmt(&i, format),
         }
     }
 }
