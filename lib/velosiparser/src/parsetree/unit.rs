@@ -31,7 +31,10 @@
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 // use crate functionality
-use super::{VelosiParseTreeConstDef, VelosiParseTreeParam};
+use super::{
+    VelosiParseTreeConstDef, VelosiParseTreeExpr, VelosiParseTreeParam, VelosiParseTreeState,
+    VelosiParseTreeType,
+};
 use crate::VelosiTokenStream;
 
 /// Represents possible nodes in the unit definitions
@@ -41,9 +44,9 @@ pub enum VelosiParseTreeUnitNode {
     InBitWidth(u64, VelosiTokenStream),
     OutBitWidth(u64, VelosiTokenStream),
     Flags,
-    State,
+    State(VelosiParseTreeState),
     Interface,
-    Method,
+    Method(VelosiParseTreeMethod),
     Map,
 }
 
@@ -52,6 +55,22 @@ impl Display for VelosiParseTreeUnitNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         writeln!(f, "TODO: implement display for VelosiParseTreeUnitNode")
     }
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct VelosiParseTreeMethod {
+    /// the name of the unit (identifier)
+    pub name: String,
+    /// the unit parameters
+    pub params: Vec<VelosiParseTreeParam>,
+    /// the name of the derrived unit
+    pub rettype: VelosiParseTreeType,
+    /// the nodes defined in the parse tree
+    pub requires: Vec<VelosiParseTreeExpr>,
+    /// the body of the method
+    pub body: Option<VelosiParseTreeExpr>,
+    /// the position in the source tree where this unit is defined
+    pub pos: VelosiTokenStream,
 }
 
 /// Represents a unit definition

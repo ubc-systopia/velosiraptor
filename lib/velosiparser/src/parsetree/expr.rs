@@ -267,8 +267,8 @@ impl Display for VelosiParseTreeIdentifierLiteral {
 /// Represents an unary operation
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeNumLiteral {
-    value: u64,
-    loc: VelosiTokenStream,
+    pub value: u64,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeNumLiteral {
@@ -387,6 +387,62 @@ impl Display for VelosiParseTreeIfElseExpr {
     }
 }
 
+/// Represents an unary operation
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct VelosiParseTreeRangeExpr {
+    start: u64,
+    end: u64,
+    loc: VelosiTokenStream,
+}
+
+impl VelosiParseTreeRangeExpr {
+    pub fn new(start: u64, end: u64, loc: VelosiTokenStream) -> Self {
+        Self { start, end, loc }
+    }
+
+    pub fn loc(&self) -> &VelosiTokenStream {
+        &self.loc
+    }
+}
+
+impl Display for VelosiParseTreeRangeExpr {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        write!(format, "{}..{}", self.start, self.end)
+    }
+}
+
+/// Represents an unary operation
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct VelosiParseTreeSliceExpr {
+    name: VelosiParseTreeIdentifierLiteral,
+    range: VelosiParseTreeRangeExpr,
+    loc: VelosiTokenStream,
+}
+
+impl VelosiParseTreeSliceExpr {
+    pub fn new(
+        name: VelosiParseTreeIdentifierLiteral,
+        range: VelosiParseTreeRangeExpr,
+        loc: VelosiTokenStream,
+    ) -> Self {
+        Self { name, range, loc }
+    }
+
+    pub fn loc(&self) -> &VelosiTokenStream {
+        &self.loc
+    }
+}
+
+impl Display for VelosiParseTreeSliceExpr {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        write!(
+            format,
+            "{}[{}..{}]",
+            self.name, self.range.start, self.range.end
+        )
+    }
+}
+
 /// Represents an expression in the parse tree
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum VelosiParseTreeExpr {
@@ -398,6 +454,8 @@ pub enum VelosiParseTreeExpr {
     Quantifier(VelosiParseTreeQuantifierExpr),
     FnCall(VelosiParseTreeFnCallExpr),
     IfElse(VelosiParseTreeIfElseExpr),
+    Slice(VelosiParseTreeSliceExpr),
+    Range(VelosiParseTreeRangeExpr),
 }
 
 impl VelosiParseTreeExpr {
@@ -412,6 +470,8 @@ impl VelosiParseTreeExpr {
             Quantifier(i) => i.loc(),
             FnCall(i) => i.loc(),
             IfElse(i) => i.loc(),
+            Slice(i) => i.loc(),
+            Range(i) => i.loc(),
         }
     }
 }
@@ -428,6 +488,8 @@ impl Display for VelosiParseTreeExpr {
             VelosiParseTreeExpr::Quantifier(i) => Display::fmt(&i, format),
             VelosiParseTreeExpr::FnCall(i) => Display::fmt(&i, format),
             VelosiParseTreeExpr::IfElse(i) => Display::fmt(&i, format),
+            VelosiParseTreeExpr::Slice(i) => Display::fmt(&i, format),
+            VelosiParseTreeExpr::Range(i) => Display::fmt(&i, format),
         }
     }
 }
