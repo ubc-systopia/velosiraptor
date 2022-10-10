@@ -314,19 +314,19 @@ impl Display for VelosiParserErr {
 /// Implementation of [nom:error::ParseError] for [VelosiParserErr]
 impl ParseError<VelosiTokenStream> for VelosiParserErr {
     /// Creates an error from the input position and an ErrorKind
-    fn from_error_kind(input: VelosiTokenStream, kind: ErrorKind) -> Self {
+    fn from_error_kind(_input: VelosiTokenStream, kind: ErrorKind) -> Self {
         VelosiParserErr::Kind(kind)
     }
 
     /// Combines the existing error with a new one created at position
-    fn append(_input: VelosiTokenStream, _kind: ErrorKind, mut other: Self) -> Self {
+    fn append(_input: VelosiTokenStream, _kind: ErrorKind, other: Self) -> Self {
         other
     }
 
     fn or(mut self, other: Self) -> Self {
         use VelosiParserErr::*;
         let mut other = other;
-        let ret = match (&mut self, &mut other) {
+        match (&mut self, &mut other) {
             (Expected(s), Expected(o)) => {
                 for k in o.kind.drain(..) {
                     if !s.kind.contains(&k) {
@@ -335,12 +335,10 @@ impl ParseError<VelosiTokenStream> for VelosiParserErr {
                 }
                 self
             }
-            (Expected(s), Kind(ErrorKind::Eof)) => self,
-            (Kind(ErrorKind::Eof), Expected(s)) => other,
-            (Kind(a), Kind(_)) => self,
+            (Expected(_), Kind(ErrorKind::Eof)) => self,
+            (Kind(ErrorKind::Eof), Expected(_)) => other,
+            (Kind(_), Kind(_)) => self,
             _ => panic!("not yet implemented: {:?} {:?}", self, other),
-        };
-
-        ret
+        }
     }
 }
