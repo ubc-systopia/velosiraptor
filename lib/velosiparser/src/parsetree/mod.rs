@@ -35,13 +35,20 @@ use crate::VelosiTokenStream;
 
 pub mod constparams;
 pub mod expr;
+pub mod state;
 pub mod types;
 pub mod unit;
 
 pub use constparams::{VelosiParseTreeConstDef, VelosiParseTreeParam};
 pub use expr::VelosiParseTreeExpr;
+pub use state::{
+    VelosiParseTreeFieldSlice, VelosiParseTreeState, VelosiParseTreeStateDef,
+    VelosiParseTreeStateField,
+};
 pub use types::{VelosiParseTreeType, VelosiParseTreeTypeInfo};
-pub use unit::{VelosiParseTreeUnit, VelosiParseTreeUnitDef, VelosiParseTreeUnitNode};
+pub use unit::{
+    VelosiParseTreeMethod, VelosiParseTreeUnit, VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,
+};
 
 /// Import clause in the root context
 #[derive(PartialEq, Eq, Clone, Debug)]
