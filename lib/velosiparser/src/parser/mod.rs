@@ -30,7 +30,9 @@ use nom::{branch::alt, combinator::map, multi::many0, Err};
 
 // the used library-internal functionality
 use crate::error::{IResult, VelosiParserErrBuilder};
-use crate::parsetree::{VelosiParseTree, VelosiParseTreeConstDef, VelosiParseTreeContextNode};
+use crate::parsetree::{
+    VelosiParseTree, VelosiParseTreeConstDef, VelosiParseTreeContextNode, VelosiParseTreeUnit,
+};
 use crate::VelosiTokenStream;
 
 // the parser modules
@@ -47,12 +49,13 @@ mod param;
 // mod state;
 // mod statement;
 mod terminals;
-// mod unit;
+mod unit;
 
 //use constdef::constdef;
 use constdef::constdef;
 use expr::expr;
 use import::import;
+use unit::unit;
 
 /// Parses a VelosiTokenStream into a VelosiParseTree
 ///
@@ -76,6 +79,9 @@ pub fn parse_with_context(
         import,
         map(constdef, |s: VelosiParseTreeConstDef| {
             VelosiParseTreeContextNode::Const(s)
+        }),
+        map(unit, |s: VelosiParseTreeUnit| {
+            VelosiParseTreeContextNode::Unit(s)
         }),
     )))(input)?;
 
