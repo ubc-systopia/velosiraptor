@@ -31,78 +31,10 @@
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 // used crate functionality
-use super::VelosiParseTreeParam;
+use super::{VelosiParseTreeField, VelosiParseTreeParam};
 use crate::VelosiTokenStream;
 
-/// Represents the state definition
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub struct VelosiParseTreeFieldSlice {
-    pub start: u64,
-    pub end: u64,
-    pub name: String,
-    pub pos: VelosiTokenStream,
-}
-
-impl VelosiParseTreeFieldSlice {
-    pub fn new(start: u64, end: u64, name: String, pos: VelosiTokenStream) -> Self {
-        Self {
-            start,
-            end,
-            name,
-            pos,
-        }
-    }
-}
-
-impl Display for VelosiParseTreeFieldSlice {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "{}..{} {}", self.start, self.end, self.name)
-    }
-}
-
-/// Represents a state field
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub struct VelosiParseTreeStateField {
-    pub name: String,
-    pub offset: Option<(String, u64)>,
-    pub size: u64,
-    pub layout: Vec<VelosiParseTreeFieldSlice>,
-    pub pos: VelosiTokenStream,
-}
-
-impl VelosiParseTreeStateField {
-    pub fn new(
-        name: String,
-        offset: Option<(String, u64)>,
-        size: u64,
-        layout: Vec<VelosiParseTreeFieldSlice>,
-        pos: VelosiTokenStream,
-    ) -> Self {
-        Self {
-            name,
-            offset,
-            size,
-            layout,
-            pos,
-        }
-    }
-}
-
-impl Display for VelosiParseTreeStateField {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "{} [", self.name)?;
-        if let Some((name, num)) = &self.offset {
-            write!(f, "{}, {},", name, num)?;
-        }
-        write!(f, "{}", self.size)?;
-        writeln!(f, "] {{")?;
-        for slice in &self.layout {
-            Display::fmt(slice, f)?;
-            writeln!(f, ",")?;
-        }
-        writeln!(f, "}}")
-    }
-}
+pub type VelosiParseTreeStateField = VelosiParseTreeField;
 
 /// Represents the parsed state description
 #[derive(PartialEq, Eq, Clone, Debug)]

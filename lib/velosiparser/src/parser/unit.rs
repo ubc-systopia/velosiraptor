@@ -39,11 +39,12 @@ use nom::{
 use crate::error::IResult;
 use crate::parser::{
     constdef,
-    state,
+    interface::interface,
     // flags, interface, state
     // map::parse_map,
     method::method,
     param::parameter,
+    state,
     terminals::{
         assign, colon, comma, ident, kw_inbitwidth, kw_outbitwidth, kw_segment, kw_staticmap,
         lbrace, lparen, num, rbrace, rparen, semicolon,
@@ -209,6 +210,7 @@ fn unit_body(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vec<VelosiP
         outbitwidth_clause,
         method,
         state,
+        interface,
         map(constdef, |s: VelosiParseTreeConstDef| {
             VelosiParseTreeUnitNode::Const(s)
         }),

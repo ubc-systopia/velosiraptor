@@ -23,9 +23,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! # VelosiParser -- Parse Tree
+//! # VelosiParser -- Parse Tree Constants and Parameters
 //!
-//! This module defines the parse tree for the Velosiraptor language.
+//! This module defines the constants and parameter nodes for the velosiraptor parse tree.
 
 // used standard library functionality
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};

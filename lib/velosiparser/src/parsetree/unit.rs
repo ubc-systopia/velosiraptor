@@ -32,8 +32,8 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 // use crate functionality
 use super::{
-    VelosiParseTreeConstDef, VelosiParseTreeExpr, VelosiParseTreeParam, VelosiParseTreeState,
-    VelosiParseTreeType,
+    VelosiParseTreeConstDef, VelosiParseTreeExpr, VelosiParseTreeInterface, VelosiParseTreeParam,
+    VelosiParseTreeState, VelosiParseTreeType,
 };
 use crate::VelosiTokenStream;
 
@@ -45,7 +45,7 @@ pub enum VelosiParseTreeUnitNode {
     OutBitWidth(u64, VelosiTokenStream),
     Flags,
     State(VelosiParseTreeState),
-    Interface,
+    Interface(VelosiParseTreeInterface),
     Method(VelosiParseTreeMethod),
     Map,
 }

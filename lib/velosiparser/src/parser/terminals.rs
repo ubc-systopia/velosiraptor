@@ -102,9 +102,9 @@ terminalparser!(pub assign, VelosiOpToken::Assign);
 // arrows
 terminalparser!(pub larrow, VelosiOpToken::LArrow);
 terminalparser!(pub rarrow, VelosiOpToken::RArrow);
-terminalparser!(pub bidirarrow, VelosiOpToken::BiDirArrow);
-terminalparser!(pub fatarrow, VelosiOpToken::FatArrow);
-terminalparser!(pub bidirfatarrow, VelosiOpToken::BiDirFatArrow);
+// terminalparser!(pub bidirarrow, VelosiOpToken::BiDirArrow);
+// terminalparser!(pub fatarrow, VelosiOpToken::FatArrow);
+// terminalparser!(pub bidirfatarrow, VelosiOpToken::BiDirFatArrow);
 terminalparser!(pub rlongfatarrow, VelosiOpToken::RLongFatArrow);
 
 // comparators
@@ -203,17 +203,17 @@ keywordparser!(pub kw_const, VelosiKeyword::Const);
 keywordparser!(pub kw_if, VelosiKeyword::If);
 keywordparser!(pub kw_else, VelosiKeyword::Else);
 keywordparser!(pub kw_state, VelosiKeyword::State);
-// keywordparser!(pub kw_interface, VelosiKeyword::Interface);
+keywordparser!(pub kw_interface, VelosiKeyword::Interface);
 keywordparser!(pub kw_memorystate, VelosiKeyword::MemoryState);
 keywordparser!(pub kw_registerstate, VelosiKeyword::RegisterState);
-// keywordparser!(pub kw_memoryinterface, VelosiKeyword::MemoryInterface);
-// keywordparser!(pub kw_mmiointerface, VelosiKeyword::MMIOInterface);
-// keywordparser!(pub kw_cpuregisterinterface, VelosiKeyword::CPURegisterInterface);
+keywordparser!(pub kw_memoryinterface, VelosiKeyword::MemoryInterface);
+keywordparser!(pub kw_mmiointerface, VelosiKeyword::MMIOInterface);
+keywordparser!(pub kw_cpuregisterinterface, VelosiKeyword::CPURegisterInterface);
 keywordparser!(pub kw_none, VelosiKeyword::None);
-// keywordparser!(pub kw_layout, VelosiKeyword::Layout);
+keywordparser!(pub kw_layout, VelosiKeyword::Layout);
 keywordparser!(pub kw_fn, VelosiKeyword::Fn);
-// keywordparser!(pub kw_readaction, VelosiKeyword::ReadAction);
-// keywordparser!(pub kw_writeaction, VelosiKeyword::WriteAction);
+keywordparser!(pub kw_readaction, VelosiKeyword::ReadAction);
+keywordparser!(pub kw_writeaction, VelosiKeyword::WriteAction);
 keywordparser!(pub kw_requires, VelosiKeyword::Requires);
 // keywordparser!(pub kw_ensures, VelosiKeyword::Ensures);
 // keywordparser!(pub kw_assert, VelosiKeyword::Assert);
