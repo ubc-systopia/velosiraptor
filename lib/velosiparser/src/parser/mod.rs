@@ -42,12 +42,11 @@ mod expr;
 // mod field;
 // mod flags;
 mod import;
-// mod interface;
+mod interface;
 // mod map;
 mod method;
 mod param;
 mod state;
-// mod statement;
 mod terminals;
 mod unit;
 

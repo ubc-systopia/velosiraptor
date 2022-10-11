@@ -35,16 +35,20 @@ use crate::VelosiTokenStream;
 
 pub mod constparams;
 pub mod expr;
+pub mod field;
+pub mod interface;
 pub mod state;
 pub mod types;
 pub mod unit;
 
 pub use constparams::{VelosiParseTreeConstDef, VelosiParseTreeParam};
 pub use expr::VelosiParseTreeExpr;
-pub use state::{
-    VelosiParseTreeFieldSlice, VelosiParseTreeState, VelosiParseTreeStateDef,
-    VelosiParseTreeStateField,
+pub use field::{VelosiParseTreeField, VelosiParseTreeFieldSlice};
+pub use interface::{
+    VelosiParseTreeInterface, VelosiParseTreeInterfaceAction, VelosiParseTreeInterfaceActions,
+    VelosiParseTreeInterfaceDef, VelosiParseTreeInterfaceField, VelosiParseTreeInterfaceFieldNode,
 };
+pub use state::{VelosiParseTreeState, VelosiParseTreeStateDef, VelosiParseTreeStateField};
 pub use types::{VelosiParseTreeType, VelosiParseTreeTypeInfo};
 pub use unit::{
     VelosiParseTreeMethod, VelosiParseTreeUnit, VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,

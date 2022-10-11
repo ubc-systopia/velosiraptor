@@ -29,7 +29,7 @@
 use nom::{
     branch::alt,
     combinator::{cut, opt},
-    multi::{separated_list0},
+    multi::separated_list0,
     sequence::{delimited, preceded, terminated, tuple},
 };
 
@@ -54,6 +54,8 @@ use crate::VelosiTokenStream;
 ///
 /// `STATE := KW_STATE ASSIGN (NONE | REGISTERSTATE | MEMORYSTATE) SEMICOLON?`
 pub fn state(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
+    //    let mut pos = input.clone();
+
     // try to match the state keyword, if there is no match, return.
     let (i1, _) = kw_state(input)?;
 
