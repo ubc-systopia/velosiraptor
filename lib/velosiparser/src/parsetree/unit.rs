@@ -43,7 +43,7 @@ pub enum VelosiParseTreeUnitNode {
     Const(VelosiParseTreeConstDef),
     InBitWidth(u64, VelosiTokenStream),
     OutBitWidth(u64, VelosiTokenStream),
-    Flags,
+    Flags(VelosiParseTreeFlags),
     State(VelosiParseTreeState),
     Interface(VelosiParseTreeInterface),
     Method(VelosiParseTreeMethod),
@@ -71,6 +71,37 @@ pub struct VelosiParseTreeMethod {
     pub body: Option<VelosiParseTreeExpr>,
     /// the position in the source tree where this unit is defined
     pub pos: VelosiTokenStream,
+}
+
+/// reprsents a flag
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct VelosiParseTreeFlags {
+    /// vector of defined flags
+    pub flags: Vec<VelosiParseTreeFlag>,
+    /// the position in the source tree where this unit is defined
+    pub pos: VelosiTokenStream,
+}
+
+impl VelosiParseTreeFlags {
+    /// create a new [VelosiParseTreeFlags] with the given flags and position
+    pub fn new(flags: Vec<VelosiParseTreeFlag>, pos: VelosiTokenStream) -> Self {
+        VelosiParseTreeFlags { flags, pos }
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct VelosiParseTreeFlag {
+    /// name of the flag
+    pub name: String,
+    /// the position in the source tree where this unit is defined
+    pub pos: VelosiTokenStream,
+}
+
+impl VelosiParseTreeFlag {
+    /// create a new [VelosiParseTreeFlag] with the given name and position
+    pub fn new(name: String, pos: VelosiTokenStream) -> Self {
+        VelosiParseTreeFlag { name, pos }
+    }
 }
 
 /// Represents a unit definition

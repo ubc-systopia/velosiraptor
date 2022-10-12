@@ -51,7 +51,8 @@ pub use interface::{
 pub use state::{VelosiParseTreeState, VelosiParseTreeStateDef, VelosiParseTreeStateField};
 pub use types::{VelosiParseTreeType, VelosiParseTreeTypeInfo};
 pub use unit::{
-    VelosiParseTreeMethod, VelosiParseTreeUnit, VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,
+    VelosiParseTreeFlag, VelosiParseTreeFlags, VelosiParseTreeMethod, VelosiParseTreeUnit,
+    VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,
 };
 
 /// Import clause in the root context
