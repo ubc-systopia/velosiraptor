@@ -46,13 +46,13 @@ use crate::parser::{
     param::parameter,
     state,
     terminals::{
-        assign, colon, comma, ident, kw_inbitwidth, kw_outbitwidth, kw_segment, kw_staticmap,
-        lbrace, lparen, num, rbrace, rparen, semicolon,
+        assign, colon, comma, ident, kw_flags, kw_inbitwidth, kw_outbitwidth, kw_segment,
+        kw_staticmap, lbrace, lparen, num, rbrace, rparen, semicolon,
     },
 };
 use crate::parsetree::{
-    VelosiParseTreeConstDef, VelosiParseTreeParam, VelosiParseTreeUnit, VelosiParseTreeUnitDef,
-    VelosiParseTreeUnitNode,
+    VelosiParseTreeConstDef, VelosiParseTreeFlag, VelosiParseTreeFlags, VelosiParseTreeParam,
+    VelosiParseTreeUnit, VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,
 };
 use crate::VelosiTokenStream;
 
@@ -193,6 +193,35 @@ fn outbitwidth_clause(
     Ok((i2, VelosiParseTreeUnitNode::OutBitWidth(n, pos)))
 }
 
+/// parses a single flat, currently just an identifier
+fn flag(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeFlag> {
+    let mut pos = input.clone();
+    let (i, n) = ident(input)?;
+    pos.span_until_start(&i);
+    Ok((i, VelosiParseTreeFlag::new(n, pos)))
+}
+
+////
+fn flags_clause(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
+    let mut pos = input.clone();
+    // parse the `const` keyword, return otherwise
+    let (i1, _) = kw_flags(input.clone())?;
+
+    let flagsblock = delimited(
+        lbrace,
+        separated_list0(comma, flag),
+        tuple((opt(comma), rbrace)),
+    );
+
+    let (i2, flags) = cut(delimited(assign, flagsblock, semicolon))(i1)?;
+    pos.span_until_start(&i2);
+
+    Ok((
+        i2,
+        VelosiParseTreeUnitNode::Flags(VelosiParseTreeFlags::new(flags, pos)),
+    ))
+}
+
 /// parses the unit body
 ///
 /// # Arguments
@@ -211,6 +240,7 @@ fn unit_body(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vec<VelosiP
         method,
         state,
         interface,
+        flags_clause,
         map(constdef, |s: VelosiParseTreeConstDef| {
             VelosiParseTreeUnitNode::Const(s)
         }),
