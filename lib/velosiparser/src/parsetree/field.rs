@@ -89,16 +89,17 @@ impl VelosiParseTreeField {
 
 impl Display for VelosiParseTreeField {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "{} [", self.name)?;
+        write!(f, "    {} [", self.name)?;
         if let Some((name, num)) = &self.offset {
-            write!(f, "{}, {},", name, num)?;
+            write!(f, "{}, {}, ", name, num)?;
         }
         write!(f, "{}", self.size)?;
         writeln!(f, "] {{")?;
         for slice in &self.layout {
+            write!(f, "      ")?;
             Display::fmt(slice, f)?;
             writeln!(f, ",")?;
         }
-        writeln!(f, "}}")
+        write!(f, "    }}")
     }
 }

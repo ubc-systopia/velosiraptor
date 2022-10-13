@@ -40,7 +40,7 @@ use nom::{
 
 /// library internal includes
 use crate::error::IResult;
-use crate::parser::{expr, param::parameter, terminals::*};
+use crate::parser::{expr::expr, param::parameter, terminals::*};
 use crate::parsetree::{
     VelosiParseTreeFieldSlice, VelosiParseTreeInterface, VelosiParseTreeInterfaceAction,
     VelosiParseTreeInterfaceActions, VelosiParseTreeInterfaceDef, VelosiParseTreeInterfaceField,

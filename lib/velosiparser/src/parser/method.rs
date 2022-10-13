@@ -70,7 +70,7 @@ pub fn require_clauses(
     input: VelosiTokenStream,
 ) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
     let (i1, _) = kw_requires(input)?;
-    cut(terminated(alt((quantifier_expr, expr)), semicolon))(i1)
+    cut(terminated(alt((quantifier_expr, expr)), opt(semicolon)))(i1)
 }
 
 /// Parses a ensures clause
@@ -117,8 +117,10 @@ pub fn require_clauses(
 ///
 /// # TODO: is this just a statement block?
 ///
-fn method_body(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
-    delimited(lbrace, expr, cut(rbrace))(input)
+fn method_body(
+    input: VelosiTokenStream,
+) -> IResult<VelosiTokenStream, Option<VelosiParseTreeExpr>> {
+    delimited(lbrace, opt(expr), cut(rbrace))(input)
 }
 
 /// parses an arguments list
@@ -200,6 +202,12 @@ pub fn method(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPars
 
     // try to parse the method body
     let (i6, body) = opt(method_body)(i5)?;
+
+    let body = if let Some(Some(e)) = body {
+        Some(e)
+    } else {
+        None
+    };
 
     // create the token stream covering the entire method def
     pos.span_until_start(&i6);

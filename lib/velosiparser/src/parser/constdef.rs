@@ -33,7 +33,7 @@ use nom::{
 
 // used crate functionality
 use crate::error::IResult;
-use crate::parser::expr;
+use crate::parser::expr::expr;
 use crate::parser::terminals::{assign, colon, ident, kw_const, semicolon, typeinfo};
 use crate::parsetree::VelosiParseTreeConstDef;
 use crate::VelosiTokenStream;

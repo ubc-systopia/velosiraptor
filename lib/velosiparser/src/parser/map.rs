@@ -28,19 +28,23 @@
 //  2. List Comprehension that split the address space equally amongst them.
 //  3. List Comprehension with explicit address ranges.
 
-use crate::ast::{ExplicitMap, Expr, ListComprehensionMap, Map, MapEntry};
 use crate::error::IResult;
-use crate::parser::expression::{expr, expr_list, range_expr};
+use crate::parser::expr::{expr, fn_call_expr, range_expr};
 use crate::parser::terminals::{
-    assign, at, comma, fatarrow, ident, kw_for, kw_in, kw_staticmap, lbrack, lparen, rbrack,
-    rparen, semicolon,
+    assign, at, comma, fatarrow, ident, kw_for, kw_in, kw_staticmap, lbrack, rbrack, semicolon,
 };
-use crate::token::TokenStream;
+use crate::parsetree::{
+    VelosiParseTreeExpr, VelosiParseTreeMap, VelosiParseTreeMapElement, VelosiParseTreeMapExplicit,
+    VelosiParseTreeMapListComp, VelosiParseTreeUnitNode,
+};
+use crate::VelosiTokenStream;
 
-use nom::branch::alt;
-use nom::combinator::{cut, opt};
-use nom::multi::separated_list1;
-use nom::sequence::{delimited, pair, preceded, terminated, tuple};
+use nom::{
+    branch::alt,
+    combinator::{cut, opt},
+    multi::separated_list0,
+    sequence::{delimited, pair, preceded, terminated, tuple},
+};
 
 /// Parses a map statement
 ///
@@ -53,10 +57,15 @@ use nom::sequence::{delimited, pair, preceded, terminated, tuple};
 ///  - `map = [UnitA(), UnitB()]`
 ///  - `map = [UnitA(x) for x in 1..2]`
 ///
-pub fn parse_map(input: TokenStream) -> IResult<TokenStream, Map> {
+pub fn staticmap(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
     let (i1, _) = kw_staticmap(input)?;
-    let maps = alt((explicitmap, listcomprehensionmap));
-    cut(delimited(assign, maps, opt(semicolon)))(i1)
+    let (i2, m) = cut(delimited(
+        assign,
+        alt((explicitmap, listcomprehensionmap)),
+        semicolon,
+    ))(i1)?;
+
+    Ok((i2, VelosiParseTreeUnitNode::Map(m)))
 }
 
 /// Parses the body of an explicit map list
@@ -69,15 +78,20 @@ pub fn parse_map(input: TokenStream) -> IResult<TokenStream, Map> {
 ///
 ///  - `UnitA(), UnitB()`
 ///
-fn explicitmap(input: TokenStream) -> IResult<TokenStream, Map> {
+fn explicitmap(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeMap> {
+    let mut pos = input.clone();
     let (i1, elms) = delimited(
         lbrack,
-        separated_list1(comma, cut(map_element)),
+        separated_list0(comma, map_element),
         rbrack, // can't use cut here
-    )(input.clone())?;
+    )(input)?;
 
-    let map = ExplicitMap::new(input).add_entries(elms).finalize(&i1);
-    Ok((i1, Map::Explicit(map)))
+    pos.span_until_start(&i1);
+
+    Ok((
+        i1,
+        VelosiParseTreeMap::Explicit(VelosiParseTreeMapExplicit::new(elms, pos)),
+    ))
 }
 
 /// Parses the body of a list comprehension map
@@ -90,19 +104,25 @@ fn explicitmap(input: TokenStream) -> IResult<TokenStream, Map> {
 ///
 ///  - `[UnitA(x) for x in 1..2]`
 ///
-fn listcomprehensionmap(input: TokenStream) -> IResult<TokenStream, Map> {
+fn listcomprehensionmap(
+    input: VelosiTokenStream,
+) -> IResult<VelosiTokenStream, VelosiParseTreeMap> {
+    let mut pos = input.clone();
+
     let (i1, (elm, id, expr)) = delimited(
         lbrack,
         tuple((
-            cut(map_element),
+            map_element,
             delimited(kw_for, cut(ident), cut(kw_in)),
             cut(range_expr),
         )),
-        cut(rbrack),
-    )(input.clone())?;
+        rbrack,
+    )(input)?;
 
-    let map = ListComprehensionMap::new(elm, id, expr, input).finalize(&i1);
-    Ok((i1, Map::ListComprehension(Box::new(map))))
+    pos.span_until_start(&i1);
+
+    let map = VelosiParseTreeMapListComp::new(elm, id, expr, pos);
+    Ok((i1, VelosiParseTreeMap::ListComp(map)))
 }
 
 /// parses a map elemenet
@@ -117,16 +137,13 @@ fn listcomprehensionmap(input: TokenStream) -> IResult<TokenStream, Map> {
 ///  - `UnitA(base)
 ///  - `0..0x1000 => UnitA()`
 ///  - `0..0x1000 => UnitA() @ 0x10`
-fn map_element(input: TokenStream) -> IResult<TokenStream, MapEntry> {
-    let (i1, (src, (dst, args, offset))) = pair(opt(map_src), map_dst)(input.clone())?;
+fn map_element(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeMapElement> {
+    let mut pos = input.clone();
 
-    let elm = MapEntry::new(input, dst)
-        .set_range(src)
-        .set_offset(offset)
-        .add_unit_params(args)
-        .finalize(&i1);
+    let (i1, (src, (dst, offset))) = pair(opt(map_src), map_dst)(input)?;
 
-    Ok((i1, elm))
+    pos.span_until_start(&i1);
+    Ok((i1, VelosiParseTreeMapElement::new(src, dst, offset, pos)))
 }
 
 /// parses a map source description
@@ -138,7 +155,7 @@ fn map_element(input: TokenStream) -> IResult<TokenStream, MapEntry> {
 /// # Example
 ///
 ///  - `0..0x1000 =>`
-fn map_src(input: TokenStream) -> IResult<TokenStream, Expr> {
+fn map_src(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
     terminated(range_expr, cut(fatarrow))(input)
 }
 
@@ -152,67 +169,61 @@ fn map_src(input: TokenStream) -> IResult<TokenStream, Expr> {
 ///
 ///  - `UnitA(base) @ 123`
 ///
-fn map_dst(input: TokenStream) -> IResult<TokenStream, (String, Vec<Expr>, Option<Expr>)> {
-    let (i1, unitname) = ident(input)?;
-
-    // get the unit args
-    let (i2, unitargs) = cut(delimited(lparen, expr_list, rparen))(i1)?;
-
+fn map_dst(
+    input: VelosiTokenStream,
+) -> IResult<VelosiTokenStream, (VelosiParseTreeExpr, Option<VelosiParseTreeExpr>)> {
+    let (i1, cons) = fn_call_expr(input)?;
     // get the offset
-    let (i3, offset) = opt(preceded(at, expr))(i2)?;
+    let (i2, offset) = opt(preceded(at, expr))(i1)?;
 
-    Ok((i3, (unitname, unitargs, offset)))
+    Ok((i2, (cons, offset)))
 }
 
 #[cfg(test)]
-use crate::lexer::Lexer;
+use velosilexer::VelosiLexer;
 
 #[test]
 fn test_map_simple() {
     let content = "staticmap = [UnitA(), UnitB()];";
-    let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());
-    let res = parse_map(ts);
+    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
+    let res = staticmap(ts);
     assert!(res.is_ok());
 
     let content = "staticmap = [UnitA()];";
-    let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());
-    let res = parse_map(ts);
+    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
+    let res = staticmap(ts);
     assert!(res.is_ok());
 
     let content = "staticmap = [UnitA() @ a];";
-    let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());
-    let res = parse_map(ts);
+    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
+    let res = staticmap(ts);
     assert!(res.is_ok());
 
     let content = "staticmap = [ 0.. 1 => UnitA()];";
-    let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());
-    let res = parse_map(ts);
+    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
+    let res = staticmap(ts);
     assert!(res.is_ok());
 }
 
 #[test]
 fn test_map_comprehension() {
     let content = "staticmap = [UnitA() for i in 0..512];";
-    let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());
-    let res = parse_map(ts);
-    println!("{:?}", res);
+    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
+    let res = staticmap(ts);
     assert!(res.is_ok());
 
     let content = "staticmap = [UnitA() @ i for i in 0..512];";
-    let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());
-    let res = parse_map(ts);
-    println!("{:?}", res);
+    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
+    let res = staticmap(ts);
     assert!(res.is_ok());
 
     let content = "staticmap = [0..1 => UnitA() @ i for i in 0..512];";
-    let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());
-    let res = parse_map(ts);
-    println!("{:?}", res);
+    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
+    let res = staticmap(ts);
     assert!(res.is_ok());
 
-    let content = "staticmap = [0*i..1*i => UnitA() @ i for i in 0..512];";
-    let ts = TokenStream::from_vec(Lexer::lex_string("stdio", content).unwrap());
-    let res = parse_map(ts);
-    println!("{:?}", res);
-    assert!(res.is_ok());
+    // let content = "staticmap = [0*i..1*i => UnitA() @ i for i in 0..512];";
+    // let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
+    // let res = staticmap(ts);
+    // assert!(res.is_ok());
 }

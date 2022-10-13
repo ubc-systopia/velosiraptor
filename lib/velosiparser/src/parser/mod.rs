@@ -43,19 +43,12 @@ mod expr;
 // mod flags;
 mod import;
 mod interface;
-// mod map;
+mod map;
 mod method;
 mod param;
 mod state;
 mod terminals;
 mod unit;
-
-//use constdef::constdef;
-use constdef::constdef;
-use expr::expr;
-use import::import;
-use state::state;
-use unit::unit;
 
 /// Parses a VelosiTokenStream into a VelosiParseTree
 ///
@@ -76,11 +69,11 @@ pub fn parse_with_context(
     // parse as many tree nodes as possible, that are either imports, constants or units
     //let (rem, nodes) = many0(alt((import, constdef, unit)))(input)?;
     let (rem, nodes) = many0(alt((
-        import,
-        map(constdef, |s: VelosiParseTreeConstDef| {
+        import::import,
+        map(constdef::constdef, |s: VelosiParseTreeConstDef| {
             VelosiParseTreeContextNode::Const(s)
         }),
-        map(unit, |s: VelosiParseTreeUnit| {
+        map(unit::unit, |s: VelosiParseTreeUnit| {
             VelosiParseTreeContextNode::Unit(s)
         }),
     )))(input)?;
