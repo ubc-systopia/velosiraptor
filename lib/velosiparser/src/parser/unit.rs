@@ -41,10 +41,10 @@ use crate::parser::{
     constdef,
     interface::interface,
     // flags, interface, state
-    // map::parse_map,
+    map::staticmap,
     method::method,
     param::parameter,
-    state,
+    state::state,
     terminals::{
         assign, colon, comma, ident, kw_flags, kw_inbitwidth, kw_outbitwidth, kw_segment,
         kw_staticmap, lbrace, lparen, num, rbrace, rparen, semicolon,
@@ -205,7 +205,7 @@ fn flag(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeF
 fn flags_clause(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
     let mut pos = input.clone();
     // parse the `const` keyword, return otherwise
-    let (i1, _) = kw_flags(input.clone())?;
+    let (i1, _) = kw_flags(input)?;
 
     let flagsblock = delimited(
         lbrace,
@@ -241,7 +241,8 @@ fn unit_body(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vec<VelosiP
         state,
         interface,
         flags_clause,
-        map(constdef, |s: VelosiParseTreeConstDef| {
+        staticmap,
+        map(constdef::constdef, |s: VelosiParseTreeConstDef| {
             VelosiParseTreeUnitNode::Const(s)
         }),
     )))(input)

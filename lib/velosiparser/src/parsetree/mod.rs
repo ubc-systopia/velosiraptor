@@ -37,6 +37,7 @@ pub mod constparams;
 pub mod expr;
 pub mod field;
 pub mod interface;
+pub mod map;
 pub mod state;
 pub mod types;
 pub mod unit;
@@ -47,6 +48,10 @@ pub use field::{VelosiParseTreeField, VelosiParseTreeFieldSlice};
 pub use interface::{
     VelosiParseTreeInterface, VelosiParseTreeInterfaceAction, VelosiParseTreeInterfaceActions,
     VelosiParseTreeInterfaceDef, VelosiParseTreeInterfaceField, VelosiParseTreeInterfaceFieldNode,
+};
+pub use map::{
+    VelosiParseTreeMap, VelosiParseTreeMapElement, VelosiParseTreeMapExplicit,
+    VelosiParseTreeMapListComp,
 };
 pub use state::{VelosiParseTreeState, VelosiParseTreeStateDef, VelosiParseTreeStateField};
 pub use types::{VelosiParseTreeType, VelosiParseTreeTypeInfo};

@@ -74,8 +74,9 @@ impl Display for VelosiParseTreeStateDef {
         writeln!(f, " {{")?;
         for field in &self.fields {
             Display::fmt(field, f)?;
+            writeln!(f, ",")?;
         }
-        writeln!(f, " }};")
+        writeln!(f, "  }};")
     }
 }
 

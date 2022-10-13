@@ -542,7 +542,7 @@ pub fn expr_list(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vec<Vel
 ///  * `b(a)`
 ///  * `a.b(c)`
 ///
-fn fn_call_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
+pub fn fn_call_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
     let mut pos = input.clone();
     let (i, id) = ident_path(input)?;
 

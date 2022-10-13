@@ -103,12 +103,12 @@ terminalparser!(pub assign, VelosiOpToken::Assign);
 terminalparser!(pub larrow, VelosiOpToken::LArrow);
 terminalparser!(pub rarrow, VelosiOpToken::RArrow);
 // terminalparser!(pub bidirarrow, VelosiOpToken::BiDirArrow);
-// terminalparser!(pub fatarrow, VelosiOpToken::FatArrow);
+terminalparser!(pub fatarrow, VelosiOpToken::FatArrow);
 // terminalparser!(pub bidirfatarrow, VelosiOpToken::BiDirFatArrow);
 terminalparser!(pub rlongfatarrow, VelosiOpToken::RLongFatArrow);
 
 // comparators
-// terminalparser!(pub at, VelosiOpToken::At);
+terminalparser!(pub at, VelosiOpToken::At);
 terminalparser!(pub dotdot, VelosiOpToken::DotDot);
 terminalparser!(pub coloncolon, VelosiOpToken::ColonColon);
 // terminalparser!(pub questionmark, VelosiOpToken::QuestionMark);
@@ -222,11 +222,10 @@ keywordparser!(pub kw_forall, VelosiKeyword::Forall);
 keywordparser!(pub kw_exists, VelosiKeyword::Exists);
 keywordparser!(pub kw_staticmap, VelosiKeyword::StaticMap);
 keywordparser!(pub kw_segment, VelosiKeyword::Segment);
-// keywordparser!(pub kw_for, VelosiKeyword::For);
-// keywordparser!(pub kw_in, VelosiKeyword::In);
+keywordparser!(pub kw_for, VelosiKeyword::For);
+keywordparser!(pub kw_in, VelosiKeyword::In);
 keywordparser!(pub kw_inbitwidth, VelosiKeyword::InBitWidth);
 keywordparser!(pub kw_outbitwidth, VelosiKeyword::OutBitWidth);
-// keywordparser!(pub kw_flags, VelosiKeyword::FlagsType);
 
 // types
 keywordparser!(pub kw_size, VelosiKeyword::SizeType);

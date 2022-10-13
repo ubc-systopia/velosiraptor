@@ -48,6 +48,12 @@ impl VelosiParseTreeInterfaceAction {
     }
 }
 
+impl Display for VelosiParseTreeInterfaceAction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "{} -> {}", self.src, self.dst)
+    }
+}
+
 /// Represents a state field
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeInterfaceActions {
@@ -63,7 +69,10 @@ impl VelosiParseTreeInterfaceActions {
 
 impl Display for VelosiParseTreeInterfaceActions {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "action")
+        for a in &self.actions {
+            writeln!(f, "        {},", a)?;
+        }
+        Ok(())
     }
 }
 
@@ -73,6 +82,32 @@ pub enum VelosiParseTreeInterfaceFieldNode {
     ReadActions(VelosiParseTreeInterfaceActions),
     WriteActions(VelosiParseTreeInterfaceActions),
     ReadWriteActions(VelosiParseTreeInterfaceActions),
+}
+
+impl Display for VelosiParseTreeInterfaceFieldNode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            VelosiParseTreeInterfaceFieldNode::Layout(l) => {
+                writeln!(f, "      Layout {{")?;
+                for s in l {
+                    writeln!(f, "        {},", s)?;
+                }
+            }
+            VelosiParseTreeInterfaceFieldNode::ReadActions(a) => {
+                writeln!(f, "      ReadActions {{")?;
+                Display::fmt(a, f)?;
+            }
+            VelosiParseTreeInterfaceFieldNode::WriteActions(a) => {
+                writeln!(f, "      WriteActions {{")?;
+                Display::fmt(a, f)?;
+            }
+            VelosiParseTreeInterfaceFieldNode::ReadWriteActions(a) => {
+                writeln!(f, "      ReadWriteActions {{")?;
+                Display::fmt(a, f)?;
+            }
+        }
+        write!(f, "      }}")
+    }
 }
 
 /// Represents a state field
@@ -105,18 +140,17 @@ impl VelosiParseTreeInterfaceField {
 
 impl Display for VelosiParseTreeInterfaceField {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        writeln!(f, "interfac field")
-        // write!(f, "{} [", self.name)?;
-        // if let Some((name, num)) = &self.offset {
-        //     write!(f, "{}, {},", name, num)?;
-        // }
-        // write!(f, "{}", self.size)?;
-        // writeln!(f, "] {{")?;
-        // for slice in &self.layout {
-        //     Display::fmt(slice, f)?;
-        //     writeln!(f, ",")?;
-        // }
-        // writeln!(f, "}}")
+        write!(f, "    {} [", self.name)?;
+        if let Some((name, num)) = &self.offset {
+            write!(f, "{}, {},", name, num)?;
+        }
+        write!(f, "{}", self.size)?;
+        writeln!(f, "] {{")?;
+        for node in &self.nodes {
+            Display::fmt(node, f)?;
+            writeln!(f, ",")?;
+        }
+        write!(f, "    }}")
     }
 }
 
@@ -158,8 +192,9 @@ impl Display for VelosiParseTreeInterfaceDef {
         writeln!(f, " {{")?;
         for field in &self.fields {
             Display::fmt(field, f)?;
+            writeln!(f, ",")?;
         }
-        writeln!(f, " }};")
+        write!(f, "  }}")
     }
 }
 
@@ -177,19 +212,20 @@ impl Display for VelosiParseTreeInterface {
         match self {
             VelosiParseTreeInterface::Memory(s) => {
                 write!(f, "MemoryInterface")?;
-                Display::fmt(&s, f)
+                Display::fmt(&s, f)?;
             }
             VelosiParseTreeInterface::MMIORegister(s) => {
                 write!(f, "MMIORegisterInterface")?;
-                Display::fmt(&s, f)
+                Display::fmt(&s, f)?;
             }
             VelosiParseTreeInterface::CPURegister(s) => {
                 write!(f, "CPURegisterInterface")?;
-                Display::fmt(&s, f)
+                Display::fmt(&s, f)?;
             }
             VelosiParseTreeInterface::None(_) => {
-                writeln!(f, "None;")
+                write!(f, "None")?;
             }
         }
+        writeln!(f, ";")
     }
 }

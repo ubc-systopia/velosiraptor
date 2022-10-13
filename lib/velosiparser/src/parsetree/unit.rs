@@ -32,8 +32,8 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 // use crate functionality
 use super::{
-    VelosiParseTreeConstDef, VelosiParseTreeExpr, VelosiParseTreeInterface, VelosiParseTreeParam,
-    VelosiParseTreeState, VelosiParseTreeType,
+    VelosiParseTreeConstDef, VelosiParseTreeExpr, VelosiParseTreeInterface, VelosiParseTreeMap,
+    VelosiParseTreeParam, VelosiParseTreeState, VelosiParseTreeType,
 };
 use crate::VelosiTokenStream;
 
@@ -47,13 +47,42 @@ pub enum VelosiParseTreeUnitNode {
     State(VelosiParseTreeState),
     Interface(VelosiParseTreeInterface),
     Method(VelosiParseTreeMethod),
-    Map,
+    Map(VelosiParseTreeMap),
 }
 
 /// Implement [Display] for [VelosiParseTreeUnitNode]
 impl Display for VelosiParseTreeUnitNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        writeln!(f, "TODO: implement display for VelosiParseTreeUnitNode")
+        match self {
+            VelosiParseTreeUnitNode::Const(const_def) => {
+                write!(f, "  ")?;
+                Display::fmt(const_def, f)?;
+            }
+            VelosiParseTreeUnitNode::InBitWidth(bit_width, _) => {
+                write!(f, "  inbitwidth = {};", bit_width)?;
+            }
+            VelosiParseTreeUnitNode::OutBitWidth(bit_width, _) => {
+                write!(f, "  outbitwidth = {};", bit_width)?;
+            }
+            VelosiParseTreeUnitNode::Flags(flags) => {
+                write!(f, "  ")?;
+                Display::fmt(flags, f)?;
+            }
+            VelosiParseTreeUnitNode::State(state) => {
+                write!(f, "  state = ")?;
+                Display::fmt(state, f)?;
+            }
+            VelosiParseTreeUnitNode::Interface(interface) => {
+                write!(f, "  interface = ")?;
+                Display::fmt(interface, f)?;
+            }
+            VelosiParseTreeUnitNode::Method(method) => Display::fmt(method, f)?,
+            VelosiParseTreeUnitNode::Map(map) => {
+                write!(f, "  staticmap = ")?;
+                Display::fmt(map, f)?;
+            }
+        }
+        writeln!(f)
     }
 }
 
@@ -73,6 +102,29 @@ pub struct VelosiParseTreeMethod {
     pub pos: VelosiTokenStream,
 }
 
+impl Display for VelosiParseTreeMethod {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "  fn {}(", self.name)?;
+        for (i, param) in self.params.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", param)?;
+        }
+        write!(f, ") -> {}", self.rettype)?;
+        for (i, require) in self.requires.iter().enumerate() {
+            if i == 0 {
+                writeln!(f)?;
+            }
+            writeln!(f, "    requires {}", require)?;
+        }
+        if let Some(body) = &self.body {
+            writeln!(f, "  {{\n    {}\n  }}", body)?;
+        }
+        Ok(())
+    }
+}
+
 /// reprsents a flag
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeFlags {
@@ -86,6 +138,19 @@ impl VelosiParseTreeFlags {
     /// create a new [VelosiParseTreeFlags] with the given flags and position
     pub fn new(flags: Vec<VelosiParseTreeFlag>, pos: VelosiTokenStream) -> Self {
         VelosiParseTreeFlags { flags, pos }
+    }
+}
+
+impl Display for VelosiParseTreeFlags {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "flags = {{")?;
+        for (i, flag) in self.flags.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", flag.name)?;
+        }
+        writeln!(f, "}};")
     }
 }
 
@@ -143,8 +208,11 @@ impl Display for VelosiParseTreeUnitDef {
         write!(f, "{}", self.name)?;
         if !self.params.is_empty() {
             write!(f, "(")?;
-            for param in self.params.iter() {
-                write!(f, "{}, ", param)?;
+            for (i, param) in self.params.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                write!(f, "{}", param)?;
             }
             write!(f, ")")?;
         }
