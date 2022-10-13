@@ -37,7 +37,7 @@ use nom::{
 };
 
 use crate::error::{IResult, VelosiLexerErrBuilder};
-use crate::{SrcSpan, Token, VelosiToken, VelosiTokenKind};
+use crate::{SrcSpan, Tok, VelosiToken, VelosiTokenKind};
 
 fn base10(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
     // match a digit followed by alphanumeric characters and the `_`
@@ -83,7 +83,7 @@ fn base10(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
             return Err(Err::Failure(err));
         }
     };
-    Ok((rem, Token::new(VelosiTokenKind::NumLiteral(num), numsp)))
+    Ok((rem, Tok::new(VelosiTokenKind::NumLiteral(num), numsp)))
 }
 
 macro_rules! namedbase (
@@ -116,7 +116,7 @@ macro_rules! namedbase (
             // now convert the string to to a number
             let numstr = String::from(numsp.as_str()).replace("_", "");
             match u64::from_str_radix(&numstr, $radix) {
-                Ok(i) => Ok((rem, Token::new(VelosiTokenKind::NumLiteral(i), input.slice(0..numsp.input_len() + 2)))),
+                Ok(i) => Ok((rem, Tok::new(VelosiTokenKind::NumLiteral(i), input.slice(0..numsp.input_len() + 2)))),
                 Err(_) => {
                     let errmsg = "number too large to be stored as a 64-bit number.";
                     let err = VelosiLexerErrBuilder::new(errmsg.to_string())

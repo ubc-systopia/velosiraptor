@@ -35,7 +35,7 @@ use nom::{
 };
 
 use crate::error::{IResult, VelosiLexerErrBuilder};
-use crate::{SrcSpan, Token, VelosiOpToken, VelosiToken, VelosiTokenKind};
+use crate::{SrcSpan, Tok, VelosiOpToken, VelosiToken, VelosiTokenKind};
 
 mod comments;
 mod identifier;
@@ -50,7 +50,7 @@ macro_rules! namedtag (
     ($vis:vis $name:ident, $tag: expr) => (
         $vis fn $name(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
             let (i, s) = tag($tag.as_str())(input)?;
-            Ok((i, Token::new(VelosiTokenKind::OpToken($tag), s)))
+            Ok((i, Tok::new(VelosiTokenKind::OpToken($tag), s)))
         }
     )
 );

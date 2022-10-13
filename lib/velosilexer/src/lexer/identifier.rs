@@ -38,7 +38,7 @@ use nom::sequence::pair;
 
 use crate::error::IResult;
 
-use crate::{SrcSpan, Token, VelosiToken, VelosiTokenKind};
+use crate::{SrcSpan, Tok, VelosiToken, VelosiTokenKind};
 
 /// parses a rust-like identifiers
 pub fn identifier(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
@@ -49,13 +49,13 @@ pub fn identifier(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
     let (rem, ident) = recognize(pair(firstchar, many0(otherchar)))(input)?;
 
     match ident.as_str().try_into() {
-        Ok(t) => Ok((rem, Token::new(VelosiTokenKind::Keyword(t), ident))),
+        Ok(t) => Ok((rem, Tok::new(VelosiTokenKind::Keyword(t), ident))),
         Err(x) => match x {
-            "true" => Ok((rem, Token::new(VelosiTokenKind::BoolLiteral(true), ident))),
-            "false" => Ok((rem, Token::new(VelosiTokenKind::BoolLiteral(false), ident))),
+            "true" => Ok((rem, Tok::new(VelosiTokenKind::BoolLiteral(true), ident))),
+            "false" => Ok((rem, Tok::new(VelosiTokenKind::BoolLiteral(false), ident))),
             x => Ok((
                 rem,
-                Token::new(VelosiTokenKind::Identifier(x.to_string()), ident),
+                Tok::new(VelosiTokenKind::Identifier(x.to_string()), ident),
             )),
         },
     }

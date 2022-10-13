@@ -33,7 +33,7 @@ use std::convert::TryFrom;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
 // used external dependencies
-use crate::TokenKind;
+use crate::TokKind;
 
 /// Enumeration of all keywords in the language
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
@@ -550,7 +550,7 @@ impl Display for VelosiTokenKind {
     }
 }
 
-impl TokenKind for VelosiTokenKind {
+impl TokKind for VelosiTokenKind {
     /// whether the token is a keyword
     fn is_keyword(&self) -> bool {
         matches!(self, VelosiTokenKind::Keyword(_))
