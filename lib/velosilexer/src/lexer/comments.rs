@@ -33,7 +33,7 @@ use nom::{
 };
 
 use crate::error::{IResult, VelosiLexerErrBuilder};
-use crate::{SrcSpan, Token, VelosiToken, VelosiTokenKind};
+use crate::{SrcSpan, Tok, VelosiToken, VelosiTokenKind};
 
 /// parses and consumes an end of line comment `// foo`
 pub fn linecomment(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
@@ -46,7 +46,7 @@ pub fn linecomment(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
     // trim the whitespace around the comments.
     let comment = c.as_str().trim().to_string();
 
-    Ok((input, Token::new(VelosiTokenKind::Comment(comment), c)))
+    Ok((input, Tok::new(VelosiTokenKind::Comment(comment), c)))
 }
 
 /// parses and consumes a block comment `/* bar */`
@@ -62,7 +62,7 @@ pub fn blockcomment(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
         Ok((input, c)) => {
             // trim the whitespace around the comment
             let comment = c.as_str().trim().to_string();
-            Ok((input, Token::new(VelosiTokenKind::BlockComment(comment), c)))
+            Ok((input, Tok::new(VelosiTokenKind::BlockComment(comment), c)))
         }
         Err(e) => {
             let _e: Err<Error<SrcSpan>> = e;
