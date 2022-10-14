@@ -193,25 +193,25 @@ impl Display for VelosiParserErrExpected {
         let red = |s: &str| s.bright_red().bold();
         let blue = |s: &str| s.bold().blue();
 
-        write!(f, "{}{} expected ", red("error"), ":".bold())?;
+        write!(f, "{}{} ", red("error"), ": expected".bold())?;
         if self.kind.len() == 1 {
-            write!(f, "`{}`", self.kind[0].as_hint_str())?;
+            write!(f, "`{}`", self.kind[0].as_hint_str().bold())?;
         } else {
-            write!(f, "one of ")?;
+            write!(f, "{}", "one of ".bold())?;
             for (i, t) in self.kind.iter().enumerate() {
                 if i == 0 {
-                    write!(f, "`{}`", t.as_hint_str())?;
+                    write!(f, "`{}`", t.as_hint_str().bold())?;
                 } else if i == self.kind.len() - 1 {
-                    write!(f, ", or `{}`", t.as_hint_str())?;
+                    write!(f, ", or `{}`", t.as_hint_str().bold())?;
                 } else {
-                    write!(f, ", `{}`", t.as_hint_str())?;
+                    write!(f, ", `{}`", t.as_hint_str().bold())?;
                 }
             }
         }
 
-        write!(f, ", found ")?;
+        write!(f, "{}", ", found ".bold())?;
         let ulen = if let Some(t) = self.tokstream.peek() {
-            writeln!(f, "`{}`", t.span().as_str())?;
+            writeln!(f, "`{}`", t.span().as_str().bold())?;
             t.span().as_str().len()
         } else {
             writeln!(f, "`Eof`")?;
@@ -282,7 +282,7 @@ impl Display for VelosiParserErrExpected {
         } else {
             format!("expected one of {} possible tokens", self.kind.len())
         };
-        write!(f, " {}", red(h.as_str()))
+        writeln!(f, " {}", red(h.as_str()))
     }
 }
 
@@ -292,6 +292,7 @@ pub enum VelosiParserErr {
     Expected(VelosiParserErrExpected),
     Kind(ErrorKind),
     Custom(VelosiParserErrCustom),
+    Stack(Vec<VelosiParserErr>),
 }
 
 impl VelosiParserErr {
@@ -307,6 +308,12 @@ impl Display for VelosiParserErr {
             VelosiParserErr::Expected(e) => e.fmt(f),
             VelosiParserErr::Custom(e) => e.fmt(f),
             VelosiParserErr::Kind(k) => writeln!(f, "Nom kind: {:?}", k),
+            VelosiParserErr::Stack(s) => {
+                for e in s {
+                    e.fmt(f)?;
+                }
+                Ok(())
+            }
         }
     }
 }
