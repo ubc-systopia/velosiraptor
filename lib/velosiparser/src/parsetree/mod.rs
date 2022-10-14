@@ -96,27 +96,64 @@ impl Display for VelosiParseTreeContextNode {
 }
 
 /// Represents the parse tree root for the velosiraptor language
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTree {
     /// List of nodes in the current parse tree context
-    nodes: Vec<VelosiParseTreeContextNode>,
+    pub nodes: Vec<VelosiParseTreeContextNode>,
     /// The current node context
-    context: String,
+    pub context: Option<String>,
 }
 
 impl VelosiParseTree {
-    pub fn new(context: String, nodes: Vec<VelosiParseTreeContextNode>) -> Self {
-        Self { nodes, context }
+    pub fn new(nodes: Vec<VelosiParseTreeContextNode>) -> Self {
+        Self {
+            nodes,
+            context: None,
+        }
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            nodes: Vec::new(),
+            context: None,
+        }
+    }
+
+    pub fn merge(&mut self, other: Self) {
+        self.nodes.extend(other.nodes);
+    }
+
+    pub fn filter_imports(&mut self) {
+        self.nodes
+            .retain(|n| !matches!(n, VelosiParseTreeContextNode::Import(_)));
+    }
+
+    pub fn set_context(&mut self, c: String) {
+        self.context = Some(c);
+    }
+
+    pub fn imports(&self) -> impl Iterator<Item = &VelosiParseTreeImport> {
+        self.nodes.iter().filter_map(|n| match n {
+            VelosiParseTreeContextNode::Import(i) => Some(i),
+            _ => None,
+        })
     }
 }
 
 /// Implement [Display] for [VelosiParseTree]
 impl Display for VelosiParseTree {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        writeln!(f, "VelosiParseTree({})", self.context)?;
+        if let Some(c) = &self.context {
+            writeln!(f, "VelosiParseTree({})", c)?;
+        } else {
+            writeln!(f, "VelosiParseTree($buf)")?;
+        }
+
         writeln!(f, "---------------------------------------------")?;
         for n in &self.nodes {
             writeln!(f, "{}\n", n)?;
         }
+        writeln!(f, "---------------------------------------------")?;
         Ok(())
     }
 }
