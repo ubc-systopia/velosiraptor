@@ -66,8 +66,29 @@ pub fn parse_with_context(
     input: VelosiTokenStream,
     context: String,
 ) -> IResult<VelosiTokenStream, VelosiParseTree> {
+    match parse(input) {
+        Ok((ts, mut pt)) => {
+            pt.set_context(context);
+            Ok((ts, pt))
+        }
+        e => e,
+    }
+}
+
+/// Parses a VelosiTokenStream into a VelosiParseTree
+///
+/// The function tries to extract the parsing context from the supplied token stream.
+///
+/// # Arguments
+///  * `input`   - The input token stream to be parsed
+///
+/// # Grammar
+///
+/// CONTEXT := [ IMPORT | CONSTDEF | UNIT ]*
+///
+pub fn parse(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTree> {
     // parse as many tree nodes as possible, that are either imports, constants or units
-    //let (rem, nodes) = many0(alt((import, constdef, unit)))(input)?;
+    // let (rem, nodes) = many0(alt((import, constdef, unit)))(input)?;
     let (rem, nodes) = many0(alt((
         import::import,
         map(constdef::constdef, |s: VelosiParseTreeConstDef| {
@@ -88,21 +109,5 @@ pub fn parse_with_context(
         return Err(Err::Failure(err));
     }
 
-    Ok((rem, VelosiParseTree::new(context, nodes)))
-}
-
-/// Parses a VelosiTokenStream into a VelosiParseTree
-///
-/// The function tries to extract the parsing context from the supplied token stream.
-///
-/// # Arguments
-///  * `input`   - The input token stream to be parsed
-///
-/// # Grammar
-///
-/// CONTEXT := [ IMPORT | CONSTDEF | UNIT ]*
-///
-pub fn parse(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTree> {
-    let ctxt = input.loc().context().unwrap_or("").to_string();
-    parse_with_context(input, ctxt)
+    Ok((rem, VelosiParseTree::new(nodes)))
 }

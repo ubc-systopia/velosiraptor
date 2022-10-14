@@ -23,68 +23,19 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! # VelosiParser -- Parse Tree Type Node
+//! # VelosiParser -- Parse Tree Unit
 //!
-//! Parse tree nodes for type information
+//! Parse tree nodes for Unit definitions
 
 // used standard library functionality
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
-// use crate functionality
-use super::{
+// used parsetree nodes
+use crate::parsetree::{
     VelosiParseTreeConstDef, VelosiParseTreeExpr, VelosiParseTreeInterface, VelosiParseTreeMap,
     VelosiParseTreeParam, VelosiParseTreeState, VelosiParseTreeType,
 };
 use crate::VelosiTokenStream;
-
-/// Represents possible nodes in the unit definitions
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub enum VelosiParseTreeUnitNode {
-    Const(VelosiParseTreeConstDef),
-    InBitWidth(u64, VelosiTokenStream),
-    OutBitWidth(u64, VelosiTokenStream),
-    Flags(VelosiParseTreeFlags),
-    State(VelosiParseTreeState),
-    Interface(VelosiParseTreeInterface),
-    Method(VelosiParseTreeMethod),
-    Map(VelosiParseTreeMap),
-}
-
-/// Implement [Display] for [VelosiParseTreeUnitNode]
-impl Display for VelosiParseTreeUnitNode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        match self {
-            VelosiParseTreeUnitNode::Const(const_def) => {
-                write!(f, "  ")?;
-                Display::fmt(const_def, f)?;
-            }
-            VelosiParseTreeUnitNode::InBitWidth(bit_width, _) => {
-                write!(f, "  inbitwidth = {};", bit_width)?;
-            }
-            VelosiParseTreeUnitNode::OutBitWidth(bit_width, _) => {
-                write!(f, "  outbitwidth = {};", bit_width)?;
-            }
-            VelosiParseTreeUnitNode::Flags(flags) => {
-                write!(f, "  ")?;
-                Display::fmt(flags, f)?;
-            }
-            VelosiParseTreeUnitNode::State(state) => {
-                write!(f, "  state = ")?;
-                Display::fmt(state, f)?;
-            }
-            VelosiParseTreeUnitNode::Interface(interface) => {
-                write!(f, "  interface = ")?;
-                Display::fmt(interface, f)?;
-            }
-            VelosiParseTreeUnitNode::Method(method) => Display::fmt(method, f)?,
-            VelosiParseTreeUnitNode::Map(map) => {
-                write!(f, "  staticmap = ")?;
-                Display::fmt(map, f)?;
-            }
-        }
-        writeln!(f)
-    }
-}
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeMethod {
@@ -102,6 +53,7 @@ pub struct VelosiParseTreeMethod {
     pub pos: VelosiTokenStream,
 }
 
+/// Implement the [Display] trait for the [VelosiParseTreeMethod] struct
 impl Display for VelosiParseTreeMethod {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "  fn {}(", self.name)?;
@@ -169,7 +121,80 @@ impl VelosiParseTreeFlag {
     }
 }
 
+/// Represents possible definitions of a unit body
+///
+/// The enum captures all possible elements of a unit body ([VelosiParseTreeUnitDef]).
+///
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub enum VelosiParseTreeUnitNode {
+    /// A constant definition
+    Const(VelosiParseTreeConstDef),
+    /// Input bit width
+    InBitWidth(u64, VelosiTokenStream),
+    /// Output bit width
+    OutBitWidth(u64, VelosiTokenStream),
+    /// Flag definition
+    Flags(VelosiParseTreeFlags),
+    /// State definition
+    State(VelosiParseTreeState),
+    /// Interface definition
+    Interface(VelosiParseTreeInterface),
+    /// Method definition
+    Method(VelosiParseTreeMethod),
+    /// Static map definition
+    Map(VelosiParseTreeMap),
+}
+
+/// Implement [Display] for [VelosiParseTreeUnitNode]
+impl Display for VelosiParseTreeUnitNode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            VelosiParseTreeUnitNode::Const(const_def) => {
+                write!(f, "  ")?;
+                Display::fmt(const_def, f)?;
+            }
+            VelosiParseTreeUnitNode::InBitWidth(bit_width, _) => {
+                write!(f, "  inbitwidth = {};", bit_width)?;
+            }
+            VelosiParseTreeUnitNode::OutBitWidth(bit_width, _) => {
+                write!(f, "  outbitwidth = {};", bit_width)?;
+            }
+            VelosiParseTreeUnitNode::Flags(flags) => {
+                write!(f, "  ")?;
+                Display::fmt(flags, f)?;
+            }
+            VelosiParseTreeUnitNode::State(state) => {
+                write!(f, "  state = ")?;
+                Display::fmt(state, f)?;
+            }
+            VelosiParseTreeUnitNode::Interface(interface) => {
+                write!(f, "  interface = ")?;
+                Display::fmt(interface, f)?;
+            }
+            VelosiParseTreeUnitNode::Method(method) => Display::fmt(method, f)?,
+            VelosiParseTreeUnitNode::Map(map) => {
+                write!(f, "  staticmap = ")?;
+                Display::fmt(map, f)?;
+            }
+        }
+        writeln!(f)
+    }
+}
+
 /// Represents a unit definition
+///
+/// The unit definition corresponds to the definition of a basic building block
+/// in the Velosiraptor language.
+///
+/// A unit has an identifier that gives it a name. It can be derived from another
+/// unit using, similar to inheritance in object oriented programming.
+///
+/// Units can be parameterized, for example defining the base address. In some
+/// way this is a bit like a mixture between templating and constructor values.
+///
+/// A unit has a set of nodes ([VelosiParseTreeUnitNode]) that contain the definitions
+/// of the body of the unit.
+///
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeUnitDef {
     /// the name of the unit (identifier)
@@ -230,10 +255,23 @@ impl Display for VelosiParseTreeUnitDef {
     }
 }
 
-/// Represent a unit
+/// Unit Node Representation
+///
+/// A unit in the Velosiraptor language represents a basic building block.
+/// There are two kinds of units:
+///
+///   - the configurable segment
+///   - the static map
+///
+/// While the unit kind dictates the nature of the unit, the parser doesn't
+/// restrict the parsing as such. Thus each unit body is defined by the
+/// [VelosiParseTreeUnitDef] struct.
+///
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum VelosiParseTreeUnit {
+    /// This unit is a configurable segment
     Segment(VelosiParseTreeUnitDef),
+    /// This unit is a static map
     StaticMap(VelosiParseTreeUnitDef),
 }
 

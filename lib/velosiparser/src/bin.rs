@@ -53,6 +53,12 @@ pub fn main() {
         }
     };
 
+    let res = if let Ok(ps) = res {
+        VelosiParser::resolve_imports(ps)
+    } else {
+        res
+    };
+
     match res {
         Ok(tokens) => {
             println!("{}", tokens);
@@ -68,6 +74,10 @@ pub fn main() {
 
         Err(VelosiParserError::ParsingFailure { e }) => {
             println!("Parsing Failure");
+            println!("{}", e);
+        }
+        Err(VelosiParserError::ImportFailure { e }) => {
+            println!("Import resolution failure");
             println!("{}", e);
         }
     }

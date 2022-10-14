@@ -29,29 +29,42 @@
 //! for further processing.
 
 // used standard library functionality
-
+use std::collections::{HashMap, HashSet};
 use std::io::Error;
+use std::path::{Path, PathBuf};
 
 // external dependencies
 use custom_error::custom_error;
 
-pub use velosilexer::{
-    VelosiKeyword, VelosiLexer, VelosiLexerError, VelosiOpToken, VelosiTokenKind, VelosiTokenStream,
-};
+pub use velosilexer::{VelosiLexer, VelosiLexerError, VelosiTokenStream};
+
+use velosilexer::{VelosiKeyword, VelosiOpToken, VelosiTokenKind};
 
 // crate modules
 mod error;
 mod parser;
 mod parsetree;
 
-use error::VelosiParserErr;
-pub use parsetree::{VelosiParseTree, VelosiParseTreeContextNode, VelosiParseTreeTypeInfo};
+pub use error::VelosiParserErr;
+pub use parsetree::{
+    VelosiParseTree, VelosiParseTreeConstDef, VelosiParseTreeContextNode, VelosiParseTreeExpr,
+    VelosiParseTreeField, VelosiParseTreeFieldSlice, VelosiParseTreeFlag, VelosiParseTreeFlags,
+    VelosiParseTreeInterface, VelosiParseTreeInterfaceAction, VelosiParseTreeInterfaceActions,
+    VelosiParseTreeInterfaceDef, VelosiParseTreeInterfaceField, VelosiParseTreeInterfaceFieldNode,
+    VelosiParseTreeMap, VelosiParseTreeMapElement, VelosiParseTreeMapExplicit,
+    VelosiParseTreeMapListComp, VelosiParseTreeMethod, VelosiParseTreeParam, VelosiParseTreeState,
+    VelosiParseTreeStateDef, VelosiParseTreeStateField, VelosiParseTreeType,
+    VelosiParseTreeTypeInfo, VelosiParseTreeUnit, VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,
+};
+
+use error::VelosiParserErrBuilder;
 
 // // custom error definitions
 custom_error! {pub VelosiParserError
     ReadSourceFile {e: Error} = "Could not read the source file.",
     LexingFailure { e: VelosiLexerError }   = "Lexing failed.",
     ParsingFailure { e: VelosiParserErr } = "Parsing failed.",
+    ImportFailure { e: VelosiParserErr } = "Import failed.",
 }
 
 /// represents the lexer state
@@ -75,12 +88,30 @@ impl VelosiParser {
         }
     }
 
+    /// Parses the supplied [TokenStream] and converts it into a [VelosiParseTree]
+    ///
+    /// This function will create a new `VelosiParseTree` from the supplied string.
+    pub fn parse_tokstream_with_context(
+        content: VelosiTokenStream,
+        context: String,
+    ) -> Result<VelosiParseTree, VelosiParserError> {
+        let ts = content.with_retained(|t| t.keep());
+        match parser::parse_with_context(ts, context) {
+            Ok((_, tree)) => Ok(tree),
+            Err(nom::Err::Error(e)) => Err(VelosiParserError::ParsingFailure { e }),
+            Err(nom::Err::Failure(e)) => Err(VelosiParserError::ParsingFailure { e }),
+            _ => Err(VelosiParserError::LexingFailure {
+                e: VelosiLexerError::LexingIncomplete,
+            }),
+        }
+    }
+
     /// Parses the supplied string and converts it into a [VelosiParseTree]
     ///
     /// This function will create a new `VelosiParseTree` from the supplied string.
     pub fn parse_string(content: String) -> Result<VelosiParseTree, VelosiParserError> {
         match VelosiLexer::lex_string(content) {
-            Ok(tokens) => VelosiParser::parse_tokstream(tokens),
+            Ok(tokens) => VelosiParser::parse_tokstream_with_context(tokens, "$buf".to_string()),
             Err(e) => Err(VelosiParserError::LexingFailure { e }),
         }
     }
@@ -88,12 +119,196 @@ impl VelosiParser {
     /// Parses the supplied file and converts it into a [VelosiParseTree]
     pub fn parse_file(filename: &str) -> Result<VelosiParseTree, VelosiParserError> {
         match VelosiLexer::lex_file(filename) {
-            Ok(tokens) => VelosiParser::parse_tokstream(tokens),
+            Ok(tokens) => VelosiParser::parse_tokstream_with_context(tokens, filename.to_string()),
             Err(VelosiLexerError::ReadSourceFile { e }) => {
                 Err(VelosiParserError::ReadSourceFile { e })
             }
             Err(e) => Err(VelosiParserError::LexingFailure { e }),
         }
+    }
+
+    /// recursively resolves the imports and produces a tree of parse trees
+    fn do_resolve_imports(
+        ptree: VelosiParseTree,
+        path: &mut Vec<String>,
+    ) -> Result<ImportResolver, VelosiParserError> {
+        // push ourselves to the sequence of imports, as we recurse later
+        if let Some(filename) = &ptree.context {
+            path.push(filename.clone());
+        } else {
+            path.push("$buf".to_string());
+        }
+
+        // get the import file, the parent directory of the current one
+        let mut importpath = if let Some(c) = &ptree.context {
+            match Path::new(&c).parent() {
+                Some(d) => PathBuf::from(d),
+                None => PathBuf::from("./"),
+            }
+        } else {
+            PathBuf::from("./")
+        };
+
+        // resolve the imports
+        let mut current_imports: HashMap<String, VelosiTokenStream> = HashMap::new();
+        let mut resolved_imports = Vec::new();
+        for import in ptree.imports() {
+            // just stop when we have a douplicate import, return the error
+            match current_imports.get(&import.name) {
+                Some(i) => {
+                    let msg = format!("Duplicate import `{}`", import.name);
+                    let err1 = VelosiParserErrBuilder::new(msg)
+                        .add_tokstream(import.loc.clone())
+                        .add_hint("Remove this duplicate import.".to_string())
+                        .build();
+
+                    let msg = "Previous import was here:";
+                    let err2 = VelosiParserErrBuilder::new(msg.to_string())
+                        .add_tokstream(i.clone())
+                        .build();
+
+                    return Err(VelosiParserError::ImportFailure {
+                        e: VelosiParserErr::Stack(vec![err1, err2]),
+                    });
+                }
+                None => {
+                    current_imports.insert(import.name.clone(), import.loc.clone());
+                }
+            }
+
+            // construct the path to the imported file
+            let filename = format!("{}.vrs", import.name);
+            importpath.push(filename);
+
+            // cyclic import check, if we import the same thing twice, report error
+            let filename = importpath.as_path().display().to_string();
+            if path.contains(&filename) {
+                // we have a circular dependency, find the start of the cycle
+                let it = path.iter().skip_while(|e| *e != &filename);
+
+                // convert the cycle to a string
+                let s = it
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>()
+                    .join(" -> ");
+
+                let msg = format!("circular dependency detected:\n  {} -> {}", s, filename);
+                let hint = "try removing the following import";
+                let e = VelosiParserErrBuilder::new(msg)
+                    .add_tokstream(import.loc.clone())
+                    .add_hint(hint.to_string())
+                    .build();
+                return Err(VelosiParserError::ImportFailure { e });
+            }
+
+            // no duplicate import, no cycile, we can parse the file now, and recurse
+            let result = match Self::parse_file(filename.as_str()) {
+                Ok(pt) => Self::do_resolve_imports(pt, path),
+                Err(e) => Err(e),
+            };
+
+            match result {
+                Ok(pt) => {
+                    resolved_imports.push(pt);
+                }
+                Err(VelosiParserError::ReadSourceFile { e: _ }) => {
+                    let msg = format!("Failed to resolve error: file not found: {}", filename);
+                    let hint = "Remove this import or ensure the module is part of the search path";
+                    let e = VelosiParserErrBuilder::new(msg)
+                        .add_tokstream(import.loc.clone())
+                        .add_hint(hint.to_string())
+                        .build();
+                    return Err(VelosiParserError::ImportFailure { e });
+                }
+                Err(VelosiParserError::ImportFailure { e }) => {
+                    let msg = format!("failed to resolve {}", filename);
+                    let hint = "Imported from here.";
+                    let err = VelosiParserErrBuilder::new(msg)
+                        .add_tokstream(import.loc.clone())
+                        .add_hint(hint.to_string())
+                        .build();
+
+                    let e = VelosiParserErr::Stack(vec![e, err]);
+                    return Err(VelosiParserError::ImportFailure { e });
+                }
+                Err(VelosiParserError::ParsingFailure { e }) => {
+                    let msg = format!("failed to resolve {}", filename);
+                    let hint = "Imported from here.";
+                    let err = VelosiParserErrBuilder::new(msg)
+                        .add_tokstream(import.loc.clone())
+                        .add_hint(hint.to_string())
+                        .build();
+
+                    let e = VelosiParserErr::Stack(vec![e, err]);
+                    return Err(VelosiParserError::ImportFailure { e });
+                }
+                Err(e) => {
+                    panic!("unhandled error: {:?}", e)
+                }
+            }
+
+            // restore the current import path
+            importpath.pop();
+        }
+
+        // remove ourselves from the sequence of import
+        path.pop();
+
+        Ok(ImportResolver::new(ptree, resolved_imports))
+    }
+
+    /// Resolves the imports of the given [VelosiParseTree]
+    pub fn resolve_imports(ptree: VelosiParseTree) -> Result<VelosiParseTree, VelosiParserError> {
+        println!("resolving imports...");
+        // get the path context for circle detection
+        let mut importpath = Vec::new();
+        let import_resolver = Self::do_resolve_imports(ptree, &mut importpath)?;
+
+        Ok(import_resolver.flatten())
+    }
+}
+
+struct ImportResolver {
+    parsetree: VelosiParseTree,
+    imports: Vec<ImportResolver>,
+}
+
+impl ImportResolver {
+    pub fn new(parsetree: VelosiParseTree, imports: Vec<ImportResolver>) -> Self {
+        Self { parsetree, imports }
+    }
+
+    fn do_flatten(mut self, imported: &mut HashSet<String>) -> VelosiParseTree {
+        let c = if let Some(s) = &self.parsetree.context {
+            s.clone()
+        } else {
+            "$buf".to_string()
+        };
+
+        // already imported, just return an empty parse tree
+        if imported.contains(&c) {
+            return VelosiParseTree::empty();
+        }
+
+        // go through the imports and recurse
+        let mut ps = VelosiParseTree::new(Vec::new());
+        for import in self.imports.drain(..) {
+            // recurse and merge
+            let pt = import.do_flatten(imported);
+            ps.merge(pt);
+        }
+
+        // remove the imports from the current parsetree
+        self.parsetree.filter_imports();
+        ps.merge(self.parsetree);
+        imported.insert(c);
+
+        ps
+    }
+
+    pub fn flatten(self) -> VelosiParseTree {
+        let mut imported = HashSet::new();
+        self.do_flatten(&mut imported)
     }
 }
 
