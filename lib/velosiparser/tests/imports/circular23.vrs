@@ -1,0 +1,3 @@
+import      circular24;
+
+const FOO : int = 12345;
