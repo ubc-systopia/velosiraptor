@@ -515,17 +515,18 @@ impl VelosiParseTreeExpr {
 /// Implementation of [Display] for [VelosiParseTreeExpr]
 impl Display for VelosiParseTreeExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        use VelosiParseTreeExpr::*;
         match self {
-            VelosiParseTreeExpr::Identifier(i) => Display::fmt(&i, format),
-            VelosiParseTreeExpr::NumLiteral(i) => Display::fmt(&i, format),
-            VelosiParseTreeExpr::BoolLiteral(i) => Display::fmt(&i, format),
-            VelosiParseTreeExpr::BinOp(i) => Display::fmt(&i, format),
-            VelosiParseTreeExpr::UnOp(i) => Display::fmt(&i, format),
-            VelosiParseTreeExpr::Quantifier(i) => Display::fmt(&i, format),
-            VelosiParseTreeExpr::FnCall(i) => Display::fmt(&i, format),
-            VelosiParseTreeExpr::IfElse(i) => Display::fmt(&i, format),
-            VelosiParseTreeExpr::Slice(i) => Display::fmt(&i, format),
-            VelosiParseTreeExpr::Range(i) => Display::fmt(&i, format),
+            Identifier(i) => Display::fmt(&i, format),
+            NumLiteral(i) => Display::fmt(&i, format),
+            BoolLiteral(i) => Display::fmt(&i, format),
+            BinOp(i) => Display::fmt(&i, format),
+            UnOp(i) => Display::fmt(&i, format),
+            Quantifier(i) => Display::fmt(&i, format),
+            FnCall(i) => Display::fmt(&i, format),
+            IfElse(i) => Display::fmt(&i, format),
+            Slice(i) => Display::fmt(&i, format),
+            Range(i) => Display::fmt(&i, format),
         }
     }
 }
