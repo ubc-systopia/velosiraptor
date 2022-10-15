@@ -123,7 +123,7 @@ fn print_location(f: &mut Formatter<'_>, warn: bool, tokstream: &VelosiTokenStre
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct VelosiAstErrBuilder {
-    error: bool,
+    warn: bool,
     message: String,
     hint: Option<String>,
     tokstream: Option<VelosiTokenStream>,
@@ -132,7 +132,7 @@ pub(crate) struct VelosiAstErrBuilder {
 impl VelosiAstErrBuilder {
     pub fn warn(message: String) -> Self {
         Self {
-            error: false,
+            warn: true,
             message,
             hint: None,
             tokstream: None,
@@ -141,7 +141,7 @@ impl VelosiAstErrBuilder {
 
     pub fn err(message: String) -> Self {
         Self {
-            error: true,
+            warn: true,
             message,
             hint: None,
             tokstream: None,
@@ -163,7 +163,7 @@ impl VelosiAstErrBuilder {
     pub fn build(&mut self) -> VelosiAstErr {
         VelosiAstErr::Custom(VelosiAstErrCustom {
             message: self.message.clone(),
-            error: self.error,
+            warn: self.warn,
             hint: self.hint.take(),
             tokstream: self.tokstream.take().unwrap_or_default(),
         })
@@ -176,7 +176,7 @@ pub struct VelosiAstErrCustom {
     /// error message
     message: String,
     /// whether this is an error or a warning
-    error: bool,
+    warn: bool,
     /// Hint
     hint: Option<String>,
     /// the location where the error happened
@@ -187,20 +187,41 @@ pub struct VelosiAstErrCustom {
 impl Display for VelosiAstErrCustom {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         // closure for coloring
-        let red = |s: &str| s.bright_red().bold();
+        let highlight = if self.warn {
+            |s: &str| s.bold().bright_yellow()
+        } else {
+            |s: &str| s.bold().bright_red()
+        };
+
         let blue = |s: &str| s.bold().blue();
 
         // the error message
-        writeln!(f, "{}{} {}", red("error"), ":".bold(), self.message.bold())?;
+        if self.warn {
+            writeln!(
+                f,
+                "{}{} {}",
+                highlight("warning"),
+                ":".bold(),
+                self.message.bold()
+            )?;
+        } else {
+            writeln!(
+                f,
+                "{}{} {}",
+                highlight("error"),
+                ":".bold(),
+                self.message.bold()
+            )?;
+        }
 
         // the location, if it is set
         if !self.tokstream.span().is_default() {
-            print_location(f, self.error, &self.tokstream)?;
+            print_location(f, self.warn, &self.tokstream)?;
         }
 
         // apply the hint if needed
         match &self.hint {
-            Some(h) => writeln!(f, " {}", red(h.as_str())),
+            Some(h) => writeln!(f, " {}", highlight(h.as_str())),
             None => writeln!(f),
         }
     }
@@ -357,7 +378,7 @@ pub enum VelosiAstErr {
 impl VelosiAstErr {
     pub fn is_warn(&self) -> bool {
         match self {
-            VelosiAstErr::Custom(err) => !err.error,
+            VelosiAstErr::Custom(err) => err.warn,
             _ => false,
         }
     }
