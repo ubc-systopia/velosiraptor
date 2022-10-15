@@ -155,14 +155,14 @@ impl Display for VelosiAstRoot {
             f,
             "--------------------------------------------------------"
         )?;
-        writeln!(f, "Consts:")?;
+        writeln!(f, "\nConsts:")?;
 
         for c in self.consts.values() {
             Display::fmt(c, f)?;
             writeln!(f)?;
         }
 
-        writeln!(f, "Units:")?;
+        writeln!(f, "\nUnits:")?;
 
         // for u in self.units.values() {
         //     Display::fmt(u, f)?;

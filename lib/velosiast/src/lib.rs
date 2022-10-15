@@ -39,6 +39,7 @@ pub use velosiparser::VelosiTokenStream;
 mod ast;
 mod error;
 mod symboltable;
+mod utils;
 
 use error::VelosiAstIssues;
 use symboltable::{Symbol, SymbolTable};

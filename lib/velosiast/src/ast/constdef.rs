@@ -33,8 +33,8 @@ use std::rc::Rc;
 use velosiparser::{VelosiParseTreeConstDef, VelosiTokenStream};
 
 use crate::ast::{expr::VelosiAstExpr, types::VelosiAstType, VelosiAstNode};
-
 use crate::error::{VelosiAstErr, VelosiAstIssues};
+use crate::utils;
 use crate::{AstResult, Symbol, SymbolTable};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -67,6 +67,9 @@ impl VelosiAstConst {
         st: &mut SymbolTable,
     ) -> AstResult<Self, VelosiAstIssues> {
         let mut issues = VelosiAstIssues::new();
+
+        // check whether the name is in the right format
+        utils::check_upper_case(&mut issues, &pt.name, &pt.loc);
 
         let ctype = ast_result_unwrap!(VelosiAstType::from_parse_tree(pt.ctype, st), issues);
         let value = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(pt.value, st), issues);
