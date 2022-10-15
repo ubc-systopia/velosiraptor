@@ -47,14 +47,19 @@ mod parsetree;
 
 pub use error::VelosiParserErr;
 pub use parsetree::{
-    VelosiParseTree, VelosiParseTreeConstDef, VelosiParseTreeContextNode, VelosiParseTreeExpr,
-    VelosiParseTreeField, VelosiParseTreeFieldSlice, VelosiParseTreeFlag, VelosiParseTreeFlags,
+    VelosiParseTree, VelosiParseTreeBinOp, VelosiParseTreeBinOpExpr, VelosiParseTreeBoolLiteral,
+    VelosiParseTreeConstDef, VelosiParseTreeContextNode, VelosiParseTreeExpr, VelosiParseTreeField,
+    VelosiParseTreeFieldSlice, VelosiParseTreeFlag, VelosiParseTreeFlags,
+    VelosiParseTreeFnCallExpr, VelosiParseTreeIdentifierLiteral, VelosiParseTreeIfElseExpr,
     VelosiParseTreeInterface, VelosiParseTreeInterfaceAction, VelosiParseTreeInterfaceActions,
     VelosiParseTreeInterfaceDef, VelosiParseTreeInterfaceField, VelosiParseTreeInterfaceFieldNode,
     VelosiParseTreeMap, VelosiParseTreeMapElement, VelosiParseTreeMapExplicit,
-    VelosiParseTreeMapListComp, VelosiParseTreeMethod, VelosiParseTreeParam, VelosiParseTreeState,
+    VelosiParseTreeMapListComp, VelosiParseTreeMethod, VelosiParseTreeNumLiteral,
+    VelosiParseTreeParam, VelosiParseTreeQuantifier, VelosiParseTreeQuantifierExpr,
+    VelosiParseTreeRangeExpr, VelosiParseTreeSliceExpr, VelosiParseTreeState,
     VelosiParseTreeStateDef, VelosiParseTreeStateField, VelosiParseTreeType,
-    VelosiParseTreeTypeInfo, VelosiParseTreeUnit, VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,
+    VelosiParseTreeTypeInfo, VelosiParseTreeUnOp, VelosiParseTreeUnOpExpr, VelosiParseTreeUnit,
+    VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,
 };
 
 use error::VelosiParserErrBuilder;
