@@ -35,6 +35,10 @@ use crate::VelosiTokenStream;
 
 use crate::parsetree::VelosiParseTreeParam;
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Binary Operation Expressions
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Represents an operator for a binary expression
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum VelosiParseTreeBinOp {
@@ -92,10 +96,10 @@ impl Display for VelosiParseTreeBinOp {
 /// Represents a binary operation `expr <op> expr`
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeBinOpExpr {
-    lhs: Box<VelosiParseTreeExpr>,
-    op: VelosiParseTreeBinOp,
-    rhs: Box<VelosiParseTreeExpr>,
-    loc: VelosiTokenStream,
+    pub lhs: Box<VelosiParseTreeExpr>,
+    pub op: VelosiParseTreeBinOp,
+    pub rhs: Box<VelosiParseTreeExpr>,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeBinOpExpr {
@@ -125,6 +129,10 @@ impl Display for VelosiParseTreeBinOpExpr {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Unary Operation Expressions
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Represents an operator for a unary expression
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum VelosiParseTreeUnOp {
@@ -148,9 +156,9 @@ impl Display for VelosiParseTreeUnOp {
 /// Represents an unary operation
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeUnOpExpr {
-    op: VelosiParseTreeUnOp,
-    expr: Box<VelosiParseTreeExpr>,
-    loc: VelosiTokenStream,
+    pub op: VelosiParseTreeUnOp,
+    pub expr: Box<VelosiParseTreeExpr>,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeUnOpExpr {
@@ -174,6 +182,10 @@ impl Display for VelosiParseTreeUnOpExpr {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Quantifier Expression
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// representation of a quantifier
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum VelosiParseTreeQuantifier {
@@ -195,10 +207,10 @@ impl Display for VelosiParseTreeQuantifier {
 /// Represents an unary operation
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeQuantifierExpr {
-    quant: VelosiParseTreeQuantifier,
-    params: Vec<VelosiParseTreeParam>,
-    expr: Box<VelosiParseTreeExpr>,
-    loc: VelosiTokenStream,
+    pub quant: VelosiParseTreeQuantifier,
+    pub params: Vec<VelosiParseTreeParam>,
+    pub expr: Box<VelosiParseTreeExpr>,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeQuantifierExpr {
@@ -235,11 +247,15 @@ impl Display for VelosiParseTreeQuantifierExpr {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Literal Expressions
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Represents an unary operation
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeIdentifierLiteral {
-    path: Vec<String>,
-    loc: VelosiTokenStream,
+    pub path: Vec<String>,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeIdentifierLiteral {
@@ -290,8 +306,8 @@ impl Display for VelosiParseTreeNumLiteral {
 /// Represents an unary operation
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeBoolLiteral {
-    value: bool,
-    loc: VelosiTokenStream,
+    pub value: bool,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeBoolLiteral {
@@ -311,12 +327,16 @@ impl Display for VelosiParseTreeBoolLiteral {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Function Call Expression
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Represents an unary operation
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeFnCallExpr {
-    path: VelosiParseTreeIdentifierLiteral,
-    args: Vec<VelosiParseTreeExpr>,
-    loc: VelosiTokenStream,
+    pub path: VelosiParseTreeIdentifierLiteral,
+    pub args: Vec<VelosiParseTreeExpr>,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeFnCallExpr {
@@ -347,13 +367,17 @@ impl Display for VelosiParseTreeFnCallExpr {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// IF Else Expression
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Represents an unary operation
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeIfElseExpr {
-    cond: Box<VelosiParseTreeExpr>,
-    then: Box<VelosiParseTreeExpr>,
-    other: Box<VelosiParseTreeExpr>,
-    loc: VelosiTokenStream,
+    pub cond: Box<VelosiParseTreeExpr>,
+    pub then: Box<VelosiParseTreeExpr>,
+    pub other: Box<VelosiParseTreeExpr>,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeIfElseExpr {
@@ -387,12 +411,16 @@ impl Display for VelosiParseTreeIfElseExpr {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Range Expression
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Represents an unary operation
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeRangeExpr {
-    start: u64,
-    end: u64,
-    loc: VelosiTokenStream,
+    pub start: u64,
+    pub end: u64,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeRangeExpr {
@@ -411,12 +439,16 @@ impl Display for VelosiParseTreeRangeExpr {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Slice Expression
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Represents an unary operation
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeSliceExpr {
-    name: VelosiParseTreeIdentifierLiteral,
-    range: VelosiParseTreeRangeExpr,
-    loc: VelosiTokenStream,
+    pub name: VelosiParseTreeIdentifierLiteral,
+    pub range: VelosiParseTreeRangeExpr,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeSliceExpr {
@@ -442,6 +474,10 @@ impl Display for VelosiParseTreeSliceExpr {
         )
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Expressions
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents an expression in the parse tree
 #[derive(PartialEq, Eq, Clone, Debug)]

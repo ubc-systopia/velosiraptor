@@ -43,7 +43,13 @@ pub mod types;
 pub mod unit;
 
 pub use constparams::{VelosiParseTreeConstDef, VelosiParseTreeParam};
-pub use expr::VelosiParseTreeExpr;
+pub use expr::{
+    VelosiParseTreeBinOp, VelosiParseTreeBinOpExpr, VelosiParseTreeBoolLiteral,
+    VelosiParseTreeExpr, VelosiParseTreeFnCallExpr, VelosiParseTreeIdentifierLiteral,
+    VelosiParseTreeIfElseExpr, VelosiParseTreeNumLiteral, VelosiParseTreeQuantifier,
+    VelosiParseTreeQuantifierExpr, VelosiParseTreeRangeExpr, VelosiParseTreeSliceExpr,
+    VelosiParseTreeUnOp, VelosiParseTreeUnOpExpr,
+};
 pub use field::{VelosiParseTreeField, VelosiParseTreeFieldSlice};
 pub use interface::{
     VelosiParseTreeInterface, VelosiParseTreeInterfaceAction, VelosiParseTreeInterfaceActions,
