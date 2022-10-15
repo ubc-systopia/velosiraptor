@@ -1,0 +1,25 @@
+[package]
+name = "velosiast"
+description = "AST library the Velosiraptor Language"
+license = "MIT"
+version = "0.1.0"
+authors = ["Reto Achermann <achreto@cs.ubc.ca>"]
+edition = "2018"
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nom = "7.1.1"
+velosiparser = { path = "../velosiparser" }
+colored = "2.0.0"
+custom_error = "1.9.2"
+
+
+[lib]
+name = "velosiast"
+path = "src/lib.rs"
+
+[[bin]]
+name = "velosiast"
+path = "src/bin.rs"
