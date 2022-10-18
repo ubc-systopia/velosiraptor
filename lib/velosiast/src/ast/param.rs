@@ -32,7 +32,7 @@ use std::rc::Rc;
 
 use velosiparser::{VelosiParseTreeParam, VelosiTokenStream};
 
-use crate::ast::{expr::VelosiAstExpr, types::VelosiAstType, VelosiAstNode};
+use crate::ast::{types::VelosiAstType, VelosiAstNode};
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
 

@@ -36,8 +36,7 @@ use velosiparser::{VelosiParseTreeType, VelosiParseTreeTypeInfo};
 // use crate functionality
 use crate::VelosiTokenStream;
 
-use crate::ast::VelosiAstNode;
-use crate::error::{VelosiAstErr, VelosiAstErrUndef, VelosiAstIssues};
+use crate::error::VelosiAstIssues;
 use crate::{ast_result_return, utils, AstResult, SymbolTable};
 
 /// Represents the type information, either built in or a type ref
@@ -117,7 +116,7 @@ impl VelosiAstTypeInfo {
             Size => "size",
             Flags => "flags",
             Range => "range",
-            TypeRef(name) => &name,
+            TypeRef(name) => name,
         }
     }
 
@@ -133,7 +132,7 @@ impl VelosiAstTypeInfo {
             Bool => "boolean",
             Flags => "flags",
             Range => "range",
-            TypeRef(name) => &name,
+            TypeRef(name) => name,
             _ => unreachable!(),
         }
     }

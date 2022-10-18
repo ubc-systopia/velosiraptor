@@ -106,7 +106,7 @@ impl VelosiAstConst {
                 value.result_type(st).as_kind_str()
             );
             let err = VelosiAstErrBuilder::err(msg.to_string())
-                .add_hint(hint.to_string())
+                .add_hint(hint)
                 .add_location(value.loc().clone())
                 .build();
             issues.push(err);
