@@ -36,42 +36,40 @@ use std::collections::HashMap;
 use velosiparser::{VelosiParseTree, VelosiParseTreeContextNode, VelosiTokenStream};
 
 use crate::error::VelosiAstIssues;
-use crate::AstResult;
-use crate::SymbolTable;
+use crate::{ast_result_return, ast_result_unwrap, AstResult, SymbolTable};
 
 mod constdef;
 mod expr;
+mod param;
 mod types;
+mod unit;
 
 pub use constdef::VelosiAstConst;
+pub use param::VelosiAstParam;
 pub use types::{VelosiAstType, VelosiAstTypeInfo};
+pub use unit::VelosiAstUnit;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum VelosiAstNode {
-    Unit(usize),
+    Unit(Rc<VelosiAstUnit>),
     Const(Rc<VelosiAstConst>),
-    Method,
-    Param(usize),
+    Method(usize),
+    Param(Rc<VelosiAstParam>),
 }
 
 impl VelosiAstNode {
     pub fn loc(&self) -> &VelosiTokenStream {
         use VelosiAstNode::*;
         match self {
-            // Unit(loc) => loc,
+            Unit(u) => u.loc(),
             Const(c) => &c.loc,
             // Method => todo!(),
-            // Param(loc) => loc,
+            Param(p) => &p.loc,
             _ => {
                 panic!("nyi")
             }
         }
     }
-}
-
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub struct VelosiAstUnit {
-    pub name: Rc<String>,
 }
 
 /// Defines the root note of the ast
@@ -96,7 +94,7 @@ impl VelosiAstRoot {
     }
 
     pub fn add_unit(&mut self, u: VelosiAstUnit) {
-        self.units.insert(u.name.to_string(), Rc::new(u));
+        self.units.insert(u.name().to_string(), Rc::new(u));
     }
 
     pub fn from_parse_tree(pt: VelosiParseTree) -> AstResult<VelosiAstRoot, VelosiAstIssues> {
@@ -107,43 +105,39 @@ impl VelosiAstRoot {
         let mut st = SymbolTable::new();
         let mut issues = VelosiAstIssues::new();
 
+        // loop throug the nodes and try to conver them into the ast nodes.
+        // if we hit a non-recoverable error, we simply abort and
         for n in pt.nodes {
             match n {
                 VelosiParseTreeContextNode::Const(c) => {
-                    let c = match VelosiAstConst::from_parse_tree(c, &mut st) {
-                        AstResult::Ok(c) => Some(Rc::new(c)),
-                        AstResult::Issues(c, i) => {
-                            issues.merge(i);
-                            Some(Rc::new(c))
-                        }
-                        AstResult::Err(i) => {
-                            issues.merge(i);
-                            None
-                        }
-                    };
-                    if let Some(c) = c {
-                        if let Err(e) = st.insert(c.clone().into()) {
-                            issues.push(e);
-                        } else {
-                            root.consts.insert(c.name.to_string(), c);
-                        }
+                    let c = Rc::new(ast_result_unwrap!(
+                        VelosiAstConst::from_parse_tree(c, &mut st),
+                        issues
+                    ));
+                    if let Err(e) = st.insert(c.clone().into()) {
+                        issues.push(e);
+                    } else {
+                        root.consts.insert(c.name.to_string(), c);
                     }
                 }
                 VelosiParseTreeContextNode::Unit(u) => {
-                    panic!("not handled yet");
+                    let c = Rc::new(ast_result_unwrap!(
+                        VelosiAstUnit::from_parse_tree(u, &mut st),
+                        issues
+                    ));
+                    if let Err(e) = st.insert(c.clone().into()) {
+                        issues.push(e);
+                    } else {
+                        root.units.insert(c.name().to_string(), c);
+                    }
                 }
-                VelosiParseTreeContextNode::Import(i) => {
-                    panic!("triggered ");
-                    //return Err(VelosiAstError::Errors { err: 1, warn: 0 });
+                VelosiParseTreeContextNode::Import(_i) => {
+                    unreachable!("Import nodes should have been removed!");
                 }
             }
         }
 
-        if issues.is_ok() {
-            AstResult::Ok(root)
-        } else {
-            AstResult::Issues(root, issues)
-        }
+        ast_result_return!(root, issues)
     }
 }
 
