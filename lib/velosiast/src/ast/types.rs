@@ -37,8 +37,8 @@ use velosiparser::{VelosiParseTreeType, VelosiParseTreeTypeInfo};
 use crate::VelosiTokenStream;
 
 use crate::ast::VelosiAstNode;
-use crate::error::{VelosiAstErr, VelosiAstErrUndef};
-use crate::{AstResult, SymbolTable};
+use crate::error::{VelosiAstErr, VelosiAstErrUndef, VelosiAstIssues};
+use crate::{ast_result_return, utils, AstResult, SymbolTable};
 
 /// Represents the type information, either built in or a type ref
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -57,6 +57,8 @@ pub enum VelosiAstTypeInfo {
     Size,
     /// built-in flags type
     Flags,
+    /// built in range type
+    Range,
     /// type referece to user-define type
     TypeRef(Rc<String>),
 }
@@ -65,6 +67,75 @@ impl VelosiAstTypeInfo {
     /// whether or not the type is a built-in type
     pub fn is_builtin(&self) -> bool {
         matches!(self, VelosiAstTypeInfo::TypeRef(_))
+    }
+
+    /// whether or not the type is of a numeric kind
+    pub fn is_numeric(&self) -> bool {
+        use VelosiAstTypeInfo::*;
+        matches!(self, Integer | GenAddr | VirtAddr | PhysAddr | Size)
+    }
+
+    /// whether or not the type is boolean
+    pub fn is_boolean(&self) -> bool {
+        matches!(self, VelosiAstTypeInfo::Bool)
+    }
+
+    /// whether or not the type is flags
+    pub fn is_flags(&self) -> bool {
+        matches!(self, VelosiAstTypeInfo::Flags)
+    }
+
+    /// check whether the type is compatible with the other.
+    ///
+    /// The two types are compatible if they have the same kind
+    /// numeric-numeric, boolean-boolean, flags-flags, or the same
+    /// type reference.
+    pub fn compatible(&self, other: &Self) -> bool {
+        use VelosiAstTypeInfo::*;
+        match self {
+            Integer => other.is_numeric(),
+            Bool => other.is_boolean(),
+            GenAddr => other.is_numeric(),
+            VirtAddr => other.is_numeric(),
+            PhysAddr => other.is_numeric(),
+            Size => other.is_numeric(),
+            Flags => other.is_flags(),
+            Range => false,
+            TypeRef(_) => self == other,
+        }
+    }
+
+    /// obtains the type as a string slices
+    pub fn as_str(&self) -> &str {
+        use VelosiAstTypeInfo::*;
+        match self {
+            Integer => "int",
+            Bool => "bool",
+            GenAddr => "addr",
+            VirtAddr => "vaddr",
+            PhysAddr => "paddr",
+            Size => "size",
+            Flags => "flags",
+            Range => "range",
+            TypeRef(name) => &name,
+        }
+    }
+
+    /// obtains the type kind
+    pub fn as_kind_str(&self) -> &str {
+        use VelosiAstTypeInfo::*;
+
+        if self.is_numeric() {
+            return "numeric";
+        }
+
+        match self {
+            Bool => "boolean",
+            Flags => "flags",
+            Range => "range",
+            TypeRef(name) => &name,
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -88,17 +159,7 @@ impl From<VelosiParseTreeTypeInfo> for VelosiAstTypeInfo {
 /// Implementation of trait [Display] for [VelosiAstTypeInfo]
 impl Display for VelosiAstTypeInfo {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        use VelosiAstTypeInfo::*;
-        match self {
-            Integer => write!(f, "int"),
-            Bool => write!(f, "bool"),
-            GenAddr => write!(f, "addr"),
-            VirtAddr => write!(f, "vaddr"),
-            PhysAddr => write!(f, "paddr"),
-            Size => write!(f, "size"),
-            Flags => write!(f, "flags"),
-            TypeRef(name) => write!(f, "{}", name),
-        }
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -112,10 +173,18 @@ pub struct VelosiAstType {
 }
 
 impl VelosiAstType {
+    pub fn new(typeinfo: VelosiAstTypeInfo, loc: VelosiTokenStream) -> Self {
+        VelosiAstType { typeinfo, loc }
+    }
+
+    // converts the parse tree node into an ast node, performing checks
     pub fn from_parse_tree(
         pt: VelosiParseTreeType,
         st: &mut SymbolTable,
-    ) -> AstResult<Self, VelosiAstErr> {
+    ) -> AstResult<Self, VelosiAstIssues> {
+        let mut issues = VelosiAstIssues::new();
+
+        // obtain the type information
         let typeinfo = VelosiAstTypeInfo::from(pt.typeinfo);
 
         let res = VelosiAstType {
@@ -123,30 +192,54 @@ impl VelosiAstType {
             loc: pt.loc,
         };
 
+        // check the type reference
         if let VelosiAstTypeInfo::TypeRef(tname) = &res.typeinfo {
-            if let Some(s) = st.lookup(tname.as_str()) {
-                match s.ast_node {
-                    VelosiAstNode::Unit(_) => {
-                        // there is a symbol with that type
-                        AstResult::Ok(res)
-                    }
-                    _ => {
-                        // report that there was a mismatching type
-                        let err = VelosiAstErrUndef::with_other(
-                            tname.clone(),
-                            res.loc.clone(),
-                            s.loc().clone(),
-                        );
-                        AstResult::Issues(res, err.into())
-                    }
-                }
-            } else {
-                // there is no such type, still create the node and report the issue
-                let err = VelosiAstErrUndef::new(tname.clone(), res.loc.clone());
-                AstResult::Issues(res, err.into())
-            }
+            utils::check_type_exists(&mut issues, st, tname.clone(), res.loc.clone());
+            ast_result_return!(res, issues)
         } else {
+            // no type reference, built-in types are always ok.
             AstResult::Ok(res)
+        }
+    }
+
+    /// whether or not the type is a built-in type
+    pub fn is_builtin(&self) -> bool {
+        self.typeinfo.is_builtin()
+    }
+
+    /// whether the type is of a numeric kind
+    pub fn is_numeric(&self) -> bool {
+        self.typeinfo.is_numeric()
+    }
+
+    /// whether or not the type is boolean
+    pub fn is_boolean(&self) -> bool {
+        self.typeinfo.is_boolean()
+    }
+
+    /// whether or not the type is flags
+    pub fn is_flags(&self) -> bool {
+        self.typeinfo.is_flags()
+    }
+
+    /// check whether the type is compatible with the other.
+    ///
+    /// The two types are compatible if they have the same kind
+    /// numeric-numeric, boolean-boolean, flags-flags, or the same
+    /// type reference.
+    pub fn compatible(&self, other: &Self) -> bool {
+        self.typeinfo.compatible(&other.typeinfo)
+    }
+
+    pub fn as_type_kind(&self) -> &str {
+        if self.is_numeric() {
+            "numeric"
+        } else if self.is_boolean() {
+            "boolean"
+        } else if self.is_flags() {
+            "flags"
+        } else {
+            self.typeinfo.as_str()
         }
     }
 }
