@@ -42,6 +42,16 @@ pub enum VelosiParseTreeMap {
     Explicit(VelosiParseTreeMapExplicit),
 }
 
+impl VelosiParseTreeMap {
+    /// Returns the position of the node in the source code
+    pub fn pos(&self) -> &VelosiTokenStream {
+        match self {
+            VelosiParseTreeMap::ListComp(node) => &node.pos,
+            VelosiParseTreeMap::Explicit(node) => &node.pos,
+        }
+    }
+}
+
 impl Display for VelosiParseTreeMap {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
