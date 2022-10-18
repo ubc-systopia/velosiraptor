@@ -74,7 +74,7 @@ impl VelosiAstUnitSegment {
             }
         }
 
-        let derived = if let Some(d) = pt.derived {
+        let _derived = if let Some(d) = pt.derived {
             let d = Rc::new(d);
             let start = 5 + params.len() * 3 + params.len() - std::cmp::min(params.len(), 1);
             let range = start..start + 1;
@@ -101,6 +101,13 @@ impl VelosiAstUnitSegment {
     }
 }
 
+/// Implementation of [Display] for [VelosiAstUnitSegment]
+impl Display for VelosiAstUnitSegment {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        writeln!(f, "Segment ...")
+    }
+}
+
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstUnitStaticMap {
     /// the name of the unit
@@ -112,10 +119,17 @@ pub struct VelosiAstUnitStaticMap {
 impl VelosiAstUnitStaticMap {
     // converts the parse tree node into an ast node, performing checks
     pub fn from_parse_tree(
-        pt: VelosiParseTreeUnitDef,
-        st: &mut SymbolTable,
+        _pt: VelosiParseTreeUnitDef,
+        _st: &mut SymbolTable,
     ) -> AstResult<VelosiAstUnit, VelosiAstIssues> {
         panic!("not implemented");
+    }
+}
+
+/// Implementation of [Display] for [VelosiAstUnitStaticMap]
+impl Display for VelosiAstUnitStaticMap {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        writeln!(f, "StaticMap ...")
     }
 }
 
@@ -180,6 +194,9 @@ impl From<Rc<VelosiAstUnit>> for VelosiAstType {
 /// Implementation of [Display] for [VelosiAstUnit]
 impl Display for VelosiAstUnit {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        panic!("not yet implemented");
+        match self {
+            VelosiAstUnit::Segment(s) => Display::fmt(s, f),
+            VelosiAstUnit::StaticMap(s) => Display::fmt(s, f),
+        }
     }
 }
