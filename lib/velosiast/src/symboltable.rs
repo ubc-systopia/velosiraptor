@@ -78,7 +78,7 @@ impl Display for Symbol {
         match self.ast_node {
             VelosiAstNode::Unit(_) => write!(f, "unit|{:?}|{}", self.typeinfo, self.name),
             VelosiAstNode::Const(_) => write!(f, "const|{:?}|{}", self.typeinfo, self.name),
-            VelosiAstNode::Method => write!(f, "method|{:?}|{}", self.typeinfo, self.name),
+            VelosiAstNode::Method(_) => write!(f, "method|{:?}|{}", self.typeinfo, self.name),
             VelosiAstNode::Param(_) => write!(f, "param|{:?}|{}", self.typeinfo, self.name),
         }
     }

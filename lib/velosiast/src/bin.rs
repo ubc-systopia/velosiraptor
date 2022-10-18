@@ -54,6 +54,12 @@ pub fn main() {
         }
     };
 
+    let res = if let Ok(ps) = res {
+        VelosiParser::resolve_imports(ps)
+    } else {
+        res
+    };
+
     match res {
         Ok(ptree) => {
             let ast = VelosiAst::from_parse_tree(ptree);
@@ -66,7 +72,9 @@ pub fn main() {
                 AstResult::Err(err) => println!("{}", err),
             }
         }
-        Err(VelosiParserError::ImportFailure { .. }) => todo!(),
+        Err(VelosiParserError::ImportFailure { e }) => {
+            println!("Failed import resolution: {}", e);
+        }
         Err(VelosiParserError::ReadSourceFile { e }) => {
             println!("Failed to open the source file: {}", e);
         }
