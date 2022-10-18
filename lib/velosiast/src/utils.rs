@@ -35,7 +35,9 @@ use crate::SymbolTable;
 
 /// checks if the identifier has snake case
 pub fn check_upper_case(issues: &mut VelosiAstIssues, name: &str, loc: VelosiTokenStream) {
-    let allupper = name.chars().all(|x| x.is_uppercase());
+    let allupper = name
+        .chars()
+        .all(|x| x.is_ascii_uppercase() || !x.is_alphanumeric());
     if !allupper {
         let msg = format!("identifier `{}` should have an upper case name", name);
         let hint = format!(
@@ -53,11 +55,13 @@ pub fn check_upper_case(issues: &mut VelosiAstIssues, name: &str, loc: VelosiTok
 
 /// checks whether the identifier is in snake_case
 pub fn check_snake_case(issues: &mut VelosiAstIssues, name: &str, loc: VelosiTokenStream) {
-    let allupper = name.chars().all(|x| x.is_lowercase());
+    let allupper = name
+        .chars()
+        .all(|x| x.is_ascii_lowercase() || !x.is_alphanumeric());
     if !allupper {
         let msg = format!("identifier `{}` should have an snake case name", name);
         let hint = format!(
-            "convert the identifier to upper case (notice the snake_case): `{}`",
+            "convert the identifier to lower case (notice the snake_case): `{}`",
             name.to_ascii_lowercase()
         );
         let err = VelosiAstErrBuilder::warn(msg)

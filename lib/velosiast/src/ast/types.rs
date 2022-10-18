@@ -65,7 +65,7 @@ pub enum VelosiAstTypeInfo {
 impl VelosiAstTypeInfo {
     /// whether or not the type is a built-in type
     pub fn is_builtin(&self) -> bool {
-        matches!(self, VelosiAstTypeInfo::TypeRef(_))
+        !matches!(self, VelosiAstTypeInfo::TypeRef(_))
     }
 
     /// whether or not the type is of a numeric kind

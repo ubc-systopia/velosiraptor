@@ -31,11 +31,13 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
-use velosiparser::{VelosiParseTreeUnit, VelosiParseTreeUnitDef, VelosiTokenStream};
+use velosiparser::{
+    VelosiParseTreeUnit, VelosiParseTreeUnitDef, VelosiParseTreeUnitNode, VelosiTokenStream,
+};
 
 use crate::ast::{
     types::{VelosiAstType, VelosiAstTypeInfo},
-    VelosiAstNode, VelosiAstParam,
+    VelosiAstConst, VelosiAstNode, VelosiAstParam,
 };
 use crate::error::{VelosiAstErrBuilder, VelosiAstErrUndef, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
@@ -88,6 +90,39 @@ impl VelosiAstUnitSegment {
         } else {
             None
         };
+
+        //let mut methods = HashMap::new();
+        let mut consts = HashMap::new();
+        for node in pt.nodes.into_iter() {
+            match node {
+                VelosiParseTreeUnitNode::Const(c) => {
+                    let c = Rc::new(ast_result_unwrap!(
+                        VelosiAstConst::from_parse_tree(c, st),
+                        issues
+                    ));
+                    if let Err(e) = st.insert(c.clone().into()) {
+                        issues.push(e);
+                    } else {
+                        consts.insert(c.name.to_string(), c);
+                    }
+                }
+                VelosiParseTreeUnitNode::InBitWidth(w, loc) => (),
+                VelosiParseTreeUnitNode::OutBitWidth(w, loc) => (),
+                VelosiParseTreeUnitNode::Flags(flags) => (),
+                VelosiParseTreeUnitNode::State(state) => (),
+                VelosiParseTreeUnitNode::Interface(interface) => (),
+                VelosiParseTreeUnitNode::Method(method) => {}
+                VelosiParseTreeUnitNode::Map(map) => {
+                    let msg = "Ignored unit node: Map definitions are not supported in Segments.";
+                    let hint = "Remove the map definition.";
+                    let err = VelosiAstErrBuilder::warn(msg.to_string())
+                        .add_hint(hint.to_string())
+                        .add_location(map.pos().clone())
+                        .build();
+                    issues.push(err);
+                }
+            }
+        }
 
         let res = Self {
             name: Rc::new(pt.name),
