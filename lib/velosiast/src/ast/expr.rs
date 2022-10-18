@@ -23,7 +23,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use std::collections::{HashMap, HashSet};
 ///! Ast Module of the Velosiraptor Compiler
 // used standard library functionality
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
@@ -31,8 +30,8 @@ use std::rc::Rc;
 
 // used crate functionality
 use crate::ast::VelosiAstNode;
-use crate::error::{VelosiAstErr, VelosiAstErrUndef, VelosiAstIssues};
-use crate::{AstResult, SymbolTable};
+use crate::error::{VelosiAstErrBuilder, VelosiAstErrUndef, VelosiAstIssues};
+use crate::{ast_result_unwrap, AstResult, SymbolTable};
 use velosiparser::{
     VelosiParseTreeBinOp, VelosiParseTreeBinOpExpr, VelosiParseTreeBoolLiteral,
     VelosiParseTreeExpr, VelosiParseTreeFnCallExpr, VelosiParseTreeIdentifierLiteral,
@@ -41,6 +40,8 @@ use velosiparser::{
     VelosiParseTreeUnOp, VelosiParseTreeUnOpExpr, VelosiTokenStream,
 };
 
+use super::VelosiAstTypeInfo;
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Binary Operation Expressions
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -48,7 +49,7 @@ use velosiparser::{
 /// Binary operations for [VelosiAstExpr] <OP> [VelosiAstExpr]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum VelosiAstBinOp {
-    // arithmetic opreators
+    // arithmetic opreators: Numeric <OP> Numeric -> Numeric
     Plus,
     Minus,
     Multiply,
@@ -59,13 +60,15 @@ pub enum VelosiAstBinOp {
     And,
     Xor,
     Or,
-    // boolean operators
+    // equality operators: Numeric|Bool <OP> Numeric|Bool -> Bool
     Eq,
     Ne,
+    // Comparison Operators: Numeric <OP> Numeric -> Bool
     Lt,
     Gt,
     Le,
     Ge,
+    // logical operators: Bool <OP> Bool -> Bool
     Land,
     Lor,
     Implies,
@@ -73,119 +76,47 @@ pub enum VelosiAstBinOp {
 
 /// Implementation of binary operators
 impl VelosiAstBinOp {
-    /// Evalutes a BinOp expression
-    ///
-    /// The function creates a new [Expr] from the supplied operation and expression.
-    /// It folds the expression if applicapble
-    ///
-    /// # Example
-    ///
-    /// `1 + 4 => 5`
-    /// `1 < 5 => True`
-    /// `x + 5 => x + 5`
-    // pub fn eval(&self, lhs: Expr, rhs: Expr, pos: TokenStream) -> Expr {
-    //     use VelosiAstBinOp::*;
-    //     use VelosiAstExpr::*;
+    pub fn types_ok(&self, lhs_type: &VelosiAstTypeInfo, rhs_type: &VelosiAstTypeInfo) -> bool {
+        use VelosiAstBinOp::*;
+        match self {
+            Plus | Minus | Multiply | Divide | Modulo | LShift | RShift | And | Xor | Or => {
+                lhs_type.compatible(&VelosiAstTypeInfo::Integer)
+                    && rhs_type.compatible(&VelosiAstTypeInfo::Integer)
+            }
+            Eq | Ne => !rhs_type.compatible(lhs_type),
+            Lt | Gt | Le | Ge => {
+                lhs_type.compatible(&VelosiAstTypeInfo::Integer)
+                    && rhs_type.compatible(&VelosiAstTypeInfo::Integer)
+            }
+            Land | Lor | Implies => {
+                lhs_type.compatible(&VelosiAstTypeInfo::Bool)
+                    && rhs_type.compatible(&VelosiAstTypeInfo::Bool)
+            }
+        }
+    }
 
-    //     match (self, lhs, rhs) {
-    //         // XXX: handle case where v1 + v2 overflows
-    //         (Plus, Number { value: v1, .. }, Number { value: v2, .. }) => Number {
-    //             value: v1 + v2,
-    //             pos,
-    //         },
-    //         // XXX: handle case where v2 > v1
-    //         (Minus, Number { value: v1, .. }, Number { value: v2, .. }) => Number {
-    //             value: v1 - v2,
-    //             pos,
-    //         },
-    //         // XXX: handle case where v1 * v2 overflows
-    //         (Multiply, Number { value: v1, .. }, Number { value: v2, .. }) => Number {
-    //             value: v1 * v2,
-    //             pos,
-    //         },
-    //         // XXX: handle case where v2 == 0
-    //         (Divide, Number { value: v1, .. }, Number { value: v2, .. }) => Number {
-    //             value: v1 / v2,
-    //             pos,
-    //         },
-    //         // XXX: handle case where v2 == 0
-    //         (Modulo, Number { value: v1, .. }, Number { value: v2, .. }) => Number {
-    //             value: v1 % v2,
-    //             pos,
-    //         },
-    //         // XXX: handle case where v2 > 63
-    //         (LShift, Number { value: v1, .. }, Number { value: v2, .. }) => Number {
-    //             value: v1 << v2,
-    //             pos,
-    //         },
-    //         // XXX: handle case where v2 > 63
-    //         (RShift, Number { value: v1, .. }, Number { value: v2, .. }) => Number {
-    //             value: v1 >> v2,
-    //             pos,
-    //         },
-    //         (And, Number { value: v1, .. }, Number { value: v2, .. }) => Number {
-    //             value: v1 & v2,
-    //             pos,
-    //         },
-    //         (Xor, Number { value: v1, .. }, Number { value: v2, .. }) => Number {
-    //             value: v1 ^ v2,
-    //             pos,
-    //         },
-    //         (Or, Number { value: v1, .. }, Number { value: v2, .. }) => Number {
-    //             value: v1 | v2,
-    //             pos,
-    //         },
-    //         // comparisons
-    //         (Eq, Number { value: v1, .. }, Number { value: v2, .. }) => Boolean {
-    //             value: v1 == v2,
-    //             pos,
-    //         },
-    //         (Ne, Number { value: v1, .. }, Number { value: v2, .. }) => Boolean {
-    //             value: v1 != v2,
-    //             pos,
-    //         },
-    //         (Lt, Number { value: v1, .. }, Number { value: v2, .. }) => Boolean {
-    //             value: v1 < v2,
-    //             pos,
-    //         },
-    //         (Gt, Number { value: v1, .. }, Number { value: v2, .. }) => Boolean {
-    //             value: v1 > v2,
-    //             pos,
-    //         },
-    //         (Le, Number { value: v1, .. }, Number { value: v2, .. }) => Boolean {
-    //             value: v1 <= v2,
-    //             pos,
-    //         },
-    //         (Ge, Number { value: v1, .. }, Number { value: v2, .. }) => Boolean {
-    //             value: v1 >= v2,
-    //             pos,
-    //         },
-    //         // booleans
-    //         (Land, Boolean { value: v1, .. }, Boolean { value: v2, .. }) => Boolean {
-    //             value: v1 && v2,
-    //             pos,
-    //         },
-    //         (Lor, Boolean { value: v1, .. }, Boolean { value: v2, .. }) => Boolean {
-    //             value: v1 || v2,
-    //             pos,
-    //         },
-    //         (Eq, Boolean { value: v1, .. }, Boolean { value: v2, .. }) => Boolean {
-    //             value: v1 == v2,
-    //             pos,
-    //         },
-    //         (Ne, Boolean { value: v1, .. }, Boolean { value: v2, .. }) => Boolean {
-    //             value: v1 != v2,
-    //             pos,
-    //         },
-    //         // can't handle this
-    //         (_, lhs, rhs) => BinaryOperation {
-    //             op: *self,
-    //             lhs: Box::new(lhs),
-    //             rhs: Box::new(rhs),
-    //             pos,
-    //         },
-    //     }
-    // }
+    pub fn is_arithmetic(&self) -> bool {
+        use VelosiAstBinOp::*;
+        matches!(
+            self,
+            Plus | Minus | Multiply | Divide | Modulo | LShift | RShift | And | Xor | Or
+        )
+    }
+
+    pub fn is_equality(&self) -> bool {
+        use VelosiAstBinOp::*;
+        matches!(self, Eq | Ne)
+    }
+
+    pub fn is_comparison(&self) -> bool {
+        use VelosiAstBinOp::*;
+        matches!(self, Lt | Gt | Le | Ge)
+    }
+
+    pub fn is_logical(&self) -> bool {
+        use VelosiAstBinOp::*;
+        matches!(self, Land | Lor | Implies)
+    }
 
     /// the result type of a binary operation
     fn result_numeric(&self) -> bool {
@@ -240,6 +171,16 @@ impl VelosiAstBinOp {
             Land => true,
             Lor => true,
             Implies => true,
+        }
+    }
+
+    pub fn result_type(&self, _st: &SymbolTable) -> &VelosiAstTypeInfo {
+        if self.result_numeric() {
+            &VelosiAstTypeInfo::Integer
+        } else if self.result_boolean() {
+            &VelosiAstTypeInfo::Bool
+        } else {
+            unreachable!()
         }
     }
 }
@@ -310,12 +251,150 @@ pub struct VelosiAstBinOpExpr {
 }
 
 impl VelosiAstBinOpExpr {
+    pub fn new(
+        lhs: VelosiAstExpr,
+        op: VelosiAstBinOp,
+        rhs: VelosiAstExpr,
+        loc: VelosiTokenStream,
+    ) -> VelosiAstBinOpExpr {
+        VelosiAstBinOpExpr {
+            lhs: Box::new(lhs),
+            op,
+            rhs: Box::new(rhs),
+            loc,
+        }
+    }
+
     pub fn from_parse_tree(
-        p: VelosiParseTreeBinOpExpr,
+        pt: VelosiParseTreeBinOpExpr,
         st: &SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
-        let op = VelosiAstBinOp::from(p.op);
-        panic!("nyi");
+        let mut issues = VelosiAstIssues::new();
+
+        // convet the lhs/rhs and operator
+        let op = VelosiAstBinOp::from(pt.op);
+        let lhs = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(*pt.lhs, st), issues);
+        let rhs = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(*pt.rhs, st), issues);
+
+        // obtain the result types
+        let lhs_type = lhs.result_type(st);
+        let rhs_type = rhs.result_type(st);
+
+        // evaluate whether the types are ok
+        if !op.types_ok(lhs_type, rhs_type) {
+            let msg = "Unsupported type combination in binary operation";
+            let hint = format!("No implementation for `{} {} {}`", lhs_type, op, rhs_type);
+
+            let err = VelosiAstErrBuilder::err(msg.to_string())
+                .add_hint(hint)
+                .add_location(pt.loc.clone())
+                .build();
+            issues.push(err);
+        }
+
+        // evaluate the expression, see if we can fold the constants
+        let res = VelosiAstBinOpExpr::new(lhs, op, rhs, pt.loc).eval();
+
+        if issues.is_ok() {
+            AstResult::Ok(res)
+        } else {
+            AstResult::Issues(res, issues)
+        }
+    }
+
+    fn eval(self) -> VelosiAstExpr {
+        use VelosiAstBinOp::*;
+        use VelosiAstExpr::*;
+        match (self.lhs.as_ref(), self.op, self.rhs.as_ref()) {
+            // arithmetic operators
+            (NumLiteral(l), Plus, NumLiteral(r)) => {
+                // TODO: check for overflow!
+                NumLiteral(VelosiAstNumLiteralExpr::new(l.val + r.val, self.loc))
+            }
+            (NumLiteral(l), Minus, NumLiteral(r)) => {
+                // TODO: check for underflow!
+                NumLiteral(VelosiAstNumLiteralExpr::new(l.val - r.val, self.loc))
+            }
+            (NumLiteral(l), Multiply, NumLiteral(r)) => {
+                // TODO: check for overflow
+                NumLiteral(VelosiAstNumLiteralExpr::new(l.val * r.val, self.loc))
+            }
+            (NumLiteral(l), Divide, NumLiteral(r)) => {
+                // TODO: check for division by 0
+                NumLiteral(VelosiAstNumLiteralExpr::new(l.val / r.val, self.loc))
+            }
+            (NumLiteral(l), Modulo, NumLiteral(r)) => {
+                // TODO: check for division by 0!
+                NumLiteral(VelosiAstNumLiteralExpr::new(l.val % r.val, self.loc))
+            }
+            (NumLiteral(l), LShift, NumLiteral(r)) => {
+                // TODO: check for shift amount
+                NumLiteral(VelosiAstNumLiteralExpr::new(l.val << r.val, self.loc))
+            }
+            (NumLiteral(l), RShift, NumLiteral(r)) => {
+                // TODO: check for shift amount!
+                NumLiteral(VelosiAstNumLiteralExpr::new(l.val >> r.val, self.loc))
+            }
+            (NumLiteral(l), And, NumLiteral(r)) => {
+                // TODO: check for shift amount!
+                NumLiteral(VelosiAstNumLiteralExpr::new(l.val & r.val, self.loc))
+            }
+            (NumLiteral(l), Or, NumLiteral(r)) => {
+                // TODO: check for shift amount!
+                NumLiteral(VelosiAstNumLiteralExpr::new(l.val | r.val, self.loc))
+            }
+            (NumLiteral(l), Xor, NumLiteral(r)) => {
+                // TODO: check for shift amount!
+                NumLiteral(VelosiAstNumLiteralExpr::new(l.val ^ r.val, self.loc))
+            }
+            // equality operators
+            (NumLiteral(l), Eq, NumLiteral(r)) => {
+                BoolLiteral(VelosiAstBoolLiteralExpr::new(l.val == r.val, self.loc))
+            }
+            (NumLiteral(l), Ne, NumLiteral(r)) => {
+                BoolLiteral(VelosiAstBoolLiteralExpr::new(l.val != r.val, self.loc))
+            }
+            (BoolLiteral(l), Eq, BoolLiteral(r)) => {
+                BoolLiteral(VelosiAstBoolLiteralExpr::new(l.val == r.val, self.loc))
+            }
+            (BoolLiteral(l), Ne, BoolLiteral(r)) => {
+                BoolLiteral(VelosiAstBoolLiteralExpr::new(l.val != r.val, self.loc))
+            }
+            // comparison operators
+            (NumLiteral(l), Lt, NumLiteral(r)) => {
+                BoolLiteral(VelosiAstBoolLiteralExpr::new(l.val < r.val, self.loc))
+            }
+            (NumLiteral(l), Gt, NumLiteral(r)) => {
+                BoolLiteral(VelosiAstBoolLiteralExpr::new(l.val > r.val, self.loc))
+            }
+            (NumLiteral(l), Ge, NumLiteral(r)) => {
+                BoolLiteral(VelosiAstBoolLiteralExpr::new(l.val >= r.val, self.loc))
+            }
+            (NumLiteral(l), Le, NumLiteral(r)) => {
+                BoolLiteral(VelosiAstBoolLiteralExpr::new(l.val <= r.val, self.loc))
+            }
+            // logical operators
+            (BoolLiteral(l), Land, BoolLiteral(r)) => {
+                BoolLiteral(VelosiAstBoolLiteralExpr::new(l.val && r.val, self.loc))
+            }
+            (BoolLiteral(l), Lor, BoolLiteral(r)) => {
+                BoolLiteral(VelosiAstBoolLiteralExpr::new(l.val || r.val, self.loc))
+            }
+            (BoolLiteral(l), Implies, BoolLiteral(r)) => {
+                BoolLiteral(VelosiAstBoolLiteralExpr::new(!l.val || r.val, self.loc))
+            }
+            _ => BinOp(self),
+        }
+    }
+
+    pub fn flatten(self, st: &SymbolTable) -> VelosiAstExpr {
+        let lhs = self.lhs.flatten(st);
+        let rhs = self.rhs.flatten(st);
+        VelosiAstBinOpExpr::new(lhs, self.op, rhs, self.loc).eval()
+    }
+
+    pub fn result_type(&self, st: &SymbolTable) -> &VelosiAstTypeInfo {
+        self.op.result_type(st)
     }
 }
 
@@ -334,25 +413,49 @@ impl Display for VelosiAstBinOpExpr {
 pub enum VelosiAstUnOp {
     // arithmetic operators
     Not,
-    Ref,
+    // Ref,
     // boolean operator
     LNot,
 }
 
 /// Implementation of an unary operator
 impl VelosiAstUnOp {
-    // pub fn eval(&self, val: VelosiAstExpr, pos: VelosiTokenStream) -> VelosiAstExpr {
-    //     use VelosiAstUnOp::*;
-    //     match (self, val) {
-    //         (LNot, Boolean { value, pos: _ }) => Boolean { value: !value, pos },
-    //         (Not, Number { value, pos: _ }) => Number { value: !value, pos },
-    //         (_, val) => UnaryOperation {
-    //             op: *self,
-    //             val: Box::new(val),
-    //             pos,
-    //         },
-    //     }
-    // }
+    pub fn types_ok(&self, expr_type: &VelosiAstTypeInfo) -> bool {
+        use VelosiAstUnOp::*;
+        match self {
+            Not => expr_type.compatible(&VelosiAstTypeInfo::Integer),
+            LNot => expr_type.compatible(&VelosiAstTypeInfo::Bool),
+        }
+    }
+
+    pub fn is_arithmetic(&self) -> bool {
+        use VelosiAstUnOp::*;
+        matches!(self, Not)
+    }
+
+    pub fn is_logical(&self) -> bool {
+        use VelosiAstUnOp::*;
+        matches!(self, LNot)
+    }
+
+    /// the result type of a binary operation
+    pub fn result_numeric(&self) -> bool {
+        self.is_arithmetic()
+    }
+
+    /// the result type of a binary operation
+    pub fn result_boolean(&self) -> bool {
+        self.is_logical()
+    }
+
+    pub fn result_type(&self, _st: &SymbolTable) -> &VelosiAstTypeInfo {
+        use self::VelosiAstUnOp::*;
+        match self {
+            Not => &VelosiAstTypeInfo::Integer,
+            LNot => &VelosiAstTypeInfo::Bool,
+            // Ref => panic!("not supported"),
+        }
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstUnOp]
@@ -362,7 +465,7 @@ impl Display for VelosiAstUnOp {
         match self {
             Not => write!(format, "~"),
             LNot => write!(format, "!"),
-            Ref => write!(format, "&"),
+            //Ref => write!(format, "&"),
         }
     }
 }
@@ -387,12 +490,71 @@ pub struct VelosiAstUnOpExpr {
 }
 
 impl VelosiAstUnOpExpr {
+    pub fn new(
+        op: VelosiAstUnOp,
+        expr: VelosiAstExpr,
+        loc: VelosiTokenStream,
+    ) -> VelosiAstUnOpExpr {
+        VelosiAstUnOpExpr {
+            op,
+            expr: Box::new(expr),
+            loc,
+        }
+    }
     pub fn from_parse_tree(
-        p: VelosiParseTreeUnOpExpr,
+        pt: VelosiParseTreeUnOpExpr,
         st: &SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
-        let op = VelosiAstUnOp::from(p.op);
-        panic!("nyi");
+        let mut issues = VelosiAstIssues::new();
+
+        // convet the lhs/rhs and operator
+        let op = VelosiAstUnOp::from(pt.op);
+        let expr = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(*pt.expr, st), issues);
+
+        // obtain the result types
+        let expr_type = expr.result_type(st);
+
+        // evaluate whether the types are ok
+        if !op.types_ok(expr_type) {
+            let msg = "Unsupported type combination in unary operation";
+            let hint = format!("No implementation for `{} {}`", op, expr_type);
+
+            let err = VelosiAstErrBuilder::err(msg.to_string())
+                .add_hint(hint)
+                .add_location(pt.loc.clone())
+                .build();
+            issues.push(err);
+        }
+
+        // evaluate the expression, see if we can fold the constants
+        let res = VelosiAstUnOpExpr::new(op, expr, pt.loc).eval();
+
+        if issues.is_ok() {
+            AstResult::Ok(res)
+        } else {
+            AstResult::Issues(res, issues)
+        }
+    }
+
+    fn eval(self) -> VelosiAstExpr {
+        use VelosiAstExpr::*;
+        use VelosiAstUnOp::*;
+        match (self.op, self.expr.as_ref()) {
+            // arithmetic operators
+            (Not, NumLiteral(l)) => NumLiteral(VelosiAstNumLiteralExpr::new(!l.val, self.loc)),
+            // boolean operators
+            (LNot, BoolLiteral(l)) => BoolLiteral(VelosiAstBoolLiteralExpr::new(!l.val, self.loc)),
+            _ => UnOp(self),
+        }
+    }
+
+    pub fn flatten(self, st: &SymbolTable) -> VelosiAstExpr {
+        let val = self.expr.flatten(st);
+        VelosiAstUnOpExpr::new(self.op, val, self.loc).eval()
+    }
+
+    pub fn result_type(&self, st: &SymbolTable) -> &VelosiAstTypeInfo {
+        self.op.result_type(st)
     }
 }
 
@@ -460,8 +622,8 @@ impl VelosiAstQuantifierExpr {
     // }
 
     pub fn from_parse_tree(
-        p: VelosiParseTreeQuantifierExpr,
-        st: &SymbolTable,
+        _p: VelosiParseTreeQuantifierExpr,
+        _st: &SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
         panic!("nyi");
 
@@ -470,6 +632,10 @@ impl VelosiAstQuantifierExpr {
 
         // let e = VelosiAstQuantifierExpr::new(quant, params, expr, p.loc);
         // Ok(VelosiAstExpr::Quantifier(e))
+    }
+
+    pub fn flatten(self, _st: &SymbolTable) -> VelosiAstExpr {
+        panic!("nyi");
     }
 }
 
@@ -495,12 +661,13 @@ impl Display for VelosiAstQuantifierExpr {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstIdentLiteralExpr {
     path: Vec<String>,
+    etype: VelosiAstTypeInfo,
     loc: VelosiTokenStream,
 }
 
 impl VelosiAstIdentLiteralExpr {
-    pub fn new(path: Vec<String>, loc: VelosiTokenStream) -> Self {
-        VelosiAstIdentLiteralExpr { path, loc }
+    pub fn new(path: Vec<String>, etype: VelosiAstTypeInfo, loc: VelosiTokenStream) -> Self {
+        VelosiAstIdentLiteralExpr { path, etype, loc }
     }
 
     pub fn from_parse_tree(
@@ -509,33 +676,41 @@ impl VelosiAstIdentLiteralExpr {
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
         // lookup the symbol in the symbol table
 
-        let litexpr = VelosiAstIdentLiteralExpr::new(p.path, p.loc);
+        let litexpr = VelosiAstIdentLiteralExpr::new(p.path, VelosiAstTypeInfo::Integer, p.loc);
         let tname = litexpr.path.join(".");
 
-        let res = VelosiAstExpr::IdentLiteral(litexpr);
-
-        if let Some(s) = st.lookup(tname.as_str()) {
-            match &s.ast_node {
-                VelosiAstNode::Const(c) => {
-                    debug_assert!(c.value.is_const_expr());
-                    // replace the identifier with the constant value
-                    AstResult::Ok(c.value.clone())
-                }
-                VelosiAstNode::Param(_) => AstResult::Ok(res),
-                _ => {
-                    // we have the wrong kind of symbol
-                    let err = VelosiAstErrUndef::with_other(
-                        Rc::new(tname),
-                        res.loc().clone(),
-                        s.loc().clone(),
-                    );
-                    AstResult::Issues(res, err.into())
-                }
-            }
-        } else {
-            let err = VelosiAstErrUndef::new(Rc::new(tname), res.loc().clone());
-            AstResult::Issues(res, err.into())
+        let sym = st.lookup(tname.as_str());
+        if sym.is_none() {
+            let err = VelosiAstErrUndef::new(Rc::new(tname), litexpr.loc.clone());
+            return AstResult::Issues(VelosiAstExpr::IdentLiteral(litexpr), err.into());
         }
+
+        let sym = sym.unwrap();
+        match &sym.ast_node {
+            VelosiAstNode::Const(c) => {
+                debug_assert!(c.value.is_const_expr());
+                // replace the identifier with the constant value
+                AstResult::Ok(c.value.clone())
+            }
+            VelosiAstNode::Param(_p) => {
+                // // litexpr.etype = p.ptype;
+                // AstResult::Ok(VelosiAstExpr::IdentLiteral(litexpr));
+                panic!("nyi")
+            }
+            _ => {
+                // we have the wrong kind of symbol
+                let err = VelosiAstErrUndef::with_other(
+                    Rc::new(tname),
+                    litexpr.loc.clone(),
+                    sym.loc().clone(),
+                );
+                AstResult::Issues(VelosiAstExpr::IdentLiteral(litexpr), err.into())
+            }
+        }
+    }
+
+    pub fn result_type(&self, _st: &SymbolTable) -> &VelosiAstTypeInfo {
+        &self.etype
     }
 }
 
@@ -560,7 +735,7 @@ impl VelosiAstNumLiteralExpr {
 
     pub fn from_parse_tree(
         p: VelosiParseTreeNumLiteral,
-        st: &SymbolTable,
+        _st: &SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
         // we can just convert the literal, as all values should be fine
         let e = VelosiAstNumLiteralExpr::new(p.value, p.loc);
@@ -589,7 +764,7 @@ impl VelosiAstBoolLiteralExpr {
 
     pub fn from_parse_tree(
         p: VelosiParseTreeBoolLiteral,
-        st: &SymbolTable,
+        _st: &SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
         // we can just convert the literal, as all values should be fine
         let e = VelosiAstBoolLiteralExpr::new(p.value, p.loc);
@@ -611,17 +786,99 @@ impl Display for VelosiAstBoolLiteralExpr {
 /// Represents an boolean literal expression
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstFnCallExpr {
-    pub path: VelosiAstIdentLiteralExpr,
+    pub path: String,
     pub args: Vec<VelosiAstExpr>,
+    pub etype: VelosiAstTypeInfo,
     pub loc: VelosiTokenStream,
 }
 
 impl VelosiAstFnCallExpr {
+    pub fn new(
+        path: String,
+        args: Vec<VelosiAstExpr>,
+        etype: VelosiAstTypeInfo,
+        loc: VelosiTokenStream,
+    ) -> Self {
+        VelosiAstFnCallExpr {
+            path,
+            args,
+            etype,
+            loc,
+        }
+    }
+
     pub fn from_parse_tree(
-        p: VelosiParseTreeFnCallExpr,
+        pt: VelosiParseTreeFnCallExpr,
         st: &SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
-        panic!("nyi!");
+        let mut issues = VelosiAstIssues::new();
+
+        // process the function call arguments
+        let mut args = Vec::with_capacity(pt.args.len());
+        for a in pt.args.into_iter() {
+            let arg = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(a, st), issues);
+            args.push(arg);
+        }
+
+        // construct the default function call expression node
+        let res = VelosiAstFnCallExpr::new(
+            pt.path.to_string(),
+            args,
+            VelosiAstTypeInfo::Integer,
+            pt.loc,
+        );
+
+        //     error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+        //     --> lib/velosiast/src/ast/expr.rs:937:21
+        //      |
+        //  937 |             let e = VelosiAstIfElseExpr::new(cond, then, other, self.loc);
+        //      |                     ^^^^^^^^^^^^^^^^^^^^^^^^                    -------- an argument of type `VelosiAstTypeInfo` is missing
+        //      |
+
+        //     error[E0308]: mismatched types
+        //     --> lib/velosiast/src/ast/expr.rs:822:31
+        //      |
+        //  822 |             AstResult::Issues(res, issues)
+        //      |             ----------------- ^^^ expected enum `VelosiAstExpr`, found struct `VelosiAstFnCallExpr`
+        //      |             |
+        //      |             arguments to this enum variant are incorrect
+
+        let fn_name = pt.path.to_string();
+
+        let fn_sym = st.lookup(fn_name.as_str());
+        if fn_sym.is_none() {
+            // there was no symbol
+            let err = VelosiAstErrUndef::new(Rc::new(fn_name), res.loc.clone());
+            return AstResult::Issues(VelosiAstExpr::FnCall(res), err.into());
+        }
+
+        let fn_sym = fn_sym.unwrap();
+        if let VelosiAstNode::Method(_m) = &fn_sym.ast_node {
+            panic!("not implemented");
+        } else {
+            // we have the wrong kind of symbol
+            let err = VelosiAstErrUndef::with_other(
+                Rc::new(fn_name),
+                res.loc.clone(),
+                fn_sym.loc().clone(),
+            );
+            return AstResult::Issues(VelosiAstExpr::FnCall(res), err.into());
+        }
+
+        if issues.is_ok() {
+            AstResult::Ok(VelosiAstExpr::FnCall(res))
+        } else {
+            AstResult::Issues(VelosiAstExpr::FnCall(res), issues)
+        }
+    }
+
+    pub fn flatten(self, st: &SymbolTable) -> VelosiAstExpr {
+        let args = self.args.into_iter().map(|a| a.flatten(st)).collect();
+        VelosiAstExpr::FnCall(Self::new(self.path, args, self.etype, self.loc))
+    }
+
+    pub fn result_type(&self, _st: &SymbolTable) -> &VelosiAstTypeInfo {
+        &self.etype
     }
 }
 
@@ -648,15 +905,90 @@ pub struct VelosiAstIfElseExpr {
     pub cond: Box<VelosiAstExpr>,
     pub then: Box<VelosiAstExpr>,
     pub other: Box<VelosiAstExpr>,
+    pub etype: VelosiAstTypeInfo,
     pub loc: VelosiTokenStream,
 }
 
 impl VelosiAstIfElseExpr {
+    pub fn new(
+        cond: VelosiAstExpr,
+        then: VelosiAstExpr,
+        other: VelosiAstExpr,
+        etype: VelosiAstTypeInfo,
+        loc: VelosiTokenStream,
+    ) -> Self {
+        VelosiAstIfElseExpr {
+            cond: Box::new(cond),
+            then: Box::new(then),
+            other: Box::new(other),
+            etype,
+            loc,
+        }
+    }
     pub fn from_parse_tree(
-        p: VelosiParseTreeIfElseExpr,
+        pt: VelosiParseTreeIfElseExpr,
         st: &SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
-        panic!("nyi!");
+        let mut issues = VelosiAstIssues::new();
+
+        let cond = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(*pt.cond, st), issues);
+        let then = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(*pt.then, st), issues);
+        let other = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(*pt.other, st), issues);
+
+        let cond_type = cond.result_type(st);
+        if *cond_type != VelosiAstTypeInfo::Bool {
+            let msg = format!("Expected boolean expression was {} expression.", cond_type);
+            let hint = "Convert this expression into a boolean expression";
+
+            let err = VelosiAstErrBuilder::err(msg)
+                .add_hint(hint.to_string())
+                .add_location(cond.loc().clone())
+                .build();
+            issues.push(err);
+        }
+
+        let then_type = then.result_type(st).clone();
+        let other_type = other.result_type(st);
+
+        if !other_type.compatible(&then_type) {
+            let msg = "The two branches of the if-then-else expression have different types";
+            let hint = format!("Convert this expression into a {} exoression", then_type);
+
+            let err = VelosiAstErrBuilder::err(msg.to_string())
+                .add_hint(hint)
+                .add_location(cond.loc().clone())
+                .build();
+            issues.push(err);
+        }
+
+        let e = VelosiAstIfElseExpr::new(cond, then, other, then_type, pt.loc).flatten(st);
+        if issues.is_ok() {
+            AstResult::Ok(e)
+        } else {
+            AstResult::Issues(e, issues)
+        }
+    }
+
+    pub fn flatten(self, st: &SymbolTable) -> VelosiAstExpr {
+        let then = self.then.flatten(st);
+        let other = self.other.flatten(st);
+        let cond = self.cond.flatten(st);
+
+        if let VelosiAstExpr::BoolLiteral(b) = &cond {
+            if b.val {
+                then
+            } else {
+                other
+            }
+        } else {
+            let restype = then.result_type(st).clone();
+            let e = VelosiAstIfElseExpr::new(cond, then, other, restype, self.loc);
+            VelosiAstExpr::IfElse(e)
+        }
+    }
+
+    pub fn result_type(&self, _st: &SymbolTable) -> &VelosiAstTypeInfo {
+        &self.etype
     }
 }
 
@@ -684,10 +1016,14 @@ pub struct VelosiAstRangeExpr {
 
 impl VelosiAstRangeExpr {
     pub fn from_parse_tree(
-        p: VelosiParseTreeRangeExpr,
-        st: &SymbolTable,
+        _p: VelosiParseTreeRangeExpr,
+        _st: &SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
         panic!("nyi!");
+    }
+
+    pub fn flatten(self, _st: &SymbolTable) -> VelosiAstExpr {
+        VelosiAstExpr::Range(self)
     }
 }
 
@@ -710,10 +1046,26 @@ pub struct VelosiAstSliceExpr {
 }
 
 impl VelosiAstSliceExpr {
+    pub fn new(
+        name: VelosiAstIdentLiteralExpr,
+        range: VelosiAstRangeExpr,
+        loc: VelosiTokenStream,
+    ) -> Self {
+        VelosiAstSliceExpr { name, range, loc }
+    }
     pub fn from_parse_tree(
-        p: VelosiParseTreeSliceExpr,
-        st: &SymbolTable,
+        _p: VelosiParseTreeSliceExpr,
+        _st: &SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
+        panic!("nyi!");
+    }
+
+    pub fn flatten(self, _st: &SymbolTable) -> VelosiAstExpr {
+        panic!("nyi!");
+        // VelosiAstExpr::Slice(Self::new(self.name, self.range.flatten(st), self.loc))
+    }
+
+    pub fn result_type(&self, _st: &SymbolTable) -> &VelosiAstTypeInfo {
         panic!("nyi!");
     }
 }
@@ -789,6 +1141,36 @@ impl VelosiAstExpr {
         // result should only be constant if its a literal
         matches!(self, NumLiteral(_) | BoolLiteral(_))
     }
+
+    pub fn result_type(&self, st: &SymbolTable) -> &VelosiAstTypeInfo {
+        use VelosiAstExpr::*;
+        match self {
+            IdentLiteral(e) => e.result_type(st),
+            NumLiteral(_) => &VelosiAstTypeInfo::Integer,
+            BoolLiteral(_) => &VelosiAstTypeInfo::Bool,
+            BinOp(e) => e.result_type(st),
+            UnOp(e) => e.result_type(st),
+            Quantifier(_) => &VelosiAstTypeInfo::Bool,
+            FnCall(e) => e.result_type(st),
+            IfElse(e) => e.result_type(st),
+            Slice(e) => e.result_type(st),
+            Range(_) => &VelosiAstTypeInfo::Range,
+        }
+    }
+
+    pub fn flatten(self, st: &SymbolTable) -> Self {
+        use VelosiAstExpr::*;
+        match self {
+            BinOp(e) => e.flatten(st),
+            UnOp(e) => e.flatten(st),
+            Quantifier(e) => e.flatten(st),
+            FnCall(e) => e.flatten(st),
+            IfElse(e) => e.flatten(st),
+            Slice(e) => e.flatten(st),
+            Range(e) => e.flatten(st),
+            _ => self,
+        }
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstExpr]
@@ -836,7 +1218,8 @@ impl Display for VelosiAstExpr {
 //     },
 //     /// Represents a function call  `a.b(x,y)`
 //     FnCall {
-//         path: Vec<String>,
+//         path: Vec<String>,        let lhs = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(*p.lhs, st), issues);
+//let rhs = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(*p.rhs, st), issues);
 //         args: Vec<Expr>,
 //         pos: TokenStream,
 //     },
