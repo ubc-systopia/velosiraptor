@@ -33,9 +33,8 @@ use std::rc::Rc;
 use velosiparser::{VelosiParseTreeConstDef, VelosiTokenStream};
 
 use crate::ast::{expr::VelosiAstExpr, types::VelosiAstType, VelosiAstNode};
-use crate::error::{VelosiAstErr, VelosiAstIssues};
-use crate::utils;
-use crate::{AstResult, Symbol, SymbolTable};
+use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
+use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstConst {
@@ -49,19 +48,22 @@ pub struct VelosiAstConst {
     pub loc: VelosiTokenStream,
 }
 
-// ff
-macro_rules! ast_result_unwrap (($e: expr, $issues: expr) => (
-    match $e {
-        AstResult::Ok(t) => t,
-        AstResult::Issues(t, e) => {
-            $issues.merge(e.into());
-            t
-        }
-        AstResult::Err(e) => return AstResult::Err(e.into()),
-    }
-));
-
 impl VelosiAstConst {
+    pub fn new(
+        name: Rc<String>,
+        ctype: VelosiAstType,
+        value: VelosiAstExpr,
+        loc: VelosiTokenStream,
+    ) -> Self {
+        Self {
+            name,
+            ctype,
+            value,
+            loc,
+        }
+    }
+
+    // converts the parse tree node into an ast node, performing checks
     pub fn from_parse_tree(
         pt: VelosiParseTreeConstDef,
         st: &mut SymbolTable,
@@ -69,26 +71,53 @@ impl VelosiAstConst {
         let mut issues = VelosiAstIssues::new();
 
         // check whether the name is in the right format
-        utils::check_upper_case(&mut issues, &pt.name, &pt.loc);
+        utils::check_upper_case(&mut issues, &pt.name, pt.loc.from_self_with_subrange(1..2));
 
+        // obtain the type information, must be a built-in type
         let ctype = ast_result_unwrap!(VelosiAstType::from_parse_tree(pt.ctype, st), issues);
-        let value = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(pt.value, st), issues);
-
-        let res = Self {
-            name: Rc::new(pt.name),
-            ctype,
-            value,
-            loc: pt.loc,
-        };
-
-        if issues.is_ok() {
-            AstResult::Ok(res)
-        } else {
-            AstResult::Issues(res, issues)
+        if !ctype.is_builtin() || ctype.is_flags() {
+            let msg = "Unsupported type. Constant definitions only support of the built-in types.";
+            let hint = "Change this type to one of [`bool`, `int`, `size`, `addr`].";
+            let err = VelosiAstErrBuilder::err(msg.to_string())
+                .add_hint(hint.to_string())
+                .add_location(ctype.loc.clone())
+                .build();
+            issues.push(err);
         }
+
+        // obtain the value of the constant, must be a constnat expression
+        let value = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(pt.value, st), issues);
+        if !value.is_const_expr() {
+            let msg = "Expected a constant expression.";
+            let hint = "Convert this expression into a constant expression";
+            let err = VelosiAstErrBuilder::err(msg.to_string())
+                .add_hint(hint.to_string())
+                .add_location(value.loc().clone())
+                .build();
+            issues.push(err);
+        }
+
+        // check whether the result type of the expression has a compatible type
+        if !ctype.typeinfo.compatible(value.result_type(st)) {
+            let msg = "mismatched types";
+            let hint = format!(
+                "expected `{}`, found `{}`",
+                ctype.as_type_kind(),
+                value.result_type(st).as_kind_str()
+            );
+            let err = VelosiAstErrBuilder::err(msg.to_string())
+                .add_hint(hint.to_string())
+                .add_location(value.loc().clone())
+                .build();
+            issues.push(err);
+        }
+
+        let res = Self::new(Rc::new(pt.name), ctype, value, pt.loc);
+        ast_result_return!(res, issues)
     }
 }
 
+/// Implementation fo the [From] trait for [Symbol]
 impl From<Rc<VelosiAstConst>> for Symbol {
     fn from(c: Rc<VelosiAstConst>) -> Self {
         let n = VelosiAstNode::Const(c.clone());
