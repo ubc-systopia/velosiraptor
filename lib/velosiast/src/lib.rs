@@ -54,6 +54,30 @@ pub enum AstResult<T, E> {
     Err(E),
 }
 
+#[macro_export]
+macro_rules! ast_result_unwrap (($e: expr, $issues: expr) => (
+    match $e {
+        AstResult::Ok(t) => t,
+        AstResult::Issues(t, e) => {
+            $issues.merge(e.into());
+            t
+        }
+        AstResult::Err(e) => {
+            $issues.merge(e.into());
+            return AstResult::Err($issues)
+        },
+    }
+));
+
+#[macro_export]
+macro_rules! ast_result_return (($res: expr, $issues: expr) => (
+    if $issues.is_ok() {
+        AstResult::Ok($res)
+    } else {
+        AstResult::Issues($res, $issues)
+    }
+));
+
 /// represents the lexer state
 
 #[derive(PartialEq, Eq, Clone, Debug)]

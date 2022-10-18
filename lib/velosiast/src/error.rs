@@ -35,7 +35,7 @@ use colored::*;
 
 use crate::VelosiTokenStream;
 
-fn print_location_line(f: &mut Formatter<'_>, warn: bool, tokstream: &VelosiTokenStream) -> Result {
+fn print_location_line(f: &mut Formatter<'_>, tokstream: &VelosiTokenStream) -> Result {
     let blue = |s: &str| s.bold().blue();
     let pipe = blue("|");
 
@@ -114,7 +114,7 @@ fn print_location_context(
 }
 
 fn print_location(f: &mut Formatter<'_>, warn: bool, tokstream: &VelosiTokenStream) -> Result {
-    print_location_line(f, warn, tokstream)?;
+    print_location_line(f, tokstream)?;
     print_location_context(f, warn, tokstream)
 }
 
@@ -141,7 +141,7 @@ impl VelosiAstErrBuilder {
 
     pub fn err(message: String) -> Self {
         Self {
-            warn: true,
+            warn: false,
             message,
             hint: None,
             tokstream: None,
@@ -192,8 +192,6 @@ impl Display for VelosiAstErrCustom {
         } else {
             |s: &str| s.bold().bright_red()
         };
-
-        let blue = |s: &str| s.bold().blue();
 
         // the error message
         if self.warn {
@@ -334,7 +332,6 @@ impl Display for VelosiAstErrUndef {
     fn fmt(&self, f: &mut Formatter) -> Result {
         // closure for coloring
         let red = |s: &str| s.bright_red().bold();
-        let blue = |s: &str| s.bold().blue();
 
         // the error message
         let m = if self.other.is_some() {
