@@ -37,10 +37,14 @@ use velosiparser::{
 
 use crate::ast::{
     types::{VelosiAstType, VelosiAstTypeInfo},
-    VelosiAstConst, VelosiAstNode, VelosiAstParam,
+    VelosiAstConst, VelosiAstMethod, VelosiAstNode, VelosiAstParam,
 };
-use crate::error::{VelosiAstErrBuilder, VelosiAstErrUndef, VelosiAstIssues};
+use crate::error::{
+    VelosiAstErrBuilder, VelosiAstErrDoubleDef, VelosiAstErrUndef, VelosiAstIssues,
+};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
+
+use super::VelosiAstState;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstUnitSegment {
@@ -91,8 +95,13 @@ impl VelosiAstUnitSegment {
             None
         };
 
-        //let mut methods = HashMap::new();
-        let mut consts = HashMap::new();
+        let mut methods_map = HashMap::new();
+        let mut methods = Vec::new();
+        let mut consts_map = HashMap::new();
+        let mut consts = Vec::new();
+        let mut inbitwidth = None;
+        let mut outbitwidth = None;
+        let mut state: Option<Rc<VelosiAstState>> = None;
         for node in pt.nodes.into_iter() {
             match node {
                 VelosiParseTreeUnitNode::Const(c) => {
@@ -103,15 +112,48 @@ impl VelosiAstUnitSegment {
                     if let Err(e) = st.insert(c.clone().into()) {
                         issues.push(e);
                     } else {
-                        consts.insert(c.name.to_string(), c);
+                        consts.push(c.clone());
+                        consts_map.insert(c.name.to_string(), c);
                     }
                 }
-                VelosiParseTreeUnitNode::InBitWidth(w, loc) => (),
-                VelosiParseTreeUnitNode::OutBitWidth(w, loc) => (),
-                VelosiParseTreeUnitNode::Flags(flags) => (),
-                VelosiParseTreeUnitNode::State(state) => (),
-                VelosiParseTreeUnitNode::Interface(interface) => (),
-                VelosiParseTreeUnitNode::Method(method) => {}
+                VelosiParseTreeUnitNode::InBitWidth(w, loc) => {
+                    utils::check_addressing_width(&mut issues, w, loc);
+                    inbitwidth = Some(w);
+                }
+                VelosiParseTreeUnitNode::OutBitWidth(w, loc) => {
+                    utils::check_addressing_width(&mut issues, w, loc);
+                    outbitwidth = Some(w);
+                }
+                VelosiParseTreeUnitNode::Flags(_flags) => (),
+                VelosiParseTreeUnitNode::State(pst) => {
+                    let s = Rc::new(ast_result_unwrap!(
+                        VelosiAstState::from_parse_tree(pst, st),
+                        issues
+                    ));
+                    if let Some(st) = &state {
+                        let err = VelosiAstErrDoubleDef::new(
+                            Rc::new(String::from("state")),
+                            st.loc().clone(),
+                            s.loc().clone(),
+                        );
+                        issues.push(err.into());
+                    } else {
+                        state = Some(s);
+                    }
+                }
+                VelosiParseTreeUnitNode::Interface(_interface) => (),
+                VelosiParseTreeUnitNode::Method(method) => {
+                    let m = Rc::new(ast_result_unwrap!(
+                        VelosiAstMethod::from_parse_tree(method, st),
+                        issues
+                    ));
+                    if let Err(e) = st.insert(m.clone().into()) {
+                        issues.push(e);
+                    } else {
+                        methods.push(m.clone());
+                        methods_map.insert(m.name.to_string(), m);
+                    }
+                }
                 VelosiParseTreeUnitNode::Map(map) => {
                     let msg = "Ignored unit node: Map definitions are not supported in Segments.";
                     let hint = "Remove the map definition.";

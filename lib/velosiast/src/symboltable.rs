@@ -80,6 +80,7 @@ impl Display for Symbol {
             VelosiAstNode::Const(_) => write!(f, "const|{:?}|{}", self.typeinfo, self.name),
             VelosiAstNode::Method(_) => write!(f, "method|{:?}|{}", self.typeinfo, self.name),
             VelosiAstNode::Param(_) => write!(f, "param|{:?}|{}", self.typeinfo, self.name),
+            VelosiAstNode::State(_) => write!(f, "var|{:?}|{}", self.typeinfo, self.name),
         }
     }
 }

@@ -96,3 +96,36 @@ pub fn check_type_exists(
         issues.push(err.into());
     }
 }
+
+/// checks whether the identifier is in snake_case
+pub fn check_addressing_width(issues: &mut VelosiAstIssues, w: u64, loc: VelosiTokenStream) {
+    if w > 64 {
+        let msg = "unsupported addressing width: exceeds maximum addressing size of 64 bits";
+        let hint = "reduce the addressing width to 64 bits or less";
+        let err = VelosiAstErrBuilder::err(msg.to_string())
+            .add_hint(hint.to_string())
+            .add_location(loc.clone())
+            .build();
+        issues.push(err);
+    }
+
+    if w == 0 {
+        let msg = "unsupported addressing width: addressing size is zero";
+        let hint = "increase the adressing width";
+        let err = VelosiAstErrBuilder::err(msg.to_string())
+            .add_hint(hint.to_string())
+            .add_location(loc.clone())
+            .build();
+        issues.push(err);
+    }
+
+    if w < 8 {
+        let msg = "unusual addressing width: addressing size is very small";
+        let hint = "consider increase the adressing width";
+        let err = VelosiAstErrBuilder::warn(msg.to_string())
+            .add_hint(hint.to_string())
+            .add_location(loc)
+            .build();
+        issues.push(err);
+    }
+}

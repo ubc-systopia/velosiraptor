@@ -60,12 +60,17 @@ pub enum VelosiAstTypeInfo {
     Range,
     /// type referece to user-define type
     TypeRef(Rc<String>),
+    /// Reference to the state
+    State,
+    /// Reference to the interface
+    Interface,
 }
 
 impl VelosiAstTypeInfo {
     /// whether or not the type is a built-in type
     pub fn is_builtin(&self) -> bool {
-        !matches!(self, VelosiAstTypeInfo::TypeRef(_))
+        use VelosiAstTypeInfo::*;
+        !matches!(self, TypeRef(_) | State | Interface)
     }
 
     /// whether or not the type is of a numeric kind
@@ -101,6 +106,8 @@ impl VelosiAstTypeInfo {
             Flags => other.is_flags(),
             Range => false,
             TypeRef(_) => self == other,
+            State => false,
+            Interface => false,
         }
     }
 
@@ -117,6 +124,8 @@ impl VelosiAstTypeInfo {
             Flags => "flags",
             Range => "range",
             TypeRef(name) => name,
+            State => "state",
+            Interface => "interface",
         }
     }
 
@@ -133,6 +142,8 @@ impl VelosiAstTypeInfo {
             Flags => "flags",
             Range => "range",
             TypeRef(name) => name,
+            State => "state",
+            Interface => "interface",
             _ => unreachable!(),
         }
     }

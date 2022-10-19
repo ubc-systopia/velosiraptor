@@ -83,7 +83,7 @@ impl VelosiAstBinOp {
                 lhs_type.compatible(&VelosiAstTypeInfo::Integer)
                     && rhs_type.compatible(&VelosiAstTypeInfo::Integer)
             }
-            Eq | Ne => !rhs_type.compatible(lhs_type),
+            Eq | Ne => rhs_type.compatible(lhs_type),
             Lt | Gt | Le | Ge => {
                 lhs_type.compatible(&VelosiAstTypeInfo::Integer)
                     && rhs_type.compatible(&VelosiAstTypeInfo::Integer)
@@ -676,7 +676,7 @@ impl VelosiAstIdentLiteralExpr {
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
         // lookup the symbol in the symbol table
 
-        let litexpr = VelosiAstIdentLiteralExpr::new(p.path, VelosiAstTypeInfo::Integer, p.loc);
+        let mut litexpr = VelosiAstIdentLiteralExpr::new(p.path, VelosiAstTypeInfo::Integer, p.loc);
         let tname = litexpr.path.join(".");
 
         let sym = st.lookup(tname.as_str());
@@ -692,10 +692,9 @@ impl VelosiAstIdentLiteralExpr {
                 // replace the identifier with the constant value
                 AstResult::Ok(c.value.clone())
             }
-            VelosiAstNode::Param(_p) => {
-                // // litexpr.etype = p.ptype;
-                // AstResult::Ok(VelosiAstExpr::IdentLiteral(litexpr));
-                panic!("nyi")
+            VelosiAstNode::Param(p) => {
+                litexpr.etype = p.ctype.typeinfo.clone();
+                AstResult::Ok(VelosiAstExpr::IdentLiteral(litexpr))
             }
             _ => {
                 // we have the wrong kind of symbol

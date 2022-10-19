@@ -64,7 +64,7 @@ impl VelosiAstParam {
 
         // obtain the type information, must be a built-in type
         let ctype = ast_result_unwrap!(VelosiAstType::from_parse_tree(pt.ptype, st), issues);
-        if all_types && (!ctype.is_builtin() || ctype.is_flags()) {
+        if !all_types && (!ctype.is_builtin() || ctype.is_flags()) {
             let msg =
                 "Unsupported type. Parameter definition here only support of the built-in types.";
             let hint = "Change this type to one of [`bool`, `int`, `size`, `addr`].";
