@@ -40,12 +40,17 @@ use crate::{ast_result_return, ast_result_unwrap, AstResult, SymbolTable};
 
 mod constdef;
 mod expr;
+mod method;
 mod param;
+mod state;
 mod types;
 mod unit;
 
 pub use constdef::VelosiAstConst;
+pub use expr::VelosiAstExpr;
+pub use method::VelosiAstMethod;
 pub use param::VelosiAstParam;
+pub use state::VelosiAstState;
 pub use types::{VelosiAstType, VelosiAstTypeInfo};
 pub use unit::VelosiAstUnit;
 
@@ -53,8 +58,9 @@ pub use unit::VelosiAstUnit;
 pub enum VelosiAstNode {
     Unit(Rc<VelosiAstUnit>),
     Const(Rc<VelosiAstConst>),
-    Method(usize),
+    Method(Rc<VelosiAstMethod>),
     Param(Rc<VelosiAstParam>),
+    State(Rc<VelosiAstState>),
 }
 
 impl VelosiAstNode {
@@ -63,8 +69,9 @@ impl VelosiAstNode {
         match self {
             Unit(u) => u.loc(),
             Const(c) => &c.loc,
-            // Method => todo!(),
+            Method(m) => &m.loc,
             Param(p) => &p.loc,
+            State(s) => s.loc(),
             _ => {
                 panic!("nyi")
             }
