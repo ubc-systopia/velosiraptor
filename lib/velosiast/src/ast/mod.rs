@@ -33,7 +33,9 @@ use std::rc::Rc;
 
 use std::collections::HashMap;
 
-use velosiparser::{VelosiParseTree, VelosiParseTreeContextNode, VelosiTokenStream};
+use velosiparser::{
+    VelosiParseTree, VelosiParseTreeContextNode, VelosiParseTreeIdentifier, VelosiTokenStream,
+};
 
 use crate::error::VelosiAstIssues;
 use crate::{ast_result_return, ast_result_unwrap, AstResult, SymbolTable};
@@ -50,7 +52,7 @@ pub use constdef::VelosiAstConst;
 pub use expr::VelosiAstExpr;
 pub use method::VelosiAstMethod;
 pub use param::VelosiAstParam;
-pub use state::VelosiAstState;
+pub use state::{VelosiAstFieldSlice, VelosiAstState, VelosiAstStateField};
 pub use types::{VelosiAstType, VelosiAstTypeInfo};
 pub use unit::VelosiAstUnit;
 
@@ -61,6 +63,8 @@ pub enum VelosiAstNode {
     Method(Rc<VelosiAstMethod>),
     Param(Rc<VelosiAstParam>),
     State(Rc<VelosiAstState>),
+    StateField(Rc<VelosiAstStateField>),
+    StateFieldSlice(Rc<VelosiAstFieldSlice>),
 }
 
 impl VelosiAstNode {
@@ -72,10 +76,48 @@ impl VelosiAstNode {
             Method(m) => &m.loc,
             Param(p) => &p.loc,
             State(s) => s.loc(),
-            _ => {
-                panic!("nyi")
-            }
+            StateField(sf) => sf.loc(),
+            StateFieldSlice(sfs) => &sfs.loc,
         }
+    }
+}
+
+/// represents an identifier token
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct VelosiAstIdentifier {
+    pub name: Rc<String>,
+    pub loc: VelosiTokenStream,
+}
+
+impl VelosiAstIdentifier {
+    /// creates a new identifier token
+    pub fn new(name: String, loc: VelosiTokenStream) -> Self {
+        Self {
+            name: Rc::new(name),
+            loc,
+        }
+    }
+
+    pub fn from_parse_tree_with_prefix(pt: VelosiParseTreeIdentifier, prefix: &str) -> Self {
+        let s = format!("{}.{}", prefix, pt.name);
+        Self::new(s, pt.loc)
+    }
+
+    pub fn as_str(&self) -> &str {
+        self.name.as_str()
+    }
+}
+
+impl From<VelosiParseTreeIdentifier> for VelosiAstIdentifier {
+    fn from(id: VelosiParseTreeIdentifier) -> Self {
+        Self::new(id.name, id.loc)
+    }
+}
+
+/// Implementation of the [Display] trait for [VelosiAstIdentifier]
+impl Display for VelosiAstIdentifier {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        write!(f, "{}", self.name)
     }
 }
 
@@ -97,11 +139,11 @@ impl VelosiAstRoot {
     }
 
     pub fn add_const(&mut self, c: VelosiAstConst) {
-        self.consts.insert(c.name.to_string(), Rc::new(c));
+        self.consts.insert(c.ident_to_string(), Rc::new(c));
     }
 
     pub fn add_unit(&mut self, u: VelosiAstUnit) {
-        self.units.insert(u.name().to_string(), Rc::new(u));
+        self.units.insert(u.ident_to_string(), Rc::new(u));
     }
 
     pub fn from_parse_tree(pt: VelosiParseTree) -> AstResult<VelosiAstRoot, VelosiAstIssues> {
@@ -124,7 +166,7 @@ impl VelosiAstRoot {
                     if let Err(e) = st.insert(c.clone().into()) {
                         issues.push(e);
                     } else {
-                        root.consts.insert(c.name.to_string(), c);
+                        root.consts.insert(c.ident_to_string(), c);
                     }
                 }
                 VelosiParseTreeContextNode::Unit(u) => {
@@ -135,7 +177,7 @@ impl VelosiAstRoot {
                     if let Err(e) = st.insert(c.clone().into()) {
                         issues.push(e);
                     } else {
-                        root.units.insert(c.name().to_string(), c);
+                        root.units.insert(c.ident_to_string(), c);
                     }
                 }
                 VelosiParseTreeContextNode::Import(_i) => {

@@ -29,7 +29,7 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
 // used crate functionality
-use crate::ast::VelosiAstNode;
+use crate::ast::{VelosiAstIdentifier, VelosiAstNode};
 use crate::error::{VelosiAstErrBuilder, VelosiAstErrUndef, VelosiAstIssues};
 use crate::{ast_result_unwrap, AstResult, SymbolTable};
 use velosiparser::{
@@ -660,14 +660,30 @@ impl Display for VelosiAstQuantifierExpr {
 /// Represents an identifier literal expression
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstIdentLiteralExpr {
-    path: Vec<String>,
+    path: Vec<VelosiAstIdentifier>,
+    name: Rc<String>,
     etype: VelosiAstTypeInfo,
     loc: VelosiTokenStream,
 }
 
 impl VelosiAstIdentLiteralExpr {
-    pub fn new(path: Vec<String>, etype: VelosiAstTypeInfo, loc: VelosiTokenStream) -> Self {
-        VelosiAstIdentLiteralExpr { path, etype, loc }
+    pub fn new(
+        path: Vec<VelosiAstIdentifier>,
+        etype: VelosiAstTypeInfo,
+        loc: VelosiTokenStream,
+    ) -> Self {
+        let name = Rc::new(
+            path.iter()
+                .map(|p| p.name.as_str())
+                .collect::<Vec<&str>>()
+                .join("."),
+        );
+        VelosiAstIdentLiteralExpr {
+            path,
+            name,
+            etype,
+            loc,
+        }
     }
 
     pub fn from_parse_tree(
@@ -676,12 +692,18 @@ impl VelosiAstIdentLiteralExpr {
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
         // lookup the symbol in the symbol table
 
-        let mut litexpr = VelosiAstIdentLiteralExpr::new(p.path, VelosiAstTypeInfo::Integer, p.loc);
-        let tname = litexpr.path.join(".");
+        let path = p
+            .path
+            .into_iter()
+            .map(VelosiAstIdentifier::from)
+            .collect::<Vec<VelosiAstIdentifier>>();
 
-        let sym = st.lookup(tname.as_str());
+        let mut litexpr = VelosiAstIdentLiteralExpr::new(path, VelosiAstTypeInfo::Integer, p.loc);
+
+        let tname = litexpr.name.as_str();
+        let sym = st.lookup(tname);
         if sym.is_none() {
-            let err = VelosiAstErrUndef::new(Rc::new(tname), litexpr.loc.clone());
+            let err = VelosiAstErrUndef::new(litexpr.name.clone(), litexpr.loc.clone());
             return AstResult::Issues(VelosiAstExpr::IdentLiteral(litexpr), err.into());
         }
 
@@ -693,13 +715,16 @@ impl VelosiAstIdentLiteralExpr {
                 AstResult::Ok(c.value.clone())
             }
             VelosiAstNode::Param(p) => {
-                litexpr.etype = p.ctype.typeinfo.clone();
+                litexpr.etype = p.ptype.typeinfo.clone();
+                AstResult::Ok(VelosiAstExpr::IdentLiteral(litexpr))
+            }
+            VelosiAstNode::StateField(_) | VelosiAstNode::StateFieldSlice(_) => {
                 AstResult::Ok(VelosiAstExpr::IdentLiteral(litexpr))
             }
             _ => {
                 // we have the wrong kind of symbol
                 let err = VelosiAstErrUndef::with_other(
-                    Rc::new(tname),
+                    litexpr.name.clone(),
                     litexpr.loc.clone(),
                     sym.loc().clone(),
                 );
@@ -716,7 +741,7 @@ impl VelosiAstIdentLiteralExpr {
 /// Implementation of [Display] for [VelosiAstIdentLiteralExpr]
 impl Display for VelosiAstIdentLiteralExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
-        write!(format, "{}", self.path.join("."))
+        write!(format, "{}", self.name)
     }
 }
 
@@ -785,7 +810,7 @@ impl Display for VelosiAstBoolLiteralExpr {
 /// Represents an boolean literal expression
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstFnCallExpr {
-    pub path: String,
+    pub name: VelosiAstIdentifier,
     pub args: Vec<VelosiAstExpr>,
     pub etype: VelosiAstTypeInfo,
     pub loc: VelosiTokenStream,
@@ -793,13 +818,13 @@ pub struct VelosiAstFnCallExpr {
 
 impl VelosiAstFnCallExpr {
     pub fn new(
-        path: String,
+        name: VelosiAstIdentifier,
         args: Vec<VelosiAstExpr>,
         etype: VelosiAstTypeInfo,
         loc: VelosiTokenStream,
     ) -> Self {
         VelosiAstFnCallExpr {
-            path,
+            name,
             args,
             etype,
             loc,
@@ -821,7 +846,7 @@ impl VelosiAstFnCallExpr {
 
         // construct the default function call expression node
         let res = VelosiAstFnCallExpr::new(
-            pt.path.to_string(),
+            VelosiAstIdentifier::from(pt.name),
             args,
             VelosiAstTypeInfo::Integer,
             pt.loc,
@@ -842,12 +867,10 @@ impl VelosiAstFnCallExpr {
         //      |             |
         //      |             arguments to this enum variant are incorrect
 
-        let fn_name = pt.path.to_string();
-
-        let fn_sym = st.lookup(fn_name.as_str());
+        let fn_sym = st.lookup(res.name.as_str());
         if fn_sym.is_none() {
             // there was no symbol
-            let err = VelosiAstErrUndef::new(Rc::new(fn_name), res.loc.clone());
+            let err = VelosiAstErrUndef::new(res.name.name.clone(), res.loc.clone());
             return AstResult::Issues(VelosiAstExpr::FnCall(res), err.into());
         }
 
@@ -857,7 +880,7 @@ impl VelosiAstFnCallExpr {
         } else {
             // we have the wrong kind of symbol
             let err = VelosiAstErrUndef::with_other(
-                Rc::new(fn_name),
+                res.name.name.clone(),
                 res.loc.clone(),
                 fn_sym.loc().clone(),
             );
@@ -872,8 +895,10 @@ impl VelosiAstFnCallExpr {
     }
 
     pub fn flatten(self, st: &SymbolTable) -> VelosiAstExpr {
-        let args = self.args.into_iter().map(|a| a.flatten(st)).collect();
-        VelosiAstExpr::FnCall(Self::new(self.path, args, self.etype, self.loc))
+        let mut res = self.clone();
+        res.args = self.args.into_iter().map(|a| a.flatten(st)).collect();
+
+        VelosiAstExpr::FnCall(res)
     }
 
     pub fn result_type(&self, _st: &SymbolTable) -> &VelosiAstTypeInfo {
@@ -883,7 +908,7 @@ impl VelosiAstFnCallExpr {
 
 impl Display for VelosiAstFnCallExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
-        write!(format, "{}(", self.path)?;
+        write!(format, "{}(", self.name.as_str())?;
         for (i, p) in self.args.iter().enumerate() {
             if i != 0 {
                 write!(format, ".")?;

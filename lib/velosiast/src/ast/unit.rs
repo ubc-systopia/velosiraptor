@@ -39,22 +39,32 @@ use crate::ast::{
     types::{VelosiAstType, VelosiAstTypeInfo},
     VelosiAstConst, VelosiAstMethod, VelosiAstNode, VelosiAstParam,
 };
-use crate::error::{
-    VelosiAstErrBuilder, VelosiAstErrDoubleDef, VelosiAstErrUndef, VelosiAstIssues,
-};
+use crate::error::{VelosiAstErrBuilder, VelosiAstErrDoubleDef, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
 
-use super::VelosiAstState;
+use super::{VelosiAstIdentifier, VelosiAstState};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstUnitSegment {
     /// the name of the unit
-    pub name: Rc<String>,
+    pub ident: VelosiAstIdentifier,
     /// the location of the type clause
     pub loc: VelosiTokenStream,
 }
 
 impl VelosiAstUnitSegment {
+    pub fn ident_as_rc_string(&self) -> Rc<String> {
+        self.ident.name.clone()
+    }
+
+    pub fn ident_as_str(&self) -> &str {
+        self.ident.name.as_str()
+    }
+
+    pub fn ident_to_string(&self) -> String {
+        self.ident.name.to_string()
+    }
+
     pub fn from_parse_tree(
         pt: VelosiParseTreeUnitDef,
         st: &mut SymbolTable,
@@ -65,31 +75,26 @@ impl VelosiAstUnitSegment {
         st.create_context("unit".to_string());
 
         // convert all the unit parameters
-        let mut params = HashMap::new();
+        let mut params = Vec::new();
         for p in pt.params.into_iter() {
             let param = Rc::new(ast_result_unwrap!(
                 VelosiAstParam::from_parse_tree(p, false, st),
                 issues
             ));
 
+            // here we want to check if the parameter are also defined on the unit level
+            // and whether the types match precisely
+
             // add the param to the symbol table, if it doesn't exist already
             if let Err(e) = st.insert(param.clone().into()) {
                 issues.push(e);
-            } else {
-                params.insert(param.name.to_string(), param);
             }
+            params.push(param);
         }
 
         let _derived = if let Some(d) = pt.derived {
-            let d = Rc::new(d);
-            let start = 5 + params.len() * 3 + params.len() - std::cmp::min(params.len(), 1);
-            let range = start..start + 1;
-            utils::check_type_exists(
-                &mut issues,
-                st,
-                d.clone(),
-                pt.pos.from_self_with_subrange(range),
-            );
+            let d = VelosiAstIdentifier::from(d);
+            utils::check_type_exists(&mut issues, st, &d);
             Some(d)
         } else {
             None
@@ -113,7 +118,7 @@ impl VelosiAstUnitSegment {
                         issues.push(e);
                     } else {
                         consts.push(c.clone());
-                        consts_map.insert(c.name.to_string(), c);
+                        consts_map.insert(c.ident_to_string(), c);
                     }
                 }
                 VelosiParseTreeUnitNode::InBitWidth(w, loc) => {
@@ -151,7 +156,7 @@ impl VelosiAstUnitSegment {
                         issues.push(e);
                     } else {
                         methods.push(m.clone());
-                        methods_map.insert(m.name.to_string(), m);
+                        methods_map.insert(m.ident_to_string(), m);
                     }
                 }
                 VelosiParseTreeUnitNode::Map(map) => {
@@ -159,7 +164,7 @@ impl VelosiAstUnitSegment {
                     let hint = "Remove the map definition.";
                     let err = VelosiAstErrBuilder::warn(msg.to_string())
                         .add_hint(hint.to_string())
-                        .add_location(map.pos().clone())
+                        .add_location(map.loc().clone())
                         .build();
                     issues.push(err);
                 }
@@ -167,8 +172,8 @@ impl VelosiAstUnitSegment {
         }
 
         let res = Self {
-            name: Rc::new(pt.name),
-            loc: pt.pos,
+            ident: VelosiAstIdentifier::from(pt.name),
+            loc: pt.loc,
         };
 
         // and restore the context again.
@@ -188,12 +193,24 @@ impl Display for VelosiAstUnitSegment {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstUnitStaticMap {
     /// the name of the unit
-    pub name: Rc<String>,
+    pub ident: VelosiAstIdentifier,
     /// the location of the type clause
     pub loc: VelosiTokenStream,
 }
 
 impl VelosiAstUnitStaticMap {
+    pub fn ident_as_rc_string(&self) -> Rc<String> {
+        self.ident.name.clone()
+    }
+
+    pub fn ident_as_str(&self) -> &str {
+        self.ident.name.as_str()
+    }
+
+    pub fn ident_to_string(&self) -> String {
+        self.ident.name.to_string()
+    }
+
     // converts the parse tree node into an ast node, performing checks
     pub fn from_parse_tree(
         _pt: VelosiParseTreeUnitDef,
@@ -229,17 +246,24 @@ impl VelosiAstUnit {
         }
     }
 
-    pub fn name(&self) -> &str {
+    pub fn ident_as_rc_string(&self) -> Rc<String> {
         match self {
-            VelosiAstUnit::Segment(s) => s.name.as_str(),
-            VelosiAstUnit::StaticMap(s) => s.name.as_str(),
+            VelosiAstUnit::Segment(s) => s.ident_as_rc_string(),
+            VelosiAstUnit::StaticMap(s) => s.ident_as_rc_string(),
         }
     }
 
-    pub fn name_cloned(&self) -> Rc<String> {
+    pub fn ident_as_str(&self) -> &str {
         match self {
-            VelosiAstUnit::Segment(s) => s.name.clone(),
-            VelosiAstUnit::StaticMap(s) => s.name.clone(),
+            VelosiAstUnit::Segment(s) => s.ident_as_str(),
+            VelosiAstUnit::StaticMap(s) => s.ident_as_str(),
+        }
+    }
+
+    pub fn ident_to_string(&self) -> String {
+        match self {
+            VelosiAstUnit::Segment(s) => s.ident_to_string(),
+            VelosiAstUnit::StaticMap(s) => s.ident_to_string(),
         }
     }
 
@@ -255,16 +279,16 @@ impl VelosiAstUnit {
 impl From<Rc<VelosiAstUnit>> for Symbol {
     fn from(unit: Rc<VelosiAstUnit>) -> Self {
         let ti = VelosiAstType::from(unit.clone());
-        let name = unit.name_cloned();
+        let name = unit.ident_as_rc_string();
         Symbol::new(name, ti, VelosiAstNode::Unit(unit))
     }
 }
 
 /// Implementation fo the [From] trait for [Symbol]
 impl From<Rc<VelosiAstUnit>> for VelosiAstType {
-    fn from(c: Rc<VelosiAstUnit>) -> Self {
-        let name = c.name_cloned();
-        VelosiAstType::new(VelosiAstTypeInfo::TypeRef(name), c.loc().clone())
+    fn from(unit: Rc<VelosiAstUnit>) -> Self {
+        let name = unit.ident_as_rc_string();
+        VelosiAstType::new(VelosiAstTypeInfo::TypeRef(name), unit.loc().clone())
     }
 }
 
