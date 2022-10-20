@@ -146,7 +146,10 @@ fn decimal_test() {
     let num = sp.slice(0..5);
     assert_eq!(
         number(sp),
-        Ok((rem, Token::new(VelosiTokenKind::NumLiteral(12312), num)))
+        Ok((
+            rem,
+            VelosiToken::new(VelosiTokenKind::NumLiteral(12312), num)
+        ))
     );
 
     let sp = SrcSpan::new("12312213489654".to_string());
@@ -156,7 +159,7 @@ fn decimal_test() {
         number(sp),
         Ok((
             rem,
-            Token::new(VelosiTokenKind::NumLiteral(12312213489654), num)
+            VelosiToken::new(VelosiTokenKind::NumLiteral(12312213489654), num)
         ))
     );
 }
@@ -168,7 +171,10 @@ fn hexadecimal_test() {
     let num = sp.slice(0..6);
     assert_eq!(
         number(sp),
-        Ok((rem, Token::new(VelosiTokenKind::NumLiteral(0xABCD), num)))
+        Ok((
+            rem,
+            VelosiToken::new(VelosiTokenKind::NumLiteral(0xABCD), num)
+        ))
     );
 
     let sp = SrcSpan::new("0xabcd".to_string());
@@ -176,7 +182,10 @@ fn hexadecimal_test() {
     let num = sp.slice(0..6);
     assert_eq!(
         number(sp),
-        Ok((rem, Token::new(VelosiTokenKind::NumLiteral(0xABCD), num)))
+        Ok((
+            rem,
+            VelosiToken::new(VelosiTokenKind::NumLiteral(0xABCD), num)
+        ))
     );
 }
 
@@ -187,7 +196,10 @@ fn octal_test() {
     let num = sp.slice(0..6);
     assert_eq!(
         number(sp),
-        Ok((rem, Token::new(VelosiTokenKind::NumLiteral(0o1234), num)))
+        Ok((
+            rem,
+            VelosiToken::new(VelosiTokenKind::NumLiteral(0o1234), num)
+        ))
     );
 }
 
@@ -198,7 +210,10 @@ fn binary_test() {
     let num = sp.slice(0..6);
     assert_eq!(
         number(sp),
-        Ok((rem, Token::new(VelosiTokenKind::NumLiteral(0b1000), num)))
+        Ok((
+            rem,
+            VelosiToken::new(VelosiTokenKind::NumLiteral(0b1000), num)
+        ))
     );
 }
 
@@ -211,7 +226,7 @@ fn separator_test() {
         number(sp),
         Ok((
             rem,
-            Token::new(VelosiTokenKind::NumLiteral(0b11110000), num)
+            VelosiToken::new(VelosiTokenKind::NumLiteral(0b11110000), num)
         ))
     );
 
@@ -222,7 +237,7 @@ fn separator_test() {
         number(sp),
         Ok((
             rem,
-            Token::new(VelosiTokenKind::NumLiteral(0o45671234), num)
+            VelosiToken::new(VelosiTokenKind::NumLiteral(0o45671234), num)
         ))
     );
 
@@ -233,7 +248,7 @@ fn separator_test() {
         number(sp),
         Ok((
             rem,
-            Token::new(VelosiTokenKind::NumLiteral(0xabcd1234), num)
+            VelosiToken::new(VelosiTokenKind::NumLiteral(0xabcd1234), num)
         ))
     );
 
@@ -242,7 +257,10 @@ fn separator_test() {
     let num = sp.slice(0..9);
     assert_eq!(
         number(sp),
-        Ok((rem, Token::new(VelosiTokenKind::NumLiteral(1000000), num)))
+        Ok((
+            rem,
+            VelosiToken::new(VelosiTokenKind::NumLiteral(1000000), num)
+        ))
     );
 
     let sp = SrcSpan::new("0o11223344 asdf".to_string());

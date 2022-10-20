@@ -68,21 +68,17 @@ pub enum VelosiKeyword {
     //
     /// state definition
     StateDef,
-    Mem,
-    Reg,
-    // MemoryState,
-    // /// register backed state
-    // RegisterState,
+    InterfaceDef,
 
     //
-    // Interface Kinds
+    // State / Interface Fields
     //
-    /// in-memory data structure interface
-    MemoryInterface,
-    /// memory mapped registers interface
-    MMIOInterface,
-    /// special purpose cpu register interface
-    CPURegisterInterface,
+    /// field referring to a memory location
+    Mem,
+    /// field that is a register
+    Reg,
+    /// field that is a memory-mapped regsiter
+    Mmio,
 
     //
     // Interface descriptions
@@ -168,16 +164,14 @@ impl VelosiKeyword {
             VelosiKeyword::OutBitWidth => "outbitwidth",
             VelosiKeyword::State => "state",
             VelosiKeyword::Interface => "interface",
-            //
-            // VelosiKeyword::MemoryState => "MemoryState",
-            // VelosiKeyword::RegisterState => "RegisterState",
+
             VelosiKeyword::StateDef => "StateDef",
+            VelosiKeyword::InterfaceDef => "InterfaceDef",
+
             VelosiKeyword::Mem => "mem",
             VelosiKeyword::Reg => "reg",
-            //
-            VelosiKeyword::MemoryInterface => "MemoryInterface",
-            VelosiKeyword::MMIOInterface => "MMIOInterface",
-            VelosiKeyword::CPURegisterInterface => "CPURegisterInterface",
+            VelosiKeyword::Mmio => "mmio",
+
             //
             VelosiKeyword::ReadAction => "ReadAction",
             VelosiKeyword::WriteAction => "WriteAction",
@@ -229,13 +223,11 @@ impl<'a> TryFrom<&'a str> for VelosiKeyword {
             "interface" => Ok(VelosiKeyword::Interface),
             //
             "StateDef" => Ok(VelosiKeyword::StateDef),
+            "InterfaceDef" => Ok(VelosiKeyword::InterfaceDef),
+            //
             "reg" => Ok(VelosiKeyword::Reg),
             "mem" => Ok(VelosiKeyword::Mem),
-            // "MemoryState" => Ok(VelosiKeyword::MemoryState),
-            // "RegisterState" => Ok(VelosiKeyword::RegisterState),
-            "MemoryInterface" => Ok(VelosiKeyword::MemoryInterface),
-            "MMIOInterface" => Ok(VelosiKeyword::MMIOInterface),
-            "CPURegisterInterface" => Ok(VelosiKeyword::CPURegisterInterface),
+            "mmio" => Ok(VelosiKeyword::Mmio),
             //
             "ReadAction" => Ok(VelosiKeyword::ReadAction),
             "WriteAction" => Ok(VelosiKeyword::WriteAction),
@@ -637,31 +629,14 @@ fn test_enum_str() {
 
     assert_eq!("StateDef".try_into(), Ok(VelosiKeyword::StateDef));
     assert_eq!(VelosiKeyword::StateDef.as_str(), "StateDef");
+    assert_eq!("InterfaceDef".try_into(), Ok(VelosiKeyword::InterfaceDef));
+
     assert_eq!("mem".try_into(), Ok(VelosiKeyword::Mem));
     assert_eq!(VelosiKeyword::Mem.as_str(), "mem");
     assert_eq!("reg".try_into(), Ok(VelosiKeyword::Reg));
     assert_eq!(VelosiKeyword::Reg.as_str(), "reg");
-
-    assert_eq!("MemoryState".try_into(), Ok(VelosiKeyword::MemoryState));
-    assert_eq!(VelosiKeyword::MemoryState.as_str(), "MemoryState");
-    assert_eq!("RegisterState".try_into(), Ok(VelosiKeyword::RegisterState));
-    assert_eq!(VelosiKeyword::RegisterState.as_str(), "RegisterState");
-
-    assert_eq!(
-        "MemoryInterface".try_into(),
-        Ok(VelosiKeyword::MemoryInterface)
-    );
-    assert_eq!(VelosiKeyword::MemoryInterface.as_str(), "MemoryInterface");
-    assert_eq!("MMIOInterface".try_into(), Ok(VelosiKeyword::MMIOInterface));
-    assert_eq!(VelosiKeyword::MMIOInterface.as_str(), "MMIOInterface");
-    assert_eq!(
-        "CPURegisterInterface".try_into(),
-        Ok(VelosiKeyword::CPURegisterInterface)
-    );
-    assert_eq!(
-        VelosiKeyword::CPURegisterInterface.as_str(),
-        "CPURegisterInterface"
-    );
+    assert_eq!("mmio".try_into(), Ok(VelosiKeyword::Mmio));
+    assert_eq!(VelosiKeyword::Mmio.as_str(), "mmio");
 
     assert_eq!("ReadAction".try_into(), Ok(VelosiKeyword::ReadAction));
     assert_eq!(VelosiKeyword::ReadAction.as_str(), "ReadAction");
