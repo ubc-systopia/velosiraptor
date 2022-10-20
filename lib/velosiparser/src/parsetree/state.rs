@@ -107,7 +107,7 @@ impl VelosiParseTreeStateFieldRegister {
 
 impl Display for VelosiParseTreeStateFieldRegister {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "mem {} [", self.name)?;
+        write!(f, "reg {} [", self.name)?;
         write!(f, "{}", self.size)?;
         writeln!(f, "] {{")?;
         for slice in &self.layout {

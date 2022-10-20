@@ -44,8 +44,9 @@ use crate::parser::{expr::expr, param::parameter, terminals::*};
 use crate::parsetree::{
     VelosiParseTreeFieldSlice, VelosiParseTreeIdentifier, VelosiParseTreeInterface,
     VelosiParseTreeInterfaceAction, VelosiParseTreeInterfaceActions, VelosiParseTreeInterfaceDef,
-    VelosiParseTreeInterfaceField, VelosiParseTreeInterfaceFieldNode, VelosiParseTreeParam,
-    VelosiParseTreeUnitNode,
+    VelosiParseTreeInterfaceField, VelosiParseTreeInterfaceFieldMemory,
+    VelosiParseTreeInterfaceFieldMmio, VelosiParseTreeInterfaceFieldNode,
+    VelosiParseTreeInterfaceFieldRegister, VelosiParseTreeParam, VelosiParseTreeUnitNode,
 };
 use crate::{VelosiOpToken, VelosiTokenKind, VelosiTokenStream};
 
@@ -55,8 +56,7 @@ use crate::{VelosiOpToken, VelosiTokenKind, VelosiTokenStream};
 ///
 /// # Grammar
 ///
-/// INTERFACE_DEFS := NONE_INTERFACE | MMIO_INTERFACE | MEMORY_INTERFACE | REGISTER_INTERFACE
-/// INTERFACE := KW_INTERFACE = INTERFACE_DEFS ;
+/// `INTERFACE := KW_INTERFACE ASSIGN (NONE | IFACEDEF) SEMICOLON`
 ///
 /// # Results
 ///
@@ -75,16 +75,7 @@ pub fn interface(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiP
     let (i1, _) = kw_interface(input)?;
 
     // We now attempt to parse the different interface types.
-    cut(delimited(
-        assign,
-        alt((
-            mmio_interface,
-            memory_interface,
-            cpuregister_interface,
-            none_interface,
-        )),
-        opt(semicolon),
-    ))(i1)
+    cut(delimited(assign, alt((ifacedef, ifacenone)), semicolon))(i1)
 }
 
 /// parses the none interface definition
@@ -102,56 +93,31 @@ pub fn interface(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiP
 ///
 /// None
 ///
-fn none_interface(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
+fn ifacenone(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
     let mut pos = input.clone();
 
     let (i1, _) = kw_none(input)?;
 
     pos.span_until_start(&i1);
-
-    Ok((
-        i1,
-        VelosiParseTreeUnitNode::Interface(VelosiParseTreeInterface::None(pos)),
-    ))
+    let iface = VelosiParseTreeInterface::None(pos);
+    Ok((i1, VelosiParseTreeUnitNode::Interface(iface)))
 }
 
-/// parses the mmio interface definition
-///
-/// This interface is a register-like, memory-mapped interface. Software uses loads and
-/// stores to interoperate with the interface. In contrast to the memory interface,
-/// the MMIO interface may:
-///   - Hide parts of the state from software
-///   - trigger multiple state transitions
-///   - Software may need to use a specific load/store instructions (e.g., non-cached)
+/// parses and consumes an interface definition of a unit
 ///
 /// # Grammar
 ///
-/// MMIO_INTERFACE := KW_MMIO LPAREN PARAMS RPAREN LBRACE (INTERFACEFIELD)+ RBRACE
-///
-/// # Results
-///
-///  * OK:      the parser could successfully recognize the mmio interface
-///  * Error:   the parser could not recognize the mmio interface definition keyword
-///  * Failure: the parser recognized the mmion interface, but it did not properly parse
-///
-/// # Examples
-///
-/// MMIOInterface(base : addr) { ... }
-///
-fn mmio_interface(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
+/// `IFACEDEF := KW_INTERFACEDEF IFACEPARAMS LBRACE INTERFACEFIELDS RBRACE`
+fn ifacedef(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
     let mut pos = input.clone();
 
-    // try to barse the MMIO keyword
-    let (i1, _) = kw_mmiointerface(input)?;
-
-    // try to parse the arguments, must succeed
-    let (i2, bases) = cut(interfaceparams)(i1)?;
-
-    // next try to parse the interface field definitions
+    // try to barse the InterfaceDef keyword
+    let (i1, _) = kw_interfacedef(input)?;
+    let (i2, bases) = ifaceparams(i1)?;
     let (i3, fields) = cut(delimited(
         lbrace,
-        separated_list0(comma, interfacefield),
-        rbrace,
+        separated_list0(comma, ifacefield),
+        tuple((opt(comma), rbrace)),
     ))(i2)?;
 
     pos.span_until_start(&i3);
@@ -159,132 +125,7 @@ fn mmio_interface(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Velosi
     let st = VelosiParseTreeInterfaceDef::new(bases, fields, pos);
     Ok((
         i3,
-        VelosiParseTreeUnitNode::Interface(VelosiParseTreeInterface::MMIORegister(st)),
-    ))
-}
-
-/// parses the cpu register interface definition
-///
-/// This interface is a non-memory-mapped register interface. Software uses loads/stores
-/// to register locations rather than memory addresses.
-///
-/// The interface may
-///   - Hide parts of the state from software
-///   - trigger multiple state transitions
-///   - Software uses registers ad destination
-///
-/// # Grammar
-///
-/// REGISTER_INTERFACE := KW_REGISTER LPAREN PARAMS RPAREN LBRACE (INTERFACEFIELD)+ RBRACE
-///
-/// # Results
-///
-///  * OK:      the parser could successfully recognize the mmio interface
-///  * Error:   the parser could not recognize the mmio interface definition keyword
-///  * Failure: the parser recognized the register interface, but it did not properly parse
-///
-/// # Examples
-///
-/// MMIOInterface(base : addr) {}
-///
-fn cpuregister_interface(
-    input: VelosiTokenStream,
-) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
-    let mut pos = input.clone();
-
-    // try parse the registe rkeyword or return
-    let (i1, _) = kw_cpuregisterinterface(input)?;
-
-    // try to parse the arguments, must succeed
-    let (i2, bases) = cut(interfaceparams)(i1)?;
-
-    // now parse the interface fields
-    let (i3, fields) = cut(delimited(
-        lbrace,
-        separated_list0(comma, interfacefield),
-        rbrace,
-    ))(i2)?;
-
-    pos.span_until_start(&i3);
-
-    let st = VelosiParseTreeInterfaceDef::new(bases, fields, pos);
-    Ok((
-        i3,
-        VelosiParseTreeUnitNode::Interface(VelosiParseTreeInterface::CPURegister(st)),
-    ))
-}
-
-/// parses the memory interface definition
-///
-/// This interface is a memory-backed interface. Software uses load/store to normal memory
-/// locationst to
-///
-/// The interface may
-///   - Hide parts of the state from software
-///   - trigger multiple state transitions
-///   - Software uses registers ad destination
-///
-/// # Grammar
-///
-/// MMIO_INTERFACE := KW_MEMORY LPAREN PARAMS RPAREN LBRACE (INTERFACEFIELD)+ RBRACE
-///
-/// # Results
-///
-///  * OK:      the parser could successfully recognize the memory interface
-///  * Error:   the parser could not recognize the memory interface definition keyword
-///  * Failure: the parser recognized the memory interface, but it did not properly parse
-///
-/// # Examples
-///
-/// MemoryInterface(base : addr) {}
-///
-fn memory_interface(
-    input: VelosiTokenStream,
-) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
-    alt((memory_interface_identity, memory_interface_full))(input)
-}
-
-fn memory_interface_full(
-    input: VelosiTokenStream,
-) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
-    let mut pos = input.clone();
-
-    // try parse the registe rkeyword or return
-    let (i1, _) = kw_memoryinterface(input)?;
-
-    // try to parse the arguments, must succeed
-    let (i2, bases) = cut(interfaceparams)(i1)?;
-
-    // now parse the interface fields
-    let (i3, fields) = cut(delimited(
-        lbrace,
-        separated_list0(comma, interfacefield),
-        rbrace,
-    ))(i2)?;
-
-    pos.span_until_start(&i3);
-
-    let st = VelosiParseTreeInterfaceDef::new(bases, fields, pos);
-    Ok((
-        i3,
-        VelosiParseTreeUnitNode::Interface(VelosiParseTreeInterface::Memory(st)),
-    ))
-}
-
-fn memory_interface_identity(
-    input: VelosiTokenStream,
-) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
-    let mut pos = input.clone();
-
-    // try parse the memory keyword, or return
-    let (i1, _) = tuple((kw_memoryinterface, semicolon))(input)?;
-
-    pos.span_until_start(&i1);
-
-    let st = VelosiParseTreeInterfaceDef::new(Vec::new(), Vec::new(), pos);
-    Ok((
-        i1,
-        VelosiParseTreeUnitNode::Interface(VelosiParseTreeInterface::Memory(st)),
+        VelosiParseTreeUnitNode::Interface(VelosiParseTreeInterface::InterfaceDef(st)),
     ))
 }
 
@@ -292,8 +133,8 @@ fn memory_interface_identity(
 ///
 /// # GRAMMAR
 ///
-/// `INTERFACEPARAM := LPAREN SEPLIST(COMMA, PARAMETER) RPAREN
-pub fn interfaceparams(
+/// `IFACEPARAMS := LPAREN SEPLIST(COMMA, PARAMETER) RPAREN
+pub fn ifaceparams(
     input: VelosiTokenStream,
 ) -> IResult<VelosiTokenStream, Vec<VelosiParseTreeParam>> {
     let (i, p) = opt(delimited(
@@ -304,38 +145,31 @@ pub fn interfaceparams(
     Ok((i, p.unwrap_or_default()))
 }
 
-/// parses a single interface field definition
-///
-/// The interface field gives a name to a specific portion of the software-visible
-/// interface. It contains:
-///   - Layout: the meaning of the bits in the field
-///   - ReadAction: what happens when a read operation is carried out on the field
-///   - WriteAction: what happens when a write operation is carried out on the field
+/// Parses and consumes a interface field definition
 ///
 /// # Grammar
 ///
-/// INTERFACE_FIELD := IDENT FIELD_PARAMS (LAYOUT, READACTION, WRITEACTION)
+/// `IFACEFIELD := MEMORYFIELD | REGISTERFIELD | MMIOFIELD`
+pub fn ifacefield(
+    input: VelosiTokenStream,
+) -> IResult<VelosiTokenStream, VelosiParseTreeInterfaceField> {
+    alt((memoryfield, registerfield, mmiofield))(input)
+}
+
+/// Parses and consumes a register interface field definition
 ///
-/// # Results
+/// # Grammar
 ///
-///  * OK:      the parser could successfully recognize the interface field
-///  * Error:   the parser could not recognize  the interface field definition keyword
-///  * Failure: the parser recognized the interface field, but it did not properly parse
-///
-/// # Examples
-///
-/// foo [base, 0, 0] {...}
-///
-fn interfacefield(
+/// `MMIOFIELD := KW_MMIO LBRAK NUM RBRACK LBRACE SEPLIST(COMMA, IFACEFIELDBODY) RBRACE`
+pub fn registerfield(
     input: VelosiTokenStream,
 ) -> IResult<VelosiTokenStream, VelosiParseTreeInterfaceField> {
     let mut pos = input.clone();
 
-    // get the field name
-    let (i1, name) = ident(input)?;
+    // if we have the reg keyword
+    let (i1, _) = kw_reg(input)?;
 
-    // recognize the field params
-    let (i2, (offset, size)) = cut(delimited(lbrack, interfacefieldinfo, rbrack))(i1)?;
+    let (i2, (name, size)) = cut(tuple((ident, delimited(lbrack, num, rbrack))))(i1)?;
 
     let (i3, nodes) = opt(delimited(
         lbrace,
@@ -344,24 +178,100 @@ fn interfacefield(
     ))(i2)?;
 
     pos.span_until_start(&i3);
-    Ok((
-        i3,
-        VelosiParseTreeInterfaceField::new(name, offset, size, nodes.unwrap_or_default(), pos),
-    ))
+
+    let nodes = if let Some(nodes) = nodes {
+        nodes
+    } else {
+        Vec::new()
+    };
+
+    let res = VelosiParseTreeInterfaceFieldRegister::new(name, size, nodes, pos);
+    Ok((i3, VelosiParseTreeInterfaceField::Register(res)))
 }
+
+/// Parses and consumes a memory interface field definition
+///
+/// # Grammar
+///
+/// `MEMORYFIELD := KW_MEM MEMFIELDINFO LBRACE SEPLIST(COMMA, IFACEFIELDBODY) RBRACE`
+pub fn memoryfield(
+    input: VelosiTokenStream,
+) -> IResult<VelosiTokenStream, VelosiParseTreeInterfaceField> {
+    let mut pos = input.clone();
+
+    // if we have the memory keyword
+    let (i1, _) = kw_mem(input)?;
+
+    let (i2, (name, fieldinfo)) = cut(tuple((ident, delimited(lbrack, memfieldinfo, rbrack))))(i1)?;
+
+    let (i3, nodes) = opt(delimited(
+        lbrace,
+        terminated(separated_list0(comma, interfacefieldbody), opt(comma)),
+        cut(rbrace),
+    ))(i2)?;
+
+    pos.span_until_start(&i3);
+
+    let nodes = if let Some(nodes) = nodes {
+        nodes
+    } else {
+        Vec::new()
+    };
+
+    let (base, offset, size) = fieldinfo;
+
+    let res = VelosiParseTreeInterfaceFieldMemory::new(name, base, offset, size, nodes, pos);
+    Ok((i3, VelosiParseTreeInterfaceField::Memory(res)))
+}
+
+/// Parses and consumes a mmio interface field definition
+///
+/// # Grammar
+///
+/// `REGISTERFIELD := KW_REG MEMFIELDINFO LBRACE SEPLIST(COMMA, IFACEFIELDBODY) RBRACE`
+pub fn mmiofield(
+    input: VelosiTokenStream,
+) -> IResult<VelosiTokenStream, VelosiParseTreeInterfaceField> {
+    let mut pos = input.clone();
+
+    // if we have the mmio keyword
+    let (i1, _) = kw_mmio(input)?;
+
+    let (i2, (name, fieldinfo)) = cut(tuple((ident, delimited(lbrack, memfieldinfo, rbrack))))(i1)?;
+
+    let (i3, nodes) = opt(delimited(
+        lbrace,
+        terminated(separated_list0(comma, interfacefieldbody), opt(comma)),
+        cut(rbrace),
+    ))(i2)?;
+
+    pos.span_until_start(&i3);
+
+    let nodes = if let Some(nodes) = nodes {
+        nodes
+    } else {
+        Vec::new()
+    };
+
+    let (base, offset, size) = fieldinfo;
+
+    let res = VelosiParseTreeInterfaceFieldMmio::new(name, base, offset, size, nodes, pos);
+    Ok((i3, VelosiParseTreeInterfaceField::Mmio(res)))
+}
+
+type MemFiledInfo = (VelosiParseTreeIdentifier, u64, u64);
 
 /// Parses the state field information
 ///
 /// # Grammar
 ///
-/// `INTERFACEFIELDINFO := LBRACK IDENT? NUM? NUM RBRACK`
-pub fn interfacefieldinfo(
-    input: VelosiTokenStream,
-) -> IResult<VelosiTokenStream, (Option<(VelosiParseTreeIdentifier, u64)>, u64)> {
-    let off = tuple((terminated(ident, cut(comma)), cut(terminated(num, comma))));
-    tuple((opt(off), cut(num)))(input)
+/// `InterfaceFieldINFO := LBRACK IDENT NUM NUM RBRACK`
+pub fn memfieldinfo(input: VelosiTokenStream) -> IResult<VelosiTokenStream, MemFiledInfo> {
+    tuple((terminated(ident, comma), terminated(num, comma), num))(input)
 }
 
+///
+///
 fn interfacefieldbody(
     input: VelosiTokenStream,
 ) -> IResult<VelosiTokenStream, VelosiParseTreeInterfaceFieldNode> {
@@ -391,7 +301,7 @@ fn layout(
 
     let (i2, slices) = delimited(
         lbrace,
-        terminated(separated_list0(comma, statefieldslice), opt(comma)),
+        terminated(separated_list0(comma, iface_field_slice), opt(comma)),
         cut(rbrace),
     )(i1)?;
 
@@ -402,8 +312,8 @@ fn layout(
 ///
 /// # Grammar
 ///
-/// `STATEFIELDSLICE := NUM DOTDOT NUM IDENT`
-pub fn statefieldslice(
+/// `iface_field_slice := NUM DOTDOT NUM IDENT`
+pub fn iface_field_slice(
     input: VelosiTokenStream,
 ) -> IResult<VelosiTokenStream, VelosiParseTreeFieldSlice> {
     let mut pos = input.clone();

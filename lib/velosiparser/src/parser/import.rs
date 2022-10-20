@@ -80,7 +80,7 @@ fn test_ok() {
     let (rem, res) = import(ts).unwrap();
     assert_eq!(rem.len(), 0);
     if let VelosiParseTreeContextNode::Import(import) = res {
-        assert_eq!(import.name, "foobar");
+        assert_eq!(import.name(), "foobar");
     } else {
         panic!("Expected an import node, got {:?}", res);
     }

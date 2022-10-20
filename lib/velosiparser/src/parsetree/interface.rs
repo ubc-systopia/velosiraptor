@@ -114,24 +114,27 @@ impl Display for VelosiParseTreeInterfaceFieldNode {
 
 /// Represents a state field
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct VelosiParseTreeInterfaceField {
+pub struct VelosiParseTreeInterfaceFieldMemory {
     pub name: VelosiParseTreeIdentifier,
-    pub offset: Option<(VelosiParseTreeIdentifier, u64)>,
+    pub base: VelosiParseTreeIdentifier,
+    pub offset: u64,
     pub size: u64,
     pub nodes: Vec<VelosiParseTreeInterfaceFieldNode>,
     pub loc: VelosiTokenStream,
 }
 
-impl VelosiParseTreeInterfaceField {
+impl VelosiParseTreeInterfaceFieldMemory {
     pub fn new(
         name: VelosiParseTreeIdentifier,
-        offset: Option<(VelosiParseTreeIdentifier, u64)>,
+        base: VelosiParseTreeIdentifier,
+        offset: u64,
         size: u64,
         nodes: Vec<VelosiParseTreeInterfaceFieldNode>,
         loc: VelosiTokenStream,
     ) -> Self {
         Self {
             name,
+            base,
             offset,
             size,
             nodes,
@@ -140,19 +143,119 @@ impl VelosiParseTreeInterfaceField {
     }
 }
 
-impl Display for VelosiParseTreeInterfaceField {
+impl Display for VelosiParseTreeInterfaceFieldMemory {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "    {} [", self.name)?;
-        if let Some((name, num)) = &self.offset {
-            write!(f, "{}, {},", name, num)?;
-        }
+        write!(f, "mem {} [", self.name)?;
+        write!(f, "{}, {}, ", self.base, self.offset)?;
         write!(f, "{}", self.size)?;
         writeln!(f, "] {{")?;
-        for node in &self.nodes {
-            Display::fmt(node, f)?;
+        for n in &self.nodes {
+            Display::fmt(n, f)?;
             writeln!(f, ",")?;
         }
         write!(f, "    }}")
+    }
+}
+
+/// Represents a state field
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct VelosiParseTreeInterfaceFieldMmio {
+    pub name: VelosiParseTreeIdentifier,
+    pub base: VelosiParseTreeIdentifier,
+    pub offset: u64,
+    pub size: u64,
+    pub nodes: Vec<VelosiParseTreeInterfaceFieldNode>,
+    pub loc: VelosiTokenStream,
+}
+
+impl VelosiParseTreeInterfaceFieldMmio {
+    pub fn new(
+        name: VelosiParseTreeIdentifier,
+        base: VelosiParseTreeIdentifier,
+        offset: u64,
+        size: u64,
+        nodes: Vec<VelosiParseTreeInterfaceFieldNode>,
+        loc: VelosiTokenStream,
+    ) -> Self {
+        Self {
+            name,
+            base,
+            offset,
+            size,
+            nodes,
+            loc,
+        }
+    }
+}
+
+impl Display for VelosiParseTreeInterfaceFieldMmio {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "mmio {} [", self.name)?;
+        write!(f, "{}, {}, ", self.base, self.offset)?;
+        write!(f, "{}", self.size)?;
+        writeln!(f, "] {{")?;
+        for n in &self.nodes {
+            Display::fmt(n, f)?;
+            writeln!(f, ",")?;
+        }
+        write!(f, "    }}")
+    }
+}
+
+/// Represents a state field
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct VelosiParseTreeInterfaceFieldRegister {
+    pub name: VelosiParseTreeIdentifier,
+    pub size: u64,
+    pub nodes: Vec<VelosiParseTreeInterfaceFieldNode>,
+    pub loc: VelosiTokenStream,
+}
+
+impl VelosiParseTreeInterfaceFieldRegister {
+    pub fn new(
+        name: VelosiParseTreeIdentifier,
+        size: u64,
+        nodes: Vec<VelosiParseTreeInterfaceFieldNode>,
+        loc: VelosiTokenStream,
+    ) -> Self {
+        Self {
+            name,
+            size,
+            nodes,
+            loc,
+        }
+    }
+}
+
+impl Display for VelosiParseTreeInterfaceFieldRegister {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "reg {} [", self.name)?;
+        write!(f, "{}", self.size)?;
+        writeln!(f, "] {{")?;
+        for n in &self.nodes {
+            Display::fmt(n, f)?;
+            writeln!(f, ",")?;
+        }
+        write!(f, "    }}")
+    }
+}
+
+/// Represents a component of the state, either a register or a memory location
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub enum VelosiParseTreeInterfaceField {
+    Memory(VelosiParseTreeInterfaceFieldMemory),
+    Mmio(VelosiParseTreeInterfaceFieldMmio),
+    Register(VelosiParseTreeInterfaceFieldRegister),
+}
+
+impl Display for VelosiParseTreeInterfaceField {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        use VelosiParseTreeInterfaceField::*;
+        match self {
+            Memory(field) => Display::fmt(field, f),
+            Mmio(field) => Display::fmt(field, f),
+            Register(field) => Display::fmt(field, f),
+        }
     }
 }
 
@@ -185,7 +288,7 @@ impl VelosiParseTreeInterfaceDef {
 impl Display for VelosiParseTreeInterfaceDef {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         if !self.params.is_empty() {
-            write!(f, "(")?;
+            write!(f, "InterfaceDef(")?;
             for param in &self.params {
                 Display::fmt(param, f)?;
             }
@@ -196,38 +299,34 @@ impl Display for VelosiParseTreeInterfaceDef {
             Display::fmt(field, f)?;
             writeln!(f, ",")?;
         }
-        write!(f, "  }}")
+        writeln!(f, "  }};")
     }
 }
 
 /// Represents the state definition
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum VelosiParseTreeInterface {
-    Memory(VelosiParseTreeInterfaceDef),
-    MMIORegister(VelosiParseTreeInterfaceDef),
-    CPURegister(VelosiParseTreeInterfaceDef),
+    InterfaceDef(VelosiParseTreeInterfaceDef),
     None(VelosiTokenStream),
+}
+
+impl VelosiParseTreeInterface {
+    /// obtains the source position of the state definition
+    pub fn loc(&self) -> &VelosiTokenStream {
+        match self {
+            VelosiParseTreeInterface::InterfaceDef(def) => &def.loc,
+            VelosiParseTreeInterface::None(loc) => loc,
+        }
+    }
 }
 
 impl Display for VelosiParseTreeInterface {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            VelosiParseTreeInterface::Memory(s) => {
-                write!(f, "MemoryInterface")?;
-                Display::fmt(&s, f)?;
-            }
-            VelosiParseTreeInterface::MMIORegister(s) => {
-                write!(f, "MMIORegisterInterface")?;
-                Display::fmt(&s, f)?;
-            }
-            VelosiParseTreeInterface::CPURegister(s) => {
-                write!(f, "CPURegisterInterface")?;
-                Display::fmt(&s, f)?;
-            }
+            VelosiParseTreeInterface::InterfaceDef(s) => Display::fmt(&s, f),
             VelosiParseTreeInterface::None(_) => {
-                write!(f, "None")?;
+                writeln!(f, "None;")
             }
         }
-        writeln!(f, ";")
     }
 }

@@ -89,56 +89,6 @@ fn statedef(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseT
     ))
 }
 
-/// parses and consumes a register state definition of a unit
-///
-/// # Grammar
-///
-/// `REGISTERSTATE := KW_REGISTERSTATE STATEPARAMS LBRACE STATEFIELDS RBRACE`
-// fn register_state(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
-//     let mut pos = input.clone();
-
-//     let (i1, _) = kw_registerstate(input)?;
-//     let (i2, bases) = stateparams(i1)?;
-//     let (i3, fields) = cut(delimited(
-//         lbrace,
-//         separated_list0(comma, statefield),
-//         tuple((opt(comma), rbrace)),
-//     ))(i2)?;
-
-//     pos.span_until_start(&i3);
-
-//     let st = VelosiParseTreeStateDef::new(bases, fields, pos);
-//     Ok((
-//         i3,
-//         VelosiParseTreeUnitNode::State(VelosiParseTreeState::Register(st)),
-//     ))
-// }
-
-/// parses and consumes a memory state definition of a unit
-///
-/// # Grammar
-///
-/// `MEMORYSTATE := KW_REGISTERSTATE STATEPARAMS LBRACE STATEFIELDS RBRACE`
-// fn memory_state(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
-//     let mut pos = input.clone();
-
-//     let (i1, _) = kw_memorystate(input)?;
-//     let (i2, bases) = stateparams(i1)?;
-//     let (i3, fields) = cut(delimited(
-//         lbrace,
-//         separated_list0(comma, statefield),
-//         tuple((opt(comma), rbrace)),
-//     ))(i2)?;
-
-//     pos.span_until_start(&i3);
-
-//     let st = VelosiParseTreeStateDef::new(bases, fields, pos);
-//     Ok((
-//         i3,
-//         VelosiParseTreeUnitNode::State(VelosiParseTreeState::Memory(st)),
-//     ))
-// }
-
 /// parses and consumes a none state definition of a unit
 ///
 /// # Grammar
@@ -285,38 +235,23 @@ use velosilexer::VelosiLexer;
 
 #[test]
 fn memory_state_parser_test() {
-    let state_string = "state = MemoryState (base : addr) {\
-    pte [base, 0, 4] {\
+    let state_string = "state = StateDef (base : addr) {\
+    mem pte [base, 0, 4] {\
         0 .. 1   present,\
         12.. 32  base\
         }\
-    }";
+    };";
 
     let ts = VelosiLexer::lex_string(state_string.to_string()).unwrap();
     let (_, parsed_state) = state(ts).unwrap();
 
     assert!(matches!(
         parsed_state,
-        VelosiParseTreeUnitNode::State(VelosiParseTreeState::Memory(_))
+        VelosiParseTreeUnitNode::State(VelosiParseTreeState::StateDef(_))
     ));
 
-    let state_string = "state = MemoryState (base : addr) {\
-        pte [base, 0, 4] {\
-            0 .. 1   present,\
-            12.. 32  base,\
-            }\
-        }";
-
-    let ts = VelosiLexer::lex_string(state_string.to_string()).unwrap();
-    let (_, parsed_state) = state(ts).unwrap();
-
-    assert!(matches!(
-        parsed_state,
-        VelosiParseTreeUnitNode::State(VelosiParseTreeState::Memory(_))
-    ));
-
-    let state_string = "state = MemoryState (base : addr) {\
-        pte [base, 0, 4] {\
+    let state_string = "state = StateDef (base : addr) {\
+        mem pte [base, 0, 4] {\
             0 .. 1   present,\
             12.. 32  base,\
             }\
@@ -327,41 +262,56 @@ fn memory_state_parser_test() {
 
     assert!(matches!(
         parsed_state,
-        VelosiParseTreeUnitNode::State(VelosiParseTreeState::Memory(_))
+        VelosiParseTreeUnitNode::State(VelosiParseTreeState::StateDef(_))
     ));
 
-    let state_string = "state = MemoryState (base : addr) {\
-        pte [4] {\
-            0 .. 1   present,\
-            12.. 32  base,\
-            },\
-        }";
-
-    let ts = VelosiLexer::lex_string(state_string.to_string()).unwrap();
-    let (_, parsed_state) = state(ts).unwrap();
-
-    assert!(matches!(
-        parsed_state,
-        VelosiParseTreeUnitNode::State(VelosiParseTreeState::Memory(_))
-    ));
-
-    let state_string = "state = MemoryState (base : addr) {\
-        pte [4] {\
-            0 .. 1   present,\
-            12.. 32  base,\
-            },\
-        pte2 [4] {\
+    let state_string = "state = StateDef (base : addr) {\
+        mem pte [base, 0, 4] {\
             0 .. 1   present,\
             12.. 32  base,\
             }\
-        }";
+        };";
 
     let ts = VelosiLexer::lex_string(state_string.to_string()).unwrap();
     let (_, parsed_state) = state(ts).unwrap();
 
     assert!(matches!(
         parsed_state,
-        VelosiParseTreeUnitNode::State(VelosiParseTreeState::Memory(_))
+        VelosiParseTreeUnitNode::State(VelosiParseTreeState::StateDef(_))
+    ));
+
+    let state_string = "state = StateDef (base : addr) {\
+        reg pte [4] {\
+            0 .. 1   present,\
+            12.. 32  base,\
+            },\
+        };";
+
+    let ts = VelosiLexer::lex_string(state_string.to_string()).unwrap();
+    let (_, parsed_state) = state(ts).unwrap();
+
+    assert!(matches!(
+        parsed_state,
+        VelosiParseTreeUnitNode::State(VelosiParseTreeState::StateDef(_))
+    ));
+
+    let state_string = "state = StateDef (base : addr) {\
+        reg pte [4] {\
+            0 .. 1   present,\
+            12.. 32  base,\
+            },\
+        reg pte2 [4] {\
+            0 .. 1   present,\
+            12.. 32  base,\
+            }\
+        };";
+
+    let ts = VelosiLexer::lex_string(state_string.to_string()).unwrap();
+    let (_, parsed_state) = state(ts).unwrap();
+
+    assert!(matches!(
+        parsed_state,
+        VelosiParseTreeUnitNode::State(VelosiParseTreeState::StateDef(_))
     ));
 }
 
@@ -379,8 +329,8 @@ fn none_state_parser_test() {
 
 #[test]
 fn register_state_parser_test() {
-    let state_string = "state = RegisterState {\
-        base [1] {\
+    let state_string = "state = StateDef {\
+        reg base [1] {\
             0 .. 0 enabled,\
             1 .. 1 read,\
             2 .. 2 write,\
@@ -391,7 +341,7 @@ fn register_state_parser_test() {
 
     assert!(matches!(
         parsed_state,
-        VelosiParseTreeUnitNode::State(VelosiParseTreeState::Register(_))
+        VelosiParseTreeUnitNode::State(VelosiParseTreeState::StateDef(_))
     ));
 }
 

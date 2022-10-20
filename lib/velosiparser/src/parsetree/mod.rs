@@ -53,7 +53,9 @@ pub use expr::{
 pub use field::{VelosiParseTreeField, VelosiParseTreeFieldSlice};
 pub use interface::{
     VelosiParseTreeInterface, VelosiParseTreeInterfaceAction, VelosiParseTreeInterfaceActions,
-    VelosiParseTreeInterfaceDef, VelosiParseTreeInterfaceField, VelosiParseTreeInterfaceFieldNode,
+    VelosiParseTreeInterfaceDef, VelosiParseTreeInterfaceField,
+    VelosiParseTreeInterfaceFieldMemory, VelosiParseTreeInterfaceFieldMmio,
+    VelosiParseTreeInterfaceFieldNode, VelosiParseTreeInterfaceFieldRegister,
 };
 pub use map::{
     VelosiParseTreeMap, VelosiParseTreeMapElement, VelosiParseTreeMapExplicit,
