@@ -209,15 +209,13 @@ keywordparser!(pub kw_else, VelosiKeyword::Else);
 keywordparser!(pub kw_state, VelosiKeyword::State);
 keywordparser!(pub kw_interface, VelosiKeyword::Interface);
 
-// keywordparser!(pub kw_memorystate, VelosiKeyword::MemoryState);
-// keywordparser!(pub kw_registerstate, VelosiKeyword::RegisterState);
 keywordparser!(pub kw_statedef, VelosiKeyword::StateDef);
+keywordparser!(pub kw_interfacedef, VelosiKeyword::InterfaceDef);
+
 keywordparser!(pub kw_mem, VelosiKeyword::Mem);
 keywordparser!(pub kw_reg, VelosiKeyword::Reg);
+keywordparser!(pub kw_mmio, VelosiKeyword::Mmio);
 
-keywordparser!(pub kw_memoryinterface, VelosiKeyword::MemoryInterface);
-keywordparser!(pub kw_mmiointerface, VelosiKeyword::MMIOInterface);
-keywordparser!(pub kw_cpuregisterinterface, VelosiKeyword::CPURegisterInterface);
 keywordparser!(pub kw_none, VelosiKeyword::None);
 keywordparser!(pub kw_layout, VelosiKeyword::Layout);
 keywordparser!(pub kw_fn, VelosiKeyword::Fn);
