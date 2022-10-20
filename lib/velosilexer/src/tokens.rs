@@ -66,10 +66,13 @@ pub enum VelosiKeyword {
     //
     // State Kinds
     //
-    /// in-memory state
-    MemoryState,
-    /// register backed state
-    RegisterState,
+    /// state definition
+    StateDef,
+    Mem,
+    Reg,
+    // MemoryState,
+    // /// register backed state
+    // RegisterState,
 
     //
     // Interface Kinds
@@ -166,8 +169,12 @@ impl VelosiKeyword {
             VelosiKeyword::State => "state",
             VelosiKeyword::Interface => "interface",
             //
-            VelosiKeyword::MemoryState => "MemoryState",
-            VelosiKeyword::RegisterState => "RegisterState",
+            // VelosiKeyword::MemoryState => "MemoryState",
+            // VelosiKeyword::RegisterState => "RegisterState",
+            VelosiKeyword::StateDef => "StateDef",
+            VelosiKeyword::Mem => "mem",
+            VelosiKeyword::Reg => "reg",
+            //
             VelosiKeyword::MemoryInterface => "MemoryInterface",
             VelosiKeyword::MMIOInterface => "MMIOInterface",
             VelosiKeyword::CPURegisterInterface => "CPURegisterInterface",
@@ -221,8 +228,11 @@ impl<'a> TryFrom<&'a str> for VelosiKeyword {
             "state" => Ok(VelosiKeyword::State),
             "interface" => Ok(VelosiKeyword::Interface),
             //
-            "MemoryState" => Ok(VelosiKeyword::MemoryState),
-            "RegisterState" => Ok(VelosiKeyword::RegisterState),
+            "StateDef" => Ok(VelosiKeyword::StateDef),
+            "reg" => Ok(VelosiKeyword::Reg),
+            "mem" => Ok(VelosiKeyword::Mem),
+            // "MemoryState" => Ok(VelosiKeyword::MemoryState),
+            // "RegisterState" => Ok(VelosiKeyword::RegisterState),
             "MemoryInterface" => Ok(VelosiKeyword::MemoryInterface),
             "MMIOInterface" => Ok(VelosiKeyword::MMIOInterface),
             "CPURegisterInterface" => Ok(VelosiKeyword::CPURegisterInterface),
@@ -624,6 +634,13 @@ fn test_enum_str() {
     assert_eq!(VelosiKeyword::State.as_str(), "state");
     assert_eq!("interface".try_into(), Ok(VelosiKeyword::Interface));
     assert_eq!(VelosiKeyword::Interface.as_str(), "interface");
+
+    assert_eq!("StateDef".try_into(), Ok(VelosiKeyword::StateDef));
+    assert_eq!(VelosiKeyword::StateDef.as_str(), "StateDef");
+    assert_eq!("mem".try_into(), Ok(VelosiKeyword::Mem));
+    assert_eq!(VelosiKeyword::Mem.as_str(), "mem");
+    assert_eq!("reg".try_into(), Ok(VelosiKeyword::Reg));
+    assert_eq!(VelosiKeyword::Reg.as_str(), "reg");
 
     assert_eq!("MemoryState".try_into(), Ok(VelosiKeyword::MemoryState));
     assert_eq!(VelosiKeyword::MemoryState.as_str(), "MemoryState");

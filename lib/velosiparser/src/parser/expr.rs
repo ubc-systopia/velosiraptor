@@ -40,7 +40,7 @@ use nom::{
 // used crate functionality
 use crate::error::{IResult, VelosiParserErr};
 use crate::parser::{param::parameter, terminals::*};
-use crate::parsetree::expr::*;
+use crate::parsetree::{expr::*, VelosiParseTreeIdentifier};
 use crate::{VelosiKeyword, VelosiTokenKind, VelosiTokenStream};
 
 // Precedence of Operators  (strong to weak)
@@ -494,7 +494,7 @@ fn ident_path(
     // recognize the `.ident` parts
     let (i, mut ot) = many0(preceded(dot, cut(ident)))(rem)?;
     // merge the path into one big vector
-    let mut path = Vec::from([fst]);
+    let mut path = Vec::from([VelosiParseTreeIdentifier::new(fst, tok)]);
     path.append(&mut ot);
 
     pos.span_until_start(&i);
@@ -544,7 +544,7 @@ pub fn expr_list(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vec<Vel
 ///
 pub fn fn_call_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
     let mut pos = input.clone();
-    let (i, id) = ident_path(input)?;
+    let (i, id) = ident(input)?;
 
     let (i, args) = delimited(lparen, cut(expr_list), cut(rparen))(i)?;
 

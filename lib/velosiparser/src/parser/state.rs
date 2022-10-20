@@ -38,13 +38,14 @@ use crate::error::IResult;
 use crate::parser::{
     param::parameter,
     terminals::{
-        assign, comma, dotdot, ident, kw_memorystate, kw_none, kw_registerstate, kw_state, lbrace,
+        assign, comma, dotdot, ident, kw_mem, kw_none, kw_reg, kw_state, kw_statedef, lbrace,
         lbrack, lparen, num, rbrace, rbrack, rparen, semicolon,
     },
 };
 use crate::parsetree::{
-    VelosiParseTreeFieldSlice, VelosiParseTreeParam, VelosiParseTreeState, VelosiParseTreeStateDef,
-    VelosiParseTreeStateField, VelosiParseTreeUnitNode,
+    VelosiParseTreeFieldSlice, VelosiParseTreeIdentifier, VelosiParseTreeParam,
+    VelosiParseTreeState, VelosiParseTreeStateDef, VelosiParseTreeStateField,
+    VelosiParseTreeStateFieldMemory, VelosiParseTreeStateFieldRegister, VelosiParseTreeUnitNode,
 };
 use crate::VelosiTokenStream;
 
@@ -52,7 +53,7 @@ use crate::VelosiTokenStream;
 ///
 /// # Grammar
 ///
-/// `STATE := KW_STATE ASSIGN (NONE | REGISTERSTATE | MEMORYSTATE) SEMICOLON?`
+/// `STATE := KW_STATE ASSIGN (NONE | STATEDEF) SEMICOLON`
 pub fn state(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
     //    let mut pos = input.clone();
 
@@ -60,11 +61,32 @@ pub fn state(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParse
     let (i1, _) = kw_state(input)?;
 
     // We now parse the different state types.
-    cut(delimited(
-        assign,
-        alt((register_state, memory_state, none_state)),
-        opt(semicolon),
-    ))(i1)
+    cut(delimited(assign, alt((statedef, none_state)), semicolon))(i1)
+}
+
+/// parses and consumes a memory state definition of a unit
+///
+/// # Grammar
+///
+/// `STATEDEF := KW_STATEDEF STATEPARAMS LBRACE STATEFIELDS RBRACE`
+fn statedef(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
+    let mut pos = input.clone();
+
+    let (i1, _) = kw_statedef(input)?;
+    let (i2, bases) = stateparams(i1)?;
+    let (i3, fields) = cut(delimited(
+        lbrace,
+        separated_list0(comma, statefield),
+        tuple((opt(comma), rbrace)),
+    ))(i2)?;
+
+    pos.span_until_start(&i3);
+
+    let st = VelosiParseTreeStateDef::new(bases, fields, pos);
+    Ok((
+        i3,
+        VelosiParseTreeUnitNode::State(VelosiParseTreeState::StateDef(st)),
+    ))
 }
 
 /// parses and consumes a register state definition of a unit
@@ -72,50 +94,50 @@ pub fn state(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParse
 /// # Grammar
 ///
 /// `REGISTERSTATE := KW_REGISTERSTATE STATEPARAMS LBRACE STATEFIELDS RBRACE`
-fn register_state(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
-    let mut pos = input.clone();
+// fn register_state(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
+//     let mut pos = input.clone();
 
-    let (i1, _) = kw_registerstate(input)?;
-    let (i2, bases) = stateparams(i1)?;
-    let (i3, fields) = cut(delimited(
-        lbrace,
-        separated_list0(comma, statefield),
-        tuple((opt(comma), rbrace)),
-    ))(i2)?;
+//     let (i1, _) = kw_registerstate(input)?;
+//     let (i2, bases) = stateparams(i1)?;
+//     let (i3, fields) = cut(delimited(
+//         lbrace,
+//         separated_list0(comma, statefield),
+//         tuple((opt(comma), rbrace)),
+//     ))(i2)?;
 
-    pos.span_until_start(&i3);
+//     pos.span_until_start(&i3);
 
-    let st = VelosiParseTreeStateDef::new(bases, fields, pos);
-    Ok((
-        i3,
-        VelosiParseTreeUnitNode::State(VelosiParseTreeState::Register(st)),
-    ))
-}
+//     let st = VelosiParseTreeStateDef::new(bases, fields, pos);
+//     Ok((
+//         i3,
+//         VelosiParseTreeUnitNode::State(VelosiParseTreeState::Register(st)),
+//     ))
+// }
 
 /// parses and consumes a memory state definition of a unit
 ///
 /// # Grammar
 ///
 /// `MEMORYSTATE := KW_REGISTERSTATE STATEPARAMS LBRACE STATEFIELDS RBRACE`
-fn memory_state(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
-    let mut pos = input.clone();
+// fn memory_state(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
+//     let mut pos = input.clone();
 
-    let (i1, _) = kw_memorystate(input)?;
-    let (i2, bases) = stateparams(i1)?;
-    let (i3, fields) = cut(delimited(
-        lbrace,
-        separated_list0(comma, statefield),
-        tuple((opt(comma), rbrace)),
-    ))(i2)?;
+//     let (i1, _) = kw_memorystate(input)?;
+//     let (i2, bases) = stateparams(i1)?;
+//     let (i3, fields) = cut(delimited(
+//         lbrace,
+//         separated_list0(comma, statefield),
+//         tuple((opt(comma), rbrace)),
+//     ))(i2)?;
 
-    pos.span_until_start(&i3);
+//     pos.span_until_start(&i3);
 
-    let st = VelosiParseTreeStateDef::new(bases, fields, pos);
-    Ok((
-        i3,
-        VelosiParseTreeUnitNode::State(VelosiParseTreeState::Memory(st)),
-    ))
-}
+//     let st = VelosiParseTreeStateDef::new(bases, fields, pos);
+//     Ok((
+//         i3,
+//         VelosiParseTreeUnitNode::State(VelosiParseTreeState::Memory(st)),
+//     ))
+// }
 
 /// parses and consumes a none state definition of a unit
 ///
@@ -155,17 +177,27 @@ pub fn stateparams(
 ///
 /// # Grammar
 ///
-/// `STATEFIELD := IDENT STATEFIELDINFO (LBRACE SEPLIST(COMMA, STATEFIELDSLICE) RBRACE)?`
+/// `STATEFIELD := MEMORYFIELD | REGISTERFIELD`
 pub fn statefield(
+    input: VelosiTokenStream,
+) -> IResult<VelosiTokenStream, VelosiParseTreeStateField> {
+    alt((memoryfield, registerfield))(input)
+}
+
+/// Parses and consumes a state field definition
+///
+/// # Grammar
+///
+/// `MEMORYFIELD := KW_MEM IDENT STATEFIELDINFO (LBRACE SEPLIST(COMMA, STATEFIELDSLICE) RBRACE)?`
+pub fn memoryfield(
     input: VelosiTokenStream,
 ) -> IResult<VelosiTokenStream, VelosiParseTreeStateField> {
     let mut pos = input.clone();
 
-    // get the field name
-    let (i1, name) = ident(input)?;
+    // if we have the memory keyword
+    let (i1, _) = kw_mem(input)?;
 
-    // LBRACK IDENT? NUM? NUM RBRACK
-    let (i2, (offset, size)) = cut(delimited(lbrack, statefieldinfo, rbrack))(i1)?;
+    let (i2, (name, fieldinfo)) = cut(tuple((ident, delimited(lbrack, memfieldinfo, rbrack))))(i1)?;
 
     let (i3, slices) = opt(delimited(
         lbrace,
@@ -181,22 +213,54 @@ pub fn statefield(
         Vec::new()
     };
 
-    Ok((
-        i3,
-        VelosiParseTreeStateField::new(name, offset, size, slices, pos),
-    ))
+    let (base, offset, size) = fieldinfo;
+
+    let res = VelosiParseTreeStateFieldMemory::new(name, base, offset, size, slices, pos);
+    Ok((i3, VelosiParseTreeStateField::Memory(res)))
 }
+
+type MemFiledInfo = (VelosiParseTreeIdentifier, u64, u64);
 
 /// Parses the state field information
 ///
 /// # Grammar
 ///
-/// `STATEFIELDINFO := LBRACK IDENT? NUM? NUM RBRACK`
-pub fn statefieldinfo(
+/// `STATEFIELDINFO := LBRACK IDENT NUM NUM RBRACK`
+pub fn memfieldinfo(input: VelosiTokenStream) -> IResult<VelosiTokenStream, MemFiledInfo> {
+    tuple((terminated(ident, comma), terminated(num, comma), num))(input)
+}
+
+/// Parses and consumes a state field definition
+///
+/// # Grammar
+///
+/// `STATEFIELD := IDENT STATEFIELDINFO (LBRACE SEPLIST(COMMA, STATEFIELDSLICE) RBRACE)?`
+pub fn registerfield(
     input: VelosiTokenStream,
-) -> IResult<VelosiTokenStream, (Option<(String, u64)>, u64)> {
-    let off = tuple((terminated(ident, cut(comma)), cut(terminated(num, comma))));
-    tuple((opt(off), cut(num)))(input)
+) -> IResult<VelosiTokenStream, VelosiParseTreeStateField> {
+    let mut pos = input.clone();
+
+    // if we have the memory keyword
+    let (i1, _) = kw_reg(input)?;
+
+    let (i2, (name, size)) = cut(tuple((ident, delimited(lbrack, num, rbrack))))(i1)?;
+
+    let (i3, slices) = opt(delimited(
+        lbrace,
+        terminated(separated_list0(comma, statefieldslice), opt(comma)),
+        cut(rbrace),
+    ))(i2)?;
+
+    pos.span_until_start(&i3);
+
+    let slices = if let Some(slices) = slices {
+        slices
+    } else {
+        Vec::new()
+    };
+
+    let res = VelosiParseTreeStateFieldRegister::new(name, size, slices, pos);
+    Ok((i3, VelosiParseTreeStateField::Register(res)))
 }
 
 /// Pares and consumes a state field slice definition

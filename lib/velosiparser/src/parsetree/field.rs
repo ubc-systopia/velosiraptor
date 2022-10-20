@@ -31,6 +31,7 @@
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 // used crate functionality
+use crate::parsetree::VelosiParseTreeIdentifier;
 use crate::VelosiTokenStream;
 
 /// Represents the state definition
@@ -38,17 +39,22 @@ use crate::VelosiTokenStream;
 pub struct VelosiParseTreeFieldSlice {
     pub start: u64,
     pub end: u64,
-    pub name: String,
-    pub pos: VelosiTokenStream,
+    pub name: VelosiParseTreeIdentifier,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeFieldSlice {
-    pub fn new(start: u64, end: u64, name: String, pos: VelosiTokenStream) -> Self {
+    pub fn new(
+        start: u64,
+        end: u64,
+        name: VelosiParseTreeIdentifier,
+        loc: VelosiTokenStream,
+    ) -> Self {
         Self {
             start,
             end,
             name,
-            pos,
+            loc,
         }
     }
 }
@@ -62,27 +68,27 @@ impl Display for VelosiParseTreeFieldSlice {
 /// Represents a state field
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeField {
-    pub name: String,
-    pub offset: Option<(String, u64)>,
+    pub name: VelosiParseTreeIdentifier,
+    pub offset: Option<(VelosiParseTreeIdentifier, u64)>,
     pub size: u64,
     pub layout: Vec<VelosiParseTreeFieldSlice>,
-    pub pos: VelosiTokenStream,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeField {
     pub fn new(
-        name: String,
-        offset: Option<(String, u64)>,
+        name: VelosiParseTreeIdentifier,
+        offset: Option<(VelosiParseTreeIdentifier, u64)>,
         size: u64,
         layout: Vec<VelosiParseTreeFieldSlice>,
-        pos: VelosiTokenStream,
+        loc: VelosiTokenStream,
     ) -> Self {
         Self {
             name,
             offset,
             size,
             layout,
-            pos,
+            loc,
         }
     }
 }

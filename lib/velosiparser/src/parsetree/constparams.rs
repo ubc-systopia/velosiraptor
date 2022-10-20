@@ -31,14 +31,14 @@
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 // use crate functionality
-use super::{VelosiParseTreeExpr, VelosiParseTreeType};
+use super::{VelosiParseTreeExpr, VelosiParseTreeIdentifier, VelosiParseTreeType};
 use crate::VelosiTokenStream;
 
 /// A constant definition within the root or unit context
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeConstDef {
     /// the name of the constant
-    pub name: String,
+    pub name: VelosiParseTreeIdentifier,
     /// the type of the constant
     pub ctype: VelosiParseTreeType,
     /// expression representing the value of the constnat
@@ -49,7 +49,7 @@ pub struct VelosiParseTreeConstDef {
 
 impl VelosiParseTreeConstDef {
     pub fn new(
-        name: String,
+        name: VelosiParseTreeIdentifier,
         ctype: VelosiParseTreeType,
         value: VelosiParseTreeExpr,
         loc: VelosiTokenStream,
@@ -74,15 +74,19 @@ impl Display for VelosiParseTreeConstDef {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeParam {
     /// the name of the parameter
-    pub name: String,
+    pub name: VelosiParseTreeIdentifier,
     /// the type of the param
     pub ptype: VelosiParseTreeType,
-    /// the location of the import clause
+    /// the location of the entire import clause
     pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeParam {
-    pub fn new(name: String, ptype: VelosiParseTreeType, loc: VelosiTokenStream) -> Self {
+    pub fn new(
+        name: VelosiParseTreeIdentifier,
+        ptype: VelosiParseTreeType,
+        loc: VelosiTokenStream,
+    ) -> Self {
         VelosiParseTreeParam { name, ptype, loc }
     }
 }

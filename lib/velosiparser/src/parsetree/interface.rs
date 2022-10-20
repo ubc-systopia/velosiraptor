@@ -31,7 +31,9 @@
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 // used crate functionality
-use super::{VelosiParseTreeExpr, VelosiParseTreeFieldSlice, VelosiParseTreeParam};
+use super::{
+    VelosiParseTreeExpr, VelosiParseTreeFieldSlice, VelosiParseTreeIdentifier, VelosiParseTreeParam,
+};
 use crate::VelosiTokenStream;
 
 /// Represents a state field
@@ -39,12 +41,12 @@ use crate::VelosiTokenStream;
 pub struct VelosiParseTreeInterfaceAction {
     pub src: VelosiParseTreeExpr,
     pub dst: VelosiParseTreeExpr,
-    pub pos: VelosiTokenStream,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeInterfaceAction {
-    pub fn new(src: VelosiParseTreeExpr, dst: VelosiParseTreeExpr, pos: VelosiTokenStream) -> Self {
-        Self { src, dst, pos }
+    pub fn new(src: VelosiParseTreeExpr, dst: VelosiParseTreeExpr, loc: VelosiTokenStream) -> Self {
+        Self { src, dst, loc }
     }
 }
 
@@ -58,12 +60,12 @@ impl Display for VelosiParseTreeInterfaceAction {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeInterfaceActions {
     pub actions: Vec<VelosiParseTreeInterfaceAction>,
-    pub pos: VelosiTokenStream,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeInterfaceActions {
-    pub fn new(actions: Vec<VelosiParseTreeInterfaceAction>, pos: VelosiTokenStream) -> Self {
-        Self { actions, pos }
+    pub fn new(actions: Vec<VelosiParseTreeInterfaceAction>, loc: VelosiTokenStream) -> Self {
+        Self { actions, loc }
     }
 }
 
@@ -113,27 +115,27 @@ impl Display for VelosiParseTreeInterfaceFieldNode {
 /// Represents a state field
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeInterfaceField {
-    pub name: String,
-    pub offset: Option<(String, u64)>,
+    pub name: VelosiParseTreeIdentifier,
+    pub offset: Option<(VelosiParseTreeIdentifier, u64)>,
     pub size: u64,
     pub nodes: Vec<VelosiParseTreeInterfaceFieldNode>,
-    pub pos: VelosiTokenStream,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeInterfaceField {
     pub fn new(
-        name: String,
-        offset: Option<(String, u64)>,
+        name: VelosiParseTreeIdentifier,
+        offset: Option<(VelosiParseTreeIdentifier, u64)>,
         size: u64,
         nodes: Vec<VelosiParseTreeInterfaceFieldNode>,
-        pos: VelosiTokenStream,
+        loc: VelosiTokenStream,
     ) -> Self {
         Self {
             name,
             offset,
             size,
             nodes,
-            pos,
+            loc,
         }
     }
 }
@@ -162,7 +164,7 @@ pub struct VelosiParseTreeInterfaceDef {
     /// the fields defined in teh state
     pub fields: Vec<VelosiParseTreeInterfaceField>,
     /// the position in the source file
-    pub pos: VelosiTokenStream,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeInterfaceDef {
@@ -170,12 +172,12 @@ impl VelosiParseTreeInterfaceDef {
     pub fn new(
         params: Vec<VelosiParseTreeParam>,
         fields: Vec<VelosiParseTreeInterfaceField>,
-        pos: VelosiTokenStream,
+        loc: VelosiTokenStream,
     ) -> Self {
         Self {
             params,
             fields,
-            pos,
+            loc,
         }
     }
 }

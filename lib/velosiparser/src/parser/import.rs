@@ -65,7 +65,7 @@ pub fn import(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPars
     // adjust the location information to include the entire source span
     loc.span_until_start(&rem);
 
-    let import = VelosiParseTreeImport { name, loc };
+    let import = VelosiParseTreeImport(name);
     Ok((rem, VelosiParseTreeContextNode::Import(import)))
 }
 

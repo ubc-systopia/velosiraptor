@@ -23,15 +23,19 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// NOM parsing constructs
+//! # Terminal Parsers
+//!
+//! This module defines terminal parsers for the VelosiRaptor language
+
+// used nom parsing constructs
 use nom::{branch::alt, bytes::complete::take, combinator::map, Err};
 
 // library internal includes
 use crate::error::{IResult, VelosiParserErr};
-use crate::parsetree::{VelosiParseTreeType, VelosiParseTreeTypeInfo};
+use crate::parsetree::{VelosiParseTreeIdentifier, VelosiParseTreeType, VelosiParseTreeTypeInfo};
 use crate::{VelosiKeyword, VelosiOpToken, VelosiTokenKind, VelosiTokenStream};
 
-// ff
+// macro to generate terminal parsers for operator tokens.
 macro_rules! terminalparser (($vis:vis $name:ident, $tag: expr) => (
     $vis fn $name(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiTokenKind> {
         // we hit EOF, report the expected string
@@ -113,7 +117,7 @@ terminalparser!(pub dotdot, VelosiOpToken::DotDot);
 terminalparser!(pub coloncolon, VelosiOpToken::ColonColon);
 // terminalparser!(pub questionmark, VelosiOpToken::QuestionMark);
 
-pub fn ident(input: VelosiTokenStream) -> IResult<VelosiTokenStream, String> {
+pub fn ident(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeIdentifier> {
     // we hit EOF, report the expected string
     if input.is_empty() {
         let expected = VelosiTokenKind::Identifier(String::new());
@@ -126,7 +130,7 @@ pub fn ident(input: VelosiTokenStream) -> IResult<VelosiTokenStream, String> {
     // unwrap the token and check it if it matches
     let t = tok.peek().unwrap();
     if let VelosiTokenKind::Identifier(s) = t.kind() {
-        Ok((rem, s.clone()))
+        Ok((rem, VelosiParseTreeIdentifier::new(s.clone(), tok)))
     } else {
         let expected = VelosiTokenKind::Identifier(String::new());
         let err = VelosiParserErr::from_expected(input.from_self_with_subrange(0..1), expected);
@@ -204,8 +208,13 @@ keywordparser!(pub kw_if, VelosiKeyword::If);
 keywordparser!(pub kw_else, VelosiKeyword::Else);
 keywordparser!(pub kw_state, VelosiKeyword::State);
 keywordparser!(pub kw_interface, VelosiKeyword::Interface);
-keywordparser!(pub kw_memorystate, VelosiKeyword::MemoryState);
-keywordparser!(pub kw_registerstate, VelosiKeyword::RegisterState);
+
+// keywordparser!(pub kw_memorystate, VelosiKeyword::MemoryState);
+// keywordparser!(pub kw_registerstate, VelosiKeyword::RegisterState);
+keywordparser!(pub kw_statedef, VelosiKeyword::StateDef);
+keywordparser!(pub kw_mem, VelosiKeyword::Mem);
+keywordparser!(pub kw_reg, VelosiKeyword::Reg);
+
 keywordparser!(pub kw_memoryinterface, VelosiKeyword::MemoryInterface);
 keywordparser!(pub kw_mmiointerface, VelosiKeyword::MMIOInterface);
 keywordparser!(pub kw_cpuregisterinterface, VelosiKeyword::CPURegisterInterface);
@@ -259,7 +268,7 @@ fn builtin_type(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPa
 /// returns the type
 pub fn typeinfo(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeType> {
     let mut pos = input.clone();
-    let (rem, tok) = alt((builtin_type, map(ident, VelosiParseTreeTypeInfo::TypeRef)))(input)?;
+    let (rem, tok) = alt((builtin_type, map(ident, VelosiParseTreeTypeInfo::from)))(input)?;
 
     pos.span_until_start(&rem);
     Ok((rem, VelosiParseTreeType::new(tok, pos)))
