@@ -32,15 +32,16 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 // used parsetree nodes
 use crate::parsetree::{
-    VelosiParseTreeConstDef, VelosiParseTreeExpr, VelosiParseTreeInterface, VelosiParseTreeMap,
-    VelosiParseTreeParam, VelosiParseTreeState, VelosiParseTreeType,
+    VelosiParseTreeConstDef, VelosiParseTreeExpr, VelosiParseTreeIdentifier,
+    VelosiParseTreeInterface, VelosiParseTreeMap, VelosiParseTreeParam, VelosiParseTreeState,
+    VelosiParseTreeType,
 };
 use crate::VelosiTokenStream;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeMethod {
     /// the name of the unit (identifier)
-    pub name: String,
+    pub name: VelosiParseTreeIdentifier,
     /// the unit parameters
     pub params: Vec<VelosiParseTreeParam>,
     /// the name of the derrived unit
@@ -81,14 +82,14 @@ impl Display for VelosiParseTreeMethod {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeFlags {
     /// vector of defined flags
-    pub flags: Vec<VelosiParseTreeFlag>,
+    pub flags: Vec<VelosiParseTreeIdentifier>,
     /// the position in the source tree where this unit is defined
     pub pos: VelosiTokenStream,
 }
 
 impl VelosiParseTreeFlags {
     /// create a new [VelosiParseTreeFlags] with the given flags and position
-    pub fn new(flags: Vec<VelosiParseTreeFlag>, pos: VelosiTokenStream) -> Self {
+    pub fn new(flags: Vec<VelosiParseTreeIdentifier>, pos: VelosiTokenStream) -> Self {
         VelosiParseTreeFlags { flags, pos }
     }
 }
@@ -103,21 +104,6 @@ impl Display for VelosiParseTreeFlags {
             write!(f, "{}", flag.name)?;
         }
         writeln!(f, "}};")
-    }
-}
-
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub struct VelosiParseTreeFlag {
-    /// name of the flag
-    pub name: String,
-    /// the position in the source tree where this unit is defined
-    pub pos: VelosiTokenStream,
-}
-
-impl VelosiParseTreeFlag {
-    /// create a new [VelosiParseTreeFlag] with the given name and position
-    pub fn new(name: String, pos: VelosiTokenStream) -> Self {
-        VelosiParseTreeFlag { name, pos }
     }
 }
 
@@ -198,31 +184,31 @@ impl Display for VelosiParseTreeUnitNode {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeUnitDef {
     /// the name of the unit (identifier)
-    pub name: String,
+    pub name: VelosiParseTreeIdentifier,
     /// the unit parameters
     pub params: Vec<VelosiParseTreeParam>,
     /// the name of the derrived unit
-    pub derived: Option<String>,
+    pub derived: Option<VelosiParseTreeIdentifier>,
     /// the nodes defined in the parse tree
     pub nodes: Vec<VelosiParseTreeUnitNode>,
     /// the position in the source tree where this unit is defined
-    pub pos: VelosiTokenStream,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeUnitDef {
     pub fn new(
-        name: String,
+        name: VelosiParseTreeIdentifier,
         params: Vec<VelosiParseTreeParam>,
-        derived: Option<String>,
+        derived: Option<VelosiParseTreeIdentifier>,
         nodes: Vec<VelosiParseTreeUnitNode>,
-        pos: VelosiTokenStream,
+        loc: VelosiTokenStream,
     ) -> Self {
         VelosiParseTreeUnitDef {
             name,
             params,
             derived,
             nodes,
-            pos,
+            loc,
         }
     }
 }
@@ -273,6 +259,15 @@ pub enum VelosiParseTreeUnit {
     Segment(VelosiParseTreeUnitDef),
     /// This unit is a static map
     StaticMap(VelosiParseTreeUnitDef),
+}
+
+impl VelosiParseTreeUnit {
+    pub fn loc(&self) -> &VelosiTokenStream {
+        match self {
+            VelosiParseTreeUnit::Segment(unit) => &unit.loc,
+            VelosiParseTreeUnit::StaticMap(unit) => &unit.loc,
+        }
+    }
 }
 
 /// Implement [Display] for [VelosiParseTreeUnit]

@@ -33,7 +33,7 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 // used crate functionality
 use crate::VelosiTokenStream;
 
-use crate::parsetree::VelosiParseTreeParam;
+use crate::parsetree::{VelosiParseTreeIdentifier, VelosiParseTreeParam};
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Binary Operation Expressions
@@ -116,10 +116,6 @@ impl VelosiParseTreeBinOpExpr {
             loc,
         }
     }
-
-    pub fn loc(&self) -> &VelosiTokenStream {
-        &self.loc
-    }
 }
 
 /// Implementation of [Display] for [VelosiParseTreeBinOpExpr]
@@ -168,10 +164,6 @@ impl VelosiParseTreeUnOpExpr {
             expr: Box::new(expr),
             loc,
         }
-    }
-
-    pub fn loc(&self) -> &VelosiTokenStream {
-        &self.loc
     }
 }
 
@@ -227,10 +219,6 @@ impl VelosiParseTreeQuantifierExpr {
             loc,
         }
     }
-
-    pub fn loc(&self) -> &VelosiTokenStream {
-        &self.loc
-    }
 }
 
 /// Implementation of [Display] for [VelosiParseTreeQuantifierExpr]
@@ -254,16 +242,13 @@ impl Display for VelosiParseTreeQuantifierExpr {
 /// Represents an unary operation
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeIdentifierLiteral {
-    pub path: Vec<String>,
+    pub path: Vec<VelosiParseTreeIdentifier>,
     pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeIdentifierLiteral {
-    pub fn new(path: Vec<String>, loc: VelosiTokenStream) -> Self {
+    pub fn new(path: Vec<VelosiParseTreeIdentifier>, loc: VelosiTokenStream) -> Self {
         Self { path, loc }
-    }
-    pub fn loc(&self) -> &VelosiTokenStream {
-        &self.loc
     }
 }
 
@@ -334,29 +319,25 @@ impl Display for VelosiParseTreeBoolLiteral {
 /// Represents an unary operation
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeFnCallExpr {
-    pub path: VelosiParseTreeIdentifierLiteral,
+    pub name: VelosiParseTreeIdentifier,
     pub args: Vec<VelosiParseTreeExpr>,
     pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeFnCallExpr {
     pub fn new(
-        path: VelosiParseTreeIdentifierLiteral,
+        name: VelosiParseTreeIdentifier,
         args: Vec<VelosiParseTreeExpr>,
         loc: VelosiTokenStream,
     ) -> Self {
-        Self { path, args, loc }
-    }
-
-    pub fn loc(&self) -> &VelosiTokenStream {
-        &self.loc
+        Self { name, args, loc }
     }
 }
 
 /// Implementation of [Display] for [VelosiParseTreeFnCallExpr]
 impl Display for VelosiParseTreeFnCallExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
-        write!(format, "{}(", self.path)?;
+        write!(format, "{}(", self.name)?;
         for (i, p) in self.args.iter().enumerate() {
             if i != 0 {
                 write!(format, ".")?;
@@ -394,10 +375,6 @@ impl VelosiParseTreeIfElseExpr {
             loc,
         }
     }
-
-    pub fn loc(&self) -> &VelosiTokenStream {
-        &self.loc
-    }
 }
 
 /// Implementation of [Display] for [VelosiParseTreeIfElseExpr]
@@ -427,10 +404,6 @@ impl VelosiParseTreeRangeExpr {
     pub fn new(start: u64, end: u64, loc: VelosiTokenStream) -> Self {
         Self { start, end, loc }
     }
-
-    pub fn loc(&self) -> &VelosiTokenStream {
-        &self.loc
-    }
 }
 
 impl Display for VelosiParseTreeRangeExpr {
@@ -458,10 +431,6 @@ impl VelosiParseTreeSliceExpr {
         loc: VelosiTokenStream,
     ) -> Self {
         Self { name, range, loc }
-    }
-
-    pub fn loc(&self) -> &VelosiTokenStream {
-        &self.loc
     }
 }
 
@@ -498,16 +467,16 @@ impl VelosiParseTreeExpr {
     pub fn loc(&self) -> &VelosiTokenStream {
         use VelosiParseTreeExpr::*;
         match self {
-            Identifier(i) => i.loc(),
-            NumLiteral(i) => i.loc(),
-            BoolLiteral(i) => i.loc(),
-            BinOp(i) => i.loc(),
-            UnOp(i) => i.loc(),
-            Quantifier(i) => i.loc(),
-            FnCall(i) => i.loc(),
-            IfElse(i) => i.loc(),
-            Slice(i) => i.loc(),
-            Range(i) => i.loc(),
+            Identifier(i) => &i.loc,
+            NumLiteral(i) => &i.loc,
+            BoolLiteral(i) => &i.loc,
+            BinOp(i) => &i.loc,
+            UnOp(i) => &i.loc,
+            Quantifier(i) => &i.loc,
+            FnCall(i) => &i.loc,
+            IfElse(i) => &i.loc,
+            Slice(i) => &i.loc,
+            Range(i) => &i.loc,
         }
     }
 }

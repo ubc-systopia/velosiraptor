@@ -42,9 +42,10 @@ use nom::{
 use crate::error::IResult;
 use crate::parser::{expr::expr, param::parameter, terminals::*};
 use crate::parsetree::{
-    VelosiParseTreeFieldSlice, VelosiParseTreeInterface, VelosiParseTreeInterfaceAction,
-    VelosiParseTreeInterfaceActions, VelosiParseTreeInterfaceDef, VelosiParseTreeInterfaceField,
-    VelosiParseTreeInterfaceFieldNode, VelosiParseTreeParam, VelosiParseTreeUnitNode,
+    VelosiParseTreeFieldSlice, VelosiParseTreeIdentifier, VelosiParseTreeInterface,
+    VelosiParseTreeInterfaceAction, VelosiParseTreeInterfaceActions, VelosiParseTreeInterfaceDef,
+    VelosiParseTreeInterfaceField, VelosiParseTreeInterfaceFieldNode, VelosiParseTreeParam,
+    VelosiParseTreeUnitNode,
 };
 use crate::{VelosiOpToken, VelosiTokenKind, VelosiTokenStream};
 
@@ -356,7 +357,7 @@ fn interfacefield(
 /// `INTERFACEFIELDINFO := LBRACK IDENT? NUM? NUM RBRACK`
 pub fn interfacefieldinfo(
     input: VelosiTokenStream,
-) -> IResult<VelosiTokenStream, (Option<(String, u64)>, u64)> {
+) -> IResult<VelosiTokenStream, (Option<(VelosiParseTreeIdentifier, u64)>, u64)> {
     let off = tuple((terminated(ident, cut(comma)), cut(terminated(num, comma))));
     tuple((opt(off), cut(num)))(input)
 }

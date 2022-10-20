@@ -31,6 +31,7 @@
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 // use crate functionality
+use crate::parsetree::VelosiParseTreeIdentifier;
 use crate::VelosiTokenStream;
 
 /// Represents the type information, either built in or a type ref
@@ -58,6 +59,12 @@ impl VelosiParseTreeTypeInfo {
     /// whether or not the type is a built-in type
     pub fn is_builtin(&self) -> bool {
         matches!(self, VelosiParseTreeTypeInfo::TypeRef(_))
+    }
+}
+
+impl From<VelosiParseTreeIdentifier> for VelosiParseTreeTypeInfo {
+    fn from(id: VelosiParseTreeIdentifier) -> Self {
+        VelosiParseTreeTypeInfo::TypeRef(id.name)
     }
 }
 

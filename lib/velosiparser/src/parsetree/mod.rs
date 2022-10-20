@@ -59,25 +59,54 @@ pub use map::{
     VelosiParseTreeMap, VelosiParseTreeMapElement, VelosiParseTreeMapExplicit,
     VelosiParseTreeMapListComp,
 };
-pub use state::{VelosiParseTreeState, VelosiParseTreeStateDef, VelosiParseTreeStateField};
+pub use state::{
+    VelosiParseTreeState, VelosiParseTreeStateDef, VelosiParseTreeStateField,
+    VelosiParseTreeStateFieldMemory, VelosiParseTreeStateFieldRegister,
+};
 pub use types::{VelosiParseTreeType, VelosiParseTreeTypeInfo};
 pub use unit::{
-    VelosiParseTreeFlag, VelosiParseTreeFlags, VelosiParseTreeMethod, VelosiParseTreeUnit,
-    VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,
+    VelosiParseTreeFlags, VelosiParseTreeMethod, VelosiParseTreeUnit, VelosiParseTreeUnitDef,
+    VelosiParseTreeUnitNode,
 };
+
+/// represents an identifier token
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct VelosiParseTreeIdentifier {
+    pub name: String,
+    pub loc: VelosiTokenStream,
+}
+
+impl VelosiParseTreeIdentifier {
+    /// creates a new identifier token
+    pub fn new(name: String, loc: VelosiTokenStream) -> Self {
+        Self { name, loc }
+    }
+}
+
+/// Implementation of the [Display] trait for [VelosiParseTreeIdentifier]
+impl Display for VelosiParseTreeIdentifier {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        write!(f, "{}", self.name)
+    }
+}
 
 /// Import clause in the root context
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct VelosiParseTreeImport {
-    /// name of the imported module
-    pub name: String,
-    /// the location of the import clause
-    pub loc: VelosiTokenStream,
+pub struct VelosiParseTreeImport(pub VelosiParseTreeIdentifier);
+
+impl VelosiParseTreeImport {
+    pub fn name(&self) -> &str {
+        &self.0.name
+    }
+
+    pub fn loc(&self) -> &VelosiTokenStream {
+        &self.0.loc
+    }
 }
 
 impl Display for VelosiParseTreeImport {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "import {};", self.name)
+        write!(f, "import {};", self.0.name)
     }
 }
 

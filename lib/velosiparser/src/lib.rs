@@ -49,17 +49,18 @@ pub use error::VelosiParserErr;
 pub use parsetree::{
     VelosiParseTree, VelosiParseTreeBinOp, VelosiParseTreeBinOpExpr, VelosiParseTreeBoolLiteral,
     VelosiParseTreeConstDef, VelosiParseTreeContextNode, VelosiParseTreeExpr, VelosiParseTreeField,
-    VelosiParseTreeFieldSlice, VelosiParseTreeFlag, VelosiParseTreeFlags,
-    VelosiParseTreeFnCallExpr, VelosiParseTreeIdentifierLiteral, VelosiParseTreeIfElseExpr,
+    VelosiParseTreeFieldSlice, VelosiParseTreeFlags, VelosiParseTreeFnCallExpr,
+    VelosiParseTreeIdentifier, VelosiParseTreeIdentifierLiteral, VelosiParseTreeIfElseExpr,
     VelosiParseTreeInterface, VelosiParseTreeInterfaceAction, VelosiParseTreeInterfaceActions,
     VelosiParseTreeInterfaceDef, VelosiParseTreeInterfaceField, VelosiParseTreeInterfaceFieldNode,
     VelosiParseTreeMap, VelosiParseTreeMapElement, VelosiParseTreeMapExplicit,
     VelosiParseTreeMapListComp, VelosiParseTreeMethod, VelosiParseTreeNumLiteral,
     VelosiParseTreeParam, VelosiParseTreeQuantifier, VelosiParseTreeQuantifierExpr,
     VelosiParseTreeRangeExpr, VelosiParseTreeSliceExpr, VelosiParseTreeState,
-    VelosiParseTreeStateDef, VelosiParseTreeStateField, VelosiParseTreeType,
-    VelosiParseTreeTypeInfo, VelosiParseTreeUnOp, VelosiParseTreeUnOpExpr, VelosiParseTreeUnit,
-    VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,
+    VelosiParseTreeStateDef, VelosiParseTreeStateField, VelosiParseTreeStateFieldMemory,
+    VelosiParseTreeStateFieldRegister, VelosiParseTreeType, VelosiParseTreeTypeInfo,
+    VelosiParseTreeUnOp, VelosiParseTreeUnOpExpr, VelosiParseTreeUnit, VelosiParseTreeUnitDef,
+    VelosiParseTreeUnitNode,
 };
 
 use error::VelosiParserErrBuilder;
@@ -159,11 +160,11 @@ impl VelosiParser {
         let mut resolved_imports = Vec::new();
         for import in ptree.imports() {
             // just stop when we have a douplicate import, return the error
-            match current_imports.get(&import.name) {
+            match current_imports.get(import.name()) {
                 Some(i) => {
-                    let msg = format!("Duplicate import `{}`", import.name);
+                    let msg = format!("Duplicate import `{}`", import.name());
                     let err1 = VelosiParserErrBuilder::new(msg)
-                        .add_tokstream(import.loc.clone())
+                        .add_tokstream(import.loc().clone())
                         .add_hint("Remove this duplicate import.".to_string())
                         .build();
 
@@ -177,12 +178,12 @@ impl VelosiParser {
                     });
                 }
                 None => {
-                    current_imports.insert(import.name.clone(), import.loc.clone());
+                    current_imports.insert(import.name().to_string(), import.loc().clone());
                 }
             }
 
             // construct the path to the imported file
-            let filename = format!("{}.vrs", import.name);
+            let filename = format!("{}.vrs", import.name());
             importpath.push(filename);
 
             // cyclic import check, if we import the same thing twice, report error
@@ -200,7 +201,7 @@ impl VelosiParser {
                 let msg = format!("circular dependency detected:\n  {} -> {}", s, filename);
                 let hint = "try removing the following import";
                 let e = VelosiParserErrBuilder::new(msg)
-                    .add_tokstream(import.loc.clone())
+                    .add_tokstream(import.loc().clone())
                     .add_hint(hint.to_string())
                     .build();
                 return Err(VelosiParserError::ImportFailure { e });
@@ -220,7 +221,7 @@ impl VelosiParser {
                     let msg = format!("Failed to resolve error: file not found: {}", filename);
                     let hint = "Remove this import or ensure the module is part of the search path";
                     let e = VelosiParserErrBuilder::new(msg)
-                        .add_tokstream(import.loc.clone())
+                        .add_tokstream(import.loc().clone())
                         .add_hint(hint.to_string())
                         .build();
                     return Err(VelosiParserError::ImportFailure { e });
@@ -229,7 +230,7 @@ impl VelosiParser {
                     let msg = format!("failed to resolve {}", filename);
                     let hint = "Imported from here.";
                     let err = VelosiParserErrBuilder::new(msg)
-                        .add_tokstream(import.loc.clone())
+                        .add_tokstream(import.loc().clone())
                         .add_hint(hint.to_string())
                         .build();
 
@@ -240,7 +241,7 @@ impl VelosiParser {
                     let msg = format!("failed to resolve {}", filename);
                     let hint = "Imported from here.";
                     let err = VelosiParserErrBuilder::new(msg)
-                        .add_tokstream(import.loc.clone())
+                        .add_tokstream(import.loc().clone())
                         .add_hint(hint.to_string())
                         .build();
 

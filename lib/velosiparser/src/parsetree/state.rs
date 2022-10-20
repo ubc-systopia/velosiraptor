@@ -31,10 +31,110 @@
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 // used crate functionality
-use super::{VelosiParseTreeField, VelosiParseTreeParam};
+use crate::parsetree::{
+    VelosiParseTreeFieldSlice, VelosiParseTreeIdentifier, VelosiParseTreeParam,
+};
 use crate::VelosiTokenStream;
 
-pub type VelosiParseTreeStateField = VelosiParseTreeField;
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct VelosiParseTreeStateFieldMemory {
+    pub name: VelosiParseTreeIdentifier,
+    pub base: VelosiParseTreeIdentifier,
+    pub offset: u64,
+    pub size: u64,
+    pub layout: Vec<VelosiParseTreeFieldSlice>,
+    pub loc: VelosiTokenStream,
+}
+
+impl VelosiParseTreeStateFieldMemory {
+    pub fn new(
+        name: VelosiParseTreeIdentifier,
+        base: VelosiParseTreeIdentifier,
+        offset: u64,
+        size: u64,
+        layout: Vec<VelosiParseTreeFieldSlice>,
+        loc: VelosiTokenStream,
+    ) -> Self {
+        Self {
+            name,
+            base,
+            offset,
+            size,
+            layout,
+            loc,
+        }
+    }
+}
+
+impl Display for VelosiParseTreeStateFieldMemory {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "mem {} [", self.name)?;
+        write!(f, "{}, {}, ", self.base, self.offset)?;
+        write!(f, "{}", self.size)?;
+        writeln!(f, "] {{")?;
+        for slice in &self.layout {
+            write!(f, "      ")?;
+            Display::fmt(slice, f)?;
+            writeln!(f, ",")?;
+        }
+        write!(f, "    }}")
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct VelosiParseTreeStateFieldRegister {
+    pub name: VelosiParseTreeIdentifier,
+    pub size: u64,
+    pub layout: Vec<VelosiParseTreeFieldSlice>,
+    pub loc: VelosiTokenStream,
+}
+
+impl VelosiParseTreeStateFieldRegister {
+    pub fn new(
+        name: VelosiParseTreeIdentifier,
+        size: u64,
+        layout: Vec<VelosiParseTreeFieldSlice>,
+        loc: VelosiTokenStream,
+    ) -> Self {
+        Self {
+            name,
+            size,
+            layout,
+            loc,
+        }
+    }
+}
+
+impl Display for VelosiParseTreeStateFieldRegister {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "mem {} [", self.name)?;
+        write!(f, "{}", self.size)?;
+        writeln!(f, "] {{")?;
+        for slice in &self.layout {
+            write!(f, "      ")?;
+            Display::fmt(slice, f)?;
+            writeln!(f, ",")?;
+        }
+        write!(f, "    }}")
+    }
+}
+
+/// Represents a component of the state, either a register or a memory location
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub enum VelosiParseTreeStateField {
+    Memory(VelosiParseTreeStateFieldMemory),
+    Register(VelosiParseTreeStateFieldRegister),
+}
+
+impl Display for VelosiParseTreeStateField {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        use VelosiParseTreeStateField::*;
+        match self {
+            Memory(field) => Display::fmt(field, f),
+            Register(field) => Display::fmt(field, f),
+        }
+    }
+}
 
 /// Represents the parsed state description
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -44,7 +144,7 @@ pub struct VelosiParseTreeStateDef {
     /// the fields defined in teh state
     pub fields: Vec<VelosiParseTreeStateField>,
     /// the position in the source file
-    pub pos: VelosiTokenStream,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeStateDef {
@@ -52,12 +152,12 @@ impl VelosiParseTreeStateDef {
     pub fn new(
         params: Vec<VelosiParseTreeParam>,
         fields: Vec<VelosiParseTreeStateField>,
-        pos: VelosiTokenStream,
+        loc: VelosiTokenStream,
     ) -> Self {
         Self {
             params,
             fields,
-            pos,
+            loc,
         }
     }
 }
@@ -65,7 +165,7 @@ impl VelosiParseTreeStateDef {
 impl Display for VelosiParseTreeStateDef {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         if !self.params.is_empty() {
-            write!(f, "(")?;
+            write!(f, "StateDef(")?;
             for param in &self.params {
                 Display::fmt(param, f)?;
             }
@@ -83,22 +183,24 @@ impl Display for VelosiParseTreeStateDef {
 /// Represents the state definition
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum VelosiParseTreeState {
-    Memory(VelosiParseTreeStateDef),
-    Register(VelosiParseTreeStateDef),
+    StateDef(VelosiParseTreeStateDef),
     None(VelosiTokenStream),
+}
+
+impl VelosiParseTreeState {
+    /// obtains the source position of the state definition
+    pub fn loc(&self) -> &VelosiTokenStream {
+        match self {
+            VelosiParseTreeState::StateDef(def) => &def.loc,
+            VelosiParseTreeState::None(loc) => loc,
+        }
+    }
 }
 
 impl Display for VelosiParseTreeState {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            VelosiParseTreeState::Memory(s) => {
-                write!(f, "MemoryState")?;
-                Display::fmt(&s, f)
-            }
-            VelosiParseTreeState::Register(s) => {
-                write!(f, "RegisterState")?;
-                Display::fmt(&s, f)
-            }
+            VelosiParseTreeState::StateDef(s) => Display::fmt(&s, f),
             VelosiParseTreeState::None(_) => {
                 writeln!(f, "None;")
             }

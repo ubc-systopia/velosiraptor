@@ -51,7 +51,7 @@ use crate::parser::{
     },
 };
 use crate::parsetree::{
-    VelosiParseTreeConstDef, VelosiParseTreeFlag, VelosiParseTreeFlags, VelosiParseTreeParam,
+    VelosiParseTreeConstDef, VelosiParseTreeFlags, VelosiParseTreeIdentifier, VelosiParseTreeParam,
     VelosiParseTreeUnit, VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,
 };
 use crate::VelosiTokenStream;
@@ -105,12 +105,18 @@ fn param_clause(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vec<Velo
 /// # Notes
 ///
 ///  * None
-fn derived_clause(input: VelosiTokenStream) -> IResult<VelosiTokenStream, String> {
+fn derived_clause(
+    input: VelosiTokenStream,
+) -> IResult<VelosiTokenStream, VelosiParseTreeIdentifier> {
     preceded(colon, cut(ident))(input)
 }
 
 /// type definition for the unit header parser
-type UnitHeader = (String, Vec<VelosiParseTreeParam>, Option<String>);
+type UnitHeader = (
+    VelosiParseTreeIdentifier,
+    Vec<VelosiParseTreeParam>,
+    Option<VelosiParseTreeIdentifier>,
+);
 
 /// parses the unit header
 ///
@@ -193,14 +199,6 @@ fn outbitwidth_clause(
     Ok((i2, VelosiParseTreeUnitNode::OutBitWidth(n, pos)))
 }
 
-/// parses a single flat, currently just an identifier
-fn flag(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeFlag> {
-    let mut pos = input.clone();
-    let (i, n) = ident(input)?;
-    pos.span_until_start(&i);
-    Ok((i, VelosiParseTreeFlag::new(n, pos)))
-}
-
 ////
 fn flags_clause(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
     let mut pos = input.clone();
@@ -209,7 +207,7 @@ fn flags_clause(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPa
 
     let flagsblock = delimited(
         lbrace,
-        separated_list0(comma, flag),
+        separated_list0(comma, ident),
         tuple((opt(comma), rbrace)),
     );
 

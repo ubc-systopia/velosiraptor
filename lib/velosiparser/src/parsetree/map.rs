@@ -32,7 +32,7 @@
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 // use crate functionality
-use super::VelosiParseTreeExpr;
+use crate::parsetree::{VelosiParseTreeExpr, VelosiParseTreeIdentifier};
 use crate::VelosiTokenStream;
 
 /// Represents possible nodes in the unit definitions
@@ -44,10 +44,10 @@ pub enum VelosiParseTreeMap {
 
 impl VelosiParseTreeMap {
     /// Returns the position of the node in the source code
-    pub fn pos(&self) -> &VelosiTokenStream {
+    pub fn loc(&self) -> &VelosiTokenStream {
         match self {
-            VelosiParseTreeMap::ListComp(node) => &node.pos,
-            VelosiParseTreeMap::Explicit(node) => &node.pos,
+            VelosiParseTreeMap::ListComp(node) => &node.loc,
+            VelosiParseTreeMap::Explicit(node) => &node.loc,
         }
     }
 }
@@ -65,12 +65,12 @@ impl Display for VelosiParseTreeMap {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeMapExplicit {
     pub entries: Vec<VelosiParseTreeMapElement>,
-    pub pos: VelosiTokenStream,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeMapExplicit {
-    pub fn new(entries: Vec<VelosiParseTreeMapElement>, pos: VelosiTokenStream) -> Self {
-        Self { entries, pos }
+    pub fn new(entries: Vec<VelosiParseTreeMapElement>, loc: VelosiTokenStream) -> Self {
+        Self { entries, loc }
     }
 }
 
@@ -92,23 +92,23 @@ impl Display for VelosiParseTreeMapExplicit {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeMapListComp {
     pub elm: VelosiParseTreeMapElement,
-    pub var: String,
+    pub var: VelosiParseTreeIdentifier,
     pub range: VelosiParseTreeExpr,
-    pub pos: VelosiTokenStream,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeMapListComp {
     pub fn new(
         elm: VelosiParseTreeMapElement,
-        var: String,
+        var: VelosiParseTreeIdentifier,
         range: VelosiParseTreeExpr,
-        pos: VelosiTokenStream,
+        loc: VelosiTokenStream,
     ) -> Self {
         Self {
             elm,
             var,
             range,
-            pos,
+            loc,
         }
     }
 }
@@ -125,7 +125,7 @@ pub struct VelosiParseTreeMapElement {
     pub src: Option<VelosiParseTreeExpr>,
     pub dst: VelosiParseTreeExpr,
     pub offset: Option<VelosiParseTreeExpr>,
-    pub pos: VelosiTokenStream,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeMapElement {
@@ -133,13 +133,13 @@ impl VelosiParseTreeMapElement {
         src: Option<VelosiParseTreeExpr>,
         dst: VelosiParseTreeExpr,
         offset: Option<VelosiParseTreeExpr>,
-        pos: VelosiTokenStream,
+        loc: VelosiTokenStream,
     ) -> Self {
         Self {
             src,
             dst,
             offset,
-            pos,
+            loc,
         }
     }
 }
