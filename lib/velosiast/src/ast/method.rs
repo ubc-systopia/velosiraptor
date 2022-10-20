@@ -33,14 +33,16 @@ use std::rc::Rc;
 
 use velosiparser::{VelosiParseTreeMethod, VelosiTokenStream};
 
-use crate::ast::{types::VelosiAstType, VelosiAstExpr, VelosiAstNode, VelosiAstParam};
+use crate::ast::{
+    types::VelosiAstType, VelosiAstExpr, VelosiAstIdentifier, VelosiAstNode, VelosiAstParam,
+};
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstMethod {
     /// the name of the constant
-    pub name: Rc<String>,
+    pub ident: VelosiAstIdentifier,
     /// the return type
     pub rtype: VelosiAstType,
     /// the method parameter
@@ -57,7 +59,7 @@ pub struct VelosiAstMethod {
 
 impl VelosiAstMethod {
     pub fn new(
-        name: Rc<String>,
+        ident: VelosiAstIdentifier,
         rtype: VelosiAstType,
         params: Vec<Rc<VelosiAstParam>>,
         requires: Vec<VelosiAstExpr>,
@@ -66,10 +68,10 @@ impl VelosiAstMethod {
     ) -> Self {
         let mut params_map = HashMap::new();
         params.iter().for_each(|p| {
-            params_map.insert(p.name.to_string(), p.clone());
+            params_map.insert(p.ident_to_string(), p.clone());
         });
         Self {
-            name,
+            ident,
             rtype,
             params,
             params_map,
@@ -77,6 +79,18 @@ impl VelosiAstMethod {
             body,
             loc,
         }
+    }
+
+    pub fn ident_as_rc_string(&self) -> Rc<String> {
+        self.ident.name.clone()
+    }
+
+    pub fn ident_as_str(&self) -> &str {
+        self.ident.name.as_str()
+    }
+
+    pub fn ident_to_string(&self) -> String {
+        self.ident.name.to_string()
     }
 
     // converts the parse tree node into an ast node, performing checks
@@ -89,8 +103,10 @@ impl VelosiAstMethod {
         // create a new context in the symbol table
         st.create_context("unit".to_string());
 
+        let name = VelosiAstIdentifier::from(pt.name);
+        utils::check_snake_case(&mut issues, &name);
+
         // check whether the name is in the right format
-        utils::check_snake_case(&mut issues, &pt.name, pt.pos.from_self_with_subrange(0..1));
 
         // convert all the unit parameters
         let mut params = Vec::new();
@@ -139,7 +155,7 @@ impl VelosiAstMethod {
         // restore the symbol table context
         st.drop_context();
 
-        let res = Self::new(Rc::new(pt.name), rtype, params, requires, body, pt.pos);
+        let res = Self::new(name, rtype, params, requires, body, pt.pos);
         ast_result_return!(res, issues)
     }
 }
@@ -148,13 +164,13 @@ impl VelosiAstMethod {
 impl From<Rc<VelosiAstMethod>> for Symbol {
     fn from(c: Rc<VelosiAstMethod>) -> Self {
         let n = VelosiAstNode::Method(c.clone());
-        Symbol::new(c.name.clone(), c.rtype.clone(), n)
+        Symbol::new(c.ident_as_rc_string(), c.rtype.clone(), n)
     }
 }
 
 /// Implementation of [Display] for [VelosiAstMethod]
 impl Display for VelosiAstMethod {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "{}: {}", self.name, self.rtype)
+        write!(f, "{}: {}", self.ident_as_str(), self.rtype)
     }
 }

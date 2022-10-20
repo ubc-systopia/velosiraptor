@@ -32,14 +32,14 @@ use std::rc::Rc;
 
 use velosiparser::{VelosiParseTreeConstDef, VelosiTokenStream};
 
-use crate::ast::{expr::VelosiAstExpr, types::VelosiAstType, VelosiAstNode};
+use crate::ast::{expr::VelosiAstExpr, types::VelosiAstType, VelosiAstIdentifier, VelosiAstNode};
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstConst {
     /// the name of the constant
-    pub name: Rc<String>,
+    pub ident: VelosiAstIdentifier,
     /// the type of the constant
     pub ctype: VelosiAstType,
     /// expression representing the value of the constnat
@@ -50,17 +50,29 @@ pub struct VelosiAstConst {
 
 impl VelosiAstConst {
     pub fn new(
-        name: Rc<String>,
+        ident: VelosiAstIdentifier,
         ctype: VelosiAstType,
         value: VelosiAstExpr,
         loc: VelosiTokenStream,
     ) -> Self {
         Self {
-            name,
+            ident,
             ctype,
             value,
             loc,
         }
+    }
+
+    pub fn ident_as_rc_string(&self) -> Rc<String> {
+        self.ident.name.clone()
+    }
+
+    pub fn ident_as_str(&self) -> &str {
+        self.ident.name.as_str()
+    }
+
+    pub fn ident_to_string(&self) -> String {
+        self.ident.name.to_string()
     }
 
     // converts the parse tree node into an ast node, performing checks
@@ -70,8 +82,10 @@ impl VelosiAstConst {
     ) -> AstResult<Self, VelosiAstIssues> {
         let mut issues = VelosiAstIssues::new();
 
+        let name = VelosiAstIdentifier::from(pt.name);
+
         // check whether the name is in the right format
-        utils::check_upper_case(&mut issues, &pt.name, pt.loc.from_self_with_subrange(1..2));
+        utils::check_upper_case(&mut issues, &name);
 
         // obtain the type information, must be a built-in type
         let ctype = ast_result_unwrap!(VelosiAstType::from_parse_tree(pt.ctype, st), issues);
@@ -112,7 +126,7 @@ impl VelosiAstConst {
             issues.push(err);
         }
 
-        let res = Self::new(Rc::new(pt.name), ctype, value, pt.loc);
+        let res = Self::new(name, ctype, value, pt.loc);
         ast_result_return!(res, issues)
     }
 }
@@ -121,13 +135,19 @@ impl VelosiAstConst {
 impl From<Rc<VelosiAstConst>> for Symbol {
     fn from(c: Rc<VelosiAstConst>) -> Self {
         let n = VelosiAstNode::Const(c.clone());
-        Symbol::new(c.name.clone(), c.ctype.clone(), n)
+        Symbol::new(c.ident_as_rc_string(), c.ctype.clone(), n)
     }
 }
 
 /// Implementation of [Display] for [VelosiAstConst]
 impl Display for VelosiAstConst {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "const {} : {} = {};", self.name, self.ctype, self.value)
+        write!(
+            f,
+            "const {} : {} = {};",
+            self.ident_as_str(),
+            self.ctype,
+            self.value
+        )
     }
 }

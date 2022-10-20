@@ -33,6 +33,7 @@ use std::rc::Rc;
 // external dependencies
 use colored::*;
 
+use crate::ast::VelosiAstIdentifier;
 use crate::VelosiTokenStream;
 
 fn print_location_line(f: &mut Formatter<'_>, tokstream: &VelosiTokenStream) -> Result {
@@ -71,7 +72,7 @@ fn print_location_context(
         let indent = (0..col - 1).map(|_| " ").collect::<String>();
 
         // get the underline
-        let ulen = std::cmp::min(location.len(), linectxt.len());
+        let ulen = std::cmp::min(location.len(), linectxt.len() - indent.len());
         let underline = (0..ulen).map(|_| "^").collect::<String>();
 
         // the line context with highligted part that is wrong
@@ -92,7 +93,10 @@ fn print_location_context(
 
         let indent = (printrange.start..col - 1).map(|_| " ").collect::<String>();
 
-        let ulen = std::cmp::min(location.len(), printrange.end - printrange.start);
+        let ulen = std::cmp::min(
+            location.len(),
+            printrange.end - printrange.start - indent.len(),
+        );
         let underline = (0..ulen).map(|_| "^").collect::<String>();
 
         // the line context with highligted part that is wrong
@@ -127,6 +131,7 @@ pub(crate) struct VelosiAstErrBuilder {
     message: String,
     hint: Option<String>,
     tokstream: Option<VelosiTokenStream>,
+    related: Vec<(String, VelosiTokenStream)>,
 }
 
 impl VelosiAstErrBuilder {
@@ -136,6 +141,7 @@ impl VelosiAstErrBuilder {
             message,
             hint: None,
             tokstream: None,
+            related: Vec::new(),
         }
     }
 
@@ -145,6 +151,7 @@ impl VelosiAstErrBuilder {
             message,
             hint: None,
             tokstream: None,
+            related: Vec::new(),
         }
     }
 
@@ -160,12 +167,28 @@ impl VelosiAstErrBuilder {
         self
     }
 
+    pub fn add_related_location(
+        &mut self,
+        message: String,
+        tokstream: VelosiTokenStream,
+    ) -> &mut Self {
+        self.related.push((message, tokstream));
+        self
+    }
+
     pub fn build(&mut self) -> VelosiAstErr {
+        if self.hint.is_none() && self.tokstream.is_none() && !self.related.is_empty() {
+            let (message, tokstream) = self.related.pop().unwrap();
+            self.hint = Some(message);
+            self.tokstream = Some(tokstream);
+        }
+
         VelosiAstErr::Custom(VelosiAstErrCustom {
             message: self.message.clone(),
             warn: self.warn,
             hint: self.hint.take(),
             tokstream: self.tokstream.take().unwrap_or_default(),
+            related: self.related.drain(..).collect(),
         })
     }
 }
@@ -181,6 +204,8 @@ pub struct VelosiAstErrCustom {
     hint: Option<String>,
     /// the location where the error happened
     tokstream: VelosiTokenStream,
+    /// related locations in the error
+    related: Vec<(String, VelosiTokenStream)>,
 }
 
 /// Implementation of [Display] for [VelosiAstErrCustom]
@@ -192,6 +217,9 @@ impl Display for VelosiAstErrCustom {
         } else {
             |s: &str| s.bold().bright_red()
         };
+
+        let blue = |s: &str| s.bold().blue();
+        let pipe = blue("|");
 
         // the error message
         if self.warn {
@@ -219,9 +247,20 @@ impl Display for VelosiAstErrCustom {
 
         // apply the hint if needed
         match &self.hint {
-            Some(h) => writeln!(f, " {}", highlight(h.as_str())),
-            None => writeln!(f),
+            Some(h) => writeln!(f, " {}", highlight(h.as_str()))?,
+            None => writeln!(f)?,
         }
+
+        if !self.related.is_empty() {
+            writeln!(f, "   {}", blue("..."))?;
+            writeln!(f, "      {}", pipe)?;
+        }
+
+        for (message, tokstream) in &self.related {
+            print_location_context(f, self.warn, tokstream)?;
+            writeln!(f, " {}", highlight(message.as_str()))?;
+        }
+        Ok(())
     }
 }
 
@@ -320,6 +359,14 @@ impl VelosiAstErrUndef {
             other: Some(other),
         }
     }
+
+    pub fn from_ident(id: &VelosiAstIdentifier) -> Self {
+        Self::new(id.name.clone(), id.loc.clone())
+    }
+
+    pub fn from_ident_with_other(id: &VelosiAstIdentifier, other: VelosiTokenStream) -> Self {
+        Self::with_other(id.name.clone(), id.loc.clone(), other)
+    }
 }
 
 impl From<VelosiAstErrUndef> for VelosiAstErr {
@@ -353,7 +400,8 @@ impl Display for VelosiAstErrUndef {
         if let Some(other) = &self.other {
             let m = "this is the symbol with the wrong kind";
             writeln!(f, " {}", red(m))?;
-            print_location(f, false, other)
+            print_location(f, false, other)?;
+            writeln!(f, " {}", red("symbol was defined here"))
         } else {
             writeln!(f, " {}", red("not found in this scope"))
         }

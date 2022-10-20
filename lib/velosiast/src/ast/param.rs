@@ -32,23 +32,35 @@ use std::rc::Rc;
 
 use velosiparser::{VelosiParseTreeParam, VelosiTokenStream};
 
-use crate::ast::{types::VelosiAstType, VelosiAstNode};
+use crate::ast::{types::VelosiAstType, VelosiAstIdentifier, VelosiAstNode};
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstParam {
-    /// the name of the constant
-    pub name: Rc<String>,
+    /// the identifier of the constant
+    pub ident: VelosiAstIdentifier,
     /// the type of the constant
-    pub ctype: VelosiAstType,
+    pub ptype: VelosiAstType,
     /// the location of the import clause
     pub loc: VelosiTokenStream,
 }
 
 impl VelosiAstParam {
-    pub fn new(name: Rc<String>, ctype: VelosiAstType, loc: VelosiTokenStream) -> Self {
-        Self { name, ctype, loc }
+    pub fn new(ident: VelosiAstIdentifier, ptype: VelosiAstType, loc: VelosiTokenStream) -> Self {
+        Self { ident, ptype, loc }
+    }
+
+    pub fn ident_as_str(&self) -> &str {
+        self.ident.name.as_str()
+    }
+
+    pub fn ident_as_rc_string(&self) -> Rc<String> {
+        self.ident.name.clone()
+    }
+
+    pub fn ident_to_string(&self) -> String {
+        self.ident.name.to_string()
     }
 
     // converts the parse tree node into an ast node, performing checks
@@ -59,23 +71,25 @@ impl VelosiAstParam {
     ) -> AstResult<Self, VelosiAstIssues> {
         let mut issues = VelosiAstIssues::new();
 
+        let ident = VelosiAstIdentifier::from(pt.name);
+
         // check whether the name is in the right format
-        utils::check_snake_case(&mut issues, &pt.name, pt.loc.from_self_with_subrange(0..1));
+        utils::check_snake_case(&mut issues, &ident);
 
         // obtain the type information, must be a built-in type
-        let ctype = ast_result_unwrap!(VelosiAstType::from_parse_tree(pt.ptype, st), issues);
-        if !all_types && (!ctype.is_builtin() || ctype.is_flags()) {
+        let ptype = ast_result_unwrap!(VelosiAstType::from_parse_tree(pt.ptype, st), issues);
+        if !all_types && (!ptype.is_builtin() || ptype.is_flags()) {
             let msg =
                 "Unsupported type. Parameter definition here only support of the built-in types.";
             let hint = "Change this type to one of [`bool`, `int`, `size`, `addr`].";
             let err = VelosiAstErrBuilder::err(msg.to_string())
                 .add_hint(hint.to_string())
-                .add_location(ctype.loc.clone())
+                .add_location(ptype.loc.clone())
                 .build();
             issues.push(err);
         }
 
-        let res = Self::new(Rc::new(pt.name), ctype, pt.loc);
+        let res = Self::new(ident, ptype, pt.loc);
         ast_result_return!(res, issues)
     }
 }
@@ -84,13 +98,13 @@ impl VelosiAstParam {
 impl From<Rc<VelosiAstParam>> for Symbol {
     fn from(c: Rc<VelosiAstParam>) -> Self {
         let n = VelosiAstNode::Param(c.clone());
-        Symbol::new(c.name.clone(), c.ctype.clone(), n)
+        Symbol::new(c.ident_as_rc_string(), c.ptype.clone(), n)
     }
 }
 
 /// Implementation of [Display] for [VelosiAstParam]
 impl Display for VelosiAstParam {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "{}: {}", self.name, self.ctype)
+        write!(f, "{}: {}", self.ident_as_str(), self.ptype)
     }
 }

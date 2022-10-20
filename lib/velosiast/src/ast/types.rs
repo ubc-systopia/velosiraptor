@@ -37,7 +37,7 @@ use velosiparser::{VelosiParseTreeType, VelosiParseTreeTypeInfo};
 use crate::VelosiTokenStream;
 
 use crate::error::VelosiAstIssues;
-use crate::{ast_result_return, utils, AstResult, SymbolTable};
+use crate::{ast_result_return, AstResult, SymbolTable};
 
 /// Represents the type information, either built in or a type ref
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -187,6 +187,10 @@ impl VelosiAstType {
         VelosiAstType { typeinfo, loc }
     }
 
+    pub fn new_int() -> Self {
+        Self::new(VelosiAstTypeInfo::Integer, VelosiTokenStream::default())
+    }
+
     // converts the parse tree node into an ast node, performing checks
     pub fn from_parse_tree(
         pt: VelosiParseTreeType,
@@ -204,7 +208,8 @@ impl VelosiAstType {
 
         // check the type reference
         if let VelosiAstTypeInfo::TypeRef(tname) = &res.typeinfo {
-            utils::check_type_exists(&mut issues, st, tname.clone(), res.loc.clone());
+            panic!("handle me!");
+            //utils::check_type_exists_raw(&mut issues, st, tname.clone(), res.loc.clone());
             ast_result_return!(res, issues)
         } else {
             // no type reference, built-in types are always ok.
