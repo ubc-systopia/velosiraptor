@@ -75,7 +75,7 @@ fn identifier_test_alpha() {
         identifier(sp),
         Ok((
             rem,
-            Token::new(VelosiTokenKind::Identifier("foo".to_string()), ident)
+            VelosiToken::new(VelosiTokenKind::Identifier("foo".to_string()), ident)
         ))
     );
 
@@ -86,7 +86,7 @@ fn identifier_test_alpha() {
         identifier(sp),
         Ok((
             rem,
-            Token::new(VelosiTokenKind::Identifier("FoO".to_string()), ident)
+            VelosiToken::new(VelosiTokenKind::Identifier("FoO".to_string()), ident)
         ))
     );
 
@@ -97,7 +97,7 @@ fn identifier_test_alpha() {
         identifier(sp),
         Ok((
             rem,
-            Token::new(
+            VelosiToken::new(
                 VelosiTokenKind::Identifier(
                     "abcdefghijklmnopqrstuvwxzyABCDEFGHIJKLMNOPQRSTUVWXYZ".to_string()
                 ),
@@ -116,7 +116,7 @@ fn identifier_test_alnum() {
         identifier(sp),
         Ok((
             rem,
-            Token::new(VelosiTokenKind::Identifier("foo123bar".to_string()), ident)
+            VelosiToken::new(VelosiTokenKind::Identifier("foo123bar".to_string()), ident)
         ))
     );
 }
@@ -130,7 +130,7 @@ fn identifier_test_underscores() {
         identifier(sp),
         Ok((
             rem,
-            Token::new(VelosiTokenKind::Identifier("_foobar".to_string()), ident)
+            VelosiToken::new(VelosiTokenKind::Identifier("_foobar".to_string()), ident)
         ))
     );
 
@@ -141,7 +141,7 @@ fn identifier_test_underscores() {
         identifier(sp),
         Ok((
             rem,
-            Token::new(VelosiTokenKind::Identifier("_foo_bar_".to_string()), ident)
+            VelosiToken::new(VelosiTokenKind::Identifier("_foo_bar_".to_string()), ident)
         ))
     );
     let sp = SrcSpan::new("__foo__bar__".to_string());
@@ -151,7 +151,7 @@ fn identifier_test_underscores() {
         identifier(sp),
         Ok((
             rem,
-            Token::new(
+            VelosiToken::new(
                 VelosiTokenKind::Identifier("__foo__bar__".to_string()),
                 ident
             )
@@ -179,7 +179,7 @@ fn identifier_test_keywords() {
         identifier(sp),
         Ok((
             rem,
-            Token::new(VelosiTokenKind::Keyword(VelosiKeyword::Import), ident)
+            VelosiToken::new(VelosiTokenKind::Keyword(VelosiKeyword::Import), ident)
         ))
     );
 
@@ -190,7 +190,7 @@ fn identifier_test_keywords() {
         identifier(sp),
         Ok((
             rem,
-            Token::new(VelosiTokenKind::Identifier("import2".to_string()), ident)
+            VelosiToken::new(VelosiTokenKind::Identifier("import2".to_string()), ident)
         ))
     );
 
@@ -201,7 +201,7 @@ fn identifier_test_keywords() {
         identifier(sp),
         Ok((
             rem,
-            Token::new(VelosiTokenKind::Keyword(VelosiKeyword::Unit), ident)
+            VelosiToken::new(VelosiTokenKind::Keyword(VelosiKeyword::Unit), ident)
         ))
     );
 
@@ -212,7 +212,7 @@ fn identifier_test_keywords() {
         identifier(sp),
         Ok((
             rem,
-            Token::new(VelosiTokenKind::Identifier("unit_".to_string()), ident)
+            VelosiToken::new(VelosiTokenKind::Identifier("unit_".to_string()), ident)
         ))
     );
 }
@@ -224,7 +224,10 @@ fn identifier_test_boolean() {
     let ident = sp.slice(0..4);
     assert_eq!(
         identifier(sp),
-        Ok((rem, Token::new(VelosiTokenKind::BoolLiteral(true), ident)))
+        Ok((
+            rem,
+            VelosiToken::new(VelosiTokenKind::BoolLiteral(true), ident)
+        ))
     );
 
     let sp = SrcSpan::new("false".to_string());
@@ -232,6 +235,9 @@ fn identifier_test_boolean() {
     let ident = sp.slice(0..5);
     assert_eq!(
         identifier(sp),
-        Ok((rem, Token::new(VelosiTokenKind::BoolLiteral(false), ident)))
+        Ok((
+            rem,
+            VelosiToken::new(VelosiTokenKind::BoolLiteral(false), ident)
+        ))
     );
 }

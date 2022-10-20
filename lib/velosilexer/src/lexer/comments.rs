@@ -77,7 +77,7 @@ pub fn blockcomment(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
 }
 
 #[cfg(test)]
-use crate::nom::Slice;
+use nom::Slice;
 
 #[test]
 fn parse_comment_tests_one_line() {
@@ -88,7 +88,7 @@ fn parse_comment_tests_one_line() {
         linecomment(sp),
         Ok((
             rem,
-            Token::new(VelosiTokenKind::Comment("foo bar".to_string()), c)
+            VelosiToken::new(VelosiTokenKind::Comment("foo bar".to_string()), c)
         ))
     );
 }
@@ -104,7 +104,7 @@ fn parse_comment_tests_one_line_with_newline() {
         linecomment(sp),
         Ok((
             rem,
-            Token::new(VelosiTokenKind::Comment("foo bar".to_string()), c)
+            VelosiToken::new(VelosiTokenKind::Comment("foo bar".to_string()), c)
         ))
     );
 }
@@ -119,7 +119,7 @@ fn parse_comment_tests_twoline() {
         linecomment(sp),
         Ok((
             rem,
-            Token::new(VelosiTokenKind::Comment("foo".to_string()), c)
+            VelosiToken::new(VelosiTokenKind::Comment("foo".to_string()), c)
         ))
     );
 }
@@ -134,7 +134,7 @@ fn parse_blockcomment_test_one() {
         blockcomment(sp),
         Ok((
             rem,
-            Token::new(VelosiTokenKind::BlockComment("foo bar".to_string()), c)
+            VelosiToken::new(VelosiTokenKind::BlockComment("foo bar".to_string()), c)
         ))
     );
 }
@@ -148,7 +148,7 @@ fn parse_blockcomment_test_newline() {
         blockcomment(sp),
         Ok((
             rem,
-            Token::new(VelosiTokenKind::BlockComment("foo \nbar".to_string()), c)
+            VelosiToken::new(VelosiTokenKind::BlockComment("foo \nbar".to_string()), c)
         ))
     );
 }
@@ -163,7 +163,7 @@ fn parse_blockcomment_test_follow() {
         blockcomment(sp),
         Ok((
             rem,
-            Token::new(VelosiTokenKind::BlockComment("foo".to_string()), c)
+            VelosiToken::new(VelosiTokenKind::BlockComment("foo".to_string()), c)
         ))
     );
 }
