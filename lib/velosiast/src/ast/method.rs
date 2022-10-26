@@ -211,12 +211,22 @@ impl Display for VelosiAstMethod {
             Display::fmt(p, f)?;
         }
         write!(f, ") -> {}", self.rtype)?;
+
+        if !self.requires.is_empty() {
+            writeln!(f)?;
+            for r in &self.requires {
+                writeln!(f, "    requires {};", r)?;
+            }
+        } else {
+            writeln!(f, "\n    requires true;")?;
+        }
+
         if let Some(b) = &self.body {
-            write!(f, " {{\n    ")?;
+            write!(f, "  {{\n    ")?;
             Display::fmt(b, f)?;
             write!(f, "\n  }}")
         } else {
-            write!(f, ";")
+            write!(f, "  {{ }}")
         }
     }
 }
