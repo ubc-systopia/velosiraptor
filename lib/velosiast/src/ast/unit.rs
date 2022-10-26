@@ -49,6 +49,27 @@ use super::{VelosiAstIdentifier, VelosiAstState};
 pub struct VelosiAstUnitSegment {
     /// the name of the unit
     pub ident: VelosiAstIdentifier,
+    /// the parameters of the unit
+    pub params: Vec<Rc<VelosiAstParam>>,
+    /// the base class
+    pub derived: Option<Rc<VelosiAstIdentifier>>,
+
+    pub inbitwidth: u64,
+    pub outbitwidth: u64,
+
+    /// the state of the unit
+    pub state: Rc<VelosiAstState>,
+    /// the interface of the unit
+    pub interface: Rc<VelosiAstInterface>,
+    ///
+    pub consts: Vec<Rc<VelosiAstConst>>,
+    pub consts_map: HashMap<String, Rc<VelosiAstConst>>,
+
+    pub flags: Option<Rc<VelosiAstFlags>>,
+
+    pub methods: Vec<Rc<VelosiAstMethod>>,
+    pub methods_map: HashMap<String, Rc<VelosiAstMethod>>,
+
     /// the location of the type clause
     pub loc: VelosiTokenStream,
 }
@@ -89,14 +110,15 @@ impl VelosiAstUnitSegment {
             // add the param to the symbol table, if it doesn't exist already
             if let Err(e) = st.insert(param.clone().into()) {
                 issues.push(e);
+            } else {
+                params.push(param);
             }
-            params.push(param);
         }
 
-        let _derived = if let Some(d) = pt.derived {
+        let derived = if let Some(d) = pt.derived {
             let d = VelosiAstIdentifier::from(d);
             utils::check_type_exists(&mut issues, st, &d);
-            Some(d)
+            Some(Rc::new(d))
         } else {
             None
         };
@@ -109,7 +131,7 @@ impl VelosiAstUnitSegment {
         let mut consts = Vec::new();
         let mut inbitwidth = None;
         let mut outbitwidth = None;
-        let mut flags: Option<VelosiAstFlags> = None;
+        let mut flags: Option<Rc<VelosiAstFlags>> = None;
         let mut interface: Option<Rc<VelosiAstInterface>> = None;
         let mut state: Option<Rc<VelosiAstState>> = None;
         for node in pt.nodes.into_iter() {
@@ -135,7 +157,10 @@ impl VelosiAstUnitSegment {
                     outbitwidth = Some(w);
                 }
                 VelosiParseTreeUnitNode::Flags(f) => {
-                    let flgs = ast_result_unwrap!(VelosiAstFlags::from_parse_tree(f), issues);
+                    let flgs = Rc::new(ast_result_unwrap!(
+                        VelosiAstFlags::from_parse_tree(f),
+                        issues
+                    ));
                     if let Some(f) = &flags {
                         let err = VelosiAstErrDoubleDef::new(
                             Rc::new(String::from("flags")),
@@ -144,6 +169,8 @@ impl VelosiAstUnitSegment {
                         );
                         issues.push(err.into());
                     } else {
+                        st.insert(flgs.clone().into())
+                            .expect("flags already exist n symbol table?");
                         flags = Some(flgs);
                     }
                 }
@@ -160,6 +187,8 @@ impl VelosiAstUnitSegment {
                         );
                         issues.push(err.into());
                     } else {
+                        st.insert(s.clone().into())
+                            .expect("state already exists in symbolt able?");
                         state = Some(s);
                     }
                 }
@@ -170,12 +199,14 @@ impl VelosiAstUnitSegment {
                     ));
                     if let Some(st) = &interface {
                         let err = VelosiAstErrDoubleDef::new(
-                            Rc::new(String::from("state")),
+                            Rc::new(String::from("interface")),
                             st.loc().clone(),
                             s.loc().clone(),
                         );
                         issues.push(err.into());
                     } else {
+                        st.insert(s.clone().into())
+                            .expect("interface already exists in symbolt able?");
                         interface = Some(s);
                     }
                 }
@@ -203,8 +234,71 @@ impl VelosiAstUnitSegment {
             }
         }
 
+        let state = if let Some(st) = state {
+            st
+        } else {
+            let msg = "Segment unit has no state definition";
+            let hint = "Change this to a `staticmap`, or add a state definition.";
+            let err = VelosiAstErrBuilder::err(msg.to_string())
+                .add_hint(hint.to_string())
+                .add_location(pt.loc.from_self_with_subrange(0..1))
+                .build();
+            issues.push(err);
+
+            Rc::new(VelosiAstState::NoneState(pt.loc.clone()))
+        };
+
+        let interface = if let Some(i) = interface {
+            i
+        } else {
+            let msg = "Segment unit has no interface definition";
+            let hint = "Change this to a `staticmap`, or add an interface definition.";
+            let err = VelosiAstErrBuilder::err(msg.to_string())
+                .add_hint(hint.to_string())
+                .add_location(pt.loc.from_self_with_subrange(0..1))
+                .build();
+            issues.push(err);
+
+            Rc::new(VelosiAstInterface::NoneInterface(pt.loc.clone()))
+        };
+
+        let inbitwidth = if let Some(ibw) = inbitwidth {
+            ibw
+        } else {
+            let msg = "Unit has no input bitwidth definition. Assuming 64 bits.";
+            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                .add_location(pt.loc.from_self_with_subrange(0..1))
+                .build();
+            issues.push(err);
+
+            64
+        };
+
+        let outbitwidth = if let Some(obw) = outbitwidth {
+            obw
+        } else {
+            let msg = "Unit has no output bitwidth definition. Assuming 64 bits.";
+            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                .add_location(pt.loc.from_self_with_subrange(0..1))
+                .build();
+            issues.push(err);
+
+            64
+        };
+
         let res = Self {
             ident: VelosiAstIdentifier::from(pt.name),
+            params,
+            derived,
+            inbitwidth,
+            outbitwidth,
+            state,
+            interface,
+            consts,
+            consts_map,
+            flags,
+            methods,
+            methods_map,
             loc: pt.loc,
         };
 
@@ -218,7 +312,61 @@ impl VelosiAstUnitSegment {
 /// Implementation of [Display] for [VelosiAstUnitSegment]
 impl Display for VelosiAstUnitSegment {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        writeln!(f, "Segment ...")
+        write!(f, "segment {} (", self.ident)?;
+        for (i, p) in self.params.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            Display::fmt(p, f)?;
+        }
+        write!(f, ")")?;
+        if let Some(d) = &self.derived {
+            write!(f, " : {}", d)?;
+        }
+        writeln!(f, " {{")?;
+
+        for c in &self.consts {
+            write!(f, "  ")?;
+            Display::fmt(c, f)?;
+            writeln!(f)?;
+        }
+
+        if self.consts.is_empty() {
+            writeln!(f, "// no constants")?;
+        }
+        writeln!(f)?;
+
+        writeln!(f, "  inbitwidth = {};", self.inbitwidth)?;
+        writeln!(f, "  outbitwidth = {};\n", self.outbitwidth)?;
+
+        if let Some(flags) = &self.flags {
+            write!(f, "  flags = ")?;
+            Display::fmt(flags, f)?;
+            writeln!(f, ";\n")?;
+        } else {
+            writeln!(f, "  // no flags\n")?;
+        }
+
+        write!(f, "  state = ")?;
+        Display::fmt(&self.state, f)?;
+        writeln!(f, ";\n")?;
+
+        write!(f, "  interface = ")?;
+        Display::fmt(&self.interface, f)?;
+        writeln!(f, ";\n")?;
+
+        for (i, m) in self.methods.iter().enumerate() {
+            if i > 0 {
+                writeln!(f, "\n")?;
+            }
+            Display::fmt(m, f)?;
+        }
+
+        if self.methods.is_empty() {
+            write!(f, "// no methods")?;
+        }
+
+        write!(f, "\n}}")
     }
 }
 

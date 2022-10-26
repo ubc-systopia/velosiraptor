@@ -95,14 +95,14 @@ impl VelosiAstFlags {
 
 impl Display for VelosiAstFlags {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "flags = {{")?;
+        write!(f, "{{ ")?;
         for (i, flag) in self.flags.iter().enumerate() {
             if i > 0 {
                 write!(f, ", ")?;
             }
             write!(f, "{}", flag.name)?;
         }
-        writeln!(f, "}};")
+        write!(f, " }}")
     }
 }
 

@@ -217,16 +217,26 @@ impl Display for VelosiAstRoot {
         writeln!(f, "\nConsts:")?;
 
         for c in self.consts.values() {
+            writeln!(f)?;
             Display::fmt(c, f)?;
             writeln!(f)?;
         }
 
+        if self.consts.is_empty() {
+            writeln!(f, "  <none>")?;
+        }
+
         writeln!(f, "\nUnits:")?;
 
-        // for u in self.units.values() {
-        //     Display::fmt(u, f)?;
-        //     writeln!(f)?;
-        // }
+        for u in self.units.values() {
+            writeln!(f)?;
+            Display::fmt(u, f)?;
+            writeln!(f)?;
+        }
+
+        if self.units.is_empty() {
+            writeln!(f, "  <none>")?;
+        }
         writeln!(
             f,
             "--------------------------------------------------------"

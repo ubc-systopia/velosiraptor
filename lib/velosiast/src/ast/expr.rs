@@ -809,6 +809,7 @@ impl VelosiAstIdentLiteralExpr {
             VelosiAstNode::InterfaceField(_) | VelosiAstNode::InterfaceFieldSlice(_) => {
                 AstResult::Ok(VelosiAstExpr::IdentLiteral(litexpr))
             }
+            VelosiAstNode::Flag(_) => AstResult::Ok(VelosiAstExpr::IdentLiteral(litexpr)),
             _ => {
                 // we have the wrong kind of symbol
                 let err = VelosiAstErrUndef::with_other(
@@ -1590,7 +1591,6 @@ impl VelosiAstExpr {
 
             // (p or (q and r)) == (p or q) and (p or r)
             if let BinOp(inner) = outer.rhs.as_ref() {
-                println!("into_cnf | rewrite: applying distributive law");
                 if outer.op == Lor && inner.op == Land {
                     let lhs = VelosiAstBinOpExpr::new(
                         *outer.lhs.clone(),
@@ -1606,14 +1606,18 @@ impl VelosiAstExpr {
                         outer.loc.clone(),
                     )
                     .flatten(st);
-                    return VelosiAstBinOpExpr::new(lhs, Land, rhs, outer.loc.clone()).flatten(st);
+                    let res =
+                        VelosiAstBinOpExpr::new(lhs, Land, rhs, outer.loc.clone()).flatten(st);
+                    println!("into_cnf | rewrite: applying distributive law");
+                    println!("  {} -> {}", self, res);
+                    return res;
                 }
             }
 
             // ((q and r) or p) == (p or q) and (p or r)
             if let BinOp(inner) = outer.lhs.as_ref() {
-                println!("into_cnf | rewrite: applying distributive law");
                 if outer.op == Lor && inner.op == Land {
+                    println!("into_cnf | rewrite: applying distributive law");
                     let lhs = VelosiAstBinOpExpr::new(
                         *outer.rhs.clone(),
                         Lor,
@@ -1628,7 +1632,11 @@ impl VelosiAstExpr {
                         outer.loc.clone(),
                     )
                     .flatten(st);
-                    return VelosiAstBinOpExpr::new(lhs, Land, rhs, outer.loc.clone()).flatten(st);
+                    let res =
+                        VelosiAstBinOpExpr::new(lhs, Land, rhs, outer.loc.clone()).flatten(st);
+                    println!("into_cnf | rewrite: applying distributive law");
+                    println!("  {} -> {}", self, res);
+                    return res;
                 }
             }
         } else if let UnOp(ue) = &self {
@@ -1636,12 +1644,14 @@ impl VelosiAstExpr {
                 // demorgan's law
                 // !(p or q) == !p and !q
                 if ue.op == LNot && be.op == Lor {
-                    println!("into_cnf | rewrite: applying demorgan's law");
                     let lhs =
                         VelosiAstUnOpExpr::new(LNot, *be.lhs.clone(), be.loc.clone()).flatten(st);
                     let rhs =
                         VelosiAstUnOpExpr::new(LNot, *be.rhs.clone(), be.loc.clone()).flatten(st);
-                    return VelosiAstBinOpExpr::new(lhs, Land, rhs, ue.loc.clone()).flatten(st);
+                    let res = VelosiAstBinOpExpr::new(lhs, Land, rhs, ue.loc.clone()).flatten(st);
+                    println!("into_cnf | rewrite: applying demorgan's law");
+                    println!("  {} -> {}", self, res);
+                    return res;
                 }
             }
         }
