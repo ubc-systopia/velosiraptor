@@ -116,6 +116,37 @@ impl VelosiAstMethod {
                 issues
             ));
 
+            // for the flags we need to add the flags to the symbol table
+            if param.ptype.is_flags() {
+                let flags = if let Some(f) = st.lookup("flags") {
+                    if let VelosiAstNode::Flags(flags) = &f.ast_node {
+                        // clone the RC
+                        Some(flags.clone())
+                    } else {
+                        let msg = "Flags defined as a symbol of different type.";
+                        let err = VelosiAstErrBuilder::err(msg.to_string())
+                            .add_location(param.loc.clone())
+                            .build();
+                        issues.push(err);
+                        None
+                    }
+                } else {
+                    let msg = "Undefined type `flags` in method parameter.";
+                    let hint = "Define the unit flags before using them in the method.";
+                    let err = VelosiAstErrBuilder::err(msg.to_string())
+                        .add_hint(hint.to_string())
+                        .add_location(param.loc.clone())
+                        .build();
+                    issues.push(err);
+                    None
+                };
+
+                if let Some(flags) = flags {
+                    // add the flags to the symbol table
+                    flags.populate_symboltable(param.ident_as_str(), st);
+                }
+            }
+
             // add the param to the symbol table, if it doesn't exist already
             if let Err(e) = st.insert(param.clone().into()) {
                 issues.push(e);
@@ -172,6 +203,20 @@ impl From<Rc<VelosiAstMethod>> for Symbol {
 /// Implementation of [Display] for [VelosiAstMethod]
 impl Display for VelosiAstMethod {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "{}: {}", self.ident_as_str(), self.rtype)
+        write!(f, "  fn {}(", self.ident_as_str())?;
+        for (i, p) in self.params.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            Display::fmt(p, f)?;
+        }
+        write!(f, ") -> {}", self.rtype)?;
+        if let Some(b) = &self.body {
+            write!(f, " {{\n    ")?;
+            Display::fmt(b, f)?;
+            write!(f, "\n  }}")
+        } else {
+            write!(f, ";")
+        }
     }
 }

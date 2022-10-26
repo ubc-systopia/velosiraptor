@@ -133,6 +133,6 @@ impl From<Rc<VelosiAstFieldSlice>> for Symbol {
 /// Implementation of [Display] for [VelosiAstFieldSlice]
 impl Display for VelosiAstFieldSlice {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        writeln!(f, "{}..{} {}", self.start, self.end, self.ident.as_str())
+        write!(f, "{}..{} {}", self.start, self.end, self.ident.as_str())
     }
 }

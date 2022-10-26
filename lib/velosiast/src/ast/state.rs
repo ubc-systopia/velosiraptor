@@ -159,7 +159,22 @@ impl VelosiAstStateMemoryField {
 /// Implementation of [Display] for [VelosiAstStateMemoryField]
 impl Display for VelosiAstStateMemoryField {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        writeln!(f, "memory field")
+        write!(
+            f,
+            "    mem {} [{}, {}, {}]",
+            self.ident, self.base, self.offset, self.size
+        )?;
+        if !self.layout.is_empty() {
+            writeln!(f, " {{")?;
+            for slice in &self.layout {
+                write!(f, "      ")?;
+                Display::fmt(slice, f)?;
+                writeln!(f, ",")?;
+            }
+            write!(f, "    }}")
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -253,7 +268,18 @@ impl VelosiAstStateRegisterField {
 /// Implementation of [Display] for [VelosiAstStateRegisterField]
 impl Display for VelosiAstStateRegisterField {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        writeln!(f, "registers field")
+        write!(f, "    reg {} [{}]", self.ident, self.size)?;
+        if !self.layout.is_empty() {
+            writeln!(f, " {{")?;
+            for slice in &self.layout {
+                write!(f, "      ")?;
+                Display::fmt(slice, f)?;
+                writeln!(f, ",")?;
+            }
+            write!(f, "    }}")
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -463,7 +489,21 @@ impl VelosiAstStateDef {
 /// Implementation of [Display] for [VelosiAstStateDef]
 impl Display for VelosiAstStateDef {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        writeln!(f, "StateDef(...")
+        write!(f, "StateDef(")?;
+        for (i, p) in self.params.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            Display::fmt(p, f)?;
+        }
+        writeln!(f, ") {{")?;
+
+        for field in self.fields.iter() {
+            Display::fmt(field, f)?;
+            writeln!(f, ",")?;
+        }
+
+        write!(f, "  }}")
     }
 }
 

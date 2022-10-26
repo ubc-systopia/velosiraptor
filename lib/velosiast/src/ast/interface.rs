@@ -445,7 +445,53 @@ impl VelosiAstInterfaceMemoryField {
 /// Implementation of [Display] for [VelosiAstInterfaceMemoryField]
 impl Display for VelosiAstInterfaceMemoryField {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        writeln!(f, "memory field")
+        write!(
+            f,
+            "    mem {} [{}, {}, {}]",
+            self.ident, self.base, self.offset, self.size
+        )?;
+
+        if !self.layout.is_empty() || !self.readactions.is_empty() || !self.writeactions.is_empty()
+        {
+            writeln!(f, " {{")?;
+        }
+
+        if !self.layout.is_empty() {
+            writeln!(f, "      Layout {{")?;
+            for slice in &self.layout {
+                write!(f, "        ")?;
+                Display::fmt(slice, f)?;
+                writeln!(f, ",")?;
+            }
+            writeln!(f, "      }},")?;
+        }
+
+        if !self.readactions.is_empty() {
+            writeln!(f, "      ReadActions {{")?;
+            for slice in &self.readactions {
+                write!(f, "        ")?;
+                Display::fmt(slice, f)?;
+                writeln!(f, ";")?;
+            }
+            writeln!(f, "      }},")?;
+        }
+
+        if !self.writeactions.is_empty() {
+            writeln!(f, "      WriteActions {{")?;
+            for slice in &self.writeactions {
+                write!(f, "        ")?;
+                Display::fmt(slice, f)?;
+                writeln!(f, ";")?;
+            }
+            writeln!(f, "      }},")?;
+        }
+
+        if !self.layout.is_empty() || !self.readactions.is_empty() || !self.writeactions.is_empty()
+        {
+            write!(f, "    }}")
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -594,7 +640,53 @@ impl VelosiAstInterfaceMmioField {
 /// Implementation of [Display] for [VelosiAstInterfaceRegisterField]
 impl Display for VelosiAstInterfaceMmioField {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        writeln!(f, "registers field")
+        write!(
+            f,
+            "    mmio {} [{}, {}, {}]",
+            self.ident, self.base, self.offset, self.size
+        )?;
+
+        if !self.layout.is_empty() || !self.readactions.is_empty() || !self.writeactions.is_empty()
+        {
+            writeln!(f, " {{")?;
+        }
+
+        if !self.layout.is_empty() {
+            writeln!(f, "      Layout {{")?;
+            for slice in &self.layout {
+                write!(f, "        ")?;
+                Display::fmt(slice, f)?;
+                writeln!(f, ",")?;
+            }
+            writeln!(f, "      }},")?;
+        }
+
+        if !self.readactions.is_empty() {
+            writeln!(f, "      ReadActions {{")?;
+            for slice in &self.readactions {
+                write!(f, "        ")?;
+                Display::fmt(slice, f)?;
+                writeln!(f, ";")?;
+            }
+            writeln!(f, "      }},")?;
+        }
+
+        if !self.writeactions.is_empty() {
+            writeln!(f, "      WriteActions {{")?;
+            for slice in &self.writeactions {
+                write!(f, "        ")?;
+                Display::fmt(slice, f)?;
+                writeln!(f, ";")?;
+            }
+            writeln!(f, "      }},")?;
+        }
+
+        if !self.layout.is_empty() || !self.readactions.is_empty() || !self.writeactions.is_empty()
+        {
+            write!(f, "    }}")
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -707,7 +799,49 @@ impl VelosiAstInterfaceRegisterField {
 /// Implementation of [Display] for [VelosiAstInterfaceRegisterField]
 impl Display for VelosiAstInterfaceRegisterField {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        writeln!(f, "registers field")
+        write!(f, "    reg {} [{}]", self.ident, self.size)?;
+
+        if !self.layout.is_empty() || !self.readactions.is_empty() || !self.writeactions.is_empty()
+        {
+            writeln!(f, " {{")?;
+        }
+
+        if !self.layout.is_empty() {
+            writeln!(f, "      Layout {{")?;
+            for slice in &self.layout {
+                write!(f, "        ")?;
+                Display::fmt(slice, f)?;
+                writeln!(f, ",")?;
+            }
+            writeln!(f, "      }},")?;
+        }
+
+        if !self.readactions.is_empty() {
+            writeln!(f, "      ReadActions {{")?;
+            for slice in &self.readactions {
+                write!(f, "        ")?;
+                Display::fmt(slice, f)?;
+                writeln!(f, ";")?;
+            }
+            writeln!(f, "      }},")?;
+        }
+
+        if !self.writeactions.is_empty() {
+            writeln!(f, "      WriteActions {{")?;
+            for slice in &self.writeactions {
+                write!(f, "        ")?;
+                Display::fmt(slice, f)?;
+                writeln!(f, ";")?;
+            }
+            writeln!(f, "      }},")?;
+        }
+
+        if !self.layout.is_empty() || !self.readactions.is_empty() || !self.writeactions.is_empty()
+        {
+            write!(f, "    }}")
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -925,7 +1059,21 @@ impl VelosiAstInterfaceDef {
 /// Implementation of [Display] for [VelosiAstInterfaceDef]
 impl Display for VelosiAstInterfaceDef {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        writeln!(f, "InterfaceDef(...")
+        write!(f, "InterfaceDef(")?;
+        for (i, p) in self.params.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            Display::fmt(p, f)?;
+        }
+        writeln!(f, ") {{")?;
+
+        for field in self.fields.iter() {
+            Display::fmt(field, f)?;
+            writeln!(f, ",")?;
+        }
+
+        write!(f, "  }}")
     }
 }
 
