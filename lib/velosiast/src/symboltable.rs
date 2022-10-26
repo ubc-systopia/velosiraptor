@@ -87,6 +87,19 @@ impl Display for Symbol {
             VelosiAstNode::StateFieldSlice(_) => {
                 write!(f, "statefieldslice|{:?}|{}", self.typeinfo, self.name)
             }
+            VelosiAstNode::Interface(_) => {
+                write!(f, "interface|{:?}|{}", self.typeinfo, self.name)
+            }
+            VelosiAstNode::InterfaceField(_) => {
+                write!(f, "interfacefield|{:?}|{}", self.typeinfo, self.name)
+            }
+            VelosiAstNode::InterfaceFieldSlice(_) => {
+                write!(f, "interfacefieldslice|{:?}|{}", self.typeinfo, self.name)
+            }
+            VelosiAstNode::Flags(_) => write!(f, "flags|{:?}|{}", self.typeinfo, self.name),
+            VelosiAstNode::Flag(_) => {
+                write!(f, "flag|{:?}|{}", self.typeinfo, self.name)
+            }
         }
     }
 }

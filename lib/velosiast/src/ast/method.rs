@@ -140,7 +140,8 @@ impl VelosiAstMethod {
         let mut requires = Vec::new();
         for p in pt.requires.into_iter() {
             let exp = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(p, st), issues);
-            requires.push(exp);
+            let exp = exp.into_cnf(st);
+            requires.extend(exp.split_cnf());
         }
 
         let body = if let Some(b) = pt.body {
