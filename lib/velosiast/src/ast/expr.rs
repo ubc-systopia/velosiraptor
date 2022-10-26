@@ -23,15 +23,16 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+use std::collections::HashSet;
 ///! Ast Module of the Velosiraptor Compiler
 // used standard library functionality
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
 // used crate functionality
-use crate::ast::{VelosiAstIdentifier, VelosiAstNode};
+use crate::ast::{VelosiAstIdentifier, VelosiAstNode, VelosiAstParam};
 use crate::error::{VelosiAstErrBuilder, VelosiAstErrUndef, VelosiAstIssues};
-use crate::{ast_result_unwrap, AstResult, SymbolTable};
+use crate::{ast_result_return, ast_result_unwrap, AstResult, SymbolTable};
 use velosiparser::{
     VelosiParseTreeBinOp, VelosiParseTreeBinOpExpr, VelosiParseTreeBoolLiteral,
     VelosiParseTreeExpr, VelosiParseTreeFnCallExpr, VelosiParseTreeIdentifierLiteral,
@@ -267,7 +268,7 @@ impl VelosiAstBinOpExpr {
 
     pub fn from_parse_tree(
         pt: VelosiParseTreeBinOpExpr,
-        st: &SymbolTable,
+        st: &mut SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
         let mut issues = VelosiAstIssues::new();
 
@@ -387,10 +388,30 @@ impl VelosiAstBinOpExpr {
         }
     }
 
-    pub fn flatten(self, st: &SymbolTable) -> VelosiAstExpr {
+    pub fn flatten(self, st: &mut SymbolTable) -> VelosiAstExpr {
         let lhs = self.lhs.flatten(st);
         let rhs = self.rhs.flatten(st);
         VelosiAstBinOpExpr::new(lhs, self.op, rhs, self.loc).eval()
+    }
+
+    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
+        let mut res = self.lhs.get_interface_references();
+        res.extend(self.rhs.get_interface_references());
+        res
+    }
+
+    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
+        let mut res = self.lhs.get_state_references();
+        res.extend(self.rhs.get_state_references());
+        res
+    }
+
+    pub fn has_state_references(&self) -> bool {
+        self.lhs.has_state_references() || self.rhs.has_state_references()
+    }
+
+    pub fn has_interface_references(&self) -> bool {
+        self.lhs.has_interface_references() || self.rhs.has_interface_references()
     }
 
     pub fn result_type(&self, st: &SymbolTable) -> &VelosiAstTypeInfo {
@@ -501,9 +522,10 @@ impl VelosiAstUnOpExpr {
             loc,
         }
     }
+
     pub fn from_parse_tree(
         pt: VelosiParseTreeUnOpExpr,
-        st: &SymbolTable,
+        st: &mut SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
         let mut issues = VelosiAstIssues::new();
 
@@ -548,9 +570,36 @@ impl VelosiAstUnOpExpr {
         }
     }
 
-    pub fn flatten(self, st: &SymbolTable) -> VelosiAstExpr {
-        let val = self.expr.flatten(st);
-        VelosiAstUnOpExpr::new(self.op, val, self.loc).eval()
+    pub fn flatten(self, st: &mut SymbolTable) -> VelosiAstExpr {
+        match self.expr.flatten(st) {
+            // the other expression is also an unary operation
+            VelosiAstExpr::UnOp(e) => {
+                // if the two unary opearations are the same, we can apply the double rule
+                if self.op == e.op {
+                    *e.expr
+                } else {
+                    VelosiAstUnOpExpr::new(self.op, VelosiAstExpr::UnOp(e), self.loc).eval()
+                }
+            }
+            // the other expression is not unary, evaluate and return
+            e => VelosiAstUnOpExpr::new(self.op, e, self.loc).eval(),
+        }
+    }
+
+    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
+        self.expr.get_interface_references()
+    }
+
+    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
+        self.expr.get_state_references()
+    }
+
+    pub fn has_state_references(&self) -> bool {
+        self.expr.has_state_references()
+    }
+
+    pub fn has_interface_references(&self) -> bool {
+        self.expr.has_interface_references()
     }
 
     pub fn result_type(&self, st: &SymbolTable) -> &VelosiAstTypeInfo {
@@ -601,41 +650,77 @@ impl Display for VelosiAstQuantifier {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstQuantifierExpr {
     quant: VelosiAstQuantifier,
-    //params: // Vec<VelosiAstParam>,
+    params: Vec<Rc<VelosiAstParam>>,
     expr: Box<VelosiAstExpr>,
     loc: VelosiTokenStream,
 }
 
 impl VelosiAstQuantifierExpr {
-    // pub fn new(
-    //     quant: VelosiAstQuantifier,
-    //     params: Vec<VelosiAstParam>,
-    //     expr: Box<VelosiAstExpr>,
-    //     loc: VelosiTokenStream,
-    // ) -> VelosiAstQuantifierExpr {
-    //     VelosiAstQuantifierExpr {
-    //         quant,
-    //         params,
-    //         expr,
-    //         loc,
-    //     }
-    // }
-
-    pub fn from_parse_tree(
-        _p: VelosiParseTreeQuantifierExpr,
-        _st: &SymbolTable,
-    ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
-        panic!("nyi");
-
-        // let quant = VelosiAstQuantifier::from(p.quant);
-        // let expr = VelosiAstExpr::from_parse_tree(p.expr, _st).unwrap();
-
-        // let e = VelosiAstQuantifierExpr::new(quant, params, expr, p.loc);
-        // Ok(VelosiAstExpr::Quantifier(e))
+    pub fn new(
+        quant: VelosiAstQuantifier,
+        params: Vec<Rc<VelosiAstParam>>,
+        expr: Box<VelosiAstExpr>,
+        loc: VelosiTokenStream,
+    ) -> VelosiAstQuantifierExpr {
+        VelosiAstQuantifierExpr {
+            quant,
+            params,
+            expr,
+            loc,
+        }
     }
 
-    pub fn flatten(self, _st: &SymbolTable) -> VelosiAstExpr {
+    pub fn from_parse_tree(
+        pt: VelosiParseTreeQuantifierExpr,
+        st: &mut SymbolTable,
+    ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
+        let mut issues = VelosiAstIssues::new();
+
+        st.create_context("quantifier".to_string());
+
+        let quant = VelosiAstQuantifier::from(pt.quant);
+
+        let mut params = Vec::new();
+        for p in pt.params {
+            let param = Rc::new(ast_result_unwrap!(
+                VelosiAstParam::from_parse_tree(p, false, st),
+                issues
+            ));
+
+            // add the param to the symbol table, if it doesn't exist already
+            if let Err(e) = st.insert(param.clone().into()) {
+                issues.push(e);
+            } else {
+                params.push(param);
+            }
+        }
+
+        let expr = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(*pt.expr, st), issues);
+
+        st.drop_context();
+
+        let e = VelosiAstQuantifierExpr::new(quant, params, Box::new(expr), pt.loc);
+        ast_result_return!(VelosiAstExpr::Quantifier(e), issues)
+    }
+
+    pub fn flatten(self, _st: &mut SymbolTable) -> VelosiAstExpr {
         panic!("nyi");
+    }
+
+    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
+        self.expr.get_interface_references()
+    }
+
+    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
+        self.expr.get_state_references()
+    }
+
+    pub fn has_state_references(&self) -> bool {
+        self.expr.has_state_references()
+    }
+
+    pub fn has_interface_references(&self) -> bool {
+        self.expr.has_interface_references()
     }
 }
 
@@ -660,10 +745,10 @@ impl Display for VelosiAstQuantifierExpr {
 /// Represents an identifier literal expression
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstIdentLiteralExpr {
-    path: Vec<VelosiAstIdentifier>,
-    name: Rc<String>,
-    etype: VelosiAstTypeInfo,
-    loc: VelosiTokenStream,
+    pub path: Vec<VelosiAstIdentifier>,
+    pub name: Rc<String>,
+    pub etype: VelosiAstTypeInfo,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiAstIdentLiteralExpr {
@@ -688,7 +773,7 @@ impl VelosiAstIdentLiteralExpr {
 
     pub fn from_parse_tree(
         p: VelosiParseTreeIdentifierLiteral,
-        st: &SymbolTable,
+        st: &mut SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
         // lookup the symbol in the symbol table
 
@@ -721,6 +806,9 @@ impl VelosiAstIdentLiteralExpr {
             VelosiAstNode::StateField(_) | VelosiAstNode::StateFieldSlice(_) => {
                 AstResult::Ok(VelosiAstExpr::IdentLiteral(litexpr))
             }
+            VelosiAstNode::InterfaceField(_) | VelosiAstNode::InterfaceFieldSlice(_) => {
+                AstResult::Ok(VelosiAstExpr::IdentLiteral(litexpr))
+            }
             _ => {
                 // we have the wrong kind of symbol
                 let err = VelosiAstErrUndef::with_other(
@@ -735,6 +823,42 @@ impl VelosiAstIdentLiteralExpr {
 
     pub fn result_type(&self, _st: &SymbolTable) -> &VelosiAstTypeInfo {
         &self.etype
+    }
+
+    pub fn ident_as_rc_string(&self) -> Rc<String> {
+        self.name.clone()
+    }
+
+    pub fn ident_as_str(&self) -> &str {
+        self.name.as_str()
+    }
+
+    pub fn ident_to_string(&self) -> String {
+        self.name.to_string()
+    }
+
+    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
+        let mut res = HashSet::new();
+        if self.has_interface_references() {
+            res.insert(self.name.clone());
+        }
+        res
+    }
+
+    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
+        let mut res = HashSet::new();
+        if self.has_state_references() {
+            res.insert(self.name.clone());
+        }
+        res
+    }
+
+    pub fn has_state_references(&self) -> bool {
+        self.name.as_str().starts_with("state")
+    }
+
+    pub fn has_interface_references(&self) -> bool {
+        self.name.as_str().starts_with("interface")
     }
 }
 
@@ -759,11 +883,27 @@ impl VelosiAstNumLiteralExpr {
 
     pub fn from_parse_tree(
         p: VelosiParseTreeNumLiteral,
-        _st: &SymbolTable,
+        _st: &mut SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
         // we can just convert the literal, as all values should be fine
         let e = VelosiAstNumLiteralExpr::new(p.value, p.loc);
         AstResult::Ok(VelosiAstExpr::NumLiteral(e))
+    }
+
+    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
+        HashSet::new()
+    }
+
+    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
+        HashSet::new()
+    }
+
+    pub fn has_state_references(&self) -> bool {
+        false
+    }
+
+    pub fn has_interface_references(&self) -> bool {
+        false
     }
 }
 
@@ -788,11 +928,27 @@ impl VelosiAstBoolLiteralExpr {
 
     pub fn from_parse_tree(
         p: VelosiParseTreeBoolLiteral,
-        _st: &SymbolTable,
+        _st: &mut SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
         // we can just convert the literal, as all values should be fine
         let e = VelosiAstBoolLiteralExpr::new(p.value, p.loc);
         AstResult::Ok(VelosiAstExpr::BoolLiteral(e))
+    }
+
+    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
+        HashSet::new()
+    }
+
+    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
+        HashSet::new()
+    }
+
+    pub fn has_state_references(&self) -> bool {
+        false
+    }
+
+    pub fn has_interface_references(&self) -> bool {
+        false
     }
 }
 
@@ -833,7 +989,7 @@ impl VelosiAstFnCallExpr {
 
     pub fn from_parse_tree(
         pt: VelosiParseTreeFnCallExpr,
-        st: &SymbolTable,
+        st: &mut SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
         let mut issues = VelosiAstIssues::new();
 
@@ -852,21 +1008,6 @@ impl VelosiAstFnCallExpr {
             pt.loc,
         );
 
-        //     error[E0061]: this function takes 5 arguments but 4 arguments were supplied
-        //     --> lib/velosiast/src/ast/expr.rs:937:21
-        //      |
-        //  937 |             let e = VelosiAstIfElseExpr::new(cond, then, other, self.loc);
-        //      |                     ^^^^^^^^^^^^^^^^^^^^^^^^                    -------- an argument of type `VelosiAstTypeInfo` is missing
-        //      |
-
-        //     error[E0308]: mismatched types
-        //     --> lib/velosiast/src/ast/expr.rs:822:31
-        //      |
-        //  822 |             AstResult::Issues(res, issues)
-        //      |             ----------------- ^^^ expected enum `VelosiAstExpr`, found struct `VelosiAstFnCallExpr`
-        //      |             |
-        //      |             arguments to this enum variant are incorrect
-
         let fn_sym = st.lookup(res.name.as_str());
         if fn_sym.is_none() {
             // there was no symbol
@@ -875,8 +1016,70 @@ impl VelosiAstFnCallExpr {
         }
 
         let fn_sym = fn_sym.unwrap();
-        if let VelosiAstNode::Method(_m) = &fn_sym.ast_node {
-            panic!("not implemented");
+        if let VelosiAstNode::Method(m) = &fn_sym.ast_node {
+            let nparam = m.params.len();
+            let nargs = res.args.len();
+
+            if nparam != nargs {
+                let msg = format!(
+                    "this function takes {} argument{} but {} argument{} supplied",
+                    nparam,
+                    if nparam == 1 { "" } else { "s" },
+                    nargs,
+                    if nargs == 1 { "s were" } else { " was" }
+                );
+
+                let (hint, loc) = if nparam < nargs {
+                    // too many arguments
+                    let hint = format!(
+                        "remove the {} unexpected argument{}",
+                        nargs - nparam,
+                        if nargs - nparam == 1 { "" } else { "s" }
+                    );
+                    let mut loc = res.args[nargs - nparam].loc().clone();
+                    loc.expand_until_end(res.args[nargs - 1].loc());
+                    (hint, loc)
+                } else {
+                    // to few arguments
+                    let hint = format!(
+                        "add the {} missing argument{}",
+                        nparam - nargs,
+                        if nparam - nargs == 1 { "" } else { "s" }
+                    );
+                    let loc = res.args[nargs].loc().clone();
+                    (hint, loc)
+                };
+                let err = VelosiAstErrBuilder::err(msg)
+                    .add_hint(hint)
+                    .add_location(loc)
+                    .add_related_location("method defined here".to_string(), m.loc.clone())
+                    .build();
+                issues.push(err);
+            }
+
+            for (i, arg) in res.args.iter().enumerate() {
+                if i >= nparam {
+                    let msg = "unexpected argument";
+                    let hint = "remove this argument to the function call";
+                    let err = VelosiAstErrBuilder::err(msg.to_string())
+                        .add_hint(hint.to_string())
+                        .add_location(arg.loc().clone())
+                        .build();
+                    issues.push(err);
+                    continue;
+                }
+
+                let param = &m.params[i];
+                if !param.ptype.typeinfo.compatible(arg.result_type(st)) {
+                    let msg = "mismatched types";
+                    let hint = format!("expected {}, found {}", param.ptype, arg.result_type(st));
+                    let err = VelosiAstErrBuilder::err(msg.to_string())
+                        .add_hint(hint)
+                        .add_location(arg.loc().clone())
+                        .build();
+                    issues.push(err);
+                }
+            }
         } else {
             // we have the wrong kind of symbol
             let err = VelosiAstErrUndef::with_other(
@@ -884,21 +1087,41 @@ impl VelosiAstFnCallExpr {
                 res.loc.clone(),
                 fn_sym.loc().clone(),
             );
-            return AstResult::Issues(VelosiAstExpr::FnCall(res), err.into());
+            issues.push(err.into());
         }
 
-        if issues.is_ok() {
-            AstResult::Ok(VelosiAstExpr::FnCall(res))
-        } else {
-            AstResult::Issues(VelosiAstExpr::FnCall(res), issues)
-        }
+        ast_result_return!(VelosiAstExpr::FnCall(res), issues)
     }
 
-    pub fn flatten(self, st: &SymbolTable) -> VelosiAstExpr {
+    pub fn flatten(self, st: &mut SymbolTable) -> VelosiAstExpr {
         let mut res = self.clone();
         res.args = self.args.into_iter().map(|a| a.flatten(st)).collect();
 
         VelosiAstExpr::FnCall(res)
+    }
+
+    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
+        let res = HashSet::new();
+        self.args.iter().fold(res, |mut acc, a| {
+            acc.extend(a.get_interface_references());
+            acc
+        })
+    }
+
+    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
+        let res = HashSet::new();
+        self.args.iter().fold(res, |mut acc, a| {
+            acc.extend(a.get_state_references());
+            acc
+        })
+    }
+
+    pub fn has_state_references(&self) -> bool {
+        self.args.iter().any(|a| a.has_state_references())
+    }
+
+    pub fn has_interface_references(&self) -> bool {
+        self.args.iter().any(|a| a.has_interface_references())
     }
 
     pub fn result_type(&self, _st: &SymbolTable) -> &VelosiAstTypeInfo {
@@ -951,7 +1174,7 @@ impl VelosiAstIfElseExpr {
     }
     pub fn from_parse_tree(
         pt: VelosiParseTreeIfElseExpr,
-        st: &SymbolTable,
+        st: &mut SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
         let mut issues = VelosiAstIssues::new();
 
@@ -993,7 +1216,7 @@ impl VelosiAstIfElseExpr {
         }
     }
 
-    pub fn flatten(self, st: &SymbolTable) -> VelosiAstExpr {
+    pub fn flatten(self, st: &mut SymbolTable) -> VelosiAstExpr {
         let then = self.then.flatten(st);
         let other = self.other.flatten(st);
         let cond = self.cond.flatten(st);
@@ -1009,6 +1232,32 @@ impl VelosiAstIfElseExpr {
             let e = VelosiAstIfElseExpr::new(cond, then, other, restype, self.loc);
             VelosiAstExpr::IfElse(e)
         }
+    }
+
+    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
+        let mut res = self.then.get_interface_references();
+        res.extend(self.other.get_interface_references());
+        res.extend(self.cond.get_interface_references());
+        res
+    }
+
+    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
+        let mut res = self.then.get_state_references();
+        res.extend(self.other.get_state_references());
+        res.extend(self.cond.get_state_references());
+        res
+    }
+
+    pub fn has_state_references(&self) -> bool {
+        self.then.has_state_references()
+            || self.other.has_state_references()
+            || self.cond.has_state_references()
+    }
+
+    pub fn has_interface_references(&self) -> bool {
+        self.then.has_interface_references()
+            || self.other.has_interface_references()
+            || self.cond.has_interface_references()
     }
 
     pub fn result_type(&self, _st: &SymbolTable) -> &VelosiAstTypeInfo {
@@ -1041,13 +1290,29 @@ pub struct VelosiAstRangeExpr {
 impl VelosiAstRangeExpr {
     pub fn from_parse_tree(
         _p: VelosiParseTreeRangeExpr,
-        _st: &SymbolTable,
+        _st: &mut SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
         panic!("nyi!");
     }
 
-    pub fn flatten(self, _st: &SymbolTable) -> VelosiAstExpr {
+    pub fn flatten(self, _st: &mut SymbolTable) -> VelosiAstExpr {
         VelosiAstExpr::Range(self)
+    }
+
+    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
+        HashSet::new()
+    }
+
+    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
+        HashSet::new()
+    }
+
+    pub fn has_state_references(&self) -> bool {
+        false
+    }
+
+    pub fn has_interface_references(&self) -> bool {
+        false
     }
 }
 
@@ -1078,19 +1343,73 @@ impl VelosiAstSliceExpr {
         VelosiAstSliceExpr { name, range, loc }
     }
     pub fn from_parse_tree(
-        _p: VelosiParseTreeSliceExpr,
-        _st: &SymbolTable,
+        pt: VelosiParseTreeSliceExpr,
+        st: &mut SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
-        panic!("nyi!");
+        let mut issues = VelosiAstIssues::new();
+
+        // process the function call arguments
+
+        let range = ast_result_unwrap!(VelosiAstRangeExpr::from_parse_tree(pt.range, st), issues);
+        let name = ast_result_unwrap!(
+            VelosiAstIdentLiteralExpr::from_parse_tree(pt.name, st),
+            issues
+        );
+
+        if let VelosiAstExpr::Range(r) = range {
+            if let VelosiAstExpr::IdentLiteral(n) = name {
+                let res = VelosiAstExpr::Slice(Self::new(n, r, pt.loc));
+                ast_result_return!(res, issues)
+            } else {
+                unreachable!("should always return a literal expression")
+            }
+        } else {
+            unreachable!("should always return a range expression")
+        }
     }
 
-    pub fn flatten(self, _st: &SymbolTable) -> VelosiAstExpr {
-        panic!("nyi!");
-        // VelosiAstExpr::Slice(Self::new(self.name, self.range.flatten(st), self.loc))
+    pub fn flatten(self, st: &mut SymbolTable) -> VelosiAstExpr {
+        if let VelosiAstExpr::Range(x) = self.range.flatten(st) {
+            VelosiAstExpr::Slice(Self::new(self.name, x, self.loc))
+        } else {
+            unreachable!("should always return a range expression")
+        }
     }
 
     pub fn result_type(&self, _st: &SymbolTable) -> &VelosiAstTypeInfo {
-        panic!("nyi!");
+        &VelosiAstTypeInfo::Integer
+    }
+
+    pub fn ident_as_rc_string(&self) -> Rc<String> {
+        self.name.ident_as_rc_string()
+    }
+
+    pub fn ident_as_str(&self) -> &str {
+        self.name.ident_as_str()
+    }
+
+    pub fn ident_to_string(&self) -> String {
+        self.name.ident_to_string()
+    }
+
+    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
+        let mut res = self.name.get_interface_references();
+        res.extend(self.range.get_interface_references());
+        res
+    }
+
+    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
+        let mut res = self.name.get_state_references();
+        res.extend(self.range.get_state_references());
+        res
+    }
+
+    pub fn has_state_references(&self) -> bool {
+        self.name.has_state_references() || self.range.has_state_references()
+    }
+
+    pub fn has_interface_references(&self) -> bool {
+        self.name.has_interface_references() || self.range.has_interface_references()
     }
 }
 
@@ -1126,7 +1445,7 @@ pub enum VelosiAstExpr {
 impl VelosiAstExpr {
     pub fn from_parse_tree(
         p: VelosiParseTreeExpr,
-        st: &SymbolTable,
+        st: &mut SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
         use VelosiParseTreeExpr::*;
         match p {
@@ -1182,7 +1501,7 @@ impl VelosiAstExpr {
         }
     }
 
-    pub fn flatten(self, st: &SymbolTable) -> Self {
+    pub fn flatten(self, st: &mut SymbolTable) -> Self {
         use VelosiAstExpr::*;
         match self {
             BinOp(e) => e.flatten(st),
@@ -1194,6 +1513,162 @@ impl VelosiAstExpr {
             Range(e) => e.flatten(st),
             _ => self,
         }
+    }
+
+    pub fn has_interface_references(&self) -> bool {
+        use VelosiAstExpr::*;
+        match self {
+            IdentLiteral(i) => i.has_interface_references(),
+            NumLiteral(i) => i.has_interface_references(),
+            BoolLiteral(i) => i.has_interface_references(),
+            BinOp(i) => i.has_interface_references(),
+            UnOp(i) => i.has_interface_references(),
+            Quantifier(i) => i.has_interface_references(),
+            FnCall(i) => i.has_interface_references(),
+            IfElse(i) => i.has_interface_references(),
+            Slice(i) => i.has_interface_references(),
+            Range(i) => i.has_interface_references(),
+        }
+    }
+
+    pub fn has_state_references(&self) -> bool {
+        use VelosiAstExpr::*;
+        match self {
+            IdentLiteral(i) => i.has_state_references(),
+            NumLiteral(i) => i.has_state_references(),
+            BoolLiteral(i) => i.has_state_references(),
+            BinOp(i) => i.has_state_references(),
+            UnOp(i) => i.has_state_references(),
+            Quantifier(i) => i.has_state_references(),
+            FnCall(i) => i.has_state_references(),
+            IfElse(i) => i.has_state_references(),
+            Slice(i) => i.has_state_references(),
+            Range(i) => i.has_state_references(),
+        }
+    }
+
+    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
+        use VelosiAstExpr::*;
+        match self {
+            IdentLiteral(i) => i.get_state_references(),
+            NumLiteral(i) => i.get_state_references(),
+            BoolLiteral(i) => i.get_state_references(),
+            BinOp(i) => i.get_state_references(),
+            UnOp(i) => i.get_state_references(),
+            Quantifier(i) => i.get_state_references(),
+            FnCall(i) => i.get_state_references(),
+            IfElse(i) => i.get_state_references(),
+            Slice(i) => i.get_state_references(),
+            Range(i) => i.get_state_references(),
+        }
+    }
+
+    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
+        use VelosiAstExpr::*;
+        match self {
+            IdentLiteral(i) => i.get_interface_references(),
+            NumLiteral(i) => i.get_interface_references(),
+            BoolLiteral(i) => i.get_interface_references(),
+            BinOp(i) => i.get_interface_references(),
+            UnOp(i) => i.get_interface_references(),
+            Quantifier(i) => i.get_interface_references(),
+            FnCall(i) => i.get_interface_references(),
+            IfElse(i) => i.get_interface_references(),
+            Slice(i) => i.get_interface_references(),
+            Range(i) => i.get_interface_references(),
+        }
+    }
+
+    // converts a boolean expression into the conjunctive normal form
+    pub fn into_cnf(self, st: &mut SymbolTable) -> Self {
+        use VelosiAstBinOp::*;
+        use VelosiAstExpr::*;
+        use VelosiAstUnOp::*;
+
+        if let BinOp(outer) = &self {
+            // distributive law
+
+            // (p or (q and r)) == (p or q) and (p or r)
+            if let BinOp(inner) = outer.rhs.as_ref() {
+                println!("into_cnf | rewrite: applying distributive law");
+                if outer.op == Lor && inner.op == Land {
+                    let lhs = VelosiAstBinOpExpr::new(
+                        *outer.lhs.clone(),
+                        Lor,
+                        *inner.lhs.clone(),
+                        outer.loc.clone(),
+                    )
+                    .flatten(st);
+                    let rhs = VelosiAstBinOpExpr::new(
+                        *outer.lhs.clone(),
+                        Lor,
+                        *inner.rhs.clone(),
+                        outer.loc.clone(),
+                    )
+                    .flatten(st);
+                    return VelosiAstBinOpExpr::new(lhs, Land, rhs, outer.loc.clone()).flatten(st);
+                }
+            }
+
+            // ((q and r) or p) == (p or q) and (p or r)
+            if let BinOp(inner) = outer.lhs.as_ref() {
+                println!("into_cnf | rewrite: applying distributive law");
+                if outer.op == Lor && inner.op == Land {
+                    let lhs = VelosiAstBinOpExpr::new(
+                        *outer.rhs.clone(),
+                        Lor,
+                        *inner.lhs.clone(),
+                        outer.loc.clone(),
+                    )
+                    .flatten(st);
+                    let rhs = VelosiAstBinOpExpr::new(
+                        *outer.rhs.clone(),
+                        Lor,
+                        *inner.rhs.clone(),
+                        outer.loc.clone(),
+                    )
+                    .flatten(st);
+                    return VelosiAstBinOpExpr::new(lhs, Land, rhs, outer.loc.clone()).flatten(st);
+                }
+            }
+        } else if let UnOp(ue) = &self {
+            if let BinOp(be) = ue.expr.as_ref() {
+                // demorgan's law
+                // !(p or q) == !p and !q
+                if ue.op == LNot && be.op == Lor {
+                    println!("into_cnf | rewrite: applying demorgan's law");
+                    let lhs =
+                        VelosiAstUnOpExpr::new(LNot, *be.lhs.clone(), be.loc.clone()).flatten(st);
+                    let rhs =
+                        VelosiAstUnOpExpr::new(LNot, *be.rhs.clone(), be.loc.clone()).flatten(st);
+                    return VelosiAstBinOpExpr::new(lhs, Land, rhs, ue.loc.clone()).flatten(st);
+                }
+            }
+        }
+        self
+    }
+
+    /// splits a boolean expression into is conjuncts
+    pub fn split_cnf(self) -> Vec<Self> {
+        use VelosiAstExpr::*;
+        match self {
+            BinOp(e) => {
+                if e.op == VelosiAstBinOp::Land {
+                    let mut v = e.lhs.split_cnf();
+                    v.extend(e.rhs.split_cnf());
+                    v
+                } else {
+                    vec![BinOp(e)]
+                }
+            }
+            e => vec![e],
+        }
+    }
+
+    /// returns true if the expression is an lvalue
+    pub fn is_lvalue(&self) -> bool {
+        use VelosiAstExpr::*;
+        matches!(self, IdentLiteral(_) | Slice(_))
     }
 }
 
@@ -1215,601 +1690,6 @@ impl Display for VelosiAstExpr {
         }
     }
 }
-
-// /// Represents an Expression
-// ///
-// /// The expressions form a trie that is the being evaluated bottom up.
-// #[derive(Debug, PartialEq, Eq, Clone)]
-// pub enum Expr {
-//     /// Represents an identifier. That may be qualified or not.  `a.b`
-//     Identifier { path: Vec<String>, pos: TokenStream },
-//     /// Represents a constant, unsigned number  `5`
-//     Number { value: u64, pos: TokenStream },
-//     /// Represents a constant boolean value  `True | False`
-//     Boolean { value: bool, pos: TokenStream },
-//     /// Represents a binary operation  `a + 1`
-//     BinaryOperation {
-//         op: BinOp,
-//         lhs: Box<Expr>,
-//         rhs: Box<Expr>,
-//         pos: TokenStream,
-//     },
-//     /// Represents an unary operation `!a`
-//     UnaryOperation {
-//         op: UnOp,
-//         val: Box<Expr>,
-//         pos: TokenStream,
-//     },
-//     /// Represents a function call  `a.b(x,y)`
-//     FnCall {
-//         path: Vec<String>,        let lhs = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(*p.lhs, st), issues);
-//let rhs = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(*p.rhs, st), issues);
-//         args: Vec<Expr>,
-//         pos: TokenStream,
-//     },
-//     /// Represents a slice  `a[1..x]`
-//     Slice {
-//         path: Vec<String>,
-//         slice: Box<Expr>,
-//         pos: TokenStream,
-//     },
-//     /// Represents an element aaccess `a[0]`
-//     Element {
-//         path: Vec<String>,
-//         idx: Box<Expr>,
-//         pos: TokenStream,
-//     },
-//     /// Represents a range  `start..end`
-//     Range {
-//         start: Box<Expr>,
-//         end: Box<Expr>,
-//         pos: TokenStream,
-//     },
-//     /// Represents a quantifier `forall x | x > 0`
-//     Quantifier {
-//         kind: Quantifier,
-//         vars: Vec<Param>,
-//         expr: Box<Expr>,
-//         pos: TokenStream,
-//     },
-// }
-
-// /// Implementation of [Expr]
-// impl<'a> Expr {
-//     /// applies constant folding
-//     pub fn fold_constants(&self, st: &SymbolTable, vars: &HashMap<String, u64>) -> Self {
-//         use Expr::*;
-//         match self {
-//             Number { value, pos } => Number {
-//                 value: *value,
-//                 pos: pos.clone(),
-//             },
-//             Boolean { value, pos } => Boolean {
-//                 value: *value,
-//                 pos: pos.clone(),
-//             },
-//             Identifier { path, pos } => {
-//                 let v = path.join(".");
-//                 if let Some(val) = vars.get(&v) {
-//                     Number {
-//                         value: *val,
-//                         pos: pos.clone(),
-//                     }
-//                 } else if let Some(val) = st.lookup(&v) {
-//                     if let AstNode::Const(c) = val.ast_node {
-//                         c.to_expr().fold_constants(st, vars)
-//                     } else {
-//                         panic!("{} is not a constant", v)
-//                     }
-//                 } else {
-//                     panic!("{} is not defined", v)
-//                 }
-//             }
-//             BinaryOperation { op, lhs, rhs, pos } => {
-//                 let lhs = lhs.fold_constants(st, vars);
-//                 let rhs = rhs.fold_constants(st, vars);
-//                 op.eval(lhs, rhs, pos.clone())
-//             }
-//             UnaryOperation { op, val, pos } => {
-//                 let val = val.fold_constants(st, vars);
-//                 op.eval(val, pos.clone())
-//             }
-//             FnCall { path, args, pos } => {
-//                 let args = args.iter().map(|e| e.fold_constants(st, vars)).collect();
-//                 FnCall {
-//                     path: path.clone(),
-//                     args,
-//                     pos: pos.clone(),
-//                 }
-//             }
-//             Slice { path, slice, pos } => {
-//                 let slice = slice.fold_constants(st, vars);
-//                 Slice {
-//                     path: path.clone(),
-//                     slice: Box::new(slice),
-//                     pos: pos.clone(),
-//                 }
-//             }
-//             Element { path, idx, pos } => {
-//                 let idx = idx.fold_constants(st, vars);
-//                 Element {
-//                     path: path.clone(),
-//                     idx: Box::new(idx),
-//                     pos: pos.clone(),
-//                 }
-//             }
-//             Range { start, end, pos } => {
-//                 let start = start.fold_constants(st, vars);
-//                 let end = end.fold_constants(st, vars);
-//                 Range {
-//                     start: Box::new(start),
-//                     end: Box::new(end),
-//                     pos: pos.clone(),
-//                 }
-//             }
-//             Quantifier {
-//                 kind,
-//                 vars: lvars,
-//                 expr,
-//                 pos,
-//             } => {
-//                 let expr = expr.fold_constants(st, vars);
-//                 Quantifier {
-//                     kind: *kind,
-//                     vars: lvars.clone(),
-//                     expr: Box::new(expr),
-//                     pos: pos.clone(),
-//                 }
-//             }
-//         }
-//     }
-
-//     /// returns true if the expression is a constant expression
-//     ///
-//     /// it consults the symbol table to figure out whether the symbol / variable is constant
-//     pub fn is_const_expr(&self, st: &SymbolTable) -> bool {
-//         use Expr::*;
-//         match self {
-//             // numbers and booleans are constant
-//             Number { .. } => true,
-//             Boolean { .. } => true,
-//             // unary and binary operations are constant, if and only if each operand is constnat
-//             BinaryOperation { lhs, rhs, .. } => lhs.is_const_expr(st) && rhs.is_const_expr(st),
-//             UnaryOperation { val, .. } => val.is_const_expr(st),
-//             // an identifyer is constnat, if its in the symbol table as a constant
-//             Identifier { path, .. } => {
-//                 // TODO: deal with context.symbol
-//                 let name = path.join(".");
-//                 match st.lookup(&name) {
-//                     Some(s) => s.is_const(),
-//                     None => false,
-//                 }
-//             }
-//             // everything else is not constant
-//             _ => false,
-//         }
-//     }
-
-//     /// returns true if the expression is an lvalue
-//     pub fn is_lvalue(&self) -> bool {
-//         use Expr::*;
-//         matches!(self, Identifier { .. } | Slice { .. } | Element { .. })
-//     }
-
-//     /// matches a symbol with a given type
-//     pub fn match_symbol(path: &[String], pos: &TokenStream, ty: Type, st: &SymbolTable) -> Issues {
-//         let name = path.join(".");
-//         match st.lookup(&name) {
-//             Some(s) => {
-//                 if !ty.compatible(s.typeinfo) {
-//                     // warning
-//                     let msg = format!(
-//                         "expected expression of type `{}`, {} symbol `{}` has type `{}`",
-//                         ty.to_type_string(),
-//                         s.kind,
-//                         name,
-//                         s.typeinfo.to_type_string()
-//                     );
-//                     let hint = String::from("define symbol with matching type");
-//                     VrsError::new_err(pos, msg, Some(hint)).print();
-//                     Issues::err()
-//                 } else {
-//                     Issues::ok()
-//                 }
-//             }
-//             None => {
-//                 // warning
-//                 let msg = format!(
-//                     "expected expression of type `{}`, symbol `{}` was not found",
-//                     ty.to_type_string(),
-//                     name
-//                 );
-//                 let hint = format!("define symbol with type `{}`", ty.to_type_string());
-//                 VrsError::new_err(pos, msg, Some(hint)).print();
-//                 Issues::err()
-//             }
-//         }
-//     }
-
-//     /// matches the type of the expressin with the supplied type
-//     pub fn match_type(&self, ty: Type, st: &SymbolTable) -> Issues {
-//         use Expr::*;
-//         match self {
-//             // numbers and booleans are constant
-//             Number { pos, .. } => {
-//                 if !ty.is_numeric() {
-//                     // warning
-//                     let msg = format!(
-//                         "expected expression of type `{}`, but was of numeric type.`",
-//                         ty.to_type_string()
-//                     );
-//                     let hint = format!("convert to `{}` type.", ty.to_type_string());
-//                     VrsError::new_err(pos, msg, Some(hint)).print();
-//                     Issues::err()
-//                 } else {
-//                     Issues::ok()
-//                 }
-//             }
-//             Boolean { pos, .. } => {
-//                 if !ty.is_boolean() {
-//                     // warning
-//                     let msg = format!(
-//                         "expected expression of type `{}`, but was of boolean type.`",
-//                         ty.to_type_string()
-//                     );
-//                     let hint = format!("convert to `{}` type.", ty.to_type_string());
-//                     VrsError::new_err(pos, msg, Some(hint)).print();
-//                     Issues::err()
-//                 } else {
-//                     Issues::ok()
-//                 }
-//             }
-//             // unary and binary operations are constant, if and only if each operand is constnat
-//             BinaryOperation { op, pos, .. } => {
-//                 if op.result_boolean() && ty.is_boolean() || op.result_numeric() && ty.is_numeric()
-//                 {
-//                     Issues::ok()
-//                 } else {
-//                     // warning
-//                     let msg = format!("expected expression of type `{}`", ty.to_type_string(),);
-//                     let hint = format!(
-//                         "change expression to produce `{}` or change type",
-//                         ty.to_type_string()
-//                     );
-//                     VrsError::new_err(pos, msg, Some(hint)).print();
-//                     Issues::err()
-//                 }
-//             }
-//             UnaryOperation { val, .. } => val.match_type(ty, st),
-//             // an identifyer is constnat, if its in the symbol table as a constant
-//             Identifier { path, pos } => Self::match_symbol(path, pos, ty, st),
-//             FnCall { path, pos, .. } => Self::match_symbol(path, pos, ty, st),
-//             Element { path, pos, .. } => Self::match_symbol(path, pos, ty, st),
-//             Quantifier { pos, .. } => {
-//                 if ty.is_boolean() {
-//                     Issues::ok()
-//                 } else {
-//                     let msg = format!(
-//                         "expected expression of type `{}`, but quantifier is boolean",
-//                         ty.to_type_string(),
-//                     );
-//                     VrsError::new_err(pos, msg, None).print();
-//                     Issues::err()
-//                 }
-//             }
-//             // everything else is currently not supported
-//             x => {
-//                 // warning
-//                 let msg = format!(
-//                     "expected expression of type `{}`, but found unsupported exprssion {}",
-//                     ty.to_type_string(),
-//                     x
-//                 );
-//                 let hint = format!(
-//                     "change expression to produce `{}` or change type",
-//                     ty.to_type_string()
-//                 );
-//                 VrsError::new_err(x.loc(), msg, Some(hint)).print();
-//                 Issues::err()
-//             }
-//         }
-//     }
-
-//     /// checks if a given symbol exists with the path
-//     fn symbol_exists(
-//         pos: &TokenStream,
-//         path: &[String],
-//         st: &SymbolTable,
-//         kind: &[SymbolKind],
-//     ) -> Issues {
-//         let ident = path.join(".");
-//         match st.lookup(&ident) {
-//             Some(s) => {
-//                 if !kind.contains(&s.kind) {
-//                     // warning
-//                     let msg = format!(
-//                         "symbol `{}` exists but has a wrong kind. Expected `{:?}`, was `{:?}`",
-//                         ident, kind, s.kind
-//                     );
-//                     let hint = format!(
-//                         "define this symbol as {:?}, or converts its use to {:?}",
-//                         kind, s.kind
-//                     );
-//                     VrsError::new_err(pos, msg, Some(hint)).print();
-//                     Issues::err()
-//                 } else {
-//                     Issues::ok()
-//                 }
-//             }
-//             None => {
-//                 let msg = format!("symbol `{}` does not exist within this context", ident);
-//                 VrsError::new_err(pos, msg, None).print();
-//                 Issues::err()
-//             }
-//         }
-//     }
-
-//     /// checks that all symbols are defined in the exprssions
-//     pub fn check_symbols(&'a self, st: &mut SymbolTable<'a>) -> Issues {
-//         let varkind = &[
-//             SymbolKind::Const,
-//             SymbolKind::Parameter,
-//             SymbolKind::Variable,
-//             SymbolKind::State,
-//         ];
-//         let fnkind = &[SymbolKind::Function];
-//         use Expr::*;
-//         match self {
-//             Identifier { path, pos } => Expr::symbol_exists(pos, path, st, varkind),
-//             Number { .. } => Issues::ok(),
-//             Boolean { .. } => Issues::ok(),
-//             BinaryOperation { lhs, rhs, .. } => lhs.check_symbols(st) + rhs.check_symbols(st),
-//             UnaryOperation { val, .. } => val.check_symbols(st),
-//             FnCall { path, args, pos } => {
-//                 let s = Expr::symbol_exists(pos, path, st, fnkind);
-//                 args.iter().fold(s, |acc, e| e.check_symbols(st) + acc)
-//             }
-//             Slice { path, slice, pos } => {
-//                 // currently we can't do foo()[]
-//                 let s = Expr::symbol_exists(pos, path, st, varkind);
-//                 s + slice.check_symbols(st)
-//             }
-//             Element { path, idx, pos } => {
-//                 let s = Expr::symbol_exists(pos, path, st, varkind);
-//                 s + idx.check_symbols(st)
-//             }
-//             Range { start, end, .. } => start.check_symbols(st) + end.check_symbols(st),
-//             Quantifier { vars, expr, .. } => {
-//                 let mut issues = Issues::ok();
-//                 // create st context
-//                 st.create_context(String::from("quantifier"));
-//                 issues.inc_err(utils::check_double_entries(vars));
-//                 for v in vars {
-//                     if let Some(s) = st.lookup(&v.name) {
-//                         let msg = format!(
-//                             "identifier `{}` shadows a previously defined symbol",
-//                             s.name
-//                         );
-//                         let hint = String::from("consider giving the variable another name");
-//                         VrsError::new_warn(v.loc(), msg, Some(hint)).print();
-//                         issues.inc_warn(1);
-//                     }
-//                     issues = issues + utils::check_snake_case(&v.name, v.loc());
-//                     st.insert(v.to_symbol());
-//                 }
-
-//                 issues = issues + expr.check_symbols(st) + expr.match_type(Type::Boolean, st);
-
-//                 // pop systable context
-//                 st.drop_context();
-
-//                 issues
-//             }
-//         }
-//     }
-
-//     /// checks if the types of the expression match
-//     pub fn check_types(&self, _st: &mut SymbolTable) -> Issues {
-//         Issues::ok()
-//     }
-
-//     fn path_to_hashset(path: &[String]) -> HashSet<String> {
-//         let mut hs = HashSet::new();
-//         hs.insert(path.join("."));
-//         hs
-//     }
-
-//     /// obtains the state references of this expression
-//     fn get_state_interface_references(&self, prefix: &str) -> HashSet<String> {
-//         use Expr::*;
-//         match self {
-//             Identifier { path, .. } => {
-//                 if path[0] == prefix {
-//                     Expr::path_to_hashset(path)
-//                 } else {
-//                     HashSet::new()
-//                 }
-//             }
-//             Number { .. } => HashSet::new(),
-//             Boolean { .. } => HashSet::new(),
-//             BinaryOperation { lhs, rhs, .. } => {
-//                 let mut v = lhs.get_state_interface_references(prefix);
-//                 v.extend(rhs.get_state_interface_references(prefix));
-//                 v
-//             }
-//             UnaryOperation { val, .. } => val.get_state_interface_references(prefix),
-//             FnCall { path, args, .. } => {
-//                 // TODO: recurse into the function
-//                 println!("WARN: not recursing into method call {}", path.join("."));
-//                 let a = args
-//                     .iter()
-//                     .flat_map(|s| s.get_state_interface_references(prefix))
-//                     .collect::<Vec<String>>();
-//                 let mut s = HashSet::new();
-//                 s.extend(a);
-//                 s
-//             }
-//             Slice { path, slice, .. } => {
-//                 let mut v = if path[0] == prefix {
-//                     Expr::path_to_hashset(path)
-//                 } else {
-//                     HashSet::new()
-//                 };
-//                 v.extend(slice.get_state_interface_references(prefix));
-//                 v
-//             }
-//             Element { path, idx, .. } => {
-//                 if path[0] == prefix {
-//                     let mut v = Expr::path_to_hashset(path);
-//                     v.extend(idx.get_state_interface_references(prefix));
-//                     v
-//                 } else {
-//                     HashSet::new()
-//                 }
-//             }
-//             Range { start, end, .. } => {
-//                 let mut v = start.get_state_interface_references(prefix);
-//                 v.extend(end.get_state_interface_references(prefix));
-//                 v
-//             }
-//             Quantifier { expr, .. } => expr.get_state_interface_references(prefix),
-//         }
-//     }
-
-//     pub fn get_state_references(&self) -> HashSet<String> {
-//         self.get_state_interface_references("state")
-//     }
-
-//     pub fn get_interface_references(&self) -> HashSet<String> {
-//         self.get_state_interface_references("interface")
-//     }
-
-//     pub fn has_state_interface_references(&self, prefix: &str) -> bool {
-//         use Expr::*;
-//         match self {
-//             Identifier { path, .. } => path[0] == prefix,
-//             Number { .. } => false,
-//             Boolean { .. } => false,
-//             BinaryOperation { lhs, rhs, .. } => {
-//                 lhs.has_state_interface_references(prefix)
-//                     | rhs.has_state_interface_references(prefix)
-//             }
-//             UnaryOperation { val, .. } => val.has_state_interface_references(prefix),
-//             FnCall { args, .. } => {
-//                 for a in args {
-//                     if a.has_state_interface_references(prefix) {
-//                         return true;
-//                     }
-//                 }
-//                 // TODO: recurse into the function
-//                 false
-//             }
-//             Slice { path, slice, .. } => {
-//                 (path[0] == prefix) | slice.has_state_interface_references(prefix)
-//             }
-//             Element { path, idx, .. } => {
-//                 (path[0] == prefix) | idx.has_state_interface_references(prefix)
-//             }
-//             Range { start, end, .. } => {
-//                 start.has_state_interface_references(prefix)
-//                     | end.has_state_interface_references(prefix)
-//             }
-//             Quantifier { expr, .. } => expr.has_state_interface_references(prefix),
-//         }
-//     }
-
-//     pub fn has_interface_references(&self) -> bool {
-//         self.has_state_interface_references("interface")
-//     }
-
-//     pub fn has_state_references(&self) -> bool {
-//         self.has_state_interface_references("state")
-//     }
-
-//     /// trying to split the expressions of the form `E and E`
-//     pub fn split_and(self) -> Vec<Expr> {
-//         match self {
-//             Expr::BinaryOperation {
-//                 lhs,
-//                 rhs,
-//                 op: BinOp::Land,
-//                 ..
-//             } => {
-//                 // println!("Splitting: {}", self);
-//                 let mut v = lhs.split_and();
-//                 v.extend(rhs.split_and());
-//                 v
-//             }
-//             _ => {
-//                 vec![self]
-//             }
-//         }
-//     }
-// }
-
-// impl Display for Expr {
-//     fn fmt(&self, format: &mut fmt::Formatter) -> FmtResult {
-//         use self::Expr::*;
-//         match self {
-//             Identifier { path, .. } => write!(format, "{}", path.join(".")),
-//             Number { value, .. } => write!(format, "{}", value),
-//             Boolean { value, .. } => write!(format, "{}", value),
-//             BinaryOperation { op, lhs, rhs, .. } => write!(format, "({} {} {})", lhs, op, rhs),
-//             UnaryOperation { op, val, .. } => write!(format, "{}({})", op, val),
-//             FnCall { path, .. } => write!(format, "{}()", path.join(".")),
-//             Slice { path, slice, .. } => write!(format, "{}[{}]", path.join("."), slice),
-//             Element { path, idx, .. } => write!(format, "{}[{}]", path.join("."), idx),
-//             Range { start, end, .. } => write!(format, "{}..{}", start, end),
-//             Quantifier { kind, expr, .. } => write!(format, "{} {}", kind, expr),
-//         }
-//     }
-// }
-
-// impl<'a> AstNodeGeneric<'a> for Expr {
-//     fn name(&self) -> &str {
-//         "Expression"
-//     }
-
-//     /// performs teh ast check on the expression node
-//     fn check(&'a self, st: &mut SymbolTable<'a>) -> Issues {
-//         let mut res = Issues::ok();
-
-//         // Check 1: Sybol definitions
-//         // --------------------------------------------------------------------------------------
-//         // Type:        Error
-//         // Description: Check that the symbols are defined
-//         // Notes:
-//         // --------------------------------------------------------------------------------------
-
-//         res = res + self.check_symbols(st);
-
-//         // Check 2: Type checks
-//         // --------------------------------------------------------------------------------------
-//         // Type:        Error
-//         // Description: Check that teh types match
-//         // Notes:
-//         // --------------------------------------------------------------------------------------
-
-//         res + self.check_types(st)
-//     }
-
-//     /// returns the location of the current
-//     fn loc(&self) -> &TokenStream {
-//         use self::Expr::*;
-//         match &self {
-//             Identifier { pos, .. } => pos,
-//             Number { pos, .. } => pos,
-//             Boolean { pos, .. } => pos,
-//             BinaryOperation { pos, .. } => pos,
-//             UnaryOperation { pos, .. } => pos,
-//             FnCall { pos, .. } => pos,
-//             Slice { pos, .. } => pos,
-//             Element { pos, .. } => pos,
-//             Range { pos, .. } => pos,
-//             Quantifier { pos, .. } => pos,
-//         }
-//     }
-// }
 
 // #[cfg(test)]
 // use crate::lexer::Lexer;

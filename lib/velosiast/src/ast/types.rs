@@ -34,8 +34,9 @@ use std::rc::Rc;
 use velosiparser::{VelosiParseTreeType, VelosiParseTreeTypeInfo};
 
 // use crate functionality
-use crate::VelosiTokenStream;
+use crate::{utils, VelosiTokenStream};
 
+use crate::ast::VelosiAstIdentifier;
 use crate::error::VelosiAstIssues;
 use crate::{ast_result_return, AstResult, SymbolTable};
 
@@ -208,8 +209,9 @@ impl VelosiAstType {
 
         // check the type reference
         if let VelosiAstTypeInfo::TypeRef(tname) = &res.typeinfo {
-            panic!("handle me!");
-            //utils::check_type_exists_raw(&mut issues, st, tname.clone(), res.loc.clone());
+            // hacky way for the type check
+            let id = VelosiAstIdentifier::new(tname.to_string(), res.loc.clone());
+            utils::check_type_exists(&mut issues, st, &id);
             ast_result_return!(res, issues)
         } else {
             // no type reference, built-in types are always ok.

@@ -42,17 +42,23 @@ use crate::{ast_result_return, ast_result_unwrap, AstResult, SymbolTable};
 
 mod constdef;
 mod expr;
+mod flags;
+mod interface;
 mod method;
 mod param;
+mod slice;
 mod state;
 mod types;
 mod unit;
 
 pub use constdef::VelosiAstConst;
 pub use expr::VelosiAstExpr;
+pub use flags::VelosiAstFlags;
+pub use interface::{VelosiAstInterface, VelosiAstInterfaceAction, VelosiAstInterfaceField};
 pub use method::VelosiAstMethod;
 pub use param::VelosiAstParam;
-pub use state::{VelosiAstFieldSlice, VelosiAstState, VelosiAstStateField};
+pub use slice::VelosiAstFieldSlice;
+pub use state::{VelosiAstState, VelosiAstStateField};
 pub use types::{VelosiAstType, VelosiAstTypeInfo};
 pub use unit::VelosiAstUnit;
 
@@ -65,6 +71,11 @@ pub enum VelosiAstNode {
     State(Rc<VelosiAstState>),
     StateField(Rc<VelosiAstStateField>),
     StateFieldSlice(Rc<VelosiAstFieldSlice>),
+    Interface(Rc<VelosiAstInterface>),
+    InterfaceField(Rc<VelosiAstInterfaceField>),
+    InterfaceFieldSlice(Rc<VelosiAstFieldSlice>),
+    Flags(Rc<VelosiAstFlags>),
+    Flag(Rc<VelosiAstIdentifier>),
 }
 
 impl VelosiAstNode {
@@ -78,6 +89,11 @@ impl VelosiAstNode {
             State(s) => s.loc(),
             StateField(sf) => sf.loc(),
             StateFieldSlice(sfs) => &sfs.loc,
+            Interface(i) => i.loc(),
+            InterfaceField(i) => i.loc(),
+            InterfaceFieldSlice(i) => &i.loc,
+            Flags(f) => &f.loc,
+            Flag(f) => &f.loc,
         }
     }
 }

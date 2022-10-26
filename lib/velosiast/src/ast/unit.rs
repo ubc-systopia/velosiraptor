@@ -37,11 +37,12 @@ use velosiparser::{
 
 use crate::ast::{
     types::{VelosiAstType, VelosiAstTypeInfo},
-    VelosiAstConst, VelosiAstMethod, VelosiAstNode, VelosiAstParam,
+    VelosiAstConst, VelosiAstInterface, VelosiAstMethod, VelosiAstNode, VelosiAstParam,
 };
 use crate::error::{VelosiAstErrBuilder, VelosiAstErrDoubleDef, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
 
+use super::flags::VelosiAstFlags;
 use super::{VelosiAstIdentifier, VelosiAstState};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -100,12 +101,16 @@ impl VelosiAstUnitSegment {
             None
         };
 
+        // TODO: handle the drivation...
+
         let mut methods_map = HashMap::new();
         let mut methods = Vec::new();
         let mut consts_map = HashMap::new();
         let mut consts = Vec::new();
         let mut inbitwidth = None;
         let mut outbitwidth = None;
+        let mut flags: Option<VelosiAstFlags> = None;
+        let mut interface: Option<Rc<VelosiAstInterface>> = None;
         let mut state: Option<Rc<VelosiAstState>> = None;
         for node in pt.nodes.into_iter() {
             match node {
@@ -129,7 +134,19 @@ impl VelosiAstUnitSegment {
                     utils::check_addressing_width(&mut issues, w, loc);
                     outbitwidth = Some(w);
                 }
-                VelosiParseTreeUnitNode::Flags(_flags) => (),
+                VelosiParseTreeUnitNode::Flags(f) => {
+                    let flgs = ast_result_unwrap!(VelosiAstFlags::from_parse_tree(f), issues);
+                    if let Some(f) = &flags {
+                        let err = VelosiAstErrDoubleDef::new(
+                            Rc::new(String::from("flags")),
+                            f.loc.clone(),
+                            flgs.loc.clone(),
+                        );
+                        issues.push(err.into());
+                    } else {
+                        flags = Some(flgs);
+                    }
+                }
                 VelosiParseTreeUnitNode::State(pst) => {
                     let s = Rc::new(ast_result_unwrap!(
                         VelosiAstState::from_parse_tree(pst, st),
@@ -146,7 +163,22 @@ impl VelosiAstUnitSegment {
                         state = Some(s);
                     }
                 }
-                VelosiParseTreeUnitNode::Interface(_interface) => (),
+                VelosiParseTreeUnitNode::Interface(pst) => {
+                    let s = Rc::new(ast_result_unwrap!(
+                        VelosiAstInterface::from_parse_tree(pst, st),
+                        issues
+                    ));
+                    if let Some(st) = &interface {
+                        let err = VelosiAstErrDoubleDef::new(
+                            Rc::new(String::from("state")),
+                            st.loc().clone(),
+                            s.loc().clone(),
+                        );
+                        issues.push(err.into());
+                    } else {
+                        interface = Some(s);
+                    }
+                }
                 VelosiParseTreeUnitNode::Method(method) => {
                     let m = Rc::new(ast_result_unwrap!(
                         VelosiAstMethod::from_parse_tree(method, st),

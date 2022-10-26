@@ -29,7 +29,10 @@ use std::rc::Rc;
 
 use velosiparser::VelosiTokenStream;
 
-use crate::ast::{VelosiAstFieldSlice, VelosiAstIdentifier, VelosiAstNode};
+use crate::ast::{
+    VelosiAstExpr, VelosiAstFieldSlice, VelosiAstIdentifier, VelosiAstInterfaceAction,
+    VelosiAstNode,
+};
 use crate::error::{VelosiAstErrBuilder, VelosiAstErrUndef, VelosiAstIssues};
 use crate::SymbolTable;
 
@@ -205,3 +208,55 @@ pub fn slice_overlap_check(
         }
     }
 }
+
+pub fn actions_conflict_check(issues: &mut VelosiAstIssues, actions: &[VelosiAstInterfaceAction]) {
+    let mut dst: Vec<(&str, &VelosiTokenStream)> = Vec::new();
+
+    for action in actions {
+        let ident = match &action.dst {
+            VelosiAstExpr::IdentLiteral(e) => e.ident_as_str(),
+            VelosiAstExpr::Slice(e) => e.ident_as_str(),
+            _ => "",
+        };
+
+        if ident.is_empty() {
+            continue;
+        }
+
+        for d in dst.iter() {
+            if d.0 == ident {
+                // they are equial, we have a conflict
+                let msg = format!("Conflicting action destination `{}`", action.dst);
+                let hint = "this destination of the action";
+                let related = "this is the other action that uses the same destination";
+                let err = VelosiAstErrBuilder::err(msg)
+                    .add_hint(hint.to_string())
+                    .add_location(action.loc.clone())
+                    .add_related_location(related.to_string(), d.1.clone())
+                    .build();
+                issues.push(err);
+            } else if d.0.starts_with(ident) || ident.starts_with(d.0) {
+                // the new one is the full field, or the old one is the full field
+                let msg = format!(
+                    "Conflicting action destination `{}` (full field)",
+                    action.dst
+                );
+                let hint = "this destination of the action";
+                let related = "this is the action that overlaps";
+                let err = VelosiAstErrBuilder::err(msg)
+                    .add_hint(hint.to_string())
+                    .add_location(action.loc.clone())
+                    .add_related_location(related.to_string(), d.1.clone())
+                    .build();
+                issues.push(err);
+            }
+        }
+
+        dst.push((ident, &action.loc));
+    }
+}
+
+// pub fn check_state_interface_fields(issues: &mut VelosiAstIssues, statefields: &[VelosiAstStateField], interfacefields: &[VelosiAstStateField])
+// {
+
+// }
