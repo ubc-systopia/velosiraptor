@@ -147,6 +147,8 @@ pub enum VelosiKeyword {
     //
     /// constant values
     Const,
+    /// constant values
+    Map,
     /// import statements
     Import,
     /// Null-like value
@@ -201,6 +203,7 @@ impl VelosiKeyword {
             VelosiKeyword::Invariant => "invariant",
             //
             VelosiKeyword::Const => "const",
+            VelosiKeyword::Map => "map",
             VelosiKeyword::Import => "import",
             //
             VelosiKeyword::None => "None",
@@ -256,6 +259,7 @@ impl<'a> TryFrom<&'a str> for VelosiKeyword {
             "invariant" => Ok(VelosiKeyword::Invariant),
             //
             "const" => Ok(VelosiKeyword::Const),
+            "mapdef" => Ok(VelosiKeyword::Map),
             "import" => Ok(VelosiKeyword::Import),
             //
             "None" => Ok(VelosiKeyword::None),
@@ -690,6 +694,8 @@ fn test_enum_str() {
 
     assert_eq!("const".try_into(), Ok(VelosiKeyword::Const));
     assert_eq!(VelosiKeyword::Const.as_str(), "const");
+    assert_eq!("mapdef".try_into(), Ok(VelosiKeyword::Map));
+    assert_eq!(VelosiKeyword::Map.as_str(), "mapdef");
     assert_eq!("import".try_into(), Ok(VelosiKeyword::Import));
     assert_eq!(VelosiKeyword::Import.as_str(), "import");
     assert_eq!("None".try_into(), Ok(VelosiKeyword::None));
