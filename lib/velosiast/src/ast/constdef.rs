@@ -63,6 +63,15 @@ impl VelosiAstConst {
         }
     }
 
+    pub fn new_int(ident: &str, value: u64) -> Self {
+        Self::new(
+            ident.into(),
+            VelosiAstType::new_int(),
+            VelosiAstExpr::NumLiteral(value.into()),
+            VelosiTokenStream::default(),
+        )
+    }
+
     pub fn ident_as_rc_string(&self) -> Rc<String> {
         self.ident.name.clone()
     }

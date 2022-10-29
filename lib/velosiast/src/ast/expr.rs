@@ -32,7 +32,7 @@ use std::rc::Rc;
 // used crate functionality
 use crate::ast::{VelosiAstIdentifier, VelosiAstNode, VelosiAstParam};
 use crate::error::{VelosiAstErrBuilder, VelosiAstErrUndef, VelosiAstIssues};
-use crate::{ast_result_return, ast_result_unwrap, AstResult, SymbolTable};
+use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, SymbolTable};
 use velosiparser::{
     VelosiParseTreeBinOp, VelosiParseTreeBinOpExpr, VelosiParseTreeBoolLiteral,
     VelosiParseTreeExpr, VelosiParseTreeFnCallExpr, VelosiParseTreeIdentifierLiteral,
@@ -793,6 +793,7 @@ impl VelosiAstIdentLiteralExpr {
         }
 
         let sym = sym.unwrap();
+
         match &sym.ast_node {
             VelosiAstNode::Const(c) => {
                 debug_assert!(c.value.is_const_expr());
@@ -819,6 +820,18 @@ impl VelosiAstIdentLiteralExpr {
                 );
                 AstResult::Issues(VelosiAstExpr::IdentLiteral(litexpr), err.into())
             }
+        }
+    }
+
+    pub fn flatten(self, st: &mut SymbolTable) -> VelosiAstExpr {
+        let sym = st.lookup(self.name.as_str());
+        if let Some(sym) = sym {
+            match &sym.ast_node {
+                VelosiAstNode::Const(c) => c.value.clone(),
+                _ => VelosiAstExpr::IdentLiteral(self),
+            }
+        } else {
+            VelosiAstExpr::IdentLiteral(self)
         }
     }
 
@@ -915,6 +928,12 @@ impl Display for VelosiAstNumLiteralExpr {
     }
 }
 
+impl From<u64> for VelosiAstNumLiteralExpr {
+    fn from(val: u64) -> Self {
+        Self::new(val, VelosiTokenStream::default())
+    }
+}
+
 /// Represents an boolean literal expression
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstBoolLiteralExpr {
@@ -993,6 +1012,15 @@ impl VelosiAstFnCallExpr {
         st: &mut SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
         let mut issues = VelosiAstIssues::new();
+        let e = ast_result_unwrap!(Self::from_parse_tree_raw(pt, st), issues);
+        ast_result_return!(VelosiAstExpr::FnCall(e), issues)
+    }
+
+    pub fn from_parse_tree_raw(
+        pt: VelosiParseTreeFnCallExpr,
+        st: &mut SymbolTable,
+    ) -> AstResult<Self, VelosiAstIssues> {
+        let mut issues = VelosiAstIssues::new();
 
         // process the function call arguments
         let mut args = Vec::with_capacity(pt.args.len());
@@ -1013,92 +1041,39 @@ impl VelosiAstFnCallExpr {
         if fn_sym.is_none() {
             // there was no symbol
             let err = VelosiAstErrUndef::new(res.name.name.clone(), res.loc.clone());
-            return AstResult::Issues(VelosiAstExpr::FnCall(res), err.into());
+            return AstResult::Issues(res, err.into());
         }
 
         let fn_sym = fn_sym.unwrap();
-        if let VelosiAstNode::Method(m) = &fn_sym.ast_node {
-            let nparam = m.params.len();
-            let nargs = res.args.len();
-
-            if nparam != nargs {
-                let msg = format!(
-                    "this function takes {} argument{} but {} argument{} supplied",
-                    nparam,
-                    if nparam == 1 { "" } else { "s" },
-                    nargs,
-                    if nargs == 1 { "s were" } else { " was" }
+        match &fn_sym.ast_node {
+            VelosiAstNode::Method(m) => {
+                utils::check_fn_call_args(&mut issues, st, m.params.as_slice(), res.args.as_slice())
+            }
+            VelosiAstNode::Unit(u) => {
+                utils::check_fn_call_args(&mut issues, st, u.params_as_slice(), res.args.as_slice())
+            }
+            _ => {
+                // we have the wrong kind of symbol
+                let err = VelosiAstErrUndef::with_other(
+                    res.name.name.clone(),
+                    res.loc.clone(),
+                    fn_sym.loc().clone(),
                 );
-
-                let (hint, loc) = if nparam < nargs {
-                    // too many arguments
-                    let hint = format!(
-                        "remove the {} unexpected argument{}",
-                        nargs - nparam,
-                        if nargs - nparam == 1 { "" } else { "s" }
-                    );
-                    let mut loc = res.args[nargs - nparam].loc().clone();
-                    loc.expand_until_end(res.args[nargs - 1].loc());
-                    (hint, loc)
-                } else {
-                    // to few arguments
-                    let hint = format!(
-                        "add the {} missing argument{}",
-                        nparam - nargs,
-                        if nparam - nargs == 1 { "" } else { "s" }
-                    );
-                    let loc = res.args[nargs].loc().clone();
-                    (hint, loc)
-                };
-                let err = VelosiAstErrBuilder::err(msg)
-                    .add_hint(hint)
-                    .add_location(loc)
-                    .add_related_location("method defined here".to_string(), m.loc.clone())
-                    .build();
-                issues.push(err);
+                issues.push(err.into());
             }
-
-            for (i, arg) in res.args.iter().enumerate() {
-                if i >= nparam {
-                    let msg = "unexpected argument";
-                    let hint = "remove this argument to the function call";
-                    let err = VelosiAstErrBuilder::err(msg.to_string())
-                        .add_hint(hint.to_string())
-                        .add_location(arg.loc().clone())
-                        .build();
-                    issues.push(err);
-                    continue;
-                }
-
-                let param = &m.params[i];
-                if !param.ptype.typeinfo.compatible(arg.result_type(st)) {
-                    let msg = "mismatched types";
-                    let hint = format!("expected {}, found {}", param.ptype, arg.result_type(st));
-                    let err = VelosiAstErrBuilder::err(msg.to_string())
-                        .add_hint(hint)
-                        .add_location(arg.loc().clone())
-                        .build();
-                    issues.push(err);
-                }
-            }
-        } else {
-            // we have the wrong kind of symbol
-            let err = VelosiAstErrUndef::with_other(
-                res.name.name.clone(),
-                res.loc.clone(),
-                fn_sym.loc().clone(),
-            );
-            issues.push(err.into());
         }
 
-        ast_result_return!(VelosiAstExpr::FnCall(res), issues)
+        ast_result_return!(res, issues)
     }
 
     pub fn flatten(self, st: &mut SymbolTable) -> VelosiAstExpr {
+        VelosiAstExpr::FnCall(self.flatten_raw(st))
+    }
+
+    pub fn flatten_raw(self, st: &mut SymbolTable) -> Self {
         let mut res = self.clone();
         res.args = self.args.into_iter().map(|a| a.flatten(st)).collect();
-
-        VelosiAstExpr::FnCall(res)
+        res
     }
 
     pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
@@ -1289,15 +1264,67 @@ pub struct VelosiAstRangeExpr {
 }
 
 impl VelosiAstRangeExpr {
+    pub fn new(start: u64, end: u64, loc: VelosiTokenStream) -> Self {
+        VelosiAstRangeExpr { start, end, loc }
+    }
     pub fn from_parse_tree(
-        _p: VelosiParseTreeRangeExpr,
-        _st: &mut SymbolTable,
+        pt: VelosiParseTreeRangeExpr,
+        st: &mut SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
-        panic!("nyi!");
+        let mut issues = VelosiAstIssues::new();
+        let e = ast_result_unwrap!(Self::from_parse_tree_raw(pt, st), issues);
+        ast_result_return!(VelosiAstExpr::Range(e), issues)
     }
 
-    pub fn flatten(self, _st: &mut SymbolTable) -> VelosiAstExpr {
-        VelosiAstExpr::Range(self)
+    pub fn from_parse_tree_raw(
+        pt: VelosiParseTreeRangeExpr,
+        _st: &mut SymbolTable,
+    ) -> AstResult<Self, VelosiAstIssues> {
+        let mut issues = VelosiAstIssues::new();
+
+        // check if we actually have a range
+        if pt.start == pt.end {
+            let msg = "Empty range.";
+            let hint = "Increase the end of the range";
+            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                .add_hint(hint.to_string())
+                .add_location(pt.loc.from_self_with_subrange(0..3))
+                .build();
+            issues.push(err);
+        }
+
+        // check if the range makes sense
+        if pt.start > pt.end {
+            let msg = "Start of range is smaller than the end.";
+            let hint = "Adjust the range bounds.";
+            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                .add_hint(hint.to_string())
+                .add_location(pt.loc.from_self_with_subrange(0..3))
+                .build();
+            issues.push(err);
+        }
+
+        ast_result_return!(Self::new(pt.start, pt.end, pt.loc), issues)
+    }
+
+    pub fn is_const(&self) -> bool {
+        true
+    }
+
+    pub fn try_get_start_limit(&self) -> Option<(u64, u64)> {
+        if self.end > 0 {
+            Some((self.start, self.end - 1))
+        } else {
+            None
+        }
+    }
+
+    pub fn flatten(self, st: &mut SymbolTable) -> VelosiAstExpr {
+        VelosiAstExpr::Range(self.flatten_raw(st))
+    }
+
+    pub fn flatten_raw(self, _st: &mut SymbolTable) -> Self {
+        self
     }
 
     pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
@@ -1512,6 +1539,7 @@ impl VelosiAstExpr {
             IfElse(e) => e.flatten(st),
             Slice(e) => e.flatten(st),
             Range(e) => e.flatten(st),
+            IdentLiteral(e) => e.flatten(st),
             _ => self,
         }
     }

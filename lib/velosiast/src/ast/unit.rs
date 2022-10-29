@@ -38,6 +38,7 @@ use velosiparser::{
 use crate::ast::{
     types::{VelosiAstType, VelosiAstTypeInfo},
     VelosiAstConst, VelosiAstInterface, VelosiAstMethod, VelosiAstNode, VelosiAstParam,
+    VelosiAstStaticMap,
 };
 use crate::error::{VelosiAstErrBuilder, VelosiAstErrDoubleDef, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
@@ -75,18 +76,6 @@ pub struct VelosiAstUnitSegment {
 }
 
 impl VelosiAstUnitSegment {
-    pub fn ident_as_rc_string(&self) -> Rc<String> {
-        self.ident.name.clone()
-    }
-
-    pub fn ident_as_str(&self) -> &str {
-        self.ident.name.as_str()
-    }
-
-    pub fn ident_to_string(&self) -> String {
-        self.ident.name.to_string()
-    }
-
     pub fn from_parse_tree(
         pt: VelosiParseTreeUnitDef,
         st: &mut SymbolTable,
@@ -103,9 +92,6 @@ impl VelosiAstUnitSegment {
                 VelosiAstParam::from_parse_tree(p, false, st),
                 issues
             ));
-
-            // here we want to check if the parameter are also defined on the unit level
-            // and whether the types match precisely
 
             // add the param to the symbol table, if it doesn't exist already
             if let Err(e) = st.insert(param.clone().into()) {
@@ -307,6 +293,22 @@ impl VelosiAstUnitSegment {
 
         ast_result_return!(VelosiAstUnit::Segment(res), issues)
     }
+
+    pub fn ident_as_rc_string(&self) -> Rc<String> {
+        self.ident.name.clone()
+    }
+
+    pub fn ident_as_str(&self) -> &str {
+        self.ident.name.as_str()
+    }
+
+    pub fn ident_to_string(&self) -> String {
+        self.ident.name.to_string()
+    }
+
+    pub fn params_as_slice(&self) -> &[Rc<VelosiAstParam>] {
+        self.params.as_slice()
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstUnitSegment]
@@ -332,7 +334,7 @@ impl Display for VelosiAstUnitSegment {
         }
 
         if self.consts.is_empty() {
-            writeln!(f, "// no constants")?;
+            writeln!(f, "  // no constants")?;
         }
         writeln!(f)?;
 
@@ -363,7 +365,7 @@ impl Display for VelosiAstUnitSegment {
         }
 
         if self.methods.is_empty() {
-            write!(f, "// no methods")?;
+            write!(f, "  // no methods")?;
         }
 
         write!(f, "\n}}")
@@ -374,11 +376,214 @@ impl Display for VelosiAstUnitSegment {
 pub struct VelosiAstUnitStaticMap {
     /// the name of the unit
     pub ident: VelosiAstIdentifier,
+    /// the parameters of the unit
+    pub params: Vec<Rc<VelosiAstParam>>,
+    /// the base class
+    pub derived: Option<Rc<VelosiAstIdentifier>>,
+
+    pub inbitwidth: u64,
+    pub outbitwidth: u64,
+
+    ///
+    pub consts: Vec<Rc<VelosiAstConst>>,
+    pub consts_map: HashMap<String, Rc<VelosiAstConst>>,
+
+    pub methods: Vec<Rc<VelosiAstMethod>>,
+    pub methods_map: HashMap<String, Rc<VelosiAstMethod>>,
+
+    pub map: VelosiAstStaticMap,
+
     /// the location of the type clause
     pub loc: VelosiTokenStream,
 }
 
 impl VelosiAstUnitStaticMap {
+    // converts the parse tree node into an ast node, performing checks
+    pub fn from_parse_tree(
+        pt: VelosiParseTreeUnitDef,
+        st: &mut SymbolTable,
+    ) -> AstResult<VelosiAstUnit, VelosiAstIssues> {
+        let mut issues = VelosiAstIssues::new();
+
+        // create a new context in the symbol table
+        st.create_context("unit".to_string());
+
+        // convert all the unit parameters
+        let mut params = Vec::new();
+        for p in pt.params.into_iter() {
+            let param = Rc::new(ast_result_unwrap!(
+                VelosiAstParam::from_parse_tree(p, false, st),
+                issues
+            ));
+
+            // add the param to the symbol table, if it doesn't exist already
+            if let Err(e) = st.insert(param.clone().into()) {
+                issues.push(e);
+            } else {
+                params.push(param);
+            }
+        }
+
+        let derived = if let Some(d) = pt.derived {
+            let d = VelosiAstIdentifier::from(d);
+            utils::check_type_exists(&mut issues, st, &d);
+            Some(Rc::new(d))
+        } else {
+            None
+        };
+
+        // TODO: handle the drivation...
+
+        let mut methods_map = HashMap::new();
+        let mut methods = Vec::new();
+        let mut consts_map = HashMap::new();
+        let mut consts = Vec::new();
+        let mut inbitwidth = None;
+        let mut outbitwidth = None;
+        let mut map: Option<VelosiAstStaticMap> = None;
+        for node in pt.nodes.into_iter() {
+            match node {
+                VelosiParseTreeUnitNode::Const(c) => {
+                    let c = Rc::new(ast_result_unwrap!(
+                        VelosiAstConst::from_parse_tree(c, st),
+                        issues
+                    ));
+                    if let Err(e) = st.insert(c.clone().into()) {
+                        issues.push(e);
+                    } else {
+                        consts.push(c.clone());
+                        consts_map.insert(c.ident_to_string(), c);
+                    }
+                }
+                VelosiParseTreeUnitNode::InBitWidth(w, loc) => {
+                    utils::check_addressing_width(&mut issues, w, loc.clone());
+                    inbitwidth = Some((w, loc));
+                }
+                VelosiParseTreeUnitNode::OutBitWidth(w, loc) => {
+                    utils::check_addressing_width(&mut issues, w, loc.clone());
+                    outbitwidth = Some((w, loc));
+                }
+                VelosiParseTreeUnitNode::Flags(f) => {
+                    let msg =
+                        "Ignored unit node: Flags definitions are not supported in StaticMaps.";
+                    let hint = "Remove the flags definition.";
+                    let err = VelosiAstErrBuilder::warn(msg.to_string())
+                        .add_hint(hint.to_string())
+                        .add_location(f.pos.clone())
+                        .build();
+                    issues.push(err);
+                }
+                VelosiParseTreeUnitNode::State(pst) => {
+                    let msg =
+                        "Ignored unit node: State definitions are not supported in StaticMaps.";
+                    let hint = "Remove the state definition.";
+                    let err = VelosiAstErrBuilder::warn(msg.to_string())
+                        .add_hint(hint.to_string())
+                        .add_location(pst.loc().clone())
+                        .build();
+                    issues.push(err);
+                }
+                VelosiParseTreeUnitNode::Interface(pst) => {
+                    let msg =
+                        "Ignored unit node: Interface definitions are not supported in StaticMaps.";
+                    let hint = "Remove the interface definition.";
+                    let err = VelosiAstErrBuilder::warn(msg.to_string())
+                        .add_hint(hint.to_string())
+                        .add_location(pst.loc().clone())
+                        .build();
+                    issues.push(err);
+                }
+                VelosiParseTreeUnitNode::Method(method) => {
+                    let m = Rc::new(ast_result_unwrap!(
+                        VelosiAstMethod::from_parse_tree(method, st),
+                        issues
+                    ));
+                    if let Err(e) = st.insert(m.clone().into()) {
+                        issues.push(e);
+                    } else {
+                        methods.push(m.clone());
+                        methods_map.insert(m.ident_to_string(), m);
+                    }
+                }
+                VelosiParseTreeUnitNode::Map(m) => {
+                    let s = ast_result_unwrap!(VelosiAstStaticMap::from_parse_tree(m, st), issues);
+                    if let Some(st) = &map {
+                        let err = VelosiAstErrDoubleDef::new(
+                            Rc::new(String::from("staticmap")),
+                            st.loc().clone(),
+                            s.loc().clone(),
+                        );
+                        issues.push(err.into());
+                    } else {
+                        // st.insert(s.clone().into())
+                        //     .expect("interface already exists in symbolt able?");
+                        map = Some(s);
+                    }
+                }
+            }
+        }
+
+        let loc = pt.loc.from_self_with_subrange(0..2);
+        let map = map.unwrap_or_else(|| {
+            let msg = "Map definition missing.";
+            let hint = "Add a `mapdef = ...` definition to the unit";
+            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                .add_location(loc)
+                .add_hint(hint.to_string())
+                .build();
+            issues.push(err);
+            VelosiAstStaticMap::default()
+        });
+
+        let inbitwidth = if let Some((ibw, loc)) = inbitwidth {
+            if ibw != map.inputsize() {
+                let msg = "Declared input address width doesn't match the size of the map.";
+                let hint = format!("Set this value to {}", map.inputsize());
+                let err = VelosiAstErrBuilder::warn(msg.to_string())
+                    .add_location(loc)
+                    .add_hint(hint)
+                    .build();
+                issues.push(err);
+                map.inputsize()
+            } else {
+                ibw
+            }
+        } else {
+            map.inputsize()
+        };
+
+        let outbitwidth = if let Some((obw, _loc)) = outbitwidth {
+            obw
+        } else {
+            let msg = "Unit has no output bitwidth definition. Assuming 64 bits.";
+            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                .add_location(pt.loc.from_self_with_subrange(0..1))
+                .build();
+            issues.push(err);
+
+            64
+        };
+
+        let res = Self {
+            ident: VelosiAstIdentifier::from(pt.name),
+            params,
+            derived,
+            inbitwidth,
+            outbitwidth,
+            consts,
+            consts_map,
+            methods,
+            methods_map,
+            map,
+            loc: pt.loc,
+        };
+
+        // and restore the context again.
+        st.drop_context();
+
+        ast_result_return!(VelosiAstUnit::StaticMap(res), issues)
+    }
+
     pub fn ident_as_rc_string(&self) -> Rc<String> {
         self.ident.name.clone()
     }
@@ -391,19 +596,57 @@ impl VelosiAstUnitStaticMap {
         self.ident.name.to_string()
     }
 
-    // converts the parse tree node into an ast node, performing checks
-    pub fn from_parse_tree(
-        _pt: VelosiParseTreeUnitDef,
-        _st: &mut SymbolTable,
-    ) -> AstResult<VelosiAstUnit, VelosiAstIssues> {
-        panic!("not implemented");
+    pub fn params_as_slice(&self) -> &[Rc<VelosiAstParam>] {
+        self.params.as_slice()
     }
 }
 
 /// Implementation of [Display] for [VelosiAstUnitStaticMap]
 impl Display for VelosiAstUnitStaticMap {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        writeln!(f, "StaticMap ...")
+        write!(f, "staticmap {} (", self.ident)?;
+        for (i, p) in self.params.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            Display::fmt(p, f)?;
+        }
+        write!(f, ")")?;
+        if let Some(d) = &self.derived {
+            write!(f, " : {}", d)?;
+        }
+        writeln!(f, " {{")?;
+
+        for c in &self.consts {
+            write!(f, "  ")?;
+            Display::fmt(c, f)?;
+            writeln!(f)?;
+        }
+
+        if self.consts.is_empty() {
+            writeln!(f, "  // no constants")?;
+        }
+        writeln!(f)?;
+
+        writeln!(f, "  inbitwidth = {};", self.inbitwidth)?;
+        writeln!(f, "  outbitwidth = {};\n", self.outbitwidth)?;
+
+        for (i, m) in self.methods.iter().enumerate() {
+            if i > 0 {
+                writeln!(f, "\n")?;
+            }
+            Display::fmt(m, f)?;
+        }
+
+        if self.methods.is_empty() {
+            write!(f, "  // no methods")?;
+        }
+
+        write!(f, "\n  mapdef = ")?;
+        Display::fmt(&self.map, f)?;
+        write!(f, ";")?;
+
+        write!(f, "\n}}")
     }
 }
 
@@ -426,6 +669,13 @@ impl VelosiAstUnit {
         }
     }
 
+    pub fn params_as_slice(&self) -> &[Rc<VelosiAstParam>] {
+        match self {
+            VelosiAstUnit::Segment(pt) => pt.params_as_slice(),
+            VelosiAstUnit::StaticMap(pt) => pt.params_as_slice(),
+        }
+    }
+
     pub fn ident_as_rc_string(&self) -> Rc<String> {
         match self {
             VelosiAstUnit::Segment(s) => s.ident_as_rc_string(),
@@ -444,6 +694,13 @@ impl VelosiAstUnit {
         match self {
             VelosiAstUnit::Segment(s) => s.ident_to_string(),
             VelosiAstUnit::StaticMap(s) => s.ident_to_string(),
+        }
+    }
+
+    pub fn input_bitwidth(&self) -> u64 {
+        match self {
+            VelosiAstUnit::Segment(s) => s.inbitwidth,
+            VelosiAstUnit::StaticMap(s) => s.inbitwidth,
         }
     }
 
