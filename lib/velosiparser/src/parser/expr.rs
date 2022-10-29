@@ -353,7 +353,9 @@ pub fn term_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiP
 /// `0..10` corresponds to the mathematical interval `[0, 10)`
 ///
 /// an arithmetic expression evalutes to a number a | b
-pub fn range_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
+pub fn range_expr(
+    input: VelosiTokenStream,
+) -> IResult<VelosiTokenStream, VelosiParseTreeRangeExpr> {
     let mut pos = input.clone();
     let (i, (s, _, e)) = tuple((num_lit_expr, dotdot, num_lit_expr))(input)?;
     pos.span_until_start(&i);
@@ -361,7 +363,8 @@ pub fn range_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Velosi
     match (s, e) {
         (VelosiParseTreeExpr::NumLiteral(s), VelosiParseTreeExpr::NumLiteral(e)) => {
             let range = VelosiParseTreeRangeExpr::new(s.value, e.value, pos);
-            Ok((i, VelosiParseTreeExpr::Range(range)))
+            Ok((i, range))
+            //Ok((i, VelosiParseTreeExpr::Range(range)))
         }
         _ => unreachable!(),
     }
@@ -455,14 +458,10 @@ pub fn slice_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Velosi
     let (i, (p, e)) = pair(ident_path, delimited(lbrack, cut(range_expr), cut(rbrack)))(input)?;
     pos.span_until_start(&i);
 
-    if let VelosiParseTreeExpr::Range(r) = e {
-        Ok((
-            i,
-            VelosiParseTreeExpr::Slice(VelosiParseTreeSliceExpr::new(p, r, pos)),
-        ))
-    } else {
-        unreachable!()
-    }
+    Ok((
+        i,
+        VelosiParseTreeExpr::Slice(VelosiParseTreeSliceExpr::new(p, e, pos)),
+    ))
 }
 
 fn ident_path(
@@ -543,14 +542,20 @@ pub fn expr_list(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vec<Vel
 ///  * `a.b(c)`
 ///
 pub fn fn_call_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
+    let (i, expr) = fn_call_expr_raw(input)?;
+    Ok((i, VelosiParseTreeExpr::FnCall(expr)))
+}
+
+pub fn fn_call_expr_raw(
+    input: VelosiTokenStream,
+) -> IResult<VelosiTokenStream, VelosiParseTreeFnCallExpr> {
     let mut pos = input.clone();
     let (i, id) = ident(input)?;
 
     let (i, args) = delimited(lparen, cut(expr_list), cut(rparen))(i)?;
 
     pos.span_until_start(&i);
-    let expr = VelosiParseTreeFnCallExpr::new(id, args, pos);
-    Ok((i, VelosiParseTreeExpr::FnCall(expr)))
+    Ok((i, VelosiParseTreeFnCallExpr::new(id, args, pos)))
 }
 
 /// parses a slice element expression

@@ -83,7 +83,7 @@ pub enum VelosiParseTreeInterfaceFieldNode {
     Layout(Vec<VelosiParseTreeFieldSlice>),
     ReadActions(VelosiParseTreeInterfaceActions),
     WriteActions(VelosiParseTreeInterfaceActions),
-    ReadWriteActions(VelosiParseTreeInterfaceActions),
+    // ReadWriteActions(VelosiParseTreeInterfaceActions),
 }
 
 impl Display for VelosiParseTreeInterfaceFieldNode {
@@ -102,11 +102,10 @@ impl Display for VelosiParseTreeInterfaceFieldNode {
             VelosiParseTreeInterfaceFieldNode::WriteActions(a) => {
                 writeln!(f, "      WriteActions {{")?;
                 Display::fmt(a, f)?;
-            }
-            VelosiParseTreeInterfaceFieldNode::ReadWriteActions(a) => {
-                writeln!(f, "      ReadWriteActions {{")?;
-                Display::fmt(a, f)?;
-            }
+            } // VelosiParseTreeInterfaceFieldNode::ReadWriteActions(a) => {
+              //     writeln!(f, "      ReadWriteActions {{")?;
+              //     Display::fmt(a, f)?;
+              // }
         }
         write!(f, "      }}")
     }

@@ -203,6 +203,7 @@ macro_rules! keywordparser (($vis:vis $name:ident, $tag: expr) => (
 //keywordparser!(pub kw_unit, VelosiKeyword::Unit);
 keywordparser!(pub kw_import, VelosiKeyword::Import);
 keywordparser!(pub kw_const, VelosiKeyword::Const);
+keywordparser!(pub kw_map, VelosiKeyword::Map);
 // keywordparser!(pub kw_let, VelosiKeyword::Let);
 keywordparser!(pub kw_if, VelosiKeyword::If);
 keywordparser!(pub kw_else, VelosiKeyword::Else);

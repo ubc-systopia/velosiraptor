@@ -29,13 +29,14 @@
 //  3. List Comprehension with explicit address ranges.
 
 use crate::error::IResult;
-use crate::parser::expr::{expr, fn_call_expr, range_expr};
+use crate::parser::expr::{expr, fn_call_expr_raw, range_expr};
 use crate::parser::terminals::{
-    assign, at, comma, fatarrow, ident, kw_for, kw_in, kw_staticmap, lbrack, rbrack, semicolon,
+    assign, at, comma, fatarrow, ident, kw_for, kw_in, kw_map, lbrack, rbrack, semicolon,
 };
 use crate::parsetree::{
-    VelosiParseTreeExpr, VelosiParseTreeMap, VelosiParseTreeMapElement, VelosiParseTreeMapExplicit,
-    VelosiParseTreeMapListComp, VelosiParseTreeUnitNode,
+    VelosiParseTreeExpr, VelosiParseTreeFnCallExpr, VelosiParseTreeMap, VelosiParseTreeMapElement,
+    VelosiParseTreeMapExplicit, VelosiParseTreeMapListComp, VelosiParseTreeRangeExpr,
+    VelosiParseTreeUnitNode,
 };
 use crate::VelosiTokenStream;
 
@@ -58,7 +59,7 @@ use nom::{
 ///  - `map = [UnitA(x) for x in 1..2]`
 ///
 pub fn staticmap(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
-    let (i1, _) = kw_staticmap(input)?;
+    let (i1, _) = kw_map(input)?;
     let (i2, m) = cut(delimited(
         assign,
         alt((explicitmap, listcomprehensionmap)),
@@ -88,10 +89,8 @@ fn explicitmap(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPar
 
     pos.span_until_start(&i1);
 
-    Ok((
-        i1,
-        VelosiParseTreeMap::Explicit(VelosiParseTreeMapExplicit::new(elms, pos)),
-    ))
+    let map = VelosiParseTreeMapExplicit::new(elms, pos);
+    Ok((i1, VelosiParseTreeMap::Explicit(Box::new(map))))
 }
 
 /// Parses the body of a list comprehension map
@@ -122,7 +121,7 @@ fn listcomprehensionmap(
     pos.span_until_start(&i1);
 
     let map = VelosiParseTreeMapListComp::new(elm, id, expr, pos);
-    Ok((i1, VelosiParseTreeMap::ListComp(map)))
+    Ok((i1, VelosiParseTreeMap::ListComp(Box::new(map))))
 }
 
 /// parses a map elemenet
@@ -155,7 +154,7 @@ fn map_element(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPar
 /// # Example
 ///
 ///  - `0..0x1000 =>`
-fn map_src(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
+fn map_src(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeRangeExpr> {
     terminated(range_expr, cut(fatarrow))(input)
 }
 
@@ -171,8 +170,8 @@ fn map_src(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTr
 ///
 fn map_dst(
     input: VelosiTokenStream,
-) -> IResult<VelosiTokenStream, (VelosiParseTreeExpr, Option<VelosiParseTreeExpr>)> {
-    let (i1, cons) = fn_call_expr(input)?;
+) -> IResult<VelosiTokenStream, (VelosiParseTreeFnCallExpr, Option<VelosiParseTreeExpr>)> {
+    let (i1, cons) = fn_call_expr_raw(input)?;
     // get the offset
     let (i2, offset) = opt(preceded(at, expr))(i1)?;
 
