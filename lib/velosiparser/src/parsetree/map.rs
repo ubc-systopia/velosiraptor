@@ -32,14 +32,17 @@
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 // use crate functionality
-use crate::parsetree::{VelosiParseTreeExpr, VelosiParseTreeIdentifier};
+use crate::parsetree::{
+    VelosiParseTreeExpr, VelosiParseTreeFnCallExpr, VelosiParseTreeIdentifier,
+    VelosiParseTreeRangeExpr,
+};
 use crate::VelosiTokenStream;
 
 /// Represents possible nodes in the unit definitions
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum VelosiParseTreeMap {
-    ListComp(VelosiParseTreeMapListComp),
-    Explicit(VelosiParseTreeMapExplicit),
+    ListComp(Box<VelosiParseTreeMapListComp>),
+    Explicit(Box<VelosiParseTreeMapExplicit>),
 }
 
 impl VelosiParseTreeMap {
@@ -93,7 +96,7 @@ impl Display for VelosiParseTreeMapExplicit {
 pub struct VelosiParseTreeMapListComp {
     pub elm: VelosiParseTreeMapElement,
     pub var: VelosiParseTreeIdentifier,
-    pub range: VelosiParseTreeExpr,
+    pub range: VelosiParseTreeRangeExpr,
     pub loc: VelosiTokenStream,
 }
 
@@ -101,7 +104,7 @@ impl VelosiParseTreeMapListComp {
     pub fn new(
         elm: VelosiParseTreeMapElement,
         var: VelosiParseTreeIdentifier,
-        range: VelosiParseTreeExpr,
+        range: VelosiParseTreeRangeExpr,
         loc: VelosiTokenStream,
     ) -> Self {
         Self {
@@ -122,16 +125,16 @@ impl Display for VelosiParseTreeMapListComp {
 /// Represents possible nodes in the unit definitions
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeMapElement {
-    pub src: Option<VelosiParseTreeExpr>,
-    pub dst: VelosiParseTreeExpr,
+    pub src: Option<VelosiParseTreeRangeExpr>,
+    pub dst: VelosiParseTreeFnCallExpr,
     pub offset: Option<VelosiParseTreeExpr>,
     pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeMapElement {
     pub fn new(
-        src: Option<VelosiParseTreeExpr>,
-        dst: VelosiParseTreeExpr,
+        src: Option<VelosiParseTreeRangeExpr>,
+        dst: VelosiParseTreeFnCallExpr,
         offset: Option<VelosiParseTreeExpr>,
         loc: VelosiTokenStream,
     ) -> Self {

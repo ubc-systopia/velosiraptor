@@ -166,7 +166,7 @@ fn inbitwidth_clause(
     let (i2, n) = cut(delimited(assign, num, semicolon))(i1)?;
 
     pos.span_until_start(&i2);
-    Ok((i2, VelosiParseTreeUnitNode::OutBitWidth(n, pos)))
+    Ok((i2, VelosiParseTreeUnitNode::InBitWidth(n, pos)))
 }
 
 /// parses the output bitwidth clause of the unit
