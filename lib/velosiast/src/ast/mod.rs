@@ -44,6 +44,7 @@ mod constdef;
 mod expr;
 mod flags;
 mod interface;
+mod map;
 mod method;
 mod param;
 mod slice;
@@ -55,6 +56,7 @@ pub use constdef::VelosiAstConst;
 pub use expr::VelosiAstExpr;
 pub use flags::VelosiAstFlags;
 pub use interface::{VelosiAstInterface, VelosiAstInterfaceAction, VelosiAstInterfaceField};
+pub use map::{VelosiAstStaticMap, VelosiAstStaticMapElement};
 pub use method::VelosiAstMethod;
 pub use param::VelosiAstParam;
 pub use slice::VelosiAstFieldSlice;
@@ -124,6 +126,12 @@ impl VelosiAstIdentifier {
     }
 }
 
+impl From<&str> for VelosiAstIdentifier {
+    fn from(id: &str) -> Self {
+        Self::new(id.to_string(), VelosiTokenStream::default())
+    }
+}
+
 impl From<VelosiParseTreeIdentifier> for VelosiAstIdentifier {
     fn from(id: VelosiParseTreeIdentifier) -> Self {
         Self::new(id.name, id.loc)
@@ -140,26 +148,42 @@ impl Display for VelosiAstIdentifier {
 /// Defines the root note of the ast
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstRoot {
-    pub consts: HashMap<String, Rc<VelosiAstConst>>,
-    pub units: HashMap<String, Rc<VelosiAstUnit>>,
+    pub consts: Vec<Rc<VelosiAstConst>>,
+    pub consts_map: HashMap<String, Rc<VelosiAstConst>>,
+    pub units: Vec<Rc<VelosiAstUnit>>,
+    pub units_map: HashMap<String, Rc<VelosiAstUnit>>,
     pub context: String,
 }
 
 impl VelosiAstRoot {
     pub fn new(context: String) -> Self {
         Self {
-            consts: HashMap::new(),
-            units: HashMap::new(),
+            consts: Vec::new(),
+            consts_map: HashMap::new(),
+            units: Vec::new(),
+            units_map: HashMap::new(),
             context,
         }
     }
 
     pub fn add_const(&mut self, c: VelosiAstConst) {
-        self.consts.insert(c.ident_to_string(), Rc::new(c));
+        let c = Rc::new(c);
+        self.add_const_rc(c)
+    }
+
+    fn add_const_rc(&mut self, c: Rc<VelosiAstConst>) {
+        self.consts_map.insert(c.ident_to_string(), c.clone());
+        self.consts.push(c);
     }
 
     pub fn add_unit(&mut self, u: VelosiAstUnit) {
-        self.units.insert(u.ident_to_string(), Rc::new(u));
+        let u = Rc::new(u);
+        self.add_unit_rc(u);
+    }
+
+    pub fn add_unit_rc(&mut self, u: Rc<VelosiAstUnit>) {
+        self.units_map.insert(u.ident_to_string(), u.clone());
+        self.units.push(u);
     }
 
     pub fn from_parse_tree(pt: VelosiParseTree) -> AstResult<VelosiAstRoot, VelosiAstIssues> {
@@ -182,7 +206,7 @@ impl VelosiAstRoot {
                     if let Err(e) = st.insert(c.clone().into()) {
                         issues.push(e);
                     } else {
-                        root.consts.insert(c.ident_to_string(), c);
+                        root.add_const_rc(c);
                     }
                 }
                 VelosiParseTreeContextNode::Unit(u) => {
@@ -193,7 +217,7 @@ impl VelosiAstRoot {
                     if let Err(e) = st.insert(c.clone().into()) {
                         issues.push(e);
                     } else {
-                        root.units.insert(c.ident_to_string(), c);
+                        root.add_unit_rc(c);
                     }
                 }
                 VelosiParseTreeContextNode::Import(_i) => {
@@ -216,7 +240,7 @@ impl Display for VelosiAstRoot {
         )?;
         writeln!(f, "\nConsts:")?;
 
-        for c in self.consts.values() {
+        for c in self.consts.iter() {
             writeln!(f)?;
             Display::fmt(c, f)?;
             writeln!(f)?;
@@ -228,7 +252,7 @@ impl Display for VelosiAstRoot {
 
         writeln!(f, "\nUnits:")?;
 
-        for u in self.units.values() {
+        for u in self.units.iter() {
             writeln!(f)?;
             Display::fmt(u, f)?;
             writeln!(f)?;

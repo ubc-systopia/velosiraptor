@@ -30,9 +30,12 @@
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
-use velosiparser::{VelosiParseTreeParam, VelosiTokenStream};
+use velosiparser::{VelosiParseTreeIdentifier, VelosiParseTreeParam, VelosiTokenStream};
 
-use crate::ast::{types::VelosiAstType, VelosiAstIdentifier, VelosiAstNode};
+use crate::ast::{
+    types::{VelosiAstType, VelosiAstTypeInfo},
+    VelosiAstIdentifier, VelosiAstNode,
+};
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
 
@@ -90,6 +93,24 @@ impl VelosiAstParam {
         }
 
         let res = Self::new(ident, ptype, pt.loc);
+        ast_result_return!(res, issues)
+    }
+
+    pub fn from_parse_tree_ident(
+        pt: VelosiParseTreeIdentifier,
+        ti: VelosiAstTypeInfo,
+        _st: &mut SymbolTable,
+    ) -> AstResult<Self, VelosiAstIssues> {
+        let mut issues = VelosiAstIssues::new();
+
+        let loc = pt.loc.clone();
+        let ptype = VelosiAstType::new(ti, pt.loc.clone());
+        let ident = VelosiAstIdentifier::from(pt);
+
+        // check whether the name is in the right format
+        utils::check_snake_case(&mut issues, &ident);
+
+        let res = Self::new(ident, ptype, loc);
         ast_result_return!(res, issues)
     }
 }
