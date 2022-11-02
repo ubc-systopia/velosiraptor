@@ -309,6 +309,26 @@ impl VelosiAstUnitSegment {
     pub fn params_as_slice(&self) -> &[Rc<VelosiAstParam>] {
         self.params.as_slice()
     }
+
+    pub fn get_method(&self, name: &str) -> Option<&Rc<VelosiAstMethod>> {
+        self.methods_map.get(name)
+    }
+
+    pub fn vaddr_max(&self) -> u64 {
+        if self.inbitwidth < 64 {
+            (1u64 << self.inbitwidth) - 1
+        } else {
+            u64::MAX
+        }
+    }
+
+    pub fn paddr_max(&self) -> u64 {
+        if self.outbitwidth < 64 {
+            (1u64 << self.outbitwidth) - 1
+        } else {
+            u64::MAX
+        }
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstUnitSegment]
@@ -584,6 +604,10 @@ impl VelosiAstUnitStaticMap {
         ast_result_return!(VelosiAstUnit::StaticMap(res), issues)
     }
 
+    pub fn get_method(&self, name: &str) -> Option<&Rc<VelosiAstMethod>> {
+        self.methods_map.get(name)
+    }
+
     pub fn ident_as_rc_string(&self) -> Rc<String> {
         self.ident.name.clone()
     }
@@ -598,6 +622,22 @@ impl VelosiAstUnitStaticMap {
 
     pub fn params_as_slice(&self) -> &[Rc<VelosiAstParam>] {
         self.params.as_slice()
+    }
+
+    pub fn vaddr_max(&self) -> u64 {
+        if self.inbitwidth < 64 {
+            (1u64 << self.inbitwidth) - 1
+        } else {
+            u64::MAX
+        }
+    }
+
+    pub fn paddr_max(&self) -> u64 {
+        if self.outbitwidth < 64 {
+            (1u64 << self.outbitwidth) - 1
+        } else {
+            u64::MAX
+        }
     }
 }
 
@@ -669,42 +709,88 @@ impl VelosiAstUnit {
         }
     }
 
-    pub fn params_as_slice(&self) -> &[Rc<VelosiAstParam>] {
-        match self {
-            VelosiAstUnit::Segment(pt) => pt.params_as_slice(),
-            VelosiAstUnit::StaticMap(pt) => pt.params_as_slice(),
-        }
-    }
-
     pub fn ident_as_rc_string(&self) -> Rc<String> {
+        use VelosiAstUnit::*;
         match self {
-            VelosiAstUnit::Segment(s) => s.ident_as_rc_string(),
-            VelosiAstUnit::StaticMap(s) => s.ident_as_rc_string(),
+            Segment(s) => s.ident_as_rc_string(),
+            StaticMap(s) => s.ident_as_rc_string(),
         }
     }
 
     pub fn ident_as_str(&self) -> &str {
+        use VelosiAstUnit::*;
         match self {
-            VelosiAstUnit::Segment(s) => s.ident_as_str(),
-            VelosiAstUnit::StaticMap(s) => s.ident_as_str(),
+            Segment(s) => s.ident_as_str(),
+            StaticMap(s) => s.ident_as_str(),
         }
     }
 
     pub fn ident_to_string(&self) -> String {
+        use VelosiAstUnit::*;
         match self {
-            VelosiAstUnit::Segment(s) => s.ident_to_string(),
-            VelosiAstUnit::StaticMap(s) => s.ident_to_string(),
+            Segment(s) => s.ident_to_string(),
+            StaticMap(s) => s.ident_to_string(),
+        }
+    }
+
+    pub fn params_as_slice(&self) -> &[Rc<VelosiAstParam>] {
+        use VelosiAstUnit::*;
+        match self {
+            Segment(pt) => pt.params_as_slice(),
+            StaticMap(pt) => pt.params_as_slice(),
         }
     }
 
     pub fn input_bitwidth(&self) -> u64 {
+        use VelosiAstUnit::*;
         match self {
-            VelosiAstUnit::Segment(s) => s.inbitwidth,
-            VelosiAstUnit::StaticMap(s) => s.inbitwidth,
+            Segment(s) => s.inbitwidth,
+            StaticMap(s) => s.inbitwidth,
+        }
+    }
+
+    pub fn vaddr_max(&self) -> u64 {
+        use VelosiAstUnit::*;
+        match self {
+            StaticMap(staticmap) => staticmap.vaddr_max(),
+            Segment(segment) => segment.vaddr_max(),
+        }
+    }
+
+    pub fn paddr_max(&self) -> u64 {
+        use VelosiAstUnit::*;
+        match self {
+            StaticMap(staticmap) => staticmap.paddr_max(),
+            Segment(segment) => segment.paddr_max(),
+        }
+    }
+
+    pub fn methods(&self) -> &[Rc<VelosiAstMethod>] {
+        use VelosiAstUnit::*;
+        match self {
+            StaticMap(staticmap) => staticmap.methods.as_slice(),
+            Segment(segment) => segment.methods.as_slice(),
+        }
+    }
+
+    pub fn get_method(&self, name: &str) -> Option<&Rc<VelosiAstMethod>> {
+        use VelosiAstUnit::*;
+        match self {
+            StaticMap(staticmap) => staticmap.get_method(name),
+            Segment(segment) => segment.get_method(name),
+        }
+    }
+
+    pub fn consts(&self) -> &[Rc<VelosiAstConst>] {
+        use VelosiAstUnit::*;
+        match self {
+            StaticMap(staticmap) => staticmap.consts.as_slice(),
+            Segment(segment) => segment.consts.as_slice(),
         }
     }
 
     pub fn loc(&self) -> &VelosiTokenStream {
+        use VelosiAstUnit::*;
         match self {
             VelosiAstUnit::Segment(s) => &s.loc,
             VelosiAstUnit::StaticMap(s) => &s.loc,

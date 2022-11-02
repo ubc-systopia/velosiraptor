@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! # VelosiLexer -- The Velosiraptor Lexer Example Programm
+//! # VelosiAst -- The Velosiraptor Ast Example Programm
 //!
 //! This example program
 
@@ -48,7 +48,7 @@ pub fn main() {
         }
         2 => VelosiParser::parse_file(&args[1]),
         _ => {
-            println!("Usage: velosiparser [file]");
+            println!("Usage: velosiast [file]");
             println!("Usage: echo \"foo\" | velosiparser");
             return;
         }

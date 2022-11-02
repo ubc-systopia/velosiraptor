@@ -27,7 +27,7 @@
 //!
 //! This module defines the Constant AST nodes of the langauge
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
@@ -52,11 +52,20 @@ use super::expr::VelosiAstIdentLiteralExpr;
 // Actions
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Represents a state field
+/// Defines an action that is executed on the interface
+///
+/// An action defines a read access to the state or a write access to the state. The latter
+/// basically triggers a state transition.
+///
+/// Currently an action is basically an assignment that assigns the destination the value of the
+/// source. If the destination is a StateRef, then this src => dst
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstInterfaceAction {
+    /// the source operand of the action
     pub src: VelosiAstExpr,
+    /// the destination operand of the action (lvalue expression)
     pub dst: VelosiAstExpr,
+    /// the location where the action was defined
     pub loc: VelosiTokenStream,
 }
 
@@ -85,10 +94,139 @@ impl VelosiAstInterfaceAction {
             issues.push(err);
         }
 
+        // the types must match
+        if !dst.result_type(st).compatible(src.result_type(st)) {
+            let msg = "type mismatch";
+            let hint = format!(
+                "Cannot assign value of type `{}` to `{}`",
+                src.result_type(st),
+                dst.result_type(st)
+            );
+            let err = VelosiAstErrBuilder::err(msg.to_string())
+                .add_hint(hint)
+                .add_location(dst.loc().clone())
+                .build();
+            issues.push(err);
+        }
+
+        // we can only assign number types for now
+        if !src.result_type(st).is_numeric() {
+            let msg = "unsupported type";
+            let hint = format!(
+                "Expected a numeric or boolean type, but got `{}`",
+                src.result_type(st),
+            );
+            let err = VelosiAstErrBuilder::err(msg.to_string())
+                .add_hint(hint)
+                .add_location(src.loc().clone())
+                .build();
+            issues.push(err);
+        }
+
+        // TODO: check the bit overflow
+
         ast_result_return!(VelosiAstInterfaceAction::new(src, dst, pt.loc), issues)
+    }
+
+    /// handles state accesses with a state reference in the destination
+    ///
+    /// # Example
+    ///
+    ///  - `interface.field.slice -> state.field.slice;`
+    ///  - `interface.field       -> state.field.slice;`
+    ///  - `interface.field.slice -> state.field;`
+    ///  - `interface.field       -> state.field;`
+    ///  -  `1                    -> state.field.slice;
+    ///  -  `1                    -> state.field;
+    pub fn get_iface_refs_for_state_update(
+        &self,
+        state_syms: &HashSet<Rc<String>>,
+        state_bits: &HashMap<Rc<String>, u64>,
+        if_bits: &HashMap<Rc<String>, u64>,
+    ) -> HashSet<Rc<String>> {
+        // TODO: here we should build the transitive closure of the
+        //       state references. As the state can be update by moving
+        //       data from one state field to another.
+
+        let mut dst_refs = HashSet::new();
+        self.dst.get_state_references(&mut dst_refs);
+        if dst_refs.is_empty() {
+            // there were no stare references
+            return dst_refs;
+        }
+
+        let mut src_refs = HashSet::new();
+        self.src.get_interface_references(&mut src_refs);
+        if src_refs.is_empty() {
+            // there were no interface references
+            return dst_refs;
+        }
+
+        // we should not have multiple state or interface references in an lvalue
+        debug_assert!(dst_refs.len() == 1);
+        debug_assert!(src_refs.len() == 1);
+
+        let dst_ref = dst_refs.iter().next().unwrap();
+        let dst_ref_parts = dst_ref.split('.').collect::<Vec<&str>>();
+
+        debug_assert_eq!(dst_ref_parts[0], "state");
+
+        let src_ref = src_refs.iter().next().unwrap();
+        let src_ref_parts = src_ref.split('.').collect::<Vec<&str>>();
+
+        debug_assert_eq!(src_ref_parts[0], "interface");
+
+        match (src_ref_parts.len(), dst_ref_parts.len()) {
+            //  - `interface.field.slice -> state.field.slice;`
+            (3, 3) => {
+                // one-to-one match, we simply take the interface reference here.
+                if state_syms.contains(dst_ref) {
+                    src_refs
+                } else {
+                    HashSet::new()
+                }
+            }
+            //  - `interface.field       -> state.field.slice;`
+            (2, 3) => {
+                //HashSet::new()
+                // somehow here we could filter out slices > number of bits...
+                if state_syms.contains(dst_ref) {
+                    src_refs
+                } else {
+                    HashSet::new()
+                }
+            }
+            //  - `interface.field.slice -> state.field;`
+            (3, 2) => {
+                let bits = state_bits.get(dst_ref).unwrap();
+                if *bits != 0 {
+                    src_refs
+                } else {
+                    HashSet::new()
+                }
+            }
+            //  - `interface.field       -> state.field;`
+            (2, 2) => {
+                // add the interface elements that actually match the used state elements.
+                let mut res = HashSet::new();
+                //res.insert(src_ref.clone());
+                let bits = state_bits.get(dst_ref).unwrap();
+                for (fld, b) in if_bits {
+                    if bits & b != 0 {
+                        res.insert(fld.clone());
+                    } else {
+                    }
+                }
+                res
+            }
+            _ => {
+                panic!("unsupported state access: {} -> {}", self.src, self.dst);
+            }
+        }
     }
 }
 
+/// implementation of trait [Display] for [VelosiAstInterfaceAction]
 impl Display for VelosiAstInterfaceAction {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "{} -> {}", self.src, self.dst)
@@ -99,6 +237,7 @@ impl Display for VelosiAstInterfaceAction {
 // Nodes
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Represents the sorted and filtered list of interface field nodes
 struct FieldNodes {
     pub layout: Vec<Rc<VelosiAstFieldSlice>>,
     pub readactions: Vec<VelosiAstInterfaceAction>,
@@ -308,7 +447,7 @@ fn handle_nodes(
 pub struct VelosiAstInterfaceMemoryField {
     /// the name of the unit
     pub ident: VelosiAstIdentifier,
-    /// the size of the field
+    /// the size of the field in bytes
     pub size: u64,
     /// base this field is part of
     pub base: VelosiAstIdentifier,
@@ -327,34 +466,6 @@ pub struct VelosiAstInterfaceMemoryField {
 }
 
 impl VelosiAstInterfaceMemoryField {
-    pub fn new(
-        ident: VelosiAstIdentifier,
-        size: u64,
-        base: VelosiAstIdentifier,
-        offset: u64,
-        layout: Vec<Rc<VelosiAstFieldSlice>>,
-        readactions: Vec<VelosiAstInterfaceAction>,
-        writeactions: Vec<VelosiAstInterfaceAction>,
-        loc: VelosiTokenStream,
-    ) -> Self {
-        let mut layout_map = HashMap::new();
-        for slice in &layout {
-            layout_map.insert(slice.ident_to_string(), slice.clone());
-        }
-
-        Self {
-            ident,
-            size,
-            base,
-            offset,
-            layout,
-            layout_map,
-            readactions,
-            writeactions,
-            loc,
-        }
-    }
-
     pub fn from_parse_tree(
         pt: VelosiParseTreeInterfaceFieldMemory,
         st: &mut SymbolTable,
@@ -373,16 +484,17 @@ impl VelosiAstInterfaceMemoryField {
         utils::check_param_exists(&mut issues, st, &base);
 
         // create dummy memory field
-        let n = Self::new(
-            ident.clone(),
+        let n = Self {
+            ident: ident.clone(),
             size,
-            base.clone(),
-            pt.offset,
-            vec![],
-            vec![],
-            vec![],
-            pt.loc.clone(),
-        );
+            base: base.clone(),
+            offset: pt.offset,
+            layout: vec![],
+            layout_map: HashMap::new(),
+            readactions: vec![],
+            writeactions: vec![],
+            loc: pt.loc.clone(),
+        };
 
         let s = Symbol::new(
             ident.name.clone(),
@@ -411,17 +523,23 @@ impl VelosiAstInterfaceMemoryField {
             issues
         );
 
+        let mut layout_map = HashMap::new();
+        for slice in &nodes.layout {
+            layout_map.insert(slice.ident_to_string(), slice.clone());
+        }
+
         // construct the ast node and return
-        let res = Self::new(
+        let res = Self {
             ident,
             size,
             base,
             offset,
-            nodes.layout,
-            nodes.readactions,
-            nodes.writeactions,
-            pt.loc,
-        );
+            layout: nodes.layout,
+            layout_map,
+            readactions: nodes.readactions,
+            writeactions: nodes.writeactions,
+            loc: pt.loc,
+        };
 
         // remove the symbol again.
         st.remove(res.ident.as_str());
@@ -439,6 +557,23 @@ impl VelosiAstInterfaceMemoryField {
 
     pub fn ident_to_string(&self) -> String {
         self.ident.name.to_string()
+    }
+
+    pub fn accessing_state(
+        &self,
+        state_syms: &HashSet<Rc<String>>,
+        state_bits: &HashMap<Rc<String>, u64>,
+        if_bits: &HashMap<Rc<String>, u64>,
+    ) -> HashSet<Rc<String>> {
+        let mut res = HashSet::new();
+        for action in &self.readactions {
+            res.extend(action.get_iface_refs_for_state_update(state_syms, state_bits, if_bits));
+        }
+
+        for action in &self.writeactions {
+            res.extend(action.get_iface_refs_for_state_update(state_syms, state_bits, if_bits));
+        }
+        res
     }
 }
 
@@ -503,7 +638,7 @@ impl Display for VelosiAstInterfaceMemoryField {
 pub struct VelosiAstInterfaceMmioField {
     /// the name of the unit
     pub ident: VelosiAstIdentifier,
-    /// the size of the field
+    /// the size of the field in bytes
     pub size: u64,
     /// base this field is part of
     pub base: VelosiAstIdentifier,
@@ -522,34 +657,6 @@ pub struct VelosiAstInterfaceMmioField {
 }
 
 impl VelosiAstInterfaceMmioField {
-    pub fn new(
-        ident: VelosiAstIdentifier,
-        size: u64,
-        base: VelosiAstIdentifier,
-        offset: u64,
-        layout: Vec<Rc<VelosiAstFieldSlice>>,
-        readactions: Vec<VelosiAstInterfaceAction>,
-        writeactions: Vec<VelosiAstInterfaceAction>,
-        loc: VelosiTokenStream,
-    ) -> Self {
-        let mut layout_map = HashMap::new();
-        for slice in &layout {
-            layout_map.insert(slice.ident_to_string(), slice.clone());
-        }
-
-        Self {
-            ident,
-            size,
-            base,
-            offset,
-            layout,
-            layout_map,
-            readactions,
-            writeactions,
-            loc,
-        }
-    }
-
     pub fn from_parse_tree(
         pt: VelosiParseTreeInterfaceFieldMmio,
         st: &mut SymbolTable,
@@ -568,16 +675,17 @@ impl VelosiAstInterfaceMmioField {
         utils::check_param_exists(&mut issues, st, &base);
 
         // create dummy memory field
-        let n = Self::new(
-            ident.clone(),
+        let n = Self {
+            ident: ident.clone(),
             size,
-            base.clone(),
-            pt.offset,
-            vec![],
-            vec![],
-            vec![],
-            pt.loc.clone(),
-        );
+            base: base.clone(),
+            offset: pt.offset,
+            layout: vec![],
+            layout_map: HashMap::new(),
+            readactions: vec![],
+            writeactions: vec![],
+            loc: pt.loc.clone(),
+        };
 
         let s = Symbol::new(
             ident.name.clone(),
@@ -606,17 +714,23 @@ impl VelosiAstInterfaceMmioField {
             issues
         );
 
+        let mut layout_map = HashMap::new();
+        for slice in &nodes.layout {
+            layout_map.insert(slice.ident_to_string(), slice.clone());
+        }
+
         // construct the ast node and return
-        let res = Self::new(
+        let res = Self {
             ident,
             size,
             base,
             offset,
-            nodes.layout,
-            nodes.readactions,
-            nodes.writeactions,
-            pt.loc,
-        );
+            layout: nodes.layout,
+            layout_map,
+            readactions: nodes.readactions,
+            writeactions: nodes.writeactions,
+            loc: pt.loc,
+        };
 
         // remove the dummy symbol again.
         st.remove(res.ident.as_str());
@@ -698,7 +812,7 @@ impl Display for VelosiAstInterfaceMmioField {
 pub struct VelosiAstInterfaceRegisterField {
     /// the name of the unit
     pub ident: VelosiAstIdentifier,
-    /// the size of the field
+    /// the size of the field in bytes
     pub size: u64,
     /// layout of the field
     pub layout: Vec<Rc<VelosiAstFieldSlice>>,

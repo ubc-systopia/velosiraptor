@@ -187,12 +187,17 @@ pub fn slice_overlap_check(
 ) {
     let mut bits: Vec<Option<Rc<VelosiAstFieldSlice>>> = vec![None; sizebits as usize];
     for slice in slices {
-        for i in (slice.start as usize)..(slice.end as usize) {
+        for (i, e) in bits
+            .iter_mut()
+            .enumerate()
+            .take(slice.end as usize)
+            .skip(slice.start as usize)
+        {
             // overflow captured at another place
             if i >= sizebits as usize {
                 break;
             }
-            if let Some(s) = &bits[i] {
+            if let Some(s) = e {
                 let msg = format!("Field slices overlap at bit {}", i);
                 let hint = format!("This slices overlaps with slice `{}`", s.ident);
                 let related = "This is the slice that overlaps with.";
@@ -204,7 +209,7 @@ pub fn slice_overlap_check(
                 issues.push(err);
                 break;
             }
-            bits[i] = Some(slice.clone());
+            *e = Some(slice.clone());
         }
     }
 }
