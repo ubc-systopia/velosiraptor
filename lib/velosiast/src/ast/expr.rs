@@ -394,16 +394,14 @@ impl VelosiAstBinOpExpr {
         VelosiAstBinOpExpr::new(lhs, self.op, rhs, self.loc).eval()
     }
 
-    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
-        let mut res = self.lhs.get_interface_references();
-        res.extend(self.rhs.get_interface_references());
-        res
+    pub fn get_interface_references(&self, irefs: &mut HashSet<Rc<String>>) {
+        self.lhs.get_interface_references(irefs);
+        self.rhs.get_interface_references(irefs);
     }
 
-    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
-        let mut res = self.lhs.get_state_references();
-        res.extend(self.rhs.get_state_references());
-        res
+    pub fn get_state_references(&self, srefs: &mut HashSet<Rc<String>>) {
+        self.lhs.get_state_references(srefs);
+        self.rhs.get_state_references(srefs);
     }
 
     pub fn has_state_references(&self) -> bool {
@@ -586,12 +584,12 @@ impl VelosiAstUnOpExpr {
         }
     }
 
-    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
-        self.expr.get_interface_references()
+    pub fn get_interface_references(&self, irefs: &mut HashSet<Rc<String>>) {
+        self.expr.get_interface_references(irefs);
     }
 
-    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
-        self.expr.get_state_references()
+    pub fn get_state_references(&self, srefs: &mut HashSet<Rc<String>>) {
+        self.expr.get_state_references(srefs);
     }
 
     pub fn has_state_references(&self) -> bool {
@@ -707,12 +705,12 @@ impl VelosiAstQuantifierExpr {
         panic!("nyi");
     }
 
-    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
-        self.expr.get_interface_references()
+    pub fn get_interface_references(&self, irefs: &mut HashSet<Rc<String>>) {
+        self.expr.get_interface_references(irefs);
     }
 
-    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
-        self.expr.get_state_references()
+    pub fn get_state_references(&self, srefs: &mut HashSet<Rc<String>>) {
+        self.expr.get_state_references(srefs);
     }
 
     pub fn has_state_references(&self) -> bool {
@@ -851,20 +849,16 @@ impl VelosiAstIdentLiteralExpr {
         self.name.to_string()
     }
 
-    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
-        let mut res = HashSet::new();
+    pub fn get_interface_references(&self, irefs: &mut HashSet<Rc<String>>) {
         if self.has_interface_references() {
-            res.insert(self.name.clone());
+            irefs.insert(self.name.clone());
         }
-        res
     }
 
-    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
-        let mut res = HashSet::new();
+    pub fn get_state_references(&self, srefs: &mut HashSet<Rc<String>>) {
         if self.has_state_references() {
-            res.insert(self.name.clone());
+            srefs.insert(self.name.clone());
         }
-        res
     }
 
     pub fn has_state_references(&self) -> bool {
@@ -904,12 +898,12 @@ impl VelosiAstNumLiteralExpr {
         AstResult::Ok(VelosiAstExpr::NumLiteral(e))
     }
 
-    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
-        HashSet::new()
+    pub fn get_interface_references(&self, _irefs: &mut HashSet<Rc<String>>) {
+        /* no-op */
     }
 
-    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
-        HashSet::new()
+    pub fn get_state_references(&self, _srefs: &mut HashSet<Rc<String>>) {
+        /* no-op */
     }
 
     pub fn has_state_references(&self) -> bool {
@@ -955,12 +949,12 @@ impl VelosiAstBoolLiteralExpr {
         AstResult::Ok(VelosiAstExpr::BoolLiteral(e))
     }
 
-    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
-        HashSet::new()
+    pub fn get_interface_references(&self, _irefs: &mut HashSet<Rc<String>>) {
+        /* no-op */
     }
 
-    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
-        HashSet::new()
+    pub fn get_state_references(&self, _srefs: &mut HashSet<Rc<String>>) {
+        /* no op */
     }
 
     pub fn has_state_references(&self) -> bool {
@@ -1030,7 +1024,7 @@ impl VelosiAstFnCallExpr {
         }
 
         // construct the default function call expression node
-        let res = VelosiAstFnCallExpr::new(
+        let mut res = VelosiAstFnCallExpr::new(
             VelosiAstIdentifier::from(pt.name),
             args,
             VelosiAstTypeInfo::Integer,
@@ -1047,10 +1041,22 @@ impl VelosiAstFnCallExpr {
         let fn_sym = fn_sym.unwrap();
         match &fn_sym.ast_node {
             VelosiAstNode::Method(m) => {
-                utils::check_fn_call_args(&mut issues, st, m.params.as_slice(), res.args.as_slice())
+                utils::check_fn_call_args(
+                    &mut issues,
+                    st,
+                    m.params.as_slice(),
+                    res.args.as_slice(),
+                );
+                res.etype = m.rtype.typeinfo.clone();
             }
             VelosiAstNode::Unit(u) => {
-                utils::check_fn_call_args(&mut issues, st, u.params_as_slice(), res.args.as_slice())
+                utils::check_fn_call_args(
+                    &mut issues,
+                    st,
+                    u.params_as_slice(),
+                    res.args.as_slice(),
+                );
+                res.etype = VelosiAstTypeInfo::TypeRef(u.ident_as_rc_string());
             }
             _ => {
                 // we have the wrong kind of symbol
@@ -1076,20 +1082,16 @@ impl VelosiAstFnCallExpr {
         res
     }
 
-    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
-        let res = HashSet::new();
-        self.args.iter().fold(res, |mut acc, a| {
-            acc.extend(a.get_interface_references());
-            acc
-        })
+    pub fn get_interface_references(&self, irefs: &mut HashSet<Rc<String>>) {
+        for a in self.args.iter() {
+            a.get_interface_references(irefs);
+        }
     }
 
-    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
-        let res = HashSet::new();
-        self.args.iter().fold(res, |mut acc, a| {
-            acc.extend(a.get_state_references());
-            acc
-        })
+    pub fn get_state_references(&self, srefs: &mut HashSet<Rc<String>>) {
+        for a in self.args.iter() {
+            a.get_state_references(srefs);
+        }
     }
 
     pub fn has_state_references(&self) -> bool {
@@ -1210,18 +1212,16 @@ impl VelosiAstIfElseExpr {
         }
     }
 
-    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
-        let mut res = self.then.get_interface_references();
-        res.extend(self.other.get_interface_references());
-        res.extend(self.cond.get_interface_references());
-        res
+    pub fn get_interface_references(&self, irefs: &mut HashSet<Rc<String>>) {
+        self.then.get_interface_references(irefs);
+        self.other.get_interface_references(irefs);
+        self.cond.get_interface_references(irefs);
     }
 
-    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
-        let mut res = self.then.get_state_references();
-        res.extend(self.other.get_state_references());
-        res.extend(self.cond.get_state_references());
-        res
+    pub fn get_state_references(&self, srefs: &mut HashSet<Rc<String>>) {
+        self.then.get_state_references(srefs);
+        self.other.get_state_references(srefs);
+        self.cond.get_state_references(srefs);
     }
 
     pub fn has_state_references(&self) -> bool {
@@ -1327,12 +1327,12 @@ impl VelosiAstRangeExpr {
         self
     }
 
-    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
-        HashSet::new()
+    pub fn get_interface_references(&self, _irefs: &mut HashSet<Rc<String>>) {
+        /* no-op */
     }
 
-    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
-        HashSet::new()
+    pub fn get_state_references(&self, _srefs: &mut HashSet<Rc<String>>) {
+        /* no-op */
     }
 
     pub fn has_state_references(&self) -> bool {
@@ -1420,16 +1420,14 @@ impl VelosiAstSliceExpr {
         self.name.ident_to_string()
     }
 
-    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
-        let mut res = self.name.get_interface_references();
-        res.extend(self.range.get_interface_references());
-        res
+    pub fn get_interface_references(&self, irefs: &mut HashSet<Rc<String>>) {
+        self.name.get_interface_references(irefs);
+        self.range.get_interface_references(irefs);
     }
 
-    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
-        let mut res = self.name.get_state_references();
-        res.extend(self.range.get_state_references());
-        res
+    pub fn get_state_references(&self, srefs: &mut HashSet<Rc<String>>) {
+        self.name.get_state_references(srefs);
+        self.range.get_state_references(srefs);
     }
 
     pub fn has_state_references(&self) -> bool {
@@ -1576,36 +1574,36 @@ impl VelosiAstExpr {
         }
     }
 
-    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
+    pub fn get_state_references(&self, srefs: &mut HashSet<Rc<String>>) {
         use VelosiAstExpr::*;
         match self {
-            IdentLiteral(i) => i.get_state_references(),
-            NumLiteral(i) => i.get_state_references(),
-            BoolLiteral(i) => i.get_state_references(),
-            BinOp(i) => i.get_state_references(),
-            UnOp(i) => i.get_state_references(),
-            Quantifier(i) => i.get_state_references(),
-            FnCall(i) => i.get_state_references(),
-            IfElse(i) => i.get_state_references(),
-            Slice(i) => i.get_state_references(),
-            Range(i) => i.get_state_references(),
-        }
+            IdentLiteral(i) => i.get_state_references(srefs),
+            NumLiteral(i) => i.get_state_references(srefs),
+            BoolLiteral(i) => i.get_state_references(srefs),
+            BinOp(i) => i.get_state_references(srefs),
+            UnOp(i) => i.get_state_references(srefs),
+            Quantifier(i) => i.get_state_references(srefs),
+            FnCall(i) => i.get_state_references(srefs),
+            IfElse(i) => i.get_state_references(srefs),
+            Slice(i) => i.get_state_references(srefs),
+            Range(i) => i.get_state_references(srefs),
+        };
     }
 
-    pub fn get_interface_references(&self) -> HashSet<Rc<String>> {
+    pub fn get_interface_references(&self, irefs: &mut HashSet<Rc<String>>) {
         use VelosiAstExpr::*;
         match self {
-            IdentLiteral(i) => i.get_interface_references(),
-            NumLiteral(i) => i.get_interface_references(),
-            BoolLiteral(i) => i.get_interface_references(),
-            BinOp(i) => i.get_interface_references(),
-            UnOp(i) => i.get_interface_references(),
-            Quantifier(i) => i.get_interface_references(),
-            FnCall(i) => i.get_interface_references(),
-            IfElse(i) => i.get_interface_references(),
-            Slice(i) => i.get_interface_references(),
-            Range(i) => i.get_interface_references(),
-        }
+            IdentLiteral(i) => i.get_interface_references(irefs),
+            NumLiteral(i) => i.get_interface_references(irefs),
+            BoolLiteral(i) => i.get_interface_references(irefs),
+            BinOp(i) => i.get_interface_references(irefs),
+            UnOp(i) => i.get_interface_references(irefs),
+            Quantifier(i) => i.get_interface_references(irefs),
+            FnCall(i) => i.get_interface_references(irefs),
+            IfElse(i) => i.get_interface_references(irefs),
+            Slice(i) => i.get_interface_references(irefs),
+            Range(i) => i.get_interface_references(irefs),
+        };
     }
 
     // converts a boolean expression into the conjunctive normal form

@@ -120,6 +120,18 @@ impl VelosiAstFieldSlice {
     pub fn ident_to_string(&self) -> String {
         self.ident.name.to_string()
     }
+
+    /// constructs the mask value of the bit slice
+    ///
+    /// # Example
+    /// start = 0, end = 3 -> 0xf
+    pub fn mask(&self) -> u64 {
+        let mut mask = 0;
+        for i in self.start..=self.end {
+            mask |= 1 << i;
+        }
+        mask
+    }
 }
 
 /// Implementation fo the [From] trait for [Symbol] for conversion to symbol

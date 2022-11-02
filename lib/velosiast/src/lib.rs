@@ -33,7 +33,7 @@
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
 // public re-exports
-pub use velosiparser::VelosiTokenStream;
+pub use velosiparser::{VelosiParser, VelosiParserError, VelosiTokenStream};
 
 // crate modules
 mod ast;
@@ -89,7 +89,13 @@ impl VelosiAst {
     pub fn from_parse_tree(ptree: VelosiParseTree) -> AstResult<VelosiAst, VelosiAstIssues> {
         match VelosiAstRoot::from_parse_tree(ptree) {
             AstResult::Ok(root) => AstResult::Ok(VelosiAst { root }),
-            AstResult::Issues(root, issues) => AstResult::Issues(VelosiAst { root }, issues),
+            AstResult::Issues(root, issues) => {
+                if issues.has_errors() {
+                    AstResult::Err(issues)
+                } else {
+                    AstResult::Issues(VelosiAst { root }, issues)
+                }
+            }
             AstResult::Err(issues) => AstResult::Err(issues),
         }
     }

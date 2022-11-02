@@ -27,7 +27,7 @@
 //!
 //! This module defines the Method AST nodes of the langauge
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
@@ -101,12 +101,11 @@ impl VelosiAstMethod {
         let mut issues = VelosiAstIssues::new();
 
         // create a new context in the symbol table
-        st.create_context("unit".to_string());
-
-        let name = VelosiAstIdentifier::from(pt.name);
-        utils::check_snake_case(&mut issues, &name);
+        st.create_context("method".to_string());
 
         // check whether the name is in the right format
+        let name = VelosiAstIdentifier::from(pt.name);
+        utils::check_snake_case(&mut issues, &name);
 
         // convert all the unit parameters
         let mut params = Vec::new();
@@ -171,15 +170,66 @@ impl VelosiAstMethod {
         let mut requires = Vec::new();
         for p in pt.requires.into_iter() {
             let exp = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(p, st), issues);
+
+            if !exp.result_type(st).is_boolean() {
+                // check that the expression is boolean
+                let msg = "Requires clause has incompatible type ";
+                let hint = format!("Expected boolean, found {}", exp.result_type(st));
+                let err = VelosiAstErrBuilder::err(msg.to_string())
+                    .add_hint(hint)
+                    .add_location(exp.loc().clone())
+                    .build();
+                issues.push(err);
+            }
+
+            if exp.has_interface_references() {
+                // TODO: could make this a bit better by highlighting the interface reference
+                let msg = "Interface references are not allowed in requires clauses.";
+                let hint = "Remove interface reference from the predicate";
+                let err = VelosiAstErrBuilder::err(msg.to_string())
+                    .add_hint(hint.to_string())
+                    .add_location(exp.loc().clone())
+                    .build();
+                issues.push(err);
+            }
+
             let exp = exp.into_cnf(st);
             requires.extend(exp.split_cnf());
         }
 
         let body = if let Some(b) = pt.body {
-            Some(ast_result_unwrap!(
-                VelosiAstExpr::from_parse_tree(b, st),
-                issues
-            ))
+            let body = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(b, st), issues);
+
+            // check the return type matches the body
+            if !rtype.typeinfo.compatible(body.result_type(st)) {
+                let msg = "Method body has incomptaible type. ";
+                let hint = if rtype.is_boolean() {
+                    format!("Expected boolean, found {}", body.result_type(st))
+                } else {
+                    format!(
+                        "Expected [`bool`, `int`, `size`, `addr`], found {}",
+                        body.result_type(st)
+                    )
+                };
+                let err = VelosiAstErrBuilder::err(msg.to_string())
+                    .add_hint(hint)
+                    .add_location(body.loc().clone())
+                    .build();
+                issues.push(err);
+            }
+
+            if body.has_interface_references() {
+                // TODO: could make this a bit better by highlighting the interface reference
+                let msg = "Interface references are not allowed in method bodies";
+                let hint = "Remove interface reference from the expression";
+                let err = VelosiAstErrBuilder::err(msg.to_string())
+                    .add_hint(hint.to_string())
+                    .add_location(body.loc().clone())
+                    .build();
+                issues.push(err);
+            }
+
+            Some(body)
         } else {
             None
         };
@@ -189,6 +239,72 @@ impl VelosiAstMethod {
 
         let res = Self::new(name, rtype, params, requires, body, pt.pos);
         ast_result_return!(res, issues)
+    }
+
+    /// returns a set of state references made by this method's body
+    ///
+    /// # Arguments
+    ///
+    /// * `self`  -  reference of the method
+    ///
+    /// # Return Value
+    ///
+    /// Hash set of strings containing state references in state.field.slice format
+    ///
+    pub fn get_state_references_in_body(&self) -> HashSet<Rc<String>> {
+        if let Some(body) = &self.body {
+            let mut srefs = HashSet::new();
+            body.get_state_references(&mut srefs);
+            srefs
+        } else {
+            HashSet::new()
+        }
+    }
+
+    /// returns a set of state references made by this method's preconditions
+    ///
+    /// # Arguments
+    ///
+    /// * `self`  -  reference of the method
+    ///
+    /// # Return Value
+    ///
+    /// Hash set of strings containing state references in state.field.slice format
+    ///
+    pub fn get_state_references_in_preconditions(&self) -> HashSet<Rc<String>> {
+        let mut srefs = HashSet::new();
+        for p in self.requires.iter() {
+            p.get_state_references(&mut srefs);
+        }
+        srefs
+    }
+
+    /// returns a set of state references made by this method
+    ///
+    /// This includes references made by the statements of the method body,
+    /// and the ensures and requires clauses by the methods
+    ///
+    /// # Arguments
+    ///
+    /// * `self`  -  reference of the method
+    ///
+    /// # Return Value
+    ///
+    /// Hash set of strings containing all state references
+    ///
+    pub fn get_state_references(&self) -> HashSet<Rc<String>> {
+        let mut srefs = self.get_state_references_in_body();
+        srefs.extend(self.get_state_references_in_preconditions());
+        srefs
+    }
+
+    /// obtains the names of method parameters that are of the flags type
+    pub fn get_flag_param_names(&self) -> Vec<Rc<String>> {
+        self.params
+            .iter()
+            .filter(|p| p.ptype.is_flags())
+            .map(|p| p.ident_as_rc_string())
+            .collect()
     }
 }
 

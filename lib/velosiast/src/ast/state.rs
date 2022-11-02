@@ -27,7 +27,7 @@
 //!
 //! This module defines the State AST nodes of the langauge
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
@@ -154,6 +154,17 @@ impl VelosiAstStateMemoryField {
     pub fn ident_to_string(&self) -> String {
         self.ident.name.to_string()
     }
+
+    /// obtains a bitmask for the refrenced slices in the supplied refs
+    pub fn get_slice_mask_for_refs(&self, refs: &HashSet<Rc<String>>) -> u64 {
+        self.layout.iter().fold(0, |acc, slice| {
+            if refs.contains(&slice.ident.name) {
+                acc | slice.mask()
+            } else {
+                acc
+            }
+        })
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstStateMemoryField]
@@ -263,6 +274,17 @@ impl VelosiAstStateRegisterField {
     pub fn ident_to_string(&self) -> String {
         self.ident.name.to_string()
     }
+
+    /// obtains a bitmask for the refrenced slices in the supplied refs
+    pub fn get_slice_mask_for_refs(&self, refs: &HashSet<Rc<String>>) -> u64 {
+        self.layout.iter().fold(0, |acc, slice| {
+            if refs.contains(&slice.ident.name) {
+                acc | slice.mask()
+            } else {
+                acc
+            }
+        })
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstStateRegisterField]
@@ -326,6 +348,13 @@ impl VelosiAstStateField {
         match self {
             VelosiAstStateField::Memory(field) => &field.loc,
             VelosiAstStateField::Register(field) => &field.loc,
+        }
+    }
+
+    pub fn get_slice_mask_for_refs(&self, refs: &HashSet<Rc<String>>) -> u64 {
+        match self {
+            VelosiAstStateField::Memory(field) => field.get_slice_mask_for_refs(refs),
+            VelosiAstStateField::Register(field) => field.get_slice_mask_for_refs(refs),
         }
     }
 
@@ -443,6 +472,8 @@ impl VelosiAstStateDef {
             }
             // we don't need to add those to the symbol table, as they are expected to match
             params.push(param);
+
+            // TODO: check that we don't have any double-defined parameters!
         }
 
         let mut fields = Vec::new();
@@ -483,6 +514,19 @@ impl VelosiAstStateDef {
 
         let res = Self::new(params, fields, pt.loc);
         ast_result_return!(VelosiAstState::StateDef(res), issues)
+    }
+
+    /// obtains the state slice refs for the
+    pub fn get_field_slice_refs(&self, refs: &HashSet<Rc<String>>) -> HashMap<Rc<String>, u64> {
+        let mut hs = HashMap::new();
+        for f in &self.fields {
+            if refs.contains(&f.ident_as_rc_string()) {
+                hs.insert(f.ident_as_rc_string(), 0xffff_ffff_ffff_ffff);
+            } else {
+                hs.insert(f.ident_as_rc_string(), f.get_slice_mask_for_refs(refs));
+            }
+        }
+        hs
     }
 }
 
@@ -530,10 +574,36 @@ impl VelosiAstState {
         "state"
     }
 
+    pub fn is_none_state(&self) -> bool {
+        matches!(self, VelosiAstState::NoneState(_))
+    }
+
+    pub fn nfields(&self) -> usize {
+        use VelosiAstState::*;
+        match self {
+            StateDef(s) => s.fields.len(),
+            NoneState(_) => 0,
+        }
+    }
+
     pub fn loc(&self) -> &VelosiTokenStream {
         match self {
             VelosiAstState::StateDef(s) => &s.loc,
             VelosiAstState::NoneState(s) => s,
+        }
+    }
+
+    pub fn fields(&self) -> &[Rc<VelosiAstStateField>] {
+        match self {
+            VelosiAstState::StateDef(s) => s.fields.as_slice(),
+            VelosiAstState::NoneState(_s) => &[],
+        }
+    }
+
+    pub fn get_field_slice_refs(&self, refs: &HashSet<Rc<String>>) -> HashMap<Rc<String>, u64> {
+        match self {
+            VelosiAstState::StateDef(s) => s.get_field_slice_refs(refs),
+            VelosiAstState::NoneState(_s) => HashMap::new(),
         }
     }
 }
