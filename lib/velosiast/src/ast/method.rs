@@ -34,10 +34,19 @@ use std::rc::Rc;
 use velosiparser::{VelosiParseTreeMethod, VelosiTokenStream};
 
 use crate::ast::{
-    types::VelosiAstType, VelosiAstExpr, VelosiAstIdentifier, VelosiAstNode, VelosiAstParam,
+    VelosiAstExpr, VelosiAstIdentifier, VelosiAstNode, VelosiAstParam, VelosiAstType,
+    VelosiAstTypeInfo,
 };
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
+
+/// the signature of the translate function
+const FN_SIG_TRANSLATE: &str = "fn translate(va: vaddr) -> addr";
+const FN_SIG_MATCHFLAGS: &str = "fn matchflags(flgs:flags) -> bool";
+const FN_SIG_MAP: &str = "fn map(va: vaddr, sz: size, flgs: flags, pa: addr)";
+const FN_SIG_UNMAP: &str = "fn unmap(va: vaddr, sz: size)";
+const FN_SIG_PROTECT: &str = "fn protect(va: vaddr, sz: size, flgs: flags)";
+const FN_SIG_INIT: &str = "fn init()";
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstMethod {
@@ -155,16 +164,22 @@ impl VelosiAstMethod {
         }
 
         // obtain the type information, must be a built-in type
-        let rtype = ast_result_unwrap!(VelosiAstType::from_parse_tree(pt.rettype, st), issues);
-        if !rtype.is_builtin() || rtype.is_flags() {
-            let msg = "Unsupported type. Function returns only support of the built-in types.";
-            let hint = "Change this type to one of [`bool`, `int`, `size`, `addr`].";
-            let err = VelosiAstErrBuilder::err(msg.to_string())
-                .add_hint(hint.to_string())
-                .add_location(rtype.loc.clone())
-                .build();
-            issues.push(err);
-        }
+        let rtype = if let Some(rtype) = pt.rettype {
+            let rtype = ast_result_unwrap!(VelosiAstType::from_parse_tree(rtype, st), issues);
+            if !rtype.is_builtin() || rtype.is_flags() {
+                let msg = "Unsupported type. Function returns only support of the built-in types.";
+                let hint = "Change this type to one of [`bool`, `int`, `size`, `addr`].";
+                let err = VelosiAstErrBuilder::err(msg.to_string())
+                    .add_hint(hint.to_string())
+                    .add_location(rtype.loc.clone())
+                    .build();
+                issues.push(err);
+            }
+            rtype
+        } else {
+            // if no return type is specified, we assume it is void
+            VelosiAstType::new_void()
+        };
 
         // convert all the unit parameters
         let mut requires = Vec::new();
@@ -205,6 +220,8 @@ impl VelosiAstMethod {
                 let msg = "Method body has incomptaible type. ";
                 let hint = if rtype.is_boolean() {
                     format!("Expected boolean, found {}", body.result_type(st))
+                } else if rtype.is_void() {
+                    format!("Expected (), found {}", body.result_type(st))
                 } else {
                     format!(
                         "Expected [`bool`, `int`, `size`, `addr`], found {}",
@@ -238,7 +255,140 @@ impl VelosiAstMethod {
         st.drop_context();
 
         let res = Self::new(name, rtype, params, requires, body, pt.pos);
+
+        // perform additional checks for one of the special methods
+        res.check_special_methods(&mut issues);
+
         ast_result_return!(res, issues)
+    }
+
+    /// checks whether the method's return type match the given signature
+    ///
+    /// # Arguments
+    ///
+    /// * `self`  - reference of the method
+    /// * `sig`   - the signature of the method (just a string)
+    /// * `ty`    - the expected return type of the parameter (produces error)
+    ///
+    /// # Return Value
+    ///
+    /// The number of issues found with the return type
+    ///
+    fn check_rettype(&self, issues: &mut VelosiAstIssues, sig: &str, ty: VelosiAstTypeInfo) {
+        if self.rtype.typeinfo != ty {
+            let msg = format!("mismatched return type in special method: `{}`", sig);
+            let hint = format!("expected {}, found {}", ty, self.rtype.typeinfo);
+            let err = VelosiAstErrBuilder::err(msg)
+                .add_hint(hint)
+                .add_location(self.rtype.loc.clone())
+                .build();
+            issues.push(err);
+        }
+    }
+
+    fn check_arguments_exact(
+        &self,
+        issues: &mut VelosiAstIssues,
+        sig: &str,
+        params: &[(&str, VelosiAstTypeInfo)],
+    ) {
+        if self.params.len() != params.len() {
+            let msg = format!(
+                "mismatched number of parameter in special method: `{}`",
+                sig
+            );
+            let hint = format!("expected {}, found {}", params.len(), self.params.len());
+            let err = VelosiAstErrBuilder::err(msg)
+                .add_hint(hint)
+                .add_location(self.loc.clone())
+                .build();
+            issues.push(err);
+        }
+
+        for (i, p) in self.params.iter().enumerate() {
+            if i >= params.len() {
+                let msg = format!("unexpected parameter in special method: `{}`", sig);
+                let hint = "remove this parameter of the function";
+                let err = VelosiAstErrBuilder::err(msg)
+                    .add_hint(hint.to_string())
+                    .add_location(p.loc.clone())
+                    .build();
+                issues.push(err);
+                continue;
+            }
+            if p.ident_as_str() != params[i].0 {
+                let msg = format!("mismatch of parameter name in special method: `{}`", sig);
+                let hint = format!("expected {}, found {}", params[i].0, p.ident_as_str());
+                let err = VelosiAstErrBuilder::err(msg)
+                    .add_hint(hint)
+                    .add_location(p.loc.clone())
+                    .build();
+                issues.push(err);
+            }
+
+            if p.ptype.typeinfo != params[i].1 {
+                let msg = format!("mismatch of parameter type in special method: `{}`", sig);
+                let hint = format!("expected {}, found {}", params[i].1, p.ptype);
+                let err = VelosiAstErrBuilder::err(msg.to_string())
+                    .add_hint(hint)
+                    .add_location(p.loc.clone())
+                    .build();
+                issues.push(err);
+            }
+        }
+    }
+
+    fn check_special_methods(&self, issues: &mut VelosiAstIssues) {
+        match self.ident_as_str() {
+            "translate" => {
+                self.check_rettype(issues, FN_SIG_TRANSLATE, VelosiAstTypeInfo::PhysAddr);
+                self.check_arguments_exact(
+                    issues,
+                    FN_SIG_TRANSLATE,
+                    &[("va", VelosiAstTypeInfo::VirtAddr)],
+                );
+            }
+            "matchflags" => {
+                // fn matchflags(flgs: flags) -> bool
+                self.check_rettype(issues, FN_SIG_MATCHFLAGS, VelosiAstTypeInfo::Bool);
+                self.check_arguments_exact(
+                    issues,
+                    FN_SIG_MATCHFLAGS,
+                    &[("flgs", VelosiAstTypeInfo::Flags)],
+                );
+            }
+            "map" => {
+                // fn map(va: vaddr, sz: size, flgs: flags, pa: paddr)
+                self.check_rettype(issues, FN_SIG_MAP, VelosiAstTypeInfo::Void);
+                //self.check_arguments_exact(issues, FN_SIG_MAP, &[("va", VelosiAstTypeInfo::VirtAddr), ("sz", VelosiAstTypeInfo::Size), ("flgs", VelosiAstTypeInfo::Flags), ("pa", VelosiAstTypeInfo::PhysAddr)]);
+            }
+            "unmap" => {
+                // fn unmap(va: vaddr, sz: size)
+                self.check_rettype(issues, FN_SIG_UNMAP, VelosiAstTypeInfo::Void);
+                self.check_arguments_exact(
+                    issues,
+                    FN_SIG_UNMAP,
+                    &[
+                        ("va", VelosiAstTypeInfo::VirtAddr),
+                        ("sz", VelosiAstTypeInfo::Size),
+                    ],
+                );
+            }
+            "protect" => {
+                // fn protect(va: vaddr, sz: size, flgs: flags)
+                self.check_rettype(issues, FN_SIG_PROTECT, VelosiAstTypeInfo::Void);
+                self.check_arguments_exact(
+                    issues,
+                    FN_SIG_PROTECT,
+                    &[
+                        ("va", VelosiAstTypeInfo::VirtAddr),
+                        ("sz", VelosiAstTypeInfo::Size),
+                        ("flgs", VelosiAstTypeInfo::Flags),
+                    ],
+                );
+            }
+            _ => (),
+        }
     }
 
     /// returns a set of state references made by this method's body

@@ -1003,6 +1003,30 @@ impl VelosiAstInterfaceField {
         }
     }
 
+    pub fn layout_as_slice(&self) -> &[Rc<VelosiAstFieldSlice>] {
+        match self {
+            VelosiAstInterfaceField::Memory(field) => field.layout.as_slice(),
+            VelosiAstInterfaceField::Register(field) => field.layout.as_slice(),
+            VelosiAstInterfaceField::Mmio(field) => field.layout.as_slice(),
+        }
+    }
+
+    pub fn write_actions_as_ref(&self) -> &[VelosiAstInterfaceAction] {
+        match self {
+            VelosiAstInterfaceField::Memory(field) => field.writeactions.as_slice(),
+            VelosiAstInterfaceField::Register(field) => field.writeactions.as_slice(),
+            VelosiAstInterfaceField::Mmio(field) => field.writeactions.as_slice(),
+        }
+    }
+
+    pub fn read_actions_as_ref(&self) -> &[VelosiAstInterfaceAction] {
+        match self {
+            VelosiAstInterfaceField::Memory(field) => field.readactions.as_slice(),
+            VelosiAstInterfaceField::Register(field) => field.readactions.as_slice(),
+            VelosiAstInterfaceField::Mmio(field) => field.readactions.as_slice(),
+        }
+    }
+
     pub fn loc(&self) -> &VelosiTokenStream {
         match self {
             VelosiAstInterfaceField::Memory(field) => &field.loc,
@@ -1212,6 +1236,13 @@ impl VelosiAstInterface {
 
     pub fn name(&self) -> &str {
         "Interface"
+    }
+
+    pub fn fields(&self) -> &[Rc<VelosiAstInterfaceField>] {
+        match self {
+            VelosiAstInterface::InterfaceDef(def) => def.fields.as_slice(),
+            VelosiAstInterface::NoneInterface(_) => &[],
+        }
     }
 
     pub fn loc(&self) -> &VelosiTokenStream {
