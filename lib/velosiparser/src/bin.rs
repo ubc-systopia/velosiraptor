@@ -45,18 +45,12 @@ pub fn main() {
                 .expect("could not read from stdin");
             VelosiParser::parse_string(buffer)
         }
-        2 => VelosiParser::parse_file(&args[1]),
+        2 => VelosiParser::parse_file(&args[1], true),
         _ => {
             println!("Usage: velosiparser [file]");
             println!("Usage: echo \"foo\" | velosiparser");
             return;
         }
-    };
-
-    let res = if let Ok(ps) = res {
-        VelosiParser::resolve_imports(ps)
-    } else {
-        res
     };
 
     match res {

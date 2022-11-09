@@ -82,11 +82,18 @@ impl VelosiParser {
     ///
     /// This function will create a new `VelosiParseTree` from the supplied string.
     pub fn parse_tokstream(
-        content: VelosiTokenStream,
+        tokens: VelosiTokenStream,
+        resolve_imports: bool,
     ) -> Result<VelosiParseTree, VelosiParserError> {
-        let ts = content.with_retained(|t| t.keep());
+        let ts = tokens.with_retained(|t| t.keep());
         match parser::parse(ts) {
-            Ok((_, tree)) => Ok(tree),
+            Ok((_, ptree)) => {
+                if resolve_imports {
+                    VelosiParser::resolve_imports(ptree)
+                } else {
+                    Ok(ptree)
+                }
+            }
             Err(nom::Err::Error(e)) => Err(VelosiParserError::ParsingFailure { e }),
             Err(nom::Err::Failure(e)) => Err(VelosiParserError::ParsingFailure { e }),
             _ => Err(VelosiParserError::LexingFailure {
@@ -99,12 +106,19 @@ impl VelosiParser {
     ///
     /// This function will create a new `VelosiParseTree` from the supplied string.
     pub fn parse_tokstream_with_context(
-        content: VelosiTokenStream,
+        tokens: VelosiTokenStream,
         context: String,
+        resolve_imports: bool,
     ) -> Result<VelosiParseTree, VelosiParserError> {
-        let ts = content.with_retained(|t| t.keep());
+        let ts = tokens.with_retained(|t| t.keep());
         match parser::parse_with_context(ts, context) {
-            Ok((_, tree)) => Ok(tree),
+            Ok((_, ptree)) => {
+                if resolve_imports {
+                    VelosiParser::resolve_imports(ptree)
+                } else {
+                    Ok(ptree)
+                }
+            }
             Err(nom::Err::Error(e)) => Err(VelosiParserError::ParsingFailure { e }),
             Err(nom::Err::Failure(e)) => Err(VelosiParserError::ParsingFailure { e }),
             _ => Err(VelosiParserError::LexingFailure {
@@ -118,15 +132,24 @@ impl VelosiParser {
     /// This function will create a new `VelosiParseTree` from the supplied string.
     pub fn parse_string(content: String) -> Result<VelosiParseTree, VelosiParserError> {
         match VelosiLexer::lex_string(content) {
-            Ok(tokens) => VelosiParser::parse_tokstream_with_context(tokens, "$buf".to_string()),
+            Ok(tokens) => {
+                VelosiParser::parse_tokstream_with_context(tokens, "$buf".to_string(), false)
+            }
             Err(e) => Err(VelosiParserError::LexingFailure { e }),
         }
     }
 
     /// Parses the supplied file and converts it into a [VelosiParseTree]
-    pub fn parse_file(filename: &str) -> Result<VelosiParseTree, VelosiParserError> {
+    pub fn parse_file(
+        filename: &str,
+        resolve_imports: bool,
+    ) -> Result<VelosiParseTree, VelosiParserError> {
         match VelosiLexer::lex_file(filename) {
-            Ok(tokens) => VelosiParser::parse_tokstream_with_context(tokens, filename.to_string()),
+            Ok(tokens) => VelosiParser::parse_tokstream_with_context(
+                tokens,
+                filename.to_string(),
+                resolve_imports,
+            ),
             Err(VelosiLexerError::ReadSourceFile { e }) => {
                 Err(VelosiParserError::ReadSourceFile { e })
             }
@@ -209,7 +232,7 @@ impl VelosiParser {
             }
 
             // no duplicate import, no cycile, we can parse the file now, and recurse
-            let result = match Self::parse_file(filename.as_str()) {
+            let result = match Self::parse_file(filename.as_str(), false) {
                 Ok(pt) => Self::do_resolve_imports(pt, path),
                 Err(e) => Err(e),
             };
@@ -266,7 +289,6 @@ impl VelosiParser {
 
     /// Resolves the imports of the given [VelosiParseTree]
     pub fn resolve_imports(ptree: VelosiParseTree) -> Result<VelosiParseTree, VelosiParserError> {
-        println!("resolving imports...");
         // get the path context for circle detection
         let mut importpath = Vec::new();
         let import_resolver = Self::do_resolve_imports(ptree, &mut importpath)?;
