@@ -82,7 +82,7 @@ impl From<VelosiLexerError> for VelosiParserError {
                 // could not read the soruce file
                 let message = format!("Could not read the source file: {}", e);
                 let e = VelosiParserErrBuilder::new(message).build();
-                VelosiParserError::LexingFailure { e: e.into() }
+                VelosiParserError::LexingFailure { e }
             }
             VelosiLexerError::LexingFailure { r } => {
                 VelosiParserError::LexingFailure { e: r.into() }
@@ -90,7 +90,7 @@ impl From<VelosiLexerError> for VelosiParserError {
             VelosiLexerError::LexingIncomplete => {
                 let message = "Lexing incomplete: input stream ended unexpectedly.";
                 let e = VelosiParserErrBuilder::new(message.to_string()).build();
-                VelosiParserError::LexingFailure { e: e.into() }
+                VelosiParserError::LexingFailure { e }
             }
         }
     }
