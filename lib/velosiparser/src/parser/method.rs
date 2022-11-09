@@ -194,7 +194,7 @@ pub fn method(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPars
     let (i3, params) = delimited(cut(lparen), param_list, cut(rparen))(i2)?;
 
     // get the return type `-> Type`, fail if there is no arrow, or type info
-    let (i4, rettype) = cut(preceded(rarrow, typeinfo))(i3)?;
+    let (i4, rettype) = opt(preceded(rarrow, cut(typeinfo)))(i3)?;
 
     // get the ensures / requires clauses
     //let (i5, (requires, ensures)) = tuple((many0(require_clauses), many0(ensure_clauses)))(i4)?;
@@ -236,14 +236,14 @@ fn test_abstract() {
     let content = "fn foo(a : addr) -> addr;";
     let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
     assert!(method(ts).is_ok());
+
+    let content = "fn foo();";
+    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
+    assert!(method(ts).is_ok());
 }
 
 #[test]
 fn test_fail() {
-    let content = "fn foo();";
-    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
-    assert!(method(ts).is_err());
-
     let content = "fn foo(a) -> Addr;";
     let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
     assert!(method(ts).is_err());
