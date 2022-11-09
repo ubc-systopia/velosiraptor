@@ -64,29 +64,47 @@ pub use parsetree::{
     VelosiParseTreeUnit, VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,
 };
 
+use error::IResult;
 use error::VelosiParserErrBuilder;
 
 // // custom error definitions
 custom_error! {pub VelosiParserError
     ReadSourceFile {e: Error} = "Could not read the source file.",
-    LexingFailure { e: VelosiLexerError }   = "Lexing failed.",
+    LexingFailure { e: VelosiParserErr }   = "Lexing failed.",
     ParsingFailure { e: VelosiParserErr } = "Parsing failed.",
     ImportFailure { e: VelosiParserErr } = "Import failed.",
+}
+
+impl From<VelosiLexerError> for VelosiParserError {
+    fn from(err: VelosiLexerError) -> Self {
+        match err {
+            VelosiLexerError::ReadSourceFile { e } => {
+                // could not read the soruce file
+                let message = format!("Could not read the source file: {}", e);
+                let e = VelosiParserErrBuilder::new(message).build();
+                VelosiParserError::LexingFailure { e: e.into() }
+            }
+            VelosiLexerError::LexingFailure { r } => {
+                VelosiParserError::LexingFailure { e: r.into() }
+            }
+            VelosiLexerError::LexingIncomplete => {
+                let message = "Lexing incomplete: input stream ended unexpectedly.";
+                let e = VelosiParserErrBuilder::new(message.to_string()).build();
+                VelosiParserError::LexingFailure { e: e.into() }
+            }
+        }
+    }
 }
 
 /// represents the lexer state
 pub struct VelosiParser;
 
 impl VelosiParser {
-    /// Parses the supplied [TokenStream] and converts it into a [VelosiParseTree]
-    ///
-    /// This function will create a new `VelosiParseTree` from the supplied string.
-    pub fn parse_tokstream(
-        tokens: VelosiTokenStream,
+    fn maybe_resolve_imports(
+        res: IResult<VelosiTokenStream, VelosiParseTree>,
         resolve_imports: bool,
     ) -> Result<VelosiParseTree, VelosiParserError> {
-        let ts = tokens.with_retained(|t| t.keep());
-        match parser::parse(ts) {
+        match res {
             Ok((_, ptree)) => {
                 if resolve_imports {
                     VelosiParser::resolve_imports(ptree)
@@ -96,10 +114,23 @@ impl VelosiParser {
             }
             Err(nom::Err::Error(e)) => Err(VelosiParserError::ParsingFailure { e }),
             Err(nom::Err::Failure(e)) => Err(VelosiParserError::ParsingFailure { e }),
-            _ => Err(VelosiParserError::LexingFailure {
-                e: VelosiLexerError::LexingIncomplete,
-            }),
+            Err(nom::Err::Incomplete(_)) => {
+                let message = "Parsing incomplete: input stream ended unexpectedly.";
+                let e = VelosiParserErrBuilder::new(message.to_string()).build();
+                Err(VelosiParserError::ParsingFailure { e })
+            }
         }
+    }
+
+    /// Parses the supplied [TokenStream] and converts it into a [VelosiParseTree]
+    ///
+    /// This function will create a new `VelosiParseTree` from the supplied string.
+    pub fn parse_tokstream(
+        tokens: VelosiTokenStream,
+        resolve_imports: bool,
+    ) -> Result<VelosiParseTree, VelosiParserError> {
+        let ts = tokens.with_retained(|t| t.keep());
+        VelosiParser::maybe_resolve_imports(parser::parse(ts), resolve_imports)
     }
 
     /// Parses the supplied [TokenStream] and converts it into a [VelosiParseTree]
@@ -111,20 +142,10 @@ impl VelosiParser {
         resolve_imports: bool,
     ) -> Result<VelosiParseTree, VelosiParserError> {
         let ts = tokens.with_retained(|t| t.keep());
-        match parser::parse_with_context(ts, context) {
-            Ok((_, ptree)) => {
-                if resolve_imports {
-                    VelosiParser::resolve_imports(ptree)
-                } else {
-                    Ok(ptree)
-                }
-            }
-            Err(nom::Err::Error(e)) => Err(VelosiParserError::ParsingFailure { e }),
-            Err(nom::Err::Failure(e)) => Err(VelosiParserError::ParsingFailure { e }),
-            _ => Err(VelosiParserError::LexingFailure {
-                e: VelosiLexerError::LexingIncomplete,
-            }),
-        }
+        VelosiParser::maybe_resolve_imports(
+            parser::parse_with_context(ts, context),
+            resolve_imports,
+        )
     }
 
     /// Parses the supplied string and converts it into a [VelosiParseTree]
@@ -135,7 +156,7 @@ impl VelosiParser {
             Ok(tokens) => {
                 VelosiParser::parse_tokstream_with_context(tokens, "$buf".to_string(), false)
             }
-            Err(e) => Err(VelosiParserError::LexingFailure { e }),
+            Err(e) => Err(e.into()),
         }
     }
 
@@ -150,10 +171,8 @@ impl VelosiParser {
                 filename.to_string(),
                 resolve_imports,
             ),
-            Err(VelosiLexerError::ReadSourceFile { e }) => {
-                Err(VelosiParserError::ReadSourceFile { e })
-            }
-            Err(e) => Err(VelosiParserError::LexingFailure { e }),
+
+            Err(e) => Err(e.into()),
         }
     }
 

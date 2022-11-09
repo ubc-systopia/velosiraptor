@@ -36,6 +36,7 @@ use nom::{
 };
 
 use crate::{VelosiTokenKind, VelosiTokenStream};
+use velosilexer::VelosiLexerErr;
 
 /// define the type of IResult
 pub type IResult<I, O> = std::result::Result<(I, O), Err<VelosiParserErr>>;
@@ -292,6 +293,7 @@ pub enum VelosiParserErr {
     Expected(VelosiParserErrExpected),
     Kind(ErrorKind),
     Custom(VelosiParserErrCustom),
+    Lexer(VelosiLexerErr),
     Stack(Vec<VelosiParserErr>),
 }
 
@@ -301,12 +303,19 @@ impl VelosiParserErr {
     }
 }
 
+impl From<VelosiLexerErr> for VelosiParserErr {
+    fn from(err: VelosiLexerErr) -> Self {
+        VelosiParserErr::Lexer(err)
+    }
+}
+
 /// Implementation of [Display] for [VelosiParserErr]
 impl Display for VelosiParserErr {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             VelosiParserErr::Expected(e) => e.fmt(f),
             VelosiParserErr::Custom(e) => e.fmt(f),
+            VelosiParserErr::Lexer(e) => e.fmt(f),
             VelosiParserErr::Kind(k) => writeln!(f, "Nom kind: {:?}", k),
             VelosiParserErr::Stack(s) => {
                 for e in s {
