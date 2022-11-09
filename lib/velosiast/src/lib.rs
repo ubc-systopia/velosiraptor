@@ -41,7 +41,7 @@ mod error;
 mod symboltable;
 mod utils;
 
-use error::VelosiAstIssues;
+use error::{VelosiAstErrBuilder, VelosiAstIssues};
 use symboltable::{Symbol, SymbolTable};
 use velosiparser::VelosiParseTree;
 
@@ -98,6 +98,45 @@ impl VelosiAst {
             }
             AstResult::Err(issues) => AstResult::Err(issues),
         }
+    }
+
+    fn from_parse_result(
+        res: Result<VelosiParseTree, VelosiParserError>,
+    ) -> AstResult<VelosiAst, VelosiAstIssues> {
+        match res {
+            Ok(ptree) => VelosiAst::from_parse_tree(ptree),
+            Err(VelosiParserError::ReadSourceFile { e }) => {
+                let msg = format!("Failed to read the source file: `{}`", e);
+                let err = VelosiAstErrBuilder::err(msg).build();
+                AstResult::Err(err.into())
+            }
+
+            Err(VelosiParserError::ImportFailure { e }) => {
+                let msg = format!("Import failure: {}", e);
+                let err = VelosiAstErrBuilder::err(msg).build();
+                AstResult::Err(err.into())
+            }
+
+            Err(VelosiParserError::LexingFailure { e }) => {
+                let msg = format!("Lexing failure. \n\n{}", e);
+                let err = VelosiAstErrBuilder::err(msg).build();
+                AstResult::Err(err.into())
+            }
+
+            Err(VelosiParserError::ParsingFailure { e }) => {
+                let msg = format!("Parsing failure. \n\n{}", e);
+                let err = VelosiAstErrBuilder::err(msg).build();
+                AstResult::Err(err.into())
+            }
+        }
+    }
+
+    pub fn from_string(content: String) -> AstResult<VelosiAst, VelosiAstIssues> {
+        Self::from_parse_result(VelosiParser::parse_string(content))
+    }
+
+    pub fn from_file(filename: &str) -> AstResult<VelosiAst, VelosiAstIssues> {
+        Self::from_parse_result(VelosiParser::parse_file(filename, true))
     }
 }
 

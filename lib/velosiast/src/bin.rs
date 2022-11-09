@@ -32,21 +32,20 @@ use std::io;
 use std::io::Read;
 
 use velosiast::{AstResult, VelosiAst};
-use velosiparser::{VelosiParser, VelosiParserError};
 
 pub fn main() {
     let args: Vec<String> = env::args().collect();
 
-    let res = match args.len() {
+    let ast = match args.len() {
         1 => {
             let mut buffer = String::new();
             let mut stdin = io::stdin();
             stdin
                 .read_to_string(&mut buffer)
                 .expect("could not read from stdin");
-            VelosiParser::parse_string(buffer)
+            VelosiAst::from_string(buffer)
         }
-        2 => VelosiParser::parse_file(&args[1]),
+        2 => VelosiAst::from_file(&args[1]),
         _ => {
             println!("Usage: velosiast [file]");
             println!("Usage: echo \"foo\" | velosiparser");
@@ -54,39 +53,12 @@ pub fn main() {
         }
     };
 
-    let res = if let Ok(ps) = res {
-        VelosiParser::resolve_imports(ps)
-    } else {
-        res
-    };
-
-    match res {
-        Ok(ptree) => {
-            let ast = VelosiAst::from_parse_tree(ptree);
-            match ast {
-                AstResult::Ok(ast) => println!("{}", ast),
-                AstResult::Issues(ast, err) => {
-                    println!("{}", ast);
-                    println!("{}", err);
-                }
-                AstResult::Err(err) => println!("{}", err),
-            }
+    match ast {
+        AstResult::Ok(ast) => println!("{}", ast),
+        AstResult::Issues(ast, err) => {
+            println!("{}", ast);
+            println!("{}", err);
         }
-        Err(VelosiParserError::ImportFailure { e }) => {
-            println!("Failed import resolution: {}", e);
-        }
-        Err(VelosiParserError::ReadSourceFile { e }) => {
-            println!("Failed to open the source file: {}", e);
-        }
-
-        Err(VelosiParserError::LexingFailure { e }) => {
-            println!("Lexing Failure");
-            println!("{}", e);
-        }
-
-        Err(VelosiParserError::ParsingFailure { e }) => {
-            println!("Parsing Failure");
-            println!("{}", e);
-        }
+        AstResult::Err(err) => println!("{}", err),
     }
 }
