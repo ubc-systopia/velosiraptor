@@ -45,7 +45,7 @@ pub struct VelosiParseTreeMethod {
     /// the unit parameters
     pub params: Vec<VelosiParseTreeParam>,
     /// the name of the derrived unit
-    pub rettype: VelosiParseTreeType,
+    pub rettype: Option<VelosiParseTreeType>,
     /// the nodes defined in the parse tree
     pub requires: Vec<VelosiParseTreeExpr>,
     /// the body of the method
@@ -64,7 +64,12 @@ impl Display for VelosiParseTreeMethod {
             }
             write!(f, "{}", param)?;
         }
-        write!(f, ") -> {}", self.rettype)?;
+        if let Some(rtype) = &self.rettype {
+            write!(f, ") -> {}", rtype)?;
+        } else {
+            write!(f, ")")?;
+        }
+
         for (i, require) in self.requires.iter().enumerate() {
             if i == 0 {
                 writeln!(f)?;
