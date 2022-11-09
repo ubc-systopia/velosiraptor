@@ -121,6 +121,10 @@ impl VelosiAstIdentifier {
         }
     }
 
+    pub fn with_name(name: String) -> Self {
+        Self::new(name, VelosiTokenStream::default())
+    }
+
     pub fn from_parse_tree_with_prefix(pt: VelosiParseTreeIdentifier, prefix: &str) -> Self {
         let s = format!("{}.{}", prefix, pt.name);
         Self::new(s, pt.loc)

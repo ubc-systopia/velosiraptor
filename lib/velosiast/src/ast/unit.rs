@@ -36,6 +36,7 @@ use velosiparser::{
 };
 
 use crate::ast::{
+    method::{FN_SIG_MAP, FN_SIG_MATCHFLAGS, FN_SIG_PROTECT, FN_SIG_TRANSLATE, FN_SIG_UNMAP},
     types::{VelosiAstType, VelosiAstTypeInfo},
     VelosiAstConst, VelosiAstInterface, VelosiAstMethod, VelosiAstNode, VelosiAstParam,
     VelosiAstStaticMap,
@@ -233,6 +234,76 @@ impl VelosiAstUnitSegment {
 
             Rc::new(VelosiAstState::NoneState(pt.loc.clone()))
         };
+
+        if !methods_map.contains_key("map") {
+            let msg = "Segment unit has no `map` method defined. Using default implementation";
+            let hint = format!("add method with signature `{}` to unit", FN_SIG_MAP);
+            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                .add_hint(hint)
+                .add_location(pt.loc.from_self_with_subrange(0..1))
+                .build();
+            issues.push(err);
+
+            let m = Rc::new(VelosiAstMethod::default_map());
+            methods.push(m.clone());
+            methods_map.insert(m.ident_to_string(), m);
+        }
+
+        if !methods_map.contains_key("unmap") {
+            let msg = "Segment unit has no `unmap` method defined. Using default implementation";
+            let hint = format!("add method with signature `{}` to unit", FN_SIG_UNMAP);
+            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                .add_hint(hint)
+                .add_location(pt.loc.from_self_with_subrange(0..1))
+                .build();
+            issues.push(err);
+
+            let m = Rc::new(VelosiAstMethod::default_unmap());
+            methods.push(m.clone());
+            methods_map.insert(m.ident_to_string(), m);
+        }
+
+        if !methods_map.contains_key("protect") {
+            let msg = "Segment unit has no `protect` method defined. Using default implementation";
+            let hint = format!("add method with signature `{}` to unit", FN_SIG_PROTECT);
+            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                .add_hint(hint)
+                .add_location(pt.loc.from_self_with_subrange(0..1))
+                .build();
+            issues.push(err);
+
+            let m = Rc::new(VelosiAstMethod::default_protect());
+            methods.push(m.clone());
+            methods_map.insert(m.ident_to_string(), m);
+        }
+
+        if !methods_map.contains_key("translate") {
+            let msg = "Segment unit has no `protect` method defined. Using default implementation";
+            let hint = format!("add method with signature `{}` to unit", FN_SIG_TRANSLATE);
+            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                .add_hint(hint)
+                .add_location(pt.loc.from_self_with_subrange(0..1))
+                .build();
+            issues.push(err);
+
+            let m = Rc::new(VelosiAstMethod::default_translate());
+            methods.push(m.clone());
+            methods_map.insert(m.ident_to_string(), m);
+        }
+
+        if !methods_map.contains_key("matchflags") {
+            let msg = "Segment unit has no `protect` method defined. Using default implementation";
+            let hint = format!("add method with signature `{}` to unit", FN_SIG_MATCHFLAGS);
+            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                .add_hint(hint)
+                .add_location(pt.loc.from_self_with_subrange(0..1))
+                .build();
+            issues.push(err);
+
+            let m = Rc::new(VelosiAstMethod::default_matchflags());
+            methods.push(m.clone());
+            methods_map.insert(m.ident_to_string(), m);
+        }
 
         let interface = if let Some(i) = interface {
             i

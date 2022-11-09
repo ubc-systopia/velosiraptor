@@ -769,6 +769,14 @@ impl VelosiAstIdentLiteralExpr {
         }
     }
 
+    pub fn with_name(name: String, ptype: VelosiAstTypeInfo) -> Self {
+        VelosiAstIdentLiteralExpr::new(
+            vec![VelosiAstIdentifier::with_name(name)],
+            ptype.into(),
+            VelosiTokenStream::empty(),
+        )
+    }
+
     pub fn from_parse_tree(
         p: VelosiParseTreeIdentifierLiteral,
         st: &mut SymbolTable,
@@ -963,6 +971,12 @@ impl VelosiAstBoolLiteralExpr {
 
     pub fn has_interface_references(&self) -> bool {
         false
+    }
+}
+
+impl From<bool> for VelosiAstBoolLiteralExpr {
+    fn from(val: bool) -> Self {
+        Self::new(val, VelosiTokenStream::default())
     }
 }
 

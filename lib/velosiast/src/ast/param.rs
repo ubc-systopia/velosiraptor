@@ -54,6 +54,14 @@ impl VelosiAstParam {
         Self { ident, ptype, loc }
     }
 
+    pub fn with_name(name: String, ptype: VelosiAstTypeInfo) -> Self {
+        VelosiAstParam::new(
+            VelosiAstIdentifier::with_name(name),
+            ptype.into(),
+            VelosiTokenStream::empty(),
+        )
+    }
+
     pub fn ident_as_str(&self) -> &str {
         self.ident.name.as_str()
     }
