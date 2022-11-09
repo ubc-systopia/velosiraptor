@@ -31,6 +31,7 @@
 // used standard library functionality
 
 use std::fmt::{Display, Formatter, Result as FmtResult};
+use std::rc::Rc;
 
 // public re-exports
 pub use velosiparser::{VelosiParser, VelosiParserError, VelosiTokenStream};
@@ -45,7 +46,7 @@ use error::{VelosiAstErrBuilder, VelosiAstIssues};
 use symboltable::{Symbol, SymbolTable};
 use velosiparser::VelosiParseTree;
 
-use crate::ast::VelosiAstRoot;
+use crate::ast::{VelosiAstRoot, VelosiAstUnit, VelosiAstUnitSegment, VelosiAstUnitStaticMap};
 
 // custom error definitions
 pub enum AstResult<T, E> {
@@ -137,6 +138,17 @@ impl VelosiAst {
 
     pub fn from_file(filename: &str) -> AstResult<VelosiAst, VelosiAstIssues> {
         Self::from_parse_result(VelosiParser::parse_file(filename, true))
+    }
+
+    pub fn units(&self) -> &[VelosiAstUnit] {
+        self.root.units()
+    }
+
+    pub fn segment_units<'a>(&'a self) -> impl Iterator<Item = &'a Rc<VelosiAstUnitSegment>> {
+        self.root.units.iter().filter_map(|u| match u {
+            VelosiAstUnit::Segment(s) => Some(s),
+            _ => None,
+        })
     }
 }
 
