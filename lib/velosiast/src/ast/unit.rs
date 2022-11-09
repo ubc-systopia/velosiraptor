@@ -291,7 +291,7 @@ impl VelosiAstUnitSegment {
         // and restore the context again.
         st.drop_context();
 
-        ast_result_return!(VelosiAstUnit::Segment(res), issues)
+        ast_result_return!(VelosiAstUnit::Segment(Rc::new(res)), issues)
     }
 
     pub fn ident_as_rc_string(&self) -> Rc<String> {
@@ -601,7 +601,7 @@ impl VelosiAstUnitStaticMap {
         // and restore the context again.
         st.drop_context();
 
-        ast_result_return!(VelosiAstUnit::StaticMap(res), issues)
+        ast_result_return!(VelosiAstUnit::StaticMap(Rc::new(res)), issues)
     }
 
     pub fn get_method(&self, name: &str) -> Option<&Rc<VelosiAstMethod>> {
@@ -692,8 +692,8 @@ impl Display for VelosiAstUnitStaticMap {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum VelosiAstUnit {
-    Segment(VelosiAstUnitSegment),
-    StaticMap(VelosiAstUnitStaticMap),
+    Segment(Rc<VelosiAstUnitSegment>),
+    StaticMap(Rc<VelosiAstUnitStaticMap>),
 }
 
 impl VelosiAstUnit {
@@ -799,8 +799,8 @@ impl VelosiAstUnit {
 }
 
 /// Implementation fo the [From] trait for [Symbol]
-impl From<Rc<VelosiAstUnit>> for Symbol {
-    fn from(unit: Rc<VelosiAstUnit>) -> Self {
+impl From<VelosiAstUnit> for Symbol {
+    fn from(unit: VelosiAstUnit) -> Self {
         let ti = VelosiAstType::from(unit.clone());
         let name = unit.ident_as_rc_string();
         Symbol::new(name, ti, VelosiAstNode::Unit(unit))
@@ -808,8 +808,8 @@ impl From<Rc<VelosiAstUnit>> for Symbol {
 }
 
 /// Implementation fo the [From] trait for [Symbol]
-impl From<Rc<VelosiAstUnit>> for VelosiAstType {
-    fn from(unit: Rc<VelosiAstUnit>) -> Self {
+impl From<VelosiAstUnit> for VelosiAstType {
+    fn from(unit: VelosiAstUnit) -> Self {
         let name = unit.ident_as_rc_string();
         VelosiAstType::new(VelosiAstTypeInfo::TypeRef(name), unit.loc().clone())
     }
