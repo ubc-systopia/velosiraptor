@@ -41,9 +41,8 @@ mod error;
 mod lexer;
 mod tokens;
 
-use crate::error::VelosiLexerErr;
-
 // re-exports
+pub use error::VelosiLexerErr;
 pub use tokens::{VelosiKeyword, VelosiOpToken, VelosiTokenKind};
 pub use tokstream::{SrcSpan, TokKind};
 
