@@ -34,19 +34,19 @@ use std::rc::Rc;
 use velosiparser::{VelosiParseTreeMethod, VelosiTokenStream};
 
 use crate::ast::{
-    VelosiAstExpr, VelosiAstIdentifier, VelosiAstNode, VelosiAstParam, VelosiAstType,
-    VelosiAstTypeInfo,
+    VelosiAstExpr, VelosiAstIdentLiteralExpr, VelosiAstIdentifier, VelosiAstNode, VelosiAstParam,
+    VelosiAstType, VelosiAstTypeInfo,
 };
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
 
 /// the signature of the translate function
-const FN_SIG_TRANSLATE: &str = "fn translate(va: vaddr) -> addr";
-const FN_SIG_MATCHFLAGS: &str = "fn matchflags(flgs:flags) -> bool";
-const FN_SIG_MAP: &str = "fn map(va: vaddr, sz: size, flgs: flags, pa: addr)";
-const FN_SIG_UNMAP: &str = "fn unmap(va: vaddr, sz: size)";
-const FN_SIG_PROTECT: &str = "fn protect(va: vaddr, sz: size, flgs: flags)";
-const FN_SIG_INIT: &str = "fn init()";
+pub const FN_SIG_TRANSLATE: &str = "fn translate(va: vaddr) -> addr";
+pub const FN_SIG_MATCHFLAGS: &str = "fn matchflags(flgs:flags) -> bool";
+pub const FN_SIG_MAP: &str = "fn map(va: vaddr, sz: size, flgs: flags, pa: addr)";
+pub const FN_SIG_UNMAP: &str = "fn unmap(va: vaddr, sz: size)";
+pub const FN_SIG_PROTECT: &str = "fn protect(va: vaddr, sz: size, flgs: flags)";
+// const FN_SIG_INIT: &str = "fn init()";
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstMethod {
@@ -88,6 +88,108 @@ impl VelosiAstMethod {
             body,
             loc,
         }
+    }
+
+    pub fn default_map() -> Self {
+        Self::new(
+            VelosiAstIdentifier::with_name("map".to_string()),
+            VelosiAstType::new_void(),
+            vec![
+                Rc::new(VelosiAstParam::with_name(
+                    "va".to_string(),
+                    VelosiAstTypeInfo::VirtAddr,
+                )),
+                Rc::new(VelosiAstParam::with_name(
+                    "sz".to_string(),
+                    VelosiAstTypeInfo::Size,
+                )),
+                Rc::new(VelosiAstParam::with_name(
+                    "flgs".to_string(),
+                    VelosiAstTypeInfo::Flags,
+                )),
+                Rc::new(VelosiAstParam::with_name(
+                    "pa".to_string(),
+                    VelosiAstTypeInfo::PhysAddr,
+                )),
+            ],
+            Vec::new(),                   // no requires
+            None,                         // no body
+            VelosiTokenStream::default(), // no location
+        )
+    }
+
+    pub fn default_unmap() -> Self {
+        Self::new(
+            VelosiAstIdentifier::with_name("unmap".to_string()),
+            VelosiAstType::new_void(),
+            vec![
+                Rc::new(VelosiAstParam::with_name(
+                    "va".to_string(),
+                    VelosiAstTypeInfo::VirtAddr,
+                )),
+                Rc::new(VelosiAstParam::with_name(
+                    "sz".to_string(),
+                    VelosiAstTypeInfo::Size,
+                )),
+            ],
+            Vec::new(),                   // no requires
+            None,                         // no body
+            VelosiTokenStream::default(), // no location
+        )
+    }
+
+    pub fn default_protect() -> Self {
+        Self::new(
+            VelosiAstIdentifier::with_name("protect".to_string()),
+            VelosiAstType::new_void(),
+            vec![
+                Rc::new(VelosiAstParam::with_name(
+                    "va".to_string(),
+                    VelosiAstTypeInfo::VirtAddr,
+                )),
+                Rc::new(VelosiAstParam::with_name(
+                    "sz".to_string(),
+                    VelosiAstTypeInfo::Size,
+                )),
+                Rc::new(VelosiAstParam::with_name(
+                    "flgs".to_string(),
+                    VelosiAstTypeInfo::Flags,
+                )),
+            ],
+            Vec::new(),                   // no requires
+            None,                         // no body
+            VelosiTokenStream::default(), // no location
+        )
+    }
+
+    pub fn default_translate() -> Self {
+        Self::new(
+            VelosiAstIdentifier::with_name("protect".to_string()),
+            VelosiAstType::new_paddr(),
+            vec![Rc::new(VelosiAstParam::with_name(
+                "va".to_string(),
+                VelosiAstTypeInfo::VirtAddr,
+            ))],
+            Vec::new(), // no requires
+            Some(VelosiAstExpr::IdentLiteral(
+                VelosiAstIdentLiteralExpr::with_name("va".to_string(), VelosiAstTypeInfo::VirtAddr),
+            )), // just true
+            VelosiTokenStream::default(), // no location
+        )
+    }
+
+    pub fn default_matchflags() -> Self {
+        Self::new(
+            VelosiAstIdentifier::with_name("protect".to_string()),
+            VelosiAstType::new_bool(),
+            vec![Rc::new(VelosiAstParam::with_name(
+                "flgs".to_string(),
+                VelosiAstTypeInfo::Flags,
+            ))],
+            Vec::new(),                                    // no requires
+            Some(VelosiAstExpr::BoolLiteral(true.into())), // just true
+            VelosiTokenStream::default(),                  // no location
+        )
     }
 
     pub fn ident_as_rc_string(&self) -> Rc<String> {
@@ -286,6 +388,18 @@ impl VelosiAstMethod {
         }
     }
 
+    fn check_rettype_non_void(&self, issues: &mut VelosiAstIssues) {
+        if self.rtype.typeinfo == VelosiAstTypeInfo::Void {
+            let msg = "return type `()` is only allowed for map/unmap/protect";
+            let hint = format!("expected integer or boolean, found {}", self.rtype.typeinfo);
+            let err = VelosiAstErrBuilder::err(msg.to_string())
+                .add_hint(hint)
+                .add_location(self.rtype.loc.clone())
+                .build();
+            issues.push(err);
+        }
+    }
+
     fn check_arguments_exact(
         &self,
         issues: &mut VelosiAstIssues,
@@ -387,7 +501,9 @@ impl VelosiAstMethod {
                     ],
                 );
             }
-            _ => (),
+            _ => {
+                self.check_rettype_non_void(issues);
+            }
         }
     }
 

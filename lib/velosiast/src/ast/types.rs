@@ -206,6 +206,14 @@ impl VelosiAstType {
         Self::new(VelosiAstTypeInfo::Void, VelosiTokenStream::default())
     }
 
+    pub fn new_paddr() -> Self {
+        Self::new(VelosiAstTypeInfo::PhysAddr, VelosiTokenStream::default())
+    }
+
+    pub fn new_bool() -> Self {
+        Self::new(VelosiAstTypeInfo::Bool, VelosiTokenStream::default())
+    }
+
     // converts the parse tree node into an ast node, performing checks
     pub fn from_parse_tree(
         pt: VelosiParseTreeType,
@@ -277,6 +285,12 @@ impl VelosiAstType {
         } else {
             self.typeinfo.as_str()
         }
+    }
+}
+
+impl From<VelosiAstTypeInfo> for VelosiAstType {
+    fn from(t: VelosiAstTypeInfo) -> Self {
+        VelosiAstType::new(t, VelosiTokenStream::default())
     }
 }
 

@@ -144,9 +144,16 @@ impl VelosiAst {
         self.root.units()
     }
 
-    pub fn segment_units<'a>(&'a self) -> impl Iterator<Item = &'a Rc<VelosiAstUnitSegment>> {
+    pub fn segment_units(&self) -> impl Iterator<Item = &Rc<VelosiAstUnitSegment>> {
         self.root.units.iter().filter_map(|u| match u {
             VelosiAstUnit::Segment(s) => Some(s),
+            _ => None,
+        })
+    }
+
+    pub fn staticmap_units(&self) -> impl Iterator<Item = &Rc<VelosiAstUnitStaticMap>> {
+        self.root.units.iter().filter_map(|u| match u {
+            VelosiAstUnit::StaticMap(s) => Some(s),
             _ => None,
         })
     }
