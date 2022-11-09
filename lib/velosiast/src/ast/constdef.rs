@@ -84,6 +84,20 @@ impl VelosiAstConst {
         self.ident.name.to_string()
     }
 
+    pub fn try_into_u64(&self) -> Option<u64> {
+        match &self.value {
+            VelosiAstExpr::NumLiteral(n) => Some(n.val),
+            _ => None,
+        }
+    }
+
+    pub fn try_into_bool(&self) -> Option<bool> {
+        match &self.value {
+            VelosiAstExpr::BoolLiteral(n) => Some(n.val),
+            _ => None,
+        }
+    }
+
     // converts the parse tree node into an ast node, performing checks
     pub fn from_parse_tree(
         pt: VelosiParseTreeConstDef,

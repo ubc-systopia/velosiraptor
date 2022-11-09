@@ -245,10 +245,10 @@ impl From<VelosiParseTreeBinOp> for VelosiAstBinOp {
 /// Represents a binary operation `expr <op> expr`
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstBinOpExpr {
-    lhs: Box<VelosiAstExpr>,
-    op: VelosiAstBinOp,
-    rhs: Box<VelosiAstExpr>,
-    loc: VelosiTokenStream,
+    pub lhs: Box<VelosiAstExpr>,
+    pub op: VelosiAstBinOp,
+    pub rhs: Box<VelosiAstExpr>,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiAstBinOpExpr {
@@ -503,9 +503,9 @@ impl From<VelosiParseTreeUnOp> for VelosiAstUnOp {
 /// Represents an unary operation
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstUnOpExpr {
-    op: VelosiAstUnOp,
-    expr: Box<VelosiAstExpr>,
-    loc: VelosiTokenStream,
+    pub op: VelosiAstUnOp,
+    pub expr: Box<VelosiAstExpr>,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiAstUnOpExpr {
@@ -647,10 +647,10 @@ impl Display for VelosiAstQuantifier {
 /// Represents an unary operation
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstQuantifierExpr {
-    quant: VelosiAstQuantifier,
-    params: Vec<Rc<VelosiAstParam>>,
-    expr: Box<VelosiAstExpr>,
-    loc: VelosiTokenStream,
+    pub quant: VelosiAstQuantifier,
+    pub params: Vec<Rc<VelosiAstParam>>,
+    pub expr: Box<VelosiAstExpr>,
+    pub loc: VelosiTokenStream,
 }
 
 impl VelosiAstQuantifierExpr {

@@ -792,8 +792,8 @@ impl VelosiAstUnit {
     pub fn loc(&self) -> &VelosiTokenStream {
         use VelosiAstUnit::*;
         match self {
-            VelosiAstUnit::Segment(s) => &s.loc,
-            VelosiAstUnit::StaticMap(s) => &s.loc,
+            Segment(s) => &s.loc,
+            StaticMap(s) => &s.loc,
         }
     }
 }

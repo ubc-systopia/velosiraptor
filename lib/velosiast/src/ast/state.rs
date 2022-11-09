@@ -351,6 +351,13 @@ impl VelosiAstStateField {
         }
     }
 
+    pub fn layout_as_slice(&self) -> &[Rc<VelosiAstFieldSlice>] {
+        match self {
+            VelosiAstStateField::Memory(field) => field.layout.as_slice(),
+            VelosiAstStateField::Register(field) => field.layout.as_slice(),
+        }
+    }
+
     pub fn get_slice_mask_for_refs(&self, refs: &HashSet<Rc<String>>) -> u64 {
         match self {
             VelosiAstStateField::Memory(field) => field.get_slice_mask_for_refs(refs),

@@ -65,6 +65,8 @@ pub enum VelosiAstTypeInfo {
     State,
     /// Reference to the interface
     Interface,
+    ///
+    Void,
 }
 
 impl VelosiAstTypeInfo {
@@ -72,6 +74,11 @@ impl VelosiAstTypeInfo {
     pub fn is_builtin(&self) -> bool {
         use VelosiAstTypeInfo::*;
         !matches!(self, TypeRef(_) | State | Interface)
+    }
+
+    pub fn is_void(&self) -> bool {
+        use VelosiAstTypeInfo::*;
+        matches!(self, Void)
     }
 
     /// whether or not the type is of a numeric kind
@@ -109,6 +116,7 @@ impl VelosiAstTypeInfo {
             TypeRef(_) => self == other,
             State => false,
             Interface => false,
+            Void => *other == Void,
         }
     }
 
@@ -127,6 +135,7 @@ impl VelosiAstTypeInfo {
             TypeRef(name) => name,
             State => "state",
             Interface => "interface",
+            Void => "()",
         }
     }
 
@@ -145,6 +154,7 @@ impl VelosiAstTypeInfo {
             TypeRef(name) => name,
             State => "state",
             Interface => "interface",
+            Void => "void",
             _ => unreachable!(),
         }
     }
@@ -192,6 +202,10 @@ impl VelosiAstType {
         Self::new(VelosiAstTypeInfo::Integer, VelosiTokenStream::default())
     }
 
+    pub fn new_void() -> Self {
+        Self::new(VelosiAstTypeInfo::Void, VelosiTokenStream::default())
+    }
+
     // converts the parse tree node into an ast node, performing checks
     pub fn from_parse_tree(
         pt: VelosiParseTreeType,
@@ -232,6 +246,11 @@ impl VelosiAstType {
     /// whether or not the type is boolean
     pub fn is_boolean(&self) -> bool {
         self.typeinfo.is_boolean()
+    }
+
+    /// whether the type is void
+    pub fn is_void(&self) -> bool {
+        self.typeinfo.is_void()
     }
 
     /// whether or not the type is flags

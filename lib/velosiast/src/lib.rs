@@ -36,7 +36,7 @@ use std::fmt::{Display, Formatter, Result as FmtResult};
 pub use velosiparser::{VelosiParser, VelosiParserError, VelosiTokenStream};
 
 // crate modules
-mod ast;
+pub mod ast;
 mod error;
 mod symboltable;
 mod utils;
@@ -45,7 +45,7 @@ use error::VelosiAstIssues;
 use symboltable::{Symbol, SymbolTable};
 use velosiparser::VelosiParseTree;
 
-pub use ast::VelosiAstRoot;
+use crate::ast::VelosiAstRoot;
 
 // custom error definitions
 pub enum AstResult<T, E> {

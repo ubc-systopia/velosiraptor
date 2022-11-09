@@ -53,7 +53,12 @@ mod types;
 mod unit;
 
 pub use constdef::VelosiAstConst;
-pub use expr::VelosiAstExpr;
+pub use expr::{
+    VelosiAstBinOp, VelosiAstBinOpExpr, VelosiAstBoolLiteralExpr, VelosiAstExpr,
+    VelosiAstFnCallExpr, VelosiAstIdentLiteralExpr, VelosiAstIfElseExpr, VelosiAstNumLiteralExpr,
+    VelosiAstQuantifier, VelosiAstQuantifierExpr, VelosiAstRangeExpr, VelosiAstSliceExpr,
+    VelosiAstUnOp, VelosiAstUnOpExpr,
+};
 pub use flags::VelosiAstFlags;
 pub use interface::{VelosiAstInterface, VelosiAstInterfaceAction, VelosiAstInterfaceField};
 pub use map::{VelosiAstStaticMap, VelosiAstStaticMapElement};
@@ -62,7 +67,7 @@ pub use param::VelosiAstParam;
 pub use slice::VelosiAstFieldSlice;
 pub use state::{VelosiAstState, VelosiAstStateField};
 pub use types::{VelosiAstType, VelosiAstTypeInfo};
-pub use unit::VelosiAstUnit;
+pub use unit::{VelosiAstUnit, VelosiAstUnitSegment, VelosiAstUnitStaticMap};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum VelosiAstNode {
