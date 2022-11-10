@@ -7,6 +7,22 @@ authors = ["Reto Achermann <achreto@cs.ubc.ca>"]
 edition = "2018"
 readme = "README.md"
 
+[workspace]
+
+members = [
+    "lib/codegen",
+    "lib/crustal",
+    "lib/libvrc",
+    "lib/rosettelang",
+    "lib/smtlib2",
+    "lib/srcspan",
+    "lib/tokstream",
+    "lib/velosilexer",
+    "lib/velosiparser",
+    "lib/velosiast",
+    "lib/velosisynth"
+]
+
 [dependencies]
 # the argument parser
 clap = "2.33.3"
