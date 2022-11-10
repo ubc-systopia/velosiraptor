@@ -816,7 +816,10 @@ impl VelosiAstIdentLiteralExpr {
             VelosiAstNode::InterfaceField(_) | VelosiAstNode::InterfaceFieldSlice(_) => {
                 AstResult::Ok(VelosiAstExpr::IdentLiteral(litexpr))
             }
-            VelosiAstNode::Flag(_) => AstResult::Ok(VelosiAstExpr::IdentLiteral(litexpr)),
+            VelosiAstNode::Flag(_) => {
+                litexpr.etype = VelosiAstTypeInfo::Flags;
+                AstResult::Ok(VelosiAstExpr::IdentLiteral(litexpr))
+            }
             _ => {
                 // we have the wrong kind of symbol
                 let err = VelosiAstErrUndef::with_other(
