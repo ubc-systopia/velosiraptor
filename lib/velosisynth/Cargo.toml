@@ -14,7 +14,7 @@ nom = "7.1.1"
 velosiast = { path = "../velosiast" }
 colored = "2.0.0"
 custom_error = "1.9.2"
-smt2 = { path = "../smt2" }
+smt2 = { path = "../smtlib2" }
 
 [lib]
 name = "velosisynth"
