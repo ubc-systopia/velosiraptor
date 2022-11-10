@@ -257,6 +257,10 @@ impl Term {
         Term::Identifier(s)
     }
 
+    pub fn ifelse(cond: Term, then: Term, other: Term) -> Self {
+        Term::FunctionApplication("ite".to_string(), vec![cond, then, other])
+    }
+
     pub fn attributed(term: Term, attrs: Vec<Attribute>) -> Self {
         Term::AttributedTerm(Box::new(term), attrs)
     }
@@ -282,6 +286,10 @@ impl Term {
 
     pub fn bvor(lhs: Term, rhs: Term) -> Self {
         Term::FunctionApplication("bvor".to_string(), vec![lhs, rhs])
+    }
+
+    pub fn bvxor(lhs: Term, rhs: Term) -> Self {
+        Term::FunctionApplication("bvxor".to_string(), vec![lhs, rhs])
     }
 
     pub fn bvshl(lhs: Term, rhs: Term) -> Self {
@@ -358,6 +366,10 @@ impl Term {
 
     pub fn forall(vars: Vec<SortedVar>, expr: Term) -> Self {
         Term::Forall(vars, Box::new(expr))
+    }
+
+    pub fn exists(vars: Vec<SortedVar>, expr: Term) -> Self {
+        Term::Exists(vars, Box::new(expr))
     }
 
     pub fn is_literal(&self) -> bool {

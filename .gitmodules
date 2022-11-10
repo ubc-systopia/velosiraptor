@@ -4,3 +4,6 @@
 [submodule "lib/crustal"]
 	path = lib/crustal
 	url = git@github.com:achreto/crustal.git
+[submodule "lib/smtlib2"]
+	path = lib/smtlib2
+	url = git@github.com:achreto/rust-smtlib2.git
