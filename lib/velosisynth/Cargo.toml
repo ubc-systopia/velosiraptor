@@ -1,0 +1,25 @@
+[package]
+name = "velosisynth"
+description = "Synthesis Library for the Velosiraptor"
+license = "MIT"
+version = "0.1.0"
+authors = ["Reto Achermann <achreto@cs.ubc.ca>"]
+edition = "2018"
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nom = "7.1.1"
+velosiast = { path = "../velosiast" }
+colored = "2.0.0"
+custom_error = "1.9.2"
+smt2 = { path = "../smt2" }
+
+[lib]
+name = "velosisynth"
+path = "src/lib.rs"
+
+[[bin]]
+name = "velosisynth"
+path = "src/bin.rs"
