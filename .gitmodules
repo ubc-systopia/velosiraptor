@@ -7,3 +7,9 @@
 [submodule "lib/smtlib2"]
 	path = lib/smtlib2
 	url = git@github.com:achreto/rust-smtlib2.git
+[submodule "lib/srcspan"]
+	path = lib/srcspan
+	url = git@github.com:achreto/rust-srcspan.git
+[submodule "lib/tokstream"]
+	path = lib/tokstream
+	url = git@github.com:achreto/rust-tokstream.git
