@@ -43,7 +43,7 @@ use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, Symb
 /// the signature of the translate function
 pub const FN_SIG_TRANSLATE: &str = "fn translate(va: vaddr) -> addr";
 pub const FN_SIG_MATCHFLAGS: &str = "fn matchflags(flgs:flags) -> bool";
-pub const FN_SIG_MAP: &str = "fn map(va: vaddr, sz: size, flgs: flags, pa: addr)";
+pub const FN_SIG_MAP: &str = "fn map(va: vaddr, sz: size, flgs: flags, pa: paddr)";
 pub const FN_SIG_UNMAP: &str = "fn unmap(va: vaddr, sz: size)";
 pub const FN_SIG_PROTECT: &str = "fn protect(va: vaddr, sz: size, flgs: flags)";
 // const FN_SIG_INIT: &str = "fn init()";
@@ -289,10 +289,10 @@ impl VelosiAstMethod {
         for p in pt.requires.into_iter() {
             let exp = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(p, st), issues);
 
-            if !exp.result_type(st).is_boolean() {
+            if !exp.result_type().is_boolean() {
                 // check that the expression is boolean
                 let msg = "Requires clause has incompatible type ";
-                let hint = format!("Expected boolean, found {}", exp.result_type(st));
+                let hint = format!("Expected boolean, found {}", exp.result_type());
                 let err = VelosiAstErrBuilder::err(msg.to_string())
                     .add_hint(hint)
                     .add_location(exp.loc().clone())
@@ -319,16 +319,16 @@ impl VelosiAstMethod {
             let body = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(b, st), issues);
 
             // check the return type matches the body
-            if !rtype.typeinfo.compatible(body.result_type(st)) {
+            if !rtype.typeinfo.compatible(body.result_type()) {
                 let msg = "Method body has incomptaible type. ";
                 let hint = if rtype.is_boolean() {
-                    format!("Expected boolean, found {}", body.result_type(st))
+                    format!("Expected boolean, found {}", body.result_type())
                 } else if rtype.is_void() {
-                    format!("Expected (), found {}", body.result_type(st))
+                    format!("Expected (), found {}", body.result_type())
                 } else {
                     format!(
                         "Expected [`bool`, `int`, `size`, `addr`], found {}",
-                        body.result_type(st)
+                        body.result_type()
                     )
                 };
                 let err = VelosiAstErrBuilder::err(msg.to_string())
@@ -349,7 +349,7 @@ impl VelosiAstMethod {
                 issues.push(err);
             }
 
-            Some(body)
+            Some(body.into_cnf(st))
         } else {
             None
         };

@@ -135,12 +135,12 @@ impl VelosiAstConst {
         }
 
         // check whether the result type of the expression has a compatible type
-        if !ctype.typeinfo.compatible(value.result_type(st)) {
+        if !ctype.typeinfo.compatible(value.result_type()) {
             let msg = "mismatched types";
             let hint = format!(
                 "expected `{}`, found `{}`",
                 ctype.as_type_kind(),
-                value.result_type(st).as_kind_str()
+                value.result_type().as_kind_str()
             );
             let err = VelosiAstErrBuilder::err(msg.to_string())
                 .add_hint(hint)

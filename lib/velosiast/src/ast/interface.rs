@@ -95,12 +95,12 @@ impl VelosiAstInterfaceAction {
         }
 
         // the types must match
-        if !dst.result_type(st).compatible(src.result_type(st)) {
+        if !dst.result_type().compatible(src.result_type()) {
             let msg = "type mismatch";
             let hint = format!(
                 "Cannot assign value of type `{}` to `{}`",
-                src.result_type(st),
-                dst.result_type(st)
+                src.result_type(),
+                dst.result_type()
             );
             let err = VelosiAstErrBuilder::err(msg.to_string())
                 .add_hint(hint)
@@ -110,11 +110,11 @@ impl VelosiAstInterfaceAction {
         }
 
         // we can only assign number types for now
-        if !src.result_type(st).is_numeric() {
+        if !src.result_type().is_numeric() {
             let msg = "unsupported type";
             let hint = format!(
                 "Expected a numeric or boolean type, but got `{}`",
-                src.result_type(st),
+                src.result_type(),
             );
             let err = VelosiAstErrBuilder::err(msg.to_string())
                 .add_hint(hint)
@@ -526,6 +526,9 @@ impl VelosiAstInterfaceMemoryField {
         let mut layout_map = HashMap::new();
         for slice in &nodes.layout {
             layout_map.insert(slice.ident_to_string(), slice.clone());
+            // XXX: stupd work around to enable lookup using the identifier
+            let n = slice.ident_as_str().split(".").last().unwrap();
+            layout_map.insert(n.to_string(), slice.clone());
         }
 
         // construct the ast node and return
@@ -557,23 +560,6 @@ impl VelosiAstInterfaceMemoryField {
 
     pub fn ident_to_string(&self) -> String {
         self.ident.name.to_string()
-    }
-
-    pub fn accessing_state(
-        &self,
-        state_syms: &HashSet<Rc<String>>,
-        state_bits: &HashMap<Rc<String>, u64>,
-        if_bits: &HashMap<Rc<String>, u64>,
-    ) -> HashSet<Rc<String>> {
-        let mut res = HashSet::new();
-        for action in &self.readactions {
-            res.extend(action.get_iface_refs_for_state_update(state_syms, state_bits, if_bits));
-        }
-
-        for action in &self.writeactions {
-            res.extend(action.get_iface_refs_for_state_update(state_syms, state_bits, if_bits));
-        }
-        res
     }
 }
 
@@ -717,6 +703,9 @@ impl VelosiAstInterfaceMmioField {
         let mut layout_map = HashMap::new();
         for slice in &nodes.layout {
             layout_map.insert(slice.ident_to_string(), slice.clone());
+            // XXX: stupd work around to enable lookup using the identifier
+            let n = slice.ident_as_str().split(".").last().unwrap();
+            layout_map.insert(n.to_string(), slice.clone());
         }
 
         // construct the ast node and return
@@ -838,6 +827,9 @@ impl VelosiAstInterfaceRegisterField {
         let mut layout_map = HashMap::new();
         for slice in &layout {
             layout_map.insert(slice.ident_to_string(), slice.clone());
+            // XXX: stupd work around to enable lookup using the identifier
+            let n = slice.ident_as_str().split(".").last().unwrap();
+            layout_map.insert(n.to_string(), slice.clone());
         }
 
         Self {
@@ -995,6 +987,20 @@ impl VelosiAstInterfaceField {
         }
     }
 
+    pub fn slice(&self, ident: &str) -> Option<&VelosiAstFieldSlice> {
+        match self {
+            VelosiAstInterfaceField::Memory(field) => {
+                field.layout_map.get(ident).map(|rc| rc.as_ref())
+            }
+            VelosiAstInterfaceField::Register(field) => {
+                field.layout_map.get(ident).map(|rc| rc.as_ref())
+            }
+            VelosiAstInterfaceField::Mmio(field) => {
+                field.layout_map.get(ident).map(|rc| rc.as_ref())
+            }
+        }
+    }
+
     pub fn size(&self) -> u64 {
         match self {
             VelosiAstInterfaceField::Memory(field) => field.size,
@@ -1025,6 +1031,23 @@ impl VelosiAstInterfaceField {
             VelosiAstInterfaceField::Register(field) => field.readactions.as_slice(),
             VelosiAstInterfaceField::Mmio(field) => field.readactions.as_slice(),
         }
+    }
+
+    pub fn accessing_state(
+        &self,
+        state_syms: &HashSet<Rc<String>>,
+        state_bits: &HashMap<Rc<String>, u64>,
+        if_bits: &HashMap<Rc<String>, u64>,
+    ) -> HashSet<Rc<String>> {
+        let mut res = HashSet::new();
+        for action in self.read_actions_as_ref() {
+            res.extend(action.get_iface_refs_for_state_update(state_syms, state_bits, if_bits));
+        }
+
+        for action in self.write_actions_as_ref() {
+            res.extend(action.get_iface_refs_for_state_update(state_syms, state_bits, if_bits));
+        }
+        res
     }
 
     pub fn loc(&self) -> &VelosiTokenStream {
@@ -1099,6 +1122,9 @@ impl VelosiAstInterfaceDef {
         let mut fields_map = HashMap::new();
         for f in &fields {
             fields_map.insert(f.ident_to_string(), f.clone());
+            // XXX: stupd work around to enable lookup using the identifier
+            let n = f.ident_as_str().split(".").last().unwrap();
+            fields_map.insert(n.to_string(), f.clone());
         }
         VelosiAstInterfaceDef {
             params,
@@ -1192,6 +1218,26 @@ impl VelosiAstInterfaceDef {
         let res = Self::new(params, fields, pt.loc);
         ast_result_return!(VelosiAstInterface::InterfaceDef(res), issues)
     }
+
+    pub fn fields_accessing_state(
+        &self,
+        state_syms: &HashSet<Rc<String>>,
+        state_bits: &HashMap<Rc<String>, u64>,
+    ) -> HashSet<Rc<String>> {
+        let mut if_bits = HashMap::new();
+        for f in &self.fields {
+            for l in f.layout_as_slice() {
+                if_bits.insert(l.ident_as_rc_string(), l.mask());
+            }
+        }
+
+        let mut hs = HashSet::new();
+        for f in &self.fields {
+            let fhs = f.accessing_state(state_syms, state_bits, &if_bits);
+            hs.extend(fhs)
+        }
+        hs
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstInterfaceDef]
@@ -1245,10 +1291,29 @@ impl VelosiAstInterface {
         }
     }
 
+    pub fn field(&self, name: &str) -> Option<&VelosiAstInterfaceField> {
+        match self {
+            VelosiAstInterface::InterfaceDef(def) => def.fields_map.get(name).map(|rc| rc.as_ref()),
+            VelosiAstInterface::NoneInterface(_) => None,
+        }
+    }
+
     pub fn loc(&self) -> &VelosiTokenStream {
         match self {
             VelosiAstInterface::InterfaceDef(s) => &s.loc,
             VelosiAstInterface::NoneInterface(s) => s,
+        }
+    }
+
+    // returns a list of all the fields with action that touch one of the state elements
+    pub fn fields_accessing_state(
+        &self,
+        state_syms: &HashSet<Rc<String>>,
+        state_bits: &HashMap<Rc<String>, u64>,
+    ) -> HashSet<Rc<String>> {
+        match self {
+            VelosiAstInterface::InterfaceDef(s) => s.fields_accessing_state(state_syms, state_bits),
+            VelosiAstInterface::NoneInterface(_s) => HashSet::new(),
         }
     }
 }
