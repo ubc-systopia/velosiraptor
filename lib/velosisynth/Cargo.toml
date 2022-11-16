@@ -15,7 +15,9 @@ velosiast = { path = "../velosiast" }
 colored = "2.0.0"
 custom_error = "1.9.2"
 smt2 = { path = "../smtlib2" }
-
+log = { version = "0.4.17", features = ["max_level_trace", "release_max_level_warn"] }
+simplelog = { version = "^0.12.0", features = ["paris"] }
+clap = { version = "4.0.24", features = [ "cargo" ] }
 [lib]
 name = "velosisynth"
 path = "src/lib.rs"

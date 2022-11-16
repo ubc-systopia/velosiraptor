@@ -52,7 +52,7 @@ pub struct Z3Instance {
 impl Z3Instance {
     /// creates a new z3 instance with the given identifier
     pub fn new(id: usize) -> Self {
-        // println!("[z3-inst-{}] creating new", id);
+        log::trace!("[Z3Instance-{}] creating new", id);
 
         Z3Instance {
             id,
@@ -63,11 +63,11 @@ impl Z3Instance {
 
     /// creates a new Z3 instace with the supplied log path
     pub fn with_logpath(id: usize, logpath: &PathBuf) -> Self {
-        // println!(
-        //     "[z3-inst-{}] creating new with log {}",
-        //     id,
-        //     logpath.display()
-        // );
+        log::trace!(
+            "[Z3Instance-{}] creating new with log {}",
+            id,
+            logpath.display()
+        );
 
         // create the log directory if it does not exist
         fs::create_dir_all(logpath).expect("failed to create the log directory");
@@ -76,8 +76,8 @@ impl Z3Instance {
         let p = logpath.join(format!("z3-worker-{}-log.smt2", id));
         let logfile = match File::create(p) {
             Ok(f) => Some(f),
-            Err(_) => {
-                // println!("[z3-inst-{}] failed to create the file: {}", id, e);
+            Err(e) => {
+                log::warn!("[Z3Instance-{}] failed to create the file ({})", id, e);
                 None
             }
         };
@@ -103,7 +103,7 @@ impl Z3Instance {
     /// terminates the z3 instance
     pub fn terminate(&mut self) {
         if self.z3_proc.kill().is_ok() {
-            println!("[z3-inst-{}] forcefully terminated z3 instance", self.id);
+            log::warn!("[Z3Instance-{}] forcefully terminated z3 instance", self.id);
         }
         self.z3_proc
             .wait()
@@ -125,7 +125,7 @@ impl Z3Instance {
             match self.exec(&mut Z3Query::reset()) {
                 Ok(_) => Ok(()),
                 Err(e) => {
-                    // println!("[z3-inst-{}] failed to reset", self.id);
+                    log::error!("[Z3Instance-{}] failed to reset", self.id);
                     Err(e)
                 }
             }
@@ -134,7 +134,7 @@ impl Z3Instance {
 
     ///executes the query
     pub fn exec(&mut self, query: &mut Z3Query) -> Result<Z3Result, Z3Error> {
-        //  println!("[z3-inst-{}] writing commands", self.id);
+        log::trace!("[Z3Instance-{}] executing query", self.id);
 
         // write the commands to the z3 process' stdin
         if let Some(z3_stdin) = self.z3_proc.stdin.as_mut() {
@@ -163,7 +163,7 @@ impl Z3Instance {
         }
 
         // read back the results from stdout
-        // println!("[z3-inst-{}] reading results...", self.id);
+        log::trace!("[Z3Instance-{}] obtaining query results", self.id);
 
         let result = if let Some(z3_stdout) = self.z3_proc.stdout.as_mut() {
             // create a buffer reader for the z3_stdout
@@ -187,13 +187,13 @@ impl Z3Instance {
             String::new()
         };
 
-        // println!("[z3-inst-{}] result '{}'", self.id, result);
+        log::trace!("[Z3Instance-{}] query result is '{}'", self.id, result);
         Ok(Z3Result::new(result))
     }
 
     ///executes the query
     pub fn exec_shared(&mut self, query: &Z3Query) -> Result<Z3Result, Z3Error> {
-        // println!("[z3-inst-{}] writing commands", self.id);
+        log::trace!("[Z3Instance-{}] executing shared query", self.id);
 
         // write the commands to the z3 process' stdin
         if let Some(z3_stdin) = self.z3_proc.stdin.as_mut() {
@@ -218,8 +218,6 @@ impl Z3Instance {
         }
 
         // read back the results from stdout
-        // println!("[z3-inst-{}] reading results...", self.id);
-
         let result = if let Some(z3_stdout) = self.z3_proc.stdout.as_mut() {
             // create a buffer reader for the z3_stdout
             let mut z3_buf_reader = BufReader::new(z3_stdout);
@@ -243,7 +241,6 @@ impl Z3Instance {
             String::new()
         };
 
-        // println!("[z3-inst-{}] result '{}'", self.id, result);
         Ok(Z3Result::new(result))
     }
 }

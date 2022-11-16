@@ -212,8 +212,9 @@ fn add_model_iface_accessors(smt: &mut Smt2Context, iface: &VelosiAstInterface) 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn action_fn_name(fieldname: &str, ty: &str) -> String {
+    let fieldname = fieldname.split('.').last().unwrap();
     format!(
-        "{}.{}.{}.{}actions!",
+        "{}.{}.{}.{}action!",
         MODEL_PREFIX, IFACE_PREFIX, fieldname, ty
     )
 }

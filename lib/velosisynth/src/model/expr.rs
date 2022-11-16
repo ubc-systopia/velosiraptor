@@ -85,14 +85,13 @@ pub fn expr_to_smt2(e: &VelosiAstExpr, stvar: &str) -> smt2::Term {
                 Term::ident(i.path[0].to_string())
             } else if i.path.len() == 2 {
                 // if we have flags, then this is bascially a field access
-                println!("i.path: {:?}  {}", i.ident_as_str(), i.etype.is_flags());
                 if i.etype.is_flags() {
                     flags_get_fn(i.path[0].as_str(), i.path[1].as_str())
                 } else {
                     model_accessor_read_fn(stvar, i.path[0].as_str(), i.path[1].as_str())
                 }
             } else if i.path.len() == 3 {
-                let fieldslice = format!("{}.{}", i.path[1], i.path[2]);
+                //let fieldslice = format!("{}.{}", i.path[1], i.path[2]);
                 model_slice_accessor_read_fn(
                     stvar,
                     i.path[0].as_str(),
@@ -155,7 +154,8 @@ pub fn expr_to_smt2(e: &VelosiAstExpr, stvar: &str) -> smt2::Term {
             }
         }
         FnCall(i) => {
-            let args = i.args.iter().map(|a| expr_to_smt2(a, stvar)).collect();
+            let mut args = vec![Term::ident(stvar.to_string())];
+            args.extend(i.args.iter().map(|a| expr_to_smt2(a, stvar)));
             Term::fn_apply(i.name.to_string(), args)
         }
         IfElse(i) => Term::ifelse(

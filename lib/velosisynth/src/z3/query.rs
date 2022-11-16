@@ -25,6 +25,7 @@
 
 // standard library imports
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+use std::sync::Arc;
 use std::time::Instant;
 
 // external library imports
@@ -53,12 +54,13 @@ impl Display for Z3Ticket {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// represents a Z3 smt query
+#[derive(Eq, PartialEq)]
 pub struct Z3Query {
     /// the operations of this query for bookkeeping purposes
     prog: Option<Program>,
 
     /// the statements to be executed
-    smt: Smt2Context,
+    smt: Arc<Smt2Context>,
 
     /// the timestamps fo tracing
     timestamps: Vec<(&'static str, Instant)>,
@@ -74,8 +76,16 @@ impl Z3Query {
     pub fn with_context(smt: Smt2Context) -> Self {
         Self {
             prog: None,
-            smt,
+            smt: Arc::new(smt),
             timestamps: Vec::with_capacity(10),
+        }
+    }
+
+    pub fn clone_without_program(&self) -> Self {
+        Self {
+            prog: None,
+            smt: self.smt.clone(),
+            timestamps: Vec::with_capacity(0),
         }
     }
 
@@ -96,13 +106,7 @@ impl Z3Query {
 
     /// sets the SMT context of the query
     pub fn set_smt(&mut self, smt: Smt2Context) -> &mut Self {
-        self.smt = smt;
-        self
-    }
-
-    /// adds a command to the SMT context
-    pub fn add_command(&mut self, cmd: Smt2Command) -> &mut Self {
-        self.smt.add_command(cmd);
+        self.smt = Arc::new(smt);
         self
     }
 
@@ -111,14 +115,13 @@ impl Z3Query {
         &self.smt
     }
 
-    /// obtains a mutable reference to the smt context of this query
-    pub fn smt_context_mut(&mut self) -> &mut Smt2Context {
-        &mut self.smt
-    }
-
     /// obtains a reference to the operations of this query
     pub fn program(&self) -> Option<&Program> {
         self.prog.as_ref()
+    }
+
+    pub fn take_program(&mut self) -> Option<Program> {
+        self.prog.take()
     }
 
     pub fn program_mut(&mut self) -> &mut Program {
@@ -169,11 +172,11 @@ impl From<Smt2Context> for Z3Query {
     }
 }
 
-impl From<Z3Query> for Smt2Context {
-    fn from(item: Z3Query) -> Self {
-        item.smt
-    }
-}
+// impl From<Z3Query> for Smt2Context {
+//     fn from(item: Z3Query) -> Self {
+//         item.smt.
+//     }
+// }
 
 impl Display for Z3Query {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
@@ -184,6 +187,15 @@ impl Display for Z3Query {
 impl Debug for Z3Query {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "Query: {}", self.smt)
+    }
+}
+
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+
+impl Hash for Z3Query {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.smt.hash(state);
     }
 }
 
@@ -206,6 +218,13 @@ impl Z3Result {
         Self {
             query: None,
             result,
+        }
+    }
+
+    pub fn clone_with_query(&self, query: Z3Query) -> Self {
+        Self {
+            query: Some(query),
+            result: self.result.clone(),
         }
     }
 
@@ -277,5 +296,11 @@ impl Display for Z3Result {
 impl Debug for Z3Result {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "Result: {}", self.result)
+    }
+}
+
+impl From<Z3Result> for Z3Query {
+    fn from(item: Z3Result) -> Self {
+        item.query.unwrap()
     }
 }

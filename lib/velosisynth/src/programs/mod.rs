@@ -26,6 +26,8 @@
 //! Synthesis Module: Operations
 
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter, Result as FmtResult};
+use std::rc::Rc;
 use std::sync::Arc;
 
 use smt2::{Function, Smt2Context, Term, VarBinding};
@@ -42,7 +44,7 @@ mod symvars;
 use statevars::StateVars;
 
 // public re-exports
-pub use builder::ProgramsBuilder;
+pub use builder::{MultiDimIterator, ProgramsBuilder};
 pub use symvars::SymbolicVars;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -123,7 +125,7 @@ pub enum Expression {
     /// the literal without any operation
     Lit(Literal),
     /// logic right shift: `a >> b`
-    RShift(Literal, Literal),
+    // RShift(Literal, Literal),  // replace the right shift with the ShiftMask
     /// left shift operation: `a << b`
     LShift(Literal, Literal),
     /// division operation: `a / b`
@@ -153,10 +155,10 @@ impl Expression {
         use Expression::*;
         match self {
             Lit(x) => Lit(x.replace_symbolic_values(vals)),
-            RShift(a, b) => RShift(
-                a.replace_symbolic_values(vals),
-                b.replace_symbolic_values(vals),
-            ),
+            // RShift(a, b) => RShift(
+            //     a.replace_symbolic_values(vals),
+            //     b.replace_symbolic_values(vals),
+            // ),
             LShift(a, b) => LShift(
                 a.replace_symbolic_values(vals),
                 b.replace_symbolic_values(vals),
@@ -194,16 +196,44 @@ impl Expression {
         }
     }
 
+    pub fn skip_for_bits(&self, bits: usize) -> bool {
+        use Expression::*;
+        match (bits, self) {
+            // all with 0 bits
+            (0, _) => true,
+            // with 1 bits, we can basicaly remove a lot of operations...
+            (1, Lit(Literal::Val(_))) => false,
+            (1, Lit(Literal::Num)) => true, // skip arbitrary numbers
+            (1, Lit(Literal::Var(_))) => true, // we skip the base variable
+            (1, Lit(Literal::Flag(_, _))) => false,
+            // (1, RShift(_, _)) => true, // keep right shifts
+            (1, LShift(_, _)) => true, // left shifts are useless here...
+            (1, Div(_, _)) => true,
+            (1, Mul(_, _)) => true,
+            (1, Add(_, _)) => true,
+            (1, Sub(_, _)) => true,
+            (1, And(_, Literal::Val(1))) => false,
+            (1, And(_, Literal::Flag(_, _))) => false,
+            (1, And(_, _)) => true,
+            (1, Or(_, Literal::Flag(_, _))) => false,
+            (1, Or(_, _)) => true, // skip Or,
+            (1, ShiftMask(_, _, Literal::Val(1))) => false,
+            (1, ShiftMask(_, _, _)) => true,
+            (1, Not(_)) => false, // don't skip negations
+            _ => false,
+        }
+    }
+
     /// Converts the [Expression] into a [Term] for smt query
     pub fn to_smt2_term(&self, symvars: &mut SymbolicVars) -> Term {
         use Expression::*;
         match self {
             Lit(x) => x.to_smt2_term(symvars),
-            RShift(x, y) => {
-                let x = x.to_smt2_term(symvars);
-                let y = y.to_smt2_term(symvars);
-                Term::bvshr(x, y)
-            }
+            // RShift(x, y) => {
+            //     let x = x.to_smt2_term(symvars);
+            //     let y = y.to_smt2_term(symvars);
+            //     Term::bvshr(x, y)
+            // }
             LShift(x, y) => {
                 let x = x.to_smt2_term(symvars);
                 let y = y.to_smt2_term(symvars);
@@ -258,7 +288,7 @@ impl From<&Expression> for OpExpr {
         use Expression::*;
         match prog {
             Lit(x) => OpExpr::from(x),
-            RShift(x, y) => OpExpr::Shr(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y))),
+            //RShift(x, y) => OpExpr::Shr(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y))),
             LShift(x, y) => OpExpr::Shl(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y))),
             Div(x, y) => OpExpr::Div(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y))),
             Mul(x, y) => OpExpr::Mul(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y))),
@@ -306,11 +336,12 @@ impl FieldSliceOp {
     /// Converts the [Expression] into a [Term] for smt query
     pub fn to_smt2_term(
         &self,
+        fieldname: &str,
         smtops: &mut Vec<(String, Option<Term>)>,
         symvars: &mut SymbolicVars,
     ) {
         let arg = self.1.to_smt2_term(symvars);
-        let fname = format!("Model.IFace.{}.set!", self.0);
+        let fname = format!("Model.IFace.{}.{}.set!", fieldname, self.0);
         smtops.push((fname, Some(arg)));
     }
 }
@@ -367,14 +398,14 @@ impl FieldOp {
             FieldOp::InsertFieldSlices(sliceops) => {
                 sliceops
                     .iter()
-                    .for_each(|f| f.to_smt2_term(smtops, symvars));
+                    .for_each(|f| f.to_smt2_term(fieldname, smtops, symvars));
             }
             FieldOp::ReadAction => {
-                let fname = format!("Model.IFace.{}.readaction ", fieldname);
+                let fname = format!("Model.IFace.{}.readaction! ", fieldname);
                 smtops.push((fname, None));
             }
             FieldOp::WriteAction => {
-                let fname = format!("Model.IFace.{}.writeaction ", fieldname);
+                let fname = format!("Model.IFace.{}.writeaction! ", fieldname);
                 smtops.push((fname, None));
             }
         }
@@ -467,7 +498,7 @@ impl FieldActions {
             .for_each(|f| f.to_smt2_term(self.0.as_str(), smtops, symvars));
 
         // field actions always end with a write action
-        let fname = format!("Model.IFace.{}.writeaction ", self.0);
+        let fname = format!("Model.IFace.{}.writeaction! ", self.0);
         smtops.push((fname, None));
     }
 }
@@ -486,6 +517,15 @@ impl From<&FieldActions> for Vec<Operation> {
     }
 }
 
+impl Display for FieldActions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        for a in self.1.iter() {
+            writeln!(f, "{}.{:?};", self.0, a)?;
+        }
+        Ok(())
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Program -- A full configuration sequence
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -494,7 +534,7 @@ impl From<&FieldActions> for Vec<Operation> {
 ///
 /// A program represents the sequence of operations on fields that perform the configuration
 /// sequence.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Program(Vec<Arc<FieldActions>>);
 
 impl Program {
@@ -519,7 +559,7 @@ impl Program {
     pub fn to_smt2_term(
         &self,
         fnname: &str,
-        args: &[VelosiAstParam],
+        args: &[Rc<VelosiAstParam>],
     ) -> (Smt2Context, SymbolicVars) {
         // new symbolic variables
         let mut symvar = SymbolicVars::new();
@@ -689,5 +729,14 @@ impl From<Program> for Vec<Operation> {
             .collect();
         ops.push(Operation::Return);
         ops
+    }
+}
+
+impl Display for Program {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        for a in self.0.iter() {
+            writeln!(f, "{};", a)?;
+        }
+        Ok(())
     }
 }
