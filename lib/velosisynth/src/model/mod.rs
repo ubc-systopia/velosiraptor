@@ -33,11 +33,8 @@ pub mod flags;
 pub mod interface;
 pub mod method;
 pub mod model;
-pub mod resultparser;
 pub mod state;
 pub mod types;
-
-pub use resultparser::parse_result;
 
 pub fn create(unit: &VelosiAstUnitSegment) -> Smt2Context {
     let mut smt = Smt2Context::new();
@@ -60,7 +57,6 @@ pub fn create(unit: &VelosiAstUnitSegment) -> Smt2Context {
     interface::add_interface_def(&mut smt, &unit.interface);
     model::add_model_def(&mut smt, unit);
     method::add_methods(&mut smt, unit.methods.as_slice());
-    method::add_translate_result_checks(&mut smt);
 
     smt
 }

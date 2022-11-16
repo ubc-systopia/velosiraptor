@@ -25,90 +25,96 @@
 
 //! Synthesis of Virtual Memory Operations
 
+use std::fmt::{Display, Formatter, Result as FmtResult};
+
+pub mod map;
+mod precond;
+pub mod protect;
+mod resultparser;
 pub mod sanity;
+mod semantics;
+pub mod unmap;
+mod utils;
 
-// fn check_programs_precond(
-//     &mut self,
-//     m_fn: &Method,
-//     g_fn: &Method,
-//     idx: Option<usize>,
-//     negate: bool,
-//     mut progs: Vec<Program>,
-// ) -> Vec<Z3Ticket> {
+use crate::z3::{Z3Result, Z3Ticket};
 
-//     let mut tickets = Vec::new();
-//     for (_i, prog) in progs.drain(..).enumerate() {
-//         let (mut smt, symvars) = prog.to_smt2(&m_fn.name, m_fn.args.as_slice());
+/// a combined program
+pub enum TicketOrResult {
+    Ticket(Vec<Z3Ticket>),
+    Result(Vec<Z3Result>),
+}
 
-//         let vars = vec![
-//             SortedVar::new(String::from("st!0"), model::types::model()),
-//             SortedVar::new(String::from("va"), String::from("VAddr_t")),
-//             SortedVar::new(String::from("sz"), String::from("Size_t")),
-//             SortedVar::new(String::from("pa"), String::from("PAddr_t")),
-//             SortedVar::new(String::from("flgs"), String::from("Flags_t")),
-//         ];
+impl TicketOrResult {
+    pub fn len(&self) -> usize {
+        match self {
+            TicketOrResult::Ticket(tickets) => tickets.len(),
+            TicketOrResult::Result(results) => results.len(),
+        }
+    }
+}
 
-//         // for a in &m_fn.args {
-//         //     vars.push(SortedVar::new(
-//         //         a.name.clone(),
-//         //         types::type_to_smt2(&a.ptype),
-//         //     ));
-//         // }
+pub struct CandidateFragmentsQueries {
+    translate_preconds: Vec<Vec<Z3Ticket>>,
+    translate_semantics: Vec<Vec<Z3Ticket>>,
+    matchflags_preconds: Vec<Vec<Z3Ticket>>,
+    matchflags_semantics: Vec<Vec<Z3Ticket>>,
+}
 
-//         let mut assm_args = vec![Term::ident(String::from("st!0"))];
-//         for a in g_fn.args.iter() {
-//             assm_args.push(Term::ident(a.name.clone()));
-//         }
+impl CandidateFragmentsQueries {
+    pub fn query_count(&self) -> usize {
+        self.translate_preconds
+            .iter()
+            .fold(0, |acc, x| acc + x.len())
+            + self
+                .translate_semantics
+                .iter()
+                .fold(0, |acc, x| acc + x.len())
+            + self
+                .matchflags_preconds
+                .iter()
+                .fold(0, |acc, x| acc + x.len())
+            + self
+                .matchflags_semantics
+                .iter()
+                .fold(0, |acc, x| acc + x.len())
+    }
+}
 
-//         let pre1 = Term::fn_apply(format!("{}.assms", g_fn.name), assm_args);
+impl Display for CandidateFragmentsQueries {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, " - translate-precond: ")?;
+        for a in self.translate_preconds.iter() {
+            write!(f, "{:?}, ", a.len())?;
+        }
+        write!(f, "\n - translate-semantics: ")?;
+        for a in self.translate_semantics.iter() {
+            write!(f, "{:?}, ", a.len())?;
+        }
+        write!(f, "\n - matchflags-precond: ")?;
+        for a in self.matchflags_preconds.iter() {
+            write!(f, "{:?}, ", a.len())?;
+        }
+        write!(f, "\n - matchflags-semantics: ")?;
+        for a in self.matchflags_semantics.iter() {
+            write!(f, "{:?}, ", a.len())?;
+        }
+        Ok(())
+    }
+}
 
-//         let mut assm_args = vec![Term::ident(String::from("st!0"))];
-//         for a in m_fn.args.iter() {
-//             assm_args.push(Term::ident(a.name.clone()));
-//         }
-//         let pre2 = Term::fn_apply(format!("{}.assms", m_fn.name), assm_args);
+pub struct CandidateBlockQueries {
+    translate_preconds: TicketOrResult,
+    translate_semantics: TicketOrResult,
+    matchflags_preconds: TicketOrResult,
+    matchflags_semantics: TicketOrResult,
+}
 
-//         let pre = Term::land(pre1, pre2);
+struct CandidateProgram {
+    translate_preconds: Z3Ticket,
+    translate_semantics: Z3Ticket,
+    matchflags_preconds: Z3Ticket,
+    matchflags_semantics: Z3Ticket,
+}
 
-//         let mut fn_args = vec![Term::ident(String::from("st!0"))];
-//         for v in m_fn.args.iter() {
-//             fn_args.push(Term::ident(v.name.clone()));
-//         }
-
-//         let mut check_args = vec![Term::fn_apply(m_fn.name.clone(), fn_args)];
-//         for a in g_fn.args.iter() {
-//             check_args.push(Term::ident(a.name.clone()));
-//         }
-
-//         let check = if let Some(i) = idx {
-//             Term::fn_apply(format!("{}.pre.{}", g_fn.name, i), check_args)
-//         } else {
-//             Term::fn_apply(format!("{}.pre", g_fn.name), check_args)
-//         };
-
-//         let t = if negate {
-//             Term::forall(vars, pre.implies(Term::lnot(check)))
-//         } else {
-//             Term::forall(vars, pre.implies(check))
-//         };
-
-//         smt.assert(t);
-//         smt.check_sat();
-
-//         symvars.add_get_values(&mut smt);
-//         let mut smtctx = Smt2Context::new();
-//         smtctx.subsection(String::from("Verification"));
-//         smtctx.level(smt);
-
-//         let mut query = Z3Query::from(smtctx);
-//         query.set_program(prog);
-
-//         let ticket = self
-//             .workerpool
-//             .submit_query(query)
-//             .expect("failed to submit query");
-
-//         tickets.push(ticket);
-//     }
-//     tickets
-// }
+// the candidate programs
+pub struct CandidatePrograms(Vec<CandidateProgram>);

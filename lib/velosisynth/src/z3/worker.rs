@@ -82,8 +82,6 @@ impl Z3Worker {
     }
 
     pub fn with_context(wid: usize, logpath: Option<&PathBuf>, task: Arc<Z3Query>) -> Self {
-        // println!("[z3-worker-{}] creating new", wid);
-
         // create the running flag
         let running = Arc::new(AtomicBool::new(true));
         let running_clone = running.clone();
@@ -102,12 +100,10 @@ impl Z3Worker {
         let thread = thread::Builder::new()
             .name(format!("z3-worker-{}", wid))
             .spawn(move || {
-                // println!("[z3-worker-{}] starting...", wid);
                 while running_clone.load(Ordering::Relaxed) {
                     let msg = task_rx.recv();
                     let result = match msg {
                         Ok(Z3QueryMsg::Query(id, mut query)) => {
-                            // println!("[z3-worker-{}] new query...", wid);
                             query.timestamp("request");
                             let result = z3.exec(&mut query);
                             query.timestamp("smt");
@@ -134,7 +130,6 @@ impl Z3Worker {
                             continue;
                         }
                         Ok(Z3QueryMsg::Terminate) => {
-                            // println!("[z3-worker-{}] terminating Z3 instance...", wid);
                             // terminate the z3 instance
                             z3.terminate();
                             running_clone.store(false, Ordering::Relaxed);
@@ -142,22 +137,18 @@ impl Z3Worker {
                         }
                         Err(_) => {
                             // channel closed, exit
-                            // println!("[z3-worker-{}] channel closed...", wid);
                             running_clone.store(false, Ordering::Relaxed);
                             z3.terminate();
                             break;
                         }
                     };
 
-                    // println!("[z3-worker-{}] sending result", wid);
                     let msg = result_tx.send(result);
                     if msg.is_err() {
-                        // println!("[z3-worker-{}] channel closed exiting", wid);
                         running_clone.store(false, Ordering::Relaxed);
                         break;
                     }
                 }
-                // println!("[z3-worker-{}] exiting...", wid);
             })
             .unwrap();
 
@@ -344,6 +335,8 @@ pub struct Z3WorkerPool {
     taskq: VecDeque<(Z3Ticket, Z3Query)>,
     /// stored results that haven't been collected by the client
     results: HashMap<Z3Ticket, Z3Result>,
+    ///
+    query_cache: HashMap<Z3Query, Result<Z3Result, ()>>,
 }
 
 impl Z3WorkerPool {
@@ -355,7 +348,11 @@ impl Z3WorkerPool {
     }
 
     pub fn with_num_workers(num_workers: usize, logpath: Option<&PathBuf>) -> Self {
-        // println!("[z3-pool] initializing with {} workers", num_workers);
+        log::info!(
+            target : "[Z3WorkerPool]", " initializing using {} workers, logpath {:?}",
+            num_workers,
+            logpath
+        );
 
         let mut workers_idle = Vec::with_capacity(num_workers);
         for i in 1..=num_workers {
@@ -367,6 +364,7 @@ impl Z3WorkerPool {
             workers_busy: Vec::new(),
             taskq: VecDeque::new(),
             results: HashMap::new(),
+            query_cache: HashMap::new(),
         }
     }
 
@@ -383,10 +381,11 @@ impl Z3WorkerPool {
         logpath: Option<&PathBuf>,
         ctx: Z3Query,
     ) -> Self {
-        // println!(
-        //     "[z3-pool] initializing with {} workers, and context",
-        //     num_workers
-        // );
+        log::info!(
+            target : "[Z3WorkerPool]", " initializing with context using {} workers, logpath {:?}",
+            num_workers,
+            logpath
+        );
 
         let ctx = Arc::new(ctx);
         let mut workers_idle = Vec::with_capacity(num_workers);
@@ -399,6 +398,7 @@ impl Z3WorkerPool {
             workers_busy: Vec::with_capacity(num_workers),
             taskq: VecDeque::new(),
             results: HashMap::new(),
+            query_cache: HashMap::new(),
         }
     }
 
@@ -407,6 +407,15 @@ impl Z3WorkerPool {
         for mut w in self.workers_busy.drain(..) {
             if let Some((id, mut r)) = w.try_recv_result() {
                 r.query_mut().timestamp("result");
+                log::trace!(target : "[Z3WorkerPool]", " task {} is complete", id);
+
+                // insert the cached result
+                if r.has_query() {
+                    let query = r.query();
+                    let result = r.result().to_string();
+                    self.query_cache
+                        .insert(query.clone_without_program(), Ok(Z3Result::new(result)));
+                }
                 self.results.insert(id, r);
                 self.workers_idle.push(w);
             } else {
@@ -425,17 +434,50 @@ impl Z3WorkerPool {
 
     fn try_send_tasks(&mut self) {
         if self.taskq.is_empty() {
+            log::trace!(target : "[Z3WorkerPool]", " no new tasks.");
             return;
         }
 
-        if let Some(mut w) = self.workers_idle.pop() {
+        while let Some(mut w) = self.workers_idle.pop() {
+            if self.taskq.is_empty() {
+                log::trace!(target : "[Z3WorkerPool]", " no more tasks to send.");
+                self.workers_idle.push(w);
+                return;
+            }
+
             let (id, mut task) = self.taskq.pop_front().unwrap();
             task.timestamp("queue");
+
+            // see if we can the cached result
+            match self.query_cache.get(&task) {
+                Some(Ok(r)) => {
+                    // we've already computed this query and it's results are ready
+                    log::info!(target : "[Z3WorkerPool]", " not sending task, cached result for {}", id);
+                    self.results.insert(id, r.clone_with_query(task));
+                    self.workers_idle.push(w);
+                    continue;
+                }
+                Some(Err(_)) => {
+                    // we've submited but it's pending, push it back and continue
+                    log::info!(target : "[Z3WorkerPool]", " not sending task, pending result for {}", id);
+                    self.taskq.push_back((id, task));
+                    continue;
+                }
+                None => {
+                    log::trace!(target : "[Z3WorkerPool]", " sending task for {}", id);
+                    // we haven't seen this query before, add it to the cache
+                    self.query_cache
+                        .insert(task.clone_without_program(), Err(()));
+                }
+            }
+
+            // send the query
             match w.send_query(task, id) {
                 Ok(_) => {
                     self.workers_busy.push(w);
                 }
                 Err(t) => {
+                    log::error!(target : "[Z3WorkerPool]", " sending task failed");
                     self.workers_idle.push(w);
                     self.taskq.push_back((id, t));
                 }
@@ -444,11 +486,7 @@ impl Z3WorkerPool {
     }
 
     pub fn submit_query(&mut self, mut task: Z3Query) -> Result<Z3Ticket, Z3Query> {
-        // use some hashing stuff to do caching of queries...
-        // let mut s = DefaultHasher::new();
-        // task.hash(&mut s);
-        // let id = s.finish();
-
+        log::trace!(target : "[Z3WorkerPool]", " submitting query");
         // take the timestamp
         task.timestamp("submit");
         self.maybe_check_completd_tasks();
@@ -465,6 +503,7 @@ impl Z3WorkerPool {
     }
 
     pub fn wait_for_completion(&mut self) {
+        log::warn!(target : "[Z3WorkerPool]", " waiting for completion of all tasks");
         loop {
             self.check_completed_tasks();
             self.try_send_tasks();
@@ -481,6 +520,7 @@ impl Z3WorkerPool {
             if let Some(r) = res {
                 return r;
             }
+            log::trace!(target : "[Z3WorkerPool]", " waiting for task {}", id);
             self.check_completed_tasks();
             self.try_send_tasks();
             thread::yield_now();
@@ -492,8 +532,10 @@ impl Z3WorkerPool {
     }
 
     pub fn reset(&mut self) {
+        log::warn!(target : "[Z3WorkerPool]", " performing reset of worker pool");
         self.taskq.clear();
         self.results.clear();
+        self.query_cache.clear();
         for w in self.workers_idle.iter_mut() {
             w.reset();
         }
@@ -504,6 +546,8 @@ impl Z3WorkerPool {
     }
 
     pub fn reset_with_context(&mut self, ctx: Z3Query) {
+        log::warn!(target : "[Z3WorkerPool]", " performing reset of worker pool with context");
+
         self.taskq.clear();
         self.results.clear();
 
@@ -515,11 +559,15 @@ impl Z3WorkerPool {
         for w in self.workers_busy.iter_mut() {
             w.reset_with_context(ctx.clone());
         }
+
+        self.query_cache.clear();
     }
 
     pub fn terminate(&mut self) {
+        log::warn!(target : "[Z3WorkerPool]", " terminating worker pool");
         self.taskq.clear();
         self.results.clear();
+        self.query_cache.clear();
         self.workers_idle.clear();
         self.workers_busy.clear();
     }
