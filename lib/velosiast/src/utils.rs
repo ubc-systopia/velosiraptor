@@ -263,7 +263,7 @@ pub fn actions_conflict_check(issues: &mut VelosiAstIssues, actions: &[VelosiAst
 
 pub fn check_fn_call_args(
     issues: &mut VelosiAstIssues,
-    st: &SymbolTable,
+    _st: &SymbolTable,
     params: &[Rc<VelosiAstParam>],
     args: &[VelosiAstExpr],
 ) {
@@ -321,9 +321,9 @@ pub fn check_fn_call_args(
         }
 
         let param = &params[i];
-        if !param.ptype.typeinfo.compatible(arg.result_type(st)) {
+        if !param.ptype.typeinfo.compatible(arg.result_type()) {
             let msg = "mismatched types";
-            let hint = format!("expected {}, found {}", param.ptype, arg.result_type(st));
+            let hint = format!("expected {}, found {}", param.ptype, arg.result_type());
             let err = VelosiAstErrBuilder::err(msg.to_string())
                 .add_hint(hint)
                 .add_location(arg.loc().clone())

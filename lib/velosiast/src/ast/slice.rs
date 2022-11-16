@@ -121,13 +121,14 @@ impl VelosiAstFieldSlice {
         self.ident.name.to_string()
     }
 
+    pub fn bits(&self) -> usize {
+        (self.end - self.start) as usize
+    }
+
     /// constructs the mask value of the bit slice
-    ///
-    /// # Example
-    /// start = 0, end = 3 -> 0xf
     pub fn mask(&self) -> u64 {
         let mut mask = 0;
-        for i in self.start..=self.end {
+        for i in self.start..self.end {
             mask |= 1 << i;
         }
         mask

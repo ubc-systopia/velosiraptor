@@ -175,7 +175,7 @@ impl VelosiAstBinOp {
         }
     }
 
-    pub fn result_type(&self, _st: &SymbolTable) -> &VelosiAstTypeInfo {
+    pub fn result_type(&self) -> &VelosiAstTypeInfo {
         if self.result_numeric() {
             &VelosiAstTypeInfo::Integer
         } else if self.result_boolean() {
@@ -278,8 +278,8 @@ impl VelosiAstBinOpExpr {
         let rhs = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(*pt.rhs, st), issues);
 
         // obtain the result types
-        let lhs_type = lhs.result_type(st);
-        let rhs_type = rhs.result_type(st);
+        let lhs_type = lhs.result_type();
+        let rhs_type = rhs.result_type();
 
         // evaluate whether the types are ok
         if !op.types_ok(lhs_type, rhs_type) {
@@ -412,8 +412,8 @@ impl VelosiAstBinOpExpr {
         self.lhs.has_interface_references() || self.rhs.has_interface_references()
     }
 
-    pub fn result_type(&self, st: &SymbolTable) -> &VelosiAstTypeInfo {
-        self.op.result_type(st)
+    pub fn result_type(&self) -> &VelosiAstTypeInfo {
+        self.op.result_type()
     }
 }
 
@@ -467,7 +467,7 @@ impl VelosiAstUnOp {
         self.is_logical()
     }
 
-    pub fn result_type(&self, _st: &SymbolTable) -> &VelosiAstTypeInfo {
+    pub fn result_type(&self) -> &VelosiAstTypeInfo {
         use self::VelosiAstUnOp::*;
         match self {
             Not => &VelosiAstTypeInfo::Integer,
@@ -532,7 +532,7 @@ impl VelosiAstUnOpExpr {
         let expr = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(*pt.expr, st), issues);
 
         // obtain the result types
-        let expr_type = expr.result_type(st);
+        let expr_type = expr.result_type();
 
         // evaluate whether the types are ok
         if !op.types_ok(expr_type) {
@@ -600,8 +600,8 @@ impl VelosiAstUnOpExpr {
         self.expr.has_interface_references()
     }
 
-    pub fn result_type(&self, st: &SymbolTable) -> &VelosiAstTypeInfo {
-        self.op.result_type(st)
+    pub fn result_type(&self) -> &VelosiAstTypeInfo {
+        self.op.result_type()
     }
 }
 
@@ -844,7 +844,7 @@ impl VelosiAstIdentLiteralExpr {
         }
     }
 
-    pub fn result_type(&self, _st: &SymbolTable) -> &VelosiAstTypeInfo {
+    pub fn result_type(&self) -> &VelosiAstTypeInfo {
         &self.etype
     }
 
@@ -1119,7 +1119,7 @@ impl VelosiAstFnCallExpr {
         self.args.iter().any(|a| a.has_interface_references())
     }
 
-    pub fn result_type(&self, _st: &SymbolTable) -> &VelosiAstTypeInfo {
+    pub fn result_type(&self) -> &VelosiAstTypeInfo {
         &self.etype
     }
 }
@@ -1177,7 +1177,7 @@ impl VelosiAstIfElseExpr {
         let then = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(*pt.then, st), issues);
         let other = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(*pt.other, st), issues);
 
-        let cond_type = cond.result_type(st);
+        let cond_type = cond.result_type();
         if *cond_type != VelosiAstTypeInfo::Bool {
             let msg = format!("Expected boolean expression was {} expression.", cond_type);
             let hint = "Convert this expression into a boolean expression";
@@ -1189,8 +1189,8 @@ impl VelosiAstIfElseExpr {
             issues.push(err);
         }
 
-        let then_type = then.result_type(st).clone();
-        let other_type = other.result_type(st);
+        let then_type = then.result_type().clone();
+        let other_type = other.result_type();
 
         if !other_type.compatible(&then_type) {
             let msg = "The two branches of the if-then-else expression have different types";
@@ -1223,7 +1223,7 @@ impl VelosiAstIfElseExpr {
                 other
             }
         } else {
-            let restype = then.result_type(st).clone();
+            let restype = then.result_type().clone();
             let e = VelosiAstIfElseExpr::new(cond, then, other, restype, self.loc);
             VelosiAstExpr::IfElse(e)
         }
@@ -1253,7 +1253,7 @@ impl VelosiAstIfElseExpr {
             || self.cond.has_interface_references()
     }
 
-    pub fn result_type(&self, _st: &SymbolTable) -> &VelosiAstTypeInfo {
+    pub fn result_type(&self) -> &VelosiAstTypeInfo {
         &self.etype
     }
 }
@@ -1421,7 +1421,7 @@ impl VelosiAstSliceExpr {
         }
     }
 
-    pub fn result_type(&self, _st: &SymbolTable) -> &VelosiAstTypeInfo {
+    pub fn result_type(&self) -> &VelosiAstTypeInfo {
         &VelosiAstTypeInfo::Integer
     }
 
@@ -1528,18 +1528,18 @@ impl VelosiAstExpr {
         matches!(self, NumLiteral(_) | BoolLiteral(_))
     }
 
-    pub fn result_type(&self, st: &SymbolTable) -> &VelosiAstTypeInfo {
+    pub fn result_type(&self) -> &VelosiAstTypeInfo {
         use VelosiAstExpr::*;
         match self {
-            IdentLiteral(e) => e.result_type(st),
+            IdentLiteral(e) => e.result_type(),
             NumLiteral(_) => &VelosiAstTypeInfo::Integer,
             BoolLiteral(_) => &VelosiAstTypeInfo::Bool,
-            BinOp(e) => e.result_type(st),
-            UnOp(e) => e.result_type(st),
+            BinOp(e) => e.result_type(),
+            UnOp(e) => e.result_type(),
             Quantifier(_) => &VelosiAstTypeInfo::Bool,
-            FnCall(e) => e.result_type(st),
-            IfElse(e) => e.result_type(st),
-            Slice(e) => e.result_type(st),
+            FnCall(e) => e.result_type(),
+            IfElse(e) => e.result_type(),
+            Slice(e) => e.result_type(),
             Range(_) => &VelosiAstTypeInfo::Range,
         }
     }

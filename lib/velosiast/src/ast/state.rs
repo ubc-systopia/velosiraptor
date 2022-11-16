@@ -527,10 +527,12 @@ impl VelosiAstStateDef {
     pub fn get_field_slice_refs(&self, refs: &HashSet<Rc<String>>) -> HashMap<Rc<String>, u64> {
         let mut hs = HashMap::new();
         for f in &self.fields {
-            if refs.contains(&f.ident_as_rc_string()) {
-                hs.insert(f.ident_as_rc_string(), 0xffff_ffff_ffff_ffff);
+            // if the entire field is part of that, add it
+            let fid = f.ident_as_rc_string();
+            if refs.contains(&fid) {
+                hs.insert(fid, 0xffff_ffff_ffff_ffff);
             } else {
-                hs.insert(f.ident_as_rc_string(), f.get_slice_mask_for_refs(refs));
+                hs.insert(fid, f.get_slice_mask_for_refs(refs));
             }
         }
         hs
