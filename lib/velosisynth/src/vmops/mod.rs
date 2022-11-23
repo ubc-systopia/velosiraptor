@@ -30,6 +30,7 @@ use std::fmt::{Display, Formatter, Result as FmtResult};
 pub mod map;
 mod precond;
 pub mod protect;
+mod queryhelper;
 mod resultparser;
 pub mod sanity;
 mod semantics;
@@ -38,83 +39,4 @@ mod utils;
 
 use crate::z3::{Z3Result, Z3Ticket};
 
-/// a combined program
-pub enum TicketOrResult {
-    Ticket(Vec<Z3Ticket>),
-    Result(Vec<Z3Result>),
-}
-
-impl TicketOrResult {
-    pub fn len(&self) -> usize {
-        match self {
-            TicketOrResult::Ticket(tickets) => tickets.len(),
-            TicketOrResult::Result(results) => results.len(),
-        }
-    }
-}
-
-pub struct CandidateFragmentsQueries {
-    translate_preconds: Vec<Vec<Z3Ticket>>,
-    translate_semantics: Vec<Vec<Z3Ticket>>,
-    matchflags_preconds: Vec<Vec<Z3Ticket>>,
-    matchflags_semantics: Vec<Vec<Z3Ticket>>,
-}
-
-impl CandidateFragmentsQueries {
-    pub fn query_count(&self) -> usize {
-        self.translate_preconds
-            .iter()
-            .fold(0, |acc, x| acc + x.len())
-            + self
-                .translate_semantics
-                .iter()
-                .fold(0, |acc, x| acc + x.len())
-            + self
-                .matchflags_preconds
-                .iter()
-                .fold(0, |acc, x| acc + x.len())
-            + self
-                .matchflags_semantics
-                .iter()
-                .fold(0, |acc, x| acc + x.len())
-    }
-}
-
-impl Display for CandidateFragmentsQueries {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, " - translate-precond: ")?;
-        for a in self.translate_preconds.iter() {
-            write!(f, "{:?}, ", a.len())?;
-        }
-        write!(f, "\n - translate-semantics: ")?;
-        for a in self.translate_semantics.iter() {
-            write!(f, "{:?}, ", a.len())?;
-        }
-        write!(f, "\n - matchflags-precond: ")?;
-        for a in self.matchflags_preconds.iter() {
-            write!(f, "{:?}, ", a.len())?;
-        }
-        write!(f, "\n - matchflags-semantics: ")?;
-        for a in self.matchflags_semantics.iter() {
-            write!(f, "{:?}, ", a.len())?;
-        }
-        Ok(())
-    }
-}
-
-pub struct CandidateBlockQueries {
-    translate_preconds: TicketOrResult,
-    translate_semantics: TicketOrResult,
-    matchflags_preconds: TicketOrResult,
-    matchflags_semantics: TicketOrResult,
-}
-
-struct CandidateProgram {
-    translate_preconds: Z3Ticket,
-    translate_semantics: Z3Ticket,
-    matchflags_preconds: Z3Ticket,
-    matchflags_semantics: Z3Ticket,
-}
-
-// the candidate programs
-pub struct CandidatePrograms(Vec<CandidateProgram>);
+pub use queryhelper::{MaybeResult, ProgramBuilder};

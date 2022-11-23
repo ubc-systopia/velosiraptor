@@ -31,7 +31,7 @@ use std::env;
 use std::io;
 use std::io::Read;
 
-use clap::{arg, command, value_parser, ArgAction, Command};
+use clap::{arg, command};
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, LevelPadding, TermLogger, TerminalMode};
 
 use velosiast::{AstResult, VelosiAst};
@@ -44,6 +44,7 @@ pub fn main() {
             -v --verbose ... "Turn debugging verbosity on"
         ))
         .arg(arg!(-c --cores <VALUE>).default_value("1"))
+        .arg(arg!(-s --synth <VALUE>).default_value("all"))
         .arg(arg!([fname] "Optional name to operate on"))
         .get_matches();
 
@@ -75,7 +76,8 @@ pub fn main() {
         config,
         TerminalMode::Stdout,
         ColorChoice::Auto,
-    );
+    )
+    .expect("failed to setup logger");
 
     let ast = match matches.get_one::<String>("fname") {
         Some(filename) => VelosiAst::from_file(filename),
@@ -116,11 +118,47 @@ pub fn main() {
             println!("skipped synthesizing due to errors");
             continue;
         }
-        match synth.synthesize_map() {
-            Ok(programs) => {
-                println!("{}", programs);
+
+        match matches.get_one::<String>("synth").map(|s| s.as_str()) {
+            Some("all") => {
+                println!("Synthesizing ALL for unit {}", seg.ident_as_str());
+                match synth.synthesize_all() {
+                    Ok(p) => println!("Programs: {}", p),
+                    Err(e) => println!("Synthesis failed:\n{}", e),
+                }
             }
-            Err(i) => issues.merge(i),
+
+            Some("map") => {
+                println!("Synthesizing MAP for unit {}", seg.ident_as_str());
+                match synth.synthesize_map() {
+                    Ok(p) => println!("Programs: {}", p),
+                    Err(e) => println!("Synthesis failed:\n{}", e),
+                }
+            }
+
+            Some("unmap") => {
+                println!("Synthesizing UNMAP for unit {}", seg.ident_as_str());
+                match synth.synthesize_unmap() {
+                    Ok(p) => println!("Programs: {}", p),
+                    Err(e) => println!("Synthesis failed:\n{}", e),
+                }
+            }
+
+            Some("protect") => {
+                println!("Synthesizing PROTECT for unit {}", seg.ident_as_str());
+                match synth.synthesize_protect() {
+                    Ok(p) => println!("Programs: {}", p),
+                    Err(e) => println!("Synthesis failed:\n{}", e),
+                }
+            }
+            Some(x) => {
+                println!("unknown synth model '{}'", x);
+                return;
+            }
+            None => {
+                println!("synth mode not set");
+                return;
+            }
         }
     }
 }

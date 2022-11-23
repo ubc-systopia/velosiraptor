@@ -25,239 +25,183 @@
 
 //! Synthesis of Virtual Memory Operations: Unmap
 
-use velosiast::ast::VelosiAstUnitSegment;
+use std::collections::LinkedList;
+use std::rc::Rc;
+use std::time::Duration;
 
-use crate::{
-    z3::{Z3Result, Z3Ticket, Z3WorkerPool},
-    Program, VelosiSynthIssues,
-};
+use velosiast::ast::{VelosiAstMethod, VelosiAstUnitSegment};
 
-pub struct SyntUnmapQueries {
-    translate_preconds: Vec<Vec<Z3Ticket>>,
-    translate_result: Vec<Z3Ticket>,
-    matchflags_preconds: Vec<Vec<Z3Ticket>>,
-    matchflags_result: Vec<Z3Ticket>,
+use crate::{programs::Program, z3::Z3WorkerPool, VelosiSynthIssues};
+
+use super::{precond, utils};
+
+use crate::vmops::precond::PrecondQueries;
+use crate::vmops::queryhelper::MultiDimProgramQueries;
+use crate::vmops::queryhelper::{MaybeResult, ProgramBuilder};
+use crate::Z3Ticket;
+
+use std::time::Instant;
+
+pub struct UnmapPrograms {
+    programs: MultiDimProgramQueries<PrecondQueries>,
+    queries: LinkedList<(Program, [Option<Z3Ticket>; 2])>,
+    candidates: Vec<Program>,
+
+    m_fn: Rc<VelosiAstMethod>,
+    t_fn: Rc<VelosiAstMethod>,
+    f_fn: Rc<VelosiAstMethod>,
 }
 
-pub struct SyntUnmapResults {
-    translate_preconds: Vec<Vec<Z3Result>>,
-    translate_result: Vec<Z3Result>,
-    matchflags_preconds: Vec<Vec<Z3Result>>,
-    matchflags_result: Vec<Z3Result>,
+impl UnmapPrograms {
+    pub fn new(
+        programs: MultiDimProgramQueries<PrecondQueries>,
+        m_fn: Rc<VelosiAstMethod>,
+        t_fn: Rc<VelosiAstMethod>,
+        f_fn: Rc<VelosiAstMethod>,
+    ) -> Self {
+        Self {
+            programs,
+            queries: LinkedList::new(),
+            candidates: Vec::new(),
+            m_fn,
+            t_fn,
+            f_fn,
+        }
+    }
 }
 
-pub struct SyntUnmapPrograms(Vec<Z3Ticket>);
+impl ProgramBuilder for UnmapPrograms {
+    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
+        let has_work = !self.candidates.is_empty() || !self.queries.is_empty();
 
-pub fn submit_queries(
-    z3: &mut Z3WorkerPool,
-    unit: &VelosiAstUnitSegment,
-) -> Result<SyntUnmapQueries, VelosiSynthIssues> {
-    unimplemented!("add me");
+        // poll once, collect the program
+        match self.programs.next(z3) {
+            MaybeResult::Some(p) => self.candidates.push(p),
+            MaybeResult::Pending => {
+                if !has_work {
+                    return MaybeResult::Pending;
+                }
+            }
+            MaybeResult::None => {
+                if !has_work {
+                    return MaybeResult::None;
+                }
+            }
+        };
+
+        // we have at least one candidate program
+        const CONFIG_MAX_QUERIES: usize = 4;
+        if self.queries.len() < CONFIG_MAX_QUERIES {
+            if let Some(prog) = self.candidates.pop() {
+                let translate_preconds = precond::submit_program_query(
+                    z3,
+                    self.m_fn.as_ref(),
+                    self.t_fn.as_ref(),
+                    None,
+                    true,
+                    prog.clone(),
+                );
+
+                let matchflags_preconds = precond::submit_program_query(
+                    z3,
+                    self.m_fn.as_ref(),
+                    self.f_fn.as_ref(),
+                    None,
+                    true,
+                    prog.clone(),
+                );
+
+                self.queries
+                    .push_back((prog, [Some(translate_preconds), Some(matchflags_preconds)]));
+            }
+        }
+
+        let mut res_program = None;
+        let mut remaining_queries = LinkedList::new();
+        while let Some((prog, mut tickets)) = self.queries.pop_front() {
+            let mut all_done = true;
+            for maybe_ticket in tickets.iter_mut() {
+                if let Some(ticket) = maybe_ticket {
+                    if let Some(mut result) = z3.get_result(*ticket) {
+                        // we got a result, check if it's sat
+                        let output = result.result();
+                        if utils::check_result_no_rewrite(output) == utils::QueryResult::Sat {
+                            // set the ticket to none to mark completion
+                            *maybe_ticket = None;
+                        } else {
+                            // unsat result, just drop it
+                            break;
+                        }
+                    } else {
+                        all_done = false;
+                    }
+                }
+            }
+
+            // store the result
+            if all_done && res_program.is_none() {
+                res_program = Some(prog);
+            } else {
+                remaining_queries.push_back((prog, tickets));
+            }
+        }
+
+        self.queries = remaining_queries;
+
+        if let Some(prog) = res_program {
+            MaybeResult::Some(prog)
+        } else if !self.queries.is_empty() || !self.candidates.is_empty() {
+            MaybeResult::Pending
+        } else {
+            debug_assert!(self.programs.next(z3) == MaybeResult::None);
+            MaybeResult::None
+        }
+    }
 }
 
-/// obtain the
-pub fn check_queries(
-    z3: &mut Z3WorkerPool,
-    queries: SyntUnmapQueries,
-) -> Result<SyntUnmapResults, VelosiSynthIssues> {
-    unimplemented!("add me");
-}
+pub fn get_program_iter(unit: &VelosiAstUnitSegment) -> UnmapPrograms {
+    log::info!(
+        target : "[synth::unmap]",
+        "starting synthesizing the map operation"
+    );
 
-pub fn construct_programs(
-    z3: &mut Z3WorkerPool,
-    results: SyntUnmapResults,
-) -> Result<SyntUnmapPrograms, VelosiSynthIssues> {
-    unimplemented!("add me");
-}
+    // obtain the functions for the map operation
+    let m_fn = unit.get_method("map").unwrap();
+    let t_fn = unit.get_method("translate").unwrap();
+    let f_fn = unit.get_method("matchflags").unwrap();
 
-pub fn check_programs(
-    z3: &mut Z3WorkerPool,
-    programs: SyntUnmapPrograms,
-) -> Result<Program, VelosiSynthIssues> {
-    unimplemented!("add me");
+    // ---------------------------------------------------------------------------------------------
+    // Translate: Add a query for each of the pre-conditions of the function
+    // ---------------------------------------------------------------------------------------------
+
+    let t_start = Instant::now();
+
+    let map_queries = vec![
+        precond::precond_query(unit, m_fn.clone(), t_fn.clone(), true),
+        precond::precond_query(unit, m_fn.clone(), f_fn.clone(), true),
+    ];
+    let mut programs = MultiDimProgramQueries::new(map_queries);
+    UnmapPrograms::new(programs, m_fn.clone(), t_fn.clone(), f_fn.clone())
 }
 
 pub fn synthesize(
     z3: &mut Z3WorkerPool,
     unit: &VelosiAstUnitSegment,
 ) -> Result<Program, VelosiSynthIssues> {
-    let queries = submit_queries(z3, unit)?;
-    let results = check_queries(z3, queries)?;
-    let programs = construct_programs(z3, results)?;
-    check_programs(z3, programs)
+    let mut progs = get_program_iter(unit);
+    loop {
+        match progs.next(z3) {
+            MaybeResult::Some(prog) => {
+                println!("////////\n{}", prog);
+            }
+            MaybeResult::Pending => {
+                // wait for a bit
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            MaybeResult::None => {
+                panic!("no program found");
+            }
+        }
+    }
+    panic!("stop");
 }
-
-// fn add_synth_unmap_tasks(&mut self, unit: &mut Segment) -> Vec<Vec<Vec<Z3Ticket>>> {
-//     // get the map functions
-//     let m_fn = unit.get_method("unmap").unwrap();
-//     // get the translate function
-//     let t_fn = unit.get_method("translate").unwrap();
-//     // get the translate function
-//     let f_fn = unit.get_method("matchflags").unwrap();
-
-//     // --------------------------------------------------------------------------------------
-//     // Check whether the pre-conditions can be satisfied
-//     // --------------------------------------------------------------------------------------
-
-//     self.check_precondition_satisfiability(m_fn, t_fn, f_fn);
-
-//     // --------------------------------------------------------------------------------------
-//     // Translate: Add a query for each of the pre-conditions of the function
-//     // --------------------------------------------------------------------------------------
-
-//     let mut t_fn_tickets = Vec::new();
-
-//     for (i, pre) in t_fn
-//         .requires
-//         .iter()
-//         .filter(|p| p.has_state_references())
-//         .enumerate()
-//     {
-//         let state_syms = pre.get_state_references();
-
-//         let state_bits = unit.state.referenced_field_bits(&state_syms);
-//         let st_access_fields = unit
-//             .interface
-//             .fields_accessing_state(&state_syms, &state_bits);
-
-//         // construct the program builder
-//         let mut builder = operations::ProgramsBuilder::new();
-//         for v in m_fn.args.iter() {
-//             builder.add_var(v.name.clone());
-//         }
-
-//         for f in st_access_fields.iter() {
-//             let mut parts = f.split('.');
-//             let _ = parts.next();
-//             let field = parts.next().unwrap();
-//             if let Some(slice) = parts.next() {
-//                 builder.add_field_slice(field, slice);
-//             } else {
-//                 //builder.add_field(field);
-//             }
-//         }
-
-//         let progs = builder.construct_programs(false);
-
-//         let tickets = self.check_programs_precond(m_fn, t_fn, Some(i), true, progs);
-//         t_fn_tickets.push(tickets);
-
-//         // let progs = builder.construct_programs(true);
-
-//         // TODO: construct the task
-//     }
-
-//     // --------------------------------------------------------------------------------------
-//     // Matchflags: Add a query for each of the pre-conditions of the function
-//     // --------------------------------------------------------------------------------------
-
-//     let mut f_fn_tickets = Vec::new();
-//     for (i, pre) in f_fn
-//         .requires
-//         .iter()
-//         .filter(|p| p.has_state_references())
-//         .enumerate()
-//     {
-//         let state_syms = pre.get_state_references();
-
-//         let state_bits = unit.state.referenced_field_bits(&state_syms);
-//         let st_access_fields = unit
-//             .interface
-//             .fields_accessing_state(&state_syms, &state_bits);
-
-//         // construct the program builder
-//         let mut builder = operations::ProgramsBuilder::new();
-//         for v in m_fn.args.iter() {
-//             builder.add_var(v.name.clone());
-//         }
-
-//         for f in st_access_fields.iter() {
-//             let mut parts = f.split('.');
-//             let _ = parts.next();
-//             let field = parts.next().unwrap();
-//             let slice = parts.next().unwrap();
-
-//             builder.add_field_slice(field, slice);
-//         }
-
-//         let progs = builder.construct_programs(false);
-
-//         let tickets = self.check_programs_precond(m_fn, f_fn, Some(i), true, progs);
-//         f_fn_tickets.push(tickets);
-
-//         // let progs = builder.construct_programs(true);
-
-//         // TODO: construct the task
-//     }
-
-//     vec![t_fn_tickets, f_fn_tickets]
-// }
-
-// fn check_synth_unmap_tasks(
-//     &mut self,
-//     unit: &mut Segment,
-//     mut tickets: Vec<Vec<Vec<Z3Ticket>>>,
-// ) {
-//     // get the map functions
-//     let m_fn = unit.get_method("unmap").unwrap();
-//     // get the translate function
-//     let t_fn = unit.get_method("translate").unwrap();
-//     // get the translate function
-//     let f_fn = unit.get_method("matchflags").unwrap();
-
-//     let results = tickets
-//         .drain(..)
-//         .flat_map(|t| self.obtain_sat_results(t))
-//         .collect::<Vec<_>>();
-
-//     // the completed candidate program
-//     let mut candidate_programs: Vec<Vec<&Program>> = vec![Vec::new()];
-
-//     for res in results.iter() {
-//         // new candidate programs
-//         let mut new_candidate_programs = Vec::new();
-
-//         for prog in candidate_programs {
-//             for r in res {
-//                 // expand all candidate programs with the new program
-//                 let mut new_prog = prog.clone();
-//                 new_prog.push(r.query().program().unwrap());
-//                 new_candidate_programs.push(new_prog);
-//             }
-//         }
-
-//         // update the candidate programs
-//         candidate_programs = new_candidate_programs;
-//     }
-
-//     let mut candidate_programs: Vec<Program> = candidate_programs
-//         .iter_mut()
-//         .map(|p| p.iter_mut().fold(Program::new(), |acc, x| acc.merge(x)))
-//         .collect();
-
-//     for prog in candidate_programs.drain(..) {
-//         println!("checking: {:?}", prog);
-//         let mut p_tickets =
-//             self.check_programs_precond(m_fn, f_fn, None, true, vec![prog.clone()]);
-//         p_tickets.extend(self.check_programs_precond(
-//             m_fn,
-//             t_fn,
-//             None,
-//             true,
-//             vec![prog.clone()],
-//         ));
-
-//         let mut all_sat = true;
-//         for t in p_tickets {
-//             let res = self.workerpool.wait_for_result(t);
-//             let mut reslines = res.result().lines();
-//             all_sat &= reslines.next() == Some("sat");
-//         }
-//         if all_sat {
-//             println!("found candidate program: {:?}", prog);
-//             unit.unmap_ops = Some(prog.into());
-//             return;
-//         }
-//     }
-//     println!("no candidate program found");
-// }

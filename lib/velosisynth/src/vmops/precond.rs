@@ -25,6 +25,8 @@
 
 //! Synthesis of Virtual Memory Operations: Map
 
+use std::rc::Rc;
+
 use smt2::{Smt2Context, SortedVar, Term};
 use velosiast::ast::{VelosiAstMethod, VelosiAstUnitSegment};
 
@@ -35,10 +37,99 @@ use crate::{
     Program,
 };
 
+use super::queryhelper::{
+    MaybeResult, MultiDimProgramQueries, ProgramBuilder, ProgramQueries, QueryBuilder,
+};
 use crate::programs::MultiDimIterator;
+use crate::ProgramsIter;
 
-use super::utils::construct_programs;
-use super::TicketOrResult;
+use super::utils;
+
+pub struct PrecondQueryBuilder<T>
+where
+    T: ProgramBuilder,
+{
+    /// the programs
+    programs: T,
+    /// the operation method
+    m_op: Rc<VelosiAstMethod>,
+    /// the goal method
+    m_goal: Rc<VelosiAstMethod>,
+    /// whether or not to negate the preconditino
+    negate: bool,
+    /// the entry in the pre-condition
+    idx: Option<usize>,
+}
+
+impl<T> PrecondQueryBuilder<T>
+where
+    T: ProgramBuilder,
+{
+    pub fn new(
+        programs: T,
+        m_op: Rc<VelosiAstMethod>,
+        m_goal: Rc<VelosiAstMethod>,
+        idx: Option<usize>,
+        negate: bool,
+    ) -> Self {
+        Self {
+            programs,
+            m_op,
+            m_goal,
+            negate,
+            idx,
+        }
+    }
+}
+
+impl<T> QueryBuilder for PrecondQueryBuilder<T>
+where
+    T: ProgramBuilder,
+{
+    /// returns the next query to be submitted, or None if all have been submitted
+    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Z3Query> {
+        match self.programs.next(z3) {
+            MaybeResult::Some(prog) => MaybeResult::Some(program_to_query(
+                &self.m_op,
+                &self.m_goal,
+                self.idx,
+                self.negate,
+                prog,
+            )),
+            MaybeResult::Pending => MaybeResult::Pending,
+            MaybeResult::None => MaybeResult::None,
+        }
+    }
+}
+
+pub type PrecondFragmentQueries = ProgramQueries<PrecondQueryBuilder<ProgramsIter>>;
+pub type PrecondBlockQueries = MultiDimProgramQueries<PrecondFragmentQueries>;
+pub type PrecondQueries = ProgramQueries<PrecondQueryBuilder<PrecondBlockQueries>>;
+
+const CONFIG_BATCH_SIZE: usize = 5;
+
+pub fn precond_query(
+    unit: &VelosiAstUnitSegment,
+    m_op: Rc<VelosiAstMethod>,
+    m_goal: Rc<VelosiAstMethod>,
+    negate: bool,
+) -> PrecondQueries {
+    let mut program_queries = Vec::with_capacity(m_goal.requires.len());
+    for (i, pre) in m_goal.requires.iter().enumerate() {
+        if !pre.has_state_references() {
+            continue;
+        }
+        let programs = utils::make_program_builder(unit, m_goal.as_ref(), pre).into_iter();
+        let b = PrecondQueryBuilder::new(programs, m_op.clone(), m_goal.clone(), Some(i), negate);
+        let q = ProgramQueries::with_batchsize(b, CONFIG_BATCH_SIZE);
+        program_queries.push(q);
+    }
+
+    let programs = MultiDimProgramQueries::new(program_queries);
+
+    let b = PrecondQueryBuilder::new(programs, m_op, m_goal, None, negate);
+    ProgramQueries::new(b)
+}
 
 // submits queries for the method preconditions
 pub fn submit_method_precond_queries(
@@ -59,7 +150,7 @@ pub fn submit_method_precond_queries(
         .enumerate()
     {
         // build the programs
-        let progs = construct_programs(unit, m_goal, pre);
+        let progs = utils::construct_programs(unit, m_goal, pre);
 
         // submit the queries
         let tickets = progs
@@ -72,55 +163,13 @@ pub fn submit_method_precond_queries(
     all_tickets
 }
 
-// submits queries for the method preconditions
-pub fn combine_precond_results_submit_queries(
-    z3: &mut Z3WorkerPool,
-    m_op: &VelosiAstMethod,
-    m_goal: &VelosiAstMethod,
-    negate: bool,
-    mut fragments: Vec<Vec<Z3Result>>,
-) -> TicketOrResult {
-    if fragments.is_empty() {
-        return TicketOrResult::Result(Vec::new());
-        //panic!("was empty");
-    }
-
-    if fragments.len() == 1 {
-        let v = fragments.pop().unwrap();
-        return TicketOrResult::Result(v);
-    }
-
-    // create the multi-dim iterator
-    let mut it = MultiDimIterator::from_slice(fragments.as_slice());
-
-    let mut res = Vec::with_capacity(it.len());
-    while let Some(conf) = it.next() {
-        let prog = conf
-            .iter()
-            .enumerate()
-            .fold(Program::new(), |prog, (i, e)| {
-                let p = fragments[i][*e]
-                    .query()
-                    .program()
-                    .expect("program was not set.");
-                prog.merge(p)
-            });
-
-        let ticket = submit_program_query(z3, m_op, m_goal, None, negate, prog);
-        res.push(ticket)
-    }
-
-    TicketOrResult::Ticket(res)
-}
-
-pub fn submit_program_query(
-    z3: &mut Z3WorkerPool,
+fn program_to_query(
     m_op: &VelosiAstMethod,
     m_goal: &VelosiAstMethod,
     idx: Option<usize>,
     negate: bool,
     prog: Program,
-) -> Z3Ticket {
+) -> Z3Query {
     // convert the program to a smt2 term
     let (mut smt, symvars) = prog.to_smt2_term(m_op.ident_as_str(), m_op.params.as_slice());
 
@@ -160,9 +209,42 @@ pub fn submit_program_query(
     smtctx.subsection(String::from("Verification"));
     smtctx.level(smt);
 
+    // get the goal as string
+    let goal = if let Some(i) = idx {
+        if negate {
+            format!("!{}", m_goal.requires[i].to_string())
+        } else {
+            m_goal.requires[i].to_string()
+        }
+    } else {
+        m_goal
+            .requires
+            .iter()
+            .map(|p| {
+                if negate {
+                    format!("!{}", p.to_string())
+                } else {
+                    p.to_string()
+                }
+            })
+            .collect::<Vec<String>>()
+            .join(" && ")
+    };
+
     // create and submit query
     let mut query = Z3Query::from(smtctx);
-    query.set_program(prog);
+    query.set_program(prog).set_goal(goal);
+    query
+}
 
+pub fn submit_program_query(
+    z3: &mut Z3WorkerPool,
+    m_op: &VelosiAstMethod,
+    m_goal: &VelosiAstMethod,
+    idx: Option<usize>,
+    negate: bool,
+    prog: Program,
+) -> Z3Ticket {
+    let query = program_to_query(m_op, m_goal, idx, negate, prog);
     z3.submit_query(query).expect("failed to submit query")
 }

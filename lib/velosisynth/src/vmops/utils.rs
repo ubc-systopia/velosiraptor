@@ -30,18 +30,17 @@ use std::sync::Arc;
 
 use velosiast::ast::{VelosiAstExpr, VelosiAstMethod, VelosiAstUnitSegment};
 
-use crate::vmops::TicketOrResult;
 use crate::z3::{Z3Result, Z3Ticket, Z3WorkerPool};
 use crate::VelosiSynthIssues;
 use crate::{Program, ProgramsBuilder};
 
 use super::resultparser;
 
-pub fn construct_programs(
+pub fn make_program_builder(
     unit: &VelosiAstUnitSegment,
     m_goal: &VelosiAstMethod,
     pre: &VelosiAstExpr,
-) -> Vec<Program> {
+) -> ProgramsBuilder {
     log::info!(target: "[vmops::utils]", "constructing programs;");
     // obtain the state references in the pre-condition
     let mut state_syms = HashSet::new();
@@ -83,7 +82,7 @@ pub fn construct_programs(
 
         let field = unit
             .interface
-            .field(&fieldname)
+            .field(fieldname)
             .expect("didn't find the field");
         if let Some(slicename) = parts.next() {
             let slice = field.slice(slicename).expect("didn't find the slice");
@@ -94,58 +93,63 @@ pub fn construct_programs(
         }
     }
 
-    // build the programs
-    builder.construct_new_programs()
+    builder
 }
 
-pub fn obtain_sat_results_2d(
-    z3: &mut Z3WorkerPool,
-    fn_tickets: Vec<Vec<Z3Ticket>>,
-) -> Result<Vec<Vec<Z3Result>>, VelosiSynthIssues> {
-    let mut fn_results = Vec::with_capacity(fn_tickets.len());
-    for tickets in fn_tickets.into_iter() {
-        let results = obtain_sat_results(z3, tickets)?;
-        fn_results.push(results);
+pub fn construct_programs(
+    unit: &VelosiAstUnitSegment,
+    m_goal: &VelosiAstMethod,
+    pre: &VelosiAstExpr,
+) -> Vec<Program> {
+    make_program_builder(unit, m_goal, pre).construct_new_programs()
+}
+
+#[derive(PartialEq, Eq)]
+pub enum QueryResult {
+    Sat,
+    Unsat,
+    Unknown,
+    Error,
+}
+
+pub fn check_result_no_rewrite(output: &str) -> QueryResult {
+    let mut reslines = output.lines();
+    match reslines.next() {
+        Some("sat") => QueryResult::Sat,
+        Some("unsat") => QueryResult::Unsat,
+        Some(a) => QueryResult::Error,
+        None => {
+            unreachable!("unexpected none output")
+        }
     }
-    Ok(fn_results)
 }
 
-pub fn obtain_sat_result(
-    z3: &mut Z3WorkerPool,
-    ticket: Z3Ticket,
-) -> Result<Option<Z3Result>, VelosiSynthIssues> {
-    let mut res = z3.wait_for_result(ticket);
-
-    // res.print_timestamps();
-    let output = res.result();
-
+pub fn check_result(output: &str, program: &mut Program) -> QueryResult {
     let mut reslines = output.lines();
     match reslines.next() {
         Some("sat") => {
-            log::debug!(target: "[ObtainResult]", " - sat: {:?}", res.query().program());
+            log::debug!(target: "[CheckResult]", " - sat: {:?}", program);
             if reslines.next().is_some() {
                 match resultparser::parse_result(&output[4..]) {
                     Ok(mut vars) => {
                         if !vars.is_empty() {
-                            // println!("rewriting the program: {:?}\n", vars);
-                            res.query_mut()
-                                .program_mut()
-                                .replace_symbolic_values(&mut vars);
+                            program.replace_symbolic_values(&mut vars);
                         }
                     }
                     Err(_e) => (),
                 }
             }
-            Ok(Some(res))
+            QueryResult::Sat
         }
         Some("unsat") => {
-            log::trace!(target: "[ObtainResult]", " - unsat: {:?}", res.query().program());
-            Ok(None)
+            log::trace!(target: "[CheckResult]", " - unsat: {:?}", program);
+            QueryResult::Unsat
         }
         Some(a) => {
-            log::error!(target: "[ObtainResult]", " - {} {:?}", a, res.query().program());
+            log::error!(target: "[CheckResult]", " - {} {:?}", a, program);
             if a.starts_with("(error") {
-                panic!("!handle me: {}", a);
+                panic!("error");
+                QueryResult::Error
             } else {
                 unreachable!("unexpected none output: {}", a);
             }
@@ -153,29 +157,5 @@ pub fn obtain_sat_result(
         None => {
             unreachable!("unexpected none output")
         }
-    }
-}
-
-pub fn obtain_sat_results(
-    z3: &mut Z3WorkerPool,
-    fn_tickets: Vec<Z3Ticket>,
-) -> Result<Vec<Z3Result>, VelosiSynthIssues> {
-    let mut results = Vec::new();
-    for t in fn_tickets {
-        let res = obtain_sat_result(z3, t)?;
-        if let Some(res) = res {
-            results.push(res);
-        }
-    }
-    Ok(results)
-}
-
-pub fn maybe_obtain_sat_results(
-    z3: &mut Z3WorkerPool,
-    mut fn_tickets: TicketOrResult,
-) -> Result<Vec<Z3Result>, VelosiSynthIssues> {
-    match fn_tickets {
-        TicketOrResult::Ticket(tickets) => obtain_sat_results(z3, tickets),
-        TicketOrResult::Result(results) => Ok(results),
     }
 }
