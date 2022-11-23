@@ -25,11 +25,12 @@
 
 // standard library imports
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::time::Instant;
 
 // external library imports
-use smt2::{Smt2Command, Smt2Context};
+use smt2::Smt2Context;
 
 // own crate imports
 use crate::Program;
@@ -54,10 +55,12 @@ impl Display for Z3Ticket {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// represents a Z3 smt query
-#[derive(Eq, PartialEq)]
 pub struct Z3Query {
     /// the operations of this query for bookkeeping purposes
     prog: Option<Program>,
+
+    /// the goal of the program
+    goal: Option<String>,
 
     /// the statements to be executed
     smt: Arc<Smt2Context>,
@@ -76,6 +79,7 @@ impl Z3Query {
     pub fn with_context(smt: Smt2Context) -> Self {
         Self {
             prog: None,
+            goal: None,
             smt: Arc::new(smt),
             timestamps: Vec::with_capacity(10),
         }
@@ -84,6 +88,16 @@ impl Z3Query {
     pub fn clone_without_program(&self) -> Self {
         Self {
             prog: None,
+            goal: None,
+            smt: self.smt.clone(),
+            timestamps: Vec::with_capacity(0),
+        }
+    }
+
+    pub fn clone_without_timestamps(&self) -> Self {
+        Self {
+            prog: self.prog.clone(),
+            goal: self.goal.clone(),
             smt: self.smt.clone(),
             timestamps: Vec::with_capacity(0),
         }
@@ -101,6 +115,11 @@ impl Z3Query {
     /// sets the operations field of the query (book keeping purpose)
     pub fn set_program(&mut self, p: Program) -> &mut Self {
         self.prog = Some(p);
+        self
+    }
+
+    pub fn set_goal(&mut self, goal: String) -> &mut Self {
+        self.goal = Some(goal);
         self
     }
 
@@ -190,12 +209,26 @@ impl Debug for Z3Query {
     }
 }
 
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
+impl Eq for Z3Query {}
+
+impl PartialEq for Z3Query {
+    fn eq(&self, other: &Self) -> bool {
+        match (&self.prog, &self.goal) {
+            (Some(_), Some(_)) => self.prog == other.prog && self.goal == other.goal,
+            _ => self.smt == other.smt,
+        }
+    }
+}
 
 impl Hash for Z3Query {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.smt.hash(state);
+        match (&self.prog, &self.goal) {
+            (Some(p), Some(g)) => {
+                p.hash(state);
+                g.hash(state);
+            }
+            _ => self.smt.hash(state),
+        }
     }
 }
 
