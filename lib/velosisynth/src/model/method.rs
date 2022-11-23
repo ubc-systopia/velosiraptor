@@ -39,7 +39,7 @@ pub fn translate_map_result_name(idx: Option<usize>) -> String {
     if let Some(i) = idx {
         format!("translate.map.result.{}", i)
     } else {
-        format!("translate.map.result")
+        "translate.map.result".to_string()
     }
 }
 
@@ -47,7 +47,7 @@ pub fn translate_protect_result_name(idx: Option<usize>) -> String {
     if let Some(i) = idx {
         format!("translate.protect.result.{}", i)
     } else {
-        format!("translate.protect.result")
+        "translate.protect.result".to_string()
     }
 }
 
@@ -55,7 +55,7 @@ pub fn matchflags_map_result_name(idx: Option<usize>) -> String {
     if let Some(i) = idx {
         format!("matchflags.map.result.{}", i)
     } else {
-        format!("matchflags.map.result")
+        "matchflags.map.result".to_string()
     }
 }
 
@@ -63,7 +63,7 @@ pub fn matchflags_protect_result_name(idx: Option<usize>) -> String {
     if let Some(i) = idx {
         format!("matchflags.protect.result.{}", i)
     } else {
-        format!("matchflags.protect.result")
+        "matchflags.protect.result".to_string()
     }
 }
 
@@ -118,9 +118,13 @@ fn add_method_preconditions(smt: &mut Smt2Context, method: &VelosiAstMethod) {
     for (i, pre) in method
         .requires
         .iter()
-        .filter(|p| p.has_state_references())
+        //        .filter(|p| p.has_state_references())
         .enumerate()
     {
+        if !pre.has_state_references() {
+            continue;
+        }
+
         let name = method_precond_i_name(method.ident_as_str(), i);
         let mut f = Function::new(name, types::boolean());
         f.add_comment(format!(
@@ -266,7 +270,7 @@ pub fn add_translate_result_checks(smt: &mut Smt2Context) {
     // ---------------------------------------------------------------------------------------------
 
     let mut f = Function::new(translate_map_result_name(None), types::boolean());
-    f.add_comment(format!("Checking the translate function result"));
+    f.add_comment("Checking the translate function result".to_string());
 
     f.add_arg(String::from("st!0"), types::model());
     f.add_arg(String::from("va"), types::vaddr());
@@ -305,7 +309,7 @@ pub fn add_translate_result_checks(smt: &mut Smt2Context) {
     // ---------------------------------------------------------------------------------------------
 
     let mut f = Function::new(translate_protect_result_name(None), types::boolean());
-    f.add_comment(format!("Checking the translate function result"));
+    f.add_comment("Checking the translate function result".to_string());
 
     f.add_arg(String::from("st!0"), types::model());
     f.add_arg(String::from("st!1"), types::model());
@@ -334,7 +338,7 @@ pub fn add_translate_result_checks(smt: &mut Smt2Context) {
             "translate".to_string(),
             vec![
                 Term::ident(String::from("st!1")),
-                Term::bvadd(Term::ident("va".to_string()), Term::ident(varstr.clone())),
+                Term::bvadd(Term::ident("va".to_string()), Term::ident(varstr)),
             ],
         ),
     );
@@ -352,7 +356,7 @@ pub fn add_matchflags_result_checks(smt: &mut Smt2Context, nparts: usize) {
 
     let map = |smt: &mut Smt2Context, idx| {
         let mut f = Function::new(matchflags_map_result_name(idx), types::boolean());
-        f.add_comment(format!("Checking the matchflags function result"));
+        f.add_comment("Checking the matchflags function result".to_string());
 
         f.add_arg(String::from("st!0"), types::model());
         f.add_arg(String::from("va"), types::vaddr());
@@ -382,7 +386,7 @@ pub fn add_matchflags_result_checks(smt: &mut Smt2Context, nparts: usize) {
 
     let protect = |smt: &mut Smt2Context, idx| {
         let mut f = Function::new(matchflags_protect_result_name(idx), types::boolean());
-        f.add_comment(format!("Checking the matchflags function result"));
+        f.add_comment("Checking the matchflags function result".to_string());
 
         f.add_arg(String::from("st!0"), types::model());
         f.add_arg(String::from("va"), types::vaddr());
