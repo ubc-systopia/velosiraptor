@@ -81,40 +81,6 @@ impl<'a> Field {
         }
     }
 
-    pub fn location(&self) -> String {
-        self.pos.location()
-    }
-
-    /// converts the field into a symbol
-    pub fn to_symbol(&self) -> Symbol {
-        // prepend the 'state' prefix
-        let name = format!("state.{}", self.name);
-        Symbol::new(
-            name,
-            Type::Integer,
-            SymbolKind::State,
-            self.pos.clone(),
-            AstNode::Field(self),
-        )
-    }
-
-    /// builds the symboltable for the state related symbols
-    pub fn build_symboltable(&'a self, st: &mut SymbolTable<'a>) {
-        // insert the own symbol
-        st.insert(self.to_symbol());
-
-        for s in &self.layout {
-            let name = format!("state.{}.{}", self.name, s.name);
-            st.insert(Symbol::new(
-                name,
-                Type::Integer,
-                SymbolKind::State,
-                s.loc().clone(),
-                AstNode::BitSlice(s),
-            ));
-        }
-    }
-
     pub fn referenced_field_bits(&self, refs: &HashSet<String>) -> u64 {
         let mut bits = 0;
         for s in &self.layout {
