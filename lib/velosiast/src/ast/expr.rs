@@ -772,7 +772,7 @@ impl VelosiAstIdentLiteralExpr {
     pub fn with_name(name: String, ptype: VelosiAstTypeInfo) -> Self {
         VelosiAstIdentLiteralExpr::new(
             vec![VelosiAstIdentifier::with_name(name)],
-            ptype.into(),
+            ptype,
             VelosiTokenStream::empty(),
         )
     }

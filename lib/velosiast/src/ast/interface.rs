@@ -527,7 +527,7 @@ impl VelosiAstInterfaceMemoryField {
         for slice in &nodes.layout {
             layout_map.insert(slice.ident_to_string(), slice.clone());
             // XXX: stupd work around to enable lookup using the identifier
-            let n = slice.ident_as_str().split(".").last().unwrap();
+            let n = slice.ident_as_str().split('.').last().unwrap();
             layout_map.insert(n.to_string(), slice.clone());
         }
 
@@ -704,7 +704,7 @@ impl VelosiAstInterfaceMmioField {
         for slice in &nodes.layout {
             layout_map.insert(slice.ident_to_string(), slice.clone());
             // XXX: stupd work around to enable lookup using the identifier
-            let n = slice.ident_as_str().split(".").last().unwrap();
+            let n = slice.ident_as_str().split('.').last().unwrap();
             layout_map.insert(n.to_string(), slice.clone());
         }
 
@@ -828,7 +828,7 @@ impl VelosiAstInterfaceRegisterField {
         for slice in &layout {
             layout_map.insert(slice.ident_to_string(), slice.clone());
             // XXX: stupd work around to enable lookup using the identifier
-            let n = slice.ident_as_str().split(".").last().unwrap();
+            let n = slice.ident_as_str().split('.').last().unwrap();
             layout_map.insert(n.to_string(), slice.clone());
         }
 
@@ -1123,7 +1123,7 @@ impl VelosiAstInterfaceDef {
         for f in &fields {
             fields_map.insert(f.ident_to_string(), f.clone());
             // XXX: stupd work around to enable lookup using the identifier
-            let n = f.ident_as_str().split(".").last().unwrap();
+            let n = f.ident_as_str().split('.').last().unwrap();
             fields_map.insert(n.to_string(), f.clone());
         }
         VelosiAstInterfaceDef {
