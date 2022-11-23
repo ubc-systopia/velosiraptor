@@ -44,7 +44,7 @@ mod symvars;
 use statevars::StateVars;
 
 // public re-exports
-pub use builder::{MultiDimIterator, ProgramsBuilder};
+pub use builder::{MultiDimIterator, ProgramsBuilder, ProgramsIter};
 pub use symvars::SymbolicVars;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,7 +54,7 @@ pub use symvars::SymbolicVars;
 /// Literals -- Integers, Symbolic variables, and Flags
 ///
 /// Literals form the terminals of the grammar for constructing programs.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Literal {
     /// a constant, arbitrary 64-bit number, common used values are 0 and 1
     Val(u64),
@@ -120,7 +120,7 @@ impl From<&Literal> for OpExpr {
 ///
 /// Expressions are used to compute values for the interface operations. They support a basic
 /// arithmetic operations, bitwise operations and a shift/mask operation.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expression {
     /// the literal without any operation
     Lit(Literal),
@@ -203,7 +203,7 @@ impl Expression {
             (0, _) => true,
             // with 1 bits, we can basicaly remove a lot of operations...
             (1, Lit(Literal::Val(_))) => false,
-            (1, Lit(Literal::Num)) => true, // skip arbitrary numbers
+            (1, Lit(Literal::Num)) => false, // skip arbitrary numbers
             (1, Lit(Literal::Var(_))) => true, // we skip the base variable
             (1, Lit(Literal::Flag(_, _))) => false,
             // (1, RShift(_, _)) => true, // keep right shifts
@@ -321,7 +321,7 @@ impl From<Arc<Expression>> for OpExpr {
 /// Field Slice Operations -- Inserting  Bits in Field Slices
 ///
 /// A field slice operation represents the expression to be inserted into a specific field slice
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FieldSliceOp(Arc<String>, Arc<Expression>);
 
 impl FieldSliceOp {
@@ -354,7 +354,7 @@ impl FieldSliceOp {
 ///
 /// A field operation either inserts value into the full field, constructs a value from a sequence
 /// of field slices, or reads/writes the field.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FieldOp {
     /// set the field value to be expression
     InsertField(Arc<Expression>),
@@ -465,7 +465,7 @@ impl FieldOp {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Field Actions -- A sequence of field operations on a field
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 struct FieldActions(Arc<String>, Vec<FieldOp>);
 
 impl FieldActions {
@@ -534,7 +534,7 @@ impl Display for FieldActions {
 ///
 /// A program represents the sequence of operations on fields that perform the configuration
 /// sequence.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Program(Vec<Arc<FieldActions>>);
 
 impl Program {

@@ -31,8 +31,15 @@ use std::sync::Arc;
 use super::{Expression, FieldActions, FieldOp, FieldSliceOp, Literal, Program};
 
 pub struct ProgramsIter {
-    ///
-    expr: Vec<Arc<Expression>>,
+    // ///
+    // expr: Vec<Arc<Expression>>,
+    pub programs: Vec<Program>,
+}
+
+impl ProgramsIter {
+    pub fn next_program(&mut self) -> Option<Program> {
+        self.programs.pop()
+    }
 }
 
 pub struct ProgramsBuilder {
@@ -144,11 +151,6 @@ impl ProgramsBuilder {
             }
         }
 
-        // put the multiply stuff at the end
-        let just_num = vec![Literal::Num];
-        expr_combinator2!(expr, Expression::Mul, vars, just_num);
-        // expr_combinator2!(expr, Expression::Div, vars, just_num);
-
         // the flags, it's either a flag or not a flag
         for (v, f) in &self.flags {
             expr.push(Arc::new(Expression::Lit(Literal::Flag(
@@ -160,6 +162,11 @@ impl ProgramsBuilder {
                 f.clone(),
             ))));
         }
+
+        // put the multiply stuff at the end
+        let just_num = vec![Literal::Num];
+        expr_combinator2!(expr, Expression::Mul, vars, just_num);
+        // expr_combinator2!(expr, Expression::Div, vars, just_num);
 
         // and we're done
         expr
@@ -194,19 +201,17 @@ impl ProgramsBuilder {
         for (field, slices) in &self.fields {
             let mut fieldops = Vec::with_capacity(exprs.len() * (1 + slices.len()));
 
-            // the read / write actions
-            fieldops.push(FieldOp::ReadAction);
-            // field_progs.push(FieldOp::WriteAction);
-
-            // write the entire field
+            // write the entire field,
             if slices.is_empty() {
+                // we don't have any slices here, so just add the expressions
+                // on the entire field
                 for expr in &exprs {
                     fieldops.push(FieldOp::InsertField(expr.clone()))
                 }
             } else {
-                // just zeroing it
+                // we had slices, so just add one expression for zeroing the slice
                 fieldops.push(FieldOp::InsertField(Arc::new(Expression::Lit(
-                    Literal::Num,
+                    Literal::Val(0),
                 ))));
             }
 
@@ -217,15 +222,13 @@ impl ProgramsBuilder {
                 for (i, e) in conf.iter().enumerate() {
                     let (s, b) = &slices[i];
                     if exprs[*e].skip_for_bits(*b) {
-                        // println!("skipping: {:?}", exprs[*e]);
                         continue;
                     }
-                    // println!("taking: {:?}", exprs[*e]);
 
                     // TODO: add constraints on the symvar
-
                     sliceops.push(FieldSliceOp(s.clone(), exprs[*e].clone()));
                 }
+
                 if !sliceops.is_empty() {
                     fieldops.push(FieldOp::InsertFieldSlices(sliceops));
                 }
@@ -241,23 +244,26 @@ impl ProgramsBuilder {
                 if matches!(*op, FieldOp::ReadAction | FieldOp::InsertField(_)) {
                     continue;
                 }
-                // if *op == FieldOp::ReadAction {
-                //     continue;
-                // }
 
+                // zero first
+                fieldprogs.push(Arc::new(FieldActions(
+                    field.clone(),
+                    vec![
+                        FieldOp::InsertField(Arc::new(Expression::Lit(Literal::Val(0)))),
+                        op.clone(),
+                    ],
+                )));
+
+                // read first
                 fieldprogs.push(Arc::new(FieldActions(
                     field.clone(),
                     vec![FieldOp::ReadAction, op.clone()],
                 )));
-
-                fieldprogs.push(Arc::new(FieldActions(
-                    field.clone(),
-                    vec![
-                        FieldOp::InsertField(Arc::new(Expression::Lit(Literal::Num))),
-                        op.clone(),
-                    ],
-                )));
             }
+
+            // the read / write actions
+            fieldops.push(FieldOp::ReadAction);
+            // field_progs.push(FieldOp::WriteAction);
 
             // // programs of length 2
             // for (i, op1) in fieldops.iter().enumerate() {
@@ -300,18 +306,22 @@ impl ProgramsBuilder {
         }
 
         log::info!(target : "[ProgramsBuilder]", "constructed {} programs", programs.len());
-        // for p in programs.iter() {
-        //     println!("    * {:?}", p);
-        // }
+        for p in programs.iter() {
+            log::debug!(target : "[ProgramsBuilder]", " - {}", p);
+        }
 
         programs
     }
 
     pub fn into_iter(&mut self) -> ProgramsIter {
-        // construct the expressions
-        let exprs = self.construct_expressions();
+        let mut programs = self.construct_new_programs();
+        programs.reverse();
+        ProgramsIter { programs }
 
-        panic!("foobar");
+        // // construct the expressions
+        // let exprs = self.construct_expressions();
+
+        // panic!("foobar");
 
         // // field programs iterator
 
