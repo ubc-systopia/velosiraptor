@@ -33,7 +33,7 @@ use std::path::PathBuf;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     mpsc::{self, Receiver, Sender, TryRecvError},
-    Arc,
+    Arc, Mutex,
 };
 use std::thread;
 use std::time::Duration;
@@ -42,23 +42,15 @@ use std::time::Duration;
 use super::instance::Z3Instance;
 use super::query::{Z3Query, Z3Result, Z3Ticket};
 
-/// Message type that is being sent to the worker thread
-pub enum Z3QueryMsg {
-    Query(Z3Ticket, Z3Query),
-    SharedQuery(Z3Ticket, Arc<Z3Query>),
-    Reset,
-    Restart,
-    Terminate,
-}
-
-pub enum Z3ResultMsg {
-    Result(Z3Ticket, Z3Result),
-    Error(Z3Ticket, Option<Z3Query>),
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Z3 Worker -- A thread with a Z3 Instance
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum Z3Context {
+    Query(Arc<Z3Query>),
+    Result(Z3Result),
+    None,
+}
 
 /// represents a Z3 worker thread
 pub struct Z3Worker {
@@ -66,30 +58,50 @@ pub struct Z3Worker {
     id: usize,
     /// handle to the worker thread join handle
     thread: Option<thread::JoinHandle<()>>,
-    /// the task queue for sending new requests to the worker
-    task_q: mpsc::Sender<Z3QueryMsg>,
-    /// the result queue for completed tasks
-    result_q: mpsc::Receiver<Z3ResultMsg>,
-    /// the number of tasks in flight
-    tasks_in_flight: usize,
+
+    context: Arc<Mutex<Z3Context>>,
+
     /// whether the worker is currently running
     running: Arc<AtomicBool>,
+
+    /// reset
+    reset: Arc<AtomicBool>,
+
+    ///
+    restart: Arc<AtomicBool>,
 }
 
 impl Z3Worker {
-    pub fn new(id: usize, logpath: Option<&PathBuf>) -> Self {
-        Self::with_context(id, logpath, Arc::new(Z3Query::new()))
+    pub fn new(
+        id: usize,
+        tasks: Arc<Mutex<VecDeque<(Z3Ticket, Z3Query)>>>,
+        results: Sender<(Z3Ticket, Z3Result)>,
+        logpath: Option<&PathBuf>,
+    ) -> Self {
+        Self::with_context(id, tasks, results, logpath, Arc::new(Z3Query::new()))
     }
 
-    pub fn with_context(wid: usize, logpath: Option<&PathBuf>, task: Arc<Z3Query>) -> Self {
+    pub fn with_context(
+        wid: usize,
+        tasks: Arc<Mutex<VecDeque<(Z3Ticket, Z3Query)>>>,
+        results: Sender<(Z3Ticket, Z3Result)>,
+        logpath: Option<&PathBuf>,
+        start_context: Arc<Z3Query>,
+    ) -> Self {
         // create the running flag
         let running = Arc::new(AtomicBool::new(true));
         let running_clone = running.clone();
 
-        // create the message channels
-        let (task_tx, task_rx): (Sender<Z3QueryMsg>, Receiver<Z3QueryMsg>) = mpsc::channel();
-        let (result_tx, result_rx): (Sender<Z3ResultMsg>, Receiver<Z3ResultMsg>) = mpsc::channel();
+        let reset = Arc::new(AtomicBool::new(false));
+        let reset_clone = reset.clone();
 
+        let restart = Arc::new(AtomicBool::new(false));
+        let restart_clone = reset.clone();
+
+        let context = Arc::new(Mutex::new(Z3Context::None));
+        let context_clone = context.clone();
+
+        // create the message channels
         let mut z3 = if let Some(logpath) = logpath {
             Z3Instance::with_logpath(wid, logpath)
         } else {
@@ -100,73 +112,88 @@ impl Z3Worker {
         let thread = thread::Builder::new()
             .name(format!("z3-worker-{}", wid))
             .spawn(move || {
-                while running_clone.load(Ordering::Relaxed) {
-                    let msg = task_rx.recv();
-                    let result = match msg {
-                        Ok(Z3QueryMsg::Query(id, mut query)) => {
-                            query.timestamp("request");
-                            let result = z3.exec(&mut query);
-                            query.timestamp("smt");
-                            match result {
-                                Ok(mut result) => {
-                                    result.set_query(query);
-                                    Z3ResultMsg::Result(id, result)
-                                }
-                                Err(_) => Z3ResultMsg::Error(id, Some(query)),
-                            }
-                        }
-                        Ok(Z3QueryMsg::SharedQuery(id, query)) => {
-                            match z3.exec_shared(query.deref()) {
-                                Ok(result) => Z3ResultMsg::Result(id, result),
-                                Err(_) => Z3ResultMsg::Error(id, None),
-                            }
-                        }
-                        Ok(Z3QueryMsg::Reset) => {
-                            z3.reset().expect("resetting the Z3 instance failed");
-                            continue;
-                        }
-                        Ok(Z3QueryMsg::Restart) => {
-                            z3.restart();
-                            continue;
-                        }
-                        Ok(Z3QueryMsg::Terminate) => {
-                            // terminate the z3 instance
-                            z3.terminate();
-                            running_clone.store(false, Ordering::Relaxed);
-                            break;
-                        }
-                        Err(_) => {
-                            // channel closed, exit
-                            running_clone.store(false, Ordering::Relaxed);
-                            z3.terminate();
-                            break;
-                        }
-                    };
+                if !start_context.is_empty() {
+                    if let Err(x) = z3.exec_shared(start_context.deref()) {
+                        log::error!(target : "[Z3Worker]", "Z3 Worker {} failed to initialize with context: {:?}", wid, x);
+                    }
+                    running_clone.store(false, Ordering::Relaxed);
+                }
 
-                    let msg = result_tx.send(result);
-                    if msg.is_err() {
-                        running_clone.store(false, Ordering::Relaxed);
-                        break;
+                while running_clone.load(Ordering::Relaxed) {
+                    // check if we need to do a reset
+                    if reset_clone.load(Ordering::Relaxed) {
+                        z3.reset().expect("resetting the Z3 instance failed");
+
+
+                        let mut context = context_clone.as_ref().lock().unwrap();
+                        if let Z3Context::Query(query) = &*context {
+                            let res = z3.exec_shared(query.deref()).expect("executing the context failed");
+                            *context = Z3Context::Result(res);
+                        }
+                        drop(context);
+
+                        reset_clone.store(false, Ordering::Relaxed);
+                        continue;
+                    }
+
+                    if restart_clone.load(Ordering::Relaxed) {
+                        z3.restart();
+
+                        let mut context = context_clone.as_ref().lock().unwrap();
+                        if let Z3Context::Query(query) = &*context {
+                            let res = z3.exec_shared(query.deref()).expect("executing the context failed");
+                            *context = Z3Context::Result(res);
+                        }
+
+                        restart_clone.store(false, Ordering::Relaxed);
+                        continue;
+                    }
+
+                    // see if we have a shared query
+                    // match z3.exec_shared(query.deref()) {
+                    //     Ok(result) => Z3ResultMsg::Result(id, result),
+                    //     Err(_) => Z3ResultMsg::Error(id, None),
+                    // }
+
+                    // get a task
+                    let mut task_q = tasks.lock().unwrap();
+                    let mut task = task_q.pop_front();
+                    drop(task_q); // drop the lock again
+
+                    if let Some((ticket, mut query)) = task {
+                        // run the query
+                        query.timestamp("request");
+                        let result = z3.exec(&mut query);
+                        query.timestamp("smt");
+
+                        match result {
+                            Ok(mut result) => {
+                                result.set_query(query);
+                                results.send((ticket, result)).unwrap();
+                            }
+                            Err(x) => {
+                                panic!("handle me: {:?}", x);
+                            }
+                        }
+                    } else {
+                        // sleep for a bit
+                        thread::yield_now();
+                        // thread::sleep(Duration::from_millis(10));
                     }
                 }
+
+                // finally terminate
+                z3.terminate();
             })
             .unwrap();
 
-        if !task.is_empty()
-            && task_tx
-                .send(Z3QueryMsg::SharedQuery(Z3Ticket(0), task))
-                .is_err()
-        {
-            panic!("failed to send task to worker");
-        }
-
         Self {
             id: wid,
-            tasks_in_flight: 0,
             thread: Some(thread),
-            task_q: task_tx,
-            result_q: result_rx,
+            context,
             running,
+            reset,
+            restart,
         }
     }
 
@@ -179,135 +206,56 @@ impl Z3Worker {
     pub fn terminate(&mut self) {
         // set the termintation flag
         self.running.store(false, Ordering::Relaxed);
-        if self.task_q.send(Z3QueryMsg::Terminate).is_err() {
-            // println!("[z3-worker-{}] channel closed", self.id);
-        }
         if let Some(thread) = self.thread.take() {
             thread.join().expect("thread join failed");
         }
     }
 
-    /// performs a reset of the z3 worker
+    /// performs a reset of the z3 worker's Z3 instance
     pub fn reset(&mut self) {
-        self.task_q
-            .send(Z3QueryMsg::Reset)
-            .expect("failed to send the reset message");
+        self.reset.store(true, Ordering::Relaxed);
+        while self.reset.load(Ordering::Relaxed) {
+            thread::yield_now();
+        }
+    }
+
+    /// performs a restart of the z3 worker's Z3 instance
+    pub fn restart(&mut self) {
+        self.restart.store(true, Ordering::Relaxed);
+        while self.restart.load(Ordering::Relaxed) {
+            thread::yield_now();
+        }
+    }
+
+    /// performs a restart of the z3 worker's Z3 instance
+    pub fn restart_with_context(&mut self, ctx: Arc<Z3Query>) -> Option<Z3Result> {
+        // set the context, so we can do the restart
+        let mut context = self.context.as_ref().lock().unwrap();
+        *context = Z3Context::Query(ctx);
+        drop(context);
+
+        // perform restart
+        self.restart();
+
+        None
     }
 
     /// performs a reset and initializes the z3 worker with the given contxt
     pub fn reset_with_context(&mut self, ctx: Arc<Z3Query>) -> Option<Z3Result> {
+        // set the context, so we can do the restart
+        let mut context = self.context.as_ref().lock().unwrap();
+        *context = Z3Context::Query(ctx);
+        drop(context);
         self.reset();
-        self.exec_shared(ctx)
-    }
-
-    /// executes a task on the given worker
-    pub fn exec_shared(&mut self, task: Arc<Z3Query>) -> Option<Z3Result> {
-        if self.send_shared_query(task, Z3Ticket(0)).is_err() {
-            return None;
-        }
-        self.recv_result().map(|e| e.1)
-    }
-
-    /// executes a task on the given worker
-    pub fn exec(&mut self, task: Z3Query) -> Option<Z3Result> {
-        if self.send_query(task, Z3Ticket(0)).is_err() {
-            return None;
-        }
-        self.recv_result().map(|e| e.1)
-    }
-
-    /// whether or not the worker is busy
-    pub fn is_busy(&self) -> bool {
-        self.tasks_in_flight > 0
-    }
-
-    pub fn send_message(&mut self, msg: Z3QueryMsg) -> Result<(), Z3QueryMsg> {
-        if self.running.load(Ordering::Relaxed) {
-            let msg = self.task_q.send(msg);
-            match msg {
-                Ok(_) => {
-                    self.tasks_in_flight += 1;
-                    Ok(())
-                }
-                Err(t) => Err(t.0),
-            }
-        } else {
-            Err(msg)
-        }
-    }
-
-    /// sends a task to the worker
-    pub fn send_shared_query(
-        &mut self,
-        task: Arc<Z3Query>,
-        id: Z3Ticket,
-    ) -> Result<Z3Ticket, Arc<Z3Query>> {
-        if self.running.load(Ordering::Relaxed) {
-            match self.send_message(Z3QueryMsg::SharedQuery(id, task)) {
-                Ok(_) => Ok(id),
-                Err(Z3QueryMsg::SharedQuery(_, task)) => Err(task),
-                Err(_) => unreachable!(),
-            }
-        } else {
-            Err(task)
-        }
-    }
-
-    /// sends a task to the worker
-    pub fn send_query(&mut self, task: Z3Query, id: Z3Ticket) -> Result<Z3Ticket, Z3Query> {
-        if self.running.load(Ordering::Relaxed) {
-            match self.send_message(Z3QueryMsg::Query(id, task)) {
-                Ok(_) => Ok(id),
-                Err(Z3QueryMsg::Query(_, task)) => Err(task),
-                Err(_) => unreachable!(),
-            }
-        } else {
-            Err(task)
-        }
-    }
-
-    fn extract_result_msg(msg: Z3ResultMsg) -> Option<(Z3Ticket, Z3Result)> {
-        match msg {
-            Z3ResultMsg::Result(id, result) => Some((id, result)),
-            _ => None,
-        }
-    }
-
-    /// receives a result from the worker
-    pub fn recv_result(&mut self) -> Option<(Z3Ticket, Z3Result)> {
-        let msg = self.result_q.recv();
-        match msg {
-            Ok(result) => {
-                self.tasks_in_flight -= 1;
-                Self::extract_result_msg(result)
-            }
-            Err(_) => {
-                if self.running.load(Ordering::Relaxed) {
-                    panic!("Z3Worker::recv_result: disconnected while running");
-                } else {
-                    None
-                }
-            }
-        }
-    }
-
-    /// receives a result from the worker
-    pub fn try_recv_result(&mut self) -> Option<(Z3Ticket, Z3Result)> {
-        let msg = self.result_q.try_recv();
-        match msg {
-            Ok(result) => {
-                self.tasks_in_flight -= 1;
-                Self::extract_result_msg(result)
-            }
-            Err(TryRecvError::Empty) => None,
-            Err(_) => {
-                if self.running.load(Ordering::Relaxed) {
-                    panic!("Z3Worker::recv_result: disconnected while running");
-                } else {
-                    None
-                }
-            }
-        }
+        // let mut context = self.context.lock().unwrap();
+        // if let Z3Context::Result(res) = &*context {
+        //     *context = Z3Context::None;
+        //     Some(res.clone())
+        // } else {
+        //     *context = Z3Context::None;
+        //     return None;
+        // }
+        None
     }
 }
 
@@ -325,50 +273,44 @@ impl Drop for Z3Worker {
 
 /// Represents a pool of Z3 worker threads
 pub struct Z3WorkerPool {
+    ///
+    workers: Vec<Z3Worker>,
+
     /// the number of queries executed (statistics)
-    num_queries: usize,
-    /// workers that are currently idle
-    workers_idle: Vec<Z3Worker>,
-    /// workers that are currently busy
-    workers_busy: Vec<Z3Worker>,
-    /// tasks that haven't been dispatched to the client
-    taskq: VecDeque<(Z3Ticket, Z3Query)>,
-    /// stored results that haven't been collected by the client
-    results: HashMap<Z3Ticket, Z3Result>,
+    stats_num_queries: usize,
+    ///
+    stats_cached: usize,
     ///
     query_cache: HashMap<Z3Query, Result<Z3Result, ()>>,
+    /// tasks that haven't been dispatched to the client
+    taskq: Arc<Mutex<VecDeque<(Z3Ticket, Z3Query)>>>,
+
+    resultq: Receiver<(Z3Ticket, Z3Result)>,
+
+    /// stored results that haven't been collected by the client
+    results: HashMap<Z3Ticket, Z3Result>,
 }
 
 impl Z3WorkerPool {
-    pub fn new(logpath: Option<&PathBuf>) -> Self {
+    pub fn new(logpath: Option<Arc<PathBuf>>) -> Self {
         let parallelism = thread::available_parallelism()
             .unwrap_or(NonZeroUsize::new(1).unwrap())
             .get();
         Self::with_num_workers(parallelism, logpath)
     }
 
-    pub fn with_num_workers(num_workers: usize, logpath: Option<&PathBuf>) -> Self {
+    pub fn with_num_workers(num_workers: usize, logpath: Option<Arc<PathBuf>>) -> Self {
         log::info!(
             target : "[Z3WorkerPool]", " initializing using {} workers, logpath {:?}",
             num_workers,
             logpath
         );
 
-        let mut workers_idle = Vec::with_capacity(num_workers);
-        for i in 1..=num_workers {
-            workers_idle.push(Z3Worker::new(i, logpath));
-        }
-        Self {
-            num_queries: 0,
-            workers_idle,
-            workers_busy: Vec::new(),
-            taskq: VecDeque::new(),
-            results: HashMap::new(),
-            query_cache: HashMap::new(),
-        }
+        let ctx = Z3Query::new();
+        Self::with_num_workers_and_context(num_workers, logpath, ctx)
     }
 
-    pub fn with_context(ctx: Z3Query, logpath: Option<&PathBuf>) -> Self {
+    pub fn with_context(ctx: Z3Query, logpath: Option<Arc<PathBuf>>) -> Self {
         let parallelism = thread::available_parallelism()
             .unwrap_or(NonZeroUsize::new(1).unwrap())
             .get();
@@ -378,7 +320,7 @@ impl Z3WorkerPool {
 
     pub fn with_num_workers_and_context(
         num_workers: usize,
-        logpath: Option<&PathBuf>,
+        logpath: Option<Arc<PathBuf>>,
         ctx: Z3Query,
     ) -> Self {
         log::info!(
@@ -387,101 +329,49 @@ impl Z3WorkerPool {
             logpath
         );
 
+        // create the task and results
+        let taskq = Arc::new(Mutex::new(VecDeque::<(Z3Ticket, Z3Query)>::new()));
+
+        let (results_tx, resultq) = mpsc::channel::<(Z3Ticket, Z3Result)>();
+
+        //
+        let results = HashMap::new();
+
+        // the query cache
+        let query_cache = HashMap::new();
+
         let ctx = Arc::new(ctx);
-        let mut workers_idle = Vec::with_capacity(num_workers);
+
+        // create the workers
+        let mut workers = Vec::with_capacity(num_workers);
         for i in 0..num_workers {
-            workers_idle.push(Z3Worker::with_context(i, logpath, ctx.clone()));
-        }
-        Self {
-            num_queries: 0,
-            workers_idle,
-            workers_busy: Vec::with_capacity(num_workers),
-            taskq: VecDeque::new(),
-            results: HashMap::new(),
-            query_cache: HashMap::new(),
-        }
-    }
-
-    pub fn check_completed_tasks(&mut self) {
-        let mut busy_workers = Vec::with_capacity(self.workers_busy.capacity());
-        for mut w in self.workers_busy.drain(..) {
-            if let Some((id, mut r)) = w.try_recv_result() {
-                r.query_mut().timestamp("result");
-                log::trace!(target : "[Z3WorkerPool]", " task {} is complete", id);
-
-                // insert the cached result
-                if r.has_query() {
-                    let query = r.query();
-                    let result = r.result().to_string();
-                    self.query_cache
-                        .insert(query.clone_without_program(), Ok(Z3Result::new(result)));
-                }
-                self.results.insert(id, r);
-                self.workers_idle.push(w);
+            let worker = if !ctx.is_empty() {
+                Z3Worker::with_context(
+                    i,
+                    taskq.clone(),
+                    results_tx.clone(),
+                    logpath.as_ref().map(|h| h.as_ref()),
+                    ctx.clone(),
+                )
             } else {
-                busy_workers.push(w);
-            }
-        }
-        // update busy workers
-        self.workers_busy = busy_workers;
-    }
-
-    fn maybe_check_completd_tasks(&mut self) {
-        if 7 * self.workers_busy.len() > 8 * self.workers_idle.len() {
-            self.check_completed_tasks();
-        }
-    }
-
-    fn try_send_tasks(&mut self) {
-        if self.taskq.is_empty() {
-            log::trace!(target : "[Z3WorkerPool]", " no new tasks.");
-            return;
+                Z3Worker::new(
+                    i,
+                    taskq.clone(),
+                    results_tx.clone(),
+                    logpath.as_ref().map(|h| h.as_ref()),
+                )
+            };
+            workers.push(worker);
         }
 
-        while let Some(mut w) = self.workers_idle.pop() {
-            if self.taskq.is_empty() {
-                log::trace!(target : "[Z3WorkerPool]", " no more tasks to send.");
-                self.workers_idle.push(w);
-                return;
-            }
-
-            let (id, mut task) = self.taskq.pop_front().unwrap();
-            task.timestamp("queue");
-
-            // see if we can the cached result
-            match self.query_cache.get(&task) {
-                Some(Ok(r)) => {
-                    // we've already computed this query and it's results are ready
-                    log::info!(target : "[Z3WorkerPool]", " not sending task, cached result for {}", id);
-                    self.results.insert(id, r.clone_with_query(task));
-                    self.workers_idle.push(w);
-                    continue;
-                }
-                Some(Err(_)) => {
-                    // we've submited but it's pending, push it back and continue
-                    log::info!(target : "[Z3WorkerPool]", " not sending task, pending result for {}", id);
-                    self.taskq.push_back((id, task));
-                    continue;
-                }
-                None => {
-                    log::trace!(target : "[Z3WorkerPool]", " sending task for {}", id);
-                    // we haven't seen this query before, add it to the cache
-                    self.query_cache
-                        .insert(task.clone_without_program(), Err(()));
-                }
-            }
-
-            // send the query
-            match w.send_query(task, id) {
-                Ok(_) => {
-                    self.workers_busy.push(w);
-                }
-                Err(t) => {
-                    log::error!(target : "[Z3WorkerPool]", " sending task failed");
-                    self.workers_idle.push(w);
-                    self.taskq.push_back((id, t));
-                }
-            }
+        Self {
+            workers,
+            resultq,
+            taskq,
+            results,
+            query_cache,
+            stats_cached: 0,
+            stats_num_queries: 0,
         }
     }
 
@@ -489,28 +379,74 @@ impl Z3WorkerPool {
         log::trace!(target : "[Z3WorkerPool]", " submitting query");
         // take the timestamp
         task.timestamp("submit");
-        self.maybe_check_completd_tasks();
 
         // get the ticket
-        self.num_queries += 1;
-        let id = Z3Ticket(self.num_queries);
+        self.stats_num_queries += 1;
+        let id = Z3Ticket(self.stats_num_queries);
 
-        // add the task to the queue
-        self.taskq.push_back((id, task));
-        self.try_send_tasks();
-        // no workers available, that's ok.
+        // see if we can the cached result
+        match self.query_cache.get(&task) {
+            Some(Ok(r)) => {
+                // we've already computed this query and it's results are ready
+                log::trace!(target : "[Z3WorkerPool]", "not sending task, cached result for {}", id);
+                self.results.insert(id, r.clone_with_query(task));
+                self.stats_cached += 1;
+            }
+            Some(Err(_)) => {
+                // we've submited but it's pending, push it back and continue
+                log::trace!(target : "[Z3WorkerPool]", "not sending task, pending result for {}", id);
+            }
+            None => {
+                log::trace!(target : "[Z3WorkerPool]", " sending task for {}", id);
+                // we haven't seen this query before, add it to the cache
+                self.query_cache
+                    .insert(task.clone_without_timestamps(), Err(()));
+
+                let mut taskq = self.taskq.lock().unwrap();
+                taskq.push_back((id, task));
+                drop(taskq);
+            }
+        }
+
         Ok(id)
     }
 
-    pub fn wait_for_completion(&mut self) {
-        log::warn!(target : "[Z3WorkerPool]", " waiting for completion of all tasks");
+    fn drain_taskq(&mut self) {
+        log::trace!(target : "[Z3WorkerPool]", "draining task queue");
+        // XXX: that one here just makes sure there are no new tasks...
+        let mut taskq = self.taskq.lock().unwrap();
+        taskq.clear(); // just drop everything
+    }
+
+    fn drain_resultq(&mut self) {
+        log::trace!(target : "[Z3WorkerPool]", "draining result queue");
+        // XXX: that one here just makes sure there are no new tasks...
+
+        let mut counter = 5;
         loop {
-            self.check_completed_tasks();
-            self.try_send_tasks();
-            if self.workers_busy.is_empty() {
-                break;
+            match self.resultq.try_recv() {
+                Ok((id, result)) => {
+                    // nothing
+                    let query = result.query();
+                    let smtresult = result.result().to_string();
+                    self.query_cache.insert(
+                        query.clone_without_timestamps(),
+                        Ok(Z3Result::new(smtresult)),
+                    );
+                    self.results.insert(id, result);
+                }
+                Err(TryRecvError::Empty) => {
+                    if counter == 0 {
+                        break;
+                    }
+                    counter -= 1;
+                    thread::sleep(Duration::from_millis(5));
+                    break;
+                }
+                Err(TryRecvError::Disconnected) => {
+                    return;
+                }
             }
-            thread::sleep(Duration::from_millis(10));
         }
     }
 
@@ -520,55 +456,66 @@ impl Z3WorkerPool {
             if let Some(r) = res {
                 return r;
             }
-            log::trace!(target : "[Z3WorkerPool]", " waiting for task {}", id);
-            self.check_completed_tasks();
-            self.try_send_tasks();
             thread::yield_now();
+            // thread::sleep(Duration::from_millis(5));
         }
     }
 
     pub fn get_result(&mut self, id: Z3Ticket) -> Option<Z3Result> {
+        self.drain_resultq();
         self.results.remove(&id)
     }
 
     pub fn reset(&mut self) {
         log::warn!(target : "[Z3WorkerPool]", " performing reset of worker pool");
-        self.taskq.clear();
-        self.results.clear();
-        self.query_cache.clear();
-        for w in self.workers_idle.iter_mut() {
-            w.reset();
+
+        self.drain_taskq();
+        for worker in self.workers.iter_mut() {
+            worker.reset();
         }
 
-        for w in self.workers_busy.iter_mut() {
-            w.reset();
-        }
+        self.drain_resultq();
+        self.results.clear();
+        self.query_cache.clear();
+
+        log::warn!(target : "[Z3WorkerPool]", "reset done.");
     }
 
     pub fn reset_with_context(&mut self, ctx: Z3Query) {
         log::warn!(target : "[Z3WorkerPool]", " performing reset of worker pool with context");
 
-        self.taskq.clear();
+        let query = Arc::new(ctx);
+
+        self.drain_taskq();
+        for worker in self.workers.iter_mut() {
+            worker.reset_with_context(query.clone());
+        }
+        self.drain_resultq();
         self.results.clear();
-
-        let ctx = Arc::new(ctx);
-        for w in self.workers_idle.iter_mut() {
-            w.reset_with_context(ctx.clone());
-        }
-
-        for w in self.workers_busy.iter_mut() {
-            w.reset_with_context(ctx.clone());
-        }
-
         self.query_cache.clear();
+
+        log::warn!(target : "[Z3WorkerPool]", "reset done.");
     }
 
     pub fn terminate(&mut self) {
         log::warn!(target : "[Z3WorkerPool]", " terminating worker pool");
-        self.taskq.clear();
+
+        self.drain_taskq();
+        for worker in self.workers.iter_mut() {
+            worker.terminate();
+        }
+        self.drain_resultq();
         self.results.clear();
         self.query_cache.clear();
-        self.workers_idle.clear();
-        self.workers_busy.clear();
+
+        log::warn!(target : "[Z3WorkerPool]", "terminated.");
+    }
+
+    pub fn num_queries(&self) -> usize {
+        self.stats_num_queries
+    }
+
+    pub fn num_cached_queries(&self) -> usize {
+        self.stats_cached
     }
 }
