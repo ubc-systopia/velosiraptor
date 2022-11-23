@@ -23,6 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+use std::rc::Rc;
+
 use smt2::{Smt2Context, SortedVar, Term};
 use velosiast::ast::{VelosiAstMethod, VelosiAstUnitSegment};
 
@@ -31,100 +33,140 @@ use crate::{
         call_method, call_method_assms, call_method_result_check_part, combine_method_params,
     },
     model::types,
-    z3::{Z3Query, Z3Result, Z3Ticket, Z3WorkerPool},
+    z3::{Z3Query, Z3Ticket, Z3WorkerPool},
     Program,
 };
 
-use super::utils::construct_programs;
-use super::TicketOrResult;
-use crate::programs::MultiDimIterator;
+use super::queryhelper::{
+    MaybeResult, MultiDimProgramQueries, ProgramBuilder, ProgramQueries, QueryBuilder,
+};
+use crate::ProgramsIter;
 
-// submits queries for the method preconditions
-pub fn submit_method_semantic_queries(
-    z3: &mut Z3WorkerPool,
+use super::utils;
+
+pub struct SemanticQueryBuilder<T>
+where
+    T: ProgramBuilder,
+{
+    /// the programs
+    programs: T,
+    /// the operation method
+    m_op: Rc<VelosiAstMethod>,
+    /// the goal method
+    m_goal: Rc<VelosiAstMethod>,
+    /// the entry in the pre-condition
+    idx: Option<usize>,
+    /// whether the result should not change
+    no_change: bool,
+}
+
+impl<T> SemanticQueryBuilder<T>
+where
+    T: ProgramBuilder,
+{
+    pub fn new(
+        programs: T,
+        m_op: Rc<VelosiAstMethod>,
+        m_goal: Rc<VelosiAstMethod>,
+        idx: Option<usize>,
+        no_change: bool,
+    ) -> Self {
+        Self {
+            programs,
+            m_op,
+            m_goal,
+            idx,
+            no_change,
+        }
+    }
+}
+
+impl<T> QueryBuilder for SemanticQueryBuilder<T>
+where
+    T: ProgramBuilder,
+{
+    /// returns the next query to be submitted, or None if all have been submitted
+    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Z3Query> {
+        match self.programs.next(z3) {
+            MaybeResult::Some(prog) => MaybeResult::Some(program_to_query(
+                &self.m_op,
+                &self.m_goal,
+                self.idx,
+                prog,
+                self.no_change,
+            )),
+            MaybeResult::Pending => MaybeResult::Pending,
+            MaybeResult::None => MaybeResult::None,
+        }
+    }
+}
+
+type SemanticFragmentQueries = ProgramQueries<SemanticQueryBuilder<ProgramsIter>>;
+type SemanticBlockQueries = MultiDimProgramQueries<SemanticFragmentQueries>;
+
+pub enum SemanticQueries {
+    SingleQuery(SemanticQueryBuilder<ProgramsIter>),
+    MultiQuery(SemanticQueryBuilder<SemanticBlockQueries>),
+}
+
+impl QueryBuilder for SemanticQueries {
+    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Z3Query> {
+        match self {
+            Self::SingleQuery(q) => q.next(z3),
+            Self::MultiQuery(q) => q.next(z3),
+        }
+    }
+}
+
+const CONFIG_BATCH_SIZE: usize = 5;
+
+pub fn semantic_query(
     unit: &VelosiAstUnitSegment,
-    m_op: &VelosiAstMethod,
-    m_goal: &VelosiAstMethod,
-) -> Vec<Vec<Z3Ticket>> {
+    m_op: Rc<VelosiAstMethod>,
+    m_goal: Rc<VelosiAstMethod>,
+    no_change: bool,
+) -> ProgramQueries<SemanticQueries> {
     if let Some(body) = &m_goal.body {
         if body.result_type().is_boolean() {
             let body = body.clone();
-            let mut res = Vec::new();
+            let mut program_queries = Vec::new();
             for (idx, e) in body.split_cnf().iter().enumerate() {
-                // build the programs
-                let progs = construct_programs(unit, m_op, e);
+                let programs = utils::make_program_builder(unit, m_op.as_ref(), e).into_iter();
+                let b = SemanticQueryBuilder::new(
+                    programs,
+                    m_op.clone(),
+                    m_goal.clone(),
+                    Some(idx),
+                    no_change,
+                );
+                let q = ProgramQueries::with_batchsize(b, CONFIG_BATCH_SIZE);
 
-                // submit the queries
-                res.push(
-                    progs
-                        .into_iter()
-                        .map(|p| submit_program_query(z3, m_op, m_goal, Some(idx), p))
-                        .collect(),
-                )
+                program_queries.push(q);
             }
-            res
-        } else {
-            // build the programs
-            let progs = construct_programs(unit, m_op, body);
+            let programs = MultiDimProgramQueries::new(program_queries);
 
-            // submit the queries
-            vec![progs
-                .into_iter()
-                .map(|p| submit_program_query(z3, m_op, m_goal, None, p))
-                .collect()]
+            let b = SemanticQueryBuilder::new(programs, m_op, m_goal.clone(), None, no_change);
+            ProgramQueries::new(SemanticQueries::MultiQuery(b))
+        } else {
+            // case 1: we just have a single body element, so no need to split up.
+
+            let programs = utils::make_program_builder(unit, m_op.as_ref(), body).into_iter();
+            let b = SemanticQueryBuilder::new(programs, m_op, m_goal.clone(), None, no_change);
+
+            ProgramQueries::with_batchsize(SemanticQueries::SingleQuery(b), CONFIG_BATCH_SIZE)
         }
     } else {
-        Vec::new()
+        unreachable!("all methods should have a body here.");
     }
 }
 
-// submits queries for the method preconditions
-pub fn combine_semantic_results_submit_queries(
-    z3: &mut Z3WorkerPool,
-    m_op: &VelosiAstMethod,
-    m_goal: &VelosiAstMethod,
-    mut fragments: Vec<Vec<Z3Result>>,
-) -> TicketOrResult {
-    if fragments.is_empty() {
-        //panic!("was empty");
-        return TicketOrResult::Result(Vec::new());
-    }
-
-    if fragments.len() == 1 {
-        let v = fragments.pop().unwrap();
-        return TicketOrResult::Result(v);
-    }
-
-    // create the multi-dim iterator
-    let mut it = MultiDimIterator::from_slice(fragments.as_slice());
-
-    let mut res = Vec::with_capacity(it.len());
-    while let Some(conf) = it.next() {
-        let prog = conf
-            .iter()
-            .enumerate()
-            .fold(Program::new(), |prog, (i, e)| {
-                let p = fragments[i][*e]
-                    .query()
-                    .program()
-                    .expect("program was not set.");
-                prog.merge(p)
-            });
-
-        let ticket = submit_program_query(z3, m_op, m_goal, None, prog);
-        res.push(ticket)
-    }
-
-    TicketOrResult::Ticket(res)
-}
-
-pub fn submit_program_query(
-    z3: &mut Z3WorkerPool,
+fn program_to_query(
     m_op: &VelosiAstMethod,
     m_goal: &VelosiAstMethod,
     idx: Option<usize>,
     prog: Program,
-) -> Z3Ticket {
+    no_change: bool,
+) -> Z3Query {
     // convert the program to a smt2 term
     let (mut smt, symvars) = prog.to_smt2_term(m_op.ident_as_str(), m_op.params.as_slice());
 
@@ -145,6 +187,9 @@ pub fn submit_program_query(
         m_goal.params.as_slice(),
     );
 
+    // get the goal as string
+    let goal = m_goal_call.to_string();
+
     let t = Term::forall(vars, pre.implies(m_goal_call));
 
     // assert and check sat
@@ -161,7 +206,18 @@ pub fn submit_program_query(
 
     // create and submit query
     let mut query = Z3Query::from(smtctx);
-    query.set_program(prog);
+    query.set_program(prog).set_goal(goal);
+    query
+}
 
+pub fn submit_program_query(
+    z3: &mut Z3WorkerPool,
+    m_op: &VelosiAstMethod,
+    m_goal: &VelosiAstMethod,
+    idx: Option<usize>,
+    prog: Program,
+    no_change: bool,
+) -> Z3Ticket {
+    let query = program_to_query(m_op, m_goal, idx, prog, no_change);
     z3.submit_query(query).expect("failed to submit query")
 }

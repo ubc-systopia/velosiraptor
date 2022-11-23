@@ -229,8 +229,8 @@ pub fn check_precondition_satisfiability(
     issues.merge(check_satisfy_fn_results(z3, tickets6, t_fn, t_fn));
 
     if issues.is_ok() {
-        return Ok(());
+        Ok(())
     } else {
-        return Err(issues);
+        Err(issues)
     }
 }

@@ -33,6 +33,8 @@
 use std::env;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::time::Instant;
 
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
@@ -50,9 +52,10 @@ mod z3;
 
 use velosiast::ast::VelosiAstUnitSegment;
 
+use crate::vmops::{MaybeResult, ProgramBuilder};
 pub use error::{VelosiSynthError, VelosiSynthIssues};
 pub use operation::{OpExpr, Operation};
-pub use programs::{Program, ProgramsBuilder};
+pub use programs::{Program, ProgramsBuilder, ProgramsIter};
 pub use z3::{Z3Query, Z3Ticket, Z3Worker, Z3WorkerPool};
 
 #[macro_export]
@@ -85,7 +88,7 @@ impl Display for SynthResult {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(
             f,
-            "Programs:\n  map:\n    {}\n  unmap:\n    {}\n  protect:\n    {}",
+            "Programs:\n- map:\n    {}\n-unmap:\n    {}\n-protect:\n    {}",
             self.map, self.unmap, self.protect
         )
     }
@@ -93,9 +96,10 @@ impl Display for SynthResult {
 
 pub struct SynthZ3 {
     ast: Rc<VelosiAstUnitSegment>,
-    outdir: PathBuf,
+    outdir: Arc<PathBuf>,
     ncpu: usize,
     workerpool: Option<Z3WorkerPool>,
+    model_created: bool,
 }
 
 impl SynthZ3 {
@@ -114,9 +118,10 @@ impl SynthZ3 {
     pub fn with_ncpu(ast: Rc<VelosiAstUnitSegment>, outdir: PathBuf, ncpu: usize) -> Self {
         SynthZ3 {
             ast,
-            outdir,
+            outdir: Arc::new(outdir),
             ncpu,
             workerpool: None,
+            model_created: false,
         }
     }
 
@@ -124,7 +129,7 @@ impl SynthZ3 {
         // make sure we don't have anything running anymore
         self.terminate();
 
-        let workerpool = Z3WorkerPool::with_num_workers(ncpu, Some(&self.outdir));
+        let workerpool = Z3WorkerPool::with_num_workers(ncpu, Some(self.outdir.clone()));
 
         self.workerpool = Some(workerpool);
         self.ncpu = ncpu;
@@ -138,7 +143,7 @@ impl SynthZ3 {
 
     fn run_smt2(&mut self, ctx: Smt2Context) -> Result<(), VelosiSynthIssues> {
         if self.workerpool.is_none() {
-            let workerpool = Z3WorkerPool::with_num_workers(self.ncpu, Some(&self.outdir));
+            let workerpool = Z3WorkerPool::with_num_workers(self.ncpu, Some(self.outdir.clone()));
             self.workerpool = Some(workerpool);
         }
 
@@ -148,25 +153,31 @@ impl SynthZ3 {
     }
 
     pub fn create_model(&mut self) -> Result<(), VelosiSynthIssues> {
-        self.run_smt2(model::create(&self.ast))
+        if !self.model_created {
+            self.model_created = true;
+            self.run_smt2(model::create(&self.ast))?;
+        }
+        Ok(())
     }
 
     pub fn sanity_check(&mut self) -> Result<(), VelosiSynthIssues> {
+        self.create_model()?;
+
         log::info!(target: "[SynthZ3]", "running sanity checks on the model.");
         let mut issues = VelosiSynthIssues::new();
 
         issues.merge_result(vmops::sanity::check_precondition_satisfiability(
-            &mut self.workerpool.as_mut().unwrap(),
+            self.workerpool.as_mut().unwrap(),
             &self.ast,
             "map",
         ));
         issues.merge_result(vmops::sanity::check_precondition_satisfiability(
-            &mut self.workerpool.as_mut().unwrap(),
+            self.workerpool.as_mut().unwrap(),
             &self.ast,
             "unmap",
         ));
         issues.merge_result(vmops::sanity::check_precondition_satisfiability(
-            &mut self.workerpool.as_mut().unwrap(),
+            self.workerpool.as_mut().unwrap(),
             &self.ast,
             "protect",
         ));
@@ -178,63 +189,95 @@ impl SynthZ3 {
         // have this more conditional
         self.create_model()?;
 
-        let z3 = &mut self.workerpool.as_mut().unwrap();
+        let z3 = self.workerpool.as_mut().unwrap();
 
         // --------------------------------------------------------------------------------------
         // Submit queries for all of the three vmops
         // --------------------------------------------------------------------------------------
 
-        let map_queries = vmops::map::submit_fragment_queries(z3, &self.ast)?;
-        let unmap_tickets = vmops::unmap::submit_queries(z3, &self.ast)?;
-        let protect_tickets = vmops::protect::submit_queries(z3, &self.ast)?;
+        use std::time::Duration;
 
-        // --------------------------------------------------------------------------------------
-        // Process the results
-        // --------------------------------------------------------------------------------------
+        let t_start = Instant::now();
 
-        let map_queries = vmops::map::process_fragment_queries(z3, &self.ast, map_queries)?;
-        let unmap_results = vmops::unmap::check_queries(z3, unmap_tickets)?;
-        let protect_results = vmops::protect::check_queries(z3, protect_tickets)?;
+        let mut map_queries = vmops::map::get_program_iter(&self.ast);
+        let t_map = Instant::now();
+        let mut unmap_queries = vmops::unmap::get_program_iter(&self.ast);
+        let t_unmap = Instant::now();
+        let mut protect_queries = vmops::protect::get_program_iter(&self.ast);
 
-        // --------------------------------------------------------------------------------------
-        // Construct candiate programs
-        // --------------------------------------------------------------------------------------
+        let t_iters = Instant::now();
 
-        let map_queries = vmops::map::process_block_queries(z3, &self.ast, map_queries)?;
-        let unmap_programs = vmops::unmap::construct_programs(z3, unmap_results)?;
-        let protect_programs = vmops::protect::construct_programs(z3, protect_results)?;
+        let diff = t_map.saturating_duration_since(t_start);
 
-        // --------------------------------------------------------------------------------------
-        // Construct candiate programs
-        // --------------------------------------------------------------------------------------
+        log::info!("TIME:    map        unmap       protect      total");
+        log::info!(
+            "Iter      {}          {}           {}        {}",
+            t_map.saturating_duration_since(t_start).as_millis(),
+            t_unmap.saturating_duration_since(t_map).as_millis(),
+            t_iters.saturating_duration_since(t_unmap).as_millis(),
+            t_iters.saturating_duration_since(t_start).as_millis(),
+        );
 
-        let map_program = vmops::map::process_program_queries(z3, map_queries)?;
-        let unmap = vmops::unmap::check_programs(z3, unmap_programs)?;
-        let protect = vmops::protect::check_programs(z3, protect_programs)?;
+        let mut map_program = MaybeResult::Pending;
+        let mut unmap_program = MaybeResult::Pending;
+        let mut protect_program = MaybeResult::Pending;
 
-        Ok(SynthResult {
-            map: map_program,
-            unmap,
-            protect,
-        })
+        let mut all_done = true;
+        loop {
+            all_done = true;
+
+            if map_program == MaybeResult::Pending {
+                map_program = map_queries.next(z3);
+                all_done &= map_program != MaybeResult::Pending
+            }
+
+            if unmap_program == MaybeResult::Pending {
+                unmap_program = unmap_queries.next(z3);
+                all_done &= unmap_program != MaybeResult::Pending
+            }
+
+            if protect_program == MaybeResult::Pending {
+                protect_program = protect_queries.next(z3);
+                all_done &= protect_program != MaybeResult::Pending
+            }
+
+            if all_done {
+                break;
+            }
+        }
+
+        debug_assert!(map_program != MaybeResult::Pending);
+        debug_assert!(unmap_program != MaybeResult::Pending);
+        debug_assert!(protect_program != MaybeResult::Pending);
+
+        match (map_program, unmap_program, protect_program) {
+            (MaybeResult::Some(mp), MaybeResult::Some(up), MaybeResult::Some(pp)) => {
+                Ok(SynthResult {
+                    map: mp,
+                    unmap: up,
+                    protect: pp,
+                })
+            }
+            _ => Err(VelosiSynthIssues::new()),
+        }
     }
 
     pub fn synthesize_map(&mut self) -> Result<Program, VelosiSynthIssues> {
         // have this more conditional
         self.create_model()?;
 
-        vmops::map::synthesize(&mut self.workerpool.as_mut().unwrap(), &self.ast)
+        vmops::map::synthesize(self.workerpool.as_mut().unwrap(), &self.ast)
     }
 
     pub fn synthesize_unmap(&mut self) -> Result<Program, VelosiSynthIssues> {
         // have this more conditional
         self.create_model()?;
-        vmops::unmap::synthesize(&mut self.workerpool.as_mut().unwrap(), &self.ast)
+        vmops::unmap::synthesize(self.workerpool.as_mut().unwrap(), &self.ast)
     }
 
     pub fn synthesize_protect(&mut self) -> Result<Program, VelosiSynthIssues> {
         // have this more conditional
         self.create_model()?;
-        vmops::protect::synthesize(&mut self.workerpool.as_mut().unwrap(), &self.ast)
+        vmops::protect::synthesize(self.workerpool.as_mut().unwrap(), &self.ast)
     }
 }
