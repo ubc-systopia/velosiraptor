@@ -120,7 +120,7 @@ pub fn main() {
         t_synth_segment.push(("start", Instant::now()));
 
         let path = env::current_dir().unwrap();
-        let mut synth = SynthZ3::with_ncpu(seg.clone(), path, ncores);
+        let mut synth = SynthZ3::with_ncpu(seg.clone(), path.join("logs"), ncores);
         synth.create_model().expect("failed to create the model");
 
         t_synth_segment.push(("Model Creation", Instant::now()));
