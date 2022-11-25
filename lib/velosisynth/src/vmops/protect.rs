@@ -58,7 +58,8 @@ impl ProgramBuilder for PartQueries {
 
 pub struct ProtectPrograms {
     programs: MultiDimProgramQueries<PartQueries>,
-    queries: LinkedList<(Program, [Option<Z3Ticket>; 4])>,
+    programs_done: bool,
+    queries: LinkedList<(Program, [Option<Z3Ticket>; 2])>,
     candidates: Vec<Program>,
 
     m_fn: Rc<VelosiAstMethod>,
@@ -75,6 +76,7 @@ impl ProtectPrograms {
     ) -> Self {
         Self {
             programs,
+            programs_done: false,
             queries: LinkedList::new(),
             candidates: Vec::new(),
             m_fn,
@@ -97,6 +99,7 @@ impl ProgramBuilder for ProtectPrograms {
                 }
             }
             MaybeResult::None => {
+                self.programs_done = true;
                 if !has_work {
                     return MaybeResult::None;
                 }
@@ -107,14 +110,14 @@ impl ProgramBuilder for ProtectPrograms {
         const CONFIG_MAX_QUERIES: usize = 4;
         if self.queries.len() < CONFIG_MAX_QUERIES {
             if let Some(prog) = self.candidates.pop() {
-                let translate_preconds = precond::submit_program_query(
-                    z3,
-                    self.m_fn.as_ref(),
-                    self.t_fn.as_ref(),
-                    None,
-                    false,
-                    prog.clone(),
-                );
+                // let translate_preconds = precond::submit_program_query(
+                //     z3,
+                //     self.m_fn.as_ref(),
+                //     self.t_fn.as_ref(),
+                //     None,
+                //     false,
+                //     prog.clone(),
+                // );
 
                 let translate_semantics = semantics::submit_program_query(
                     z3,
@@ -125,14 +128,14 @@ impl ProgramBuilder for ProtectPrograms {
                     true,
                 );
 
-                let matchflags_preconds = precond::submit_program_query(
-                    z3,
-                    self.m_fn.as_ref(),
-                    self.f_fn.as_ref(),
-                    None,
-                    false,
-                    prog.clone(),
-                );
+                // let matchflags_preconds = precond::submit_program_query(
+                //     z3,
+                //     self.m_fn.as_ref(),
+                //     self.f_fn.as_ref(),
+                //     None,
+                //     false,
+                //     prog.clone(),
+                // );
                 let matchflags_semantics = semantics::submit_program_query(
                     z3,
                     self.m_fn.as_ref(),
@@ -145,9 +148,9 @@ impl ProgramBuilder for ProtectPrograms {
                 self.queries.push_back((
                     prog,
                     [
-                        Some(translate_preconds),
+                        // Some(translate_preconds),
                         Some(translate_semantics),
-                        Some(matchflags_preconds),
+                        // Some(matchflags_preconds),
                         Some(matchflags_semantics),
                     ],
                 ));
@@ -158,6 +161,7 @@ impl ProgramBuilder for ProtectPrograms {
         let mut remaining_queries = LinkedList::new();
         while let Some((prog, mut tickets)) = self.queries.pop_front() {
             let mut all_done = true;
+            let mut unsat_part = false;
             for maybe_ticket in tickets.iter_mut() {
                 if let Some(ticket) = maybe_ticket {
                     if let Some(mut result) = z3.get_result(*ticket) {
@@ -168,12 +172,18 @@ impl ProgramBuilder for ProtectPrograms {
                             *maybe_ticket = None;
                         } else {
                             // unsat result, just drop it
+                            unsat_part = true;
                             break;
                         }
                     } else {
                         all_done = false;
                     }
                 }
+            }
+
+            if unsat_part {
+                // drop the program and the tickets as it contains one unsar part
+                continue;
             }
 
             // store the result
@@ -188,7 +198,7 @@ impl ProgramBuilder for ProtectPrograms {
 
         if let Some(prog) = res_program {
             MaybeResult::Some(prog)
-        } else if !self.queries.is_empty() || !self.candidates.is_empty() {
+        } else if !self.queries.is_empty() || !self.candidates.is_empty() || !self.programs_done {
             MaybeResult::Pending
         } else {
             debug_assert!(self.programs.next(z3) == MaybeResult::None);
@@ -197,14 +207,14 @@ impl ProgramBuilder for ProtectPrograms {
     }
 }
 
-pub fn get_program_iter(unit: &VelosiAstUnitSegment) -> ProtectPrograms {
+pub fn get_program_iter(unit: &VelosiAstUnitSegment, batch_size: usize) -> ProtectPrograms {
     log::info!(
-        target : "[synth::map]",
-        "starting synthesizing the map operation"
+        target : "[synth::protect]",
+        "starting synthesizing the protect operation"
     );
 
     // obtain the functions for the map operation
-    let m_fn = unit.get_method("map").unwrap();
+    let m_fn = unit.get_method("protect").unwrap();
     let t_fn = unit.get_method("translate").unwrap();
     let f_fn = unit.get_method("matchflags").unwrap();
 
@@ -213,32 +223,34 @@ pub fn get_program_iter(unit: &VelosiAstUnitSegment) -> ProtectPrograms {
     // ---------------------------------------------------------------------------------------------
 
     let map_queries = vec![
-        PartQueries::Precond(precond::precond_query(
-            unit,
-            m_fn.clone(),
-            t_fn.clone(),
-            false,
-        )),
-        PartQueries::Precond(precond::precond_query(
-            unit,
-            m_fn.clone(),
-            f_fn.clone(),
-            false,
-        )),
+        // PartQueries::Precond(precond::precond_query(
+        //     unit,
+        //     m_fn.clone(),
+        //     t_fn.clone(),
+        //     false,
+        // )),
+        // PartQueries::Precond(precond::precond_query(
+        //     unit,
+        //     m_fn.clone(),
+        //     f_fn.clone(),
+        //     false,
+        // )),
         PartQueries::Semantic(semantics::semantic_query(
             unit,
             m_fn.clone(),
             t_fn.clone(),
             true,
+            batch_size,
         )),
         PartQueries::Semantic(semantics::semantic_query(
             unit,
             m_fn.clone(),
             f_fn.clone(),
             false,
+            batch_size,
         )),
     ];
-    let mut programs = MultiDimProgramQueries::new(map_queries);
+    let programs = MultiDimProgramQueries::new(map_queries);
 
     ProtectPrograms::new(programs, m_fn.clone(), t_fn.clone(), f_fn.clone())
 }
@@ -247,7 +259,8 @@ pub fn synthesize(
     z3: &mut Z3WorkerPool,
     unit: &VelosiAstUnitSegment,
 ) -> Result<Program, VelosiSynthIssues> {
-    let mut mprogs = get_program_iter(unit);
+    let batch_size = std::cmp::max(5, z3.num_workers() / 2);
+    let mprogs = get_program_iter(unit, batch_size);
     loop {
         match mprogs.next(z3) {
             MaybeResult::Some(prog) => {

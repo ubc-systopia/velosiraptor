@@ -25,6 +25,9 @@
 
 //! Synthesis of Virtual Memory Operations: Map
 
+use std::collections::LinkedList;
+use std::collections::VecDeque;
+
 use super::utils;
 use crate::Z3Query;
 use crate::Z3Ticket;
@@ -63,7 +66,7 @@ where
     /// the submitted queries
     submitted: Vec<Z3Ticket>,
     /// programs that had SAT results
-    completed: Vec<Program>,
+    completed: VecDeque<Program>,
     /// the batch size for submiting queries
     batch_size: usize,
 }
@@ -80,7 +83,7 @@ where
         ProgramQueries {
             queries,
             submitted: Vec::with_capacity(batch_size),
-            completed: Vec::with_capacity(batch_size),
+            completed: VecDeque::with_capacity(batch_size),
             batch_size,
         }
     }
@@ -130,7 +133,7 @@ where
                 let mut program = result.query_mut().take_program().unwrap();
                 let output = result.result();
                 if utils::check_result(output, &mut program) == utils::QueryResult::Sat {
-                    self.completed.push(program);
+                    self.completed.push_back(program);
                 }
             } else {
                 submitted.push(*ticket);
@@ -150,7 +153,7 @@ where
     fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
         let pending = self.check_submitted(z3);
 
-        if let Some(p) = self.completed.pop() {
+        if let Some(p) = self.completed.pop_front() {
             MaybeResult::Some(p)
         } else if self.submitted.is_empty() && !pending {
             debug_assert!(self.queries.next(z3) == MaybeResult::None);
@@ -207,18 +210,17 @@ where
 
         // loop over all program parts, and check if there is one next
         let mut had_pending = false;
+
         for i in 0..self.programs.len() {
             if self.done[i] {
                 continue;
             }
 
             match self.queries[i].next(z3) {
-                MaybeResult::Some(program) => {
-                    self.programs[i].push(program);
-                }
+                MaybeResult::Some(program) => self.programs[i].push(program),
                 // it's a pending result
                 MaybeResult::Pending => {
-                    // reset the pending, so we check again next turn
+                    // reset the pending, so we check again next turn, so we are not all done
                     had_pending = true;
                 }
                 MaybeResult::None => {
@@ -239,6 +241,7 @@ where
         // increment the current index
         let mut carry = true;
         let mut had_pending = false;
+        let mut had_none = false;
         for i in 0..self.programs.len() {
             if carry {
                 self.current[i] += 1;
@@ -252,16 +255,27 @@ where
                         break;
                     }
                 } else {
-                    // no wrap around, so we can stop
+                    // no wrap around, so there is no carry here
                     carry = false;
                 }
             }
+
+            if self.programs[i].is_empty() {
+                log::warn!("Programs {} is empty", i);
+            }
+
+            had_none |= self.programs[i].is_empty();
         }
 
         if had_pending {
             // roll back the current
             self.current = current;
             return MaybeResult::Pending;
+        }
+
+        if had_none {
+            log::warn!("one of the programs was empty!");
+            return MaybeResult::None;
         }
 
         self.idx += 1;

@@ -118,13 +118,12 @@ impl QueryBuilder for SemanticQueries {
     }
 }
 
-const CONFIG_BATCH_SIZE: usize = 5;
-
 pub fn semantic_query(
     unit: &VelosiAstUnitSegment,
     m_op: Rc<VelosiAstMethod>,
     m_goal: Rc<VelosiAstMethod>,
     no_change: bool,
+    batch_size: usize,
 ) -> ProgramQueries<SemanticQueries> {
     if let Some(body) = &m_goal.body {
         if body.result_type().is_boolean() {
@@ -139,7 +138,7 @@ pub fn semantic_query(
                     Some(idx),
                     no_change,
                 );
-                let q = ProgramQueries::with_batchsize(b, CONFIG_BATCH_SIZE);
+                let q = ProgramQueries::with_batchsize(b, batch_size);
 
                 program_queries.push(q);
             }
@@ -153,7 +152,7 @@ pub fn semantic_query(
             let programs = utils::make_program_builder(unit, m_op.as_ref(), body).into_iter();
             let b = SemanticQueryBuilder::new(programs, m_op, m_goal.clone(), None, no_change);
 
-            ProgramQueries::with_batchsize(SemanticQueries::SingleQuery(b), CONFIG_BATCH_SIZE)
+            ProgramQueries::with_batchsize(SemanticQueries::SingleQuery(b), batch_size)
         }
     } else {
         unreachable!("all methods should have a body here.");
@@ -176,8 +175,16 @@ fn program_to_query(
     let pre = Term::land(pre1, pre2);
 
     // construct the predicate call
+
     let m_op_call = call_method(m_op, vec![Term::from("st!0")]);
-    let m_goal_call = call_method_result_check_part(m_op, m_goal, idx, vec![m_op_call]);
+
+    let args = if no_change {
+        vec![Term::from("st!0"), m_op_call]
+    } else {
+        vec![m_op_call]
+    };
+
+    let m_goal_call = call_method_result_check_part(m_op, m_goal, idx, args);
 
     // obtain the forall params
     let stvar = SortedVar::new("st!0".to_string(), types::model());
@@ -189,6 +196,7 @@ fn program_to_query(
 
     // get the goal as string
     let goal = m_goal_call.to_string();
+    //println!("goal: {}", goal);
 
     let t = Term::forall(vars, pre.implies(m_goal_call));
 

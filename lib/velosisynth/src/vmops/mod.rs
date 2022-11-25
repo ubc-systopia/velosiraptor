@@ -37,6 +37,4 @@ mod semantics;
 pub mod unmap;
 mod utils;
 
-use crate::z3::{Z3Result, Z3Ticket};
-
 pub use queryhelper::{MaybeResult, ProgramBuilder};

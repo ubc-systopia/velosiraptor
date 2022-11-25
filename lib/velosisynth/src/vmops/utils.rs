@@ -96,14 +96,6 @@ pub fn make_program_builder(
     builder
 }
 
-pub fn construct_programs(
-    unit: &VelosiAstUnitSegment,
-    m_goal: &VelosiAstMethod,
-    pre: &VelosiAstExpr,
-) -> Vec<Program> {
-    make_program_builder(unit, m_goal, pre).construct_new_programs()
-}
-
 #[derive(PartialEq, Eq)]
 pub enum QueryResult {
     Sat,
