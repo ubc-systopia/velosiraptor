@@ -20,12 +20,13 @@ members = [
     "lib/velosilexer",
     "lib/velosiparser",
     "lib/velosiast",
-    "lib/velosisynth"
+    "lib/velosisynth",
+    "lib/z3/z3-sys"
 ]
 
 [dependencies]
 # the argument parser
-clap = "2.33.3"
+clap = "4.0.24"
 # for colorful output
 colored = "2"
 
@@ -33,7 +34,7 @@ colored = "2"
 libvrc = { path = "lib/libvrc" }
 
 # logging and errors
-log = { version = "0.4.14", features = ["max_level_trace", "release_max_level_warn"] }
-simplelog = "^0.10.0"
+log = { version = "0.4.17", features = ["max_level_trace", "release_max_level_warn"] }
+simplelog = "^0.12.0"
 
 
