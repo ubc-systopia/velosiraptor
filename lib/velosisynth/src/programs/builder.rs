@@ -234,6 +234,10 @@ impl ProgramsBuilder {
                 }
             }
 
+            // the read / write actions
+            fieldops.push(FieldOp::ReadAction);
+            // field_progs.push(FieldOp::WriteAction);
+
             // field ops now has all the possible field operations, programs of size 1
             let mut fieldprogs = Vec::with_capacity(fieldops.len());
             for op in &fieldops {
@@ -260,10 +264,6 @@ impl ProgramsBuilder {
                     vec![FieldOp::ReadAction, op.clone()],
                 )));
             }
-
-            // the read / write actions
-            fieldops.push(FieldOp::ReadAction);
-            // field_progs.push(FieldOp::WriteAction);
 
             // // programs of length 2
             // for (i, op1) in fieldops.iter().enumerate() {
