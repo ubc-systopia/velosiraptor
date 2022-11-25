@@ -228,7 +228,6 @@ impl VelosiAstMethod {
 
             // for the flags we need to add the flags to the symbol table
             if param.ptype.is_flags() {
-                println!("param is flags!");
                 let flags = if let Some(f) = st.lookup("flags") {
                     if let VelosiAstNode::Flags(flags) = &f.ast_node {
                         // clone the RC
