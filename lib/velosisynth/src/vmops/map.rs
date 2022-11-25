@@ -58,6 +58,7 @@ impl ProgramBuilder for PartQueries {
 
 pub struct MapPrograms {
     programs: MultiDimProgramQueries<PartQueries>,
+    programs_done: bool,
     queries: LinkedList<(Program, [Option<Z3Ticket>; 4])>,
     candidates: Vec<Program>,
 
@@ -75,6 +76,7 @@ impl MapPrograms {
     ) -> Self {
         Self {
             programs,
+            programs_done: false,
             queries: LinkedList::new(),
             candidates: Vec::new(),
             m_fn,
@@ -97,6 +99,7 @@ impl ProgramBuilder for MapPrograms {
                 }
             }
             MaybeResult::None => {
+                self.programs_done = true;
                 if !has_work {
                     return MaybeResult::None;
                 }
@@ -187,7 +190,7 @@ impl ProgramBuilder for MapPrograms {
 
         if let Some(prog) = res_program {
             MaybeResult::Some(prog)
-        } else if !self.queries.is_empty() || !self.candidates.is_empty() {
+        } else if !self.queries.is_empty() || !self.candidates.is_empty() || !self.programs_done {
             MaybeResult::Pending
         } else {
             debug_assert!(self.programs.next(z3) == MaybeResult::None);
@@ -196,7 +199,7 @@ impl ProgramBuilder for MapPrograms {
     }
 }
 
-pub fn get_program_iter(unit: &VelosiAstUnitSegment) -> MapPrograms {
+pub fn get_program_iter(unit: &VelosiAstUnitSegment, batch_size: usize) -> MapPrograms {
     log::info!(
         target : "[synth::map]",
         "starting synthesizing the map operation"
@@ -217,24 +220,28 @@ pub fn get_program_iter(unit: &VelosiAstUnitSegment) -> MapPrograms {
             m_fn.clone(),
             t_fn.clone(),
             false,
+            batch_size,
         )),
         PartQueries::Precond(precond::precond_query(
             unit,
             m_fn.clone(),
             f_fn.clone(),
             false,
+            batch_size,
         )),
         PartQueries::Semantic(semantics::semantic_query(
             unit,
             m_fn.clone(),
             t_fn.clone(),
             false,
+            batch_size,
         )),
         PartQueries::Semantic(semantics::semantic_query(
             unit,
             m_fn.clone(),
             f_fn.clone(),
             false,
+            batch_size,
         )),
     ];
     let mut programs = MultiDimProgramQueries::new(map_queries);
@@ -246,7 +253,8 @@ pub fn synthesize(
     z3: &mut Z3WorkerPool,
     unit: &VelosiAstUnitSegment,
 ) -> Result<Program, VelosiSynthIssues> {
-    let mut mprogs = get_program_iter(unit);
+    let batch_size = std::cmp::max(5, z3.num_workers() / 2);
+    let mut mprogs = get_program_iter(unit, batch_size);
     loop {
         match mprogs.next(z3) {
             MaybeResult::Some(prog) => {
