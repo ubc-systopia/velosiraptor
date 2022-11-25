@@ -211,7 +211,7 @@ impl SynthZ3 {
         // Submit queries for all of the three vmops
         // --------------------------------------------------------------------------------------
 
-        use std::time::Duration;
+        
 
         let t_start = Instant::now();
 
@@ -223,7 +223,7 @@ impl SynthZ3 {
 
         let t_iters = Instant::now();
 
-        let diff = t_map.saturating_duration_since(t_start);
+        let _diff = t_map.saturating_duration_since(t_start);
 
         log::info!("TIME:    map        unmap       protect      total");
         log::info!(

@@ -36,7 +36,7 @@ use clap::{arg, command};
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, LevelPadding, TermLogger, TerminalMode};
 
 use velosiast::{AstResult, VelosiAst};
-use velosisynth::{SynthZ3, VelosiSynthIssues};
+use velosisynth::{SynthZ3};
 
 pub fn main() {
     // get the command line argumentts

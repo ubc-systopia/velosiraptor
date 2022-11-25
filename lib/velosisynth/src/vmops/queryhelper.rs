@@ -25,7 +25,7 @@
 
 //! Synthesis of Virtual Memory Operations: Map
 
-use std::collections::LinkedList;
+
 use std::collections::VecDeque;
 
 use super::utils;
@@ -296,7 +296,7 @@ where
 }
 
 impl ProgramBuilder for ProgramsIter {
-    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
+    fn next(&mut self, _z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
         match self.next_program() {
             Some(p) => MaybeResult::Some(p),
             None => MaybeResult::None,

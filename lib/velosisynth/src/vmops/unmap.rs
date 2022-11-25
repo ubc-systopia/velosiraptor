@@ -129,7 +129,7 @@ impl ProgramBuilder for UnmapPrograms {
             let mut all_done = true;
             for maybe_ticket in tickets.iter_mut() {
                 if let Some(ticket) = maybe_ticket {
-                    if let Some(mut result) = z3.get_result(*ticket) {
+                    if let Some(result) = z3.get_result(*ticket) {
                         // we got a result, check if it's sat
                         let output = result.result();
                         if utils::check_result_no_rewrite(output) == utils::QueryResult::Sat {
@@ -181,13 +181,13 @@ pub fn get_program_iter(unit: &VelosiAstUnitSegment, batch_size: usize) -> Unmap
     // Translate: Add a query for each of the pre-conditions of the function
     // ---------------------------------------------------------------------------------------------
 
-    let t_start = Instant::now();
+    let _t_start = Instant::now();
 
     let unmap_queries = vec![
         precond::precond_query(unit, m_fn.clone(), t_fn.clone(), true, batch_size),
         precond::precond_query(unit, m_fn.clone(), f_fn.clone(), true, batch_size),
     ];
-    let mut programs = MultiDimProgramQueries::new(unmap_queries);
+    let programs = MultiDimProgramQueries::new(unmap_queries);
     UnmapPrograms::new(programs, m_fn.clone(), t_fn.clone(), f_fn.clone())
 }
 
@@ -199,7 +199,7 @@ pub fn synthesize(
     let mut progs = get_program_iter(unit, batch_size);
     loop {
         match progs.next(z3) {
-            MaybeResult::Some(prog) => {
+            MaybeResult::Some(_prog) => {
                 break;
             }
             MaybeResult::Pending => {
