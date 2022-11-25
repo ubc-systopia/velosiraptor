@@ -129,7 +129,13 @@ impl SynthZ3 {
         // make sure we don't have anything running anymore
         self.terminate();
 
-        let workerpool = Z3WorkerPool::with_num_workers(ncpu, Some(self.outdir.clone()));
+        let logpath = if cfg!(debug_assertions) {
+            log::warn!(target: "Z3Synth", "Enabling query logging");
+            Some(self.outdir.clone())
+        } else {
+            Some(self.outdir.clone())
+        };
+        let workerpool = Z3WorkerPool::with_num_workers(ncpu, logpath);
 
         self.workerpool = Some(workerpool);
         self.ncpu = ncpu;
@@ -143,7 +149,13 @@ impl SynthZ3 {
 
     fn run_smt2(&mut self, ctx: Smt2Context) -> Result<(), VelosiSynthIssues> {
         if self.workerpool.is_none() {
-            let workerpool = Z3WorkerPool::with_num_workers(self.ncpu, Some(self.outdir.clone()));
+            let logpath = if cfg!(debug_assertions) {
+                log::warn!(target: "Z3Synth", "Enabling query logging");
+                Some(self.outdir.clone())
+            } else {
+                Some(self.outdir.clone())
+            };
+            let workerpool = Z3WorkerPool::with_num_workers(self.ncpu, logpath);
             self.workerpool = Some(workerpool);
         }
 
@@ -191,6 +203,10 @@ impl SynthZ3 {
 
         let z3 = self.workerpool.as_mut().unwrap();
 
+        let batch_size = std::cmp::max(5, z3.num_workers() * 3 / 4);
+
+        log::warn!("batch size: {}", batch_size);
+
         // --------------------------------------------------------------------------------------
         // Submit queries for all of the three vmops
         // --------------------------------------------------------------------------------------
@@ -199,11 +215,11 @@ impl SynthZ3 {
 
         let t_start = Instant::now();
 
-        let mut map_queries = vmops::map::get_program_iter(&self.ast);
+        let mut map_queries = vmops::map::get_program_iter(&self.ast, batch_size);
         let t_map = Instant::now();
-        let mut unmap_queries = vmops::unmap::get_program_iter(&self.ast);
+        let mut unmap_queries = vmops::unmap::get_program_iter(&self.ast, batch_size);
         let t_unmap = Instant::now();
-        let mut protect_queries = vmops::protect::get_program_iter(&self.ast);
+        let mut protect_queries = vmops::protect::get_program_iter(&self.ast, batch_size);
 
         let t_iters = Instant::now();
 
