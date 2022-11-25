@@ -30,6 +30,7 @@
 use std::env;
 use std::io;
 use std::io::Read;
+use std::time::Instant;
 
 use clap::{arg, command};
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, LevelPadding, TermLogger, TerminalMode};
@@ -79,6 +80,8 @@ pub fn main() {
     )
     .expect("failed to setup logger");
 
+    let t_start = Instant::now();
+
     let ast = match matches.get_one::<String>("fname") {
         Some(filename) => VelosiAst::from_file(filename),
         None => {
@@ -93,11 +96,11 @@ pub fn main() {
 
     let ast = match ast {
         AstResult::Ok(ast) => {
-            println!("{}", ast);
+            // println!("{}", ast);
             ast
         }
         AstResult::Issues(ast, err) => {
-            println!("{}", ast);
+            // println!("{}", ast);
             println!("{}", err);
             ast
         }
@@ -107,15 +110,28 @@ pub fn main() {
         }
     };
 
+    let t_parsing = Instant::now();
+
+    let mut t_synth = Vec::new();
+
     for seg in ast.segment_units() {
-        let mut issues = VelosiSynthIssues::new();
+        let mut t_synth_segment = Vec::new();
+
+        t_synth_segment.push(("start", Instant::now()));
 
         let path = env::current_dir().unwrap();
         let mut synth = SynthZ3::with_ncpu(seg.clone(), path, ncores);
         synth.create_model().expect("failed to create the model");
-        if let Err(e) = synth.sanity_check() {
+
+        t_synth_segment.push(("Model Creation", Instant::now()));
+
+        let sanity_check = synth.sanity_check();
+
+        t_synth_segment.push(("Sanity Check", Instant::now()));
+
+        if let Err(e) = sanity_check {
             println!("{}", e);
-            println!("skipped synthesizing due to errors");
+            log::error!(target: "main", "skipped synthesizing due to errors");
             continue;
         }
 
@@ -123,42 +139,87 @@ pub fn main() {
             Some("all") => {
                 println!("Synthesizing ALL for unit {}", seg.ident_as_str());
                 match synth.synthesize_all() {
-                    Ok(p) => println!("Programs: {}", p),
-                    Err(e) => println!("Synthesis failed:\n{}", e),
+                    Ok(p) => log::info!(target: "main", "Programs: {}", p),
+                    Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
                 }
             }
 
             Some("map") => {
                 println!("Synthesizing MAP for unit {}", seg.ident_as_str());
                 match synth.synthesize_map() {
-                    Ok(p) => println!("Programs: {}", p),
-                    Err(e) => println!("Synthesis failed:\n{}", e),
+                    Ok(p) => log::info!(target: "main", "Programs: {}", p),
+                    Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
                 }
             }
 
             Some("unmap") => {
                 println!("Synthesizing UNMAP for unit {}", seg.ident_as_str());
                 match synth.synthesize_unmap() {
-                    Ok(p) => println!("Programs: {}", p),
-                    Err(e) => println!("Synthesis failed:\n{}", e),
+                    Ok(p) => log::info!(target: "main", "Programs: {}", p),
+                    Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
                 }
             }
 
             Some("protect") => {
                 println!("Synthesizing PROTECT for unit {}", seg.ident_as_str());
                 match synth.synthesize_protect() {
-                    Ok(p) => println!("Programs: {}", p),
-                    Err(e) => println!("Synthesis failed:\n{}", e),
+                    Ok(p) => log::info!(target: "main", "Programs: {}", p),
+                    Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
                 }
             }
             Some(x) => {
-                println!("unknown synth model '{}'", x);
+                log::error!(target: "main", "unknown synth model '{}'", x);
                 return;
             }
             None => {
-                println!("synth mode not set");
+                log::error!(target: "main", "synth mode not set");
                 return;
             }
         }
+        t_synth_segment.push(("Synthesis", Instant::now()));
+
+        t_synth.push((seg.ident_as_str(), t_synth_segment));
     }
+
+    let t_end = Instant::now();
+
+    println!("=================================================================================");
+    println!(
+        "Total time               {:6} ms",
+        t_end.duration_since(t_start).as_millis()
+    );
+    println!("=================================================================================");
+    println!(
+        "  Parsing time           {:6} ms",
+        t_parsing.duration_since(t_start).as_millis()
+    );
+
+    let t_synth_start = t_synth.first().unwrap().1.first().unwrap().1;
+    let t_synth_end = t_synth.last().unwrap().1.last().unwrap().1;
+    println!(
+        "  Synthesis time         {:6} ms",
+        t_synth_end.duration_since(t_synth_start).as_millis()
+    );
+    for (unit, t) in t_synth {
+        println!(
+            "---------------------------------------------------------------------------------"
+        );
+        let mut t_prev = t.first().unwrap().1;
+        let t_last = t.last().unwrap().1;
+
+        println!(
+            "  {:20.20}   {:6} ms",
+            unit,
+            t_last.duration_since(t_prev).as_millis()
+        );
+        for (name, t) in t.iter().skip(1) {
+            println!(
+                "   - {:17.17}   {:6} ms",
+                name,
+                t.duration_since(t_prev).as_millis()
+            );
+            t_prev = *t;
+        }
+    }
+    println!("=================================================================================\n");
 }
