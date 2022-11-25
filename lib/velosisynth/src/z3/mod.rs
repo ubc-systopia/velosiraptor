@@ -27,12 +27,23 @@
 //!
 //! This module provides interfaces to deal with Z3 Based synthesis
 
-mod instance;
+#[cfg(all(feature = "z3-library", feature = "z3-standalone"))]
+compile_error!("Can't enable features `z3-library` and `z3-standalone` at the same time");
+
+#[cfg(feature = "z3-library")]
+mod instance_library;
+#[cfg(feature = "z3-standalone")]
+mod instance_standalone;
+
 mod query;
 mod worker;
 
 // public re-exports
-pub use instance::Z3Instance;
+#[cfg(feature = "z3-library")]
+pub use instance_library::Z3Instance;
+#[cfg(feature = "z3-standalone")]
+pub use instance_standalone::Z3Instance;
+
 pub use query::{Z3Query, Z3Result, Z3Ticket};
 pub use worker::{Z3Worker, Z3WorkerPool};
 
