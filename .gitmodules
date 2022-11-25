@@ -13,3 +13,6 @@
 [submodule "lib/tokstream"]
 	path = lib/tokstream
 	url = git@github.com:achreto/rust-tokstream.git
+[submodule "lib/z3"]
+	path = lib/z3
+	url = git@github.com:achreto/z3.rs.git
