@@ -1651,8 +1651,8 @@ impl VelosiAstExpr {
                     .flatten(st);
                     let res =
                         VelosiAstBinOpExpr::new(lhs, Land, rhs, outer.loc.clone()).flatten(st);
-                    println!("into_cnf | rewrite: applying distributive law");
-                    println!("  {} -> {}", self, res);
+                    // println!("into_cnf | rewrite: applying distributive law");
+                    // println!("  {} -> {}", self, res);
                     return res;
                 }
             }
@@ -1660,7 +1660,7 @@ impl VelosiAstExpr {
             // ((q and r) or p) == (p or q) and (p or r)
             if let BinOp(inner) = outer.lhs.as_ref() {
                 if outer.op == Lor && inner.op == Land {
-                    println!("into_cnf | rewrite: applying distributive law");
+                    // println!("into_cnf | rewrite: applying distributive law");
                     let lhs = VelosiAstBinOpExpr::new(
                         *outer.rhs.clone(),
                         Lor,
@@ -1677,8 +1677,8 @@ impl VelosiAstExpr {
                     .flatten(st);
                     let res =
                         VelosiAstBinOpExpr::new(lhs, Land, rhs, outer.loc.clone()).flatten(st);
-                    println!("into_cnf | rewrite: applying distributive law");
-                    println!("  {} -> {}", self, res);
+                    // println!("into_cnf | rewrite: applying distributive law");
+                    // println!("  {} -> {}", self, res);
                     return res;
                 }
             }
@@ -1692,8 +1692,8 @@ impl VelosiAstExpr {
                     let rhs =
                         VelosiAstUnOpExpr::new(LNot, *be.rhs.clone(), be.loc.clone()).flatten(st);
                     let res = VelosiAstBinOpExpr::new(lhs, Land, rhs, ue.loc.clone()).flatten(st);
-                    println!("into_cnf | rewrite: applying demorgan's law");
-                    println!("  {} -> {}", self, res);
+                    // println!("into_cnf | rewrite: applying demorgan's law");
+                    // println!("  {} -> {}", self, res);
                     return res;
                 }
             }
