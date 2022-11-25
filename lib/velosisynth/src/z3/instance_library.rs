@@ -25,9 +25,9 @@
 
 use std::ffi::CStr;
 use std::ffi::CString;
-use std::fs::{self, File};
-use std::io::{BufRead, BufReader, Write};
-use std::mem::forget;
+use std::fs::{File};
+use std::io::{Write};
+
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -56,7 +56,7 @@ pub struct Z3Instance {
     t_query: u64,
 }
 
-extern "C" fn error_handler(ctx: Z3_context, code: ErrorCode) {
+extern "C" fn error_handler(ctx: Z3_context, _code: ErrorCode) {
     // println!("error handler: error code: {:?}", code);
     // println!("message: ");
 
@@ -169,7 +169,7 @@ impl Z3Instance {
     }
 
     ///executes the query
-    pub fn exec(&mut self, ticket: Z3Ticket, query: &mut Z3Query) -> Result<Z3Result, Z3Error> {
+    pub fn exec(&mut self, _ticket: Z3Ticket, query: &mut Z3Query) -> Result<Z3Result, Z3Error> {
         log::info!(target : "[Z3Instance]", "{} executing query", self.id);
 
         let t_start = Instant::now();

@@ -33,14 +33,14 @@ use velosiast::ast::{VelosiAstMethod, VelosiAstUnitSegment};
 use crate::{
     model::method::{call_method, call_method_assms, call_method_pre, combine_method_params},
     model::types,
-    z3::{Z3Query, Z3Result, Z3Ticket, Z3WorkerPool},
+    z3::{Z3Query, Z3Ticket, Z3WorkerPool},
     Program,
 };
 
 use super::queryhelper::{
     MaybeResult, MultiDimProgramQueries, ProgramBuilder, ProgramQueries, QueryBuilder,
 };
-use crate::programs::MultiDimIterator;
+
 use crate::ProgramsIter;
 
 use super::utils;

@@ -30,8 +30,8 @@ use std::sync::Arc;
 
 use velosiast::ast::{VelosiAstExpr, VelosiAstMethod, VelosiAstUnitSegment};
 
-use crate::z3::{Z3Result, Z3Ticket, Z3WorkerPool};
-use crate::VelosiSynthIssues;
+
+
 use crate::{Program, ProgramsBuilder};
 
 use super::resultparser;
@@ -109,7 +109,7 @@ pub fn check_result_no_rewrite(output: &str) -> QueryResult {
     match reslines.next() {
         Some("sat") => QueryResult::Sat,
         Some("unsat") => QueryResult::Unsat,
-        Some(a) => QueryResult::Error,
+        Some(_a) => QueryResult::Error,
         None => {
             unreachable!("unexpected none output")
         }

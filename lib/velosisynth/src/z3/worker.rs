@@ -37,7 +37,7 @@ use std::sync::{
     Arc, Mutex,
 };
 use std::thread;
-use std::time::Duration;
+
 
 // own create imports
 use super::query::{Z3Query, Z3Result, Z3Ticket};
@@ -102,7 +102,7 @@ impl Z3Worker {
         let context = Arc::new(Mutex::new(Z3Context::None));
         let context_clone = context.clone();
 
-        let mut logfile = if let Some(logpath) = logpath {
+        let logfile = if let Some(logpath) = logpath {
             // create the log directory if it does not exist
             fs::create_dir_all(logpath).expect("failed to create the log directory");
             Some(logpath.join(format!("z3-worker-{}-log.smt2", wid)))
@@ -168,7 +168,7 @@ impl Z3Worker {
 
                     // get a task
                     let mut task_q = tasks.lock().unwrap();
-                    let mut task = task_q.pop_front();
+                    let task = task_q.pop_front();
                     drop(task_q); // drop the lock again
 
                     if let Some((ticket, mut query)) = task {
@@ -431,13 +431,13 @@ impl Z3WorkerPool {
         let mut counter = 5;
         loop {
             match self.resultq.try_recv() {
-                Ok((id, result)) => {
+                Ok((_id, result)) => {
                     // nothing
                     let query = result.query();
                     let smtresult = result.result().to_string();
 
                     match self.query_cache.get_mut(query) {
-                        Some(Ok(r)) => {
+                        Some(Ok(_r)) => {
                             unreachable!("should not happen!");
                         }
                         Some(Err(v)) => {

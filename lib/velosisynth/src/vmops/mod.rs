@@ -25,7 +25,7 @@
 
 //! Synthesis of Virtual Memory Operations
 
-use std::fmt::{Display, Formatter, Result as FmtResult};
+
 
 pub mod map;
 mod precond;

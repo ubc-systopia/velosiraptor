@@ -33,7 +33,7 @@ use velosiast::ast::{VelosiAstMethod, VelosiAstUnitSegment};
 
 use crate::{programs::Program, z3::Z3WorkerPool, VelosiSynthIssues};
 
-use super::{precond, semantics, utils};
+use super::{semantics, utils};
 
 use crate::vmops::precond::PrecondQueries;
 use crate::vmops::queryhelper::MultiDimProgramQueries;
@@ -164,7 +164,7 @@ impl ProgramBuilder for ProtectPrograms {
             let mut unsat_part = false;
             for maybe_ticket in tickets.iter_mut() {
                 if let Some(ticket) = maybe_ticket {
-                    if let Some(mut result) = z3.get_result(*ticket) {
+                    if let Some(result) = z3.get_result(*ticket) {
                         // we got a result, check if it's sat
                         let output = result.result();
                         if utils::check_result_no_rewrite(output) == utils::QueryResult::Sat {

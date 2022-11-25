@@ -162,7 +162,7 @@ impl ProgramBuilder for MapPrograms {
             let mut all_done = true;
             for maybe_ticket in tickets.iter_mut() {
                 if let Some(ticket) = maybe_ticket {
-                    if let Some(mut result) = z3.get_result(*ticket) {
+                    if let Some(result) = z3.get_result(*ticket) {
                         // we got a result, check if it's sat
                         let output = result.result();
                         if utils::check_result_no_rewrite(output) == utils::QueryResult::Sat {
@@ -244,7 +244,7 @@ pub fn get_program_iter(unit: &VelosiAstUnitSegment, batch_size: usize) -> MapPr
             batch_size,
         )),
     ];
-    let mut programs = MultiDimProgramQueries::new(map_queries);
+    let programs = MultiDimProgramQueries::new(map_queries);
 
     MapPrograms::new(programs, m_fn.clone(), t_fn.clone(), f_fn.clone())
 }
