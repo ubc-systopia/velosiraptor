@@ -315,6 +315,7 @@ pub fn add_translate_result_checks(smt: &mut Smt2Context) {
     f.add_arg(String::from("st!1"), types::model());
     f.add_arg(String::from("va"), types::vaddr());
     f.add_arg(String::from("sz"), types::size());
+    f.add_arg(String::from("flgs"), types::flags());
 
     let varstr = "i!0".to_string();
     let forallvars = vec![SortedVar::new(varstr.clone(), types::size())];
@@ -392,7 +393,7 @@ pub fn add_matchflags_result_checks(smt: &mut Smt2Context, nparts: usize) {
         f.add_arg(String::from("va"), types::vaddr());
         f.add_arg(String::from("sz"), types::size());
         f.add_arg(String::from("flgs"), types::flags());
-        f.add_arg(String::from("pa"), types::paddr());
+        // f.add_arg(String::from("pa"), types::paddr());
 
         let name = if let Some(i) = idx {
             method_part_i_name("matchflags", i)
