@@ -28,8 +28,9 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::thread;
+use std::time::Instant;
 
-use super::query::{Z3Query, Z3Result};
+use super::query::{Z3Query, Z3Result, Z3Ticket};
 use super::Z3Error;
 
 /// flag whether we want to use a full restart when resetting z3
@@ -47,6 +48,9 @@ pub struct Z3Instance {
     z3_proc: Child,
     /// the path to where the logfiles are stored
     logfile: Option<File>,
+
+    t_prepare: u64,
+    t_query: u64,
 }
 
 impl Z3Instance {
@@ -58,23 +62,21 @@ impl Z3Instance {
             id,
             z3_proc: Self::spawn_z3(),
             logfile: None,
+            t_prepare: 0,
+            t_query: 0,
         }
     }
 
     /// creates a new Z3 instace with the supplied log path
-    pub fn with_logpath(id: usize, logpath: &PathBuf) -> Self {
+    pub fn with_logfile(id: usize, logfile: PathBuf) -> Self {
         log::trace!(
-            target : "[Z3Instance]", "{} creating new with log {}",
+            target : "[Z3Instance]", "{} creating new with logfile {}",
             id,
-            logpath.display()
+            logfile.display()
         );
 
-        // create the log directory if it does not exist
-        fs::create_dir_all(logpath).expect("failed to create the log directory");
-
         // construct the log file in the path, and create the file
-        let p = logpath.join(format!("z3-worker-{}-log.smt2", id));
-        let logfile = match File::create(p) {
+        let logfile = match File::create(logfile) {
             Ok(f) => Some(f),
             Err(e) => {
                 log::warn!(target : "[Z3Instance]", "{} failed to create the file ({})", id, e);
@@ -86,6 +88,8 @@ impl Z3Instance {
             id,
             z3_proc: Self::spawn_z3(),
             logfile,
+            t_prepare: 0,
+            t_query: 0,
         }
     }
 
@@ -122,7 +126,7 @@ impl Z3Instance {
             self.restart();
             Ok(())
         } else {
-            match self.exec(&mut Z3Query::reset()) {
+            match self.exec(Z3Ticket(0), &mut Z3Query::reset()) {
                 Ok(_) => Ok(()),
                 Err(e) => {
                     log::error!(target : "[Z3Instance]", "{} failed to reset", self.id);
@@ -133,16 +137,23 @@ impl Z3Instance {
     }
 
     ///executes the query
-    pub fn exec(&mut self, query: &mut Z3Query) -> Result<Z3Result, Z3Error> {
+    pub fn exec(&mut self, ticket: Z3Ticket, query: &mut Z3Query) -> Result<Z3Result, Z3Error> {
         log::trace!(target : "[Z3Instance]", "{} executing query", self.id);
+
+        let t_start = Instant::now();
 
         // write the commands to the z3 process' stdin
         if let Some(z3_stdin) = self.z3_proc.stdin.as_mut() {
             // can we format/write this directly into the stdin?
 
             // construt the smt2 context from the query
-            let smt = query.smt_context().to_code();
+            let smt = query.smt_context().to_code(!cfg!(debug_assertions));
             // query.timestamp("fmtsmt");
+
+            let id = format!(";; Z3Ticket({})\n", ticket);
+
+            // send to the z3 process
+            z3_stdin.write_all(id.as_bytes()).unwrap();
 
             // send to the z3 process
             z3_stdin.write_all(smt.as_bytes()).unwrap();
@@ -154,6 +165,8 @@ impl Z3Instance {
 
             // query.timestamp("writesmt");
             if let Some(f) = &mut self.logfile {
+                f.write_all(id.as_bytes())
+                    .expect("writing the smt query failed.");
                 f.write_all(smt.as_bytes())
                     .expect("writing the smt query failed.");
             }
@@ -161,6 +174,8 @@ impl Z3Instance {
         } else {
             return Err(Z3Error::QueryExecution);
         }
+
+        let t_prepare = Instant::now();
 
         // read back the results from stdout
         log::trace!(target : "[Z3Instance]", "{} obtaining query results", self.id);
@@ -187,6 +202,11 @@ impl Z3Instance {
             String::new()
         };
 
+        let t_query = Instant::now();
+
+        self.t_prepare += t_prepare.duration_since(t_start).as_millis() as u64;
+        self.t_query += t_query.duration_since(t_prepare).as_millis() as u64;
+
         log::trace!(target : "[Z3Instance]", "{} query result is '{}'", self.id, result);
         Ok(Z3Result::new(result))
     }
@@ -195,12 +215,14 @@ impl Z3Instance {
     pub fn exec_shared(&mut self, query: &Z3Query) -> Result<Z3Result, Z3Error> {
         log::trace!(target : "[Z3Instance]", "{} executing shared query", self.id);
 
+        let t_start = Instant::now();
+
         // write the commands to the z3 process' stdin
         if let Some(z3_stdin) = self.z3_proc.stdin.as_mut() {
             // can we format/write this directly into the stdin?
 
             // construt the smt2 context from the query
-            let smt = query.smt_context().to_string();
+            let smt = query.smt_context().to_code(!cfg!(debug_assertions));
 
             // send to the z3 process
             z3_stdin.write_all(smt.as_bytes()).unwrap();
@@ -217,6 +239,8 @@ impl Z3Instance {
             return Err(Z3Error::QueryExecution);
         }
 
+        let t_prepare = Instant::now();
+
         // read back the results from stdout
         let result = if let Some(z3_stdout) = self.z3_proc.stdout.as_mut() {
             // create a buffer reader for the z3_stdout
@@ -226,7 +250,6 @@ impl Z3Instance {
 
             // loop over the result
             loop {
-                thread::yield_now();
                 let mut line = String::with_capacity(256);
                 z3_buf_reader.read_line(&mut line).unwrap();
 
@@ -241,12 +264,21 @@ impl Z3Instance {
             String::new()
         };
 
+        let t_query = Instant::now();
+
+        self.t_prepare += t_prepare.duration_since(t_start).as_millis() as u64;
+        self.t_query += t_query.duration_since(t_prepare).as_millis() as u64;
+
         Ok(Z3Result::new(result))
     }
 }
 
 impl Drop for Z3Instance {
     fn drop(&mut self) {
+        println!(
+            "[Z3StandaloneInstance]  prepare time: {}ms, query time: {}ms",
+            self.t_prepare, self.t_query
+        );
         self.terminate();
     }
 }

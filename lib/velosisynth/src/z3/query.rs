@@ -40,7 +40,7 @@ use crate::Program;
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents a Z3 Query identifier
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Z3Ticket(pub usize);
 
 // implementation of [Display] for [Z3Ticket]]
@@ -55,6 +55,7 @@ impl Display for Z3Ticket {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// represents a Z3 smt query
+#[derive(Clone)]
 pub struct Z3Query {
     /// the operations of this query for bookkeeping purposes
     prog: Option<Program>,
@@ -237,6 +238,7 @@ impl Hash for Z3Query {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// represents a result obtained from executing a Z3 query
+#[derive(Clone)]
 pub struct Z3Result {
     /// returns the task again
     query: Option<Z3Query>,
