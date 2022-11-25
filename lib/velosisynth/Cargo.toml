@@ -18,6 +18,17 @@ smt2 = { path = "../smtlib2" }
 log = { version = "0.4.17", features = ["max_level_trace", "release_max_level_warn"] }
 simplelog = { version = "^0.12.0", features = ["paris"] }
 clap = { version = "4.0.24", features = [ "cargo" ] }
+z3-sys = { path = "../z3/z3-sys", features = ["static-link-z3"], optional = true }
+
+[features]
+default = ["z3-library"]
+# Enable standalone Z3 instead of using the library
+z3-standalone = []
+# Enable the use of the z3-library
+z3-library = ["dep:z3-sys"]
+# restart z3 instead of simply resetting
+z3-restart = []
+
 [lib]
 name = "velosisynth"
 path = "src/lib.rs"
