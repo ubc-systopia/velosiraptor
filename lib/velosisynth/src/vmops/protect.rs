@@ -260,7 +260,7 @@ pub fn synthesize(
     unit: &VelosiAstUnitSegment,
 ) -> Result<Program, VelosiSynthIssues> {
     let batch_size = std::cmp::max(5, z3.num_workers() / 2);
-    let mprogs = get_program_iter(unit, batch_size);
+    let mut mprogs = get_program_iter(unit, batch_size);
     loop {
         match mprogs.next(z3) {
             MaybeResult::Some(prog) => {
