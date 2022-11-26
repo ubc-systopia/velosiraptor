@@ -203,8 +203,7 @@ pub fn synthesize(
                 break;
             }
             MaybeResult::Pending => {
-                // wait for a bit
-                std::thread::sleep(Duration::from_millis(10));
+                // just keep running
             }
             MaybeResult::None => {
                 panic!("no program found");
