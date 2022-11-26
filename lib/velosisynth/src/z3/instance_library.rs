@@ -25,8 +25,8 @@
 
 use std::ffi::CStr;
 use std::ffi::CString;
-use std::fs::{File};
-use std::io::{Write};
+use std::fs::File;
+use std::io::Write;
 
 use std::path::PathBuf;
 use std::time::Instant;
@@ -196,7 +196,7 @@ impl Z3Instance {
         unsafe {
             let z3res = Z3_eval_smtlib2_string(self.z3_context.unwrap(), c_string.as_ptr());
 
-            let c_str: &CStr = unsafe { CStr::from_ptr(z3res) };
+            let c_str: &CStr = CStr::from_ptr(z3res);
             let str_slice: &str = c_str.to_str().unwrap();
             result.push_str(str_slice);
 
@@ -241,7 +241,7 @@ impl Z3Instance {
         unsafe {
             let z3res = Z3_eval_smtlib2_string(self.z3_context.unwrap(), c_string.as_ptr());
 
-            let c_str: &CStr = unsafe { CStr::from_ptr(z3res) };
+            let c_str: &CStr = CStr::from_ptr(z3res);
             let str_slice: &str = c_str.to_str().unwrap();
             result.push_str(str_slice);
 

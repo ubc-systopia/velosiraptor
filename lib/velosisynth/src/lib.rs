@@ -34,7 +34,6 @@ use std::env;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::time::Instant;
 
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
@@ -211,36 +210,16 @@ impl SynthZ3 {
         // Submit queries for all of the three vmops
         // --------------------------------------------------------------------------------------
 
-        
-
-        let t_start = Instant::now();
-
         let mut map_queries = vmops::map::get_program_iter(&self.ast, batch_size);
-        let t_map = Instant::now();
         let mut unmap_queries = vmops::unmap::get_program_iter(&self.ast, batch_size);
-        let t_unmap = Instant::now();
         let mut protect_queries = vmops::protect::get_program_iter(&self.ast, batch_size);
-
-        let t_iters = Instant::now();
-
-        let _diff = t_map.saturating_duration_since(t_start);
-
-        log::info!("TIME:    map        unmap       protect      total");
-        log::info!(
-            "Iter      {}          {}           {}        {}",
-            t_map.saturating_duration_since(t_start).as_millis(),
-            t_unmap.saturating_duration_since(t_map).as_millis(),
-            t_iters.saturating_duration_since(t_unmap).as_millis(),
-            t_iters.saturating_duration_since(t_start).as_millis(),
-        );
 
         let mut map_program = MaybeResult::Pending;
         let mut unmap_program = MaybeResult::Pending;
         let mut protect_program = MaybeResult::Pending;
 
-        let mut all_done = true;
         loop {
-            all_done = true;
+            let mut all_done = true;
 
             if map_program == MaybeResult::Pending {
                 map_program = map_queries.next(z3);

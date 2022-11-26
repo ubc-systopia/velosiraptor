@@ -30,8 +30,6 @@ use std::sync::Arc;
 
 use velosiast::ast::{VelosiAstExpr, VelosiAstMethod, VelosiAstUnitSegment};
 
-
-
 use crate::{Program, ProgramsBuilder};
 
 use super::resultparser;
@@ -137,10 +135,13 @@ pub fn check_result(output: &str, program: &mut Program) -> QueryResult {
             log::trace!(target: "[CheckResult]", " - unsat: {:?}", program);
             QueryResult::Unsat
         }
+        Some("unknown") => {
+            log::trace!(target: "[CheckResult]", " - unknown: {:?}", program);
+            QueryResult::Unknown
+        }
         Some(a) => {
             log::error!(target: "[CheckResult]", " - {} {:?}", a, program);
             if a.starts_with("(error") {
-                panic!("error");
                 QueryResult::Error
             } else {
                 unreachable!("unexpected none output: {}", a);

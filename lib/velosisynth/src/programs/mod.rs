@@ -362,8 +362,8 @@ pub enum FieldOp {
     InsertFieldSlices(Vec<FieldSliceOp>),
     /// performs the read action on the field
     ReadAction,
-    /// performs the write action on the field
-    WriteAction,
+    // /// performs the write action on the field
+    // WriteAction,
 }
 
 impl FieldOp {
@@ -403,11 +403,10 @@ impl FieldOp {
             FieldOp::ReadAction => {
                 let fname = format!("Model.IFace.{}.readaction! ", fieldname);
                 smtops.push((fname, None));
-            }
-            FieldOp::WriteAction => {
-                let fname = format!("Model.IFace.{}.writeaction! ", fieldname);
-                smtops.push((fname, None));
-            }
+            } // FieldOp::WriteAction => {
+              //     let fname = format!("Model.IFace.{}.writeaction! ", fieldname);
+              //     smtops.push((fname, None));
+              // }
         }
     }
 
@@ -450,12 +449,11 @@ impl FieldOp {
                 vec![Operation::ReadAction {
                     field: fieldname.to_string(),
                 }]
-            }
-            WriteAction => {
-                vec![Operation::WriteAction {
-                    field: fieldname.to_string(),
-                }]
-            }
+            } // WriteAction => {
+              //     vec![Operation::WriteAction {
+              //         field: fieldname.to_string(),
+              //     }]
+              // }
         }
     }
 }

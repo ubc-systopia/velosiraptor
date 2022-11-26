@@ -458,22 +458,6 @@ pub fn call_method_pre(m: &VelosiAstMethod, idx: Option<usize>, args: Vec<Term>)
     Term::fn_apply(name, check_args)
 }
 
-pub fn call_method_result_check(m: &VelosiAstMethod, g: &VelosiAstMethod, args: Vec<Term>) -> Term {
-    let name = match (m.ident_as_str(), g.ident_as_str()) {
-        ("map", "translate") => translate_map_result_name(None),
-        ("protect", "translate") => translate_protect_result_name(None),
-        ("map", "matchflags") => matchflags_map_result_name(None),
-        ("protect", "matchflags") => matchflags_protect_result_name(None),
-        (a, b) => unreachable!("case: {} {}", a, b),
-    };
-
-    let mut check_args = args;
-    for a in m.params.iter() {
-        check_args.push(Term::ident(a.ident_to_string()));
-    }
-    Term::fn_apply(name, check_args)
-}
-
 pub fn call_method_result_check_part(
     m: &VelosiAstMethod,
     g: &VelosiAstMethod,

@@ -376,18 +376,18 @@ impl MultiDimIterator {
         }
     }
 
-    pub fn len(&self) -> usize {
-        self.maxvals.iter().product()
-    }
+    // pub fn len(&self) -> usize {
+    //     self.maxvals.iter().product()
+    // }
 
-    pub fn idx(&self) -> usize {
-        self.idx
-    }
+    // pub fn idx(&self) -> usize {
+    //     self.idx
+    // }
 
-    pub fn from_slice<T>(v: &[Vec<T>]) -> Self {
-        let maxvals = v.iter().map(|v| v.len()).collect();
-        Self::with_maxvals(maxvals)
-    }
+    // pub fn from_slice<T>(v: &[Vec<T>]) -> Self {
+    //     let maxvals = v.iter().map(|v| v.len()).collect();
+    //     Self::with_maxvals(maxvals)
+    // }
 
     pub fn next(&mut self) -> Option<&[usize]> {
         if self.done {

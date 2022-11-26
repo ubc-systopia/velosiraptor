@@ -32,8 +32,8 @@ use velosiast::ast::{
     VelosiAstFieldSlice, VelosiAstIdentifier, VelosiAstInterfaceField, VelosiAstStateField,
 };
 
-use super::model::{IFACE_PREFIX, STATE_PREFIX};
 use super::types;
+use super::velosimodel::{IFACE_PREFIX, STATE_PREFIX};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Field Definitions

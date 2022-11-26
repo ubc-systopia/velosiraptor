@@ -32,7 +32,7 @@ use velosiast::ast::{
 };
 
 use super::flags::flags_get_fn_name;
-use super::model::{
+use super::velosimodel::{
     model_field_get_fn_name, model_field_set_fn_name, model_slice_get_fn_name,
     model_slice_set_fn_name,
 };
@@ -61,20 +61,20 @@ pub fn model_accessor_read_fn(stvar: &str, part: &str, fieldslice: &str) -> Term
     smt2::Term::fn_apply(ident, vec![Term::ident(stvar.to_string())])
 }
 
-pub fn model_accessor_write_fn(stvar: &str, part: &str, fieldslice: &str) -> Term {
-    let ident = model_field_set_fn_name(p2p(part), fieldslice);
-    smt2::Term::fn_apply(ident, vec![Term::ident(stvar.to_string())])
-}
+// pub fn model_accessor_write_fn(stvar: &str, part: &str, fieldslice: &str) -> Term {
+//     let ident = model_field_set_fn_name(p2p(part), fieldslice);
+//     smt2::Term::fn_apply(ident, vec![Term::ident(stvar.to_string())])
+// }
 
 pub fn model_slice_accessor_read_fn(stvar: &str, part: &str, field: &str, slice: &str) -> Term {
     let ident = model_slice_get_fn_name(p2p(part), field, slice);
     smt2::Term::fn_apply(ident, vec![Term::ident(stvar.to_string())])
 }
 
-pub fn model_slice_accessor_write_fn(stvar: &str, part: &str, field: &str, slice: &str) -> Term {
-    let ident = model_slice_set_fn_name(p2p(part), field, slice);
-    smt2::Term::fn_apply(ident, vec![Term::ident(stvar.to_string())])
-}
+// pub fn model_slice_accessor_write_fn(stvar: &str, part: &str, field: &str, slice: &str) -> Term {
+//     let ident = model_slice_set_fn_name(p2p(part), field, slice);
+//     smt2::Term::fn_apply(ident, vec![Term::ident(stvar.to_string())])
+// }
 
 /// Convert a
 pub fn expr_to_smt2(e: &VelosiAstExpr, stvar: &str) -> smt2::Term {

@@ -50,5 +50,6 @@ pub use worker::{Z3Worker, Z3WorkerPool};
 /// Errors reported by Z3
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Z3Error {
+    #[cfg(feature = "z3-standalone")]
     QueryExecution,
 }

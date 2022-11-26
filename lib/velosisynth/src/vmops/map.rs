@@ -27,7 +27,6 @@
 
 use std::collections::LinkedList;
 use std::rc::Rc;
-use std::time::Duration;
 
 use velosiast::ast::{VelosiAstMethod, VelosiAstUnitSegment};
 
@@ -254,18 +253,17 @@ pub fn synthesize(
     unit: &VelosiAstUnitSegment,
 ) -> Result<Program, VelosiSynthIssues> {
     let batch_size = std::cmp::max(5, z3.num_workers() / 2);
-    let mut mprogs = get_program_iter(unit, batch_size);
+    let mut progs = get_program_iter(unit, batch_size);
     loop {
-        match mprogs.next(z3) {
-            MaybeResult::Some(prog) => {
-                return Ok(prog);
-            }
+        match progs.next(z3) {
+            MaybeResult::Some(prog) => return Ok(prog),
             MaybeResult::Pending => {
                 // just keep running
             }
             MaybeResult::None => {
-                panic!("no program found");
+                break;
             }
         }
     }
+    Err(VelosiSynthIssues::new())
 }

@@ -25,8 +25,6 @@
 
 //! Synthesis of Virtual Memory Operations
 
-
-
 pub mod map;
 mod precond;
 pub mod protect;

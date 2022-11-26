@@ -29,7 +29,7 @@ use velosiast::ast::{VelosiAstType, VelosiAstTypeInfo};
 
 use smt2::{Function, Smt2Context, Sort, Term};
 
-use super::model::{IFACE_PREFIX, STATE_PREFIX};
+use super::velosimodel::{IFACE_PREFIX, STATE_PREFIX};
 
 pub const DEFAULT_BIT_WIDTH: u64 = 64;
 
