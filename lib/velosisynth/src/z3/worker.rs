@@ -38,7 +38,6 @@ use std::sync::{
 };
 use std::thread;
 
-
 // own create imports
 use super::query::{Z3Query, Z3Result, Z3Ticket};
 use super::Z3Instance;
@@ -427,8 +426,6 @@ impl Z3WorkerPool {
     fn drain_resultq(&mut self) {
         log::trace!(target : "[Z3WorkerPool]", "draining result queue");
         // XXX: that one here just makes sure there are no new tasks...
-
-        let mut counter = 5;
         loop {
             match self.resultq.try_recv() {
                 Ok((_id, result)) => {
@@ -456,10 +453,6 @@ impl Z3WorkerPool {
                     );
                 }
                 Err(TryRecvError::Empty) => {
-                    if counter == 0 {
-                        break;
-                    }
-                    counter -= 1;
                     break;
                 }
                 Err(TryRecvError::Disconnected) => {
@@ -475,8 +468,6 @@ impl Z3WorkerPool {
             if let Some(r) = res {
                 return r;
             }
-            // thread::yield_now();
-            // thread::sleep(Duration::from_millis(5));
         }
     }
 

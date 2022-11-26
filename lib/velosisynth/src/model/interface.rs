@@ -29,8 +29,8 @@ use smt2::{DataType, Smt2Context};
 use velosiast::ast::VelosiAstInterface;
 
 use super::field::{add_iface_field, add_iface_field_accessors};
-use super::model::IFACE_PREFIX;
 use super::types;
+use super::velosimodel::IFACE_PREFIX;
 
 /// adds the interface definitions to the model
 ///

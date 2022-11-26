@@ -29,8 +29,8 @@ use smt2::{DataType, Smt2Context};
 use velosiast::ast::VelosiAstState;
 
 use super::field::{add_state_field, add_state_field_accessors};
-use super::model::STATE_PREFIX;
 use super::types;
+use super::velosimodel::STATE_PREFIX;
 
 // adds the state to the context
 pub fn add_state_def(smt: &mut Smt2Context, state: &VelosiAstState) {

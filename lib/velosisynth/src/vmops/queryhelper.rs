@@ -25,7 +25,6 @@
 
 //! Synthesis of Virtual Memory Operations: Map
 
-
 use std::collections::VecDeque;
 
 use super::utils;
@@ -88,9 +87,9 @@ where
         }
     }
 
-    pub fn submit(&mut self, z3: &mut Z3WorkerPool) {
-        self.maybe_submit(z3);
-    }
+    // pub fn submit(&mut self, z3: &mut Z3WorkerPool) {
+    //     self.maybe_submit(z3);
+    // }
 
     fn maybe_submit(&mut self, z3: &mut Z3WorkerPool) -> bool {
         loop {
@@ -194,9 +193,15 @@ where
         }
     }
 
-    pub fn idx(&self) -> usize {
-        self.idx
-    }
+    // /// returns the current program count
+    // pub fn idx(&self) -> usize {
+    //     self.idx
+    // }
+
+    // /// returns the dimension of the iterator
+    // pub fn dim(&self) -> usize {
+    //     self.queries.len()
+    // }
 }
 
 impl<T> ProgramBuilder for MultiDimProgramQueries<T>

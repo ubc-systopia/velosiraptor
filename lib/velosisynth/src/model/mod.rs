@@ -32,9 +32,9 @@ pub mod field;
 pub mod flags;
 pub mod interface;
 pub mod method;
-pub mod model;
 pub mod state;
 pub mod types;
+pub mod velosimodel;
 
 pub fn create(unit: &VelosiAstUnitSegment) -> Smt2Context {
     let mut smt = Smt2Context::new();
@@ -55,7 +55,7 @@ pub fn create(unit: &VelosiAstUnitSegment) -> Smt2Context {
 
     state::add_state_def(&mut smt, &unit.state);
     interface::add_interface_def(&mut smt, &unit.interface);
-    model::add_model_def(&mut smt, unit);
+    velosimodel::add_model_def(&mut smt, unit);
     method::add_methods(&mut smt, unit.methods.as_slice());
 
     smt

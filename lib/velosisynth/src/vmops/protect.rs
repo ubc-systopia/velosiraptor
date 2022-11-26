@@ -27,38 +27,24 @@
 
 use std::collections::LinkedList;
 use std::rc::Rc;
-use std::time::Duration;
 
 use velosiast::ast::{VelosiAstMethod, VelosiAstUnitSegment};
 
+use crate::error::VelosiSynthErrorBuilder;
 use crate::{programs::Program, z3::Z3WorkerPool, VelosiSynthIssues};
 
 use super::{semantics, utils};
 
-use crate::vmops::precond::PrecondQueries;
 use crate::vmops::queryhelper::MultiDimProgramQueries;
 use crate::vmops::queryhelper::ProgramQueries;
 use crate::vmops::queryhelper::{MaybeResult, ProgramBuilder};
 use crate::vmops::semantics::SemanticQueries;
 use crate::Z3Ticket;
 
-pub enum PartQueries {
-    Precond(PrecondQueries),
-    Semantic(ProgramQueries<SemanticQueries>),
-}
-
-impl ProgramBuilder for PartQueries {
-    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
-        match self {
-            Self::Precond(q) => q.next(z3),
-            Self::Semantic(q) => q.next(z3),
-        }
-    }
-}
-
 pub struct ProtectPrograms {
-    programs: MultiDimProgramQueries<PartQueries>,
+    programs: MultiDimProgramQueries<ProgramQueries<SemanticQueries>>,
     programs_done: bool,
+
     queries: LinkedList<(Program, [Option<Z3Ticket>; 2])>,
     candidates: Vec<Program>,
 
@@ -69,7 +55,7 @@ pub struct ProtectPrograms {
 
 impl ProtectPrograms {
     pub fn new(
-        programs: MultiDimProgramQueries<PartQueries>,
+        programs: MultiDimProgramQueries<ProgramQueries<SemanticQueries>>,
         m_fn: Rc<VelosiAstMethod>,
         t_fn: Rc<VelosiAstMethod>,
         f_fn: Rc<VelosiAstMethod>,
@@ -110,15 +96,6 @@ impl ProgramBuilder for ProtectPrograms {
         const CONFIG_MAX_QUERIES: usize = 4;
         if self.queries.len() < CONFIG_MAX_QUERIES {
             if let Some(prog) = self.candidates.pop() {
-                // let translate_preconds = precond::submit_program_query(
-                //     z3,
-                //     self.m_fn.as_ref(),
-                //     self.t_fn.as_ref(),
-                //     None,
-                //     false,
-                //     prog.clone(),
-                // );
-
                 let translate_semantics = semantics::submit_program_query(
                     z3,
                     self.m_fn.as_ref(),
@@ -128,14 +105,6 @@ impl ProgramBuilder for ProtectPrograms {
                     true,
                 );
 
-                // let matchflags_preconds = precond::submit_program_query(
-                //     z3,
-                //     self.m_fn.as_ref(),
-                //     self.f_fn.as_ref(),
-                //     None,
-                //     false,
-                //     prog.clone(),
-                // );
                 let matchflags_semantics = semantics::submit_program_query(
                     z3,
                     self.m_fn.as_ref(),
@@ -147,12 +116,7 @@ impl ProgramBuilder for ProtectPrograms {
 
                 self.queries.push_back((
                     prog,
-                    [
-                        // Some(translate_preconds),
-                        Some(translate_semantics),
-                        // Some(matchflags_preconds),
-                        Some(matchflags_semantics),
-                    ],
+                    [Some(translate_semantics), Some(matchflags_semantics)],
                 ));
             }
         }
@@ -162,7 +126,7 @@ impl ProgramBuilder for ProtectPrograms {
         while let Some((prog, mut tickets)) = self.queries.pop_front() {
             let mut all_done = true;
             let mut unsat_part = false;
-            for maybe_ticket in tickets.iter_mut() {
+            for (_i, maybe_ticket) in tickets.iter_mut().enumerate() {
                 if let Some(ticket) = maybe_ticket {
                     if let Some(result) = z3.get_result(*ticket) {
                         // we got a result, check if it's sat
@@ -170,6 +134,7 @@ impl ProgramBuilder for ProtectPrograms {
                         if utils::check_result_no_rewrite(output) == utils::QueryResult::Sat {
                             // set the ticket to none to mark completion
                             *maybe_ticket = None;
+                            // record that we've found a program that satisfies the first query
                         } else {
                             // unsat result, just drop it
                             unsat_part = true;
@@ -235,20 +200,8 @@ pub fn get_program_iter(unit: &VelosiAstUnitSegment, batch_size: usize) -> Prote
         //     f_fn.clone(),
         //     false,
         // )),
-        PartQueries::Semantic(semantics::semantic_query(
-            unit,
-            m_fn.clone(),
-            t_fn.clone(),
-            true,
-            batch_size,
-        )),
-        PartQueries::Semantic(semantics::semantic_query(
-            unit,
-            m_fn.clone(),
-            f_fn.clone(),
-            false,
-            batch_size,
-        )),
+        semantics::semantic_query(unit, m_fn.clone(), t_fn.clone(), true, batch_size),
+        semantics::semantic_query(unit, m_fn.clone(), f_fn.clone(), false, batch_size),
     ];
     let programs = MultiDimProgramQueries::new(map_queries);
 
@@ -260,18 +213,24 @@ pub fn synthesize(
     unit: &VelosiAstUnitSegment,
 ) -> Result<Program, VelosiSynthIssues> {
     let batch_size = std::cmp::max(5, z3.num_workers() / 2);
-    let mut mprogs = get_program_iter(unit, batch_size);
+    let mut progs = get_program_iter(unit, batch_size);
     loop {
-        match mprogs.next(z3) {
-            MaybeResult::Some(prog) => {
-                return Ok(prog);
-            }
+        match progs.next(z3) {
+            MaybeResult::Some(prog) => return Ok(prog),
             MaybeResult::Pending => {
                 // just keep running
             }
             MaybeResult::None => {
-                panic!("no program found");
+                break;
             }
         }
     }
+
+    let m_fn = unit.get_method("protect").unwrap();
+    let msg = "failed to synthesize a program for the protect operation";
+    let err = VelosiSynthErrorBuilder::err(msg.to_string())
+        .add_location(m_fn.loc.clone())
+        .build();
+
+    Err(err.into())
 }
