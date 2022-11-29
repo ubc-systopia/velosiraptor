@@ -33,6 +33,7 @@
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
+use ast::VelosiAstConst;
 // public re-exports
 pub use velosiparser::{VelosiParser, VelosiParserError, VelosiTokenStream};
 
@@ -142,6 +143,10 @@ impl VelosiAst {
 
     pub fn units(&self) -> &[VelosiAstUnit] {
         self.root.units()
+    }
+
+    pub fn consts(&self) -> &[Rc<VelosiAstConst>] {
+        self.root.consts()
     }
 
     pub fn segment_units(&self) -> impl Iterator<Item = &Rc<VelosiAstUnitSegment>> {

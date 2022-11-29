@@ -561,6 +561,10 @@ impl VelosiAstInterfaceMemoryField {
     pub fn ident_to_string(&self) -> String {
         self.ident.name.to_string()
     }
+
+    pub fn nbits(&self) -> u64 {
+        self.size * 8
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstInterfaceMemoryField]
@@ -738,6 +742,10 @@ impl VelosiAstInterfaceMmioField {
     pub fn ident_to_string(&self) -> String {
         self.ident.name.to_string()
     }
+
+    pub fn nbits(&self) -> u64 {
+        self.size * 8
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstInterfaceRegisterField]
@@ -899,6 +907,10 @@ impl VelosiAstInterfaceRegisterField {
 
     pub fn ident_to_string(&self) -> String {
         self.ident.name.to_string()
+    }
+
+    pub fn nbits(&self) -> u64 {
+        self.size * 8
     }
 }
 
