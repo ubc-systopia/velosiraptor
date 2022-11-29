@@ -565,6 +565,14 @@ impl VelosiAstInterfaceMemoryField {
     pub fn nbits(&self) -> u64 {
         self.size * 8
     }
+
+    pub fn mask(&self) -> u64 {
+        let mut mask = 0;
+        for slice in &self.layout {
+            mask |= slice.mask();
+        }
+        mask
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstInterfaceMemoryField]
@@ -746,6 +754,14 @@ impl VelosiAstInterfaceMmioField {
     pub fn nbits(&self) -> u64 {
         self.size * 8
     }
+
+    pub fn mask(&self) -> u64 {
+        let mut mask = 0;
+        for slice in &self.layout {
+            mask |= slice.mask();
+        }
+        mask
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstInterfaceRegisterField]
@@ -912,6 +928,14 @@ impl VelosiAstInterfaceRegisterField {
     pub fn nbits(&self) -> u64 {
         self.size * 8
     }
+
+    pub fn mask(&self) -> u64 {
+        let mut mask = 0;
+        for slice in &self.layout {
+            mask |= slice.mask();
+        }
+        mask
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstInterfaceRegisterField]
@@ -1018,6 +1042,22 @@ impl VelosiAstInterfaceField {
             VelosiAstInterfaceField::Memory(field) => field.size,
             VelosiAstInterfaceField::Register(field) => field.size,
             VelosiAstInterfaceField::Mmio(field) => field.size,
+        }
+    }
+
+    pub fn nbits(&self) -> u64 {
+        match self {
+            VelosiAstInterfaceField::Memory(field) => field.nbits(),
+            VelosiAstInterfaceField::Register(field) => field.nbits(),
+            VelosiAstInterfaceField::Mmio(field) => field.nbits(),
+        }
+    }
+
+    pub fn mask(&self) -> u64 {
+        match self {
+            VelosiAstInterfaceField::Memory(field) => field.mask(),
+            VelosiAstInterfaceField::Register(field) => field.mask(),
+            VelosiAstInterfaceField::Mmio(field) => field.mask(),
         }
     }
 
