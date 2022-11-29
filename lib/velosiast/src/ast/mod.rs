@@ -60,7 +60,10 @@ pub use expr::{
     VelosiAstUnOp, VelosiAstUnOpExpr,
 };
 pub use flags::VelosiAstFlags;
-pub use interface::{VelosiAstInterface, VelosiAstInterfaceAction, VelosiAstInterfaceField};
+pub use interface::{
+    VelosiAstInterface, VelosiAstInterfaceAction, VelosiAstInterfaceField,
+    VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField, VelosiAstInterfaceRegisterField,
+};
 pub use map::{VelosiAstStaticMap, VelosiAstStaticMapElement};
 pub use method::VelosiAstMethod;
 pub use param::VelosiAstParam;
@@ -232,6 +235,10 @@ impl VelosiAstRoot {
 
     pub fn units(&self) -> &[VelosiAstUnit] {
         self.units.as_slice()
+    }
+
+    pub fn consts(&self) -> &[Rc<VelosiAstConst>] {
+        self.consts.as_slice()
     }
 }
 
