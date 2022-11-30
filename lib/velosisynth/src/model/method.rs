@@ -90,12 +90,12 @@ fn add_matchflags_parts(smt: &mut Smt2Context, method: &VelosiAstMethod) -> usiz
         .filter(|p| p.has_state_references())
         .enumerate()
     {
-        let name = method_part_i_name(method.ident_as_str(), i);
+        let name = method_part_i_name(method.ident(), i);
         let mut f = Function::new(name, types::boolean());
         f.add_comment(format!(
             "Function Body part {}: {}, {}",
             i,
-            method.ident_as_str(),
+            method.ident(),
             method.loc.loc()
         ));
 
@@ -125,12 +125,12 @@ fn add_method_preconditions(smt: &mut Smt2Context, method: &VelosiAstMethod) {
             continue;
         }
 
-        let name = method_precond_i_name(method.ident_as_str(), i);
+        let name = method_precond_i_name(method.ident(), i);
         let mut f = Function::new(name, types::boolean());
         f.add_comment(format!(
             "Function Preconditions part {}: {}, {}",
             i,
-            method.ident_as_str(),
+            method.ident(),
             method.loc.loc()
         ));
 
@@ -147,11 +147,11 @@ fn add_method_preconditions(smt: &mut Smt2Context, method: &VelosiAstMethod) {
     // Adding a Combined Function Pre-Condition
     // ---------------------------------------------------------------------------------------------
 
-    let name = method_precond_name(method.ident_as_str());
+    let name = method_precond_name(method.ident());
     let mut f = Function::new(name, types::boolean());
     f.add_comment(format!(
         "Function Preconditions: {}, {}",
-        method.ident_as_str(),
+        method.ident(),
         method.loc.loc()
     ));
 
@@ -174,11 +174,11 @@ fn add_method_preconditions(smt: &mut Smt2Context, method: &VelosiAstMethod) {
 fn add_method_assms(smt: &mut Smt2Context, method: &VelosiAstMethod) {
     // add the assumptions on the function parameters
     // this includes only pre-conditions that do not have state references
-    let name = method_assms_name(method.ident_as_str());
+    let name = method_assms_name(method.ident());
     let mut f = Function::new(name, types::boolean());
     f.add_comment(format!(
         "Function Assumptions: {}, {}",
-        method.ident_as_str(),
+        method.ident(),
         method.loc.loc()
     ));
 
@@ -209,12 +209,12 @@ pub fn add_methods(smt: &mut Smt2Context, methods: &[Rc<VelosiAstMethod>]) {
 
     for m in methods {
         // if matches!(
-        //     m.ident_as_str(),
+        //     m.ident(),
         //     "translate" | "matchflags" | "map" | "unmap" | "protect"
         // ) {
         //     smt.comment(format!(
         //         "skipping method {}, handled elsewhere",
-        //         m.ident_as_str()
+        //         m.ident()
         //     ));
         //     continue;
         // }
@@ -226,7 +226,7 @@ pub fn add_methods(smt: &mut Smt2Context, methods: &[Rc<VelosiAstMethod>]) {
         if let Some(body) = &m.body {
             // TODO: should we add an assert here with pattern?
             let mut f = Function::new(m.ident_to_string(), types::type_to_smt2(&m.rtype));
-            f.add_comment(format!("Function: {}, {}", m.ident_as_str(), m.loc.loc()));
+            f.add_comment(format!("Function: {}, {}", m.ident(), m.loc.loc()));
 
             f.add_arg(String::from("st"), types::model());
             for a in m.params.iter() {
@@ -236,7 +236,7 @@ pub fn add_methods(smt: &mut Smt2Context, methods: &[Rc<VelosiAstMethod>]) {
             f.add_body(expr::expr_to_smt2(body, "st"));
             smt.function(f);
 
-            match m.ident_as_str() {
+            match m.path().as_str() {
                 "matchflags" => {
                     // if we have match flags we create one for reach element of the
                     assert!(m.rtype.is_boolean());
@@ -249,10 +249,7 @@ pub fn add_methods(smt: &mut Smt2Context, methods: &[Rc<VelosiAstMethod>]) {
                 _ => (),
             }
         } else {
-            smt.comment(format!(
-                "skipping method {}, no body defined",
-                m.ident_as_str()
-            ));
+            smt.comment(format!("skipping method {}, no body defined", m.ident()));
         }
 
         // -----------------------------------------------------------------------------------------
@@ -417,7 +414,7 @@ pub fn call_method_assms(m: &VelosiAstMethod, st: &str) -> Term {
     for a in m.params.iter() {
         assm_args.push(Term::ident(a.ident_to_string()));
     }
-    let name = method_assms_name(m.ident_as_str());
+    let name = method_assms_name(m.ident());
     Term::fn_apply(name, assm_args)
 }
 
@@ -429,20 +426,20 @@ pub fn call_method(m: &VelosiAstMethod, args: Vec<Term>) -> Term {
     Term::fn_apply(m.ident_to_string(), fn_args)
 }
 
-pub fn call_method_part(m: &VelosiAstMethod, idx: Option<usize>, args: Vec<Term>) -> Term {
-    let mut fn_args = args;
-    for v in m.params.iter() {
-        fn_args.push(Term::ident(v.ident_to_string()));
-    }
+// pub fn call_method_part(m: &VelosiAstMethod, idx: Option<usize>, args: Vec<Term>) -> Term {
+//     let mut fn_args = args;
+//     for v in m.params.iter() {
+//         fn_args.push(Term::ident(v.ident_to_string()));
+//     }
 
-    let name = if let Some(i) = idx {
-        format!("{}.{}", m.ident_as_str(), i)
-    } else {
-        m.ident_to_string()
-    };
+//     let name = if let Some(i) = idx {
+//         format!("{}.{}", m.ident(), i)
+//     } else {
+//         m.ident_to_string()
+//     };
 
-    Term::fn_apply(name, fn_args)
-}
+//     Term::fn_apply(name, fn_args)
+// }
 
 pub fn call_method_pre(m: &VelosiAstMethod, idx: Option<usize>, args: Vec<Term>) -> Term {
     let mut check_args = args;
@@ -451,9 +448,9 @@ pub fn call_method_pre(m: &VelosiAstMethod, idx: Option<usize>, args: Vec<Term>)
     }
 
     let name = if let Some(i) = idx {
-        method_precond_i_name(m.ident_as_str(), i)
+        method_precond_i_name(m.ident(), i)
     } else {
-        method_precond_name(m.ident_as_str())
+        method_precond_name(m.ident())
     };
     Term::fn_apply(name, check_args)
 }
@@ -464,7 +461,7 @@ pub fn call_method_result_check_part(
     idx: Option<usize>,
     args: Vec<Term>,
 ) -> Term {
-    let name = match (m.ident_as_str(), g.ident_as_str()) {
+    let name = match (m.ident().as_str(), g.ident().as_str()) {
         ("map", "translate") => translate_map_result_name(idx),
         ("protect", "translate") => translate_protect_result_name(idx),
         ("map", "matchflags") => matchflags_map_result_name(idx),
@@ -491,7 +488,7 @@ pub fn combine_method_params(
     }
 
     for p in p1.iter() {
-        if vars.contains_key(p.ident_as_str()) {
+        if vars.contains_key(p.ident().as_str()) {
             continue;
         }
         let v = SortedVar::new(p.ident_to_string(), types::type_to_smt2(&p.ptype));
@@ -499,7 +496,7 @@ pub fn combine_method_params(
     }
 
     for p in p2.iter() {
-        if vars.contains_key(p.ident_as_str()) {
+        if vars.contains_key(p.ident().as_str()) {
             continue;
         }
         let v = SortedVar::new(p.ident_to_string(), types::type_to_smt2(&p.ptype));

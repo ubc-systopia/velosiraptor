@@ -138,7 +138,7 @@ fn program_to_query(
     prog: Program,
 ) -> Z3Query {
     // convert the program to a smt2 term
-    let (mut smt, symvars) = prog.to_smt2_term(m_op.ident_as_str(), m_op.params.as_slice());
+    let (mut smt, symvars) = prog.to_smt2_term(m_op.ident(), m_op.params.as_slice());
 
     // build up the pre-conditions
     let pre1 = call_method_assms(m_op, "st!0");
@@ -187,16 +187,22 @@ fn program_to_query(
         m_goal
             .requires
             .iter()
-            .map(|p| {
-                if negate {
-                    format!("!{}", p)
+            .filter_map(|p| {
+                if p.has_state_references() {
+                    if negate {
+                        Some(format!("!{}", p))
+                    } else {
+                        Some(p.to_string())
+                    }
                 } else {
-                    p.to_string()
+                    None
                 }
             })
             .collect::<Vec<String>>()
             .join(" && ")
     };
+
+    // println!("goal: {}", goal);
 
     // create and submit query
     let mut query = Z3Query::from(smtctx);

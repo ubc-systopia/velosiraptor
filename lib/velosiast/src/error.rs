@@ -361,11 +361,11 @@ impl VelosiAstErrUndef {
     }
 
     pub fn from_ident(id: &VelosiAstIdentifier) -> Self {
-        Self::new(id.name.clone(), id.loc.clone())
+        Self::new(id.ident().clone(), id.loc.clone())
     }
 
     pub fn from_ident_with_other(id: &VelosiAstIdentifier, other: VelosiTokenStream) -> Self {
-        Self::with_other(id.name.clone(), id.loc.clone(), other)
+        Self::with_other(id.ident().clone(), id.loc.clone(), other)
     }
 }
 

@@ -32,10 +32,7 @@ use velosiast::ast::{
 };
 
 use super::flags::flags_get_fn_name;
-use super::velosimodel::{
-    model_field_get_fn_name, model_field_set_fn_name, model_slice_get_fn_name,
-    model_slice_set_fn_name,
-};
+use super::velosimodel::{model_field_get_fn_name, model_slice_get_fn_name};
 
 pub fn p2p(i: &str) -> &str {
     match i {
@@ -81,26 +78,23 @@ pub fn expr_to_smt2(e: &VelosiAstExpr, stvar: &str) -> smt2::Term {
     use VelosiAstExpr::*;
     match e {
         IdentLiteral(i) => {
-            if i.path.len() == 1 {
-                Term::ident(i.path[0].to_string())
-            } else if i.path.len() == 2 {
-                // if we have flags, then this is bascially a field access
-                if i.etype.is_flags() {
-                    flags_get_fn(i.path[0].as_str(), i.path[1].as_str())
-                } else {
-                    model_accessor_read_fn(stvar, i.path[0].as_str(), i.path[1].as_str())
+            let mut s = i.path_split();
+            match (s.next(), s.next(), s.next()) {
+                (Some(m), Some(f), Some(s)) => model_slice_accessor_read_fn(stvar, p2p(m), f, s),
+                (Some(m), Some(f), None) => {
+                    if i.etype.is_flags() {
+                        flags_get_fn(m, f)
+                    } else {
+                        model_accessor_read_fn(stvar, p2p(m), f)
+                    }
                 }
-            } else if i.path.len() == 3 {
-                //let fieldslice = format!("{}.{}", i.path[1], i.path[2]);
-                model_slice_accessor_read_fn(
-                    stvar,
-                    i.path[0].as_str(),
-                    i.path[1].as_str(),
-                    i.path[2].as_str(),
-                )
-            } else {
-                unreachable!("path of unexpected length: {:?}", i.path);
+                (Some(m), None, None) => Term::ident(m.to_string()),
+                e => panic!("unknown case: {:?}", e),
             }
+
+            // if s.next().is_some() {
+            //     panic!("unknown case: {:?}", e);
+            // }
         }
         NumLiteral(i) => Term::num(i.val),
         BoolLiteral(i) => Term::binary(i.val),
@@ -156,7 +150,7 @@ pub fn expr_to_smt2(e: &VelosiAstExpr, stvar: &str) -> smt2::Term {
         FnCall(i) => {
             let mut args = vec![Term::ident(stvar.to_string())];
             args.extend(i.args.iter().map(|a| expr_to_smt2(a, stvar)));
-            Term::fn_apply(i.name.to_string(), args)
+            Term::fn_apply(i.path_to_string(), args)
         }
         IfElse(i) => Term::ifelse(
             expr_to_smt2(i.cond.as_ref(), stvar),

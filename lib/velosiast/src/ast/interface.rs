@@ -283,7 +283,7 @@ fn handle_nodes(
 
                 for slice in slices {
                     let slice = Rc::new(ast_result_unwrap!(
-                        VelosiAstFieldSlice::from_parse_tree(slice, ident.as_str(), size * 8),
+                        VelosiAstFieldSlice::from_parse_tree(slice, ident.path(), size * 8),
                         issues
                     ));
                     st.insert(slice.clone().into())
@@ -347,7 +347,7 @@ fn handle_nodes(
     utils::actions_conflict_check(&mut issues, nodes.writeactions.as_slice());
 
     // if all nodes are emtpy, check if there exists a state piece with the same name.
-    let sfn = format!("state.{}", ident);
+    let sfn = format!("state.{}", ident.ident());
     let sym = if let Some(sym) = st.lookup(&sfn) {
         if let VelosiAstNode::StateField(f) = &sym.ast_node {
             f
@@ -497,7 +497,7 @@ impl VelosiAstInterfaceMemoryField {
         };
 
         let s = Symbol::new(
-            ident.name.clone(),
+            ident.path().clone(),
             VelosiAstType::new_int(),
             VelosiAstNode::InterfaceField(Rc::new(VelosiAstInterfaceField::Memory(n))),
         );
@@ -525,10 +525,10 @@ impl VelosiAstInterfaceMemoryField {
 
         let mut layout_map = HashMap::new();
         for slice in &nodes.layout {
-            layout_map.insert(slice.ident_to_string(), slice.clone());
+            layout_map.insert(slice.path_to_string(), slice.clone());
             // XXX: stupd work around to enable lookup using the identifier
-            let n = slice.ident_as_str().split('.').last().unwrap();
-            layout_map.insert(n.to_string(), slice.clone());
+            // let n = slice.ident().split(IDENT_PATH_SEP).last().unwrap();
+            layout_map.insert(slice.ident_to_string(), slice.clone());
         }
 
         // construct the ast node and return
@@ -545,21 +545,29 @@ impl VelosiAstInterfaceMemoryField {
         };
 
         // remove the symbol again.
-        st.remove(res.ident.as_str());
+        st.remove(res.path());
 
         ast_result_return!(VelosiAstInterfaceField::Memory(res), issues)
     }
 
-    pub fn ident_as_str(&self) -> &str {
-        self.ident.name.as_str()
+    /// obtains a reference to the identifier
+    pub fn ident(&self) -> &Rc<String> {
+        self.ident.ident()
     }
 
-    pub fn ident_as_rc_string(&self) -> Rc<String> {
-        self.ident.name.clone()
-    }
-
+    /// obtains a copy of the identifer
     pub fn ident_to_string(&self) -> String {
-        self.ident.name.to_string()
+        self.ident.as_str().to_string()
+    }
+
+    /// obtains a reference to the fully qualified path
+    pub fn path(&self) -> &Rc<String> {
+        &self.ident.path
+    }
+
+    /// obtains a copy of the fully qualified path
+    pub fn path_to_string(&self) -> String {
+        self.ident.path.as_str().to_string()
     }
 
     pub fn nbits(&self) -> u64 {
@@ -686,7 +694,7 @@ impl VelosiAstInterfaceMmioField {
         };
 
         let s = Symbol::new(
-            ident.name.clone(),
+            ident.path().clone(),
             VelosiAstType::new_int(),
             VelosiAstNode::InterfaceField(Rc::new(VelosiAstInterfaceField::Mmio(n))),
         );
@@ -714,10 +722,10 @@ impl VelosiAstInterfaceMmioField {
 
         let mut layout_map = HashMap::new();
         for slice in &nodes.layout {
-            layout_map.insert(slice.ident_to_string(), slice.clone());
+            layout_map.insert(slice.path_to_string(), slice.clone());
             // XXX: stupd work around to enable lookup using the identifier
-            let n = slice.ident_as_str().split('.').last().unwrap();
-            layout_map.insert(n.to_string(), slice.clone());
+            // let n = slice.ident().split('.').last().unwrap();
+            layout_map.insert(slice.ident_to_string(), slice.clone());
         }
 
         // construct the ast node and return
@@ -734,21 +742,29 @@ impl VelosiAstInterfaceMmioField {
         };
 
         // remove the dummy symbol again.
-        st.remove(res.ident.as_str());
+        st.remove(res.path());
 
         ast_result_return!(VelosiAstInterfaceField::Mmio(res), issues)
     }
 
-    pub fn ident_as_str(&self) -> &str {
-        self.ident.name.as_str()
+    /// obtains a reference to the identifier
+    pub fn ident(&self) -> &Rc<String> {
+        self.ident.ident()
     }
 
-    pub fn ident_as_rc_string(&self) -> Rc<String> {
-        self.ident.name.clone()
-    }
-
+    /// obtains a copy of the identifer
     pub fn ident_to_string(&self) -> String {
-        self.ident.name.to_string()
+        self.ident.as_str().to_string()
+    }
+
+    /// obtains a reference to the fully qualified path
+    pub fn path(&self) -> &Rc<String> {
+        &self.ident.path
+    }
+
+    /// obtains a copy of the fully qualified path
+    pub fn path_to_string(&self) -> String {
+        self.ident.path.as_str().to_string()
     }
 
     pub fn nbits(&self) -> u64 {
@@ -852,7 +868,7 @@ impl VelosiAstInterfaceRegisterField {
         for slice in &layout {
             layout_map.insert(slice.ident_to_string(), slice.clone());
             // XXX: stupd work around to enable lookup using the identifier
-            let n = slice.ident_as_str().split('.').last().unwrap();
+            let n = slice.ident().split('.').last().unwrap();
             layout_map.insert(n.to_string(), slice.clone());
         }
 
@@ -884,7 +900,7 @@ impl VelosiAstInterfaceRegisterField {
         let n = Self::new(ident.clone(), size, vec![], vec![], vec![], pt.loc.clone());
 
         let s = Symbol::new(
-            ident.name.clone(),
+            ident.path().clone(),
             VelosiAstType::new_int(),
             VelosiAstNode::InterfaceField(Rc::new(VelosiAstInterfaceField::Register(n))),
         );
@@ -908,21 +924,29 @@ impl VelosiAstInterfaceRegisterField {
         );
 
         // remove the dummy symbol again.
-        st.remove(res.ident.as_str());
+        st.remove(res.path());
 
         ast_result_return!(VelosiAstInterfaceField::Register(res), issues)
     }
 
-    pub fn ident_as_str(&self) -> &str {
-        self.ident.name.as_str()
+    /// obtains a reference to the identifier
+    pub fn ident(&self) -> &Rc<String> {
+        self.ident.ident()
     }
 
-    pub fn ident_as_rc_string(&self) -> Rc<String> {
-        self.ident.name.clone()
-    }
-
+    /// obtains a copy of the identifer
     pub fn ident_to_string(&self) -> String {
-        self.ident.name.to_string()
+        self.ident.as_str().to_string()
+    }
+
+    /// obtains a reference to the fully qualified path
+    pub fn path(&self) -> &Rc<String> {
+        &self.ident.path
+    }
+
+    /// obtains a copy of the fully qualified path
+    pub fn path_to_string(&self) -> String {
+        self.ident.path.as_str().to_string()
     }
 
     pub fn nbits(&self) -> u64 {
@@ -999,27 +1023,39 @@ pub enum VelosiAstInterfaceField {
 }
 
 impl VelosiAstInterfaceField {
-    pub fn ident_as_str(&self) -> &str {
+    /// obtains a reference to the identifier
+    pub fn ident(&self) -> &Rc<String> {
         match self {
-            VelosiAstInterfaceField::Memory(field) => field.ident_as_str(),
-            VelosiAstInterfaceField::Register(field) => field.ident_as_str(),
-            VelosiAstInterfaceField::Mmio(field) => field.ident_as_str(),
+            VelosiAstInterfaceField::Memory(field) => field.ident(),
+            VelosiAstInterfaceField::Register(field) => field.ident(),
+            VelosiAstInterfaceField::Mmio(field) => field.ident(),
         }
     }
 
-    pub fn ident_as_rc_string(&self) -> Rc<String> {
-        match self {
-            VelosiAstInterfaceField::Memory(field) => field.ident_as_rc_string(),
-            VelosiAstInterfaceField::Register(field) => field.ident_as_rc_string(),
-            VelosiAstInterfaceField::Mmio(field) => field.ident_as_rc_string(),
-        }
-    }
-
+    /// obtains a copy of the identifer
     pub fn ident_to_string(&self) -> String {
         match self {
             VelosiAstInterfaceField::Memory(field) => field.ident_to_string(),
             VelosiAstInterfaceField::Register(field) => field.ident_to_string(),
             VelosiAstInterfaceField::Mmio(field) => field.ident_to_string(),
+        }
+    }
+
+    /// obtains a reference to the fully qualified path
+    pub fn path(&self) -> &Rc<String> {
+        match self {
+            VelosiAstInterfaceField::Memory(field) => field.path(),
+            VelosiAstInterfaceField::Register(field) => field.path(),
+            VelosiAstInterfaceField::Mmio(field) => field.path(),
+        }
+    }
+
+    /// obtains a copy of the fully qualified path
+    pub fn path_to_string(&self) -> String {
+        match self {
+            VelosiAstInterfaceField::Memory(field) => field.path_to_string(),
+            VelosiAstInterfaceField::Register(field) => field.path_to_string(),
+            VelosiAstInterfaceField::Mmio(field) => field.path_to_string(),
         }
     }
 
@@ -1139,7 +1175,7 @@ impl Display for VelosiAstInterfaceField {
 impl From<Rc<VelosiAstInterfaceField>> for Symbol {
     fn from(f: Rc<VelosiAstInterfaceField>) -> Self {
         let n = VelosiAstNode::InterfaceField(f.clone());
-        Symbol::new(f.ident_as_rc_string(), VelosiAstType::new_int(), n)
+        Symbol::new(f.path().clone(), VelosiAstType::new_int(), n)
     }
 }
 
@@ -1173,10 +1209,10 @@ impl VelosiAstInterfaceDef {
         }
         let mut fields_map = HashMap::new();
         for f in &fields {
-            fields_map.insert(f.ident_to_string(), f.clone());
+            fields_map.insert(f.path_to_string(), f.clone());
             // XXX: stupd work around to enable lookup using the identifier
-            let n = f.ident_as_str().split('.').last().unwrap();
-            fields_map.insert(n.to_string(), f.clone());
+            // let n = f.ident().split('.').last().unwrap();
+            fields_map.insert(f.ident_to_string(), f.clone());
         }
         VelosiAstInterfaceDef {
             params,
@@ -1203,7 +1239,7 @@ impl VelosiAstInterfaceDef {
 
             // here we want to check if the parameter are also defined on the unit level
             // and whether the types match precisely
-            if let Some(ps) = st.lookup(param.ident_as_str()) {
+            if let Some(ps) = st.lookup(param.path()) {
                 if ps.typeinfo.typeinfo != param.ptype.typeinfo {
                     let msg = "Parameter type mismatch. Parameter must have the same type as the unit parameter";
                     let hint = format!("Change the type of this parameter to `{}`", ps.typeinfo);
@@ -1224,7 +1260,7 @@ impl VelosiAstInterfaceDef {
                     issues.push(err);
                 }
             } else {
-                let err = VelosiAstErrUndef::new(param.ident_as_rc_string(), param.loc.clone());
+                let err = VelosiAstErrUndef::new(param.ident().clone(), param.loc.clone());
                 issues.push(err.into());
             }
             // we don't need to add those to the symbol table, as they are expected to match
@@ -1279,7 +1315,7 @@ impl VelosiAstInterfaceDef {
         let mut if_bits = HashMap::new();
         for f in &self.fields {
             for l in f.layout_as_slice() {
-                if_bits.insert(l.ident_as_rc_string(), l.mask());
+                if_bits.insert(l.path().clone(), l.mask());
             }
         }
 
@@ -1334,6 +1370,10 @@ impl VelosiAstInterface {
 
     pub fn name(&self) -> &str {
         "Interface"
+    }
+
+    pub fn is_none(&self) -> bool {
+        matches!(self, VelosiAstInterface::NoneInterface(_))
     }
 
     pub fn fields(&self) -> &[Rc<VelosiAstInterfaceField>] {

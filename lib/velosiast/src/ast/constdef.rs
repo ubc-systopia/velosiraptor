@@ -72,16 +72,24 @@ impl VelosiAstConst {
         )
     }
 
-    pub fn ident_as_rc_string(&self) -> Rc<String> {
-        self.ident.name.clone()
+    /// obtains a reference to the identifier
+    pub fn ident(&self) -> &Rc<String> {
+        self.ident.ident()
     }
 
-    pub fn ident_as_str(&self) -> &str {
-        self.ident.name.as_str()
-    }
-
+    /// obtains a copy of the identifer
     pub fn ident_to_string(&self) -> String {
-        self.ident.name.to_string()
+        self.ident.as_str().to_string()
+    }
+
+    /// obtains a reference to the fully qualified path
+    pub fn path(&self) -> &Rc<String> {
+        &self.ident.path
+    }
+
+    /// obtains a copy of the fully qualified path
+    pub fn path_to_string(&self) -> String {
+        self.ident.path.as_str().to_string()
     }
 
     pub fn try_into_u64(&self) -> Option<u64> {
@@ -158,7 +166,7 @@ impl VelosiAstConst {
 impl From<Rc<VelosiAstConst>> for Symbol {
     fn from(c: Rc<VelosiAstConst>) -> Self {
         let n = VelosiAstNode::Const(c.clone());
-        Symbol::new(c.ident_as_rc_string(), c.ctype.clone(), n)
+        Symbol::new(c.path().clone(), c.ctype.clone(), n)
     }
 }
 
@@ -168,7 +176,7 @@ impl Display for VelosiAstConst {
         write!(
             f,
             "const {} : {} = {};",
-            self.ident_as_str(),
+            self.ident(),
             self.ctype,
             self.value
         )

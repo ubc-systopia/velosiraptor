@@ -83,7 +83,7 @@ fn add_field_common(
     ident: &VelosiAstIdentifier,
     layout: &[Rc<VelosiAstFieldSlice>],
 ) {
-    let mut identsplit = ident.as_str().split('.');
+    let mut identsplit = ident.path_split();
     let (ctxt, fieldname) = match (identsplit.next(), identsplit.next()) {
         (Some("state"), Some(name)) => (STATE_PREFIX, name),
         (Some("interface"), Some(name)) => (IFACE_PREFIX, name),
@@ -108,13 +108,13 @@ fn add_field_common(
             "Accessors for {}Field.{}.{}",
             ctxt,
             fieldname,
-            s.ident_as_str()
+            s.ident()
         ));
 
         //
         // Step 2.1.1: Add the accessor function definition (*.get!)
         //
-        let s_get_fn_name = field_slice_extract_fn_name(ctxt, fieldname, s.ident_as_str());
+        let s_get_fn_name = field_slice_extract_fn_name(ctxt, fieldname, s.ident());
         let mut f = Function::new(s_get_fn_name.clone(), types::num());
         f.add_arg(fieldname.to_string(), fieldtype.clone());
         smt.function(f);
@@ -144,7 +144,7 @@ fn add_field_common(
         // Step 2.2: Add the Accessor function (*.get!)
         //
 
-        let s_set_fn_name = field_slice_insert_fn_name(ctxt, fieldname, s.ident_as_str());
+        let s_set_fn_name = field_slice_insert_fn_name(ctxt, fieldname, s.ident());
         let mut f = Function::new(s_set_fn_name.clone(), fieldtype.clone());
         f.add_arg(fieldname.to_string(), fieldtype.clone());
         f.add_arg(fieldname.to_string(), types::num());
@@ -215,7 +215,7 @@ fn add_field_accessors_common(
     ident: &VelosiAstIdentifier,
     layout: &[Rc<VelosiAstFieldSlice>],
 ) {
-    let mut identsplit = ident.as_str().split('.');
+    let mut identsplit = ident.path_split();
     let (ctxt, fieldname) = match (identsplit.next(), identsplit.next()) {
         (Some("state"), Some(name)) => (STATE_PREFIX, name),
         (Some("interface"), Some(name)) => (IFACE_PREFIX, name),
@@ -225,7 +225,7 @@ fn add_field_accessors_common(
     let ctxttype = types::ctxt(ctxt);
 
     for slice in layout {
-        let name = field_slice_get_fn_name(ctxt, fieldname, slice.ident_as_str());
+        let name = field_slice_get_fn_name(ctxt, fieldname, slice.ident());
 
         let mut f = Function::new(name, types::num());
         f.add_arg(String::from("st"), ctxttype.clone());
@@ -233,13 +233,13 @@ fn add_field_accessors_common(
         let arg = Term::ident(String::from("st"));
         let st = Term::fn_apply(field_get_fn_name(ctxt, fieldname), vec![arg]);
         let e = Term::fn_apply(
-            field_slice_extract_fn_name(ctxt, fieldname, slice.ident_as_str()),
+            field_slice_extract_fn_name(ctxt, fieldname, slice.ident()),
             vec![st],
         );
         f.add_body(e);
         smt.function(f);
 
-        let name = field_slice_set_fn_name(ctxt, fieldname, slice.ident_as_str());
+        let name = field_slice_set_fn_name(ctxt, fieldname, slice.ident());
         let mut f = Function::new(name, ctxttype.clone());
         f.add_arg(String::from("st"), ctxttype.clone());
         f.add_arg(String::from("val"), types::num());
@@ -249,7 +249,7 @@ fn add_field_accessors_common(
 
         let fld = Term::fn_apply(field_get_fn_name(ctxt, fieldname), vec![arg.clone()]);
         let st = Term::fn_apply(
-            field_slice_insert_fn_name(ctxt, fieldname, slice.ident_as_str()),
+            field_slice_insert_fn_name(ctxt, fieldname, slice.ident()),
             vec![fld, arg2],
         );
         let e = Term::fn_apply(field_set_fn_name(ctxt, fieldname), vec![arg, st]);

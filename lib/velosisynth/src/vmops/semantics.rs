@@ -167,7 +167,7 @@ fn program_to_query(
     no_change: bool,
 ) -> Z3Query {
     // convert the program to a smt2 term
-    let (mut smt, symvars) = prog.to_smt2_term(m_op.ident_as_str(), m_op.params.as_slice());
+    let (mut smt, symvars) = prog.to_smt2_term(m_op.ident(), m_op.params.as_slice());
 
     // build up the pre-conditions
     let pre1 = call_method_assms(m_op, "st!0");
@@ -195,8 +195,8 @@ fn program_to_query(
     );
 
     // get the goal as string
-    let goal = m_goal_call.to_string();
-    //println!("goal: {}", goal);
+    let goal = m_goal_call.to_string_compact();
+    // println!("s goal: {}", goal);
 
     let t = Term::forall(vars, pre.implies(m_goal_call));
 

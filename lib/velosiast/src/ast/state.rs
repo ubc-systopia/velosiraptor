@@ -125,7 +125,7 @@ impl VelosiAstStateMemoryField {
         let mut layout = Vec::new();
         for s in pt.layout.into_iter() {
             let slice = Rc::new(ast_result_unwrap!(
-                VelosiAstFieldSlice::from_parse_tree(s, ident.as_str(), size * 8),
+                VelosiAstFieldSlice::from_parse_tree(s, ident.path(), size * 8),
                 issues
             ));
 
@@ -143,22 +143,30 @@ impl VelosiAstStateMemoryField {
         ast_result_return!(VelosiAstStateField::Memory(res), issues)
     }
 
-    pub fn ident_as_str(&self) -> &str {
-        self.ident.name.as_str()
+    /// obtains a reference to the identifier
+    pub fn ident(&self) -> &Rc<String> {
+        self.ident.ident()
     }
 
-    pub fn ident_as_rc_string(&self) -> Rc<String> {
-        self.ident.name.clone()
-    }
-
+    /// obtains a copy of the identifer
     pub fn ident_to_string(&self) -> String {
-        self.ident.name.to_string()
+        self.ident.as_str().to_string()
+    }
+
+    /// obtains a reference to the fully qualified path
+    pub fn path(&self) -> &Rc<String> {
+        &self.ident.path
+    }
+
+    /// obtains a copy of the fully qualified path
+    pub fn path_to_string(&self) -> String {
+        self.ident.path.as_str().to_string()
     }
 
     /// obtains a bitmask for the refrenced slices in the supplied refs
     pub fn get_slice_mask_for_refs(&self, refs: &HashSet<Rc<String>>) -> u64 {
         self.layout.iter().fold(0, |acc, slice| {
-            if refs.contains(&slice.ident.name) {
+            if refs.contains(slice.path()) {
                 acc | slice.mask()
             } else {
                 acc
@@ -245,7 +253,7 @@ impl VelosiAstStateRegisterField {
         let mut layout = Vec::new();
         for s in pt.layout.into_iter() {
             let slice = Rc::new(ast_result_unwrap!(
-                VelosiAstFieldSlice::from_parse_tree(s, ident.as_str(), size * 8),
+                VelosiAstFieldSlice::from_parse_tree(s, ident.path(), size * 8),
                 issues
             ));
 
@@ -263,22 +271,29 @@ impl VelosiAstStateRegisterField {
         ast_result_return!(VelosiAstStateField::Register(res), issues)
     }
 
-    pub fn ident_as_str(&self) -> &str {
-        self.ident.name.as_str()
+    /// obtains a reference to the identifier
+    pub fn ident(&self) -> &Rc<String> {
+        self.ident.ident()
     }
 
-    pub fn ident_as_rc_string(&self) -> Rc<String> {
-        self.ident.name.clone()
-    }
-
+    /// obtains a copy of the identifer
     pub fn ident_to_string(&self) -> String {
-        self.ident.name.to_string()
+        self.ident.as_str().to_string()
     }
 
+    /// obtains a reference to the fully qualified path
+    pub fn path(&self) -> &Rc<String> {
+        &self.ident.path
+    }
+
+    /// obtains a copy of the fully qualified path
+    pub fn path_to_string(&self) -> String {
+        self.ident.path.as_str().to_string()
+    }
     /// obtains a bitmask for the refrenced slices in the supplied refs
     pub fn get_slice_mask_for_refs(&self, refs: &HashSet<Rc<String>>) -> u64 {
         self.layout.iter().fold(0, |acc, slice| {
-            if refs.contains(&slice.ident.name) {
+            if refs.contains(slice.ident()) {
                 acc | slice.mask()
             } else {
                 acc
@@ -316,24 +331,35 @@ pub enum VelosiAstStateField {
 }
 
 impl VelosiAstStateField {
-    pub fn ident_as_str(&self) -> &str {
+    /// obtains a reference to the identifier
+    pub fn ident(&self) -> &Rc<String> {
         match self {
-            VelosiAstStateField::Memory(field) => field.ident_as_str(),
-            VelosiAstStateField::Register(field) => field.ident_as_str(),
+            VelosiAstStateField::Memory(field) => field.ident(),
+            VelosiAstStateField::Register(field) => field.ident(),
         }
     }
 
-    pub fn ident_as_rc_string(&self) -> Rc<String> {
-        match self {
-            VelosiAstStateField::Memory(field) => field.ident_as_rc_string(),
-            VelosiAstStateField::Register(field) => field.ident_as_rc_string(),
-        }
-    }
-
+    /// obtains a copy of the identifer
     pub fn ident_to_string(&self) -> String {
         match self {
             VelosiAstStateField::Memory(field) => field.ident_to_string(),
             VelosiAstStateField::Register(field) => field.ident_to_string(),
+        }
+    }
+
+    /// obtains a reference to the fully qualified path
+    pub fn path(&self) -> &Rc<String> {
+        match self {
+            VelosiAstStateField::Memory(field) => field.path(),
+            VelosiAstStateField::Register(field) => field.path(),
+        }
+    }
+
+    /// obtains a copy of the fully qualified path
+    pub fn path_to_string(&self) -> String {
+        match self {
+            VelosiAstStateField::Memory(field) => field.path_to_string(),
+            VelosiAstStateField::Register(field) => field.path_to_string(),
         }
     }
 
@@ -392,7 +418,7 @@ impl Display for VelosiAstStateField {
 impl From<Rc<VelosiAstStateField>> for Symbol {
     fn from(f: Rc<VelosiAstStateField>) -> Self {
         let n = VelosiAstNode::StateField(f.clone());
-        Symbol::new(f.ident_as_rc_string(), VelosiAstType::new_int(), n)
+        Symbol::new(f.path().clone(), VelosiAstType::new_int(), n)
     }
 }
 
@@ -453,7 +479,7 @@ impl VelosiAstStateDef {
 
             // here we want to check if the parameter are also defined on the unit level
             // and whether the types match precisely
-            if let Some(ps) = st.lookup(param.ident_as_str()) {
+            if let Some(ps) = st.lookup(param.path()) {
                 if ps.typeinfo.typeinfo != param.ptype.typeinfo {
                     let msg = "Parameter type mismatch. Parameter must have the same type as the unit parameter";
                     let hint = format!("Change the type of this parameter to `{}`", ps.typeinfo);
@@ -474,7 +500,7 @@ impl VelosiAstStateDef {
                     issues.push(err);
                 }
             } else {
-                let err = VelosiAstErrUndef::new(param.ident_as_rc_string(), param.loc.clone());
+                let err = VelosiAstErrUndef::new(param.ident().clone(), param.loc.clone());
                 issues.push(err.into());
             }
             // we don't need to add those to the symbol table, as they are expected to match
@@ -528,7 +554,7 @@ impl VelosiAstStateDef {
         let mut hs = HashMap::new();
         for f in &self.fields {
             // if the entire field is part of that, add it
-            let fid = f.ident_as_rc_string();
+            let fid = f.path().clone();
             if refs.contains(&fid) {
                 hs.insert(fid, 0xffff_ffff_ffff_ffff);
             } else {

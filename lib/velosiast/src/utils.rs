@@ -38,7 +38,7 @@ use crate::SymbolTable;
 
 /// checks if the identifier has snake case
 pub fn check_upper_case(issues: &mut VelosiAstIssues, id: &VelosiAstIdentifier) {
-    let name = id.name.as_str();
+    let name = id.ident();
     let allupper = name
         .chars()
         .all(|x| x.is_ascii_uppercase() || !x.is_alphanumeric());
@@ -59,7 +59,7 @@ pub fn check_upper_case(issues: &mut VelosiAstIssues, id: &VelosiAstIdentifier) 
 
 /// checks whether the identifier is in snake_case
 pub fn check_snake_case(issues: &mut VelosiAstIssues, id: &VelosiAstIdentifier) {
-    let name = id.name.as_str();
+    let name = id.ident();
     let allupper = name
         .chars()
         .all(|x| x.is_ascii_lowercase() || !x.is_alphabetic());
@@ -80,7 +80,7 @@ pub fn check_snake_case(issues: &mut VelosiAstIssues, id: &VelosiAstIdentifier) 
 
 /// checks whether the identifier is in snake_case
 pub fn check_type_exists(issues: &mut VelosiAstIssues, st: &SymbolTable, id: &VelosiAstIdentifier) {
-    let name = id.name.as_str();
+    let name = id.path();
     if let Some(s) = st.lookup(name) {
         match s.ast_node {
             // there is a unit with that type, so we're good
@@ -104,7 +104,7 @@ pub fn check_param_exists(
     st: &SymbolTable,
     id: &VelosiAstIdentifier,
 ) {
-    let name = id.name.as_str();
+    let name = id.path();
     if let Some(s) = st.lookup(name) {
         match s.ast_node {
             // there is a unit with that type, so we're good
@@ -219,8 +219,8 @@ pub fn actions_conflict_check(issues: &mut VelosiAstIssues, actions: &[VelosiAst
 
     for action in actions {
         let ident = match &action.dst {
-            VelosiAstExpr::IdentLiteral(e) => e.ident_as_str(),
-            VelosiAstExpr::Slice(e) => e.ident_as_str(),
+            VelosiAstExpr::IdentLiteral(e) => e.ident(),
+            VelosiAstExpr::Slice(e) => e.ident(),
             _ => "",
         };
 
@@ -350,7 +350,7 @@ pub fn check_element_ranges(
         // the unit end offset is the last address that is of this range when adding to the
         // start, the units will have an input range of [0, end_offset] (including)
         let mut unit_end_offset = 0xffff_ffff_ffff_ffff;
-        if let Some(u) = st.lookup(e.dst.name.as_str()) {
+        if let Some(u) = st.lookup(e.dst.path()) {
             if let VelosiAstNode::Unit(u) = &u.ast_node {
                 let inputbits = u.input_bitwidth();
                 if inputbits < 64 {

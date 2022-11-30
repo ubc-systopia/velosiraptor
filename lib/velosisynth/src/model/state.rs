@@ -48,8 +48,8 @@ pub fn add_state_def(smt: &mut Smt2Context, state: &VelosiAstState) {
     dt.add_comment(format!("State Definition, {}", state.loc().loc()));
     for field in state.fields() {
         dt.add_field(
-            format!("State.{}", field.ident_as_str().split('.').last().unwrap()),
-            types::field_type(STATE_PREFIX, field.ident_as_str()),
+            format!("State.{}", field.ident().split('.').last().unwrap()),
+            types::field_type(STATE_PREFIX, field.ident()),
         );
     }
 

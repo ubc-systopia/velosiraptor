@@ -186,11 +186,11 @@ fn add_model_slice_accessor(smt: &mut Smt2Context, ftype: &str, fieldname: &str,
 fn add_model_state_accessors(smt: &mut Smt2Context, state: &VelosiAstState) {
     smt.section(String::from("Model State Accessors"));
     for f in state.fields() {
-        smt.subsection(format!("state field: {}", f.ident_as_str()));
-        add_model_field_accessor(smt, STATE_PREFIX, f.ident_as_str());
+        smt.subsection(format!("state field: {}", f.ident()));
+        add_model_field_accessor(smt, STATE_PREFIX, f.ident());
 
         for s in f.layout_as_slice() {
-            add_model_slice_accessor(smt, STATE_PREFIX, f.ident_as_str(), s.ident_as_str());
+            add_model_slice_accessor(smt, STATE_PREFIX, f.ident(), s.ident());
         }
     }
 }
@@ -199,10 +199,10 @@ fn add_model_iface_accessors(smt: &mut Smt2Context, iface: &VelosiAstInterface) 
     smt.section(String::from("Model Interface Accessors"));
 
     for f in iface.fields() {
-        smt.subsection(format!("interface field: {}", f.ident_as_str()));
-        add_model_field_accessor(smt, IFACE_PREFIX, f.ident_as_str());
+        smt.subsection(format!("interface field: {}", f.ident()));
+        add_model_field_accessor(smt, IFACE_PREFIX, f.ident());
         for s in f.layout_as_slice() {
-            add_model_slice_accessor(smt, IFACE_PREFIX, f.ident_as_str(), s.ident_as_str());
+            add_model_slice_accessor(smt, IFACE_PREFIX, f.ident(), s.ident());
         }
     }
 }
@@ -241,17 +241,11 @@ fn add_field_action(
 
         let dst = match &a.dst {
             VelosiAstExpr::IdentLiteral(i) => {
-                if i.path.len() == 2 {
-                    // if we have flags, then this is bascially a field access
-                    model_field_set_fn_name(p2p(i.path[0].as_str()), i.path[1].as_str())
-                } else if i.path.len() == 3 {
-                    model_slice_set_fn_name(
-                        p2p(i.path[0].as_str()),
-                        i.path[1].as_str(),
-                        i.path[2].as_str(),
-                    )
-                } else {
-                    unreachable!("path of unexpected length: {:?}", i.path);
+                let mut s = i.path_split();
+                match (s.next(), s.next(), s.next()) {
+                    (Some(m), Some(f), Some(s)) => model_slice_set_fn_name(p2p(m), f, s),
+                    (Some(m), Some(f), None) => model_field_set_fn_name(p2p(m), f),
+                    e => panic!("unknown case: {:?}", e),
                 }
             }
             _ => panic!("should not happen here! {}", &a.dst),
@@ -276,19 +270,19 @@ fn add_field_action(
 fn add_actions(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
     smt.section(String::from("Actions"));
     for f in iface.fields() {
-        smt.subsection(format!("interface field: {}", f.ident_as_str()));
+        smt.subsection(format!("interface field: {}", f.ident()));
 
         add_field_action(
             smt,
             f.write_actions_as_ref(),
-            f.ident_as_str(),
+            f.ident(),
             "write",
             f.size() * 8,
         );
         add_field_action(
             smt,
             f.read_actions_as_ref(),
-            f.ident_as_str(),
+            f.ident(),
             "read",
             f.size() * 8,
         );

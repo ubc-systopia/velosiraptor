@@ -71,8 +71,11 @@ impl VelosiAstFlags {
 
             // insert into the symbol table
             if let Some(f) = flag_map.get(flag.as_str()) {
-                let err =
-                    VelosiAstErrDoubleDef::new(flag.name.clone(), flag.loc.clone(), f.loc.clone());
+                let err = VelosiAstErrDoubleDef::new(
+                    flag.path().clone(),
+                    flag.loc.clone(),
+                    f.loc.clone(),
+                );
                 issues.push(err.into());
             } else {
                 flag_map.insert(flag.as_str(), flag);
@@ -84,7 +87,7 @@ impl VelosiAstFlags {
 
     pub fn populate_symboltable(&self, varname: &str, st: &mut SymbolTable) {
         for flag in &self.flags {
-            let name = format!("{}.{}", varname, flag.name);
+            let name = format!("{}.{}", varname, flag.ident());
             let ti = VelosiAstType::new(VelosiAstTypeInfo::Flags, flag.loc.clone());
             let sym = Symbol::new(Rc::new(name), ti, VelosiAstNode::Flag(flag.clone()));
             st.insert(sym)
@@ -100,7 +103,7 @@ impl Display for VelosiAstFlags {
             if i > 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "{}", flag.name)?;
+            write!(f, "{}", flag.ident())?;
         }
         write!(f, " }}")
     }

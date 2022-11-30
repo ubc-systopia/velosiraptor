@@ -84,7 +84,7 @@ pub fn make_program_builder(
             .expect("didn't find the field");
         if let Some(slicename) = parts.next() {
             let slice = field.slice(slicename).expect("didn't find the slice");
-            builder.add_field_slice(fieldname, slicename, slice.bits());
+            builder.add_field_slice(fieldname, slicename, slice.nbits() as usize);
         } else {
             unimplemented!("not yet implementation");
             //builder.add_field(field);

@@ -365,16 +365,24 @@ impl VelosiAstUnitSegment {
         ast_result_return!(VelosiAstUnit::Segment(Rc::new(res)), issues)
     }
 
-    pub fn ident_as_rc_string(&self) -> Rc<String> {
-        self.ident.name.clone()
+    /// obtains a reference to the identifier
+    pub fn ident(&self) -> &Rc<String> {
+        self.ident.ident()
     }
 
-    pub fn ident_as_str(&self) -> &str {
-        self.ident.name.as_str()
-    }
-
+    /// obtains a copy of the identifer
     pub fn ident_to_string(&self) -> String {
-        self.ident.name.to_string()
+        self.ident.as_str().to_string()
+    }
+
+    /// obtains a reference to the fully qualified path
+    pub fn path(&self) -> &Rc<String> {
+        &self.ident.path
+    }
+
+    /// obtains a copy of the fully qualified path
+    pub fn path_to_string(&self) -> String {
+        self.ident.path.as_str().to_string()
     }
 
     pub fn params_as_slice(&self) -> &[Rc<VelosiAstParam>] {
@@ -675,20 +683,28 @@ impl VelosiAstUnitStaticMap {
         ast_result_return!(VelosiAstUnit::StaticMap(Rc::new(res)), issues)
     }
 
+    /// obtains a reference to the identifier
+    pub fn ident(&self) -> &Rc<String> {
+        self.ident.ident()
+    }
+
+    /// obtains a copy of the identifer
+    pub fn ident_to_string(&self) -> String {
+        self.ident.as_str().to_string()
+    }
+
+    /// obtains a reference to the fully qualified path
+    pub fn path(&self) -> &Rc<String> {
+        &self.ident.path
+    }
+
+    /// obtains a copy of the fully qualified path
+    pub fn path_to_string(&self) -> String {
+        self.ident.path.as_str().to_string()
+    }
+
     pub fn get_method(&self, name: &str) -> Option<&Rc<VelosiAstMethod>> {
         self.methods_map.get(name)
-    }
-
-    pub fn ident_as_rc_string(&self) -> Rc<String> {
-        self.ident.name.clone()
-    }
-
-    pub fn ident_as_str(&self) -> &str {
-        self.ident.name.as_str()
-    }
-
-    pub fn ident_to_string(&self) -> String {
-        self.ident.name.to_string()
     }
 
     pub fn params_as_slice(&self) -> &[Rc<VelosiAstParam>] {
@@ -780,27 +796,39 @@ impl VelosiAstUnit {
         }
     }
 
-    pub fn ident_as_rc_string(&self) -> Rc<String> {
+    /// obtains a reference to the identifier
+    pub fn ident(&self) -> &Rc<String> {
         use VelosiAstUnit::*;
         match self {
-            Segment(s) => s.ident_as_rc_string(),
-            StaticMap(s) => s.ident_as_rc_string(),
+            Segment(s) => s.ident(),
+            StaticMap(s) => s.ident(),
         }
     }
 
-    pub fn ident_as_str(&self) -> &str {
-        use VelosiAstUnit::*;
-        match self {
-            Segment(s) => s.ident_as_str(),
-            StaticMap(s) => s.ident_as_str(),
-        }
-    }
-
+    /// obtains a copy of the identifer
     pub fn ident_to_string(&self) -> String {
         use VelosiAstUnit::*;
         match self {
             Segment(s) => s.ident_to_string(),
             StaticMap(s) => s.ident_to_string(),
+        }
+    }
+
+    /// obtains a reference to the fully qualified path
+    pub fn path(&self) -> &Rc<String> {
+        use VelosiAstUnit::*;
+        match self {
+            Segment(s) => s.path(),
+            StaticMap(s) => s.path(),
+        }
+    }
+
+    /// obtains a copy of the fully qualified path
+    pub fn path_to_string(&self) -> String {
+        use VelosiAstUnit::*;
+        match self {
+            Segment(s) => s.path_to_string(),
+            StaticMap(s) => s.path_to_string(),
         }
     }
 
@@ -873,7 +901,7 @@ impl VelosiAstUnit {
 impl From<VelosiAstUnit> for Symbol {
     fn from(unit: VelosiAstUnit) -> Self {
         let ti = VelosiAstType::from(unit.clone());
-        let name = unit.ident_as_rc_string();
+        let name = unit.path().clone();
         Symbol::new(name, ti, VelosiAstNode::Unit(unit))
     }
 }
@@ -881,7 +909,7 @@ impl From<VelosiAstUnit> for Symbol {
 /// Implementation fo the [From] trait for [Symbol]
 impl From<VelosiAstUnit> for VelosiAstType {
     fn from(unit: VelosiAstUnit) -> Self {
-        let name = unit.ident_as_rc_string();
+        let name = unit.ident().clone();
         VelosiAstType::new(VelosiAstTypeInfo::TypeRef(name), unit.loc().clone())
     }
 }
