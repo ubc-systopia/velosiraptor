@@ -137,7 +137,7 @@ pub fn main() {
 
         match matches.get_one::<String>("synth").map(|s| s.as_str()) {
             Some("all") => {
-                println!("Synthesizing ALL for unit {}", seg.ident_as_str());
+                println!("Synthesizing ALL for unit {}", seg.ident());
                 match synth.synthesize_all() {
                     Ok(p) => log::info!(target: "main", "Programs: {}", p),
                     Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
@@ -145,7 +145,7 @@ pub fn main() {
             }
 
             Some("map") => {
-                println!("Synthesizing MAP for unit {}", seg.ident_as_str());
+                println!("Synthesizing MAP for unit {}", seg.ident());
                 match synth.synthesize_map() {
                     Ok(p) => log::info!(target: "main", "Programs: {}", p),
                     Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
@@ -153,7 +153,7 @@ pub fn main() {
             }
 
             Some("unmap") => {
-                println!("Synthesizing UNMAP for unit {}", seg.ident_as_str());
+                println!("Synthesizing UNMAP for unit {}", seg.ident());
                 match synth.synthesize_unmap() {
                     Ok(p) => log::info!(target: "main", "Programs: {}", p),
                     Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
@@ -161,7 +161,7 @@ pub fn main() {
             }
 
             Some("protect") => {
-                println!("Synthesizing PROTECT for unit {}", seg.ident_as_str());
+                println!("Synthesizing PROTECT for unit {}", seg.ident());
                 match synth.synthesize_protect() {
                     Ok(p) => log::info!(target: "main", "Programs: {}", p),
                     Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
@@ -178,7 +178,7 @@ pub fn main() {
         }
         t_synth_segment.push(("Synthesis", Instant::now()));
 
-        t_synth.push((seg.ident_as_str(), t_synth_segment));
+        t_synth.push((seg.ident(), t_synth_segment));
     }
 
     let t_end = Instant::now();

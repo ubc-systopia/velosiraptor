@@ -132,7 +132,7 @@ impl SynthZ3 {
             log::warn!(target: "Z3Synth", "Enabling query logging");
             Some(self.outdir.clone())
         } else {
-            Some(self.outdir.clone())
+            None
         };
         let workerpool = Z3WorkerPool::with_num_workers(ncpu, logpath);
 
@@ -152,7 +152,7 @@ impl SynthZ3 {
                 log::warn!(target: "Z3Synth", "Enabling query logging");
                 Some(self.outdir.clone())
             } else {
-                Some(self.outdir.clone())
+                None
             };
             let workerpool = Z3WorkerPool::with_num_workers(self.ncpu, logpath);
             self.workerpool = Some(workerpool);
@@ -202,9 +202,7 @@ impl SynthZ3 {
 
         let z3 = self.workerpool.as_mut().unwrap();
 
-        let batch_size = std::cmp::max(5, z3.num_workers() * 3 / 4);
-
-        log::warn!("batch size: {}", batch_size);
+        let batch_size = std::cmp::max(3, z3.num_workers() * 3 / 4);
 
         // --------------------------------------------------------------------------------------
         // Submit queries for all of the three vmops
