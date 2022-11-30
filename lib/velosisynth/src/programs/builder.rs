@@ -64,7 +64,7 @@ impl ProgramsBuilder {
     pub fn add_field_slice(&mut self, field: &str, slice: &str, bits: usize) -> &mut Self {
         self.fields
             .entry(Arc::new(field.to_string()))
-            .or_insert(vec![])
+            .or_default()
             .push((Arc::new(slice.to_string()), bits));
         self
     }
@@ -173,7 +173,7 @@ impl ProgramsBuilder {
     }
 
     /// constructs new programs
-    pub fn construct_new_programs(&self) -> Vec<Program> {
+    pub fn construct_new_programs(&mut self) -> Vec<Program> {
         // get all the expression possibilities;
         let exprs = self.construct_expressions();
 
@@ -192,13 +192,16 @@ impl ProgramsBuilder {
 
         log::debug!(target : "[ProgramsBuilder]", "Expressions:");
         for (i, e) in exprs.iter().enumerate() {
-            log::debug!(target : "[ProgramsBuilder]", "  - {}: {:?}", i, e);
+            log::debug!(target : "[ProgramsBuilder]", "  - e{}: {:?}", i, e);
         }
 
         let mut fieldprograms = Vec::new();
 
         // a program must have some choice of things for each of the fields
-        for (field, slices) in &self.fields {
+        for (field, slices) in self.fields.iter_mut() {
+            // sort the slices
+            slices.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+
             let mut fieldops = Vec::with_capacity(exprs.len() * (1 + slices.len()));
 
             // write the entire field,
@@ -229,7 +232,8 @@ impl ProgramsBuilder {
                     sliceops.push(FieldSliceOp(s.clone(), exprs[*e].clone()));
                 }
 
-                if !sliceops.is_empty() {
+                // we need to set every slice, so we need to to match the dimensions
+                if sliceops.len() == slices.len() {
                     fieldops.push(FieldOp::InsertFieldSlices(sliceops));
                 }
             }
@@ -306,8 +310,8 @@ impl ProgramsBuilder {
         }
 
         log::info!(target : "[ProgramsBuilder]", "constructed {} programs", programs.len());
-        for p in programs.iter() {
-            log::debug!(target : "[ProgramsBuilder]", " - {}", p);
+        for (i, p) in programs.iter().enumerate() {
+            log::debug!(target : "[ProgramsBuilder]", "  - p{}: {:?}", i, p);
         }
 
         programs
