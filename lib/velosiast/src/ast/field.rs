@@ -23,38 +23,26 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! # VelosiAst -- Generif Field
+//! # VelosiAst -- Generic Field
 //!
 //! This module defines the State AST nodes of the langauge
 
+use crate::ast::VelosiAstFieldSlice;
+use std::rc::Rc;
 
-/// represents the generic part of a field
-struct VelosiAstField {
-    /// the name of the unit
-    pub ident: VelosiAstIdentifier,
-    /// the size of the field
-    pub size: u64,
-    /// layout of the field
-    pub layout: Vec<Rc<VelosiAstFieldSlice>>,
-    /// hashmap of the layout from slice name to slice
-    pub layout_map: HashMap<String, Rc<VelosiAstFieldSlice>>,
+pub trait VelosiAstField {
+    /// obtains a reference to the identifier
+    fn ident(&self) -> &Rc<String>;
+
+    /// obtains a copy of the identifer
+    fn ident_to_string(&self) -> String;
+
+    /// obtains a reference to the fully qualified path
+    fn path(&self) -> &Rc<String>;
+
+    /// obtains a copy of the fully qualified path
+    fn path_to_string(&self) -> String;
+
+    /// obtains the layout of the field
+    fn layout(&self) -> &[Rc<VelosiAstFieldSlice>];
 }
-
-/// represents a memory reference
-struct VelsiAstMemoryRef {
-    /// base this field is part of
-    pub base: VelosiAstIdentifier,
-    /// offset of this field within the base
-    pub offset: u64,
-}
-
-/// represents a memory field
-struct VelosiAstMemField {
-    field: VelosiAstField,
-    memref: VelsiAstMemoryRef,
-}
-
-/// represents a register field
-struct VelosiAstRegField(pub VelosiAstField);
-
-

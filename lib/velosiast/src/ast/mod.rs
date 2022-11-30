@@ -42,6 +42,7 @@ use crate::{ast_result_return, ast_result_unwrap, AstResult, SymbolTable};
 
 mod constdef;
 mod expr;
+mod field;
 mod flags;
 mod interface;
 mod map;
@@ -59,6 +60,7 @@ pub use expr::{
     VelosiAstQuantifier, VelosiAstQuantifierExpr, VelosiAstRangeExpr, VelosiAstSliceExpr,
     VelosiAstUnOp, VelosiAstUnOpExpr,
 };
+pub use field::VelosiAstField;
 pub use flags::VelosiAstFlags;
 pub use interface::{
     VelosiAstInterface, VelosiAstInterfaceAction, VelosiAstInterfaceField,
