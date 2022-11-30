@@ -1,6 +1,6 @@
-# Velosiparser Library
+# Velositynth Library
 
-This library implements the VelosiAst the AST for the Velosiraptor Specification Language source files (*.vrs).
+This library implements the the synthesis library for the velosiraptor project.
 
 ## License
 
