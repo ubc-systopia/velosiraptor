@@ -202,6 +202,11 @@ impl VelosiAstField for VelosiAstStateMemoryField {
     fn layout(&self) -> &[Rc<VelosiAstFieldSlice>] {
         self.layout.as_slice()
     }
+
+    /// the size of the field in bits
+    fn nbits(&self) -> u64 {
+        self.size * 8
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -314,6 +319,11 @@ impl VelosiAstField for VelosiAstStateRegisterField {
     /// obtains the layout of the field
     fn layout(&self) -> &[Rc<VelosiAstFieldSlice>] {
         self.layout.as_slice()
+    }
+
+    /// the size of the field in bits
+    fn nbits(&self) -> u64 {
+        self.size * 8
     }
 }
 
