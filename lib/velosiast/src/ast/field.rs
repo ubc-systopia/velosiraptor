@@ -45,4 +45,7 @@ pub trait VelosiAstField {
 
     /// obtains the layout of the field
     fn layout(&self) -> &[Rc<VelosiAstFieldSlice>];
+
+    /// the size of the field in bits
+    fn nbits(&self) -> u64;
 }

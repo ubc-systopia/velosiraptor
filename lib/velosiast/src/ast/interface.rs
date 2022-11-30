@@ -551,10 +551,6 @@ impl VelosiAstInterfaceMemoryField {
         ast_result_return!(VelosiAstInterfaceField::Memory(res), issues)
     }
 
-    pub fn nbits(&self) -> u64 {
-        self.size * 8
-    }
-
     pub fn mask(&self) -> u64 {
         let mut mask = 0;
         for slice in &self.layout {
@@ -588,6 +584,11 @@ impl VelosiAstField for VelosiAstInterfaceMemoryField {
     /// obtains the layout of the field
     fn layout(&self) -> &[Rc<VelosiAstFieldSlice>] {
         self.layout.as_slice()
+    }
+
+    /// the size of the field in bits
+    fn nbits(&self) -> u64 {
+        self.size * 8
     }
 }
 
@@ -775,10 +776,6 @@ impl VelosiAstInterfaceMmioField {
         self.ident.path.as_str().to_string()
     }
 
-    pub fn nbits(&self) -> u64 {
-        self.size * 8
-    }
-
     pub fn mask(&self) -> u64 {
         let mut mask = 0;
         for slice in &self.layout {
@@ -812,6 +809,11 @@ impl VelosiAstField for VelosiAstInterfaceMmioField {
     /// obtains the layout of the field
     fn layout(&self) -> &[Rc<VelosiAstFieldSlice>] {
         self.layout.as_slice()
+    }
+
+    /// the size of the field in bits
+    fn nbits(&self) -> u64 {
+        self.size * 8
     }
 }
 
@@ -984,10 +986,6 @@ impl VelosiAstInterfaceRegisterField {
         self.ident.path.as_str().to_string()
     }
 
-    pub fn nbits(&self) -> u64 {
-        self.size * 8
-    }
-
     pub fn mask(&self) -> u64 {
         let mut mask = 0;
         for slice in &self.layout {
@@ -1021,6 +1019,11 @@ impl VelosiAstField for VelosiAstInterfaceRegisterField {
     /// obtains the layout of the field
     fn layout(&self) -> &[Rc<VelosiAstFieldSlice>] {
         self.layout.as_slice()
+    }
+
+    /// the size of the field in bits
+    fn nbits(&self) -> u64 {
+        self.size * 8
     }
 }
 
@@ -1085,42 +1088,6 @@ pub enum VelosiAstInterfaceField {
 }
 
 impl VelosiAstInterfaceField {
-    /// obtains a reference to the identifier
-    pub fn ident(&self) -> &Rc<String> {
-        match self {
-            VelosiAstInterfaceField::Memory(field) => field.ident(),
-            VelosiAstInterfaceField::Register(field) => field.ident(),
-            VelosiAstInterfaceField::Mmio(field) => field.ident(),
-        }
-    }
-
-    /// obtains a copy of the identifer
-    pub fn ident_to_string(&self) -> String {
-        match self {
-            VelosiAstInterfaceField::Memory(field) => field.ident_to_string(),
-            VelosiAstInterfaceField::Register(field) => field.ident_to_string(),
-            VelosiAstInterfaceField::Mmio(field) => field.ident_to_string(),
-        }
-    }
-
-    /// obtains a reference to the fully qualified path
-    pub fn path(&self) -> &Rc<String> {
-        match self {
-            VelosiAstInterfaceField::Memory(field) => field.path(),
-            VelosiAstInterfaceField::Register(field) => field.path(),
-            VelosiAstInterfaceField::Mmio(field) => field.path(),
-        }
-    }
-
-    /// obtains a copy of the fully qualified path
-    pub fn path_to_string(&self) -> String {
-        match self {
-            VelosiAstInterfaceField::Memory(field) => field.path_to_string(),
-            VelosiAstInterfaceField::Register(field) => field.path_to_string(),
-            VelosiAstInterfaceField::Mmio(field) => field.path_to_string(),
-        }
-    }
-
     pub fn slice(&self, ident: &str) -> Option<&VelosiAstFieldSlice> {
         match self {
             VelosiAstInterfaceField::Memory(field) => {
@@ -1156,14 +1123,6 @@ impl VelosiAstInterfaceField {
             VelosiAstInterfaceField::Memory(field) => field.mask(),
             VelosiAstInterfaceField::Register(field) => field.mask(),
             VelosiAstInterfaceField::Mmio(field) => field.mask(),
-        }
-    }
-
-    pub fn layout_as_slice(&self) -> &[Rc<VelosiAstFieldSlice>] {
-        match self {
-            VelosiAstInterfaceField::Memory(field) => field.layout.as_slice(),
-            VelosiAstInterfaceField::Register(field) => field.layout.as_slice(),
-            VelosiAstInterfaceField::Mmio(field) => field.layout.as_slice(),
         }
     }
 
@@ -1217,6 +1176,62 @@ impl VelosiAstInterfaceField {
             Memory(pt) => VelosiAstInterfaceMemoryField::from_parse_tree(pt, st),
             Register(pt) => VelosiAstInterfaceRegisterField::from_parse_tree(pt, st),
             Mmio(pt) => VelosiAstInterfaceMmioField::from_parse_tree(pt, st),
+        }
+    }
+}
+
+impl VelosiAstField for VelosiAstInterfaceField {
+    /// obtains a reference to the identifier
+    fn ident(&self) -> &Rc<String> {
+        match self {
+            VelosiAstInterfaceField::Memory(field) => field.ident(),
+            VelosiAstInterfaceField::Register(field) => field.ident(),
+            VelosiAstInterfaceField::Mmio(field) => field.ident(),
+        }
+    }
+
+    /// obtains a copy of the identifer
+    fn ident_to_string(&self) -> String {
+        match self {
+            VelosiAstInterfaceField::Memory(field) => field.ident_to_string(),
+            VelosiAstInterfaceField::Register(field) => field.ident_to_string(),
+            VelosiAstInterfaceField::Mmio(field) => field.ident_to_string(),
+        }
+    }
+
+    /// obtains a reference to the fully qualified path
+    fn path(&self) -> &Rc<String> {
+        match self {
+            VelosiAstInterfaceField::Memory(field) => field.path(),
+            VelosiAstInterfaceField::Register(field) => field.path(),
+            VelosiAstInterfaceField::Mmio(field) => field.path(),
+        }
+    }
+
+    /// obtains a copy of the fully qualified path
+    fn path_to_string(&self) -> String {
+        match self {
+            VelosiAstInterfaceField::Memory(field) => field.path_to_string(),
+            VelosiAstInterfaceField::Register(field) => field.path_to_string(),
+            VelosiAstInterfaceField::Mmio(field) => field.path_to_string(),
+        }
+    }
+
+    /// obtains the layout of the field
+    fn layout(&self) -> &[Rc<VelosiAstFieldSlice>] {
+        match self {
+            VelosiAstInterfaceField::Memory(field) => field.layout.as_slice(),
+            VelosiAstInterfaceField::Register(field) => field.layout.as_slice(),
+            VelosiAstInterfaceField::Mmio(field) => field.layout.as_slice(),
+        }
+    }
+
+    /// the size of the field in bits
+    fn nbits(&self) -> u64 {
+        match self {
+            VelosiAstInterfaceField::Memory(field) => field.nbits(),
+            VelosiAstInterfaceField::Register(field) => field.nbits(),
+            VelosiAstInterfaceField::Mmio(field) => field.nbits(),
         }
     }
 }
@@ -1376,7 +1391,7 @@ impl VelosiAstInterfaceDef {
     ) -> HashSet<Rc<String>> {
         let mut if_bits = HashMap::new();
         for f in &self.fields {
-            for l in f.layout_as_slice() {
+            for l in f.layout() {
                 if_bits.insert(l.path().clone(), l.mask());
             }
         }
