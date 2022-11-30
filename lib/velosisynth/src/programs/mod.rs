@@ -410,20 +410,18 @@ impl FieldOp {
         }
     }
 
-    /// Checks whether the `other` would overwrite the effect of `self`
-    pub fn would_overwrite(&self, other: &Self) -> bool {
+    pub fn merge_field_slices(&mut self, other: Self) {
         use FieldOp::*;
-        match (self, other) {
-            (InsertField(_), InsertField(_)) => true,
-            (InsertFieldSlices(_), InsertField(_)) => true,
-            (InsertFieldSlices(a), InsertFieldSlices(b)) => {
-                if a.len() != b.len() {
-                    return false;
+
+        if let (InsertFieldSlices(ex_ops), InsertFieldSlices(b)) = (self, other) {
+            for new_op in b.into_iter() {
+                // if there is any existing operation on the same slice, continue
+                if ex_ops.iter().any(|a| a.0 == new_op.0) {
+                    continue;
                 }
-                // if all slice elements are the same
-                a.iter().zip(b.iter()).all(|(a, b)| a.0 == b.0)
+                // add the new operation to the
+                ex_ops.push(new_op);
             }
-            _ => false,
         }
     }
 
@@ -518,7 +516,7 @@ impl From<&FieldActions> for Vec<Operation> {
 impl Display for FieldActions {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         for a in self.1.iter() {
-            writeln!(f, "{}.{:?};", self.0, a)?;
+            write!(f, "{}.{:?}; ", self.0, a)?;
         }
         Ok(())
     }
@@ -625,89 +623,73 @@ impl Program {
     /// Merges two programs together
     ///
     /// This combines two programs by merging the respective field actions together
+    ///
+    /// XXX: this doesn't account for two independent actions on the same field that
+    ///      need to be taken.
     pub fn merge(mut self, other: &Self) -> Self {
-        let mut ops: HashMap<Arc<String>, Vec<FieldOp>> = HashMap::new();
+        // merge the two programs by combining the field actions
+        let mut field_operations: HashMap<Arc<String>, Vec<FieldOp>> = HashMap::new();
+
+        log::debug!("MERGE:");
+        log::debug!("  {:?}", self);
+        log::debug!("  {:?}", other);
 
         // struct FieldActions(Arc<String>, Vec<Arc<FieldOp>>);
         for op in self.0.iter() {
-            if let Some(x) = ops.get_mut(&op.0) {
+            if let Some(x) = field_operations.get_mut(&op.0) {
+                // insert the field actions into the map by extending the current one
                 x.extend(op.1.clone());
             } else {
-                ops.insert(op.0.clone(), op.1.clone());
+                // simply insert all actions of the current one
+                field_operations.insert(op.0.clone(), op.1.clone());
             }
         }
 
         for op in other.0.iter() {
-            if let Some(x) = ops.get_mut(&op.0) {
-                for o in op.1.iter() {
-                    if !x.contains(o) {
-                        x.push(o.clone());
-                    }
-                }
-            //    x.push(op.1.clone());
-            } else {
-                ops.insert(op.0.clone(), op.1.clone());
-            }
-        }
-
-        let mut newops = Vec::new();
-
-        for (fld, fops) in ops.iter_mut() {
-            let mut fieldops: Vec<FieldOp> = Vec::new();
-            let mut sliceops = Vec::new();
-            for fop in fops {
-                match fop {
-                    // FieldOp::InsertField(a) => {
-                    //     if !sliceops.is_empty() {
-                    //         let sops = FieldOp::InsertFieldSlices(sliceops.clone());
-                    //         newops.push(FieldActions(fld.clone(), Arc::new(sops)));
-                    //         sliceops.clear();
-                    //     }
-                    //     newops.push(Arc::new(FieldActions(fld.clone(), fop.clone())));
-                    // }
-                    FieldOp::InsertFieldSlices(slices) => {
-                        sliceops.extend(slices.clone());
+            if let Some(existing_ops) = field_operations.get_mut(&op.0) {
+                // merge the field actions, for all other actions just insert the ones that
+                for other_op in op.1.iter() {
+                    use FieldOp::*;
+                    // if the new op is basically writing the entire field, then don't do anything
+                    if matches!(other_op, InsertField(_) | ReadAction) {
+                        continue;
                     }
 
-                    _ => {
-                        if !sliceops.is_empty() {
-                            let sops = FieldOp::InsertFieldSlices(sliceops.clone());
-                            fieldops.push(sops);
-                            sliceops.clear();
-                        } else {
-                            if fieldops.contains(fop) {
-                                continue;
-                            }
-                            fieldops.push(fop.clone());
+                    if existing_ops.len() > 2 {
+                        panic!("handle me: too many operations on a field");
+                    }
+
+                    let last = existing_ops.last_mut().unwrap();
+                    match last {
+                        InsertField(_) => existing_ops.push(other_op.clone()),
+                        ReadAction => existing_ops.push(other_op.clone()),
+                        InsertFieldSlices(_) => {
+                            last.merge_field_slices(other_op.clone());
                         }
-
-                        // if let Some(x) = fieldops.last() {
-                        //     if x.as_ref() == fld.as_ref() && x.1.contains(fop) {
-                        //         continue;
-                        //     }
-                        // } else {
-
-                        // }
-                        // newops.push(Arc::new(FieldActions(fld.clone(), vec![fop.clone()])));
                     }
                 }
+            } else {
+                // simply insert all actions of the current one
+                field_operations.insert(op.0.clone(), op.1.clone());
             }
-
-            if !sliceops.is_empty() {
-                let sops = FieldOp::InsertFieldSlices(sliceops);
-                fieldops.push(sops);
-            }
-
-            newops.push(Arc::new(FieldActions(fld.clone(), fieldops)));
         }
 
-        self.0 = newops;
+        // by now we should have all field programs ready
 
-        // for op in other.ops.iter() {
-        //     if !self.ops.contains(&op) {
-        //         self.ops.push(op.clone());
-        //     }
-        // }
+        for fop in self.0.iter_mut() {
+            let fld = fop.0.clone();
+            let ops = field_operations.remove(&fld).unwrap();
+            *fop = Arc::new(FieldActions(fld.clone(), ops))
+        }
+
+        for fop in other.0.iter() {
+            if let Some(ops) = field_operations.remove(&fop.0) {
+                let fld = fop.0.clone();
+                self.0.push(Arc::new(FieldActions(fld, ops)))
+            }
+        }
+
+        log::debug!("  {:?}", self);
         self
     }
 }
@@ -733,7 +715,7 @@ impl From<Program> for Vec<Operation> {
 impl Display for Program {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         for a in self.0.iter() {
-            writeln!(f, "{};", a)?;
+            writeln!(f, "{}", a)?;
         }
         Ok(())
     }
