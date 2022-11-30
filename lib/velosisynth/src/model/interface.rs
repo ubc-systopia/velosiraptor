@@ -26,6 +26,7 @@
 //! State Synthesis Module: Z3
 
 use smt2::{DataType, Smt2Context};
+use velosiast::ast::VelosiAstField;
 use velosiast::ast::VelosiAstInterface;
 
 use super::field::{add_iface_field, add_iface_field_accessors};
