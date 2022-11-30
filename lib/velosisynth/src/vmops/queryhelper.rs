@@ -293,7 +293,7 @@ where
             .iter()
             .enumerate()
             .fold(Program::new(), |prog, (i, e)| {
-                prog.merge(&self.programs[i][*e])
+                prog.merge(&self.programs[i][*e].clone())
             });
 
         MaybeResult::Some(prog)

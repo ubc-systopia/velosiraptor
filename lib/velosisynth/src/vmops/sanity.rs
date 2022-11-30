@@ -60,11 +60,11 @@ fn check_precondition_pair(
     smt.variable(VarDecl::new("flgs".to_string(), types::flags()));
     smt.variable(VarDecl::new("pa".to_string(), types::paddr()));
 
-    // smt.comment(format!("{}: {}", fn_1.ident_as_str(), p1));
+    // smt.comment(format!("{}: {}", fn_1.ident(), p1));
     let name1 = format!("fn_1-{}", i1);
     smt.assert(Term::named(expr::expr_to_smt2(p1, "st"), name1));
 
-    // smt.comment(format!("{}: {}", fn_2.ident_as_str(), p2));
+    // smt.comment(format!("{}: {}", fn_2.ident(), p2));
     let name2 = format!("fn_2-{}", i2);
     smt.assert(Term::named(expr::expr_to_smt2(p2, "st"), name2));
 

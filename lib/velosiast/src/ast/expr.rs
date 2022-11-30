@@ -743,11 +743,12 @@ impl Display for VelosiAstQuantifierExpr {
 /// Represents an identifier literal expression
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstIdentLiteralExpr {
-    pub path: Vec<VelosiAstIdentifier>,
-    pub name: Rc<String>,
+    pub ident: VelosiAstIdentifier,
     pub etype: VelosiAstTypeInfo,
     pub loc: VelosiTokenStream,
 }
+
+use core::str::Split;
 
 impl VelosiAstIdentLiteralExpr {
     pub fn new(
@@ -755,18 +756,12 @@ impl VelosiAstIdentLiteralExpr {
         etype: VelosiAstTypeInfo,
         loc: VelosiTokenStream,
     ) -> Self {
-        let name = Rc::new(
-            path.iter()
-                .map(|p| p.name.as_str())
-                .collect::<Vec<&str>>()
-                .join("."),
-        );
-        VelosiAstIdentLiteralExpr {
-            path,
-            name,
-            etype,
-            loc,
+        let mut ident = path.first().unwrap().clone();
+        for p in path.into_iter().skip(1) {
+            ident.extend(p);
         }
+
+        VelosiAstIdentLiteralExpr { ident, etype, loc }
     }
 
     pub fn with_name(name: String, ptype: VelosiAstTypeInfo) -> Self {
@@ -791,10 +786,10 @@ impl VelosiAstIdentLiteralExpr {
 
         let mut litexpr = VelosiAstIdentLiteralExpr::new(path, VelosiAstTypeInfo::Integer, p.loc);
 
-        let tname = litexpr.name.as_str();
+        let tname = litexpr.path();
         let sym = st.lookup(tname);
         if sym.is_none() {
-            let err = VelosiAstErrUndef::new(litexpr.name.clone(), litexpr.loc.clone());
+            let err = VelosiAstErrUndef::new(litexpr.ident().clone(), litexpr.loc.clone());
             return AstResult::Issues(VelosiAstExpr::IdentLiteral(litexpr), err.into());
         }
 
@@ -823,7 +818,7 @@ impl VelosiAstIdentLiteralExpr {
             _ => {
                 // we have the wrong kind of symbol
                 let err = VelosiAstErrUndef::with_other(
-                    litexpr.name.clone(),
+                    litexpr.path().clone(),
                     litexpr.loc.clone(),
                     sym.loc().clone(),
                 );
@@ -833,7 +828,7 @@ impl VelosiAstIdentLiteralExpr {
     }
 
     pub fn flatten(self, st: &mut SymbolTable) -> VelosiAstExpr {
-        let sym = st.lookup(self.name.as_str());
+        let sym = st.lookup(self.path());
         if let Some(sym) = sym {
             match &sym.ast_node {
                 VelosiAstNode::Const(c) => c.value.clone(),
@@ -848,43 +843,55 @@ impl VelosiAstIdentLiteralExpr {
         &self.etype
     }
 
-    pub fn ident_as_rc_string(&self) -> Rc<String> {
-        self.name.clone()
+    /// obtains a reference to the identifier
+    pub fn ident(&self) -> &Rc<String> {
+        self.ident.ident()
     }
 
-    pub fn ident_as_str(&self) -> &str {
-        self.name.as_str()
-    }
-
+    /// obtains a copy of the identifer
     pub fn ident_to_string(&self) -> String {
-        self.name.to_string()
+        self.ident.as_str().to_string()
+    }
+
+    /// obtains a reference to the fully qualified path
+    pub fn path(&self) -> &Rc<String> {
+        &self.ident.path
+    }
+
+    pub fn path_split(&'_ self) -> Split<&'_ str> {
+        self.ident.path_split()
+    }
+
+    /// obtains a copy of the fully qualified path
+    pub fn path_to_string(&self) -> String {
+        self.ident.path.as_str().to_string()
     }
 
     pub fn get_interface_references(&self, irefs: &mut HashSet<Rc<String>>) {
         if self.has_interface_references() {
-            irefs.insert(self.name.clone());
+            irefs.insert(self.path().clone());
         }
     }
 
     pub fn get_state_references(&self, srefs: &mut HashSet<Rc<String>>) {
         if self.has_state_references() {
-            srefs.insert(self.name.clone());
+            srefs.insert(self.path().clone());
         }
     }
 
     pub fn has_state_references(&self) -> bool {
-        self.name.as_str().starts_with("state")
+        self.path().starts_with("state")
     }
 
     pub fn has_interface_references(&self) -> bool {
-        self.name.as_str().starts_with("interface")
+        self.path().starts_with("interface")
     }
 }
 
 /// Implementation of [Display] for [VelosiAstIdentLiteralExpr]
 impl Display for VelosiAstIdentLiteralExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
-        write!(format, "{}", self.name)
+        write!(format, "{}", self.ident())
     }
 }
 
@@ -997,7 +1004,7 @@ impl Display for VelosiAstBoolLiteralExpr {
 /// Represents an boolean literal expression
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstFnCallExpr {
-    pub name: VelosiAstIdentifier,
+    pub ident: VelosiAstIdentifier,
     pub args: Vec<VelosiAstExpr>,
     pub etype: VelosiAstTypeInfo,
     pub loc: VelosiTokenStream,
@@ -1005,13 +1012,13 @@ pub struct VelosiAstFnCallExpr {
 
 impl VelosiAstFnCallExpr {
     pub fn new(
-        name: VelosiAstIdentifier,
+        ident: VelosiAstIdentifier,
         args: Vec<VelosiAstExpr>,
         etype: VelosiAstTypeInfo,
         loc: VelosiTokenStream,
     ) -> Self {
         VelosiAstFnCallExpr {
-            name,
+            ident,
             args,
             etype,
             loc,
@@ -1048,10 +1055,10 @@ impl VelosiAstFnCallExpr {
             pt.loc,
         );
 
-        let fn_sym = st.lookup(res.name.as_str());
+        let fn_sym = st.lookup(res.path());
         if fn_sym.is_none() {
             // there was no symbol
-            let err = VelosiAstErrUndef::new(res.name.name.clone(), res.loc.clone());
+            let err = VelosiAstErrUndef::new(res.path().clone(), res.loc.clone());
             return AstResult::Issues(res, err.into());
         }
 
@@ -1073,12 +1080,12 @@ impl VelosiAstFnCallExpr {
                     u.params_as_slice(),
                     res.args.as_slice(),
                 );
-                res.etype = VelosiAstTypeInfo::TypeRef(u.ident_as_rc_string());
+                res.etype = VelosiAstTypeInfo::TypeRef(u.ident().clone());
             }
             _ => {
                 // we have the wrong kind of symbol
                 let err = VelosiAstErrUndef::with_other(
-                    res.name.name.clone(),
+                    res.ident().clone(),
                     res.loc.clone(),
                     fn_sym.loc().clone(),
                 );
@@ -1087,6 +1094,26 @@ impl VelosiAstFnCallExpr {
         }
 
         ast_result_return!(res, issues)
+    }
+
+    /// obtains a reference to the identifier
+    pub fn ident(&self) -> &Rc<String> {
+        self.ident.ident()
+    }
+
+    /// obtains a copy of the identifer
+    pub fn ident_to_string(&self) -> String {
+        self.ident.as_str().to_string()
+    }
+
+    /// obtains a reference to the fully qualified path
+    pub fn path(&self) -> &Rc<String> {
+        &self.ident.path
+    }
+
+    /// obtains a copy of the fully qualified path
+    pub fn path_to_string(&self) -> String {
+        self.ident.path.as_str().to_string()
     }
 
     pub fn flatten(self, st: &mut SymbolTable) -> VelosiAstExpr {
@@ -1126,7 +1153,7 @@ impl VelosiAstFnCallExpr {
 
 impl Display for VelosiAstFnCallExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
-        write!(format, "{}(", self.name.as_str())?;
+        write!(format, "{}(", self.ident())?;
         for (i, p) in self.args.iter().enumerate() {
             if i != 0 {
                 write!(format, ".")?;
@@ -1374,18 +1401,18 @@ impl Display for VelosiAstRangeExpr {
 /// Represents an boolean literal expression
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstSliceExpr {
-    pub name: VelosiAstIdentLiteralExpr,
+    pub ident: VelosiAstIdentLiteralExpr,
     pub range: VelosiAstRangeExpr,
     pub loc: VelosiTokenStream,
 }
 
 impl VelosiAstSliceExpr {
     pub fn new(
-        name: VelosiAstIdentLiteralExpr,
+        ident: VelosiAstIdentLiteralExpr,
         range: VelosiAstRangeExpr,
         loc: VelosiTokenStream,
     ) -> Self {
-        VelosiAstSliceExpr { name, range, loc }
+        VelosiAstSliceExpr { ident, range, loc }
     }
     pub fn from_parse_tree(
         pt: VelosiParseTreeSliceExpr,
@@ -1415,7 +1442,7 @@ impl VelosiAstSliceExpr {
 
     pub fn flatten(self, st: &mut SymbolTable) -> VelosiAstExpr {
         if let VelosiAstExpr::Range(x) = self.range.flatten(st) {
-            VelosiAstExpr::Slice(Self::new(self.name, x, self.loc))
+            VelosiAstExpr::Slice(Self::new(self.ident, x, self.loc))
         } else {
             unreachable!("should always return a range expression")
         }
@@ -1425,34 +1452,42 @@ impl VelosiAstSliceExpr {
         &VelosiAstTypeInfo::Integer
     }
 
-    pub fn ident_as_rc_string(&self) -> Rc<String> {
-        self.name.ident_as_rc_string()
+    /// obtains a reference to the identifier
+    pub fn ident(&self) -> &Rc<String> {
+        self.ident.ident()
     }
 
-    pub fn ident_as_str(&self) -> &str {
-        self.name.ident_as_str()
-    }
-
+    /// obtains a copy of the identifer
     pub fn ident_to_string(&self) -> String {
-        self.name.ident_to_string()
+        self.ident.ident_to_string()
+    }
+
+    /// obtains a reference to the fully qualified path
+    pub fn path(&self) -> &Rc<String> {
+        self.ident.path()
+    }
+
+    /// obtains a copy of the fully qualified path
+    pub fn path_to_string(&self) -> String {
+        self.ident.path_to_string()
     }
 
     pub fn get_interface_references(&self, irefs: &mut HashSet<Rc<String>>) {
-        self.name.get_interface_references(irefs);
+        self.ident.get_interface_references(irefs);
         self.range.get_interface_references(irefs);
     }
 
     pub fn get_state_references(&self, srefs: &mut HashSet<Rc<String>>) {
-        self.name.get_state_references(srefs);
+        self.ident.get_state_references(srefs);
         self.range.get_state_references(srefs);
     }
 
     pub fn has_state_references(&self) -> bool {
-        self.name.has_state_references() || self.range.has_state_references()
+        self.ident.has_state_references() || self.range.has_state_references()
     }
 
     pub fn has_interface_references(&self) -> bool {
-        self.name.has_interface_references() || self.range.has_interface_references()
+        self.ident.has_interface_references() || self.range.has_interface_references()
     }
 }
 
@@ -1461,7 +1496,9 @@ impl Display for VelosiAstSliceExpr {
         write!(
             format,
             "{}[{}..{}]",
-            self.name, self.range.start, self.range.end
+            self.path(),
+            self.range.start,
+            self.range.end
         )
     }
 }

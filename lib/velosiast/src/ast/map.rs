@@ -180,14 +180,14 @@ impl VelosiAstStaticMapListComp {
 
         let mut elms = Vec::new();
         for i in range.start..range.end {
-            elms.push(elm.from_self_with_var_value(st, var.ident_as_str(), i))
+            elms.push(elm.from_self_with_var_value(st, var.ident(), i))
         }
 
         // check the elements for overlaps
         utils::check_element_ranges(&mut issues, st, elms.as_slice());
 
         let mut inputbits = 64;
-        if let Some(u) = st.lookup(elm.dst.name.as_str()) {
+        if let Some(u) = st.lookup(elm.dst.path()) {
             if let VelosiAstNode::Unit(u) = &u.ast_node {
                 inputbits = u.input_bitwidth() + numbits;
                 if inputbits >= 64 {

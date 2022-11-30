@@ -192,16 +192,24 @@ impl VelosiAstMethod {
         )
     }
 
-    pub fn ident_as_rc_string(&self) -> Rc<String> {
-        self.ident.name.clone()
+    /// obtains a reference to the identifier
+    pub fn ident(&self) -> &Rc<String> {
+        self.ident.ident()
     }
 
-    pub fn ident_as_str(&self) -> &str {
-        self.ident.name.as_str()
-    }
-
+    /// obtains a copy of the identifer
     pub fn ident_to_string(&self) -> String {
-        self.ident.name.to_string()
+        self.ident.as_str().to_string()
+    }
+
+    /// obtains a reference to the fully qualified path
+    pub fn path(&self) -> &Rc<String> {
+        &self.ident.path
+    }
+
+    /// obtains a copy of the fully qualified path
+    pub fn path_to_string(&self) -> String {
+        self.ident.path.as_str().to_string()
     }
 
     // converts the parse tree node into an ast node, performing checks
@@ -253,7 +261,7 @@ impl VelosiAstMethod {
 
                 if let Some(flags) = flags {
                     // add the flags to the symbol table
-                    flags.populate_symboltable(param.ident_as_str(), st);
+                    flags.populate_symboltable(param.ident(), st);
                 }
             }
 
@@ -430,9 +438,9 @@ impl VelosiAstMethod {
                 issues.push(err);
                 continue;
             }
-            if p.ident_as_str() != params[i].0 {
+            if p.ident().as_str() != params[i].0 {
                 let msg = format!("mismatch of parameter name in special method: `{}`", sig);
-                let hint = format!("expected {}, found {}", params[i].0, p.ident_as_str());
+                let hint = format!("expected {}, found {}", params[i].0, p.ident());
                 let err = VelosiAstErrBuilder::err(msg)
                     .add_hint(hint)
                     .add_location(p.loc.clone())
@@ -453,7 +461,7 @@ impl VelosiAstMethod {
     }
 
     fn check_special_methods(&self, issues: &mut VelosiAstIssues) {
-        match self.ident_as_str() {
+        match self.ident().as_str() {
             "translate" => {
                 self.check_rettype(issues, FN_SIG_TRANSLATE, VelosiAstTypeInfo::PhysAddr);
                 self.check_arguments_exact(
@@ -569,7 +577,7 @@ impl VelosiAstMethod {
         self.params
             .iter()
             .filter(|p| p.ptype.is_flags())
-            .map(|p| p.ident_as_rc_string())
+            .map(|p| p.ident().clone())
             .collect()
     }
 }
@@ -578,14 +586,14 @@ impl VelosiAstMethod {
 impl From<Rc<VelosiAstMethod>> for Symbol {
     fn from(c: Rc<VelosiAstMethod>) -> Self {
         let n = VelosiAstNode::Method(c.clone());
-        Symbol::new(c.ident_as_rc_string(), c.rtype.clone(), n)
+        Symbol::new(c.path().clone(), c.rtype.clone(), n)
     }
 }
 
 /// Implementation of [Display] for [VelosiAstMethod]
 impl Display for VelosiAstMethod {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "  fn {}(", self.ident_as_str())?;
+        write!(f, "  fn {}(", self.ident())?;
         for (i, p) in self.params.iter().enumerate() {
             if i > 0 {
                 write!(f, ", ")?;

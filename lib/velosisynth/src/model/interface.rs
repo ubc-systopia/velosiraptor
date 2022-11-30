@@ -49,8 +49,8 @@ pub fn add_interface_def(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
     dt.add_comment(format!("Interface Definition, {}", iface.loc().loc()));
     for field in iface.fields() {
         dt.add_field(
-            format!("IFace.{}", field.ident_as_str().split('.').last().unwrap()),
-            types::field_type(IFACE_PREFIX, field.ident_as_str()),
+            format!("IFace.{}", field.ident().split('.').last().unwrap()),
+            types::field_type(IFACE_PREFIX, field.ident()),
         );
     }
 

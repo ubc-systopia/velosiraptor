@@ -109,20 +109,24 @@ impl VelosiAstFieldSlice {
         ast_result_return!(Self::new(ident, pt.start, pt.end, pt.loc), issues)
     }
 
-    pub fn ident_as_str(&self) -> &str {
-        self.ident.name.as_str()
+    /// obtains a reference to the identifier
+    pub fn ident(&self) -> &Rc<String> {
+        self.ident.ident()
     }
 
-    pub fn ident_as_rc_string(&self) -> Rc<String> {
-        self.ident.name.clone()
-    }
-
+    /// obtains a copy of the identifer
     pub fn ident_to_string(&self) -> String {
-        self.ident.name.to_string()
+        self.ident.as_str().to_string()
     }
 
-    pub fn nbits(&self) -> u64 {
-        self.end - self.start
+    /// obtains a reference to the fully qualified path
+    pub fn path(&self) -> &Rc<String> {
+        &self.ident.path
+    }
+
+    /// obtains a copy of the fully qualified path
+    pub fn path_to_string(&self) -> String {
+        self.ident.path.as_str().to_string()
     }
 
     /// constructs the mask value of the bit slice
@@ -133,19 +137,23 @@ impl VelosiAstFieldSlice {
         }
         mask
     }
+
+    pub fn nbits(&self) -> u64 {
+        self.end - self.start
+    }
 }
 
 /// Implementation fo the [From] trait for [Symbol] for conversion to symbol
 impl From<Rc<VelosiAstFieldSlice>> for Symbol {
     fn from(f: Rc<VelosiAstFieldSlice>) -> Self {
         let n = VelosiAstNode::StateFieldSlice(f.clone());
-        Symbol::new(f.ident_as_rc_string(), VelosiAstType::new_int(), n)
+        Symbol::new(f.path().clone(), VelosiAstType::new_int(), n)
     }
 }
 
 /// Implementation of [Display] for [VelosiAstFieldSlice]
 impl Display for VelosiAstFieldSlice {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "{}..{} {}", self.start, self.end, self.ident.as_str())
+        write!(f, "{}..{} {}", self.start, self.end, self.path())
     }
 }

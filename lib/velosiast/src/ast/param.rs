@@ -62,16 +62,24 @@ impl VelosiAstParam {
         )
     }
 
-    pub fn ident_as_str(&self) -> &str {
-        self.ident.name.as_str()
+    /// obtains a reference to the identifier
+    pub fn ident(&self) -> &Rc<String> {
+        self.ident.ident()
     }
 
-    pub fn ident_as_rc_string(&self) -> Rc<String> {
-        self.ident.name.clone()
-    }
-
+    /// obtains a copy of the identifer
     pub fn ident_to_string(&self) -> String {
-        self.ident.name.to_string()
+        self.ident.as_str().to_string()
+    }
+
+    /// obtains a reference to the fully qualified path
+    pub fn path(&self) -> &Rc<String> {
+        &self.ident.path
+    }
+
+    /// obtains a copy of the fully qualified path
+    pub fn path_to_string(&self) -> String {
+        self.ident.path.as_str().to_string()
     }
 
     // converts the parse tree node into an ast node, performing checks
@@ -127,13 +135,13 @@ impl VelosiAstParam {
 impl From<Rc<VelosiAstParam>> for Symbol {
     fn from(c: Rc<VelosiAstParam>) -> Self {
         let n = VelosiAstNode::Param(c.clone());
-        Symbol::new(c.ident_as_rc_string(), c.ptype.clone(), n)
+        Symbol::new(c.path().clone(), c.ptype.clone(), n)
     }
 }
 
 /// Implementation of [Display] for [VelosiAstParam]
 impl Display for VelosiAstParam {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "{}: {}", self.ident_as_str(), self.ptype)
+        write!(f, "{}: {}", self.ident(), self.ptype)
     }
 }

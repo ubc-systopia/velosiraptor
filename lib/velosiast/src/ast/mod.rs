@@ -111,49 +111,86 @@ impl VelosiAstNode {
 /// represents an identifier token
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstIdentifier {
-    pub name: Rc<String>,
+    /// the identifier
+    pub ident: Rc<String>,
+    /// the path as a fully formatted string
+    pub path: Rc<String>,
+    /// the location of the identifier in the source pos
     pub loc: VelosiTokenStream,
 }
 
+/// the path separator
+pub const IDENT_PATH_SEP: &str = ".";
+
+use core::str::Split;
+
 impl VelosiAstIdentifier {
     /// creates a new identifier token
-    pub fn new(name: String, loc: VelosiTokenStream) -> Self {
-        Self {
-            name: Rc::new(name),
-            loc,
-        }
+    fn new(prefix: &str, name: String, loc: VelosiTokenStream) -> Self {
+        let ident = Rc::new(name.clone());
+        let path = if prefix.is_empty() {
+            ident.clone()
+        } else {
+            let path = format!("{}{}{}", prefix, IDENT_PATH_SEP, name);
+            Rc::new(path)
+        };
+
+        Self { ident, path, loc }
     }
 
+    /// creates a new identifier from the give name
     pub fn with_name(name: String) -> Self {
-        Self::new(name, VelosiTokenStream::default())
+        Self::new("", name, VelosiTokenStream::default())
     }
 
+    pub fn extend(&mut self, other: Self) -> &mut Self {
+        self.ident = Rc::new(format!("{}{}{}", self.ident, IDENT_PATH_SEP, other.ident));
+        self.path = Rc::new(format!("{}{}{}", self.path, IDENT_PATH_SEP, other.path));
+        self.loc.expand_until_end(&other.loc);
+        self
+    }
+
+    /// convert the parse tree identifier to a ast identifier with the given prefix
     pub fn from_parse_tree_with_prefix(pt: VelosiParseTreeIdentifier, prefix: &str) -> Self {
-        let s = format!("{}.{}", prefix, pt.name);
-        Self::new(s, pt.loc)
+        Self::new(prefix, pt.name, pt.loc)
     }
 
+    /// obtains a reference to the identifier string
+    pub fn ident(&self) -> &Rc<String> {
+        &self.ident
+    }
+
+    /// return the identifier as a string slice
     pub fn as_str(&self) -> &str {
-        self.name.as_str()
+        self.ident.as_str()
+    }
+
+    /// obtains the path as a string
+    pub fn path(&self) -> &Rc<String> {
+        &self.path
+    }
+
+    pub fn path_split(&'_ self) -> Split<&'_ str> {
+        self.path.split(IDENT_PATH_SEP)
     }
 }
 
 impl From<&str> for VelosiAstIdentifier {
     fn from(id: &str) -> Self {
-        Self::new(id.to_string(), VelosiTokenStream::default())
+        Self::with_name(id.to_string())
     }
 }
 
 impl From<VelosiParseTreeIdentifier> for VelosiAstIdentifier {
     fn from(id: VelosiParseTreeIdentifier) -> Self {
-        Self::new(id.name, id.loc)
+        Self::new("", id.name, id.loc)
     }
 }
 
 /// Implementation of the [Display] trait for [VelosiAstIdentifier]
 impl Display for VelosiAstIdentifier {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
-        write!(f, "{}", self.name)
+        write!(f, "{}", self.path)
     }
 }
 
