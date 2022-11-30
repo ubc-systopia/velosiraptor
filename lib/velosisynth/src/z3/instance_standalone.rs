@@ -138,7 +138,7 @@ impl Z3Instance {
 
     ///executes the query
     pub fn exec(&mut self, ticket: Z3Ticket, query: &mut Z3Query) -> Result<Z3Result, Z3Error> {
-        log::trace!(target : "[Z3Instance]", "{} executing query", self.id);
+        log::debug!(target : "[Z3Instance]", "{} executing query", self.id);
 
         let t_start = Instant::now();
 

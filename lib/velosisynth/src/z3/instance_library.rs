@@ -170,7 +170,7 @@ impl Z3Instance {
 
     ///executes the query
     pub fn exec(&mut self, _ticket: Z3Ticket, query: &mut Z3Query) -> Result<Z3Result, Z3Error> {
-        log::info!(target : "[Z3Instance]", "{} executing query", self.id);
+        log::trace!(target : "[Z3Instance]", "{} executing query", self.id);
 
         let t_start = Instant::now();
 
@@ -209,13 +209,13 @@ impl Z3Instance {
         self.t_prepare += t_prepare.duration_since(t_start).as_millis() as u64;
         self.t_query += t_query.duration_since(t_prepare).as_millis() as u64;
 
-        log::info!(target : "[Z3Instance]", "{} query result is '{}'", self.id, result);
+        log::trace!(target : "[Z3Instance]", "{} query result is '{}'", self.id, result);
         Ok(Z3Result::new(result))
     }
 
     ///executes the query
     pub fn exec_shared(&mut self, query: &Z3Query) -> Result<Z3Result, Z3Error> {
-        log::info!(target : "[Z3Instance]", "{} executing shared query", self.id);
+        log::trace!(target : "[Z3Instance]", "{} executing shared query", self.id);
 
         let t_start = Instant::now();
 
@@ -254,7 +254,7 @@ impl Z3Instance {
         self.t_prepare += t_prepare.duration_since(t_start).as_millis() as u64;
         self.t_query += t_query.duration_since(t_prepare).as_millis() as u64;
 
-        log::info!(target : "[Z3Instance]", "{} query result is '{}'", self.id, result);
+        log::trace!(target : "[Z3Instance]", "{} query result is '{}'", self.id, result);
 
         Ok(Z3Result::new(result))
     }
