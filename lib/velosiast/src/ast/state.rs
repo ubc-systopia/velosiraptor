@@ -39,7 +39,7 @@ use velosiparser::{
 use crate::ast::VelosiAstIdentifier;
 use crate::ast::{
     types::{VelosiAstType, VelosiAstTypeInfo},
-    VelosiAstFieldSlice, VelosiAstNode, VelosiAstParam,
+    VelosiAstField, VelosiAstFieldSlice, VelosiAstNode, VelosiAstParam,
 };
 use crate::error::{VelosiAstErrBuilder, VelosiAstErrUndef, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
@@ -143,26 +143,6 @@ impl VelosiAstStateMemoryField {
         ast_result_return!(VelosiAstStateField::Memory(res), issues)
     }
 
-    /// obtains a reference to the identifier
-    pub fn ident(&self) -> &Rc<String> {
-        self.ident.ident()
-    }
-
-    /// obtains a copy of the identifer
-    pub fn ident_to_string(&self) -> String {
-        self.ident.as_str().to_string()
-    }
-
-    /// obtains a reference to the fully qualified path
-    pub fn path(&self) -> &Rc<String> {
-        &self.ident.path
-    }
-
-    /// obtains a copy of the fully qualified path
-    pub fn path_to_string(&self) -> String {
-        self.ident.path.as_str().to_string()
-    }
-
     /// obtains a bitmask for the refrenced slices in the supplied refs
     pub fn get_slice_mask_for_refs(&self, refs: &HashSet<Rc<String>>) -> u64 {
         self.layout.iter().fold(0, |acc, slice| {
@@ -194,6 +174,33 @@ impl Display for VelosiAstStateMemoryField {
         } else {
             Ok(())
         }
+    }
+}
+
+impl VelosiAstField for VelosiAstStateMemoryField {
+    /// obtains a reference to the identifier
+    fn ident(&self) -> &Rc<String> {
+        self.ident.ident()
+    }
+
+    /// obtains a copy of the identifer
+    fn ident_to_string(&self) -> String {
+        self.ident.as_str().to_string()
+    }
+
+    /// obtains a reference to the fully qualified path
+    fn path(&self) -> &Rc<String> {
+        &self.ident.path
+    }
+
+    /// obtains a copy of the fully qualified path
+    fn path_to_string(&self) -> String {
+        self.ident.path.as_str().to_string()
+    }
+
+    /// obtains the layout of the field
+    fn layout(&self) -> &[Rc<VelosiAstFieldSlice>] {
+        self.layout.as_slice()
     }
 }
 
@@ -271,25 +278,6 @@ impl VelosiAstStateRegisterField {
         ast_result_return!(VelosiAstStateField::Register(res), issues)
     }
 
-    /// obtains a reference to the identifier
-    pub fn ident(&self) -> &Rc<String> {
-        self.ident.ident()
-    }
-
-    /// obtains a copy of the identifer
-    pub fn ident_to_string(&self) -> String {
-        self.ident.as_str().to_string()
-    }
-
-    /// obtains a reference to the fully qualified path
-    pub fn path(&self) -> &Rc<String> {
-        &self.ident.path
-    }
-
-    /// obtains a copy of the fully qualified path
-    pub fn path_to_string(&self) -> String {
-        self.ident.path.as_str().to_string()
-    }
     /// obtains a bitmask for the refrenced slices in the supplied refs
     pub fn get_slice_mask_for_refs(&self, refs: &HashSet<Rc<String>>) -> u64 {
         self.layout.iter().fold(0, |acc, slice| {
@@ -299,6 +287,33 @@ impl VelosiAstStateRegisterField {
                 acc
             }
         })
+    }
+}
+
+impl VelosiAstField for VelosiAstStateRegisterField {
+    /// obtains a reference to the identifier
+    fn ident(&self) -> &Rc<String> {
+        self.ident.ident()
+    }
+
+    /// obtains a copy of the identifer
+    fn ident_to_string(&self) -> String {
+        self.ident.as_str().to_string()
+    }
+
+    /// obtains a reference to the fully qualified path
+    fn path(&self) -> &Rc<String> {
+        &self.ident.path
+    }
+
+    /// obtains a copy of the fully qualified path
+    fn path_to_string(&self) -> String {
+        self.ident.path.as_str().to_string()
+    }
+
+    /// obtains the layout of the field
+    fn layout(&self) -> &[Rc<VelosiAstFieldSlice>] {
+        self.layout.as_slice()
     }
 }
 
