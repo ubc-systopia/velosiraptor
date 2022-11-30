@@ -30,7 +30,7 @@ use super::types;
 
 use smt2::{DataType, Function, Smt2Context, Term, VarBinding};
 use velosiast::ast::{
-    VelosiAstExpr, VelosiAstInterface, VelosiAstInterfaceAction, VelosiAstState,
+    VelosiAstExpr, VelosiAstField, VelosiAstInterface, VelosiAstInterfaceAction, VelosiAstState,
     VelosiAstUnitSegment,
 };
 
@@ -201,7 +201,7 @@ fn add_model_iface_accessors(smt: &mut Smt2Context, iface: &VelosiAstInterface) 
     for f in iface.fields() {
         smt.subsection(format!("interface field: {}", f.ident()));
         add_model_field_accessor(smt, IFACE_PREFIX, f.ident());
-        for s in f.layout_as_slice() {
+        for s in f.layout() {
             add_model_slice_accessor(smt, IFACE_PREFIX, f.ident(), s.ident());
         }
     }
