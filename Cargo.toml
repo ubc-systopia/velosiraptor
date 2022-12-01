@@ -10,18 +10,19 @@ readme = "README.md"
 [workspace]
 
 members = [
-    "lib/codegen",
-    "lib/crustal",
-    "lib/libvrc",
-    "lib/rosettelang",
-    "lib/smtlib2",
-    "lib/srcspan",
-    "lib/tokstream",
-    "lib/velosilexer",
-    "lib/velosiparser",
-    "lib/velosiast",
-    "lib/velosisynth",
-    "lib/z3/z3-sys"
+    "lib/codegen"
+    ,"lib/crustal"
+    ,"lib/libvrc"
+    ,"lib/rosettelang"
+    ,"lib/smtlib2"
+    ,"lib/srcspan"
+    ,"lib/tokstream"
+    ,"lib/velosilexer"
+    ,"lib/velosiparser"
+    ,"lib/velosiast"
+    ,"lib/velosisynth"
+    ,"lib/velosicodegen"
+    ,"lib/z3/z3-sys"
 ]
 
 [dependencies]
