@@ -726,6 +726,10 @@ impl VelosiAstUnitStaticMap {
             u64::MAX
         }
     }
+
+    pub fn get_unit_names(&self) -> Vec<&str> {
+        self.map.get_unit_names()
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstUnitStaticMap]

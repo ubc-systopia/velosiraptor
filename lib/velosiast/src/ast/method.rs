@@ -35,7 +35,7 @@ use velosiparser::{VelosiParseTreeMethod, VelosiTokenStream};
 
 use crate::ast::{
     VelosiAstExpr, VelosiAstIdentLiteralExpr, VelosiAstIdentifier, VelosiAstNode, VelosiAstParam,
-    VelosiAstType, VelosiAstTypeInfo,
+    VelosiAstType, VelosiAstTypeInfo, VelosiOperation,
 };
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
@@ -62,6 +62,8 @@ pub struct VelosiAstMethod {
     pub requires: Vec<VelosiAstExpr>,
     /// method body
     pub body: Option<VelosiAstExpr>,
+    /// synthesized operations
+    pub ops: Vec<VelosiOperation>,
     /// the location of the import clause
     pub loc: VelosiTokenStream,
 }
@@ -86,6 +88,7 @@ impl VelosiAstMethod {
             params_map,
             requires,
             body,
+            ops: Vec::new(),
             loc,
         }
     }
