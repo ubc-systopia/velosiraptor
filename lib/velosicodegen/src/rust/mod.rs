@@ -34,13 +34,12 @@ use std::path::PathBuf;
 
 use codegen_rs as CG;
 
-use crate::ast::{AstNodeGeneric, AstRoot};
-use crate::codegen::CodeGenBackend;
-use crate::codegen::CodeGenError;
+use crate::VelosiCodeGenError;
+use velosiast::VelosiAst;
 
-mod field;
-mod interface;
-mod unit;
+// mod field;
+// mod interface;
+// mod unit;
 mod utils;
 
 use utils::{add_const_def, add_header, save_scope};
@@ -71,7 +70,7 @@ impl BackendRust {
         }
     }
 
-    fn generate_tomlfile(&self, outfile: &Path) -> Result<(), CodeGenError> {
+    fn generate_tomlfile(&self, outfile: &Path) -> Result<(), VelosiCodeGenError> {
         // create the Cargo.toml
         let cargofile = File::create(outfile.join("Cargo.toml"))?;
         let mut cargo = BufWriter::new(cargofile);
@@ -102,14 +101,12 @@ impl BackendRust {
         cargo.flush()?;
         Ok(())
     }
-}
 
-impl CodeGenBackend for BackendRust {
     /// prepares the code generation for the Rust backend
     ///
     /// This will setup the output directories, create the Toml file and
     /// create the `src` directory.
-    fn prepare(&self) -> Result<(), CodeGenError> {
+    pub fn prepare(&self) -> Result<(), VelosiCodeGenError> {
         // create the output directory, if needed
 
         // create the package path
@@ -129,9 +126,10 @@ impl CodeGenBackend for BackendRust {
     ///
     /// This will produce a file with all the globally defined constant definitions.
     /// The file won't be produced if there are no globally defined constants
-    fn generate_globals(&self, ast: &AstRoot) -> Result<(), CodeGenError> {
+    pub fn generate_globals(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
+        let consts = ast.consts();
         // no need to create anything if there are no constants defined
-        if ast.consts.is_empty() {
+        if consts.is_empty() {
             return Ok(());
         }
 
@@ -146,61 +144,61 @@ impl CodeGenBackend for BackendRust {
         add_header(&mut scope, &title);
 
         // now add the constants
-        for c in &ast.consts {
+        for c in consts {
             add_const_def(&mut scope, c);
         }
 
         save_scope(scope, &srcdir, MOD_CONSTS)
     }
 
-    fn generate_interfaces(&self, ast: &AstRoot) -> Result<(), CodeGenError> {
+    pub fn generate_interfaces(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
         // get the source dir
         let mut srcdir = self.outdir.join("src");
 
-        for unit in &ast.units {
-            srcdir.push(unit.name().to_lowercase());
+        for unit in ast.units() {
+            srcdir.push(unit.ident().to_lowercase());
             // the root directory as supplied by backend
             fs::create_dir_all(&srcdir)?;
-            interface::generate(unit, &srcdir)?;
+            //interface::generate(unit, &srcdir)?;
             srcdir.pop();
         }
         Ok(())
     }
 
     /// Generates the units
-    fn generate_units(&self, ast: &AstRoot) -> Result<(), CodeGenError> {
+    pub fn generate_units(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
         // get the source dir
         let mut srcdir = self.outdir.join("src");
 
         println!("##### rust generat_units");
 
-        for unit in &ast.units {
-            srcdir.push(unit.name().to_lowercase());
+        for unit in ast.units() {
+            // srcdir.push(unit.ident().to_lowercase());
 
-            // generate the unit
-            unit::generate(unit, &srcdir)?;
+            // // generate the unit
+            // unit::generate(unit, &srcdir)?;
 
-            // construct the scope
-            let mut scope = CG::Scope::new();
+            // // construct the scope
+            // let mut scope = CG::Scope::new();
 
-            let title = format!("{} translation unit module", unit.name());
-            add_header(&mut scope, &title);
+            // let title = format!("{} translation unit module", unit.ident());
+            // add_header(&mut scope, &title);
 
-            // the fields
-            scope.raw("pub mod fields;");
-            // the unit
-            scope.raw("mod unit;");
-            // the unit
-            scope.raw("pub use unit :: *;");
+            // // the fields
+            // scope.raw("pub mod fields;");
+            // // the unit
+            // scope.raw("mod unit;");
+            // // the unit
+            // scope.raw("pub use unit :: *;");
 
-            // the unit
-            scope.raw("mod interface;");
-            scope.raw("pub use interface :: *;");
+            // // the unit
+            // scope.raw("mod interface;");
+            // scope.raw("pub use interface :: *;");
 
-            // save the scope
-            save_scope(scope, &srcdir, "mod")?;
+            // // save the scope
+            // save_scope(scope, &srcdir, "mod")?;
 
-            srcdir.pop();
+            // srcdir.pop();
         }
 
         Ok(())
@@ -213,7 +211,7 @@ impl CodeGenBackend for BackendRust {
     /// This basically creates a `pub mod` statement for each unit,
     /// and also for for the constant definitions. It then also re-exports
     /// the defined constants and unit types using `pub use` statements.
-    fn finalize(&self, ast: &AstRoot) -> Result<(), CodeGenError> {
+    pub fn finalize(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
         // construct the source directory
         let srcdir = self.outdir.join("src");
 
@@ -225,15 +223,10 @@ impl CodeGenBackend for BackendRust {
 
         // import the constants
         scope.new_comment("import constant definitions ");
-        if !ast.consts.is_empty() {
-            scope.raw(&format!("pub mod {};", MOD_CONSTS));
-        } else {
-            scope.new_comment("no constants defined");
-        }
 
-        // re-export the constants
-        scope.new_comment("re-export the constants directly");
-        if !ast.consts.is_empty() {
+        let consts = ast.consts();
+        if !consts.is_empty() {
+            scope.raw(&format!("pub mod {};", MOD_CONSTS));
             scope.raw(&format!("pub use {}::*;", MOD_CONSTS));
         } else {
             scope.new_comment("no constants defined");
@@ -241,22 +234,20 @@ impl CodeGenBackend for BackendRust {
 
         // impor the units
         scope.new_comment("import the unit modules");
-        if !ast.units.is_empty() {
-            for unit in &ast.units {
-                scope.raw(&format!("pub mod {};", unit.name().to_lowercase()));
+
+        let units = ast.units();
+        if !units.is_empty() {
+            for unit in units {
+                scope.raw(&format!("pub mod {};", unit.ident().to_lowercase()));
+
+                scope.raw(&format!(
+                    "pub use {}::{};",
+                    unit.ident().to_lowercase(),
+                    unit.ident()
+                ));
             }
         } else {
             scope.new_comment("no unit definitions to import");
-        }
-
-        // reexport the
-        scope.new_comment("re-export the unit types directly");
-        for unit in &ast.units {
-            scope.raw(&format!(
-                "pub use {}::{};",
-                unit.name().to_lowercase(),
-                unit.name()
-            ));
         }
 
         // save the scope
