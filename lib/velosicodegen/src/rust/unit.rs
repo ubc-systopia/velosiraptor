@@ -56,7 +56,7 @@ fn add_struct_definition(scope: &mut CG::Scope, unit: &Unit) {
     // field_name  --> struct FieldName {  val: u64 };
 
     // create the struct in the scope
-    let st = scope.new_struct(unit.name());
+    let st = scope.new_struct(unit.ident());
 
     // make it public
     st.vis("pub");
@@ -64,7 +64,7 @@ fn add_struct_definition(scope: &mut CG::Scope, unit: &Unit) {
     // add the doc field to the struct
     st.doc(&format!(
         "Represents the Unit type '{}'.\n@loc: {}",
-        unit.name(),
+        unit.ident(),
         unit.location()
     ));
 
@@ -75,13 +75,13 @@ fn add_struct_definition(scope: &mut CG::Scope, unit: &Unit) {
 fn add_constructor_function(imp: &mut CG::Impl, unit: &Unit) {
     imp.new_fn("new")
         .vis("pub")
-        .doc(&format!("Creates a new `{}` unit", unit.name()))
+        .doc(&format!("Creates a new `{}` unit", unit.ident()))
         //.ret(CG::Type::new("Self"))
         .line("// TODO: SYNTHESIZE ME");
 
     imp.new_fn("from_raw")
         .vis("pub")
-        .doc(&format!("Creates a new `{}` unit", unit.name()))
+        .doc(&format!("Creates a new `{}` unit", unit.ident()))
         //.ret(CG::Type::new("Self"))
         .line("// TODO: SYNTHESIZE ME");
 }
@@ -89,7 +89,7 @@ fn add_constructor_function(imp: &mut CG::Impl, unit: &Unit) {
 fn add_translate_function(imp: &mut CG::Impl, unit: &Unit) {
     imp.new_fn("translate")
         .vis("pub")
-        .doc(&format!("Creates a new {} unit", unit.name()))
+        .doc(&format!("Creates a new {} unit", unit.ident()))
         //.ret(CG::Type::new("Self"))
         .line("// TODO: SYNTHESIZE ME");
 }
@@ -167,7 +167,7 @@ fn add_map_function(imp: &mut CG::Impl, unit: &Unit) {
         .arg("pa", "u64")
         .arg("flags", "u64")
         .vis("pub")
-        .doc(&format!("Creates a new {} unit", unit.name()));
+        .doc(&format!("Creates a new {} unit", unit.ident()));
     //.ret(CG::Type::new("Self"))
 
     m.line("// field variable definitions");
@@ -192,7 +192,7 @@ fn add_map_function(imp: &mut CG::Impl, unit: &Unit) {
 fn add_unmap_function(imp: &mut CG::Impl, unit: &Unit) {
     imp.new_fn("unmap")
         .vis("pub")
-        .doc(&format!("Creates a new {} unit", unit.name()))
+        .doc(&format!("Creates a new {} unit", unit.ident()))
         //.ret(CG::Type::new("Self"))
         .line("// TODO: SYNTHESIZE ME");
 }
@@ -200,14 +200,14 @@ fn add_unmap_function(imp: &mut CG::Impl, unit: &Unit) {
 fn add_protect_function(imp: &mut CG::Impl, unit: &Unit) {
     imp.new_fn("protect")
         .vis("pub")
-        .doc(&format!("Creates a new {} unit", unit.name()))
+        .doc(&format!("Creates a new {} unit", unit.ident()))
         //.ret(CG::Type::new("Self"))
         .line("// TODO: SYNTHESIZE ME");
 }
 
 fn add_struct_impl(scope: &mut CG::Scope, unit: &Unit) {
     // new implementation
-    let imp = scope.new_impl(unit.name());
+    let imp = scope.new_impl(unit.ident());
 
     // add the new() function
     add_constructor_function(imp, unit);
@@ -224,7 +224,7 @@ pub fn generate(unit: &Unit, outdir: &Path) -> Result<(), CodeGenError> {
     let mut scope = CG::Scope::new();
 
     // add the header comments
-    let title = format!("`{}` Unit definition ", unit.name());
+    let title = format!("`{}` Unit definition ", unit.ident());
     utils::add_header(&mut scope, &title);
 
     // add the definitions

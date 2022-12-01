@@ -37,7 +37,7 @@ use crate::codegen::CodeGenError;
 
 /// returns the string of the field type
 pub fn interface_type(unit: &Unit) -> String {
-    utils::to_struct_name(unit.name(), Some("Interface"))
+    utils::to_struct_name(unit.ident(), Some("Interface"))
 }
 
 pub fn generate_memory_interface(scope: &mut CG::Scope, unit: &Unit) {
@@ -49,14 +49,14 @@ pub fn generate_memory_interface(scope: &mut CG::Scope, unit: &Unit) {
     st.vis("pub");
     st.doc(&format!(
         "Represents the interface of unit '{}' (memory).\n@loc: {}",
-        unit.name(),
+        unit.ident(),
         unit.location()
     ));
     // c representation
     st.repr("C");
 
     for f in unit.interface().fields() {
-        let doc = format!("Field '{}' in unit '{}'", f.field.name, unit.name());
+        let doc = format!("Field '{}' in unit '{}'", f.field.name, unit.ident());
         let loc = format!("@loc: {}", f.field.location());
         let mut f = CG::Field::new(&f.field.name, field::field_type(&f.field));
         f.doc(vec![&doc, &loc]);
@@ -72,7 +72,7 @@ pub fn generate_memory_interface(scope: &mut CG::Scope, unit: &Unit) {
         .arg("base", "u64")
         .doc(&format!(
             "creates a new reference to a {} interface",
-            unit.name()
+            unit.ident()
         ))
         .ret(CG::Type::new(&iftyperef))
         .set_unsafe(true)
@@ -114,12 +114,12 @@ pub fn generate_mmio_interface(scope: &mut CG::Scope, unit: &Unit) {
     st.vis("pub");
     st.doc(&format!(
         "Represents the interface of unit '{}' (mmio).\n@loc: {}",
-        unit.name(),
+        unit.ident(),
         unit.location()
     ));
     // for each base, add a field
     for b in unit.interface().bases() {
-        let doc = format!("Base pointer '{}' in unit '{}'", b.name, unit.name());
+        let doc = format!("Base pointer '{}' in unit '{}'", b.name, unit.ident());
         let mut f = CG::Field::new(&b.name, "u64");
         f.doc(vec![&doc]);
         st.push_field(f);
@@ -133,7 +133,7 @@ pub fn generate_mmio_interface(scope: &mut CG::Scope, unit: &Unit) {
         .vis("pub")
         .doc(&format!(
             "creates a new MMIO interface for '{}'",
-            unit.name()
+            unit.ident()
         ))
         .arg_mut_self()
         .ret(CG::Type::new(&ifname));
@@ -203,7 +203,7 @@ pub fn generate_register_interface(scope: &mut CG::Scope, unit: &Unit) {
     st.vis("pub");
     st.doc(&format!(
         "Represents the interface of unit '{}' (register).\n@loc: {}",
-        unit.name(),
+        unit.ident(),
         unit.location()
     ));
 }
@@ -219,7 +219,7 @@ pub fn generate_interface_fields(unit: &Unit, outdir: &Path) -> Result<(), CodeG
     // add the mod path
     let mut scope = CG::Scope::new();
 
-    let title = format!("{} interface module", unit.name());
+    let title = format!("{} interface module", unit.ident());
     utils::add_header(&mut scope, &title);
     for f in fields {
         let i = format!("mod {};", f.field.name.to_lowercase());
@@ -236,7 +236,7 @@ pub fn generate_interface_fields(unit: &Unit, outdir: &Path) -> Result<(), CodeG
 
     let res: Result<(), CodeGenError> = Ok(());
     fields.iter().fold(res, |res: Result<(), CodeGenError>, e| {
-        let r = field::generate(unit.name(), &e.field, &fieldsdir);
+        let r = field::generate(unit.ident(), &e.field, &fieldsdir);
         if res.is_err() {
             res
         } else {
@@ -260,7 +260,7 @@ pub fn generate(unit: &Unit, outdir: &Path) -> Result<(), CodeGenError> {
     let mut scope = CG::Scope::new();
 
     // add the header comments
-    let title = format!("`{}` Interface definition ", unit.name());
+    let title = format!("`{}` Interface definition ", unit.ident());
     utils::add_header(&mut scope, &title);
 
     for f in unit.interface().fields() {

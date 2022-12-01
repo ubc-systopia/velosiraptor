@@ -31,22 +31,24 @@ use std::path::Path;
 // get the code generator
 use crustal as C;
 
-use crate::ast::{BitSlice, Field, Segment};
-use crate::codegen::CodeGenError;
+use velosiast::ast::{
+    VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField, VelosiAstUnitSegment,
+};
 
 // library internal includes
 use super::utils;
+use crate::VelosiCodeGenError;
 
 /// adding a constant value for the mask : const FIELD_MASK : type = value;
-fn add_field_constants(scope: &mut C::Scope, unit: &Segment, field: &Field) {
+fn add_field_constants(
+    scope: &mut C::Scope,
+    unit: &VelosiAstUnitSegment,
+    field: &VelosiAstInterfaceField,
+) {
     // construct the constant name
     let maskname = utils::field_mask_name(unit, field);
 
-    let maskvalue = if field.nbits() > 32 {
-        format!("0x{:x}ULL", field.mask_value())
-    } else {
-        format!("0x{:x}", field.mask_value())
-    };
+    let maskvalue = format!("(uint{}_t)0x{:x}", field.nbits(), field.mask());
 
     // create and add the constant to the scope
     let mut m = C::Macro::with_name(maskname);
@@ -55,10 +57,10 @@ fn add_field_constants(scope: &mut C::Scope, unit: &Segment, field: &Field) {
     // add some documentation
     m.doc_str(&format!(
         "Defined constant for masking field `{}`",
-        field.name
+        field.ident()
     ));
     m.doc_str("");
-    m.doc_str(&format!("@loc: {}", field.location()));
+    m.doc_str(&format!("@loc: {}", field.loc().loc()));
 
     // add the macro to the scope
     scope.push_macro(m);
@@ -69,16 +71,20 @@ pub fn if_field_header_path(name: &str) -> String {
     format!("{}_field.h", name)
 }
 
-fn add_struct_definition(scope: &mut C::Scope, unit: &Segment, field: &Field) {
+fn add_struct_definition(
+    scope: &mut C::Scope,
+    unit: &VelosiAstUnitSegment,
+    field: &VelosiAstInterfaceField,
+) {
     let sn = utils::field_struct_name(unit, field);
     let mut s = C::Struct::with_fields(
         &sn,
         vec![C::Field::new("_val", C::Type::new_uint(field.nbits()))],
     );
 
-    s.push_doc_str(&format!("Field Type `{}`", field.name));
+    s.push_doc_str(&format!("Field Type `{}`", field.ident()));
     s.push_doc_str("");
-    s.push_doc_str(&format!("@loc: {}", field.location()));
+    s.push_doc_str(&format!("@loc: {}", field.loc().loc()));
 
     let stype = s.to_type();
     scope.push_struct(s);
@@ -91,7 +97,7 @@ fn add_struct_definition(scope: &mut C::Scope, unit: &Segment, field: &Field) {
     let fnname = utils::field_get_raw_fn_name(unit, field);
     let mut f = C::Function::with_string(fnname, C::Type::new_uint(field.nbits()));
     f.set_static().set_inline();
-    f.push_doc_str(&format!("gets value {} in field", field.name));
+    f.push_doc_str(&format!("gets value {} in field", field.ident()));
     let p = f.new_param("field", C::Type::new_typedef(&fieldtype));
     let var = C::Expr::from_fn_param(p);
     f.body().return_expr(C::Expr::field_access(&var, "_val"));
@@ -102,7 +108,7 @@ fn add_struct_definition(scope: &mut C::Scope, unit: &Segment, field: &Field) {
     let fnname = utils::field_set_raw_fn_name(unit, field);
     let mut f = C::Function::with_string(fnname, C::Type::new_typedef(&fieldtype));
     f.set_static().set_inline();
-    f.push_doc_str(&format!("sets value {} in field", field.name));
+    f.push_doc_str(&format!("sets value {} in field", field.ident()));
     let v = f.new_param("val", C::Type::new_uint(field.nbits()));
     let rhs = C::Expr::from_fn_param(v);
 
@@ -125,7 +131,12 @@ fn add_struct_definition(scope: &mut C::Scope, unit: &Segment, field: &Field) {
 }
 
 /// adds an extraction function
-fn add_extract_fn(scope: &mut C::Scope, unit: &Segment, field: &Field, sl: &BitSlice) {
+fn add_extract_fn(
+    scope: &mut C::Scope,
+    unit: &VelosiAstUnitSegment,
+    field: &VelosiAstInterfaceField,
+    sl: &VelosiAstFieldSlice,
+) {
     let fieldtype = utils::field_type_name(unit, field);
 
     // adding the get value function
@@ -135,10 +146,13 @@ fn add_extract_fn(scope: &mut C::Scope, unit: &Segment, field: &Field, sl: &BitS
 
     f.push_doc_str(&format!(
         "extracts value {}.{} [{}..{}] in field",
-        field.name, sl.name, sl.start, sl.end
+        field.ident(),
+        sl.ident(),
+        sl.start,
+        sl.end
     ));
     f.push_doc_str("");
-    f.push_doc_str(&format!("@loc: {}", sl.pos));
+    f.push_doc_str(&format!("@loc: {}", sl.loc.loc()));
 
     f.new_param("field", C::Type::new_typedef(&fieldtype));
 
@@ -161,7 +175,12 @@ fn add_extract_fn(scope: &mut C::Scope, unit: &Segment, field: &Field, sl: &BitS
 }
 
 /// Generates an insert function taht sets the value of a field value
-fn add_insert_fn(scope: &mut C::Scope, unit: &Segment, field: &Field, sl: &BitSlice) {
+fn add_insert_fn(
+    scope: &mut C::Scope,
+    unit: &VelosiAstUnitSegment,
+    field: &VelosiAstInterfaceField,
+    sl: &VelosiAstFieldSlice,
+) {
     let fieldtype = utils::field_type_name(unit, field);
 
     let fnname = utils::field_slice_insert_fn_name(unit, field, sl);
@@ -170,10 +189,13 @@ fn add_insert_fn(scope: &mut C::Scope, unit: &Segment, field: &Field, sl: &BitSl
 
     f.push_doc_str(&format!(
         "inserts value {}.{} [{}..{}] in field",
-        field.name, sl.name, sl.start, sl.end
+        field.ident(),
+        sl.ident(),
+        sl.start,
+        sl.end
     ));
     f.push_doc_str("");
-    f.push_doc_str(&format!("@loc: {}", sl.pos));
+    f.push_doc_str(&format!("@loc: {}", sl.loc.loc()));
 
     let p = f.new_param("field", C::Type::new_typedef(&fieldtype));
     let lhs = C::Expr::from_fn_param(p);
@@ -182,14 +204,14 @@ fn add_insert_fn(scope: &mut C::Scope, unit: &Segment, field: &Field, sl: &BitSl
     let body = if sl.start != 0 {
         C::Expr::Raw(format!(
             "(field._val & {}) | ((val & {}) << {})",
-            utils::to_mask_str(!sl.mask_value(), field.nbits()),
+            utils::to_mask_str(!sl.mask(), field.nbits()),
             utils::to_mask_str(((1u128 << sl.nbits()) - 1) as u64, sl.nbits()),
             sl.start
         ))
     } else {
         C::Expr::Raw(format!(
             "(field._val & {}) | (val & {})",
-            utils::to_mask_str(!sl.mask_value(), field.nbits()),
+            utils::to_mask_str(!sl.mask(), field.nbits()),
             utils::to_mask_str(((1u128 << sl.nbits()) - 1) as u64, sl.nbits())
         ))
     };
@@ -201,18 +223,22 @@ fn add_insert_fn(scope: &mut C::Scope, unit: &Segment, field: &Field, sl: &BitSl
 }
 
 /// generates the field value interface
-pub fn generate(unit: &Segment, field: &Field, outdir: &Path) -> Result<(), CodeGenError> {
+pub fn generate(
+    unit: &VelosiAstUnitSegment,
+    field: &VelosiAstInterfaceField,
+    outdir: &Path,
+) -> Result<(), VelosiCodeGenError> {
     // the code generation scope
     let mut scope = C::Scope::new();
 
     // add the header comments
-    let title = format!("Field interface for `{}::{}`", unit.name, &field.name);
+    let title = format!("Field interface for `{}::{}`", unit.ident(), &field.ident());
     utils::add_header(&mut scope, &title);
 
     let hdrguard = format!(
         "{}_{}_FIELD_H_",
-        unit.name.to_uppercase(),
-        field.name.to_uppercase()
+        unit.ident().to_uppercase(),
+        field.ident().to_uppercase()
     );
     let guard = scope.new_ifdef(&hdrguard);
     let s = guard.guard().then_scope();
@@ -221,17 +247,16 @@ pub fn generate(unit: &Segment, field: &Field, outdir: &Path) -> Result<(), Code
 
     // add the definitions
     add_field_constants(s, unit, field);
-    //
     add_struct_definition(s, unit, field);
 
     // add the get/set functions
-    for sl in &field.layout {
+    for sl in field.layout() {
         add_insert_fn(s, unit, field, sl);
         add_extract_fn(s, unit, field, sl);
     }
 
     // save the scope
-    let filename = if_field_header_path(&field.name);
+    let filename = if_field_header_path(field.ident());
     scope.set_filename(&filename);
 
     // save the scope

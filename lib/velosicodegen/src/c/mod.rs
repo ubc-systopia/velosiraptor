@@ -3,7 +3,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2021 Systopia Lab, Computer Science, University of British Columbia
+// Copyright (c) 2022 Systopia Lab, Computer Science, University of British Columbia
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -31,16 +31,17 @@ use std::path::PathBuf;
 
 use crustal as C;
 
-use crate::ast::{AstNodeGeneric, AstRoot, Unit};
-use crate::codegen::CodeGenBackend;
-use crate::codegen::CodeGenError;
+use velosiast::ast::VelosiAstUnit;
+use velosiast::VelosiAst;
+
+use crate::VelosiCodeGenError;
 
 use utils::{add_const_def, add_header};
 
 mod field;
 mod interface;
 mod segment;
-mod staticmap;
+// mod staticmap;
 mod utils;
 
 /// The C backend
@@ -62,13 +63,11 @@ impl BackendC {
         let outdir = outdir.join("clang");
         BackendC { outdir, pkgname }
     }
-}
 
-impl CodeGenBackend for BackendC {
     /// prepares the code generation for the C/CPP backend
     ///
     /// This will setup the output directories
-    fn prepare(&self) -> Result<(), CodeGenError> {
+    pub fn prepare(&self) -> Result<(), VelosiCodeGenError> {
         // create the package path
         fs::create_dir_all(&self.outdir)?;
         Ok(())
@@ -78,7 +77,7 @@ impl CodeGenBackend for BackendC {
     ///
     /// This will produce a file with all the globally defined constant definitions.
     /// The file won't be produced if there are no globally defined constants
-    fn generate_globals(&self, ast: &AstRoot) -> Result<(), CodeGenError> {
+    pub fn generate_globals(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
         // the code generation scope
         let mut scope = C::Scope::new();
 
@@ -90,12 +89,13 @@ impl CodeGenBackend for BackendC {
         let guard = scope.new_ifdef(&hdrguard);
         let s = guard.guard().then_scope();
 
-        if ast.consts.is_empty() {
+        let consts = ast.consts();
+        if consts.is_empty() {
             s.new_comment("No global constants defined");
         }
 
         // now add the constants
-        for c in &ast.consts {
+        for c in consts {
             add_const_def(s, c);
         }
 
@@ -105,40 +105,38 @@ impl CodeGenBackend for BackendC {
         Ok(())
     }
 
-    fn generate_interfaces(&self, ast: &AstRoot) -> Result<(), CodeGenError> {
+    pub fn generate_interfaces(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
         let mut srcdir = self.outdir.clone();
 
         // get the source dir
-        for unit in &ast.units {
-            if let Unit::Segment(segment) = unit {
-                srcdir.push(segment.name.to_lowercase());
-                // the root directory as supplied by backend
-                fs::create_dir_all(&srcdir)?;
-                interface::generate(segment, &srcdir)?;
-                srcdir.pop();
+        for unit in ast.units() {
+            // create the unit dir
+            let dirname = unit.ident().to_lowercase();
+            srcdir.push(dirname);
+
+            // create the directory
+            fs::create_dir_all(&srcdir)?;
+
+            if let VelosiAstUnit::Segment(seg) = unit {
+                interface::generate(seg, &srcdir)?;
             }
 
-            if let Unit::StaticMap(staticmap) = unit {
-                srcdir.push(staticmap.name.to_lowercase());
-                fs::create_dir_all(&srcdir)?;
-                srcdir.pop();
-            }
+            srcdir.pop();
         }
         Ok(())
     }
 
-    fn generate_units(&self, ast: &AstRoot) -> Result<(), CodeGenError> {
+    pub fn generate_units(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
         let mut srcdir = self.outdir.clone();
-        println!("## generating units...");
-        for unit in &ast.units {
-            srcdir.push(unit.name().to_lowercase());
+        for unit in ast.units() {
+            srcdir.push(unit.ident().to_lowercase());
 
-            println!("##### generat_units {}", unit.name());
+            log::info!("Generating unit {}", unit.ident());
 
             // generate the unit
             let err = match unit {
-                Unit::StaticMap(staticmap) => staticmap::generate(staticmap, &srcdir),
-                Unit::Segment(segment) => segment::generate(segment, &srcdir),
+                VelosiAstUnit::StaticMap(staticmap) => Ok(()), //staticmap::generate(staticmap, &srcdir),
+                VelosiAstUnit::Segment(segment) => segment::generate(segment, &srcdir),
             };
 
             if err.is_err() {
@@ -150,7 +148,7 @@ impl CodeGenBackend for BackendC {
 
         Ok(())
     }
-    fn finalize(&self, _ast: &AstRoot) -> Result<(), CodeGenError> {
+    pub fn finalize(&self, _ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
         Ok(())
     }
 }
