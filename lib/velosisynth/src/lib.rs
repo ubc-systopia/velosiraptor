@@ -44,7 +44,6 @@ use smt2::Smt2Context;
 // crate modules
 mod error;
 mod model;
-mod operation;
 mod programs;
 mod vmops;
 mod z3;
@@ -53,7 +52,6 @@ use velosiast::ast::VelosiAstUnitSegment;
 
 use crate::vmops::{MaybeResult, ProgramBuilder};
 pub use error::{VelosiSynthError, VelosiSynthIssues};
-pub use operation::{OpExpr, Operation};
 pub use programs::{Program, ProgramsBuilder, ProgramsIter};
 pub use z3::{Z3Query, Z3Ticket, Z3Worker, Z3WorkerPool};
 
