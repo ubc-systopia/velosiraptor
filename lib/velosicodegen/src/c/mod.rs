@@ -135,7 +135,7 @@ impl BackendC {
 
             // generate the unit
             let err = match unit {
-                VelosiAstUnit::StaticMap(staticmap) => Ok(()), //staticmap::generate(staticmap, &srcdir),
+                VelosiAstUnit::StaticMap(_staticmap) => Ok(()), //staticmap::generate(staticmap, &srcdir),
                 VelosiAstUnit::Segment(segment) => segment::generate(segment, &srcdir),
             };
 

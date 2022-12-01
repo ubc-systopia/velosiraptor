@@ -33,7 +33,7 @@ use crustal as C;
 use velosiast::ast::{
     VelosiAstConst, VelosiAstExpr, VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField,
     VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField, VelosiAstInterfaceRegisterField,
-    VelosiAstMethod, VelosiAstType, VelosiAstTypeInfo, VelosiAstUnit, VelosiAstUnitSegment,
+    VelosiAstMethod, VelosiAstType, VelosiAstTypeInfo, VelosiAstUnitSegment,
     VelosiAstUnitStaticMap, VelosiOpExpr, VelosiOperation,
 };
 
@@ -221,7 +221,7 @@ pub fn os_mmio_register_write_fn(
 }
 
 pub fn os_register_write_fn(
-    unit_var: &C::Expr,
+    _unit_var: &C::Expr,
     field: &VelosiAstInterfaceRegisterField,
     val: &C::Expr,
 ) -> C::Expr {
@@ -231,7 +231,7 @@ pub fn os_register_write_fn(
 }
 
 pub fn os_register_read_fn(
-    unit_var: &C::Expr,
+    _unit_var: &C::Expr,
     field: &VelosiAstInterfaceRegisterField,
     val: &C::Expr,
 ) -> C::Expr {
@@ -261,7 +261,7 @@ pub fn os_memory_write_fn(
 pub fn os_memory_read_fn(
     unit_var: &C::Expr,
     field: &VelosiAstInterfaceMemoryField,
-    val: &C::Expr,
+    _val: &C::Expr,
 ) -> C::Expr {
     let fnname = format!("os_memory_read_{}", field.nbits());
     let base = format!("_{}", field.base);
@@ -453,19 +453,19 @@ pub fn ptype_to_ctype(ptype: &VelosiAstType, unit: &VelosiAstUnitSegment) -> C::
     }
 }
 
-fn expr_to_cpp(unit: &str, expr: &VelosiAstExpr) -> C::Expr {
+fn expr_to_cpp(_unit: &str, expr: &VelosiAstExpr) -> C::Expr {
     use VelosiAstExpr::*;
     match expr {
-        IdentLiteral(i) => panic!("don't know how to handle quantifier"),
-        NumLiteral(i) => panic!("don't know how to handle quantifier"),
-        BoolLiteral(i) => panic!("don't know how to handle quantifier"),
-        BinOp(i) => panic!("don't know how to handle quantifier"),
-        UnOp(i) => panic!("don't know how to handle quantifier"),
-        Quantifier(i) => panic!("don't know how to handle quantifier"),
-        FnCall(i) => panic!("don't know how to handle quantifier"),
-        IfElse(i) => panic!("don't know how to handle quantifier"),
-        Slice(i) => panic!("don't know how to handle slices"),
-        Range(i) => panic!("don't know how to handle quantifier"),
+        IdentLiteral(_i) => panic!("don't know how to handle quantifier"),
+        NumLiteral(_i) => panic!("don't know how to handle quantifier"),
+        BoolLiteral(_i) => panic!("don't know how to handle quantifier"),
+        BinOp(_i) => panic!("don't know how to handle quantifier"),
+        UnOp(_i) => panic!("don't know how to handle quantifier"),
+        Quantifier(_i) => panic!("don't know how to handle quantifier"),
+        FnCall(_i) => panic!("don't know how to handle quantifier"),
+        IfElse(_i) => panic!("don't know how to handle quantifier"),
+        Slice(_i) => panic!("don't know how to handle slices"),
+        Range(_i) => panic!("don't know how to handle quantifier"),
     }
 
     // use VelosiAstExpr::*;

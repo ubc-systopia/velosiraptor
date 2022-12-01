@@ -31,7 +31,7 @@ use std::path::Path;
 use crustal as C;
 
 use velosiast::ast::{
-    VelosiAstExpr, VelosiAstMethod, VelosiAstUnitSegment, VelosiOpExpr, VelosiOperation,
+    VelosiAstMethod, VelosiAstUnitSegment,
 };
 
 use super::utils;
@@ -137,7 +137,7 @@ fn state_field_access(unit: &str, path: &[String]) -> C::Expr {
     panic!("unhandled!")
 }
 
-fn add_translate_function(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
+fn add_translate_function(_scope: &mut C::Scope, _unit: &VelosiAstUnitSegment) {
     // let fname = utils::translate_fn_name(unit.ident());
 
     // let mut fun = C::Function::with_string(fname, C::Type::new_bool());

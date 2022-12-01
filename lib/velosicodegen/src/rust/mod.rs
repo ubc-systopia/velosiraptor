@@ -168,11 +168,11 @@ impl BackendRust {
     /// Generates the units
     pub fn generate_units(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
         // get the source dir
-        let mut srcdir = self.outdir.join("src");
+        let _srcdir = self.outdir.join("src");
 
         println!("##### rust generat_units");
 
-        for unit in ast.units() {
+        for _unit in ast.units() {
             // srcdir.push(unit.ident().to_lowercase());
 
             // // generate the unit

@@ -31,11 +31,11 @@ use std::path::Path;
 use crustal as C;
 
 use velosiast::ast::{
-    VelosiAstField, VelosiAstFieldSlice, VelosiAstInterface, VelosiAstInterfaceField,
+    VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField,
     VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField, VelosiAstInterfaceRegisterField,
     VelosiAstUnitSegment,
 };
-use velosiast::VelosiAst;
+
 
 use super::{field, utils};
 use crate::VelosiCodeGenError;
@@ -322,17 +322,17 @@ pub fn generate_mmio_interface_field(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn generate_write_memory(
-    scope: &mut C::Scope,
-    unit: &VelosiAstUnitSegment,
-    field: &VelosiAstInterfaceMemoryField,
+    _scope: &mut C::Scope,
+    _unit: &VelosiAstUnitSegment,
+    _field: &VelosiAstInterfaceMemoryField,
 ) {
     panic!("not implemented");
 }
 
 fn generate_read_memory(
-    scope: &mut C::Scope,
-    unit: &VelosiAstUnitSegment,
-    field: &VelosiAstInterfaceMemoryField,
+    _scope: &mut C::Scope,
+    _unit: &VelosiAstUnitSegment,
+    _field: &VelosiAstInterfaceMemoryField,
 ) {
     panic!("not implemented");
 }
@@ -358,17 +358,17 @@ pub fn generate_memory_interface_field(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn generate_write_register(
-    scope: &mut C::Scope,
-    unit: &VelosiAstUnitSegment,
-    field: &VelosiAstInterfaceRegisterField,
+    _scope: &mut C::Scope,
+    _unit: &VelosiAstUnitSegment,
+    _field: &VelosiAstInterfaceRegisterField,
 ) {
     panic!("not implemented");
 }
 
 fn generate_read_register(
-    scope: &mut C::Scope,
-    unit: &VelosiAstUnitSegment,
-    field: &VelosiAstInterfaceRegisterField,
+    _scope: &mut C::Scope,
+    _unit: &VelosiAstUnitSegment,
+    _field: &VelosiAstInterfaceRegisterField,
 ) {
     panic!("not implemented");
 }
@@ -450,7 +450,7 @@ pub fn generate(unit: &VelosiAstUnitSegment, outdir: &Path) -> Result<(), Velosi
 
     let hdrguard = format!("{}_INTERFACE_H_", unit.ident().to_uppercase());
     let guard = scope.new_ifdef(&hdrguard);
-    let mut s = guard.guard().then_scope();
+    let s = guard.guard().then_scope();
 
     for f in unit.interface.fields() {
         let fieldname = format!("fields/{}_field.h", f.ident());
