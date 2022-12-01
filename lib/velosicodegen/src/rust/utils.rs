@@ -26,7 +26,7 @@
 //! Rust code generation utilities
 
 // std includes
-use std::fs;
+
 use std::path::Path;
 
 // get the code generator
@@ -83,9 +83,9 @@ pub fn to_mask_str(m: u64, len: u64) -> String {
 }
 
 /// writes the scope to a file or to stdout
-pub fn save_scope(scope: CG::Scope, outdir: &Path, name: &str) -> Result<(), VelosiCodeGenError> {
+pub fn save_scope(_scope: CG::Scope, outdir: &Path, name: &str) -> Result<(), VelosiCodeGenError> {
     // set the path to the file
-    let file = outdir.join(format!("{}.rs", name));
+    let _file = outdir.join(format!("{}.rs", name));
 
     // write the file, return IOError otherwise
     // fs::write(file, scope.to_string().as_bytes())?;
