@@ -47,6 +47,7 @@ mod flags;
 mod interface;
 mod map;
 mod method;
+mod operations;
 mod param;
 mod slice;
 mod state;
@@ -66,8 +67,12 @@ pub use interface::{
     VelosiAstInterface, VelosiAstInterfaceAction, VelosiAstInterfaceField,
     VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField, VelosiAstInterfaceRegisterField,
 };
-pub use map::{VelosiAstStaticMap, VelosiAstStaticMapElement};
+pub use map::{
+    VelosiAstStaticMap, VelosiAstStaticMapElement, VelosiAstStaticMapExplicit,
+    VelosiAstStaticMapListComp,
+};
 pub use method::VelosiAstMethod;
+pub use operations::{VelosiOpExpr, VelosiOperation};
 pub use param::VelosiAstParam;
 pub use slice::VelosiAstFieldSlice;
 pub use state::{VelosiAstState, VelosiAstStateField};

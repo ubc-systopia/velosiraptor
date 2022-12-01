@@ -82,6 +82,14 @@ impl VelosiAstStaticMap {
             VelosiAstStaticMap::None(_) => 0,
         }
     }
+
+    pub fn get_unit_names(&self) -> Vec<&str> {
+        match self {
+            VelosiAstStaticMap::ListComp(s) => s.get_unit_names(),
+            VelosiAstStaticMap::Explicit(s) => s.get_unit_names(),
+            VelosiAstStaticMap::None(_) => vec![],
+        }
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstStaticMap]
@@ -209,6 +217,10 @@ impl VelosiAstStaticMapListComp {
         let res = Self::new(elm, inputbits, var, range, pt.loc);
         ast_result_return!(VelosiAstStaticMap::ListComp(res), issues)
     }
+
+    pub fn get_unit_names(&self) -> Vec<&str> {
+        vec![self.elm.dst.ident()]
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstStaticMapListComp]
@@ -254,6 +266,13 @@ impl VelosiAstStaticMapExplicit {
 
         let res = Self::new(elems, pt.loc);
         ast_result_return!(VelosiAstStaticMap::Explicit(res), issues)
+    }
+
+    pub fn get_unit_names(&self) -> Vec<&str> {
+        self.entries
+            .iter()
+            .map(|e| e.dst.ident().as_str())
+            .collect::<Vec<_>>()
     }
 }
 
