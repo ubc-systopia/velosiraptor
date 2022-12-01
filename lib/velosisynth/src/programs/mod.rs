@@ -32,10 +32,9 @@ use std::sync::Arc;
 
 use smt2::{Function, Smt2Context, Term, VarBinding};
 
-use velosiast::ast::VelosiAstParam;
+use velosiast::ast::{VelosiAstParam, VelosiOpExpr, VelosiOperation};
 
 use crate::model;
-use crate::{OpExpr, Operation};
 
 mod builder;
 mod statevars;
@@ -96,18 +95,18 @@ impl Literal {
     }
 }
 
-/// Conversion of [Literal] to [OpExpr] for the programs we use
-impl From<&Literal> for OpExpr {
+/// Conversion of [Literal] to [VelosiOpExpr] for the programs we use
+impl From<&Literal> for VelosiOpExpr {
     fn from(prog: &Literal) -> Self {
         match prog {
-            Literal::Val(val) => OpExpr::Num(*val),
+            Literal::Val(val) => VelosiOpExpr::Num(*val),
             Literal::Num => {
                 // when converting to the OpExpr all symbolic variables should have been
                 // replaced with the corresponding concrete value
                 unreachable!("symbolic values not replaced!")
             }
-            Literal::Var(v) => OpExpr::Var(v.to_string()),
-            Literal::Flag(v, f) => OpExpr::Flags(v.to_string(), f.to_string()),
+            Literal::Var(v) => VelosiOpExpr::Var(v.to_string()),
+            Literal::Flag(v, f) => VelosiOpExpr::Flags(v.to_string(), f.to_string()),
         }
     }
 }
@@ -283,34 +282,49 @@ impl Expression {
     }
 }
 
-impl From<&Expression> for OpExpr {
+impl From<&Expression> for VelosiOpExpr {
     fn from(prog: &Expression) -> Self {
         use Expression::*;
         match prog {
-            Lit(x) => OpExpr::from(x),
-            //RShift(x, y) => OpExpr::Shr(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y))),
-            LShift(x, y) => OpExpr::Shl(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y))),
-            Div(x, y) => OpExpr::Div(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y))),
-            Mul(x, y) => OpExpr::Mul(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y))),
-            Add(x, y) => OpExpr::Add(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y))),
-            Sub(x, y) => OpExpr::Sub(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y))),
-            And(x, y) => OpExpr::And(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y))),
-            Or(x, y) => OpExpr::Or(Box::new(OpExpr::from(x)), Box::new(OpExpr::from(y))),
-            ShiftMask(x, y, z) => OpExpr::And(
-                Box::new(OpExpr::Shr(
-                    Box::new(OpExpr::from(x)),
-                    Box::new(OpExpr::from(y)),
-                )),
-                Box::new(OpExpr::from(z)),
+            Lit(x) => VelosiOpExpr::from(x),
+            //RShift(x, y) => VelosiOpExpr::Shr(Box::new(VelosiOpExpr::from(x)), Box::new(VelosiOpExpr::from(y))),
+            LShift(x, y) => VelosiOpExpr::Shl(
+                Box::new(VelosiOpExpr::from(x)),
+                Box::new(VelosiOpExpr::from(y)),
             ),
-            Not(x) => OpExpr::Not(Box::new(OpExpr::from(x))),
+            Div(x, y) => VelosiOpExpr::Div(
+                Box::new(VelosiOpExpr::from(x)),
+                Box::new(VelosiOpExpr::from(y)),
+            ),
+            Mul(x, y) => VelosiOpExpr::Mul(
+                Box::new(VelosiOpExpr::from(x)),
+                Box::new(VelosiOpExpr::from(y)),
+            ),
+            Add(x, y) => VelosiOpExpr::Add(
+                Box::new(VelosiOpExpr::from(x)),
+                Box::new(VelosiOpExpr::from(y)),
+            ),
+            Sub(x, y) => VelosiOpExpr::Sub(
+                Box::new(VelosiOpExpr::from(x)),
+                Box::new(VelosiOpExpr::from(y)),
+            ),
+            And(x, y) => VelosiOpExpr::And(
+                Box::new(VelosiOpExpr::from(x)),
+                Box::new(VelosiOpExpr::from(y)),
+            ),
+            Or(x, y) => VelosiOpExpr::Or(
+                Box::new(VelosiOpExpr::from(x)),
+                Box::new(VelosiOpExpr::from(y)),
+            ),
+            ShiftMask(x, y, z) => VelosiOpExpr::And(
+                Box::new(VelosiOpExpr::Shr(
+                    Box::new(VelosiOpExpr::from(x)),
+                    Box::new(VelosiOpExpr::from(y)),
+                )),
+                Box::new(VelosiOpExpr::from(z)),
+            ),
+            Not(x) => VelosiOpExpr::Not(Box::new(VelosiOpExpr::from(x))),
         }
-    }
-}
-
-impl From<Arc<Expression>> for OpExpr {
-    fn from(prog: Arc<Expression>) -> Self {
-        OpExpr::from(prog.as_ref())
     }
 }
 
@@ -425,28 +439,24 @@ impl FieldOp {
         }
     }
 
-    pub fn to_operations(&self, fieldname: &str) -> Vec<Operation> {
+    pub fn to_operations(&self, fieldname: Rc<String>) -> Vec<VelosiOperation> {
         use FieldOp::*;
         match self {
             InsertField(arg) => {
-                vec![Operation::Insert {
-                    field: fieldname.to_string(),
-                    slice: None,
-                    arg: arg.as_ref().into(),
-                }]
+                vec![VelosiOperation::InsertField(fieldname, arg.as_ref().into())]
             }
             InsertFieldSlices(sliceops) => sliceops
                 .iter()
-                .map(|s| Operation::Insert {
-                    field: fieldname.to_string(),
-                    slice: Some(s.0.to_string()),
-                    arg: s.1.as_ref().into(),
+                .map(|s| {
+                    VelosiOperation::InsertSlice(
+                        fieldname.clone(),
+                        Rc::new(s.0.to_string()),
+                        s.1.as_ref().into(),
+                    )
                 })
                 .collect(),
             ReadAction => {
-                vec![Operation::ReadAction {
-                    field: fieldname.to_string(),
-                }]
+                vec![VelosiOperation::ReadAction(fieldname)]
             } // WriteAction => {
               //     vec![Operation::WriteAction {
               //         field: fieldname.to_string(),
@@ -499,16 +509,14 @@ impl FieldActions {
     }
 }
 
-impl From<&FieldActions> for Vec<Operation> {
+impl From<&FieldActions> for Vec<VelosiOperation> {
     fn from(prog: &FieldActions) -> Self {
         let mut ops = Vec::new();
         for op in &prog.1 {
-            ops.extend(op.to_operations(prog.0.as_str()));
+            ops.extend(op.to_operations(Rc::new(prog.0.to_string())));
         }
         // and add the write action
-        ops.push(Operation::WriteAction {
-            field: prog.0.to_string(),
-        });
+        ops.push(VelosiOperation::WriteAction(Rc::new(prog.0.to_string())));
         ops
     }
 }
@@ -700,14 +708,14 @@ impl Default for Program {
     }
 }
 
-impl From<Program> for Vec<Operation> {
+impl From<Program> for Vec<VelosiOperation> {
     fn from(mut prog: Program) -> Self {
-        let mut ops: Vec<Operation> = prog
+        let mut ops: Vec<VelosiOperation> = prog
             .0
             .iter_mut()
-            .flat_map(|o| <&FieldActions as std::convert::Into<Vec<Operation>>>::into(o))
+            .flat_map(|o| <&FieldActions as std::convert::Into<Vec<VelosiOperation>>>::into(o))
             .collect();
-        ops.push(Operation::Return);
+        ops.push(VelosiOperation::Return);
         ops
     }
 }
