@@ -266,6 +266,7 @@ pub fn check_fn_call_args(
     _st: &SymbolTable,
     params: &[Rc<VelosiAstParam>],
     args: &[VelosiAstExpr],
+    callsite: &VelosiTokenStream,
 ) {
     let nparam = params.len();
     let nargs = args.len();
@@ -296,7 +297,12 @@ pub fn check_fn_call_args(
                 nparam - nargs,
                 if nparam - nargs == 1 { "" } else { "s" }
             );
-            let loc = args[nargs].loc().clone();
+            let loc = if nargs == 0 {
+                callsite.clone()
+            } else {
+                args[nargs - 1].loc().clone()
+            };
+
             (hint, loc)
         };
 
@@ -457,8 +463,8 @@ pub fn check_element_ranges(
         if *start >= *end {
             let msg = format!("range overlap: range 0x{:x}..0x{:x} overlaps with range 0x{:x}..0x{:x}  (entries {} andd {})",
                 prev_start, prev_end, start, end, prev_idx, idx);
-            let hint = format!("this entry here (var = {}", idx);
-            let related = format!("this is the overlapping entry (var = {}", idx);
+            let hint = format!("this entry here (var = {})", idx);
+            let related = format!("this is the overlapping entry (var = {})", idx);
             let err = VelosiAstErrBuilder::err(msg)
                 .add_hint(hint)
                 .add_location(elms[*idx].loc.clone())

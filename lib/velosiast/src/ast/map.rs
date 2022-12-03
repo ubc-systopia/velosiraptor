@@ -287,6 +287,7 @@ impl Display for VelosiAstStaticMapExplicit {
 pub struct VelosiAstStaticMapElement {
     pub src: Option<VelosiAstRangeExpr>,
     pub dst: VelosiAstFnCallExpr,
+    pub dst_bitwidth: u64,
     pub offset: Option<VelosiAstExpr>,
     pub loc: VelosiTokenStream,
 }
@@ -295,12 +296,14 @@ impl VelosiAstStaticMapElement {
     pub fn new(
         src: Option<VelosiAstRangeExpr>,
         dst: VelosiAstFnCallExpr,
+        dst_bitwidth: u64,
         offset: Option<VelosiAstExpr>,
         loc: VelosiTokenStream,
     ) -> Self {
         VelosiAstStaticMapElement {
             src,
             dst,
+            dst_bitwidth,
             offset,
             loc,
         }
@@ -319,7 +322,7 @@ impl VelosiAstStaticMapElement {
             .as_ref()
             .map(|offset| offset.clone().flatten(st));
 
-        Self::new(src, dst, offset, self.loc.clone())
+        Self::new(src, dst, self.dst_bitwidth, offset, self.loc.clone())
     }
 
     // converts the parse tree node into an ast node, performing checks
@@ -340,6 +343,14 @@ impl VelosiAstStaticMapElement {
 
         let dest = ast_result_unwrap!(VelosiAstFnCallExpr::from_parse_tree_raw(pt.dst, st), issues);
 
+        // get the destnation unit
+        let destsym = st.lookup(dest.ident()).unwrap(); // that shouldn't fail
+        let bitwidth = if let VelosiAstNode::Unit(u) = &destsym.ast_node {
+            u.input_bitwidth()
+        } else {
+            unreachable!()
+        };
+
         let offset = if let Some(offset) = pt.offset {
             Some(ast_result_unwrap!(
                 VelosiAstExpr::from_parse_tree(offset, st),
@@ -349,7 +360,7 @@ impl VelosiAstStaticMapElement {
             None
         };
 
-        ast_result_return!(Self::new(src, dest, offset, pt.loc), issues)
+        ast_result_return!(Self::new(src, dest, bitwidth, offset, pt.loc), issues)
     }
 }
 
