@@ -46,13 +46,13 @@ use crate::parser::{
     param::parameter,
     state::state,
     terminals::{
-        assign, colon, comma, ident, kw_flags, kw_inbitwidth, kw_outbitwidth, kw_segment,
+        assign, colon, comma, ident, kw_enum, kw_flags, kw_inbitwidth, kw_outbitwidth, kw_segment,
         kw_staticmap, lbrace, lparen, num, rbrace, rparen, semicolon,
     },
 };
 use crate::parsetree::{
-    VelosiParseTreeConstDef, VelosiParseTreeFlags, VelosiParseTreeIdentifier, VelosiParseTreeParam,
-    VelosiParseTreeUnit, VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,
+    VelosiParseTreeConstDef, VelosiParseTreeEnum, VelosiParseTreeFlags, VelosiParseTreeIdentifier,
+    VelosiParseTreeParam, VelosiParseTreeUnit, VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,
 };
 use crate::VelosiTokenStream;
 
@@ -246,6 +246,28 @@ fn unit_body(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vec<VelosiP
     )))(input)
 }
 
+/// parses the enum list
+///
+/// # Arguments
+///
+/// # Return Value
+///
+/// # Grammar
+///
+/// `ENUM_LIST := LIST(COMMA, IDENTIFIER LPAREN LIST(COMMA, IDENTIFIER) RPAREN)
+///
+fn enum_list(
+    input: VelosiTokenStream,
+) -> IResult<VelosiTokenStream, Vec<(VelosiParseTreeIdentifier, Vec<VelosiParseTreeIdentifier>)>> {
+    separated_list0(
+        comma,
+        tuple((
+            ident,
+            cut(delimited(lparen, separated_list0(comma, ident), rparen)),
+        )),
+    )(input)
+}
+
 /// parses and consumes a segment unit declaration
 ///
 /// # Arguments
@@ -314,6 +336,51 @@ fn unit_staticmap(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Velosi
     Ok((i3, VelosiParseTreeUnit::StaticMap(unitdef)))
 }
 
+/// parses and consumes a enum unit declaration
+///
+/// # Arguments
+///
+///  * `input`  - token stream representing the current input position
+///
+/// # Return Value
+///
+/// Result type wrapping a [VelosiParseTreeUnit] and the remaining [VelosiTokenStream] if the
+/// parser succeeded, or an error wrapping the input position if the parser failed.
+///
+/// # Grammar
+///
+/// UNIT_ENUM := KW_ENUM UNIT_HEADER LBRACE UNIT_BODY RBRACE
+///
+fn unit_enum(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnit> {
+    let mut pos = input.clone();
+
+    // try to match the staticmap keyword, if there is no match, return early.
+    let (i1, _) = kw_enum(input)?;
+
+    // we've seen the `enum` keyword, next there needs to be the unit identifier,
+    // followed by some optional parameters and the derived clause.
+    let (i2, (unitname, params, derived)) = cut(unit_header)(i1)?;
+
+    // parse the body within the curly brances
+    let (i3, body) = cut(delimited(lbrace, enum_list, rbrace))(i2)?;
+
+    let body = body
+        .into_iter()
+        .map(|(name, values)| {
+            let mut pos = name.loc.clone();
+            if let Some(last) = values.last() {
+                pos.span_until_start(&last.loc);
+            };
+            VelosiParseTreeUnitNode::EnumEntry(VelosiParseTreeEnum::new(name, values, pos))
+        })
+        .collect();
+
+    pos.span_until_start(&i3);
+
+    let unitdef = VelosiParseTreeUnitDef::new(unitname, params, derived, body, pos);
+    Ok((i3, VelosiParseTreeUnit::Enum(unitdef)))
+}
+
 /// parses and consumes a unit definition with its state, interface etc.
 ///
 /// # Arguments
@@ -327,10 +394,10 @@ fn unit_staticmap(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Velosi
 ///
 /// # Grammar
 ///
-/// UNIT := UNIT_SEGMENT | UNIT_STATICMAP
+/// UNIT := UNIT_SEGMENT | UNIT_STATICMAP | UNIT_ENUM
 ///
 pub fn unit(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnit> {
-    alt((unit_segment, unit_staticmap))(input)
+    alt((unit_segment, unit_staticmap, unit_enum))(input)
 }
 
 #[cfg(test)]

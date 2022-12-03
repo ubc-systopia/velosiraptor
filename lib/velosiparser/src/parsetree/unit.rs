@@ -54,6 +54,12 @@ pub struct VelosiParseTreeMethod {
     pub pos: VelosiTokenStream,
 }
 
+impl VelosiParseTreeMethod {
+    pub fn loc(&self) -> &VelosiTokenStream {
+        &self.pos
+    }
+}
+
 /// Implement the [Display] trait for the [VelosiParseTreeMethod] struct
 impl Display for VelosiParseTreeMethod {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
@@ -97,6 +103,10 @@ impl VelosiParseTreeFlags {
     pub fn new(flags: Vec<VelosiParseTreeIdentifier>, pos: VelosiTokenStream) -> Self {
         VelosiParseTreeFlags { flags, pos }
     }
+
+    pub fn loc(&self) -> &VelosiTokenStream {
+        &self.pos
+    }
 }
 
 impl Display for VelosiParseTreeFlags {
@@ -109,6 +119,45 @@ impl Display for VelosiParseTreeFlags {
             write!(f, "{}", flag.name)?;
         }
         writeln!(f, "}};")
+    }
+}
+
+/// reprsents a flag
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct VelosiParseTreeEnum {
+    /// vector of defined flags
+    pub ident: VelosiParseTreeIdentifier,
+    /// the parameters of the enum
+    pub params: Vec<VelosiParseTreeIdentifier>,
+    /// the position in the source tree where this unit is defined
+    pub pos: VelosiTokenStream,
+}
+
+impl VelosiParseTreeEnum {
+    /// create a new [VelosiParseTreeEnum] with the given flags and position
+    pub fn new(
+        ident: VelosiParseTreeIdentifier,
+        params: Vec<VelosiParseTreeIdentifier>,
+        pos: VelosiTokenStream,
+    ) -> Self {
+        VelosiParseTreeEnum { ident, params, pos }
+    }
+
+    pub fn loc(&self) -> &VelosiTokenStream {
+        &self.pos
+    }
+}
+
+impl Display for VelosiParseTreeEnum {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "{}(", self.ident.name)?;
+        for (i, param) in self.params.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", param.name)?;
+        }
+        writeln!(f, "),")
     }
 }
 
@@ -134,6 +183,8 @@ pub enum VelosiParseTreeUnitNode {
     Method(VelosiParseTreeMethod),
     /// Static map definition
     Map(VelosiParseTreeMap),
+    /// Enum entry
+    EnumEntry(VelosiParseTreeEnum),
 }
 
 /// Implement [Display] for [VelosiParseTreeUnitNode]
@@ -166,6 +217,10 @@ impl Display for VelosiParseTreeUnitNode {
             VelosiParseTreeUnitNode::Map(map) => {
                 write!(f, "  staticmap = ")?;
                 Display::fmt(map, f)?;
+            }
+            VelosiParseTreeUnitNode::EnumEntry(enum_entry) => {
+                write!(f, "  ")?;
+                Display::fmt(enum_entry, f)?;
             }
         }
         writeln!(f)
@@ -264,6 +319,8 @@ pub enum VelosiParseTreeUnit {
     Segment(VelosiParseTreeUnitDef),
     /// This unit is a static map
     StaticMap(VelosiParseTreeUnitDef),
+    /// This is an enum unit
+    Enum(VelosiParseTreeUnitDef),
 }
 
 impl VelosiParseTreeUnit {
@@ -271,6 +328,7 @@ impl VelosiParseTreeUnit {
         match self {
             VelosiParseTreeUnit::Segment(unit) => &unit.loc,
             VelosiParseTreeUnit::StaticMap(unit) => &unit.loc,
+            VelosiParseTreeUnit::Enum(unit) => &unit.loc,
         }
     }
 }
@@ -285,6 +343,10 @@ impl Display for VelosiParseTreeUnit {
             }
             VelosiParseTreeUnit::StaticMap(unit) => {
                 write!(f, "staticmap ")?;
+                Display::fmt(&unit, f)
+            }
+            VelosiParseTreeUnit::Enum(unit) => {
+                write!(f, "enum ")?;
                 Display::fmt(&unit, f)
             }
         }
