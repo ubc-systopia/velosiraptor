@@ -61,6 +61,10 @@ impl VelosiParseTreeConstDef {
             loc,
         }
     }
+
+    pub fn loc(&self) -> &VelosiTokenStream {
+        &self.loc
+    }
 }
 
 /// Implementation of the [Display] trait for the [VelosiParseTreeConstDef] struct

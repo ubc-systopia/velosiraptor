@@ -67,8 +67,8 @@ pub use state::{
 };
 pub use types::{VelosiParseTreeType, VelosiParseTreeTypeInfo};
 pub use unit::{
-    VelosiParseTreeFlags, VelosiParseTreeMethod, VelosiParseTreeUnit, VelosiParseTreeUnitDef,
-    VelosiParseTreeUnitNode,
+    VelosiParseTreeEnum, VelosiParseTreeFlags, VelosiParseTreeMethod, VelosiParseTreeUnit,
+    VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,
 };
 
 /// represents an identifier token
