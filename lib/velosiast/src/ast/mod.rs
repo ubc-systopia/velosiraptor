@@ -77,7 +77,7 @@ pub use param::VelosiAstParam;
 pub use slice::VelosiAstFieldSlice;
 pub use state::{VelosiAstState, VelosiAstStateField};
 pub use types::{VelosiAstType, VelosiAstTypeInfo};
-pub use unit::{VelosiAstUnit, VelosiAstUnitSegment, VelosiAstUnitStaticMap};
+pub use unit::{VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment, VelosiAstUnitStaticMap};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum VelosiAstNode {
@@ -206,8 +206,9 @@ impl Display for VelosiAstIdentifier {
 pub struct VelosiAstRoot {
     pub consts: Vec<Rc<VelosiAstConst>>,
     pub consts_map: HashMap<String, Rc<VelosiAstConst>>,
-    pub units: Vec<VelosiAstUnit>,
-    pub units_map: HashMap<String, VelosiAstUnit>,
+    pub segments_map: HashMap<String, Rc<VelosiAstUnitSegment>>,
+    pub staticmap_map: HashMap<String, Rc<VelosiAstUnitStaticMap>>,
+    pub enum_map: HashMap<String, Rc<VelosiAstUnitEnum>>,
     pub context: String,
 }
 
@@ -216,8 +217,9 @@ impl VelosiAstRoot {
         Self {
             consts: Vec::new(),
             consts_map: HashMap::new(),
-            units: Vec::new(),
-            units_map: HashMap::new(),
+            segments_map: HashMap::new(),
+            staticmap_map: HashMap::new(),
+            enum_map: HashMap::new(),
             context,
         }
     }
@@ -233,8 +235,17 @@ impl VelosiAstRoot {
     }
 
     pub fn add_unit(&mut self, u: VelosiAstUnit) {
-        self.units_map.insert(u.ident_to_string(), u.clone());
-        self.units.push(u);
+        match u {
+            VelosiAstUnit::Segment(s) => {
+                self.segments_map.insert(s.ident_to_string(), s.clone());
+            }
+            VelosiAstUnit::StaticMap(s) => {
+                self.staticmap_map.insert(s.ident_to_string(), s.clone());
+            }
+            VelosiAstUnit::Enum(f) => {
+                self.enum_map.insert(f.ident_to_string(), f.clone());
+            }
+        }
     }
 
     pub fn from_parse_tree(pt: VelosiParseTree) -> AstResult<VelosiAstRoot, VelosiAstIssues> {
@@ -277,12 +288,19 @@ impl VelosiAstRoot {
         ast_result_return!(root, issues)
     }
 
-    pub fn units(&self) -> &[VelosiAstUnit] {
-        self.units.as_slice()
-    }
-
     pub fn consts(&self) -> &[Rc<VelosiAstConst>] {
         self.consts.as_slice()
+    }
+
+    pub fn take_segment_unit(&mut self) -> Option<VelosiAstUnitSegment> {
+        if let Some((k, v)) = self.segments_map.drain().next() {
+            if Rc::weak_count(&v) > 1 || Rc::strong_count(&v) > 1 {
+                panic!("Segment unit {} is still in use!", k);
+            }
+            Some(Rc::try_unwrap(v).unwrap())
+        } else {
+            None
+        }
     }
 }
 
@@ -306,15 +324,27 @@ impl Display for VelosiAstRoot {
             writeln!(f, "  <none>")?;
         }
 
-        writeln!(f, "\nUnits:")?;
+        writeln!(f, "\nSegment Units:")?;
 
-        for u in self.units.iter() {
+        for u in self.segments_map.values() {
             writeln!(f)?;
             Display::fmt(u, f)?;
             writeln!(f)?;
         }
 
-        if self.units.is_empty() {
+        if self.segments_map.is_empty() {
+            writeln!(f, "  <none>")?;
+        }
+
+        writeln!(f, "\nStaticMap Units:")?;
+
+        for u in self.staticmap_map.values() {
+            writeln!(f)?;
+            Display::fmt(u, f)?;
+            writeln!(f)?;
+        }
+
+        if self.segments_map.is_empty() {
             writeln!(f, "  <none>")?;
         }
         writeln!(

@@ -47,7 +47,7 @@ use error::{VelosiAstErrBuilder, VelosiAstIssues};
 use symboltable::{Symbol, SymbolTable};
 use velosiparser::VelosiParseTree;
 
-use crate::ast::{VelosiAstRoot, VelosiAstUnit, VelosiAstUnitSegment, VelosiAstUnitStaticMap};
+use crate::ast::{VelosiAstRoot, VelosiAstUnitSegment, VelosiAstUnitStaticMap};
 
 // custom error definitions
 pub enum AstResult<T, E> {
@@ -141,26 +141,20 @@ impl VelosiAst {
         Self::from_parse_result(VelosiParser::parse_file(filename, true))
     }
 
-    pub fn units(&self) -> &[VelosiAstUnit] {
-        self.root.units()
-    }
-
     pub fn consts(&self) -> &[Rc<VelosiAstConst>] {
         self.root.consts()
     }
 
+    pub fn take_segment_unit(&mut self) -> Option<VelosiAstUnitSegment> {
+        self.root.take_segment_unit()
+    }
+
     pub fn segment_units(&self) -> impl Iterator<Item = &Rc<VelosiAstUnitSegment>> {
-        self.root.units.iter().filter_map(|u| match u {
-            VelosiAstUnit::Segment(s) => Some(s),
-            _ => None,
-        })
+        self.root.segments_map.values()
     }
 
     pub fn staticmap_units(&self) -> impl Iterator<Item = &Rc<VelosiAstUnitStaticMap>> {
-        self.root.units.iter().filter_map(|u| match u {
-            VelosiAstUnit::StaticMap(s) => Some(s),
-            _ => None,
-        })
+        self.root.staticmap_map.values()
     }
 }
 

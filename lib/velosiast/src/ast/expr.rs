@@ -1070,6 +1070,7 @@ impl VelosiAstFnCallExpr {
                     st,
                     m.params.as_slice(),
                     res.args.as_slice(),
+                    &res.loc,
                 );
                 res.etype = m.rtype.typeinfo.clone();
             }
@@ -1079,6 +1080,7 @@ impl VelosiAstFnCallExpr {
                     st,
                     u.params_as_slice(),
                     res.args.as_slice(),
+                    &res.loc,
                 );
                 res.etype = VelosiAstTypeInfo::TypeRef(u.ident().clone());
             }

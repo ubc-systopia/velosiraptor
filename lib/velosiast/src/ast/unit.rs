@@ -39,13 +39,30 @@ use crate::ast::{
     method::{FN_SIG_MAP, FN_SIG_MATCHFLAGS, FN_SIG_PROTECT, FN_SIG_TRANSLATE, FN_SIG_UNMAP},
     types::{VelosiAstType, VelosiAstTypeInfo},
     VelosiAstConst, VelosiAstInterface, VelosiAstMethod, VelosiAstNode, VelosiAstParam,
-    VelosiAstStaticMap,
+    VelosiAstStaticMap, VelosiOperation,
 };
-use crate::error::{VelosiAstErrBuilder, VelosiAstErrDoubleDef, VelosiAstIssues};
+use crate::error::{
+    VelosiAstErrBuilder, VelosiAstErrDoubleDef, VelosiAstErrUndef, VelosiAstIssues,
+};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
 
 use super::flags::VelosiAstFlags;
 use super::{VelosiAstIdentifier, VelosiAstState};
+
+macro_rules! ignored_node (
+    ($node:path, $pst:expr, $issues:expr, $kind:expr) => {
+       {
+            let msg = format!("Ignored unit node: {} definitions are not supported in {}.",
+            stringify!($node), $kind);
+            let hint = "Remove this definition.";
+            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                .add_hint(hint.to_string())
+                .add_location($pst.loc().clone())
+                .build();
+            $issues.push(err);
+        }
+    }
+);
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstUnitSegment {
@@ -69,7 +86,6 @@ pub struct VelosiAstUnitSegment {
 
     pub flags: Option<Rc<VelosiAstFlags>>,
 
-    pub methods: Vec<Rc<VelosiAstMethod>>,
     pub methods_map: HashMap<String, Rc<VelosiAstMethod>>,
 
     /// the location of the type clause
@@ -113,7 +129,6 @@ impl VelosiAstUnitSegment {
         // TODO: handle the drivation...
 
         let mut methods_map = HashMap::new();
-        let mut methods = Vec::new();
         let mut consts_map = HashMap::new();
         let mut consts = Vec::new();
         let mut inbitwidth = None;
@@ -205,18 +220,17 @@ impl VelosiAstUnitSegment {
                     if let Err(e) = st.insert(m.clone().into()) {
                         issues.push(e);
                     } else {
-                        methods.push(m.clone());
                         methods_map.insert(m.ident_to_string(), m);
                     }
                 }
-                VelosiParseTreeUnitNode::Map(map) => {
-                    let msg = "Ignored unit node: Map definitions are not supported in Segments.";
-                    let hint = "Remove the map definition.";
-                    let err = VelosiAstErrBuilder::warn(msg.to_string())
-                        .add_hint(hint.to_string())
-                        .add_location(map.loc().clone())
-                        .build();
-                    issues.push(err);
+                VelosiParseTreeUnitNode::EnumEntry(f) => ignored_node!(
+                    VelosiParseTreeUnitNode::EnumEntry,
+                    f,
+                    &mut issues,
+                    "Segments"
+                ),
+                VelosiParseTreeUnitNode::Map(f) => {
+                    ignored_node!(VelosiParseTreeUnitNode::Map, f, &mut issues, "Segments")
                 }
             }
         }
@@ -245,7 +259,6 @@ impl VelosiAstUnitSegment {
             issues.push(err);
 
             let m = Rc::new(VelosiAstMethod::default_map());
-            methods.push(m.clone());
             methods_map.insert(m.ident_to_string(), m);
         }
 
@@ -259,7 +272,6 @@ impl VelosiAstUnitSegment {
             issues.push(err);
 
             let m = Rc::new(VelosiAstMethod::default_unmap());
-            methods.push(m.clone());
             methods_map.insert(m.ident_to_string(), m);
         }
 
@@ -273,7 +285,6 @@ impl VelosiAstUnitSegment {
             issues.push(err);
 
             let m = Rc::new(VelosiAstMethod::default_protect());
-            methods.push(m.clone());
             methods_map.insert(m.ident_to_string(), m);
         }
 
@@ -287,7 +298,6 @@ impl VelosiAstUnitSegment {
             issues.push(err);
 
             let m = Rc::new(VelosiAstMethod::default_translate());
-            methods.push(m.clone());
             methods_map.insert(m.ident_to_string(), m);
         }
 
@@ -301,7 +311,6 @@ impl VelosiAstUnitSegment {
             issues.push(err);
 
             let m = Rc::new(VelosiAstMethod::default_matchflags());
-            methods.push(m.clone());
             methods_map.insert(m.ident_to_string(), m);
         }
 
@@ -354,7 +363,6 @@ impl VelosiAstUnitSegment {
             consts,
             consts_map,
             flags,
-            methods,
             methods_map,
             loc: pt.loc,
         };
@@ -393,6 +401,10 @@ impl VelosiAstUnitSegment {
         self.methods_map.get(name)
     }
 
+    pub fn methods(&self) -> Box<dyn Iterator<Item = &Rc<VelosiAstMethod>> + '_> {
+        Box::new(self.methods_map.values())
+    }
+
     pub fn vaddr_max(&self) -> u64 {
         if self.inbitwidth < 64 {
             (1u64 << self.inbitwidth) - 1
@@ -406,6 +418,23 @@ impl VelosiAstUnitSegment {
             (1u64 << self.outbitwidth) - 1
         } else {
             u64::MAX
+        }
+    }
+
+    pub fn set_method_ops(&mut self, method: &str, ops: Vec<VelosiOperation>) {
+        if let Some(m) = self.methods_map.get_mut(method) {
+            if let Some(m) = Rc::get_mut(m) {
+                m.ops = ops;
+            }
+
+            if Rc::strong_count(m) > 1 {
+                println!("Method `{}` has > 1 strong references", method);
+            }
+            if Rc::weak_count(m) > 1 {
+                println!("Method `{}` has > 1 weak references", method);
+            }
+        } else {
+            unreachable!("method {} not found", method);
         }
     }
 }
@@ -456,14 +485,14 @@ impl Display for VelosiAstUnitSegment {
         Display::fmt(&self.interface, f)?;
         writeln!(f, ";\n")?;
 
-        for (i, m) in self.methods.iter().enumerate() {
+        for (i, m) in self.methods().enumerate() {
             if i > 0 {
                 writeln!(f, "\n")?;
             }
             Display::fmt(m, f)?;
         }
 
-        if self.methods.is_empty() {
+        if self.methods_map.is_empty() {
             write!(f, "  // no methods")?;
         }
 
@@ -562,36 +591,6 @@ impl VelosiAstUnitStaticMap {
                     utils::check_addressing_width(&mut issues, w, loc.clone());
                     outbitwidth = Some((w, loc));
                 }
-                VelosiParseTreeUnitNode::Flags(f) => {
-                    let msg =
-                        "Ignored unit node: Flags definitions are not supported in StaticMaps.";
-                    let hint = "Remove the flags definition.";
-                    let err = VelosiAstErrBuilder::warn(msg.to_string())
-                        .add_hint(hint.to_string())
-                        .add_location(f.pos.clone())
-                        .build();
-                    issues.push(err);
-                }
-                VelosiParseTreeUnitNode::State(pst) => {
-                    let msg =
-                        "Ignored unit node: State definitions are not supported in StaticMaps.";
-                    let hint = "Remove the state definition.";
-                    let err = VelosiAstErrBuilder::warn(msg.to_string())
-                        .add_hint(hint.to_string())
-                        .add_location(pst.loc().clone())
-                        .build();
-                    issues.push(err);
-                }
-                VelosiParseTreeUnitNode::Interface(pst) => {
-                    let msg =
-                        "Ignored unit node: Interface definitions are not supported in StaticMaps.";
-                    let hint = "Remove the interface definition.";
-                    let err = VelosiAstErrBuilder::warn(msg.to_string())
-                        .add_hint(hint.to_string())
-                        .add_location(pst.loc().clone())
-                        .build();
-                    issues.push(err);
-                }
                 VelosiParseTreeUnitNode::Method(method) => {
                     let m = Rc::new(ast_result_unwrap!(
                         VelosiAstMethod::from_parse_tree(method, st),
@@ -619,6 +618,24 @@ impl VelosiAstUnitStaticMap {
                         map = Some(s);
                     }
                 }
+                VelosiParseTreeUnitNode::Flags(f) => {
+                    ignored_node!(VelosiParseTreeUnitNode::Flags, f, &mut issues, "StaticMap")
+                }
+                VelosiParseTreeUnitNode::State(f) => {
+                    ignored_node!(VelosiParseTreeUnitNode::State, f, &mut issues, "StaticMap")
+                }
+                VelosiParseTreeUnitNode::Interface(f) => ignored_node!(
+                    VelosiParseTreeUnitNode::Interface,
+                    f,
+                    &mut issues,
+                    "StaticMap"
+                ),
+                VelosiParseTreeUnitNode::EnumEntry(f) => ignored_node!(
+                    VelosiParseTreeUnitNode::EnumEntry,
+                    f,
+                    &mut issues,
+                    "StaticMap"
+                ),
             }
         }
 
@@ -782,9 +799,328 @@ impl Display for VelosiAstUnitStaticMap {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
+pub struct VelosiAstUnitEnum {
+    /// the name of the unit
+    pub ident: VelosiAstIdentifier,
+    /// the parameters of the unit
+    pub params: Vec<Rc<VelosiAstParam>>,
+
+    pub inbitwidth: u64,
+    pub outbitwidth: u64,
+
+    pub enums: Vec<(VelosiAstIdentifier, Vec<VelosiAstIdentifier>)>,
+
+    /// the location of the type clause
+    pub loc: VelosiTokenStream,
+}
+
+impl VelosiAstUnitEnum {
+    // converts the parse tree node into an ast node, performing checks
+    pub fn from_parse_tree(
+        pt: VelosiParseTreeUnitDef,
+        st: &mut SymbolTable,
+    ) -> AstResult<VelosiAstUnit, VelosiAstIssues> {
+        let mut issues = VelosiAstIssues::new();
+
+        // create a new context in the symbol table
+        st.create_context("unit".to_string());
+
+        // convert all the unit parameters
+        let mut params = Vec::new();
+        for p in pt.params.into_iter() {
+            let param = Rc::new(ast_result_unwrap!(
+                VelosiAstParam::from_parse_tree(p, false, st),
+                issues
+            ));
+
+            // add the param to the symbol table, if it doesn't exist already
+            if let Err(e) = st.insert(param.clone().into()) {
+                issues.push(e);
+            } else {
+                params.push(param);
+            }
+        }
+
+        // TODO: handle the drivation...
+
+        let mut enums = Vec::new();
+        let mut inbitwidth = 0;
+        let mut outbitwidth = 0;
+        for node in pt.nodes.into_iter() {
+            match node {
+                VelosiParseTreeUnitNode::EnumEntry(e) => {
+                    // covert the identifiers..
+                    let ident = VelosiAstIdentifier::from(e.ident);
+
+                    let args: Vec<VelosiAstIdentifier> = e
+                        .params
+                        .into_iter()
+                        .map(|p| {
+                            let id = VelosiAstIdentifier::from(p);
+                            utils::check_param_exists(&mut issues, st, &id);
+                            id
+                        })
+                        .collect();
+
+                    if let Some(sym) = st.lookup(ident.ident()) {
+                        if let VelosiAstNode::Unit(u) = &sym.ast_node {
+                            if let VelosiAstUnit::Enum(e) = u {
+                                let msg = format!(
+                                    "unit `{}` is an enum. nested enums are not supported",
+                                    ident
+                                );
+                                // let hint = "merge the two enums together";
+                                let err = VelosiAstErrBuilder::err(msg)
+                                    // .add_hint(hint.to_string())
+                                    .add_location(ident.loc.clone())
+                                    .add_related_location(
+                                        "merge with this enum".to_string(),
+                                        e.loc.clone(),
+                                    )
+                                    .build();
+                                issues.push(err);
+                            }
+
+                            if inbitwidth == 0 {
+                                inbitwidth = u.input_bitwidth();
+                            } else if inbitwidth != u.input_bitwidth() {
+                                let msg = format!(
+                                    "unit `{}` has a different inbitwidth to the enum",
+                                    ident
+                                );
+                                let hint = format!(
+                                    "expected {} bits but referenced unit has {}",
+                                    inbitwidth,
+                                    u.input_bitwidth()
+                                );
+                                let err = VelosiAstErrBuilder::err(msg)
+                                    .add_hint(hint)
+                                    .add_location(ident.loc.clone())
+                                    .build();
+                                issues.push(err);
+                            }
+
+                            // if outbitwidth == 0 {
+                            //     outbitwidth = u.output_bitwidth();
+                            // } else if outbitwidth != u.output_bitwidth() {
+                            //     let msg = format!("unit `{}` has a different outbitwidth to the enum", ident);
+                            //     let hint = format!("expected {} bits but referenced unit has {}", outbitwidth, u.output_bitwidth());
+                            //     let err = VelosiAstErrBuilder::err(msg)
+                            //     .add_hint(hint)
+                            //     .add_location(ident.loc.clone())
+                            //     .build();
+                            //     issues.push(err);
+                            // }
+
+                            // now we need to match
+                            let nparam = u.params_as_slice().len();
+                            let nargs = args.len();
+
+                            if nparam != nargs {
+                                let msg = format!(
+                                    "this unit takes {} argument{} but {} argument{} supplied",
+                                    nparam,
+                                    if nparam == 1 { "" } else { "s" },
+                                    nargs,
+                                    if nargs == 1 { "s were" } else { " was" }
+                                );
+
+                                let (hint, loc) = if nparam < nargs {
+                                    // too many arguments
+                                    let hint = format!(
+                                        "remove the {} unexpected argument{}",
+                                        nargs - nparam,
+                                        if nargs - nparam == 1 { "" } else { "s" }
+                                    );
+                                    let mut loc = args[nargs - nparam].loc.clone();
+                                    loc.expand_until_end(&args[nargs - 1].loc);
+                                    (hint, loc)
+                                } else {
+                                    // to few arguments
+                                    let hint = format!(
+                                        "add the {} missing argument{}",
+                                        nparam - nargs,
+                                        if nparam - nargs == 1 { "" } else { "s" }
+                                    );
+                                    let loc = if nargs == 0 {
+                                        ident.loc.clone()
+                                    } else {
+                                        args[nargs - 1].loc.clone()
+                                    };
+                                    (hint, loc)
+                                };
+
+                                let err = VelosiAstErrBuilder::err(msg)
+                                    .add_hint(hint)
+                                    .add_location(loc)
+                                    //.add_related_location("parameters defined here".to_string(), m.loc.clone())
+                                    .build();
+                                issues.push(err);
+                            }
+
+                            for (i, arg) in args.iter().enumerate() {
+                                if i >= nparam {
+                                    let msg = "unexpected argument";
+                                    let hint = "remove this argument to the unit instantiation";
+                                    let err = VelosiAstErrBuilder::err(msg.to_string())
+                                        .add_hint(hint.to_string())
+                                        .add_location(arg.loc.clone())
+                                        .build();
+                                    issues.push(err);
+                                    continue;
+                                }
+
+                                let param = &u.params_as_slice()[i];
+
+                                if let Some(s) = st.lookup(arg.ident()) {
+                                    if let VelosiAstNode::Param(p) = &s.ast_node {
+                                        // there is a unit with that type, so we're good
+                                        if !param.ptype.typeinfo.compatible(&p.ptype.typeinfo) {
+                                            let msg = "mismatched types";
+                                            let hint = format!(
+                                                "expected {}, found {}",
+                                                param.ptype, p.ptype
+                                            );
+                                            let err = VelosiAstErrBuilder::err(msg.to_string())
+                                                .add_hint(hint)
+                                                .add_location(arg.loc.clone())
+                                                .build();
+                                            issues.push(err);
+                                        }
+                                    } else {
+                                        unreachable!()
+                                    }
+                                }
+                            }
+                        } else {
+                            let err =
+                                VelosiAstErrUndef::from_ident_with_other(&ident, sym.loc().clone());
+                            issues.push(err.into());
+                        }
+                    } else {
+                        let err = VelosiAstErrUndef::from_ident(&ident);
+                        issues.push(err.into());
+                    }
+                }
+                VelosiParseTreeUnitNode::Const(c) => {
+                    ignored_node!(VelosiParseTreeUnitNode::Const, c, &mut issues, "Enum")
+                }
+                VelosiParseTreeUnitNode::InBitWidth(_, _) => todo!(),
+                VelosiParseTreeUnitNode::OutBitWidth(_, _) => todo!(),
+                VelosiParseTreeUnitNode::Flags(f) => {
+                    ignored_node!(VelosiParseTreeUnitNode::Flags, f, &mut issues, "Enum")
+                }
+                VelosiParseTreeUnitNode::State(pst) => {
+                    ignored_node!(VelosiParseTreeUnitNode::State, pst, &mut issues, "Enum")
+                }
+                VelosiParseTreeUnitNode::Interface(pst) => {
+                    ignored_node!(VelosiParseTreeUnitNode::Interface, pst, &mut issues, "Enum")
+                }
+                VelosiParseTreeUnitNode::Method(m) => {
+                    ignored_node!(VelosiParseTreeUnitNode::Method, m, &mut issues, "Enum")
+                }
+                VelosiParseTreeUnitNode::Map(m) => {
+                    ignored_node!(VelosiParseTreeUnitNode::Map, m, &mut issues, "Enum")
+                }
+            }
+        }
+
+        let res = Self {
+            ident: VelosiAstIdentifier::from(pt.name),
+            params,
+            inbitwidth,
+            outbitwidth,
+            enums,
+            loc: pt.loc,
+        };
+
+        // and restore the context again.
+        st.drop_context();
+
+        ast_result_return!(VelosiAstUnit::Enum(Rc::new(res)), issues)
+    }
+
+    /// obtains a reference to the identifier
+    pub fn ident(&self) -> &Rc<String> {
+        self.ident.ident()
+    }
+
+    /// obtains a copy of the identifer
+    pub fn ident_to_string(&self) -> String {
+        self.ident.as_str().to_string()
+    }
+
+    /// obtains a reference to the fully qualified path
+    pub fn path(&self) -> &Rc<String> {
+        &self.ident.path
+    }
+
+    /// obtains a copy of the fully qualified path
+    pub fn path_to_string(&self) -> String {
+        self.ident.path.as_str().to_string()
+    }
+
+    pub fn params_as_slice(&self) -> &[Rc<VelosiAstParam>] {
+        self.params.as_slice()
+    }
+
+    pub fn vaddr_max(&self) -> u64 {
+        if self.inbitwidth < 64 {
+            (1u64 << self.inbitwidth) - 1
+        } else {
+            u64::MAX
+        }
+    }
+
+    pub fn paddr_max(&self) -> u64 {
+        if self.outbitwidth < 64 {
+            (1u64 << self.outbitwidth) - 1
+        } else {
+            u64::MAX
+        }
+    }
+
+    pub fn get_unit_names(&self) -> Vec<&str> {
+        self.enums.iter().map(|(ident, _)| ident.as_str()).collect()
+    }
+}
+
+/// Implementation of [Display] for [VelosiAstUnitEnum]
+impl Display for VelosiAstUnitEnum {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "enum {} (", self.ident)?;
+        for (i, p) in self.params.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            Display::fmt(p, f)?;
+        }
+        write!(f, ")")?;
+        writeln!(f, " {{")?;
+
+        writeln!(f, "  inbitwidth = {};", self.inbitwidth)?;
+        writeln!(f, "  outbitwidth = {};\n", self.outbitwidth)?;
+
+        for (e, p) in &self.enums {
+            write!(f, "  {}(", e)?;
+            for (i, p) in p.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                write!(f, "{}", p)?;
+            }
+            writeln!(f, "  ),")?;
+        }
+
+        write!(f, "\n}}")
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub enum VelosiAstUnit {
     Segment(Rc<VelosiAstUnitSegment>),
     StaticMap(Rc<VelosiAstUnitStaticMap>),
+    Enum(Rc<VelosiAstUnitEnum>),
 }
 
 impl VelosiAstUnit {
@@ -797,6 +1133,7 @@ impl VelosiAstUnit {
         match pt {
             Segment(pt) => VelosiAstUnitSegment::from_parse_tree(pt, st),
             StaticMap(pt) => VelosiAstUnitStaticMap::from_parse_tree(pt, st),
+            Enum(pt) => VelosiAstUnitEnum::from_parse_tree(pt, st),
         }
     }
 
@@ -806,6 +1143,7 @@ impl VelosiAstUnit {
         match self {
             Segment(s) => s.ident(),
             StaticMap(s) => s.ident(),
+            Enum(e) => e.ident(),
         }
     }
 
@@ -815,6 +1153,7 @@ impl VelosiAstUnit {
         match self {
             Segment(s) => s.ident_to_string(),
             StaticMap(s) => s.ident_to_string(),
+            Enum(e) => e.ident_to_string(),
         }
     }
 
@@ -824,6 +1163,7 @@ impl VelosiAstUnit {
         match self {
             Segment(s) => s.path(),
             StaticMap(s) => s.path(),
+            Enum(e) => e.path(),
         }
     }
 
@@ -833,6 +1173,7 @@ impl VelosiAstUnit {
         match self {
             Segment(s) => s.path_to_string(),
             StaticMap(s) => s.path_to_string(),
+            Enum(e) => e.path_to_string(),
         }
     }
 
@@ -841,6 +1182,7 @@ impl VelosiAstUnit {
         match self {
             Segment(pt) => pt.params_as_slice(),
             StaticMap(pt) => pt.params_as_slice(),
+            Enum(pt) => pt.params_as_slice(),
         }
     }
 
@@ -849,6 +1191,7 @@ impl VelosiAstUnit {
         match self {
             Segment(s) => s.inbitwidth,
             StaticMap(s) => s.inbitwidth,
+            Enum(e) => e.inbitwidth,
         }
     }
 
@@ -857,6 +1200,7 @@ impl VelosiAstUnit {
         match self {
             StaticMap(staticmap) => staticmap.vaddr_max(),
             Segment(segment) => segment.vaddr_max(),
+            Enum(e) => e.vaddr_max(),
         }
     }
 
@@ -865,14 +1209,16 @@ impl VelosiAstUnit {
         match self {
             StaticMap(staticmap) => staticmap.paddr_max(),
             Segment(segment) => segment.paddr_max(),
+            Enum(e) => e.paddr_max(),
         }
     }
 
-    pub fn methods(&self) -> &[Rc<VelosiAstMethod>] {
+    pub fn methods(&self) -> Box<dyn Iterator<Item = &Rc<VelosiAstMethod>> + '_> {
         use VelosiAstUnit::*;
         match self {
-            StaticMap(staticmap) => staticmap.methods.as_slice(),
-            Segment(segment) => segment.methods.as_slice(),
+            StaticMap(staticmap) => Box::new(staticmap.methods.iter()),
+            Segment(segment) => Box::new(segment.methods()),
+            Enum(_) => Box::new(std::iter::Empty::default()),
         }
     }
 
@@ -881,6 +1227,7 @@ impl VelosiAstUnit {
         match self {
             StaticMap(staticmap) => staticmap.get_method(name),
             Segment(segment) => segment.get_method(name),
+            Enum(_) => None,
         }
     }
 
@@ -889,6 +1236,7 @@ impl VelosiAstUnit {
         match self {
             StaticMap(staticmap) => staticmap.consts.as_slice(),
             Segment(segment) => segment.consts.as_slice(),
+            Enum(_) => &[],
         }
     }
 
@@ -897,6 +1245,7 @@ impl VelosiAstUnit {
         match self {
             Segment(s) => &s.loc,
             StaticMap(s) => &s.loc,
+            Enum(e) => &e.loc,
         }
     }
 }
@@ -924,6 +1273,7 @@ impl Display for VelosiAstUnit {
         match self {
             VelosiAstUnit::Segment(s) => Display::fmt(s, f),
             VelosiAstUnit::StaticMap(s) => Display::fmt(s, f),
+            VelosiAstUnit::Enum(e) => Display::fmt(e, f),
         }
     }
 }
