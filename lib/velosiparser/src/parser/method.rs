@@ -30,7 +30,7 @@ use nom::{
     branch::alt,
     combinator::{cut, opt},
     multi::{many0, separated_list0},
-    sequence::{delimited, preceded, terminated},
+    sequence::{delimited, preceded, terminated, tuple},
 };
 
 // library internal includes
@@ -39,8 +39,8 @@ use crate::parser::{
     expr::{expr, quantifier_expr},
     param::parameter,
     terminals::{
-        comma, ident, kw_fn, kw_requires, lbrace, lparen, rarrow, rbrace, rparen, semicolon,
-        typeinfo,
+        comma, ident, kw_abstract, kw_fn, kw_requires, kw_synth, lbrace, lparen, rarrow, rbrace,
+        rparen, semicolon, typeinfo,
     },
 };
 use crate::parsetree::{
@@ -185,7 +185,7 @@ pub fn method(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPars
     let mut pos = input.clone();
 
     // parse and consume fn keyword
-    let (i1, _) = kw_fn(input)?;
+    let (i1, (abs, synth, _)) = tuple((opt(kw_abstract), opt(kw_synth), kw_fn))(input)?;
 
     // get the method identifier, fail if there is not an identifier
     let (i2, name) = cut(ident)(i1)?;
@@ -201,7 +201,7 @@ pub fn method(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPars
     let (i5, requires) = many0(require_clauses)(i4)?;
 
     // try to parse the method body
-    let (i6, body) = opt(method_body)(i5)?;
+    let (i6, (body, _)) = tuple((opt(method_body), opt(semicolon)))(i5)?;
 
     let body = if let Some(Some(e)) = body {
         Some(e)
@@ -214,6 +214,8 @@ pub fn method(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPars
 
     let method = VelosiParseTreeMethod {
         name,
+        is_abstract: abs.is_some(),
+        is_synth: synth.is_some(),
         params,
         rettype,
         requires,

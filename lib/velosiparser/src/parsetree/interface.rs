@@ -144,15 +144,18 @@ impl VelosiParseTreeInterfaceFieldMemory {
 
 impl Display for VelosiParseTreeInterfaceFieldMemory {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "mem {} [", self.name)?;
+        write!(f, "    mem {} [ ", self.name)?;
         write!(f, "{}, {}, ", self.base, self.offset)?;
-        write!(f, "{}", self.size)?;
-        writeln!(f, "] {{")?;
-        for n in &self.nodes {
-            Display::fmt(n, f)?;
-            writeln!(f, ",")?;
+        write!(f, "{} ]", self.size)?;
+        if !self.nodes.is_empty() {
+            writeln!(f, " {{")?;
+            for n in &self.nodes {
+                Display::fmt(n, f)?;
+                writeln!(f, ",")?;
+            }
+            write!(f, "    }}")?;
         }
-        write!(f, "    }}")
+        Ok(())
     }
 }
 
@@ -189,15 +192,18 @@ impl VelosiParseTreeInterfaceFieldMmio {
 
 impl Display for VelosiParseTreeInterfaceFieldMmio {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "mmio {} [", self.name)?;
+        write!(f, "    mmio {} [ ", self.name)?;
         write!(f, "{}, {}, ", self.base, self.offset)?;
-        write!(f, "{}", self.size)?;
-        writeln!(f, "] {{")?;
-        for n in &self.nodes {
-            Display::fmt(n, f)?;
-            writeln!(f, ",")?;
+        write!(f, "{} ]", self.size)?;
+        if !self.nodes.is_empty() {
+            writeln!(f, " {{")?;
+            for n in &self.nodes {
+                Display::fmt(n, f)?;
+                writeln!(f, ",")?;
+            }
+            write!(f, "    }}")?;
         }
-        write!(f, "    }}")
+        Ok(())
     }
 }
 
@@ -228,14 +234,17 @@ impl VelosiParseTreeInterfaceFieldRegister {
 
 impl Display for VelosiParseTreeInterfaceFieldRegister {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "reg {} [", self.name)?;
-        write!(f, "{}", self.size)?;
-        writeln!(f, "] {{")?;
-        for n in &self.nodes {
-            Display::fmt(n, f)?;
-            writeln!(f, ",")?;
+        write!(f, "    reg {} [ ", self.name)?;
+        write!(f, "{} ]", self.size)?;
+        if !self.nodes.is_empty() {
+            writeln!(f, " {{")?;
+            for n in &self.nodes {
+                Display::fmt(n, f)?;
+                writeln!(f, ",")?;
+            }
+            write!(f, "    }}")?;
         }
-        write!(f, "    }}")
+        Ok(())
     }
 }
 

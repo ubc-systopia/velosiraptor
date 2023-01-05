@@ -42,6 +42,10 @@ use crate::VelosiTokenStream;
 pub struct VelosiParseTreeMethod {
     /// the name of the unit (identifier)
     pub name: VelosiParseTreeIdentifier,
+    /// whether this is an abstract method
+    pub is_abstract: bool,
+    /// whether this is a method to be synthesized
+    pub is_synth: bool,
     /// the unit parameters
     pub params: Vec<VelosiParseTreeParam>,
     /// the name of the derrived unit
@@ -63,7 +67,14 @@ impl VelosiParseTreeMethod {
 /// Implement the [Display] trait for the [VelosiParseTreeMethod] struct
 impl Display for VelosiParseTreeMethod {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "  fn {}(", self.name)?;
+        write!(f, "  ")?;
+        if self.is_abstract {
+            write!(f, "abstract ")?;
+        }
+        if self.is_synth {
+            write!(f, "synth ")?;
+        }
+        write!(f, "fn {}(", self.name)?;
         for (i, param) in self.params.iter().enumerate() {
             if i > 0 {
                 write!(f, ", ")?;
@@ -251,6 +262,8 @@ pub struct VelosiParseTreeUnitDef {
     pub derived: Option<VelosiParseTreeIdentifier>,
     /// the nodes defined in the parse tree
     pub nodes: Vec<VelosiParseTreeUnitNode>,
+    /// whether this is an abstract unit
+    pub is_abstract: bool,
     /// the position in the source tree where this unit is defined
     pub loc: VelosiTokenStream,
 }
@@ -259,6 +272,7 @@ impl VelosiParseTreeUnitDef {
     pub fn new(
         name: VelosiParseTreeIdentifier,
         params: Vec<VelosiParseTreeParam>,
+        is_abstract: bool,
         derived: Option<VelosiParseTreeIdentifier>,
         nodes: Vec<VelosiParseTreeUnitNode>,
         loc: VelosiTokenStream,
@@ -268,6 +282,7 @@ impl VelosiParseTreeUnitDef {
             params,
             derived,
             nodes,
+            is_abstract,
             loc,
         }
     }
@@ -338,10 +353,16 @@ impl Display for VelosiParseTreeUnit {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
             VelosiParseTreeUnit::Segment(unit) => {
+                if unit.is_abstract {
+                    write!(f, "abstract ")?;
+                }
                 write!(f, "segment ")?;
                 Display::fmt(&unit, f)
             }
             VelosiParseTreeUnit::StaticMap(unit) => {
+                if unit.is_abstract {
+                    write!(f, "abstract ")?;
+                }
                 write!(f, "staticmap ")?;
                 Display::fmt(&unit, f)
             }
