@@ -351,18 +351,3 @@ fn fake_field_type_test() {
     let ts = VelosiLexer::lex_string(state_string.to_string()).unwrap();
     assert!(state(ts).is_err());
 }
-
-#[test]
-fn missing_semicolon_test() {
-    let state_string = "state = RegisterVelosiParseTreeState {\
-        base [_, 0, 1] {\
-            0  0 enabled;\
-            1  1 read;\
-            2  2 write;\
-        };
-    }";
-    let state_string = "state = BadType;";
-    let ts = VelosiLexer::lex_string(state_string.to_string()).unwrap();
-
-    assert!(state(ts).is_err());
-}

@@ -205,6 +205,10 @@ keywordparser!(pub kw_import, VelosiKeyword::Import);
 keywordparser!(pub kw_const, VelosiKeyword::Const);
 keywordparser!(pub kw_map, VelosiKeyword::Map);
 keywordparser!(pub kw_enum, VelosiKeyword::Enum);
+
+keywordparser!(pub kw_synth, VelosiKeyword::Synth);
+keywordparser!(pub kw_abstract, VelosiKeyword::Abstract);
+
 // keywordparser!(pub kw_let, VelosiKeyword::Let);
 keywordparser!(pub kw_if, VelosiKeyword::If);
 keywordparser!(pub kw_else, VelosiKeyword::Else);

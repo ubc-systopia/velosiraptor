@@ -183,22 +183,22 @@ use velosilexer::VelosiLexer;
 
 #[test]
 fn test_map_simple() {
-    let content = "staticmap = [UnitA(), UnitB()];";
+    let content = "mapdef = [UnitA(), UnitB()];";
     let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
     let res = staticmap(ts);
     assert!(res.is_ok());
 
-    let content = "staticmap = [UnitA()];";
+    let content = "mapdef = [UnitA()];";
     let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
     let res = staticmap(ts);
     assert!(res.is_ok());
 
-    let content = "staticmap = [UnitA() @ a];";
+    let content = "mapdef = [UnitA() @ a];";
     let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
     let res = staticmap(ts);
     assert!(res.is_ok());
 
-    let content = "staticmap = [ 0.. 1 => UnitA()];";
+    let content = "mapdef = [ 0.. 1 => UnitA()];";
     let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
     let res = staticmap(ts);
     assert!(res.is_ok());
@@ -206,17 +206,17 @@ fn test_map_simple() {
 
 #[test]
 fn test_map_comprehension() {
-    let content = "staticmap = [UnitA() for i in 0..512];";
+    let content = "mapdef = [UnitA() for i in 0..512];";
     let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
     let res = staticmap(ts);
     assert!(res.is_ok());
 
-    let content = "staticmap = [UnitA() @ i for i in 0..512];";
+    let content = "mapdef = [UnitA() @ i for i in 0..512];";
     let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
     let res = staticmap(ts);
     assert!(res.is_ok());
 
-    let content = "staticmap = [0..1 => UnitA() @ i for i in 0..512];";
+    let content = "mapdef = [0..1 => UnitA() @ i for i in 0..512];";
     let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
     let res = staticmap(ts);
     assert!(res.is_ok());

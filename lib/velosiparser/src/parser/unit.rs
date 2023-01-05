@@ -46,8 +46,8 @@ use crate::parser::{
     param::parameter,
     state::state,
     terminals::{
-        assign, colon, comma, ident, kw_enum, kw_flags, kw_inbitwidth, kw_outbitwidth, kw_segment,
-        kw_staticmap, lbrace, lparen, num, rbrace, rparen, semicolon,
+        assign, colon, comma, ident, kw_abstract, kw_enum, kw_flags, kw_inbitwidth, kw_outbitwidth,
+        kw_segment, kw_staticmap, lbrace, lparen, num, rbrace, rparen, semicolon,
     },
 };
 use crate::parsetree::{
@@ -281,13 +281,13 @@ fn enum_list(
 ///
 /// # Grammar
 ///
-/// UNIT_STATICMAP := KW_SEGMENT UNIT_HEADER LBRACE UNIT_BODY RBRACE
+/// UNIT_STATICMAP := KW_ABSTRACT? KW_SEGMENT UNIT_HEADER LBRACE UNIT_BODY RBRACE
 ///
 fn unit_segment(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnit> {
     let mut pos = input.clone();
 
     // try to match the segment keyword, if there is no match, return early.
-    let (i1, _) = kw_segment(input)?;
+    let (i1, (abs, _)) = tuple((opt(kw_abstract), kw_segment))(input)?;
 
     // we've seen the `staticmap` keyword, next there needs to be the unit identifier,
     // followed bby some optional parameters and the derived clause.
@@ -298,7 +298,7 @@ fn unit_segment(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPa
 
     pos.span_until_start(&i3);
 
-    let unitdef = VelosiParseTreeUnitDef::new(unitname, params, derived, body, pos);
+    let unitdef = VelosiParseTreeUnitDef::new(unitname, params, abs.is_some(), derived, body, pos);
     Ok((i3, VelosiParseTreeUnit::Segment(unitdef)))
 }
 
@@ -315,13 +315,13 @@ fn unit_segment(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPa
 ///
 /// # Grammar
 ///
-/// UNIT_STATICMAP := KW_STATICMAP UNIT_HEADER LBRACE UNIT_BODY RBRACE
+/// UNIT_STATICMAP := KW_ABSTRACT? KW_STATICMAP UNIT_HEADER LBRACE UNIT_BODY RBRACE
 ///
 fn unit_staticmap(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnit> {
     let mut pos = input.clone();
 
     // try to match the staticmap keyword, if there is no match, return early.
-    let (i1, _) = kw_staticmap(input)?;
+    let (i1, (abs, _)) = tuple((opt(kw_abstract), kw_staticmap))(input)?;
 
     // we've seen the `staticmap` keyword, next there needs to be the unit identifier,
     // followed bby some optional parameters and the derived clause.
@@ -332,7 +332,7 @@ fn unit_staticmap(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Velosi
 
     pos.span_until_start(&i3);
 
-    let unitdef = VelosiParseTreeUnitDef::new(unitname, params, derived, body, pos);
+    let unitdef = VelosiParseTreeUnitDef::new(unitname, params, abs.is_some(), derived, body, pos);
     Ok((i3, VelosiParseTreeUnit::StaticMap(unitdef)))
 }
 
@@ -377,7 +377,7 @@ fn unit_enum(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParse
 
     pos.span_until_start(&i3);
 
-    let unitdef = VelosiParseTreeUnitDef::new(unitname, params, derived, body, pos);
+    let unitdef = VelosiParseTreeUnitDef::new(unitname, params, false, derived, body, pos);
     Ok((i3, VelosiParseTreeUnit::Enum(unitdef)))
 }
 
