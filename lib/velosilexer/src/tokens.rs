@@ -54,6 +54,14 @@ pub enum VelosiKeyword {
     Enum,
 
     //
+    // modifiers
+    //
+    /// indicates a synthesis target (function)
+    Synth,
+    /// unit or function that is abstract
+    Abstract,
+
+    //
     // Unit "fields"
     //
     /// the unit input bitwidth
@@ -165,6 +173,9 @@ impl VelosiKeyword {
             VelosiKeyword::Segment => "segment",
             VelosiKeyword::Enum => "enum",
             //
+            VelosiKeyword::Synth => "synth",
+            VelosiKeyword::Abstract => "abstract",
+            //
             VelosiKeyword::InBitWidth => "inbitwidth",
             VelosiKeyword::OutBitWidth => "outbitwidth",
             VelosiKeyword::State => "state",
@@ -206,7 +217,7 @@ impl VelosiKeyword {
             VelosiKeyword::Invariant => "invariant",
             //
             VelosiKeyword::Const => "const",
-            VelosiKeyword::Map => "map",
+            VelosiKeyword::Map => "mapdef",
             VelosiKeyword::Import => "import",
             //
             VelosiKeyword::None => "None",
@@ -223,6 +234,9 @@ impl<'a> TryFrom<&'a str> for VelosiKeyword {
             "staticmap" => Ok(VelosiKeyword::StaticMap),
             "segment" => Ok(VelosiKeyword::Segment),
             "enum" => Ok(VelosiKeyword::Enum),
+            //
+            "synth" => Ok(VelosiKeyword::Synth),
+            "abstract" => Ok(VelosiKeyword::Abstract),
             //
             "inbitwidth" => Ok(VelosiKeyword::InBitWidth),
             "outbitwidth" => Ok(VelosiKeyword::OutBitWidth),
@@ -522,7 +536,7 @@ impl VelosiTokenKind {
             matches!(
                 ident.as_str(),
                 // for future use
-                "abstract" | "while" | "matches"
+                "while" | "matches"
             )
         } else {
             false
@@ -572,7 +586,7 @@ impl TokKind for VelosiTokenKind {
             matches!(
                 ident.as_str(),
                 // for future use
-                "abstract" | "while" | "matches"
+                "while" | "matches"
             )
         } else {
             false
@@ -625,9 +639,13 @@ fn test_enum_str() {
     assert_eq!(VelosiKeyword::Segment.as_str(), "segment");
     assert_eq!("staticmap".try_into(), Ok(VelosiKeyword::StaticMap));
     assert_eq!(VelosiKeyword::StaticMap.as_str(), "staticmap");
-
     assert_eq!("enum".try_into(), Ok(VelosiKeyword::Enum));
-    assert_eq!(VelosiKeyword::Enum.as_str(), "staticmap");
+    assert_eq!(VelosiKeyword::Enum.as_str(), "enum");
+
+    assert_eq!("synth".try_into(), Ok(VelosiKeyword::Synth));
+    assert_eq!(VelosiKeyword::Synth.as_str(), "synth");
+    assert_eq!("abstract".try_into(), Ok(VelosiKeyword::Abstract));
+    assert_eq!(VelosiKeyword::Abstract.as_str(), "abstract");
 
     assert_eq!("inbitwidth".try_into(), Ok(VelosiKeyword::InBitWidth));
     assert_eq!(VelosiKeyword::InBitWidth.as_str(), "inbitwidth");
