@@ -204,7 +204,10 @@ fn add_method_assms(smt: &mut Smt2Context, method: &VelosiAstMethod) {
 }
 
 /// adds methods defined in the unit to the current context
-pub fn add_methods(smt: &mut Smt2Context, methods: &[Rc<VelosiAstMethod>]) {
+pub fn add_methods(
+    smt: &mut Smt2Context,
+    methods: Box<dyn Iterator<Item = &Rc<VelosiAstMethod>> + '_>,
+) {
     smt.section(String::from("Methods"));
 
     for m in methods {

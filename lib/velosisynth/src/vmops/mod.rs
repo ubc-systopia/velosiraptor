@@ -36,3 +36,7 @@ pub mod unmap;
 mod utils;
 
 pub use queryhelper::{MaybeResult, ProgramBuilder};
+
+pub use map::MapPrograms;
+pub use protect::ProtectPrograms;
+pub use unmap::UnmapPrograms;
