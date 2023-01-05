@@ -56,7 +56,7 @@ pub fn create(unit: &VelosiAstUnitSegment) -> Smt2Context {
     state::add_state_def(&mut smt, &unit.state);
     interface::add_interface_def(&mut smt, &unit.interface);
     velosimodel::add_model_def(&mut smt, unit);
-    method::add_methods(&mut smt, unit.methods.as_slice());
+    method::add_methods(&mut smt, unit.methods());
 
     smt
 }

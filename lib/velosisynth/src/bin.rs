@@ -36,7 +36,7 @@ use clap::{arg, command};
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, LevelPadding, TermLogger, TerminalMode};
 
 use velosiast::{AstResult, VelosiAst};
-use velosisynth::SynthZ3;
+use velosisynth::Z3SynthFactory;
 
 pub fn main() {
     // get the command line argumentts
@@ -94,7 +94,7 @@ pub fn main() {
         }
     };
 
-    let ast = match ast {
+    let mut ast = match ast {
         AstResult::Ok(ast) => {
             // println!("{}", ast);
             ast
@@ -114,14 +114,18 @@ pub fn main() {
 
     let mut t_synth = Vec::new();
 
-    for seg in ast.segment_units() {
+    let mut synthfactory = Z3SynthFactory::new();
+    synthfactory.num_workers(ncores).default_log_dir();
+
+    let mut segments = Vec::new();
+    while let Some(seg) = ast.take_segment_unit() {
         let mut t_synth_segment = Vec::new();
 
         t_synth_segment.push(("start", Instant::now()));
 
-        let path = env::current_dir().unwrap();
-        let mut synth = SynthZ3::with_ncpu(seg.clone(), path.join("logs"), ncores);
-        synth.create_model().expect("failed to create the model");
+        let mut synth = synthfactory.create(seg);
+
+        synth.create_model();
 
         t_synth_segment.push(("Model Creation", Instant::now()));
 
@@ -137,15 +141,17 @@ pub fn main() {
 
         match matches.get_one::<String>("synth").map(|s| s.as_str()) {
             Some("all") => {
-                println!("Synthesizing ALL for unit {}", seg.ident());
-                match synth.synthesize_all() {
-                    Ok(p) => log::info!(target: "main", "Programs: {}", p),
-                    Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
+                println!("Synthesizing ALL for unit {}", synth.unit_ident());
+                synth.synthesize();
+                if synth.has_result() {
+                    log::info!(target: "main", "synthesis completed:\n{}", synth);
+                } else {
+                    log::error!(target: "main", "synthesis failed:\n{}", synth);
                 }
             }
 
             Some("map") => {
-                println!("Synthesizing MAP for unit {}", seg.ident());
+                println!("Synthesizing MAP for unit {}", synth.unit_ident());
                 match synth.synthesize_map() {
                     Ok(p) => log::info!(target: "main", "Programs: {}", p),
                     Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
@@ -153,7 +159,7 @@ pub fn main() {
             }
 
             Some("unmap") => {
-                println!("Synthesizing UNMAP for unit {}", seg.ident());
+                println!("Synthesizing UNMAP for unit {}", synth.unit_ident());
                 match synth.synthesize_unmap() {
                     Ok(p) => log::info!(target: "main", "Programs: {}", p),
                     Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
@@ -161,7 +167,7 @@ pub fn main() {
             }
 
             Some("protect") => {
-                println!("Synthesizing PROTECT for unit {}", seg.ident());
+                println!("Synthesizing PROTECT for unit {}", synth.unit_ident());
                 match synth.synthesize_protect() {
                     Ok(p) => log::info!(target: "main", "Programs: {}", p),
                     Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
@@ -176,9 +182,13 @@ pub fn main() {
                 return;
             }
         }
+
+        let seg = synth.take_unit().unwrap();
+
         t_synth_segment.push(("Synthesis", Instant::now()));
 
-        t_synth.push((seg.ident(), t_synth_segment));
+        t_synth.push((seg.ident_to_string(), t_synth_segment));
+        segments.push(seg);
     }
 
     let t_end = Instant::now();

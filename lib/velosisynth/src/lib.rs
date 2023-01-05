@@ -32,12 +32,9 @@
 
 use std::env;
 use std::path::PathBuf;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use std::fmt::{Display, Formatter, Result as FmtResult};
-
-use smt2::Smt2Context;
 
 // public re-exports
 
@@ -50,7 +47,7 @@ mod z3;
 
 use velosiast::ast::VelosiAstUnitSegment;
 
-use crate::vmops::{MaybeResult, ProgramBuilder};
+use crate::vmops::{MapPrograms, MaybeResult, ProgramBuilder, ProtectPrograms, UnmapPrograms};
 pub use error::{VelosiSynthError, VelosiSynthIssues};
 pub use programs::{Program, ProgramsBuilder, ProgramsIter};
 pub use z3::{Z3Query, Z3Ticket, Z3Worker, Z3WorkerPool};
@@ -91,184 +88,303 @@ impl Display for SynthResult {
     }
 }
 
-pub struct SynthZ3 {
-    ast: Rc<VelosiAstUnitSegment>,
-    outdir: Arc<PathBuf>,
-    ncpu: usize,
-    workerpool: Option<Z3WorkerPool>,
+pub struct Z3Synth {
+    z3: Z3WorkerPool,
+    unit: Option<VelosiAstUnitSegment>,
+    map_queries: MapPrograms,
+    map_program: Option<Program>,
+    unmap_queries: UnmapPrograms,
+    unmap_program: Option<Program>,
+    protect_queries: ProtectPrograms,
+    protect_program: Option<Program>,
+    done: bool,
     model_created: bool,
 }
 
-impl SynthZ3 {
-    pub fn new(ast: Rc<VelosiAstUnitSegment>) -> Self {
-        // get the outdir from the current path
-        let outdir = env::current_dir().unwrap();
-        let outdir = outdir.join("synth");
+impl Z3Synth {
+    /// creates a new synthesis handle with the given worker poopl and the unit
+    pub(crate) fn new(z3: Z3WorkerPool, unit: VelosiAstUnitSegment) -> Self {
+        let batch_size = std::cmp::min(3, z3.num_workers() * 3 / 4);
 
-        Self::with_outdir(ast, outdir)
-    }
+        // create the queries
+        let map_queries = vmops::map::get_program_iter(&unit, batch_size);
+        let unmap_queries = vmops::unmap::get_program_iter(&unit, batch_size);
+        let protect_queries = vmops::protect::get_program_iter(&unit, batch_size);
 
-    pub fn with_outdir(ast: Rc<VelosiAstUnitSegment>, outdir: PathBuf) -> Self {
-        Self::with_ncpu(ast, outdir, 1)
-    }
-
-    pub fn with_ncpu(ast: Rc<VelosiAstUnitSegment>, outdir: PathBuf, ncpu: usize) -> Self {
-        SynthZ3 {
-            ast,
-            outdir: Arc::new(outdir),
-            ncpu,
-            workerpool: None,
+        Self {
+            z3,
+            unit: Some(unit),
+            map_queries,
+            map_program: None,
+            unmap_queries,
+            unmap_program: None,
+            protect_queries,
+            protect_program: None,
+            done: false,
             model_created: false,
         }
     }
 
-    pub fn set_parallelism(&mut self, ncpu: usize) {
-        // make sure we don't have anything running anymore
-        self.terminate();
-
-        let logpath = if cfg!(debug_assertions) {
-            log::warn!(target: "Z3Synth", "Enabling query logging");
-            Some(self.outdir.clone())
+    pub fn unit_ident(&self) -> &str {
+        if let Some(unit) = &self.unit {
+            unit.ident()
         } else {
-            None
-        };
-        let workerpool = Z3WorkerPool::with_num_workers(ncpu, logpath);
-
-        self.workerpool = Some(workerpool);
-        self.ncpu = ncpu;
-    }
-
-    pub fn terminate(&mut self) {
-        if let Some(mut workerpool) = self.workerpool.take() {
-            workerpool.terminate();
+            "unknown"
         }
     }
 
-    fn run_smt2(&mut self, ctx: Smt2Context) -> Result<(), VelosiSynthIssues> {
-        if self.workerpool.is_none() {
-            let logpath = if cfg!(debug_assertions) {
-                log::warn!(target: "Z3Synth", "Enabling query logging");
-                Some(self.outdir.clone())
-            } else {
-                None
-            };
-            let workerpool = Z3WorkerPool::with_num_workers(self.ncpu, logpath);
-            self.workerpool = Some(workerpool);
-        }
-
-        let workerpool = self.workerpool.as_mut().unwrap();
-        workerpool.reset_with_context(Z3Query::from(ctx));
-        Ok(())
-    }
-
-    pub fn create_model(&mut self) -> Result<(), VelosiSynthIssues> {
-        if !self.model_created {
+    /// creates the model for the synthesis for this handle
+    pub fn create_model(&mut self) {
+        if !self.model_created && self.unit.is_some() {
             self.model_created = true;
-            self.run_smt2(model::create(&self.ast))?;
+            let ctx = model::create(self.unit.as_ref().unwrap());
+            self.z3.reset_with_context(Z3Query::from(ctx));
         }
-        Ok(())
     }
 
     pub fn sanity_check(&mut self) -> Result<(), VelosiSynthIssues> {
-        self.create_model()?;
+        self.create_model();
 
         log::info!(target: "[SynthZ3]", "running sanity checks on the model.");
         let mut issues = VelosiSynthIssues::new();
 
+        let unit = self.unit.as_ref().unwrap();
+
         issues.merge_result(vmops::sanity::check_precondition_satisfiability(
-            self.workerpool.as_mut().unwrap(),
-            &self.ast,
+            &mut self.z3,
+            unit,
             "map",
         ));
         issues.merge_result(vmops::sanity::check_precondition_satisfiability(
-            self.workerpool.as_mut().unwrap(),
-            &self.ast,
+            &mut self.z3,
+            unit,
             "unmap",
         ));
         issues.merge_result(vmops::sanity::check_precondition_satisfiability(
-            self.workerpool.as_mut().unwrap(),
-            &self.ast,
+            &mut self.z3,
+            unit,
             "protect",
         ));
 
         synth_result_return!((), issues)
     }
 
-    pub fn synthesize_all(&mut self) -> Result<SynthResult, VelosiSynthIssues> {
-        // have this more conditional
-        self.create_model()?;
+    /// obtains the unit with the updated operations
+    pub fn take_unit(&mut self) -> Result<VelosiAstUnitSegment, ()> {
+        if !self.is_done() {
+            return Err(());
+        }
 
-        let z3 = self.workerpool.as_mut().unwrap();
+        if let Some(mut unit) = self.unit.take() {
+            // TODO: set errors here
 
-        let batch_size = std::cmp::max(3, z3.num_workers() * 3 / 4);
-
-        // --------------------------------------------------------------------------------------
-        // Submit queries for all of the three vmops
-        // --------------------------------------------------------------------------------------
-
-        let mut map_queries = vmops::map::get_program_iter(&self.ast, batch_size);
-        let mut unmap_queries = vmops::unmap::get_program_iter(&self.ast, batch_size);
-        let mut protect_queries = vmops::protect::get_program_iter(&self.ast, batch_size);
-
-        let mut map_program = MaybeResult::Pending;
-        let mut unmap_program = MaybeResult::Pending;
-        let mut protect_program = MaybeResult::Pending;
-
-        loop {
-            let mut all_done = true;
-
-            if map_program == MaybeResult::Pending {
-                map_program = map_queries.next(z3);
-                all_done &= map_program != MaybeResult::Pending
+            if let Some(prog) = self.map_program.take() {
+                unit.set_method_ops("map", prog.into());
             }
 
-            if unmap_program == MaybeResult::Pending {
-                unmap_program = unmap_queries.next(z3);
-                all_done &= unmap_program != MaybeResult::Pending
+            if let Some(prog) = self.unmap_program.take() {
+                unit.set_method_ops("unmap", prog.into());
             }
 
-            if protect_program == MaybeResult::Pending {
-                protect_program = protect_queries.next(z3);
-                all_done &= protect_program != MaybeResult::Pending
+            if let Some(prog) = self.protect_program.take() {
+                unit.set_method_ops("protect", prog.into());
             }
 
-            if all_done {
-                break;
+            // finally return the updated unit
+            Ok(unit)
+        } else {
+            Err(())
+        }
+    }
+
+    /// checks whether the synthesis has completed, either with result or not
+    pub fn is_done(&self) -> bool {
+        self.done || self.unit.is_none()
+    }
+
+    /// checks whether we have a result
+    pub fn has_result(&self) -> bool {
+        self.is_done()
+            && self.map_program.is_some()
+            && self.unmap_program.is_some()
+            && self.protect_program.is_some()
+    }
+
+    /// performs a synthesis step for all operations that haven't completed yet
+    pub fn synthesize_step(&mut self) {
+        if self.done {
+            return;
+        }
+
+        // create the model of not done yet
+        self.create_model();
+
+        let mut all_done = true;
+
+        if self.map_program.is_none() {
+            match self.map_queries.next(&mut self.z3) {
+                MaybeResult::Some(mp) => {
+                    all_done |= true;
+                    self.map_program = Some(mp);
+                }
+                MaybeResult::Pending => all_done = false,
+                MaybeResult::None => all_done = true,
             }
         }
 
-        debug_assert!(map_program != MaybeResult::Pending);
-        debug_assert!(unmap_program != MaybeResult::Pending);
-        debug_assert!(protect_program != MaybeResult::Pending);
-
-        match (map_program, unmap_program, protect_program) {
-            (MaybeResult::Some(mp), MaybeResult::Some(up), MaybeResult::Some(pp)) => {
-                Ok(SynthResult {
-                    map: mp,
-                    unmap: up,
-                    protect: pp,
-                })
+        if self.unmap_program.is_none() {
+            match self.unmap_queries.next(&mut self.z3) {
+                MaybeResult::Some(mp) => {
+                    all_done |= true;
+                    self.unmap_program = Some(mp);
+                }
+                MaybeResult::Pending => all_done = false,
+                MaybeResult::None => all_done = true,
             }
-            _ => Err(VelosiSynthIssues::new()),
+        }
+
+        if self.protect_program.is_none() {
+            match self.protect_queries.next(&mut self.z3) {
+                MaybeResult::Some(mp) => {
+                    all_done |= true;
+                    self.protect_program = Some(mp);
+                }
+                MaybeResult::Pending => all_done = false,
+                MaybeResult::None => all_done = true,
+            }
+        }
+
+        // update the all done flag
+        self.done = all_done;
+
+        // if we are done, terminate the worker pool
+        if all_done {
+            self.terminate();
+        }
+    }
+
+    /// synthesizes the program for the unit, returns when done
+    pub fn synthesize(&mut self) {
+        while !self.is_done() {
+            self.synthesize_step();
         }
     }
 
     pub fn synthesize_map(&mut self) -> Result<Program, VelosiSynthIssues> {
         // have this more conditional
-        self.create_model()?;
+        self.create_model();
 
-        vmops::map::synthesize(self.workerpool.as_mut().unwrap(), &self.ast)
+        vmops::map::synthesize(&mut self.z3, self.unit.as_ref().unwrap())
     }
 
     pub fn synthesize_unmap(&mut self) -> Result<Program, VelosiSynthIssues> {
         // have this more conditional
-        self.create_model()?;
-        vmops::unmap::synthesize(self.workerpool.as_mut().unwrap(), &self.ast)
+        self.create_model();
+        vmops::unmap::synthesize(&mut self.z3, self.unit.as_ref().unwrap())
     }
 
     pub fn synthesize_protect(&mut self) -> Result<Program, VelosiSynthIssues> {
         // have this more conditional
-        self.create_model()?;
-        vmops::protect::synthesize(self.workerpool.as_mut().unwrap(), &self.ast)
+        self.create_model();
+        vmops::protect::synthesize(&mut self.z3, self.unit.as_ref().unwrap())
+    }
+
+    /// terminates the worker pool
+    pub fn terminate(&mut self) {
+        self.z3.terminate();
+    }
+}
+
+impl Display for Z3Synth {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        if self.is_done() {
+            if let Some(prog) = &self.map_program {
+                writeln!(f, "map: {}", prog)?;
+            } else {
+                writeln!(f, "map: synthesis failed")?;
+            }
+
+            if let Some(prog) = &self.unmap_program {
+                writeln!(f, "unmap: {}", prog)?;
+            } else {
+                writeln!(f, "unmap: synthesis failed")?;
+            }
+
+            if let Some(prog) = &self.protect_program {
+                writeln!(f, "protect: {}", prog)
+            } else {
+                writeln!(f, "protect: synthesis failed")
+            }
+        } else {
+            write!(f, "Synthesis not done yet.")
+        }
+    }
+}
+
+/// Represents a
+pub struct Z3SynthFactory {
+    /// the output directory for the synthesis logs
+    logdir: Option<Arc<PathBuf>>,
+    /// whether logging is enabled or not
+    logging: bool,
+    /// the number of workers to use
+    num_workers: usize,
+}
+
+impl Z3SynthFactory {
+    /// initializes a new Z3 Synthesis engine with the default number of workers and log
+    pub fn new() -> Self {
+        Self {
+            logdir: None,
+            logging: cfg!(debug_assertions),
+            num_workers: 1,
+        }
+    }
+
+    pub fn logdir(&mut self, logdir: Arc<PathBuf>) -> &mut Self {
+        self.logdir = Some(logdir);
+        self
+    }
+
+    pub fn logging(&mut self, logging: bool) -> &mut Self {
+        self.logging = logging;
+        self
+    }
+
+    pub fn default_log_dir(&mut self) -> &mut Self {
+        if cfg!(debug_assertions) {
+            // get the outdir from the current path
+            let outdir = env::current_dir().unwrap();
+            let outdir = outdir.join("logs");
+
+            self.logdir = Some(Arc::new(outdir));
+        }
+        self
+    }
+
+    pub fn num_workers(&mut self, num_workers: usize) -> &mut Self {
+        self.num_workers = num_workers;
+        self
+    }
+
+    pub fn create(&self, unit: VelosiAstUnitSegment) -> Z3Synth {
+        let logpath = if let Some(logdir) = &self.logdir {
+            if self.logging {
+                Some(Arc::new(logdir.join(unit.ident().as_str())))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let z3 = Z3WorkerPool::with_num_workers(self.num_workers, logpath);
+        Z3Synth::new(z3, unit)
+    }
+}
+
+impl Default for Z3SynthFactory {
+    fn default() -> Self {
+        Self::new()
     }
 }
