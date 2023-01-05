@@ -50,6 +50,8 @@ pub enum VelosiKeyword {
     StaticMap,
     /// base type for direct segments
     Segment,
+    /// the base type for enum
+    Enum,
 
     //
     // Unit "fields"
@@ -161,6 +163,7 @@ impl VelosiKeyword {
             VelosiKeyword::Unit => "unit",
             VelosiKeyword::StaticMap => "staticmap",
             VelosiKeyword::Segment => "segment",
+            VelosiKeyword::Enum => "enum",
             //
             VelosiKeyword::InBitWidth => "inbitwidth",
             VelosiKeyword::OutBitWidth => "outbitwidth",
@@ -219,6 +222,7 @@ impl<'a> TryFrom<&'a str> for VelosiKeyword {
             "unit" => Ok(VelosiKeyword::Unit),
             "staticmap" => Ok(VelosiKeyword::StaticMap),
             "segment" => Ok(VelosiKeyword::Segment),
+            "enum" => Ok(VelosiKeyword::Enum),
             //
             "inbitwidth" => Ok(VelosiKeyword::InBitWidth),
             "outbitwidth" => Ok(VelosiKeyword::OutBitWidth),
@@ -621,6 +625,9 @@ fn test_enum_str() {
     assert_eq!(VelosiKeyword::Segment.as_str(), "segment");
     assert_eq!("staticmap".try_into(), Ok(VelosiKeyword::StaticMap));
     assert_eq!(VelosiKeyword::StaticMap.as_str(), "staticmap");
+
+    assert_eq!("enum".try_into(), Ok(VelosiKeyword::Enum));
+    assert_eq!(VelosiKeyword::Enum.as_str(), "staticmap");
 
     assert_eq!("inbitwidth".try_into(), Ok(VelosiKeyword::InBitWidth));
     assert_eq!(VelosiKeyword::InBitWidth.as_str(), "inbitwidth");

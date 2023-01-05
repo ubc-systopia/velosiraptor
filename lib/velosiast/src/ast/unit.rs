@@ -845,7 +845,7 @@ impl VelosiAstUnitEnum {
 
         let mut enums = Vec::new();
         let mut inbitwidth = 0;
-        let mut outbitwidth = 0;
+        let outbitwidth = 0;
         for node in pt.nodes.into_iter() {
             match node {
                 VelosiParseTreeUnitNode::EnumEntry(e) => {
@@ -1001,6 +1001,8 @@ impl VelosiAstUnitEnum {
                         let err = VelosiAstErrUndef::from_ident(&ident);
                         issues.push(err.into());
                     }
+
+                    enums.push((ident, args));
                 }
                 VelosiParseTreeUnitNode::Const(c) => {
                     ignored_node!(VelosiParseTreeUnitNode::Const, c, &mut issues, "Enum")
