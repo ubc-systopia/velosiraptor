@@ -77,11 +77,11 @@ pub enum VelosiOperation {
 impl VelosiOperation {
     pub fn fieldname(&self) -> &str {
         match self {
-            VelosiOperation::InsertSlice(s, _, _) => &s,
-            VelosiOperation::InsertField(s, _) => &s,
-            VelosiOperation::ExtractSlice(s, _) => &s,
-            VelosiOperation::WriteAction(s) => &s,
-            VelosiOperation::ReadAction(s) => &s,
+            VelosiOperation::InsertSlice(s, _, _) => s,
+            VelosiOperation::InsertField(s, _) => s,
+            VelosiOperation::ExtractSlice(s, _) => s,
+            VelosiOperation::WriteAction(s) => s,
+            VelosiOperation::ReadAction(s) => s,
             VelosiOperation::Return => "",
         }
     }
