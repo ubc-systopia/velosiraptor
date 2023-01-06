@@ -1082,6 +1082,20 @@ impl VelosiAstFnCallExpr {
                     res.args.as_slice(),
                     &res.loc,
                 );
+                if u.is_abstract() {
+                    // cannot call abstract units.
+                    let msg = "attempted to instantiate abstract unit";
+                    let hint = "make this unit concrete by removing the `abstract` modifier.";
+                    let err = VelosiAstErrBuilder::err(msg.to_string())
+                        .add_location(res.loc.clone())
+                        .add_related_location(
+                            hint.to_string(),
+                            u.loc().from_self_with_subrange(0..2),
+                        )
+                        .build();
+                    issues.push(err);
+                }
+
                 res.etype = VelosiAstTypeInfo::TypeRef(u.ident().clone());
             }
             _ => {

@@ -52,6 +52,10 @@ pub const FN_SIG_PROTECT: &str = "fn protect(va: vaddr, sz: size, flgs: flags)";
 pub struct VelosiAstMethod {
     /// the name of the constant
     pub ident: VelosiAstIdentifier,
+    /// whether this is an abstract method
+    pub is_abstract: bool,
+    /// wheather this is a method to be synthesized
+    pub is_synth: bool,
     /// the return type
     pub rtype: VelosiAstType,
     /// the method parameter
@@ -83,6 +87,60 @@ impl VelosiAstMethod {
         });
         Self {
             ident,
+            is_abstract: false,
+            is_synth: false,
+            rtype,
+            params,
+            params_map,
+            requires,
+            body,
+            ops: Vec::new(),
+            loc,
+        }
+    }
+
+    pub fn new_abstract(
+        ident: VelosiAstIdentifier,
+        rtype: VelosiAstType,
+        params: Vec<Rc<VelosiAstParam>>,
+        requires: Vec<VelosiAstExpr>,
+        body: Option<VelosiAstExpr>,
+        loc: VelosiTokenStream,
+    ) -> Self {
+        let mut params_map = HashMap::new();
+        params.iter().for_each(|p| {
+            params_map.insert(p.ident_to_string(), p.clone());
+        });
+        Self {
+            ident,
+            is_abstract: true,
+            is_synth: false,
+            rtype,
+            params,
+            params_map,
+            requires,
+            body,
+            ops: Vec::new(),
+            loc,
+        }
+    }
+
+    pub fn new_synth(
+        ident: VelosiAstIdentifier,
+        rtype: VelosiAstType,
+        params: Vec<Rc<VelosiAstParam>>,
+        requires: Vec<VelosiAstExpr>,
+        body: Option<VelosiAstExpr>,
+        loc: VelosiTokenStream,
+    ) -> Self {
+        let mut params_map = HashMap::new();
+        params.iter().for_each(|p| {
+            params_map.insert(p.ident_to_string(), p.clone());
+        });
+        Self {
+            ident,
+            is_abstract: false,
+            is_synth: true,
             rtype,
             params,
             params_map,
@@ -94,7 +152,7 @@ impl VelosiAstMethod {
     }
 
     pub fn default_map() -> Self {
-        Self::new(
+        Self::new_synth(
             VelosiAstIdentifier::with_name("map".to_string()),
             VelosiAstType::new_void(),
             vec![
@@ -122,7 +180,7 @@ impl VelosiAstMethod {
     }
 
     pub fn default_unmap() -> Self {
-        Self::new(
+        Self::new_synth(
             VelosiAstIdentifier::with_name("unmap".to_string()),
             VelosiAstType::new_void(),
             vec![
@@ -142,7 +200,7 @@ impl VelosiAstMethod {
     }
 
     pub fn default_protect() -> Self {
-        Self::new(
+        Self::new_synth(
             VelosiAstIdentifier::with_name("protect".to_string()),
             VelosiAstType::new_void(),
             vec![
@@ -364,10 +422,55 @@ impl VelosiAstMethod {
             None
         };
 
+        // the method was abstract or synth but has a body...
+        if body.is_some() && (pt.is_abstract || pt.is_synth) {
+            let (ms, range) = match (pt.is_abstract, pt.is_synth) {
+                (true, true) => ("abstract & synth ", 0..2),
+                (false, true) => ("synth ", 0..1),
+                (true, false) => ("abstract ", 0..1),
+                (false, false) => unreachable!(),
+            };
+            let msg = format!("method defined as {} cannot have a body.", ms);
+            let hint = format!("remove the `{}` modifier", ms);
+            let err = VelosiAstErrBuilder::err(msg)
+                .add_hint(hint)
+                .add_location(pt.pos.from_self_with_subrange(range))
+                .build();
+            issues.push(err);
+        }
+
+        // the method has no body but is not abstract
+        if body.is_none() && !(pt.is_abstract || pt.is_synth) {
+            let msg = "method with no body must be declared abstract or synth.";
+            let hint = "make this an `abstract fn` or `synth fn`";
+            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                .add_hint(hint.to_string())
+                .add_location(pt.pos.from_self_with_subrange(0..1))
+                .build();
+            issues.push(err);
+        }
+
+        // doesn't make sense to have abstract synth, let's just do a warning instad
+        if pt.is_abstract && pt.is_synth {
+            let msg = "declaring a synth method abstract has no effect.";
+            let hint = "remove the `abstract` modifier";
+            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                .add_hint(hint.to_string())
+                .add_location(pt.pos.from_self_with_subrange(0..1))
+                .build();
+            issues.push(err);
+        }
+
         // restore the symbol table context
         st.drop_context();
 
-        let res = Self::new(name, rtype, params, requires, body, pt.pos);
+        let res = if pt.is_abstract {
+            Self::new_abstract(name, rtype, params, requires, body, pt.pos)
+        } else if pt.is_synth {
+            Self::new_synth(name, rtype, params, requires, body, pt.pos)
+        } else {
+            Self::new(name, rtype, params, requires, body, pt.pos)
+        };
 
         // perform additional checks for one of the special methods
         res.check_special_methods(&mut issues);
@@ -405,7 +508,7 @@ impl VelosiAstMethod {
             let hint = format!("expected integer or boolean, found {}", self.rtype.typeinfo);
             let err = VelosiAstErrBuilder::err(msg.to_string())
                 .add_hint(hint)
-                .add_location(self.rtype.loc.clone())
+                .add_location(self.loc.from_self_with_subrange(0..2))
                 .build();
             issues.push(err);
         }

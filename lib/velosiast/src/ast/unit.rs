@@ -68,6 +68,9 @@ macro_rules! ignored_node (
 pub struct VelosiAstUnitSegment {
     /// the name of the unit
     pub ident: VelosiAstIdentifier,
+    /// whether the unit is abstract
+    pub is_abstract: bool,
+
     /// the parameters of the unit
     pub params: Vec<Rc<VelosiAstParam>>,
     /// the base class
@@ -217,6 +220,17 @@ impl VelosiAstUnitSegment {
                         VelosiAstMethod::from_parse_tree(method, st),
                         issues
                     ));
+
+                    if m.is_abstract && !pt.is_abstract {
+                        let msg = "Abstract methods in non-abstract unit.";
+                        let hint = "Remove the abstract modifier or make the unit abstract.";
+                        let err = VelosiAstErrBuilder::err(msg.to_string())
+                            .add_hint(hint.to_string())
+                            .add_location(m.loc.from_self_with_subrange(0..1))
+                            .build();
+                        issues.push(err);
+                    }
+
                     if let Err(e) = st.insert(m.clone().into()) {
                         issues.push(e);
                     } else {
@@ -249,7 +263,7 @@ impl VelosiAstUnitSegment {
             Rc::new(VelosiAstState::NoneState(pt.loc.clone()))
         };
 
-        if !methods_map.contains_key("map") {
+        if !methods_map.contains_key("map") && !pt.is_abstract {
             let msg = "Segment unit has no `map` method defined. Using default implementation";
             let hint = format!("add method with signature `{}` to unit", FN_SIG_MAP);
             let err = VelosiAstErrBuilder::warn(msg.to_string())
@@ -262,7 +276,7 @@ impl VelosiAstUnitSegment {
             methods_map.insert(m.ident_to_string(), m);
         }
 
-        if !methods_map.contains_key("unmap") {
+        if !methods_map.contains_key("unmap") && !pt.is_abstract {
             let msg = "Segment unit has no `unmap` method defined. Using default implementation";
             let hint = format!("add method with signature `{}` to unit", FN_SIG_UNMAP);
             let err = VelosiAstErrBuilder::warn(msg.to_string())
@@ -275,7 +289,7 @@ impl VelosiAstUnitSegment {
             methods_map.insert(m.ident_to_string(), m);
         }
 
-        if !methods_map.contains_key("protect") {
+        if !methods_map.contains_key("protect") && !pt.is_abstract {
             let msg = "Segment unit has no `protect` method defined. Using default implementation";
             let hint = format!("add method with signature `{}` to unit", FN_SIG_PROTECT);
             let err = VelosiAstErrBuilder::warn(msg.to_string())
@@ -288,7 +302,7 @@ impl VelosiAstUnitSegment {
             methods_map.insert(m.ident_to_string(), m);
         }
 
-        if !methods_map.contains_key("translate") {
+        if !methods_map.contains_key("translate") && !pt.is_abstract {
             let msg = "Segment unit has no `protect` method defined. Using default implementation";
             let hint = format!("add method with signature `{}` to unit", FN_SIG_TRANSLATE);
             let err = VelosiAstErrBuilder::warn(msg.to_string())
@@ -301,7 +315,7 @@ impl VelosiAstUnitSegment {
             methods_map.insert(m.ident_to_string(), m);
         }
 
-        if !methods_map.contains_key("matchflags") {
+        if !methods_map.contains_key("matchflags") && !pt.is_abstract {
             let msg = "Segment unit has no `protect` method defined. Using default implementation";
             let hint = format!("add method with signature `{}` to unit", FN_SIG_MATCHFLAGS);
             let err = VelosiAstErrBuilder::warn(msg.to_string())
@@ -317,13 +331,15 @@ impl VelosiAstUnitSegment {
         let interface = if let Some(i) = interface {
             i
         } else {
-            let msg = "Segment unit has no interface definition";
-            let hint = "Change this to a `staticmap`, or add an interface definition.";
-            let err = VelosiAstErrBuilder::err(msg.to_string())
-                .add_hint(hint.to_string())
-                .add_location(pt.loc.from_self_with_subrange(0..1))
-                .build();
-            issues.push(err);
+            if !pt.is_abstract {
+                let msg = "Segment unit has no interface definition";
+                let hint = "Change this to a `staticmap`, or add an interface definition.";
+                let err = VelosiAstErrBuilder::err(msg.to_string())
+                    .add_hint(hint.to_string())
+                    .add_location(pt.loc.from_self_with_subrange(0..1))
+                    .build();
+                issues.push(err);
+            }
 
             Rc::new(VelosiAstInterface::NoneInterface(pt.loc.clone()))
         };
@@ -331,11 +347,13 @@ impl VelosiAstUnitSegment {
         let inbitwidth = if let Some(ibw) = inbitwidth {
             ibw
         } else {
-            let msg = "Unit has no input bitwidth definition. Assuming 64 bits.";
-            let err = VelosiAstErrBuilder::warn(msg.to_string())
-                .add_location(pt.loc.from_self_with_subrange(0..1))
-                .build();
-            issues.push(err);
+            if !pt.is_abstract {
+                let msg = "Unit has no input bitwidth definition. Assuming 64 bits.";
+                let err = VelosiAstErrBuilder::warn(msg.to_string())
+                    .add_location(pt.loc.from_self_with_subrange(0..1))
+                    .build();
+                issues.push(err);
+            }
 
             64
         };
@@ -343,17 +361,20 @@ impl VelosiAstUnitSegment {
         let outbitwidth = if let Some(obw) = outbitwidth {
             obw
         } else {
-            let msg = "Unit has no output bitwidth definition. Assuming 64 bits.";
-            let err = VelosiAstErrBuilder::warn(msg.to_string())
-                .add_location(pt.loc.from_self_with_subrange(0..1))
-                .build();
-            issues.push(err);
+            if !pt.is_abstract {
+                let msg = "Unit has no output bitwidth definition. Assuming 64 bits.";
+                let err = VelosiAstErrBuilder::warn(msg.to_string())
+                    .add_location(pt.loc.from_self_with_subrange(0..1))
+                    .build();
+                issues.push(err);
+            }
 
             64
         };
 
         let res = Self {
             ident: VelosiAstIdentifier::from(pt.name),
+            is_abstract: pt.is_abstract,
             params,
             derived,
             inbitwidth,
@@ -442,6 +463,9 @@ impl VelosiAstUnitSegment {
 /// Implementation of [Display] for [VelosiAstUnitSegment]
 impl Display for VelosiAstUnitSegment {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        if self.is_abstract {
+            write!(f, "abstract ")?;
+        }
         write!(f, "segment {} (", self.ident)?;
         for (i, p) in self.params.iter().enumerate() {
             if i > 0 {
@@ -504,6 +528,7 @@ impl Display for VelosiAstUnitSegment {
 pub struct VelosiAstUnitStaticMap {
     /// the name of the unit
     pub ident: VelosiAstIdentifier,
+
     /// the parameters of the unit
     pub params: Vec<Rc<VelosiAstParam>>,
     /// the base class
@@ -679,6 +704,16 @@ impl VelosiAstUnitStaticMap {
 
             64
         };
+
+        if pt.is_abstract {
+            let msg = "StaticMap unit declared as abstract.";
+            let hint = "Remove the `abstract` abstract modifiere.";
+            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                .add_hint(hint.to_string())
+                .add_location(pt.loc.from_self_with_subrange(0..1))
+                .build();
+            issues.push(err);
+        }
 
         let res = Self {
             ident: VelosiAstIdentifier::from(pt.name),
@@ -932,7 +967,7 @@ impl VelosiAstUnitEnum {
                                         nargs - nparam,
                                         if nargs - nparam == 1 { "" } else { "s" }
                                     );
-                                    let mut loc = args[nargs - nparam].loc.clone();
+                                    let mut loc = args[nparam].loc.clone();
                                     loc.expand_until_end(&args[nargs - 1].loc);
                                     (hint, loc)
                                 } else {
@@ -1179,6 +1214,16 @@ impl VelosiAstUnit {
         }
     }
 
+    /// whether the unit is abstract or conceret
+    pub fn is_abstract(&self) -> bool {
+        use VelosiAstUnit::*;
+        match self {
+            Segment(s) => s.is_abstract,
+            StaticMap(_) => false,
+            Enum(_) => false,
+        }
+    }
+
     pub fn params_as_slice(&self) -> &[Rc<VelosiAstParam>] {
         use VelosiAstUnit::*;
         match self {
@@ -1220,7 +1265,7 @@ impl VelosiAstUnit {
         match self {
             StaticMap(staticmap) => Box::new(staticmap.methods.iter()),
             Segment(segment) => Box::new(segment.methods()),
-            Enum(_) => Box::new(std::iter::Empty::default()),
+            Enum(_) => Box::new(std::iter::empty()),
         }
     }
 
