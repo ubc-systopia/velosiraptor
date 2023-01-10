@@ -388,6 +388,13 @@ impl VelosiAstStateField {
         }
     }
 
+    pub fn update_symbol_table(&self, st: &mut SymbolTable) {
+        for slice in self.layout_as_slice() {
+            st.update(slice.clone().into())
+                .expect("updating symbol table\n");
+        }
+    }
+
     pub fn size(&self) -> u64 {
         match self {
             VelosiAstStateField::Memory(field) => field.size,
@@ -627,6 +634,33 @@ impl VelosiAstState {
         match pt {
             StateDef(pt) => VelosiAstStateDef::from_parse_tree(pt, st),
             None(ts) => AstResult::Ok(VelosiAstState::NoneState(ts)),
+        }
+    }
+
+    pub fn derive_from(&mut self, other: &Self) {
+        // other is none, don't do anything
+        if matches!(other, VelosiAstState::NoneState(_)) {
+            return;
+        }
+
+        // other has some state, this one is none, so simply replicate it
+        if matches!(self, VelosiAstState::NoneState(_)) {
+            *self = other.clone();
+            return;
+        }
+
+        unimplemented!("STATE DERIVATION NOT DONE YET!");
+    }
+
+    pub fn update_symbol_table(&self, st: &mut SymbolTable) {
+        if matches!(self, VelosiAstState::NoneState(_)) {
+            return;
+        }
+
+        for f in self.fields() {
+            f.update_symbol_table(st);
+            st.update(f.clone().into())
+                .expect("state already exists in symbolt able?");
         }
     }
 
