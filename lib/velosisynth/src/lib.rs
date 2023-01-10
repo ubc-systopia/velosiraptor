@@ -104,7 +104,7 @@ pub struct Z3Synth {
 impl Z3Synth {
     /// creates a new synthesis handle with the given worker poopl and the unit
     pub(crate) fn new(z3: Z3WorkerPool, unit: VelosiAstUnitSegment) -> Self {
-        let batch_size = std::cmp::min(3, z3.num_workers() * 3 / 4);
+        let batch_size = std::cmp::max(5, z3.num_workers() / 2);
 
         // create the queries
         let map_queries = vmops::map::get_program_iter(&unit, batch_size);
@@ -224,33 +224,42 @@ impl Z3Synth {
         if self.map_program.is_none() {
             match self.map_queries.next(&mut self.z3) {
                 MaybeResult::Some(mp) => {
-                    all_done |= true;
+                    all_done &= true;
                     self.map_program = Some(mp);
                 }
                 MaybeResult::Pending => all_done = false,
-                MaybeResult::None => all_done = true,
+                MaybeResult::None => {
+                    all_done = true;
+                    self.map_program = Some(Program::new());
+                }
             }
         }
 
         if self.unmap_program.is_none() {
             match self.unmap_queries.next(&mut self.z3) {
                 MaybeResult::Some(mp) => {
-                    all_done |= true;
+                    all_done &= true;
                     self.unmap_program = Some(mp);
                 }
                 MaybeResult::Pending => all_done = false,
-                MaybeResult::None => all_done = true,
+                MaybeResult::None => {
+                    all_done = true;
+                    self.unmap_program = Some(Program::new());
+                }
             }
         }
 
         if self.protect_program.is_none() {
             match self.protect_queries.next(&mut self.z3) {
                 MaybeResult::Some(mp) => {
-                    all_done |= true;
+                    all_done &= true;
                     self.protect_program = Some(mp);
                 }
                 MaybeResult::Pending => all_done = false,
-                MaybeResult::None => all_done = true,
+                MaybeResult::None => {
+                    all_done = true;
+                    self.protect_program = Some(Program::new());
+                }
             }
         }
 
@@ -273,19 +282,21 @@ impl Z3Synth {
     pub fn synthesize_map(&mut self) -> Result<Program, VelosiSynthIssues> {
         // have this more conditional
         self.create_model();
-
+        self.done = true;
         vmops::map::synthesize(&mut self.z3, self.unit.as_ref().unwrap())
     }
 
     pub fn synthesize_unmap(&mut self) -> Result<Program, VelosiSynthIssues> {
         // have this more conditional
         self.create_model();
+        self.done = true;
         vmops::unmap::synthesize(&mut self.z3, self.unit.as_ref().unwrap())
     }
 
     pub fn synthesize_protect(&mut self) -> Result<Program, VelosiSynthIssues> {
         // have this more conditional
         self.create_model();
+        self.done = true;
         vmops::protect::synthesize(&mut self.z3, self.unit.as_ref().unwrap())
     }
 
