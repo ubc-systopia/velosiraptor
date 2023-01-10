@@ -1,0 +1,360 @@
+/*
+ * 32-bit paging on the x86 architecture involves a two-level page table. For simplicity, we focus
+ * here on the leaf page table.
+ *
+ * A single page table is 4 KiB in total. It contains 1024 32-bit page-table entries.
+ * The page table as a whole must be naturally aligned (4 KiB).
+ * This also ensures that each entry is naturally aligned to 32-bits (or 4 bytes)
+ *
+ * The layout of a page table entry is as follows:
+ * ```
+ *     Bit(s)          Contents
+ *     0       (P)     Present; must be 1 to map a 4-KByte page
+ *     1       (R/W)   Read/write; if 0, writes may not be allowed to the 4-KByte page referenced
+ *                     by this entry
+ *     2       (U/S)   User/supervisor; if 0, user-mode accesses are not allowed to the 4-KByte
+ *                     page referenced by this entry
+ *     3       (PWT)   Page-level write-through; indirectly determines the memory type used to
+ *                     access the 4-KByte page referenced by this entry
+ *     4       (PCD)   Page-level cache disable; indirectly determines the memory type used to
+ *                     access the 4-KByte page referenced by this entry
+ *     5       (A)     Accessed; indicates whether software has accessed the 4-KByte page referenced
+ *                     by this entry
+ *     6       (D)     Dirty; indicates whether software has written to the 4-KByte page referenced by
+ *                     this entry
+ *     7       (PAT)   If the PAT is supported, indirectly determines the memory type used to access
+ *                     the 4-KByte page referenced by this entry; otherwise, reserved (must be 0) 1
+ *     8       (G)     Global; if CR4.PGE = 1, determines whether the translation is global;
+ *                     ignored otherwise
+ *     11:9    (IGN)   Ignored
+ *     31:12           Physical address of the 4-KByte page referenced by this entry
+ * ```
+ */
+
+// represents an x86 page table entry
+segment X86PageDirectoryPage(base : addr) {
+
+    const PAGE_SIZE : size = 4096;
+
+const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
+
+    // there are there are 4 KiB pages
+    inbitwidth = 12;
+
+    // it's a 32-bit machine
+    outbitwidth = 32;
+
+    flags = {
+        writable,
+        readable,
+        devicemem,
+        usermode
+    };
+
+    // the state
+    // state = MemoryState(base : addr) {
+    //     pte [base, 0, 4] {
+    //         // the following fields at starting bit, ending bit, name
+    //         0 ..  1 present,
+    //         1 ..  2 writable,
+    //         2 ..  3 usermode,
+    //         3 ..  4 writethrough,
+    //         4 ..  5 nocache,
+    //         5 ..  6 accessed,
+    //         6 ..  7 dirty,
+    //         7 ..  8 pat,
+    //         8 ..  9 global,
+    //         9 .. 12 ignored,
+    //        12 .. 32 base,
+    //     }
+    // };
+
+    state = StateDef(base: addr) {
+        mem pte [base, 0, 4] {
+            // the following fields at starting bit, ending bit, name
+            0 ..  1 present,
+            1 ..  2 writable,
+            2 ..  3 usermode,
+            3 ..  4 writethrough,
+            4 ..  5 nocache,
+            5 ..  6 accessed,
+            6 ..  7 dirty,
+            7 ..  8 pat,
+            8 ..  9 global,
+            9 .. 12 ignored,
+           12 .. 32 base,
+        },
+        // mem pte [base, 0, 4],
+        // mem pte2 [base2, 0, 4],
+        // mem pte3 [base, 0, 4],
+        reg cr4 [4],
+        // reg cr4 [4],
+    };
+
+    interface = InterfaceDef(base : addr) {
+        mem pte [base, 0, 4] {
+
+            Layout {
+                // the following fields at starting bit, ending bit, name
+                    0 ..  1 present,
+                    1 ..  2 writable,
+                    2 ..  3 usermode,
+                    3 ..  4 writethrough,
+                    4 ..  5 nocache,
+                    5 ..  6 accessed,
+                    6 ..  7 dirty,
+                    7 ..  8 pat,
+                    8 ..  9 global,
+                    9 .. 12 ignored,
+                12 .. 32 base,
+            },
+            ReadAction {
+                interface.pte <- state.pte;
+            },
+            WriteAction {
+                interface.pte -> state.pte;
+            },
+        },
+        reg cr4 [4],
+    };
+
+    fn valid() -> bool {
+        state.pte.present == 1
+    }
+
+
+    // matches a translation flags,
+    fn matchflags(flgs : flags) -> bool
+        requires (state.pte.present == 1);
+    {
+        (state.pte.writable == flgs.writable)
+         && (state.pte.usermode != flgs.usermode)
+         && if (flgs.devicemem == 1) {
+               (state.pte.nocache == 1 && state.pte.writethrough == 1)
+            } else {
+                (state.pte.nocache == 0 && state.pte.writethrough == 0)
+            }
+         && (state.pte.accessed == 1)
+         && (state.pte.global == 0)
+         && (state.pte.dirty == 0)
+    }
+
+
+
+    // the translation semantics, adding an option type?
+    fn translate(va: vaddr) -> paddr
+        requires va < 4096;
+        requires state.pte.present == 1;
+    {
+        va + (state.pte.base << 12)
+    }
+
+    // unmapping an entry
+    fn unmap(va: vaddr, sz: size)
+        requires (va == 0);
+        requires sz == PAGE_SIZE;
+    {}
+
+    // mapping an entry
+    fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+        requires va == 0;
+        requires sz == PAGE_SIZE;
+        requires (pa & 0xfff) == 0;
+
+        // need a way to express types:
+        // type(addr) == Memory || type(addr) == DevMemory;
+        // type(addr) == DevMemory ==> flgs & CACHE_DISABLED
+        //
+    {}
+
+
+    // protecting the entry, i.e., change its permission
+    fn protect(va: vaddr, sz: size, flgs: flags)
+    {}
+
+
+    fn foo(va: vaddr) -> bool
+        requires (va < 0) && (va > 0);
+        requires (va < 0) && ((va > 0) || (va == 0));
+        requires !(va == 1 || va ==2)
+}
+
+// represents an x86 page table entry
+segment X86PageDirectoryTable(base : addr) {
+
+    const PAGE_SIZE : size = 4096;
+
+const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
+
+    // there are there are 4 KiB pages
+    inbitwidth = 12;
+
+    // it's a 32-bit machine
+    outbitwidth = 32;
+
+    flags = {
+        writable,
+        readable,
+        devicemem,
+        usermode
+    };
+
+    // the state
+    // state = MemoryState(base : addr) {
+    //     pte [base, 0, 4] {
+    //         // the following fields at starting bit, ending bit, name
+    //         0 ..  1 present,
+    //         1 ..  2 writable,
+    //         2 ..  3 usermode,
+    //         3 ..  4 writethrough,
+    //         4 ..  5 nocache,
+    //         5 ..  6 accessed,
+    //         6 ..  7 dirty,
+    //         7 ..  8 pat,
+    //         8 ..  9 global,
+    //         9 .. 12 ignored,
+    //        12 .. 32 base,
+    //     }
+    // };
+
+    state = StateDef(base: addr) {
+        mem pte [base, 0, 4] {
+            // the following fields at starting bit, ending bit, name
+            0 ..  1 present,
+            1 ..  2 writable,
+            2 ..  3 usermode,
+            3 ..  4 writethrough,
+            4 ..  5 nocache,
+            5 ..  6 accessed,
+            6 ..  7 dirty,
+            7 ..  8 pat,
+            8 ..  9 global,
+            9 .. 12 ignored,
+           12 .. 32 base,
+        },
+        // mem pte [base, 0, 4],
+        // mem pte2 [base2, 0, 4],
+        // mem pte3 [base, 0, 4],
+        reg cr4 [4],
+        // reg cr4 [4],
+    };
+
+    interface = InterfaceDef(base : addr) {
+        mem pte [base, 0, 4] {
+
+            Layout {
+                // the following fields at starting bit, ending bit, name
+                    0 ..  1 present,
+                    1 ..  2 writable,
+                    2 ..  3 usermode,
+                    3 ..  4 writethrough,
+                    4 ..  5 nocache,
+                    5 ..  6 accessed,
+                    6 ..  7 dirty,
+                    7 ..  8 pat,
+                    8 ..  9 global,
+                    9 .. 12 ignored,
+                12 .. 32 base,
+            },
+            ReadAction {
+                interface.pte <- state.pte;
+            },
+            WriteAction {
+                interface.pte -> state.pte;
+            },
+        },
+        reg cr4 [4],
+    };
+
+    fn valid() -> bool {
+        state.pte.present == 1
+    }
+
+
+    // matches a translation flags,
+    fn matchflags(flgs : flags) -> bool
+        requires (state.pte.present == 1);
+    {
+        (state.pte.writable == flgs.writable)
+         && (state.pte.usermode != flgs.usermode)
+         && if (flgs.devicemem == 1) {
+               (state.pte.nocache == 1 && state.pte.writethrough == 1)
+            } else {
+                (state.pte.nocache == 0 && state.pte.writethrough == 0)
+            }
+         && (state.pte.accessed == 1)
+         && (state.pte.global == 0)
+         && (state.pte.dirty == 0)
+    }
+
+
+
+    // the translation semantics, adding an option type?
+    fn translate(va: vaddr) -> paddr
+        requires va < 4096;
+        requires state.pte.present == 1;
+    {
+        va + (state.pte.base << 12)
+    }
+
+    // unmapping an entry
+    fn unmap(va: vaddr, sz: size)
+        requires (va == 0);
+        requires sz == PAGE_SIZE;
+    {}
+
+    // mapping an entry
+    fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+        requires va == 0;
+        requires sz == PAGE_SIZE;
+        requires (pa & 0xfff) == 0;
+
+        // need a way to express types:
+        // type(addr) == Memory || type(addr) == DevMemory;
+        // type(addr) == DevMemory ==> flgs & CACHE_DISABLED
+        //
+    {}
+
+
+    // protecting the entry, i.e., change its permission
+    fn protect(va: vaddr, sz: size, flgs: flags)
+    {}
+
+
+    fn foo(va: vaddr) -> bool
+        requires (va < 0) && (va > 0);
+        requires (va < 0) && ((va > 0) || (va == 0));
+        requires !(va == 1 || va ==2)
+}
+
+
+enum PageDirectoryEntry(base: addr) {
+    X86PageDirectoryTable(base),
+    X86PageDirectoryPage(base)
+}
+
+enum PageDirectoryEntry2(base: addr) {
+    PageDirectoryEntry(base),
+    X86PageDirectoryTable(base),
+    X86PageDirectoryPage(base)
+}
+
+enum PageDirectoryEntry3(base: bool) {
+    X86PageDirectoryTable(base),
+    X86PageDirectoryPage(base)
+}
+
+enum PageDirectoryEntry4(base: addr) {
+    X86PageDirectoryPage(base),
+    X86PageDirectoryPage(base)
+}
+
+enum PageDirectoryEntry4(base: addr, base2: addr) {
+    X86PageDirectoryPage(),
+    X86PageDirectoryPage(base, base2)
+}
+
+// represents an x86 page table entry
+staticmap X86PageTable(base : addr) {
+    mapdef = [ PageDirectoryEntry(base + i * 4) for i in 0..1024 ];
+}
