@@ -31,11 +31,9 @@ use std::path::Path;
 use crustal as C;
 
 use velosiast::ast::{
-    VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField,
-    VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField, VelosiAstInterfaceRegisterField,
-    VelosiAstUnitSegment,
+    VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField, VelosiAstInterfaceMemoryField,
+    VelosiAstInterfaceMmioField, VelosiAstInterfaceRegisterField, VelosiAstUnitSegment,
 };
-
 
 use super::{field, utils};
 use crate::VelosiCodeGenError;

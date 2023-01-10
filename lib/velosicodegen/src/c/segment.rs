@@ -30,9 +30,7 @@ use std::path::Path;
 
 use crustal as C;
 
-use velosiast::ast::{
-    VelosiAstMethod, VelosiAstUnitSegment,
-};
+use velosiast::ast::{VelosiAstMethod, VelosiAstUnitSegment};
 
 use super::utils;
 use crate::VelosiCodeGenError;
