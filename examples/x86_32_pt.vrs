@@ -32,11 +32,9 @@
  */
 
 // represents an x86 page table entry
-segment X86PageTableEntry(base : addr) {
+segment X86PageTableEntry(base : addr) : Segment {
 
-    const PAGE_SIZE : size = 4096;
-
-const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
+    const PAGE_SIZE : int = 4096;
 
     // there are there are 4 KiB pages
     inbitwidth = 12;
@@ -52,44 +50,38 @@ const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
     };
 
     // the state
-    state = StateDef(base: addr) {
-        mem pte [base, 0, 4] {
+    state = MemoryState(base : addr) {
+        pte [base, 0, 4] {
             // the following fields at starting bit, ending bit, name
-            0 ..  1 present,
-            1 ..  2 writable,
-            2 ..  3 usermode,
-            3 ..  4 writethrough,
-            4 ..  5 nocache,
-            5 ..  6 accessed,
-            6 ..  7 dirty,
-            7 ..  8 pat,
-            8 ..  9 global,
-            9 .. 12 ignored,
-           12 .. 32 base,
-        },
-        // mem pte [base, 0, 4],
-        // mem pte2 [base2, 0, 4],
-        // mem pte3 [base, 0, 4],
-        reg cr4 [4],
-        // reg cr4 [4],
+            0 ..  0 present,
+            1 ..  1 writable,
+            2 ..  2 usermode,
+            3 ..  3 writethrough,
+            4 ..  4 nocache,
+            5 ..  5 accessed,
+            6 ..  6 dirty,
+            7 ..  7 pat,
+            8 ..  8 global,
+            9 .. 11 ignored,
+           12 .. 31 base,
+        }
     };
 
-    interface = InterfaceDef(base : addr) {
-        mem pte [base, 0, 4] {
-
+    interface = MemoryInterface(base : addr) {
+        pte [base, 0, 4] {
             Layout {
                 // the following fields at starting bit, ending bit, name
-                    0 ..  1 present,
-                    1 ..  2 writable,
-                    2 ..  3 usermode,
-                    3 ..  4 writethrough,
-                    4 ..  5 nocache,
-                    5 ..  6 accessed,
-                    6 ..  7 dirty,
-                    7 ..  8 pat,
-                    8 ..  9 global,
-                    9 .. 12 ignored,
-                12 .. 32 base,
+                0 ..  0 present,
+                1 ..  1 writable,
+                2 ..  2 usermode,
+                3 ..  3 writethrough,
+                4 ..  4 nocache,
+                5 ..  5 accessed,
+                6 ..  6 dirty,
+                7 ..  7 pat,
+                8 ..  8 global,
+                9 .. 11 ignored,
+                12..  31 base,
             },
             ReadAction {
                 interface.pte <- state.pte;
@@ -97,8 +89,7 @@ const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
             WriteAction {
                 interface.pte -> state.pte;
             },
-        },
-        reg cr4 [4],
+        }
     };
 
     fn valid() -> bool {
@@ -108,65 +99,52 @@ const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
 
     // matches a translation flags,
     fn matchflags(flgs : flags) -> bool
-        requires (state.pte.present == 1);
+        requires (state.pte.present == 1)
     {
         (state.pte.writable == flgs.writable)
-         && (state.pte.usermode != flgs.usermode)
-         && if (flgs.devicemem == 1) {
-               (state.pte.nocache == 1 && state.pte.writethrough == 1)
-            } else {
-                (state.pte.nocache == 0 && state.pte.writethrough == 0)
-            }
-         && (state.pte.accessed == 1)
-         && (state.pte.global == 0)
-         && (state.pte.dirty == 0)
+                // && (state.pte.usermode != flgs.usermode)
+                // && (state.pte.nocache == flgs.devicemem)
+                && (state.pte.global == 0)
     }
-
-
 
     // the translation semantics, adding an option type?
     fn translate(va: vaddr) -> paddr
-        requires va < 4096;
-        requires state.pte.present == 1;
+        requires va < 4096
+        requires state.pte.present == 1
     {
         va + (state.pte.base << 12)
     }
 
     // unmapping an entry
-    synth fn unmap(va: vaddr, sz: size)
-        requires (va == 0);
-        requires sz == PAGE_SIZE;
-    {}
+    fn unmap(va: addr, sz: size) -> bool
+        requires (va == 0)
+        requires sz == PAGE_SIZE
+
 
     // mapping an entry
-    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
-        requires va == 0;
-        requires sz == PAGE_SIZE;
-        requires (pa & 0xfff) == 0;
+    fn map(va: vaddr, sz: size, flgs: flags, pa : paddr) -> bool
+        requires va == 0
+        requires sz == PAGE_SIZE
+        requires (pa & 0xfff) == 0
 
         // need a way to express types:
         // type(addr) == Memory || type(addr) == DevMemory;
         // type(addr) == DevMemory ==> flgs & CACHE_DISABLED
         //
-    {}
+    ;
 
 
     // protecting the entry, i.e., change its permission
-    synth fn protect(va: vaddr, sz: size, flgs: flags)
-    {}
-
-
-    fn foo(va: vaddr) -> bool
-        requires (va < 0) && (va > 0);
-        requires (va < 0) && ((va > 0) || (va == 0));
-        requires !(va == 1 || va ==2)
+    fn protect(va: vaddr, sz: size, flgs: flags) -> bool
     {
+        // update the entry
+        // ensures matchflags(flgs) ==> translate(a) == translate(a)
         true
     }
 }
 
 
 // represents an x86 page table entry
-staticmap X86PageTable(base : addr) {
-    mapdef = [ X86PageTableEntry(base + i * 4) for i in 0..1024 ];
+staticmap X86PageTable(base : addr) : StaticMap {
+    staticmap = [ X86PageTableEntry(base + i * 4) for i in 0..1024 ];
 }

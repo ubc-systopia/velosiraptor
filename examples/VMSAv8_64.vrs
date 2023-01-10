@@ -1,0 +1,408 @@
+/**
+ * Arm Architecture Reference Manual ARMv8 for A-Profile
+ * =====================================================
+ *
+ * The AArch64 Virtual Memory System Architecture
+ *
+ *
+ */
+
+// We use the 4 KiB granule
+const GRANULE_SIZE : size = 4096;
+
+
+// an entry in the table is invalid if it's present bit is set to 0. the remaining bits are ignored
+segment Invalid {
+
+    fn invariant() {
+        state.present == 0
+    }
+
+    state = StateDef(base: addr) {
+        0 .. 1  present,
+        1 .. 64 ignored,
+    }
+}
+
+segment TableDescriptor {
+
+    fn invariant() {
+        state.present == 1 && state.table == 1
+    }
+
+
+    state = StateDef(base :addr) {
+         0 ..  1 present,
+         1 ..  2 table,
+         2 .. 12 ignored,
+        12 .. 48 address,
+        48 .. 52 res_0,
+        52 .. 59 ignored,
+        59 .. 60 pxn_table, // PXN limit for subsequent levels of lookup
+        60 .. 61 xntable,   // XN limit for subsequent levels of lookup
+        61 .. 63 aptable,   // Access permissions limit for subsequent levels of lookup
+        63 .. 64 nstable,   // For memory accesses from Secure state, specifies the Security state for subsequent levels of lookup
+    }
+}
+
+segment Block {
+    state = StateDef(base :addr) {
+        0 ..  1 present,
+        1 ..  2 table,
+        // lower block attributes
+        2 ..  5 attr_idx,  // Stage 1 memory attributes index field
+        5 ..  6 ns,        // non-secure bit
+        6 ..  8 ap,        // access permissions (Memory access control on page D5-2754)
+        8 .. 10 sh,        // shareability field
+        10 .. 11 af,        // access flag
+        11 .. 12 ng,        // determines whether the TLB entry applies to all ASID values, or only to the current ASID value
+        12 .. 16 OA,        //
+        16 .. 17 nT,        // Block translation entry
+        // addr
+        21 .. 48 address,
+
+        48 .. 50 res0,
+
+        // upper block attributes
+        50 .. 51 gp,         // Guarded Page
+        51 .. 52 dbm,        // Dirty Bit Modifier
+        52 .. 53 contiguous, // A hint bit indicating that the translation table entry is one of a contiguous set of entries
+        53 .. 54 pxn,        // The Privileged execute-never field
+        54 .. 55 uxn,        // The Execute-never or Unprivileged execute-never field
+        55 .. 59 ignored,    // Reserved for software use
+        59 .. 62 pbha,       // Page-based Hardware Attributes bits.
+        63 .. 64 ignored,
+    }
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// VMSAv8-64 level 3 descriptor format
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+segment L3TableEntryPage {
+    // invariant
+
+    fn invariant() {
+        state.present == 1 && state.table == 1
+    }
+
+    state = StateDef(base :addr) {
+         0 ..  1 present,
+         1 ..  2 table,
+
+         // lower block attributes
+         2 ..  5 attr_idx,  // Stage 1 memory attributes index field
+         5 ..  6 ns,        // non-secure bit
+         6 ..  8 ap,        // access permissions (Memory access control on page D5-2754)
+         8 .. 10 sh,        // shareability field
+        10 .. 11 af,        // access flag
+        11 .. 12 ng,        // determines whether the TLB entry applies to all ASID values, or only to the current ASID value
+
+        // output address to the page
+        12 .. 48 frame_address,
+        48 .. 50 res0,
+
+        // upper block attributes
+        50 .. 51 gp,         // Guarded Page
+        51 .. 52 dbm,        // Dirty Bit Modifier
+        52 .. 53 contiguous, // A hint bit indicating that the translation table entry is one of a contiguous set of entries
+        53 .. 54 pxn,        // The Privileged execute-never field
+        54 .. 55 uxn,        // The Execute-never or Unprivileged execute-never field
+        55 .. 59 ignored,    // Reserved for software use
+        59 .. 62 pbha,       // Page-based Hardware Attributes bits.
+        63 .. 64 ignored,    // Ignored
+    }
+}
+
+enum L3Table_Entry(base: addr){
+    Invalid(base),
+    L3TableEntryPage(base),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// VMSAv8-64 level 2 descriptor format
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+segment L2TableEntryTable(base : addr) : TableDescriptor {
+
+}
+
+segment L2TableEntryBlock {
+
+    fn invariant() {
+        state.present == 1 && state.table == 0
+    }
+
+
+    state = StateDef(base :addr) {
+        0 ..  1 present,
+        1 ..  2 table,
+        // lower block attributes
+        2 ..  5 attr_idx,  // Stage 1 memory attributes index field
+        5 ..  6 ns,        // non-secure bit
+        6 ..  8 ap,        // access permissions (Memory access control on page D5-2754)
+        8 .. 10 sh,        // shareability field
+        10 .. 11 af,        // access flag
+        11 .. 12 ng,        // determines whether the TLB entry applies to all ASID values, or only to the current ASID value
+        12 .. 16 OA,        //
+        16 .. 17 nT,        // Block translation entry
+        // addr
+        17 .. 21 res0,
+        21 .. 48 address,
+        48 .. 50 res0,
+
+        // upper block attributes
+        50 .. 51 gp,         // Guarded Page
+        51 .. 52 dbm,        // Dirty Bit Modifier
+        52 .. 53 contiguous, // A hint bit indicating that the translation table entry is one of a contiguous set of entries
+        53 .. 54 pxn,        // The Privileged execute-never field
+        54 .. 55 uxn,        // The Execute-never or Unprivileged execute-never field
+        55 .. 59 ignored,    // Reserved for software use
+        59 .. 62 pbha,       // Page-based Hardware Attributes bits.
+        63 .. 64 ignored,
+    }
+}
+
+
+
+enum L2Table_Entry(base: addr){
+    Invalid(base),
+    L2TableEntryTable(base),
+    L2TableEntryBlock(base)
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// VMSAv8-64 level 1 descriptor format
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+segment L1TableEntryTable(base : addr) : TableDescriptor {
+
+}
+
+segment L1TableEntryBlock {
+
+    fn invariant() {
+        state.present == 1 && state.table == 0
+    }
+
+
+    state = StateDef(base :addr) {
+        0 ..  1 present,
+        1 ..  2 table,
+        // lower block attributes
+        2 ..  5 attr_idx,  // Stage 1 memory attributes index field
+        5 ..  6 ns,        // non-secure bit
+        6 ..  8 ap,        // access permissions (Memory access control on page D5-2754)
+        8 .. 10 sh,        // shareability field
+        10 .. 11 af,        // access flag
+        11 .. 12 ng,        // determines whether the TLB entry applies to all ASID values, or only to the current ASID value
+        12 .. 16 OA,        //
+        16 .. 17 nT,        // Block translation entry
+
+        // addr
+        17 .. 30 res0,
+        30 .. 48 address,
+        48 .. 50 res0,
+
+        // upper block attributes
+        50 .. 51 gp,         // Guarded Page
+        51 .. 52 dbm,        // Dirty Bit Modifier
+        52 .. 53 contiguous, // A hint bit indicating that the translation table entry is one of a contiguous set of entries
+        53 .. 54 pxn,        // The Privileged execute-never field
+        54 .. 55 uxn,        // The Execute-never or Unprivileged execute-never field
+        55 .. 59 ignored,    // Reserved for software use
+        59 .. 62 pbha,       // Page-based Hardware Attributes bits.
+        63 .. 64 ignored,
+    }
+}
+
+enum L1Table_Entry(base: addr){
+    Invalid(base),
+    L1TableEntryTable(base),
+    L1TableEntryBlock(base)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// VMSAv8-64 level 0 descriptor format
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+segment L0TableEntryTable(base : addr) : TableDescriptor {
+
+}
+
+enum L0Table_Entry(base: addr){
+    Invalid(base),
+    L0TableEntryTable(base)
+}
+
+
+
+
+
+
+// represents an x86 page table entry
+segment X86PageTableEntry(base : addr) {
+
+    const PAGE_SIZE : size = 4096;
+
+const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
+
+    // there are there are 4 KiB pages
+    inbitwidth = 12;
+
+    // it's a 32-bit machine
+    outbitwidth = 32;
+
+    flags = {
+        writable,
+        readable,
+        devicemem,
+        usermode
+    };
+
+    // the state
+    // state = MemoryState(base : addr) {
+    //     pte [base, 0, 4] {
+    //         // the following fields at starting bit, ending bit, name
+    //         0 ..  1 present,
+    //         1 ..  2 writable,
+    //         2 ..  3 usermode,
+    //         3 ..  4 writethrough,
+    //         4 ..  5 nocache,
+    //         5 ..  6 accessed,
+    //         6 ..  7 dirty,
+    //         7 ..  8 pat,
+    //         8 ..  9 global,
+    //         9 .. 12 ignored,
+    //        12 .. 32 base,
+    //     }
+    // };
+
+    state = StateDef(base: addr) {
+        mem pte [base, 0, 4] {
+            // the following fields at starting bit, ending bit, name
+            0 ..  1 present,
+            1 ..  2 writable,
+            2 ..  3 usermode,
+            3 ..  4 writethrough,
+            4 ..  5 nocache,
+            5 ..  6 accessed,
+            6 ..  7 dirty,
+            7 ..  8 pat,
+            8 ..  9 global,
+            9 .. 12 ignored,
+           12 .. 32 base,
+        },
+        // mem pte [base, 0, 4],
+        // mem pte2 [base2, 0, 4],
+        // mem pte3 [base, 0, 4],
+        reg cr4 [4],
+        // reg cr4 [4],
+    };
+
+    interface = InterfaceDef(base : addr) {
+        mem pte [base, 0, 4] {
+
+            Layout {
+                // the following fields at starting bit, ending bit, name
+                    0 ..  1 present,
+                    1 ..  2 writable,
+                    2 ..  3 usermode,
+                    3 ..  4 writethrough,
+                    4 ..  5 nocache,
+                    5 ..  6 accessed,
+                    6 ..  7 dirty,
+                    7 ..  8 pat,
+                    8 ..  9 global,
+                    9 .. 12 ignored,
+                12 .. 32 base,
+            },
+            ReadAction {
+                interface.pte <- state.pte;
+            },
+            WriteAction {
+                interface.pte -> state.pte;
+            },
+        },
+        reg cr4 [4],
+    };
+
+    fn valid() -> bool {
+        state.pte.present == 1
+    }
+
+
+    // matches a translation flags,
+    fn matchflags(flgs : flags) -> bool
+        requires (state.pte.present == 1);
+    {
+        (state.pte.writable == flgs.writable)
+         && (state.pte.usermode != flgs.usermode)
+         && if (flgs.devicemem == 1) {
+               (state.pte.nocache == 1 && state.pte.writethrough == 1)
+            } else {
+                (state.pte.nocache == 0 && state.pte.writethrough == 0)
+            }
+         && (state.pte.accessed == 1)
+         && (state.pte.global == 0)
+         && (state.pte.dirty == 0)
+    }
+
+
+
+    // the translation semantics, adding an option type?
+    fn translate(va: vaddr) -> paddr
+        requires va < 4096;
+        requires state.pte.present == 1;
+    {
+        va + (state.pte.base << 12)
+    }
+
+    // unmapping an entry
+    fn unmap(va: vaddr, sz: size)
+        requires (va == 0);
+        requires sz == PAGE_SIZE;
+    {}
+
+    // mapping an entry
+    fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+        requires va == 0;
+        requires sz == PAGE_SIZE;
+        requires (pa & 0xfff) == 0;
+
+        // need a way to express types:
+        // type(addr) == Memory || type(addr) == DevMemory;
+        // type(addr) == DevMemory ==> flgs & CACHE_DISABLED
+        //
+    {}
+
+
+    // protecting the entry, i.e., change its permission
+    fn protect(va: vaddr, sz: size, flgs: flags)
+    {}
+
+
+    fn foo(va: vaddr) -> bool
+        requires (va < 0) && (va > 0);
+        requires (va < 0) && ((va > 0) || (va == 0));
+        requires !(va == 1 || va ==2)
+}
+
+
+// represents an x86 page table entry
+staticmap X86PageTable(base : addr) {
+    mapdef = [ X86PageTableEntry(base + i * 4) for i in 0..1024 ];
+}
+
+

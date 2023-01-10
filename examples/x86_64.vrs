@@ -1,0 +1,549 @@
+/**
+ * Intel 64 and IA-32 Architectures Software Developer's Manual
+ * =====================================================
+ *
+ * Volume 3 - Chapter 4: Paging
+ * 4.5 4-LEVEL PAGING AND 5-LEVEL PAGING
+ */
+
+const PTABLE_ENTRIES : size =  512;
+const PTABLE_ENTRY_SIZE : size = 8;
+
+// the page sizes
+const BASE_PAGE_SIZE  : size = (1 << 12); // 4 KiB
+const LARGE_PAGE_SIZE : size = (1 << 21); // 2 MiB
+const HUGE_PAGE_SIZE  : size = (1 << 30);  // 1 GiB
+
+const PHYS_ADDR_MAX   : size = (1 << 48);
+
+
+// an entry in the table is invalid if it's present bit is set to 0. the remaining bits are ignored
+//segment Invalid {
+//    fn inv() {
+//        state.present == 0
+//    }
+//
+//    state = StateDef(base: addr) {
+//        mem entry [base, 0, 8] {
+//            0 .. 1  present,
+//            1 .. 64 ignored,
+//        }
+//    };
+//}
+//
+// segment TableDescriptor {
+//
+//    fn inv() {
+//        state.present == 1 && state.ps == 0
+//    }
+//
+//    state = StateDef(base :addr) {
+//        mem entry [base, 0, 8] {
+//            0 ..  1 present,
+//            1 ..  2 rw,  // Read/write; if 0, writes may not be allowed to the 512-GByte region controlled by this entry
+//            2 ..  3 us,  // if 0, user-mode accesses are not allowed to the 512-GByte region controlled by this entry
+//            3 ..  4 pwt, // Page-level write-through;
+//            4 ..  5 pcd, // Page-level cache disable
+//            5 ..  6 a,   // Accessed;
+//            6 ..  7 ignored,
+//            7 ..  8 ps,
+//            8 .. 12 ignored,
+//            12 .. 48 address,
+//            48 .. 52 res0,
+//            52 .. 63 ignored,
+//            63 .. 64 xd, // execute disabled
+//        }
+//    };
+//}
+//
+//abstract segment X86_64_PDirEntry(pagebits: usize){
+//
+//    fn inv() {
+//        state.present == 1 && state.ps == 1
+//    }
+//
+//    state = StateDef(base :addr) {
+//        mem entry [base, 0, 8] {
+//            0 ..  1 present,
+//            1 ..  2 rw,  // Read/write; if 0, writes may not be allowed to the page
+//            2 ..  3 us,  // if 0, user-mode accesses are not allowed to the page
+//            3 ..  4 pwt, // Page-level write-through;
+//            4 ..  5 pcd, // Page-level cache disable
+//            5 ..  6 a,   // Accessed;
+//            6 ..  7 d,   // dirty
+//            7 ..  8 ps,  // page size
+//            8 ..  9 g,   // global
+//            9 .. 12 ignored,
+//            12 .. 13 pat,
+//            //13 .. pagebits reserved,
+//            //pagebits .. 48 address,
+//            48 .. 52 res0,
+//            52 .. 59 ignored,
+//            59 .. 63 pkey, // protection keys
+//            63 .. 64 xd, // execute disabled
+//        }
+//    };
+//}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// x86_64 Table Descriptor (PDIR / PDPT / PML4)
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+abstract segment PTableDescriptor(base: addr) {
+
+    const PAGE_SIZE : size = 4096;
+    const PAGE_ALIGNMENT : size = 4096;
+
+    // it's a 64-bit machine with a 48 bit virtual address space
+    outbitwidth = 48;
+
+    // some flags XXX
+    flags = {
+        writable,
+        readable,
+        executable,
+        devicemem,
+        usermode
+    };
+
+    state = StateDef(base: addr) {
+        mem entry [ base, 0, 8 ] {
+            0 ..  1 present,  // whether this entry is valid
+            1 ..  2 rw,       // Read/write; if 0, writes may not be allowed to the 512-GByte region controlled by this entry
+            2 ..  3 us,       // if 0, user-mode accesses are not allowed to the 512-GByte region controlled by this entry
+            3 ..  4 pwt,      // Page-level write-through;
+            4 ..  5 pcd,      // Page-level cache disable
+            5 ..  6 a,        // Accessed;
+            6 ..  7 ignored0,
+            7 ..  8 ps,
+            8 .. 12 ignored1,
+            12 .. 48 address,
+            48 .. 52 res0,
+            52 .. 63 ignored3,
+            63 .. 64 xd, // execute disabled
+        }
+    };
+
+    interface = InterfaceDef(base: addr) {
+        mem entry [ base, 0, 8 ]
+    };
+
+    fn valid() -> bool {
+        state.entry.present == 1
+          && state.entry.ps == 0
+          && state.entry.res0 == 0
+
+    }
+
+    fn matchflags(flgs : flags) -> bool
+        requires valid()
+    {
+        (state.entry.rw == 1)      // always writable
+         && (state.entry.us == 1)  // allow user access
+         && (state.entry.pwt == 0) // don't do write back
+         && (state.entry.pcd == 0) // don't disable cches
+    }
+
+    fn translate(va: vaddr) -> paddr
+        requires valid()
+    {
+        va + (state.entry.address << 12)
+    }
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// x86_64 Page Table
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+segment X86PageTableEntry(base: addr) {
+
+    const PAGE_SIZE : size = 4096;
+    const PAGE_ALIGNMENT : size = 4096;
+
+    // there are there are 4 KiB pages
+    inbitwidth = 12;
+
+    // it's a 64-bit machine with a 48 bit virtual address space
+    outbitwidth = 48;
+
+    // some flags XXX
+    flags = {
+        writable,
+        readable,
+        executable,
+        devicemem,
+        usermode
+    };
+
+    state = StateDef(base: addr) {
+        mem entry [ base, 0, 8 ] {
+            0 ..  1 present,  // the present bit indicating this entry is valid
+            1 ..  2 rw,       // Read/write; if 0, writes may not be allowed to the page
+            2 ..  3 us,       // if 0, user-mode accesses are not allowed to the page
+            3 ..  4 pwt,      // Page-level write-through;
+            4 ..  5 pcd,      // Page-level cache disable
+            5 ..  6 a,        // Accessed;
+            6 ..  7 d,        // dirty
+            7 ..  8 pat,      // page size
+            8 ..  9 g,        // global
+            9 .. 12 ign0,  //
+            12 .. 48 address, //
+            48 .. 52 res0,    //
+            52 .. 59 ign1, // don't care
+            59 .. 63 pkey,    // protection keys
+            63 .. 64 xd,      // execute disabled
+        }
+    };
+
+    interface = InterfaceDef(base: addr) {
+        mem entry [ base, 0, 8 ]
+    };
+
+    fn valid() -> bool {
+        state.entry.present == 1 && state.entry.res0 == 0
+    }
+
+    fn matchflags(flgs : flags) -> bool
+        requires valid()
+    {
+        (state.entry.rw == flgs.writable)
+         && if (flgs.devicemem == 1) {
+                (state.entry.pcd == 1 && state.entry.pwt == 1)
+            } else {
+                (state.entry.pcd == 0 && state.entry.pwt == 0)
+            }
+         && (state.entry.us == flgs.usermode)
+         && if flgs.executable == 1 {state.entry.xd == 0} else { state.entry.xd == 1}
+    }
+
+    fn translate(va: vaddr) -> paddr
+        requires state.entry.pat == 0
+        requires state.entry.g == 0
+        requires valid()
+    {
+        va + (state.entry.address << 12)
+    }
+
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+        requires va == 0 && sz == PAGE_SIZE
+        requires (pa & (PAGE_SIZE - 1) == 0)
+
+    synth fn protect(va: vaddr, sz: size, flgs: flags);
+
+    synth fn unmap(va: vaddr, sz: size);
+}
+
+// represents an x86 page table entry
+staticmap X86PageTable(base : addr) {
+    // mapdef = [ X86PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..PTABLE_ENTRIES ];
+    mapdef = [ X86PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..512 ];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// X86_64 Page Directory
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+segment PDirEntryTable(base : addr) : PTableDescriptor {
+
+    inbitwidth = 21;
+
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+        requires va == 0 && sz == PAGE_SIZE
+        requires (pa & (PAGE_SIZE - 1) == 0)
+
+    synth fn protect(va: vaddr, sz: size, flgs: flags);
+
+    synth fn unmap(va: vaddr, sz: size);
+}
+
+//
+//segment PDirEntryPage {
+//
+//    fn inv() {
+//        state.present == 1 && state.ps == 1
+//    }
+//
+//    state = StateDef(base :addr) {
+//        mem entry [ base, 0, 8] {
+//            0 ..  1 present,
+//            1 ..  2 rw,  // Read/write; if 0, writes may not be allowed to the page
+//            2 ..  3 us,  // if 0, user-mode accesses are not allowed to the page
+//            3 ..  4 pwt, // Page-level write-through;
+//            4 ..  5 pcd, // Page-level cache disable
+//            5 ..  6 a,   // Accessed;
+//            6 ..  7 d,   // dirty
+//            7 ..  8 ps,  // page size
+//            8 ..  9 g,   // global
+//            9 .. 12 ignored,
+//            12 .. 13 pat,
+//            13 .. 21 reserved,
+//            21 .. 48 address,
+//            48 .. 52 res0,
+//            52 .. 59 ignored,
+//            59 .. 63 pkey, // protection keys
+//            63 .. 64 xd, // execute disabled
+//        }
+//    };
+//}
+//
+//
+//
+//enum PDirEntry(base: addr){
+//    Invalid(base),
+//    PDirEntryTable(base),
+//    PDirEntryPage(base)
+//}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Page-Directory-Pointer-Table
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+segment PDPTEntryTable(base : addr) : PTableDescriptor {
+
+    inbitwidth = 30;
+
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+        requires va == 0 && sz == PAGE_SIZE
+        requires (pa & (PAGE_SIZE - 1) == 0)
+
+    synth fn protect(va: vaddr, sz: size, flgs: flags);
+
+    synth fn unmap(va: vaddr, sz: size);
+}
+//
+// segment PDPTEntryPage {
+//
+//     const PAGE_SIZE_BITS : usize = 30;
+//
+//     fn inv() {
+//         state.present == 1 && state.ps == 1
+//     }
+//
+//     state = StateDef(base :addr) {
+//         mem entry [base, 0, 8] {
+//             0 ..  1 present,
+//             1 ..  2 rw,  // Read/write; if 0, writes may not be allowed to the page
+//             2 ..  3 us,  // if 0, user-mode accesses are not allowed to the page
+//             3 ..  4 pwt, // Page-level write-through;
+//             4 ..  5 pcd, // Page-level cache disable
+//             5 ..  6 a,   // Accessed;
+//             6 ..  7 d,   // dirty
+//             7 ..  8 ps,  // page size
+//             8 ..  9 g,   // global
+//             9 .. 12 ignored,
+//             12 .. 13 pat,
+//             13 .. 30 reserved,
+//             30 .. 48 address,
+//             48 .. 52 res0,
+//             52 .. 59 ignored,
+//             59 .. 63 pkey, // protection keys
+//             63 .. 64 xd, // execute disabled
+//         }
+//     };
+// }
+//
+// enum PDPTEntry(base: addr){
+//     Invalid(base),
+//     PDPTEntryTable(base),
+//     PDPTEntryPage(base)
+// }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+////
+//// PML4
+////
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+segment PML4EntryTable(base : addr) : PTableDescriptor {
+
+    inbitwidth = 39;
+
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+        requires va == 0 && sz == PAGE_SIZE
+        requires (pa & (PAGE_SIZE - 1) == 0)
+
+    synth fn protect(va: vaddr, sz: size, flgs: flags);
+
+    synth fn unmap(va: vaddr, sz: size);
+}
+//
+//enum PML4Entry(base: addr){
+//    Invalid(base),
+//    PML4EntryTable(base)
+//}
+//
+//
+//
+//
+//
+//
+//// represents an x86 page table entry
+//segment X86PageTableEntry(base : addr) {
+//
+//    const PAGE_SIZE : size = 4096;
+//
+//const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
+//
+//    // there are there are 4 KiB pages
+//    inbitwidth = 12;
+//
+//    // it's a 32-bit machine
+//    outbitwidth = 32;
+//
+//    flags = {
+//        writable,
+//        readable,
+//        devicemem,
+//        usermode
+//    };
+//
+//    // the state
+//    // state = MemoryState(base : addr) {
+//    //     pte [base, 0, 4] {
+//    //         // the following fields at starting bit, ending bit, name
+//    //         0 ..  1 present,
+//    //         1 ..  2 writable,
+//    //         2 ..  3 usermode,
+//    //         3 ..  4 writethrough,
+//    //         4 ..  5 nocache,
+//    //         5 ..  6 accessed,
+//    //         6 ..  7 dirty,
+//    //         7 ..  8 pat,
+//    //         8 ..  9 global,
+//    //         9 .. 12 ignored,
+//    //        12 .. 32 base,
+//    //     }
+//    // };
+//
+//    state = StateDef(base: addr) {
+//        mem pte [base, 0, 4] {
+//            // the following fields at starting bit, ending bit, name
+//            0 ..  1 present,
+//            1 ..  2 writable,
+//            2 ..  3 usermode,
+//            3 ..  4 writethrough,
+//            4 ..  5 nocache,
+//            5 ..  6 accessed,
+//            6 ..  7 dirty,
+//            7 ..  8 pat,
+//            8 ..  9 global,
+//            9 .. 12 ignored,
+//           12 .. 32 base,
+//        },
+//        // mem pte [base, 0, 4],
+//        // mem pte2 [base2, 0, 4],
+//        // mem pte3 [base, 0, 4],
+//        reg cr4 [4],
+//        // reg cr4 [4],
+//    };
+//
+//    interface = InterfaceDef(base : addr) {
+//        mem pte [base, 0, 4] {
+//
+//            Layout {
+//                // the following fields at starting bit, ending bit, name
+//                    0 ..  1 present,
+//                    1 ..  2 writable,
+//                    2 ..  3 usermode,
+//                    3 ..  4 writethrough,
+//                    4 ..  5 nocache,
+//                    5 ..  6 accessed,
+//                    6 ..  7 dirty,
+//                    7 ..  8 pat,
+//                    8 ..  9 global,
+//                    9 .. 12 ignored,
+//                12 .. 32 base,
+//            },
+//            ReadAction {
+//                interface.pte <- state.pte;
+//            },
+//            WriteAction {
+//                interface.pte -> state.pte;
+//            },
+//        },
+//        reg cr4 [4],
+//    };
+//
+//    fn valid() -> bool {
+//        state.pte.present == 1
+//    }
+//
+//
+//    // matches a translation flags,
+//    fn matchflags(flgs : flags) -> bool
+//        requires (state.pte.present == 1);
+//    {
+//        (state.pte.writable == flgs.writable)
+//         && (state.pte.usermode != flgs.usermode)
+//         && if (flgs.devicemem == 1) {
+//               (state.pte.nocache == 1 && state.pte.writethrough == 1)
+//            } else {
+//                (state.pte.nocache == 0 && state.pte.writethrough == 0)
+//            }
+//         && (state.pte.accessed == 1)
+//         && (state.pte.global == 0)
+//         && (state.pte.dirty == 0)
+//    }
+//
+//
+//
+//    // the translation semantics, adding an option type?
+//    fn translate(va: vaddr) -> paddr
+//        requires va < 4096;
+//        requires state.pte.present == 1;
+//    {
+//        va + (state.pte.base << 12)
+//    }
+//
+//    // unmapping an entry
+//    fn unmap(va: vaddr, sz: size)
+//        requires (va == 0);
+//        requires sz == PAGE_SIZE;
+//    {}
+//
+//    // mapping an entry
+//    fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+//        requires va == 0;
+//        requires sz == PAGE_SIZE;
+//        requires (pa & 0xfff) == 0;
+//
+//        // need a way to express types:
+//        // type(addr) == Memory || type(addr) == DevMemory;
+//        // type(addr) == DevMemory ==> flgs & CACHE_DISABLED
+//        //
+//    {}
+//
+//
+//    // protecting the entry, i.e., change its permission
+//    fn protect(va: vaddr, sz: size, flgs: flags)
+//    {}
+//
+//
+//    fn foo(va: vaddr) -> bool
+//        requires (va < 0) && (va > 0);
+//        requires (va < 0) && ((va > 0) || (va == 0));
+//        requires !(va == 1 || va ==2)
+//}
+//
+//
+//// represents an x86 page table entry
+//staticmap X86PageTable(base : addr) {
+//    mapdef = [ X86PageTableEntry(base + i * 4) for i in 0..1024 ];
+//}
+//
+//
+//
