@@ -137,6 +137,11 @@ impl SymbolTableContext {
         }
     }
 
+    /// updates an entry in the context, returning old symbol
+    fn update(&mut self, sym: Symbol) -> Option<Symbol> {
+        self.syms.insert(sym.name.to_string(), sym)
+    }
+
     /// removes an entry from the context
     fn remove(&mut self, name: &str) -> Option<Symbol> {
         self.syms.remove(name)
@@ -221,6 +226,18 @@ impl SymbolTable {
         }
     }
 
+    pub fn update(&mut self, sym: Symbol) -> Result<Option<Symbol>, VelosiAstErr> {
+        {
+            let ctxt = self.syms.last_mut().unwrap();
+            if ctxt.contains(&sym.name) {
+                // last one contains the symbol
+                return Ok(ctxt.update(sym));
+            }
+        }
+
+        self.insert(sym).map(|_| None)
+    }
+
     /// checks if there is a corresponding entry in the table
     pub fn contains(&self, sym: &str) -> bool {
         self.syms.iter().any(|x| x.contains(sym))
@@ -228,7 +245,7 @@ impl SymbolTable {
 
     /// tries to lookup a symbol by the name in all contexts
     pub fn lookup(&self, name: &str) -> Option<&Symbol> {
-        for ctxt in &self.syms {
+        for ctxt in self.syms.iter().rev() {
             let sym = ctxt.lookup(name);
             if sym.is_some() {
                 return sym;
