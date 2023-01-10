@@ -79,6 +79,7 @@ where
     }
 
     pub fn with_batchsize(queries: T, batch_size: usize) -> Self {
+        let batch_size = std::cmp::min(batch_size, 1);
         ProgramQueries {
             queries,
             submitted: Vec::with_capacity(batch_size),
