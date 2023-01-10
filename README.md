@@ -27,10 +27,12 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 ```
 
-Make sure the submodules are initialized properly
+Make sure the submodules are initialized properly. Note we have submodules in submodules,
+so we need to do a recursive initialization.
+
 ```
-git submodule init
-git submodule update
+git submodule init --recursive
+git submodule update --recursive
 ```
 
 To build the documentation, install the `mdbook` crate.
