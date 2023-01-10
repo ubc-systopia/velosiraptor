@@ -1088,6 +1088,14 @@ pub enum VelosiAstInterfaceField {
 }
 
 impl VelosiAstInterfaceField {
+    pub fn layout_as_slice(&self) -> &[Rc<VelosiAstFieldSlice>] {
+        match self {
+            VelosiAstInterfaceField::Memory(field) => field.layout.as_slice(),
+            VelosiAstInterfaceField::Register(field) => field.layout.as_slice(),
+            VelosiAstInterfaceField::Mmio(field) => field.layout.as_slice(),
+        }
+    }
+
     pub fn slice(&self, ident: &str) -> Option<&VelosiAstFieldSlice> {
         match self {
             VelosiAstInterfaceField::Memory(field) => {
@@ -1123,6 +1131,13 @@ impl VelosiAstInterfaceField {
             VelosiAstInterfaceField::Memory(field) => field.mask(),
             VelosiAstInterfaceField::Register(field) => field.mask(),
             VelosiAstInterfaceField::Mmio(field) => field.mask(),
+        }
+    }
+
+    pub fn update_symbol_table(&self, st: &mut SymbolTable) {
+        for slice in self.layout_as_slice() {
+            st.update(slice.clone().into())
+                .expect("updating symbol table\n");
         }
     }
 
@@ -1453,6 +1468,32 @@ impl VelosiAstInterface {
         matches!(self, VelosiAstInterface::NoneInterface(_))
     }
 
+    pub fn derive_from(&mut self, other: &Self) {
+        // other is none, don't do anything
+        if matches!(other, VelosiAstInterface::NoneInterface(_)) {
+            return;
+        }
+
+        // other has some interface, this one is none, so simply replicate it
+        if matches!(self, VelosiAstInterface::NoneInterface(_)) {
+            *self = other.clone();
+            return;
+        }
+        unimplemented!("IFACE DERIVATION NOT DONE YET!");
+    }
+
+    pub fn update_symbol_table(&self, st: &mut SymbolTable) {
+        if matches!(self, VelosiAstInterface::NoneInterface(_)) {
+            return;
+        }
+
+        for f in self.fields() {
+            f.update_symbol_table(st);
+            st.update(f.clone().into())
+                .expect("state already exists in symbolt able?");
+        }
+    }
+
     pub fn fields(&self) -> &[Rc<VelosiAstInterfaceField>] {
         match self {
             VelosiAstInterface::InterfaceDef(def) => def.fields.as_slice(),
@@ -1491,7 +1532,7 @@ impl VelosiAstInterface {
 impl From<Rc<VelosiAstInterface>> for Symbol {
     fn from(interface: Rc<VelosiAstInterface>) -> Self {
         let ti = VelosiAstType::from(interface.clone());
-        let name = Rc::new(String::from("Interface"));
+        let name = Rc::new(String::from("interface"));
         Symbol::new(name, ti, VelosiAstNode::Interface(interface))
     }
 }

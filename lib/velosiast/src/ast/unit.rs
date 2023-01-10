@@ -121,6 +121,24 @@ impl VelosiAstUnitSegment {
             }
         }
 
+        let mut methods_map = HashMap::new();
+        let mut consts_map = HashMap::new();
+        let mut consts = Vec::new();
+
+        let mut inbitwidth = None;
+        let mut derived_inbitwidth = None;
+        let mut outbitwidth = None;
+        let mut derived_outbitwidth = None;
+
+        let mut flags: Option<Rc<VelosiAstFlags>> = None;
+        let mut derived_flags: Option<Rc<VelosiAstFlags>> = None;
+
+        let mut interface: Option<Rc<VelosiAstInterface>> = None;
+        let mut derived_interface: Option<Rc<VelosiAstInterface>> = None;
+
+        let mut state: Option<Rc<VelosiAstState>> = None;
+        let mut derived_state: Option<Rc<VelosiAstState>> = None;
+
         let derived = if let Some(d) = pt.derived {
             let d = VelosiAstIdentifier::from(d);
             utils::check_type_exists(&mut issues, st, &d);
@@ -130,15 +148,89 @@ impl VelosiAstUnitSegment {
         };
 
         // TODO: handle the drivation...
+        if let Some(d) = &derived {
+            let sym = st.lookup(d.path()).unwrap();
+            let unit = if let VelosiAstNode::Unit(u) = &sym.ast_node {
+                u
+            } else {
+                unreachable!();
+            };
 
-        let mut methods_map = HashMap::new();
-        let mut consts_map = HashMap::new();
-        let mut consts = Vec::new();
-        let mut inbitwidth = None;
-        let mut outbitwidth = None;
-        let mut flags: Option<Rc<VelosiAstFlags>> = None;
-        let mut interface: Option<Rc<VelosiAstInterface>> = None;
-        let mut state: Option<Rc<VelosiAstState>> = None;
+            // only do derives for segments
+            if !unit.is_segment() {
+                let msg = "Derived unit is not a `segment` type.";
+                let hint = "Change this to a `staticmap`, or add a state definition.";
+                let err = VelosiAstErrBuilder::err(msg.to_string())
+                    .add_hint(hint.to_string())
+                    .add_location(pt.loc.from_self_with_subrange(0..1))
+                    .build();
+                issues.push(err);
+            }
+
+            // merge all the constants
+            for c in unit.consts() {
+                consts.push(c.clone());
+                consts_map.insert(c.ident_to_string(), c.clone());
+            }
+
+            // merge all the methods, we'll deal with overwriting abstract ones later
+            for m in unit.methods() {
+                methods_map.insert(m.ident_to_string(), m.clone());
+            }
+
+            derived_inbitwidth = Some(unit.input_bitwidth());
+            inbitwidth = Some((unit.input_bitwidth(), unit.loc().clone()));
+
+            derived_outbitwidth = Some(unit.output_bitwidth());
+            outbitwidth = Some((unit.output_bitwidth(), unit.loc().clone()));
+
+            derived_flags = unit.flags();
+            flags = unit.flags();
+
+            // TODO: add to the symbol table!
+
+            derived_interface = unit.interface();
+            interface = unit.interface();
+
+            // TODO: add to the symbol table!
+
+            derived_state = unit.state();
+            state = unit.state();
+
+            println!("DERIVATION OF Flags\n");
+        }
+
+        // add the elements to the symbol table
+
+        consts_map.values().for_each(|c| {
+            st.insert(c.clone().into())
+                .expect("could not insert into symbol table")
+        });
+
+        methods_map.values().for_each(|c| {
+            st.insert(c.clone().into())
+                .expect("could not insert into symbol table")
+        });
+
+        if let Some(f) = &flags {
+            st.insert(f.clone().into())
+                .expect("could not insert into symbol table")
+        }
+
+        if let Some(i) = &interface {
+            i.update_symbol_table(st);
+            st.insert(i.clone().into())
+                .expect("could not insert into symbol table")
+        }
+
+        if let Some(s) = &state {
+            s.update_symbol_table(st);
+            st.insert(s.clone().into())
+                .expect("could not insert into symbol table")
+        }
+
+        // now process the new nodes defined in this unit
+
         for node in pt.nodes.into_iter() {
             match node {
                 VelosiParseTreeUnitNode::Const(c) => {
@@ -154,19 +246,36 @@ impl VelosiAstUnitSegment {
                     }
                 }
                 VelosiParseTreeUnitNode::InBitWidth(w, loc) => {
-                    utils::check_addressing_width(&mut issues, w, loc);
-                    inbitwidth = Some(w);
+                    utils::check_addressing_width(&mut issues, w, loc.clone());
+                    if inbitwidth.is_some() && derived_inbitwidth.is_none() {
+                        let err = VelosiAstErrDoubleDef::new(
+                            Rc::new(String::from("inbitwidth")),
+                            inbitwidth.as_ref().unwrap().1.clone(),
+                            loc.clone(),
+                        );
+                        issues.push(err.into());
+                    } else {
+                        inbitwidth = Some((w, loc));
+                    }
                 }
                 VelosiParseTreeUnitNode::OutBitWidth(w, loc) => {
-                    utils::check_addressing_width(&mut issues, w, loc);
-                    outbitwidth = Some(w);
+                    utils::check_addressing_width(&mut issues, w, loc.clone());
+                    if outbitwidth.is_some() && derived_outbitwidth.is_none() {
+                        let err = VelosiAstErrDoubleDef::new(
+                            Rc::new(String::from("outbitwidth")),
+                            outbitwidth.as_ref().unwrap().1.clone(),
+                            loc.clone(),
+                        );
+                        issues.push(err.into());
+                    } else {
+                        outbitwidth = Some((w, loc));
+                    }
                 }
                 VelosiParseTreeUnitNode::Flags(f) => {
-                    let flgs = Rc::new(ast_result_unwrap!(
-                        VelosiAstFlags::from_parse_tree(f),
-                        issues
-                    ));
-                    if let Some(f) = &flags {
+                    let mut flgs = ast_result_unwrap!(VelosiAstFlags::from_parse_tree(f), issues);
+
+                    if flags.is_some() && derived_flags.is_none() {
+                        let f = flags.as_ref().unwrap();
                         let err = VelosiAstErrDoubleDef::new(
                             Rc::new(String::from("flags")),
                             f.loc.clone(),
@@ -174,43 +283,59 @@ impl VelosiAstUnitSegment {
                         );
                         issues.push(err.into());
                     } else {
-                        st.insert(flgs.clone().into())
+                        if let Some(d) = derived_flags.take() {
+                            flgs.derive_from(&d);
+                        }
+                        let flgs = Rc::new(flgs);
+                        st.update(flgs.clone().into())
                             .expect("flags already exist n symbol table?");
                         flags = Some(flgs);
                     }
                 }
                 VelosiParseTreeUnitNode::State(pst) => {
-                    let s = Rc::new(ast_result_unwrap!(
-                        VelosiAstState::from_parse_tree(pst, st),
-                        issues
-                    ));
-                    if let Some(st) = &state {
+                    let mut state_def =
+                        ast_result_unwrap!(VelosiAstState::from_parse_tree(pst, st), issues);
+                    if state.is_some() && derived_state.is_none() {
+                        let st = state.as_ref().unwrap();
                         let err = VelosiAstErrDoubleDef::new(
                             Rc::new(String::from("state")),
                             st.loc().clone(),
-                            s.loc().clone(),
+                            state_def.loc().clone(),
                         );
                         issues.push(err.into());
                     } else {
-                        st.insert(s.clone().into())
+                        if let Some(d) = derived_state.take() {
+                            println!("derive state\n");
+                            state_def.derive_from(&d);
+                            state_def.update_symbol_table(st);
+                        }
+
+                        let s = Rc::new(state_def);
+                        st.update(s.clone().into())
                             .expect("state already exists in symbolt able?");
                         state = Some(s);
                     }
                 }
                 VelosiParseTreeUnitNode::Interface(pst) => {
-                    let s = Rc::new(ast_result_unwrap!(
-                        VelosiAstInterface::from_parse_tree(pst, st),
-                        issues
-                    ));
-                    if let Some(st) = &interface {
+                    let mut iface_def =
+                        ast_result_unwrap!(VelosiAstInterface::from_parse_tree(pst, st), issues);
+
+                    if interface.is_some() && derived_interface.is_none() {
+                        let st = interface.as_ref().unwrap();
                         let err = VelosiAstErrDoubleDef::new(
                             Rc::new(String::from("interface")),
                             st.loc().clone(),
-                            s.loc().clone(),
+                            iface_def.loc().clone(),
                         );
                         issues.push(err.into());
                     } else {
-                        st.insert(s.clone().into())
+                        if let Some(d) = derived_interface.take() {
+                            println!("derive interface\n");
+                            iface_def.derive_from(&d);
+                            iface_def.update_symbol_table(st);
+                        }
+                        let s = Rc::new(iface_def);
+                        st.update(s.clone().into())
                             .expect("interface already exists in symbolt able?");
                         interface = Some(s);
                     }
@@ -221,15 +346,9 @@ impl VelosiAstUnitSegment {
                         issues
                     ));
 
-                    if m.is_abstract && !pt.is_abstract {
-                        let msg = "Abstract methods in non-abstract unit.";
-                        let hint = "Remove the abstract modifier or make the unit abstract.";
-                        let err = VelosiAstErrBuilder::err(msg.to_string())
-                            .add_hint(hint.to_string())
-                            .add_location(m.loc.from_self_with_subrange(0..1))
-                            .build();
-                        issues.push(err);
-                    }
+                    // TODO: update the method if it's abstract!
+
+                    println!("TODO: update the method if it's abstract!");
 
                     if let Err(e) = st.insert(m.clone().into()) {
                         issues.push(e);
@@ -328,6 +447,25 @@ impl VelosiAstUnitSegment {
             methods_map.insert(m.ident_to_string(), m);
         }
 
+        // check the methods whether they are still abstract
+        if !pt.is_abstract {
+            for m in methods_map.values() {
+                if m.is_abstract {
+                    let msg = format!(
+                        "Method `{}::{}` is declared abstract, but enclosing unit is not.",
+                        pt.name,
+                        m.ident(),
+                    );
+                    let hint = "Remove the abstract modifier or make the unit abstract.";
+                    let err = VelosiAstErrBuilder::err(msg.to_string())
+                        .add_hint(hint.to_string())
+                        .add_location(m.loc.from_self_with_subrange(0..1))
+                        .build();
+                    issues.push(err);
+                }
+            }
+        }
+
         let interface = if let Some(i) = interface {
             i
         } else {
@@ -344,7 +482,7 @@ impl VelosiAstUnitSegment {
             Rc::new(VelosiAstInterface::NoneInterface(pt.loc.clone()))
         };
 
-        let inbitwidth = if let Some(ibw) = inbitwidth {
+        let inbitwidth = if let Some((ibw, _)) = inbitwidth {
             ibw
         } else {
             if !pt.is_abstract {
@@ -358,7 +496,7 @@ impl VelosiAstUnitSegment {
             64
         };
 
-        let outbitwidth = if let Some(obw) = outbitwidth {
+        let outbitwidth = if let Some((obw, _)) = outbitwidth {
             obw
         } else {
             if !pt.is_abstract {
@@ -1224,6 +1362,18 @@ impl VelosiAstUnit {
         }
     }
 
+    pub fn is_segment(&self) -> bool {
+        matches!(self, VelosiAstUnit::Segment(_))
+    }
+
+    pub fn is_staticmap(&self) -> bool {
+        matches!(self, VelosiAstUnit::StaticMap(_))
+    }
+
+    pub fn is_enum(&self) -> bool {
+        matches!(self, VelosiAstUnit::Enum(_))
+    }
+
     pub fn params_as_slice(&self) -> &[Rc<VelosiAstParam>] {
         use VelosiAstUnit::*;
         match self {
@@ -1239,6 +1389,15 @@ impl VelosiAstUnit {
             Segment(s) => s.inbitwidth,
             StaticMap(s) => s.inbitwidth,
             Enum(e) => e.inbitwidth,
+        }
+    }
+
+    pub fn output_bitwidth(&self) -> u64 {
+        use VelosiAstUnit::*;
+        match self {
+            Segment(s) => s.outbitwidth,
+            StaticMap(s) => s.outbitwidth,
+            Enum(e) => e.outbitwidth,
         }
     }
 
@@ -1284,6 +1443,45 @@ impl VelosiAstUnit {
             StaticMap(staticmap) => staticmap.consts.as_slice(),
             Segment(segment) => segment.consts.as_slice(),
             Enum(_) => &[],
+        }
+    }
+
+    pub fn flags(&self) -> Option<Rc<VelosiAstFlags>> {
+        use VelosiAstUnit::*;
+        match self {
+            StaticMap(_) => None,
+            Segment(segment) => segment.flags.clone(),
+            Enum(_) => None,
+        }
+    }
+
+    pub fn interface(&self) -> Option<Rc<VelosiAstInterface>> {
+        use VelosiAstUnit::*;
+        match self {
+            StaticMap(_) => None,
+            Segment(segment) => {
+                if !segment.interface.is_none() {
+                    Some(segment.interface.clone())
+                } else {
+                    None
+                }
+            }
+            Enum(_) => None,
+        }
+    }
+
+    pub fn state(&self) -> Option<Rc<VelosiAstState>> {
+        use VelosiAstUnit::*;
+        match self {
+            StaticMap(_) => None,
+            Segment(segment) => {
+                if !segment.state.is_none_state() {
+                    Some(segment.state.clone())
+                } else {
+                    None
+                }
+            }
+            Enum(_) => None,
         }
     }
 

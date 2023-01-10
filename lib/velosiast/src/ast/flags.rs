@@ -54,6 +54,10 @@ impl VelosiAstFlags {
         VelosiAstFlags { flags, loc }
     }
 
+    pub fn derive_from(&mut self, _other: &Self) {
+        unimplemented!("FLAGS DERIVATION NOT DONE YET!");
+    }
+
     pub fn from_parse_tree(pt: VelosiParseTreeFlags) -> AstResult<Self, VelosiAstIssues> {
         let mut issues = VelosiAstIssues::new();
 
