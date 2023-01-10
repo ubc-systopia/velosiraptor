@@ -443,7 +443,7 @@ impl VelosiAstMethod {
         if body.is_none() && !(pt.is_abstract || pt.is_synth) {
             let msg = "method with no body must be declared abstract or synth.";
             let hint = "make this an `abstract fn` or `synth fn`";
-            let err = VelosiAstErrBuilder::warn(msg.to_string())
+            let err = VelosiAstErrBuilder::err(msg.to_string())
                 .add_hint(hint.to_string())
                 .add_location(pt.pos.from_self_with_subrange(0..1))
                 .build();
