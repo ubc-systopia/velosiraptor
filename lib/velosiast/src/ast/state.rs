@@ -130,7 +130,7 @@ impl VelosiAstStateMemoryField {
             ));
 
             st.insert(slice.clone().into())
-                .map_err(|e| issues.push(e))
+                .map_err(|e| issues.push(*e))
                 .ok();
             layout.push(slice);
         }
@@ -270,7 +270,7 @@ impl VelosiAstStateRegisterField {
             ));
 
             st.insert(slice.clone().into())
-                .map_err(|e| issues.push(e))
+                .map_err(|e| issues.push(*e))
                 .ok();
             layout.push(slice);
         }
@@ -549,7 +549,7 @@ impl VelosiAstStateDef {
             ));
 
             st.insert(field.clone().into())
-                .map_err(|e| issues.push(e))
+                .map_err(|e| issues.push(*e))
                 .ok();
             fields.push(field);
         }
@@ -579,6 +579,26 @@ impl VelosiAstStateDef {
 
         let res = Self::new(params, fields, pt.loc);
         ast_result_return!(VelosiAstState::StateDef(res), issues)
+    }
+
+    pub fn derive_from(&mut self, other: &Self) {
+        for p in &other.params {
+            if !self.params_map.contains_key(p.ident().as_str()) {
+                self.params.push(p.clone());
+                self.params_map.insert(p.ident_to_string(), p.clone());
+            } else {
+                unimplemented!("TODO: handle merging of existing params (add type check here)!");
+            }
+        }
+
+        for f in &other.fields {
+            if !self.fields_map.contains_key(f.ident().as_str()) {
+                self.fields.push(f.clone());
+                self.fields_map.insert(f.ident_to_string(), f.clone());
+            } else {
+                unimplemented!("TODO: handle merging of existing fields (add type check here)!");
+            }
+        }
     }
 
     /// obtains the state slice refs for the
@@ -638,18 +658,22 @@ impl VelosiAstState {
     }
 
     pub fn derive_from(&mut self, other: &Self) {
-        // other is none, don't do anything
-        if matches!(other, VelosiAstState::NoneState(_)) {
+        use VelosiAstState::*;
+
+        if matches!(other, NoneState(_)) {
             return;
         }
 
-        // other has some state, this one is none, so simply replicate it
-        if matches!(self, VelosiAstState::NoneState(_)) {
+        if matches!(self, NoneState(_)) {
             *self = other.clone();
             return;
         }
 
-        unimplemented!("STATE DERIVATION NOT DONE YET!");
+        if let StateDef(s) = self {
+            if let StateDef(o) = other {
+                s.derive_from(o);
+            }
+        }
     }
 
     pub fn update_symbol_table(&self, st: &mut SymbolTable) {

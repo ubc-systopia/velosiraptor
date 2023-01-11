@@ -206,6 +206,7 @@ impl Display for VelosiAstIdentifier {
 pub struct VelosiAstRoot {
     pub consts: Vec<Rc<VelosiAstConst>>,
     pub consts_map: HashMap<String, Rc<VelosiAstConst>>,
+    // pub abstract_map : HashMap<>,
     pub segments_map: HashMap<String, Rc<VelosiAstUnitSegment>>,
     pub staticmap_map: HashMap<String, Rc<VelosiAstUnitStaticMap>>,
     pub enum_map: HashMap<String, Rc<VelosiAstUnitEnum>>,
@@ -266,7 +267,7 @@ impl VelosiAstRoot {
                         issues
                     ));
                     if let Err(e) = st.insert(c.clone().into()) {
-                        issues.push(e);
+                        issues.push(*e);
                     } else {
                         root.add_const_rc(c);
                     }
@@ -274,7 +275,7 @@ impl VelosiAstRoot {
                 VelosiParseTreeContextNode::Unit(u) => {
                     let c = ast_result_unwrap!(VelosiAstUnit::from_parse_tree(u, &mut st), issues);
                     if let Err(e) = st.insert(c.clone().into()) {
-                        issues.push(e);
+                        issues.push(*e);
                     } else {
                         root.add_unit(c);
                     }

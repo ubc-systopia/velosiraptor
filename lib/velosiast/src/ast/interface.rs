@@ -288,7 +288,7 @@ fn handle_nodes(
                         issues
                     ));
                     st.insert(slice.clone().into())
-                        .map_err(|e| issues.push(e))
+                        .map_err(|e| issues.push(*e))
                         .ok();
                     nodes.layout.push(slice);
                 }
@@ -503,7 +503,7 @@ impl VelosiAstInterfaceMemoryField {
             VelosiAstNode::InterfaceField(Rc::new(VelosiAstInterfaceField::Memory(n))),
         );
 
-        st.insert(s).map_err(|e| issues.push(e)).ok();
+        st.insert(s).map_err(|e| issues.push(*e)).ok();
 
         // the offset should be aligned to the size
         let offset = pt.offset;
@@ -708,7 +708,7 @@ impl VelosiAstInterfaceMmioField {
             VelosiAstNode::InterfaceField(Rc::new(VelosiAstInterfaceField::Mmio(n))),
         );
 
-        st.insert(s).map_err(|e| issues.push(e)).ok();
+        st.insert(s).map_err(|e| issues.push(*e)).ok();
 
         // the offset should be aligned to the size
         let offset = pt.offset;
@@ -942,7 +942,7 @@ impl VelosiAstInterfaceRegisterField {
             VelosiAstNode::InterfaceField(Rc::new(VelosiAstInterfaceField::Register(n))),
         );
 
-        st.insert(s).map_err(|e| issues.push(e)).ok();
+        st.insert(s).map_err(|e| issues.push(*e)).ok();
 
         // process the nodes
         let nodes = ast_result_unwrap!(
@@ -1367,7 +1367,7 @@ impl VelosiAstInterfaceDef {
             ));
 
             st.insert(field.clone().into())
-                .map_err(|e| issues.push(e))
+                .map_err(|e| issues.push(*e))
                 .ok();
             fields.push(field);
         }
@@ -1397,6 +1397,26 @@ impl VelosiAstInterfaceDef {
 
         let res = Self::new(params, fields, pt.loc);
         ast_result_return!(VelosiAstInterface::InterfaceDef(res), issues)
+    }
+
+    pub fn derive_from(&mut self, other: &Self) {
+        for p in &other.params {
+            if !self.params_map.contains_key(p.ident().as_str()) {
+                self.params.push(p.clone());
+                self.params_map.insert(p.ident_to_string(), p.clone());
+            } else {
+                unimplemented!("TODO: handle merging of existing params (add type check here)!");
+            }
+        }
+
+        for f in &other.fields {
+            if !self.fields_map.contains_key(f.ident().as_str()) {
+                self.fields.push(f.clone());
+                self.fields_map.insert(f.ident_to_string(), f.clone());
+            } else {
+                unimplemented!("TODO: handle merging of existing fields (add type check here)!");
+            }
+        }
     }
 
     pub fn fields_accessing_state(
@@ -1469,17 +1489,22 @@ impl VelosiAstInterface {
     }
 
     pub fn derive_from(&mut self, other: &Self) {
-        // other is none, don't do anything
-        if matches!(other, VelosiAstInterface::NoneInterface(_)) {
+        use VelosiAstInterface::*;
+
+        if matches!(other, NoneInterface(_)) {
             return;
         }
 
-        // other has some interface, this one is none, so simply replicate it
-        if matches!(self, VelosiAstInterface::NoneInterface(_)) {
+        if matches!(self, NoneInterface(_)) {
             *self = other.clone();
             return;
         }
-        unimplemented!("IFACE DERIVATION NOT DONE YET!");
+
+        if let InterfaceDef(s) = self {
+            if let InterfaceDef(o) = other {
+                s.derive_from(o);
+            }
+        }
     }
 
     pub fn update_symbol_table(&self, st: &mut SymbolTable) {

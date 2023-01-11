@@ -153,7 +153,7 @@ impl VelosiAstStaticMapListComp {
 
         // add the ident to the symbol table
         st.insert(var.clone().into())
-            .map_err(|e| issues.push(e))
+            .map_err(|e| issues.push(*e))
             .ok();
 
         let range = ast_result_unwrap!(
