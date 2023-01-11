@@ -122,18 +122,20 @@ struct SymbolTableContext {
 
 impl SymbolTableContext {
     /// tries to insert a new symbol into the context
-    fn insert(&mut self, sym: Symbol) -> Result<(), VelosiAstErr> {
+    fn insert(&mut self, sym: Symbol) -> Result<(), Box<VelosiAstErr>> {
         match self.syms.get(sym.name.as_str()) {
             None => {
                 self.syms.insert(sym.name.to_string(), sym);
                 Ok(())
             }
-            Some(x) => Err(VelosiAstErrDoubleDef::new(
-                sym.name.clone(),
-                x.ast_node.loc().clone(),
-                sym.ast_node.loc().clone(),
-            )
-            .into()),
+            Some(x) => Err(Box::new(
+                VelosiAstErrDoubleDef::new(
+                    sym.name.clone(),
+                    x.ast_node.loc().clone(),
+                    sym.ast_node.loc().clone(),
+                )
+                .into(),
+            )),
         }
     }
 
@@ -211,22 +213,24 @@ impl SymbolTable {
     }
 
     /// tries to insert the symbol into the current context
-    pub fn insert(&mut self, sym: Symbol) -> Result<(), VelosiAstErr> {
+    pub fn insert(&mut self, sym: Symbol) -> Result<(), Box<VelosiAstErr>> {
         match self.lookup(&sym.name) {
             None => {
                 let ctxt = self.syms.last_mut().unwrap();
                 ctxt.insert(sym)
             }
-            Some(x) => Err(VelosiAstErrDoubleDef::new(
-                sym.name.clone(),
-                x.ast_node.loc().clone(),
-                sym.ast_node.loc().clone(),
-            )
-            .into()),
+            Some(x) => Err(Box::new(
+                VelosiAstErrDoubleDef::new(
+                    sym.name.clone(),
+                    x.ast_node.loc().clone(),
+                    sym.ast_node.loc().clone(),
+                )
+                .into(),
+            )),
         }
     }
 
-    pub fn update(&mut self, sym: Symbol) -> Result<Option<Symbol>, VelosiAstErr> {
+    pub fn update(&mut self, sym: Symbol) -> Result<Option<Symbol>, Box<VelosiAstErr>> {
         {
             let ctxt = self.syms.last_mut().unwrap();
             if ctxt.contains(&sym.name) {

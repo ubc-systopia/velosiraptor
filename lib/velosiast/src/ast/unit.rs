@@ -115,7 +115,7 @@ impl VelosiAstUnitSegment {
 
             // add the param to the symbol table, if it doesn't exist already
             if let Err(e) = st.insert(param.clone().into()) {
-                issues.push(e);
+                issues.push(*e);
             } else {
                 params.push(param);
             }
@@ -239,7 +239,7 @@ impl VelosiAstUnitSegment {
                         issues
                     ));
                     if let Err(e) = st.insert(c.clone().into()) {
-                        issues.push(e);
+                        issues.push(*e);
                     } else {
                         consts.push(c.clone());
                         consts_map.insert(c.ident_to_string(), c);
@@ -351,7 +351,7 @@ impl VelosiAstUnitSegment {
                     println!("TODO: update the method if it's abstract!");
 
                     if let Err(e) = st.insert(m.clone().into()) {
-                        issues.push(e);
+                        issues.push(*e);
                     } else {
                         methods_map.insert(m.ident_to_string(), m);
                     }
@@ -709,7 +709,7 @@ impl VelosiAstUnitStaticMap {
 
             // add the param to the symbol table, if it doesn't exist already
             if let Err(e) = st.insert(param.clone().into()) {
-                issues.push(e);
+                issues.push(*e);
             } else {
                 params.push(param);
             }
@@ -740,7 +740,7 @@ impl VelosiAstUnitStaticMap {
                         issues
                     ));
                     if let Err(e) = st.insert(c.clone().into()) {
-                        issues.push(e);
+                        issues.push(*e);
                     } else {
                         consts.push(c.clone());
                         consts_map.insert(c.ident_to_string(), c);
@@ -760,7 +760,7 @@ impl VelosiAstUnitStaticMap {
                         issues
                     ));
                     if let Err(e) = st.insert(m.clone().into()) {
-                        issues.push(e);
+                        issues.push(*e);
                     } else {
                         methods.push(m.clone());
                         methods_map.insert(m.ident_to_string(), m);
@@ -1008,7 +1008,7 @@ impl VelosiAstUnitEnum {
 
             // add the param to the symbol table, if it doesn't exist already
             if let Err(e) = st.insert(param.clone().into()) {
-                issues.push(e);
+                issues.push(*e);
             } else {
                 params.push(param);
             }

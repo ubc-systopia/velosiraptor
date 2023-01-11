@@ -328,7 +328,7 @@ impl VelosiAstMethod {
 
             // add the param to the symbol table, if it doesn't exist already
             if let Err(e) = st.insert(param.clone().into()) {
-                issues.push(e);
+                issues.push(*e);
             } else {
                 params.push(param);
             }
