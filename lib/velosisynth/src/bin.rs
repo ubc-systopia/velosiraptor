@@ -118,12 +118,12 @@ pub fn main() {
     synthfactory.num_workers(ncores).default_log_dir();
 
     let mut segments = Vec::new();
-    while let Some(seg) = ast.take_segment_unit() {
+    while let Some(mut seg) = ast.take_segment_unit() {
         let mut t_synth_segment = Vec::new();
 
         t_synth_segment.push(("start", Instant::now()));
 
-        let mut synth = synthfactory.create(seg);
+        let mut synth = synthfactory.create(&mut seg);
 
         synth.create_model();
 
@@ -183,7 +183,7 @@ pub fn main() {
             }
         }
 
-        let seg = synth.take_unit().unwrap();
+        synth.finalize();
 
         t_synth_segment.push(("Synthesis", Instant::now()));
 
