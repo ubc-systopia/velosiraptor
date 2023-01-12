@@ -7,6 +7,7 @@ on:
 name: Unit Tests
 jobs:
   compile_and_test:
+    name: "libvelosilexer"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3

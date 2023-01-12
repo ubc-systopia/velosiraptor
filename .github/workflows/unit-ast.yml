@@ -8,6 +8,7 @@ name: Unit Tests
 jobs:
   compile_and_test:
     runs-on: ubuntu-latest
+    name: "libvelosiast"
     steps:
       - uses: actions/checkout@v3
         with:
