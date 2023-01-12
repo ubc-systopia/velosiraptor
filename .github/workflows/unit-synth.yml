@@ -21,9 +21,9 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           # can add a `-- --deny warnings` here to convert warnings into errors
-          args: --workspace --manifest-path  ./lib/velosisynth/Cargo.toml
+          args: --manifest-path  ./lib/velosisynth/Cargo.toml
       - name: libvelosisynth_build
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all --manifest-path ./lib/velosisynth/Cargo.toml
+          args: --manifest-path ./lib/velosisynth/Cargo.toml
