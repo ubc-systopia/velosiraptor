@@ -293,6 +293,11 @@ impl VelosiAstRoot {
         self.consts.as_slice()
     }
 
+    pub fn put_segment_unit(&mut self, unit: VelosiAstUnitSegment) {
+        self.segments_map
+            .insert(unit.ident_to_string(), Rc::new(unit));
+    }
+
     pub fn take_segment_unit(&mut self) -> Option<VelosiAstUnitSegment> {
         if let Some((k, v)) = self.segments_map.drain().next() {
             if Rc::weak_count(&v) > 1 || Rc::strong_count(&v) > 1 {
