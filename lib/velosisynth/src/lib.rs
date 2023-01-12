@@ -88,9 +88,10 @@ impl Display for SynthResult {
     }
 }
 
-pub struct Z3Synth {
+pub struct Z3Synth<'a> {
     z3: Z3WorkerPool,
-    unit: Option<VelosiAstUnitSegment>,
+    // unit: Option<Rc<VelosiAstUnitSegment>>,
+    unit: Option<&'a mut VelosiAstUnitSegment>,
     map_queries: MapPrograms,
     map_program: Option<Program>,
     unmap_queries: UnmapPrograms,
@@ -101,9 +102,9 @@ pub struct Z3Synth {
     model_created: bool,
 }
 
-impl Z3Synth {
+impl<'a> Z3Synth<'a> {
     /// creates a new synthesis handle with the given worker poopl and the unit
-    pub(crate) fn new(z3: Z3WorkerPool, unit: VelosiAstUnitSegment) -> Self {
+    pub(crate) fn new(z3: Z3WorkerPool, unit: &'a mut VelosiAstUnitSegment) -> Self {
         let batch_size = std::cmp::max(5, z3.num_workers() / 2);
 
         // create the queries
@@ -145,7 +146,7 @@ impl Z3Synth {
     pub fn sanity_check(&mut self) -> Result<(), VelosiSynthIssues> {
         self.create_model();
 
-        log::info!(target: "[SynthZ3]", "running sanity checks on the model.");
+        log::info!(target: "[Z3Synth]", "running sanity checks on the model.");
         let mut issues = VelosiSynthIssues::new();
 
         let unit = self.unit.as_ref().unwrap();
@@ -170,12 +171,12 @@ impl Z3Synth {
     }
 
     /// obtains the unit with the updated operations
-    pub fn take_unit(&mut self) -> Result<VelosiAstUnitSegment, ()> {
+    pub fn take_unit(&mut self) -> Result<&VelosiAstUnitSegment, ()> {
         if !self.is_done() {
             return Err(());
         }
 
-        if let Some(mut unit) = self.unit.take() {
+        if let Some(unit) = self.unit.take() {
             // TODO: set errors here
 
             if let Some(prog) = self.map_program.take() {
@@ -195,6 +196,10 @@ impl Z3Synth {
         } else {
             Err(())
         }
+    }
+
+    pub fn finalize(&mut self) -> bool {
+        self.take_unit().is_ok()
     }
 
     /// checks whether the synthesis has completed, either with result or not
@@ -306,7 +311,7 @@ impl Z3Synth {
     }
 }
 
-impl Display for Z3Synth {
+impl<'a> Display for Z3Synth<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         if self.is_done() {
             if let Some(prog) = &self.map_program {
@@ -378,7 +383,7 @@ impl Z3SynthFactory {
         self
     }
 
-    pub fn create(&self, unit: VelosiAstUnitSegment) -> Z3Synth {
+    pub fn create<'a>(&self, unit: &'a mut VelosiAstUnitSegment) -> Z3Synth<'a> {
         let logpath = if let Some(logdir) = &self.logdir {
             if self.logging {
                 Some(Arc::new(logdir.join(unit.ident().as_str())))
