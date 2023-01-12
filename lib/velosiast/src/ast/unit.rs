@@ -584,13 +584,22 @@ impl VelosiAstUnitSegment {
         if let Some(m) = self.methods_map.get_mut(method) {
             if let Some(m) = Rc::get_mut(m) {
                 m.ops = ops;
+                return;
             }
 
             if Rc::strong_count(m) > 1 {
-                println!("Method `{}` has > 1 strong references", method);
+                println!(
+                    "Method `{}` has > 1 strong references ({})",
+                    method,
+                    Rc::strong_count(m)
+                );
             }
             if Rc::weak_count(m) > 1 {
-                println!("Method `{}` has > 1 weak references", method);
+                println!(
+                    "Method `{}` has > 1 weak references ({})",
+                    method,
+                    Rc::weak_count(m)
+                );
             }
         } else {
             unreachable!("method {} not found", method);

@@ -149,8 +149,16 @@ impl VelosiAst {
         self.root.take_segment_unit()
     }
 
+    pub fn put_segment_unit(&mut self, unit: VelosiAstUnitSegment) {
+        self.root.put_segment_unit(unit)
+    }
+
     pub fn segment_units(&self) -> impl Iterator<Item = &Rc<VelosiAstUnitSegment>> {
         self.root.segments_map.values()
+    }
+
+    pub fn segment_units_mut(&mut self) -> impl Iterator<Item = &mut Rc<VelosiAstUnitSegment>> {
+        self.root.segments_map.values_mut()
     }
 
     pub fn staticmap_units(&self) -> impl Iterator<Item = &Rc<VelosiAstUnitStaticMap>> {
