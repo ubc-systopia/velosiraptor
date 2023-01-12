@@ -12,7 +12,6 @@ readme = "README.md"
 members = [
     "lib/codegen"
     ,"lib/crustal"
-    ,"lib/libvrc"
     ,"lib/rosettelang"
     ,"lib/smtlib2"
     ,"lib/srcspan"
@@ -26,16 +25,20 @@ members = [
 ]
 
 [dependencies]
-# the argument parser
-clap = "4.0.24"
+# argument parsing
+clap = { version = "4.0.24", features = [ "derive" ] }
+
 # for colorful output
 colored = "2"
 
 # support library
-libvrc = { path = "lib/libvrc" }
+velosiast = { path = "lib/velosiast" }
+velosisynth = { path = "lib/velosisynth" }
+velosicodegen = { path = "lib/velosicodegen" }
 
 # logging and errors
 log = { version = "0.4.17", features = ["max_level_trace", "release_max_level_warn"] }
-simplelog = "^0.12.0"
+simplelog = { version = "^0.12.0", features = ["paris"] }
+
 
 
