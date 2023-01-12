@@ -12,6 +12,8 @@ readme = "README.md"
 [dependencies]
 velosiast = { path = "../velosiast" }
 velosisynth = { path = "../velosisynth" }
+
+
 colored = "2.0.0"
 log = { version = "0.4.17", features = ["max_level_trace", "release_max_level_warn"] }
 simplelog = { version = "^0.12.0", features = ["paris"] }
@@ -26,3 +28,4 @@ path = "src/lib.rs"
 [[bin]]
 name = "velosicodegen"
 path = "src/bin.rs"
+

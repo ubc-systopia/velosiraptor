@@ -36,7 +36,7 @@ use clap::{arg, command};
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, LevelPadding, TermLogger, TerminalMode};
 
 use velosiast::{AstResult, VelosiAst};
-use velosisynth::SynthZ3;
+use velosisynth::Z3Synth;
 
 pub fn main() {
     // get the command line argumentts
@@ -120,7 +120,7 @@ pub fn main() {
         t_synth_segment.push(("start", Instant::now()));
 
         let path = env::current_dir().unwrap();
-        let mut synth = SynthZ3::with_ncpu(seg.clone(), path.join("logs"), ncores);
+        let mut synth = Z3Synth::with_ncpu(seg.clone(), path.join("logs"), ncores);
         synth.create_model().expect("failed to create the model");
 
         t_synth_segment.push(("Model Creation", Instant::now()));
