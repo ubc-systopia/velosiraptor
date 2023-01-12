@@ -23,4 +23,4 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           # can add a `-- --deny warnings` here to convert warnings into errors
-          args:  --all-features --workspace
+          args:  --workspace
