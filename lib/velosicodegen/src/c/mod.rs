@@ -109,7 +109,7 @@ impl BackendC {
         let mut srcdir = self.outdir.clone();
 
         // get the source dir
-        for unit in ast.units() {
+        for unit in ast.segment_units() {
             // create the unit dir
             let dirname = unit.ident().to_lowercase();
             srcdir.push(dirname);
@@ -117,9 +117,7 @@ impl BackendC {
             // create the directory
             fs::create_dir_all(&srcdir)?;
 
-            if let VelosiAstUnit::Segment(seg) = unit {
-                interface::generate(seg, &srcdir)?;
-            }
+            interface::generate(unit, &srcdir)?;
 
             srcdir.pop();
         }
@@ -128,23 +126,20 @@ impl BackendC {
 
     pub fn generate_units(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
         let mut srcdir = self.outdir.clone();
-        for unit in ast.units() {
-            srcdir.push(unit.ident().to_lowercase());
 
-            log::info!("Generating unit {}", unit.ident());
-
-            // generate the unit
-            let err = match unit {
-                VelosiAstUnit::StaticMap(_staticmap) => Ok(()), //staticmap::generate(staticmap, &srcdir),
-                VelosiAstUnit::Segment(segment) => segment::generate(segment, &srcdir),
-            };
-
-            if err.is_err() {
-                panic!("TODO: handle code generation failed:  {:?}\n", err)
+        for segment in ast.segment_units() {
+            if segment.is_abstract {
+                log::info!("Skipping abstract segment unit {}", segment.ident());
+                continue;
             }
 
-            srcdir.pop();
+            log::info!("Generating segment unit {}", segment.ident());
+            srcdir.push(segment.ident().to_lowercase());
+
+            segment::generate(segment, &srcdir).expect("code generation failed\n");
         }
+
+        log::warn!("todo: handle the static map generation!");
 
         Ok(())
     }

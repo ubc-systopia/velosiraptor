@@ -155,10 +155,11 @@ impl BackendRust {
         // get the source dir
         let mut srcdir = self.outdir.join("src");
 
-        for unit in ast.units() {
+        for unit in ast.segment_units() {
             srcdir.push(unit.ident().to_lowercase());
             // the root directory as supplied by backend
             fs::create_dir_all(&srcdir)?;
+            log::warn!("TODO: handle interface generation!");
             //interface::generate(unit, &srcdir)?;
             srcdir.pop();
         }
@@ -172,7 +173,7 @@ impl BackendRust {
 
         println!("##### rust generat_units");
 
-        for _unit in ast.units() {
+        for _unit in ast.segment_units() {
             // srcdir.push(unit.ident().to_lowercase());
 
             // // generate the unit
@@ -235,19 +236,16 @@ impl BackendRust {
         // impor the units
         scope.new_comment("import the unit modules");
 
-        let units = ast.units();
-        if !units.is_empty() {
-            for unit in units {
-                scope.raw(&format!("pub mod {};", unit.ident().to_lowercase()));
+        let units = ast.segment_units();
 
-                scope.raw(&format!(
-                    "pub use {}::{};",
-                    unit.ident().to_lowercase(),
-                    unit.ident()
-                ));
-            }
-        } else {
-            scope.new_comment("no unit definitions to import");
+        for unit in units {
+            scope.raw(&format!("pub mod {};", unit.ident().to_lowercase()));
+
+            scope.raw(&format!(
+                "pub use {}::{};",
+                unit.ident().to_lowercase(),
+                unit.ident()
+            ));
         }
 
         // save the scope
