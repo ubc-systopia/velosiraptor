@@ -16,11 +16,12 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - uses: actions-rs/cargo@v1
+      - name: libvelosias_clippy
+        uses: actions-rs/clippy-check@v1
         with:
-          command: test
-          args: --all
-      - name: libvelosiast
+          # can add a `-- --deny warnings` here to convert warnings into errors
+          args:  --all-features --workspace --manifest-path  ./lib/velosiast/Cargo.toml
+      - name: libvelosiast_build
         uses: actions-rs/cargo@v1
         with:
           command: test
