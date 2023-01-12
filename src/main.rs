@@ -25,124 +25,128 @@
 
 //! Velosiraptor Compiler
 
-use clap::{App, Arg};
+use std::sync::Arc;
+use std::{fmt::Display, rc::Rc};
+
+use clap::{Parser, ValueEnum};
 use colored::*;
-use simplelog::{Config, LevelFilter, SimpleLogger};
+use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, LevelPadding, TermLogger, TerminalMode};
+
 use std::path::Path;
 use std::process::exit;
 
 // get the parser module
-use libvrc::ast::{AstError, Issues};
-use libvrc::codegen::CodeGen;
-use libvrc::hwgen::HWGen;
-use libvrc::parser::{Parser, ParserError};
-use libvrc::synth::Synthesisizer;
+use velosiast::{AstResult, VelosiAst};
+use velosisynth::Z3SynthFactory;
 
-fn parse_cmdline() -> clap::ArgMatches<'static> {
-    App::new("vtrc")
-        .version("0.1.0")
-        .author("Reto Achermann <achreto@cs.ubc.ca>")
-        .about("VelosiTransRaptor Compiler")
-        .arg(
-            Arg::with_name("output")
-                .short("o")
-                .long("output")
-                .takes_value(true)
-                .help("the output file"),
-        )
-        .arg(
-            Arg::with_name("name")
-                .short("n")
-                .long("name")
-                .takes_value(true)
-                .help("the package name to produce"),
-        )
-        .arg(
-            Arg::with_name("cpus")
-                .short("c")
-                .long("cpus")
-                .takes_value(true)
-                .default_value("1")
-                .help("the number of cpus to be used"),
-        )
-        .arg(
-            Arg::with_name("backend")
-                .short("b")
-                .long("backend")
-                .takes_value(true)
-                .help("the code backend to use [rust, c]"),
-        )
-        .arg(
-            Arg::with_name("platform")
-                .short("p")
-                .long("platform")
-                .takes_value(true)
-                .help("the hardware platform to generate the module for [fastmodels]"),
-        )
-        .arg(
-            Arg::with_name("synth")
-                .short("s")
-                .long("synth")
-                .takes_value(true)
-                .help("the synthesis backend to use [rosette, z3]"),
-        )
-        .arg(
-            Arg::with_name("v")
-                .short("v")
-                .multiple(true)
-                .help("Sets the level of verbosity"),
-        )
-        .arg(
-            Arg::with_name("error")
-                .short("e")
-                .long("Werror")
-                .takes_value(true)
-                .help("Treat warnings to errors."),
-        )
-        .arg(
-            Arg::with_name("input")
-                .help("Sets the input file to use")
-                .required(true)
-                .index(1),
-        )
-        .get_matches()
-}
-use libvrc::error::{ErrorLocation, VrsError};
-fn print_errors_and_exit<I: ErrorLocation + std::fmt::Display>(
-    msg: &str,
-    err: VrsError<I>,
-    target: &str,
-    cnt: Issues,
-) {
-    err.print();
-    eprintln!("{}{}{}.\n", "error".bold().red(), ": ".bold(), msg.bold());
-    abort(target, cnt)
+#[derive(Debug, Parser)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    /// the input file to operate on
+    infile: Option<String>,
+
+    /// output directory where to emit generated files
+    #[arg(short, long)]
+    outdir: Option<String>,
+
+    /// name of the compilation unit
+    #[arg(short, long, default_value_t = String::from("mympu"))]
+    name: String,
+
+    /// the number of cores used for synthesis
+    #[arg(short, long, default_value_t = 1)]
+    parallelism: usize,
+
+    /// treat warnings as errors
+    #[arg(short, long, default_value_t = false)]
+    werror: bool,
+
+    /// log all smt queries sent to Z3
+    #[arg(short, long, default_value_t = false)]
+    logsmt: bool,
+
+    /// language of the generated code
+    #[arg(value_enum, default_value_t = Platform::ArmFastModels)]
+    platform: Platform,
+
+    /// language of the generated code
+    #[arg(value_enum, default_value_t = OutputLanguage::C)]
+    language: OutputLanguage,
+
+    /// Turn debugging information on
+    #[arg(short, long, action = clap::ArgAction::Count)]
+    verbose: u8,
 }
 
-fn abort(target: &str, cnt: Issues) {
-    let msg = format!(": aborting due to previous {} error(s)", cnt.errors);
-    eprint!("{}{}", "error".bold().red(), msg.bold());
-    if cnt.warnings > 0 {
-        let msg = format!(", and {} warnings emitted", cnt.warnings);
-        eprintln!("{}\n", msg.bold());
-    } else {
-        eprintln!(); // add some newline
+/// defines the output langauge for the generate code
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum OutputLanguage {
+    /// emit C code
+    C,
+    /// emit Rust code
+    Rust,
+}
+
+impl Display for OutputLanguage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OutputLanguage::C => write!(f, "C"),
+            OutputLanguage::Rust => write!(f, "Rust"),
+        }
     }
-    eprintln!(
-        "{}: could not compile `{}`.\n",
-        "error".bold().red(),
-        target
-    );
-    exit(-1);
 }
+
+/// the platform to generate hardware component for
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum Platform {
+    /// generate hardware component for the Arm FastModels platform
+    ArmFastModels,
+}
+
+impl Display for Platform {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Platform::ArmFastModels => write!(f, "ArmFastModels"),
+        }
+    }
+}
+
+// use libvrc::error::{ErrorLocation, VrsError};
+// fn print_errors_and_exit<I: ErrorLocation + std::fmt::Display>(
+//     msg: &str,
+//     err: VrsError<I>,
+//     target: &str,
+//     cnt: Issues,
+// ) {
+//     err.print();
+//     eprintln!("{}{}{}.\n", "error".bold().red(), ": ".bold(), msg.bold());
+//     abort(target, cnt)
+// }
+
+// fn abort(target: &str, cnt: Issues) {
+//     let msg = format!(": aborting due to previous {} error(s)", cnt.errors);
+//     eprint!("{}{}", "error".bold().red(), msg.bold());
+//     if cnt.warnings > 0 {
+//         let msg = format!(", and {} warnings emitted", cnt.warnings);
+//         eprintln!("{}\n", msg.bold());
+//     } else {
+//         eprintln!(); // add some newline
+//     }
+//     eprintln!(
+//         "{}: could not compile `{}`.\n",
+//         "error".bold().red(),
+//         target
+//     );
+//     exit(-1);
+// }
 
 /// Main - entry point into the application
 fn main() {
-    // get the command line argumentts
-    let matches = parse_cmdline();
+    // parse command line arguments
+    let cli = Cli::parse();
 
     // setting the log level
-    let filter_level = match matches.occurrences_of("v") {
+    let filter_level = match cli.verbose {
         0 => LevelFilter::Warn,
         1 => LevelFilter::Info,
         2 => LevelFilter::Debug,
@@ -150,7 +154,20 @@ fn main() {
     };
 
     // initialize the logger
-    SimpleLogger::init(filter_level, Config::default()).unwrap();
+    let config = ConfigBuilder::default()
+        .set_level_padding(LevelPadding::Right)
+        .set_thread_level(LevelFilter::Off)
+        .set_target_level(LevelFilter::Warn)
+        .set_location_level(LevelFilter::Off)
+        .build();
+
+    TermLogger::init(
+        filter_level,
+        config,
+        TerminalMode::Stdout,
+        ColorChoice::Auto,
+    )
+    .expect("failed to setup logger");
 
     // print the start message
     eprintln!(
@@ -158,36 +175,36 @@ fn main() {
         "start".bold().green(),
     );
 
-    let infile = matches.value_of("input").unwrap_or("none");
-    log::info!("input file: {}", infile);
-
-    let outdir = matches.value_of("output").unwrap_or("");
-    log::info!("output directory: {}", outdir);
-
-    let pkgname = matches.value_of("name").unwrap_or("mpu").to_string();
-    log::info!("package name: {}", pkgname);
-
-    let backend = matches.value_of("backend").unwrap_or("c");
-    log::info!("codegen backend: {}", backend);
-
-    let platform = matches.value_of("platform").unwrap_or("fastmodels");
-    log::info!("platform backend: {}", platform);
-
-    let synth = matches.value_of("synth").unwrap_or("rosette");
-    log::info!("synthesis backend: {}", synth);
-
-    let numcpus = matches
-        .value_of("cpus")
-        .unwrap_or("1")
-        .parse::<usize>()
-        .unwrap();
-
-    log::info!("input file: {}", infile);
-
+    log::info!("Info output enabled");
     log::debug!("Debug output enabled");
     log::trace!("Tracing output enabled");
 
-    log::info!("==== PARSING STAGE ====");
+    log::info!("---------------------------------------------------------------------------------");
+
+    log::info!(
+        "Input file: {}",
+        cli.infile.as_ref().unwrap_or(&String::from("--"))
+    );
+    log::info!(
+        "Output directory: {}",
+        cli.outdir.as_ref().unwrap_or(&String::from("--"))
+    );
+    log::info!("Compilation unit name: {}", cli.name);
+    log::info!("Parallelism: {}", cli.parallelism);
+    log::info!("Warnings as errors: {}", cli.werror);
+    log::info!("Log SMT queries: {}", cli.logsmt);
+    log::info!("Output language: {}", cli.language);
+    log::info!("Platform: {}", cli.platform);
+    log::info!("Verbosity: {}", cli.verbose);
+
+    log::info!("---------------------------------------------------------------------------------");
+
+    let infile = if let Some(infile) = cli.infile.as_deref() {
+        infile
+    } else {
+        eprintln!("{}: no input file specified.\n", "error".bold().red(),);
+        exit(-1);
+    };
 
     // ===========================================================================================
     // Step 1: Parse the input file
@@ -196,257 +213,215 @@ fn main() {
     eprintln!("{:>8}: {}...\n", "parse".bold().green(), infile);
 
     // let's try to create a file parser
-    let mut ast = match Parser::parse_file(infile) {
-        Ok((ast, _)) => ast,
-        Err(ParserError::LexerFailure { error }) => {
-            print_errors_and_exit("during lexing of the file", error, infile, Issues::err());
-            return;
+    let mut ast = match VelosiAst::from_file(infile) {
+        AstResult::Ok(ast) => ast,
+        AstResult::Issues(ast, err) => {
+            if !cli.werror {
+                ast
+            } else {
+                eprintln!(
+                    "{}: could not compile `{}`.\n",
+                    "error".bold().red(),
+                    infile.bold()
+                );
+                eprint!(
+                    "{}{}",
+                    "error".bold().red(),
+                    "compilation failed due to errors (Werror)".bold()
+                );
+                println!("{}", err);
+                exit(-1);
+            }
         }
-        Err(ParserError::ParserFailure { error }) => {
-            print_errors_and_exit("during parsing of the file", error, infile, Issues::err());
-            return;
-        }
-        Err(ParserError::ParserIncomplete { error }) => {
-            print_errors_and_exit(
-                "unexpected junk at the end of the file",
-                error,
-                infile,
-                Issues::err(),
-            );
-            return;
-        }
-        Err(_) => {
-            abort(infile, Issues::err());
-            return;
-        }
-    };
-
-    log::info!("AST:");
-    log::info!("----------------------------");
-    log::info!("{}", ast);
-    log::info!("----------------------------");
-
-    // ===========================================================================================
-    // Step 2: Resolve the imports and merge ASTs
-    // ===========================================================================================
-
-    match ast.resolve_imports() {
-        Ok(()) => (),
-        Err(AstError::ImportError { e }) => {
-            print_errors_and_exit("failed resolving the imports", e, infile, Issues::err());
-            return;
-        }
-        Err(AstError::MergeError { i }) => {
+        AstResult::Err(err) => {
             eprintln!(
-                "{}{}.\n",
+                "{}: could not compile `{}`.\n",
                 "error".bold().red(),
-                ": during merging of the ASTs".bold()
+                infile.bold()
             );
-            abort(infile, i)
-        }
-        _ => {
-            abort(infile, Issues::err());
-            return;
+            println!("{}", err);
+            exit(-1);
         }
     };
 
-    eprintln!(
-        "{:>8}: resolved {} import(s)..\n",
-        "import".bold().green(),
-        ast.imports.len(),
-    );
-
-    match ast.resolve_unit_inheritance() {
-        Ok(()) => (),
-        _ => {
-            abort(infile, Issues::err());
-            return;
-        }
-    }
-
-    log::info!("AST:");
-    log::info!("----------------------------");
-    log::info!("{}", ast);
-    log::info!("----------------------------");
-
-    log::info!("==== CHECKING STAGE ====");
+    log::debug!("AST:");
+    log::debug!("----------------------------");
+    log::debug!("{}", ast);
+    log::debug!("----------------------------");
 
     // ===========================================================================================
-    // Step 3: Build Symboltable
+    // Step 2: Synthesis
     // ===========================================================================================
 
-    let mut symtab = match ast.build_symboltable() {
-        Ok(symtab) => symtab,
-        Err(AstError::SymTabError { i }) => {
-            eprintln!(
-                "{}{}.\n",
-                "error".bold().red(),
-                ": during building of the symbol table".bold()
-            );
-            abort(infile, i);
-            return;
-        }
-        _ => {
-            abort(infile, Issues::err());
-            return;
-        }
-    };
-
-    // build the symbolt table
-    eprintln!(
-        "{:>8}: created symboltable with {} symbols\n",
-        "symtab".bold().green(),
-        symtab.count()
-    );
-
-    log::info!("Symbol Table:");
-    log::info!("----------------------------");
-    log::info!("\n{}", symtab);
-    log::info!("----------------------------");
-
-    // ===========================================================================================
-    // Step 4: Consistency Checks
-    // ===========================================================================================
-
-    let issues = Issues::ok();
-
-    eprintln!(
-        "{:>8}: performing consistency check...\n",
-        "check".bold().green(),
-    );
-
-    let issues = match ast.check_consistency(&mut symtab) {
-        Ok(i) => issues + i,
-        Err(AstError::CheckError { i }) => {
-            //            matches.value_of("input").unwrap_or("none");
-            abort(infile, i);
-            return;
-        }
-        _ => {
-            abort(infile, Issues::err());
-            return;
-        }
-    };
-
-    // ===========================================================================================
-    // Step 5: Transform AST
-    // ===========================================================================================
-
-    eprintln!(
-        "{:>8}: performing AST rewrites...\n",
-        "rewrite".bold().green(),
-    );
-
-    ast.apply_rewrites();
-
-    // ===========================================================================================
-    // Step 6: Generate OS code
-    // ===========================================================================================
-
-    if issues.is_err() {
-        abort(infile, issues);
-        return;
-    }
-
-    if outdir.is_empty() {
+    // if there is no outdir specified we won't do anything
+    let outpath = if let Some(outpath) = cli.outdir.as_deref() {
+        Path::new(outpath)
+    } else {
         eprintln!(
-            "{:>8}: skipping code generation.\n",
-            "generate".bold().green(),
+            "{:>8}: skipping code generation and synthesis (no outdir specified).\n",
+            "synth".bold().green(),
         );
-        return;
-    }
-
-    log::info!("==== CODE GENERATION STAGE ====");
-
-    // get the output directory
-    let outpath = Path::new(outdir);
+        exit(0);
+    };
 
     if outpath.exists() && !outpath.is_dir() {
         eprintln!(
             "{}{} `{}`.\n",
             "error".bold().red(),
             ": output path exists, but s not a directory: ".bold(),
-            outdir.bold()
+            outpath.display()
         );
-        abort(infile, issues);
-        return;
+        exit(-1);
     }
 
-    let codegen = match backend {
-        "rust" => CodeGen::new_rust(outpath, pkgname.clone()),
-        "c" => CodeGen::new_c(outpath, pkgname.clone()),
-        s => {
-            eprintln!(
-                "{}{} `{}`.\n",
-                "error".bold().red(),
-                ": unsupported code backend".bold(),
-                s.bold()
-            );
-            abort(infile, issues);
-            return;
+    eprintln!("{:>8}: {}...\n", "synth".bold().green(), infile);
+
+    let synth_path = Arc::new(outpath.join("synth"));
+
+    for seg in ast.segment_units_mut() {
+        if Rc::strong_count(seg) > 1 {
+            println!("Unit `{}` has > 1 strong references", seg.ident());
         }
-    };
-
-    let mut synthsizer = match synth {
-        "rosette" => Synthesisizer::new_rosette(outpath, pkgname.clone()),
-        "z3" => Synthesisizer::new_z3(outpath, pkgname.clone(), numcpus),
-        s => {
-            eprintln!(
-                "{}{} `{}`.\n",
-                "error".bold().red(),
-                ": unsupported synthesis backend".bold(),
-                s.bold()
-            );
-            abort(infile, issues);
-            return;
+        if Rc::weak_count(seg) > 1 {
+            println!("Unit `{}` has > 1 weak references", seg.ident());
         }
-    };
 
-    // so things should be fine, we can now go and generate stuff
+        if let Some(unit) = Rc::get_mut(seg) {
+            let mut synth = Z3SynthFactory::new()
+                .logdir(synth_path.clone())
+                .logging(cli.logsmt)
+                .num_workers(cli.parallelism)
+                .create(unit);
+            synth.create_model();
 
-    // generate the raw interface files: this is the "language" to interface
-    eprintln!(
-        "{:>8}: prepare for code generation...\n",
-        "generate".bold().green(),
-    );
+            if let Err(_e) = synth.sanity_check() {
+                eprintln!(
+                    "{}{}.\n",
+                    "error".bold().red(),
+                    ": model sanity check has failed".bold()
+                );
+                exit(-1);
+            }
 
-    codegen.prepare().unwrap_or_else(|e| {
-        eprintln!(
-            "{}{} `{}`.\n",
-            "error".bold().red(),
-            ": failure during codegen preparation generation".bold(),
-            e
-        );
-        abort(infile, issues);
-    });
+            // perform synthesis of the programs
+            synth.synthesize();
 
-    // generate the raw interface files: this is the "language" to interface
-    eprintln!(
-        "{:>8}: generating interface files...\n",
-        "generate".bold().green(),
-    );
+            if !synth.has_result() {
+                eprintln!(
+                    "{}{}.\n",
+                    "error".bold().red(),
+                    ": synthesis has failed".bold(),
+                );
+                exit(-1);
+            }
 
-    codegen.generate_globals(&ast).unwrap_or_else(|e| {
-        eprintln!(
-            "{}{} `{}`.\n",
-            "error".bold().red(),
-            ": failure during globals generation".bold(),
-            e
-        );
-        abort(infile, issues);
-    });
+            if !synth.finalize() {
+                eprintln!(
+                    "{}{}.\n",
+                    "error".bold().red(),
+                    ": synthesis has failed".bold(),
+                );
+                exit(-1);
+            }
+        }
+    }
 
-    codegen.generate_interface(&ast).unwrap_or_else(|e| {
-        eprintln!(
-            "{}{} `{}`.\n",
-            "error".bold().red(),
-            ": failure during interface generation".bold(),
-            e
-        );
-        abort(infile, issues);
-    });
+    // ===========================================================================================
+    // Step 3: Code Generation
+    // ===========================================================================================
 
-    // synthsizer.synth_map_unmap_protect(&mut ast).unwrap_or_else(|e| {
+    eprintln!("{:>8}: {}...\n", "codegen".bold().green(), infile);
+
+    // eprintln!(
+    //     "{:>8}: prepare for code generation...\n",
+    //     "generate".bold().green(),
+    // );
+
+    // let codegen = match backend {
+    //     "rust" => CodeGen::new_rust(outpath, pkgname.clone()),
+    //     "c" => CodeGen::new_c(outpath, pkgname.clone()),
+    //     s => {
+    //         eprintln!(
+    //             "{}{} `{}`.\n",
+    //             "error".bold().red(),
+    //             ": unsupported code backend".bold(),
+    //             s.bold()
+    //         );
+    //         abort(infile, issues);
+    //         return;
+    //     }
+    // };
+
+    // ===========================================================================================
+    // Step 4: Hardware Generation
+    // ===========================================================================================
+
+    eprintln!("{:>8}: {}...\n", "hwgen".bold().green(), infile);
+
+    // // ===========================================================================================
+    // // Step 6: Generate OS code
+    // // ===========================================================================================
+
+    // log::info!("==== CODE GENERATION STAGE ====");
+
+    // // so things should be fine, we can now go and generate stuff
+
+    // // generate the raw interface files: this is the "language" to interface
+
+    // codegen.prepare().unwrap_or_else(|e| {
+    //     eprintln!(
+    //         "{}{} `{}`.\n",
+    //         "error".bold().red(),
+    //         ": failure during codegen preparation generation".bold(),
+    //         e
+    //     );
+    //     abort(infile, issues);
+    // });
+
+    // // generate the raw interface files: this is the "language" to interface
+    // eprintln!(
+    //     "{:>8}: generating interface files...\n",
+    //     "generate".bold().green(),
+    // );
+
+    // codegen.generate_globals(&ast).unwrap_or_else(|e| {
+    //     eprintln!(
+    //         "{}{} `{}`.\n",
+    //         "error".bold().red(),
+    //         ": failure during globals generation".bold(),
+    //         e
+    //     );
+    //     abort(infile, issues);
+    // });
+
+    // codegen.generate_interface(&ast).unwrap_or_else(|e| {
+    //     eprintln!(
+    //         "{}{} `{}`.\n",
+    //         "error".bold().red(),
+    //         ": failure during interface generation".bold(),
+    //         e
+    //     );
+    //     abort(infile, issues);
+    // });
+
+    // // synthsizer.synth_map_unmap_protect(&mut ast).unwrap_or_else(|e| {
+    // //     eprintln!(
+    // //         "{}{} `{}`.\n",
+    // //         "error".bold().red(),
+    // //         ": failure during interface generation".bold(),
+    // //         e
+    // //     );
+    // //     abort(infile, issues);
+    // //     panic!("s");
+    // // });
+
+    // // generate the unit files that use the interface files
+    // eprintln!(
+    //     "{:>8}: synthesizing map function...\n",
+    //     "synthesis".bold().green(),
+    // );
+
+    // synthsizer.synth_map(&mut ast).unwrap_or_else(|e| {
     //     eprintln!(
     //         "{}{} `{}`.\n",
     //         "error".bold().red(),
@@ -457,162 +432,145 @@ fn main() {
     //     panic!("s");
     // });
 
-    // generate the unit files that use the interface files
-    eprintln!(
-        "{:>8}: synthesizing map function...\n",
-        "synthesis".bold().green(),
-    );
+    // eprintln!(
+    //     "{:>8}: synthesizing unmap function...\n",
+    //     "synthesis".bold().green(),
+    // );
 
-    synthsizer.synth_map(&mut ast).unwrap_or_else(|e| {
-        eprintln!(
-            "{}{} `{}`.\n",
-            "error".bold().red(),
-            ": failure during interface generation".bold(),
-            e
-        );
-        abort(infile, issues);
-        panic!("s");
-    });
+    // synthsizer.synth_unmap(&mut ast).unwrap_or_else(|e| {
+    //     eprintln!(
+    //         "{}{} `{}`.\n",
+    //         "error".bold().red(),
+    //         ": failure during interface generation".bold(),
+    //         e
+    //     );
+    //     abort(infile, issues);
+    //     panic!("s");
+    // });
 
-    eprintln!(
-        "{:>8}: synthesizing unmap function...\n",
-        "synthesis".bold().green(),
-    );
+    // eprintln!(
+    //     "{:>8}: synthesizing prot function...\n",
+    //     "synthesis".bold().green(),
+    // );
 
-    synthsizer.synth_unmap(&mut ast).unwrap_or_else(|e| {
-        eprintln!(
-            "{}{} `{}`.\n",
-            "error".bold().red(),
-            ": failure during interface generation".bold(),
-            e
-        );
-        abort(infile, issues);
-        panic!("s");
-    });
+    // synthsizer.synth_protect(&mut ast).unwrap_or_else(|e| {
+    //     eprintln!(
+    //         "{}{} `{}`.\n",
+    //         "error".bold().red(),
+    //         ": failure during interface generation".bold(),
+    //         e
+    //     );
+    //     abort(infile, issues);
+    //     panic!("s");
+    // });
 
-    eprintln!(
-        "{:>8}: synthesizing prot function...\n",
-        "synthesis".bold().green(),
-    );
+    // // generate the unit files that use the interface files
+    // eprintln!(
+    //     "{:>8}: generating unit files...\n",
+    //     "generate".bold().green(),
+    // );
 
-    synthsizer.synth_protect(&mut ast).unwrap_or_else(|e| {
-        eprintln!(
-            "{}{} `{}`.\n",
-            "error".bold().red(),
-            ": failure during interface generation".bold(),
-            e
-        );
-        abort(infile, issues);
-        panic!("s");
-    });
+    // codegen.generate_units(&ast).unwrap_or_else(|e| {
+    //     eprintln!(
+    //         "{}{} `{}`.\n",
+    //         "error".bold().red(),
+    //         ": failure during unit generation".bold(),
+    //         e
+    //     );
+    // });
 
-    // generate the unit files that use the interface files
-    eprintln!(
-        "{:>8}: generating unit files...\n",
-        "generate".bold().green(),
-    );
+    // codegen.finalize(&ast).unwrap_or_else(|e| {
+    //     eprintln!(
+    //         "{}{} `{}`.\n",
+    //         "error".bold().red(),
+    //         ": failure during code generation finalization".bold(),
+    //         e
+    //     );
+    //     abort(infile, issues);
+    // });
 
-    codegen.generate_units(&ast).unwrap_or_else(|e| {
-        eprintln!(
-            "{}{} `{}`.\n",
-            "error".bold().red(),
-            ": failure during unit generation".bold(),
-            e
-        );
-    });
+    // // ===========================================================================================
+    // // Step 6: Generate simulator modules
+    // // ===========================================================================================
 
-    codegen.finalize(&ast).unwrap_or_else(|e| {
-        eprintln!(
-            "{}{} `{}`.\n",
-            "error".bold().red(),
-            ": failure during code generation finalization".bold(),
-            e
-        );
-        abort(infile, issues);
-    });
+    // log::info!("==== HARDWARE GENERATION STAGE ====");
 
-    // ===========================================================================================
-    // Step 6: Generate simulator modules
-    // ===========================================================================================
+    // // we can generate some modules
+    // let outpath = Path::new(outdir);
 
-    log::info!("==== HARDWARE GENERATION STAGE ====");
+    // if outpath.exists() && !outpath.is_dir() {
+    //     eprintln!(
+    //         "{}{} `{}`.\n",
+    //         "error".bold().red(),
+    //         ": output path exists, but s not a directory: ".bold(),
+    //         outdir.bold()
+    //     );
+    //     abort(infile, issues);
+    //     return;
+    // }
 
-    // we can generate some modules
-    let outpath = Path::new(outdir);
+    // eprintln!(
+    //     "{:>8}: prepare for hardware generation {}...\n",
+    //     "generate".bold().green(),
+    //     platform
+    // );
 
-    if outpath.exists() && !outpath.is_dir() {
-        eprintln!(
-            "{}{} `{}`.\n",
-            "error".bold().red(),
-            ": output path exists, but s not a directory: ".bold(),
-            outdir.bold()
-        );
-        abort(infile, issues);
-        return;
-    }
+    // let platform = match platform {
+    //     "fastmodels" => HWGen::new_fastmodels(outpath, pkgname),
+    //     s => {
+    //         eprintln!(
+    //             "{}{} `{}`.\n",
+    //             "error".bold().red(),
+    //             ": unsupported platform backend".bold(),
+    //             s.bold()
+    //         );
+    //         abort(infile, issues);
+    //         return;
+    //     }
+    // };
 
-    eprintln!(
-        "{:>8}: prepare for hardware generation {}...\n",
-        "generate".bold().green(),
-        platform
-    );
+    // platform.prepare().unwrap_or_else(|e| {
+    //     eprintln!(
+    //         "{}{} `{}`.\n",
+    //         "error".bold().red(),
+    //         ": failure during hw platform preparation".bold(),
+    //         e
+    //     );
+    // });
 
-    let platform = match platform {
-        "fastmodels" => HWGen::new_fastmodels(outpath, pkgname),
-        s => {
-            eprintln!(
-                "{}{} `{}`.\n",
-                "error".bold().red(),
-                ": unsupported platform backend".bold(),
-                s.bold()
-            );
-            abort(infile, issues);
-            return;
-        }
-    };
+    // eprintln!(
+    //     "{:>8}: generate hardware component...\n",
+    //     "generate".bold().green(),
+    // );
 
-    platform.prepare().unwrap_or_else(|e| {
-        eprintln!(
-            "{}{} `{}`.\n",
-            "error".bold().red(),
-            ": failure during hw platform preparation".bold(),
-            e
-        );
-    });
+    // platform.generate(&ast).unwrap_or_else(|e| {
+    //     eprintln!(
+    //         "{}{} `{}`.\n",
+    //         "error".bold().red(),
+    //         ": failure during hw platform generation".bold(),
+    //         e
+    //     );
+    // });
 
-    eprintln!(
-        "{:>8}: generate hardware component...\n",
-        "generate".bold().green(),
-    );
+    // eprintln!(
+    //     "{:>8}: finalize hardware component...\n",
+    //     "generate".bold().green(),
+    // );
 
-    platform.generate(&ast).unwrap_or_else(|e| {
-        eprintln!(
-            "{}{} `{}`.\n",
-            "error".bold().red(),
-            ": failure during hw platform generation".bold(),
-            e
-        );
-    });
+    // platform.finalize().unwrap_or_else(|e| {
+    //     eprintln!(
+    //         "{}{} `{}`.\n",
+    //         "error".bold().red(),
+    //         ": failure during hw platform finalization".bold(),
+    //         e
+    //     );
+    // });
 
-    eprintln!(
-        "{:>8}: finalize hardware component...\n",
-        "generate".bold().green(),
-    );
+    // if issues.warnings > 0 {
+    //     let msg = format!("{} warning(s) emitted", issues.warnings);
+    //     eprintln!("{}{}.\n", "warning: ".bold().yellow(), msg.bold());
+    // }
 
-    platform.finalize().unwrap_or_else(|e| {
-        eprintln!(
-            "{}{} `{}`.\n",
-            "error".bold().red(),
-            ": failure during hw platform finalization".bold(),
-            e
-        );
-    });
-
-    if issues.warnings > 0 {
-        let msg = format!("{} warning(s) emitted", issues.warnings);
-        eprintln!("{}{}.\n", "warning: ".bold().yellow(), msg.bold());
-    }
-
-    // ok all done.
+    // // ok all done.
     eprintln!("{:>8}: ...\n", "finished".bold().green());
 }
