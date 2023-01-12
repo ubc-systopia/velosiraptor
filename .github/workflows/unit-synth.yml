@@ -19,6 +19,7 @@ jobs:
       - name: libvelosisynth_clippy
         uses: actions-rs/clippy-check@v1
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           # can add a `-- --deny warnings` here to convert warnings into errors
           args:  --all-features --workspace --manifest-path  ./lib/velosisynth/Cargo.toml
       - name: libvelosisynth_build
