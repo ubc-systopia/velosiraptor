@@ -21,7 +21,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           # can add a `-- --deny warnings` here to convert warnings into errors
-          args:  --all-features --workspace --manifest-path  ./lib/velosiparser/Cargo.toml
+          args:  --workspace --manifest-path  ./lib/velosiparser/Cargo.toml
       - name: libvelosiparser_build
         uses: actions-rs/cargo@v1
         with:
