@@ -24,9 +24,3 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           # can add a `-- --deny warnings` here to convert warnings into errors
           args:  --all-features --workspace
-      - name: Clippy Lib
-        uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          # can add a `-- --deny warnings` here to convert warnings into errors
-          args:  --all-features --workspace --manifest-path ./lib/libvrc/Cargo.toml
