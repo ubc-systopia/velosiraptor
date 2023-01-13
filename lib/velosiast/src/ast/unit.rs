@@ -47,7 +47,7 @@ use crate::error::{
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
 
 use super::flags::VelosiAstFlags;
-use super::{VelosiAstIdentifier, VelosiAstState};
+use super::{VelosiAstExpr, VelosiAstIdentifier, VelosiAstState};
 
 macro_rules! ignored_node (
     ($node:path, $pst:expr, $issues:expr, $kind:expr) => {
@@ -245,7 +245,23 @@ impl VelosiAstUnitSegment {
                         consts_map.insert(c.ident_to_string(), c);
                     }
                 }
-                VelosiParseTreeUnitNode::InBitWidth(w, loc) => {
+                VelosiParseTreeUnitNode::InBitWidth(e, loc) => {
+                    let e = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(e, st), issues);
+
+                    let w = if let Some(w) = e.const_expr_result_num() {
+                        w
+                    } else {
+                        let msg = "Input bitwidth must be a constant expression.";
+                        let hint = "Change `{}` to a constant expression (e.g, 64).";
+                        let err = VelosiAstErrBuilder::err(msg.to_string())
+                            .add_hint(hint.to_string())
+                            .add_location(loc.clone())
+                            .build();
+                        issues.push(err.into());
+                        // just assigning 64 for now...
+                        64
+                    };
+
                     utils::check_addressing_width(&mut issues, w, loc.clone());
                     if inbitwidth.is_some() && derived_inbitwidth.is_none() {
                         let err = VelosiAstErrDoubleDef::new(
@@ -258,7 +274,23 @@ impl VelosiAstUnitSegment {
                         inbitwidth = Some((w, loc));
                     }
                 }
-                VelosiParseTreeUnitNode::OutBitWidth(w, loc) => {
+                VelosiParseTreeUnitNode::OutBitWidth(e, loc) => {
+                    let e = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(e, st), issues);
+
+                    let w = if let Some(w) = e.const_expr_result_num() {
+                        w
+                    } else {
+                        let msg = "Output bitwidth must be a constant expression.";
+                        let hint = "Change `{}` to a constant expression (e.g, 64).";
+                        let err = VelosiAstErrBuilder::err(msg.to_string())
+                            .add_hint(hint.to_string())
+                            .add_location(loc.clone())
+                            .build();
+                        issues.push(err.into());
+                        // just assigning 64 for now...
+                        64
+                    };
+
                     utils::check_addressing_width(&mut issues, w, loc.clone());
                     if outbitwidth.is_some() && derived_outbitwidth.is_none() {
                         let err = VelosiAstErrDoubleDef::new(
@@ -346,13 +378,32 @@ impl VelosiAstUnitSegment {
                         issues
                     ));
 
-                    // TODO: update the method if it's abstract!
-
-                    println!("TODO: update the method if it's abstract!");
-
-                    if let Err(e) = st.insert(m.clone().into()) {
-                        issues.push(*e);
+                    if let Some(mderiv) = st.lookup(m.ident().as_str()) {
+                        // exists already,
+                        if let VelosiAstNode::Method(md) = &mderiv.ast_node {
+                            if md.is_abstract {
+                                methods_map.insert(m.ident_to_string(), m);
+                            } else {
+                                // double defined!
+                                let err = VelosiAstErrDoubleDef::new(
+                                    m.ident().clone(),
+                                    md.loc.clone(),
+                                    m.loc.clone(),
+                                );
+                                issues.push(err.into());
+                            }
+                        } else {
+                            // differnet kind of symbol....
+                            let err = VelosiAstErrUndef::with_other(
+                                m.ident().clone(),
+                                m.loc.clone(),
+                                mderiv.loc().clone(),
+                            );
+                            issues.push(err.into());
+                        }
                     } else {
+                        st.insert(m.clone().into())
+                            .expect("method already exists in symbol table?");
                         methods_map.insert(m.ident_to_string(), m);
                     }
                 }
@@ -371,13 +422,15 @@ impl VelosiAstUnitSegment {
         let state = if let Some(st) = state {
             st
         } else {
-            let msg = "Segment unit has no state definition";
-            let hint = "Change this to a `staticmap`, or add a state definition.";
-            let err = VelosiAstErrBuilder::err(msg.to_string())
-                .add_hint(hint.to_string())
-                .add_location(pt.loc.from_self_with_subrange(0..1))
-                .build();
-            issues.push(err);
+            if !pt.is_abstract {
+                let msg = "Segment unit has no state definition";
+                let hint = "Change this to a `staticmap`, or add a state definition.";
+                let err = VelosiAstErrBuilder::err(msg.to_string())
+                    .add_hint(hint.to_string())
+                    .add_location(pt.loc.from_self_with_subrange(0..1))
+                    .build();
+                issues.push(err);
+            }
 
             Rc::new(VelosiAstState::NoneState(pt.loc.clone()))
         };
@@ -738,8 +791,8 @@ impl VelosiAstUnitStaticMap {
         let mut methods = Vec::new();
         let mut consts_map = HashMap::new();
         let mut consts = Vec::new();
-        let mut inbitwidth = None;
-        let mut outbitwidth = None;
+        let mut inbitwidth: Option<(u64, VelosiTokenStream)> = None;
+        let mut outbitwidth: Option<(u64, VelosiTokenStream)> = None;
         let mut map: Option<VelosiAstStaticMap> = None;
         for node in pt.nodes.into_iter() {
             match node {
@@ -755,13 +808,63 @@ impl VelosiAstUnitStaticMap {
                         consts_map.insert(c.ident_to_string(), c);
                     }
                 }
-                VelosiParseTreeUnitNode::InBitWidth(w, loc) => {
+                VelosiParseTreeUnitNode::InBitWidth(e, loc) => {
+                    let e = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(e, st), issues);
+
+                    let w = if let Some(w) = e.const_expr_result_num() {
+                        w
+                    } else {
+                        let msg = "Input bitwidth must be a constant expression.";
+                        let hint = "Change `{}` to a constant expression (e.g, 64).";
+                        let err = VelosiAstErrBuilder::err(msg.to_string())
+                            .add_hint(hint.to_string())
+                            .add_location(loc.clone())
+                            .build();
+                        issues.push(err.into());
+                        // just assigning 64 for now...
+                        64
+                    };
+
                     utils::check_addressing_width(&mut issues, w, loc.clone());
-                    inbitwidth = Some((w, loc));
+                    if inbitwidth.is_some() {
+                        let err = VelosiAstErrDoubleDef::new(
+                            Rc::new(String::from("inbitwidth")),
+                            inbitwidth.as_ref().unwrap().1.clone(),
+                            loc.clone(),
+                        );
+                        issues.push(err.into());
+                    } else {
+                        inbitwidth = Some((w, loc));
+                    }
                 }
-                VelosiParseTreeUnitNode::OutBitWidth(w, loc) => {
+                VelosiParseTreeUnitNode::OutBitWidth(e, loc) => {
+                    let e = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(e, st), issues);
+
+                    let w = if let Some(w) = e.const_expr_result_num() {
+                        w
+                    } else {
+                        let msg = "Output bitwidth must be a constant expression.";
+                        let hint = "Change `{}` to a constant expression (e.g, 64).";
+                        let err = VelosiAstErrBuilder::err(msg.to_string())
+                            .add_hint(hint.to_string())
+                            .add_location(loc.clone())
+                            .build();
+                        issues.push(err.into());
+                        // just assigning 64 for now...
+                        64
+                    };
+
                     utils::check_addressing_width(&mut issues, w, loc.clone());
-                    outbitwidth = Some((w, loc));
+                    if outbitwidth.is_some() {
+                        let err = VelosiAstErrDoubleDef::new(
+                            Rc::new(String::from("outbitwidth")),
+                            outbitwidth.as_ref().unwrap().1.clone(),
+                            loc.clone(),
+                        );
+                        issues.push(err.into());
+                    } else {
+                        outbitwidth = Some((w, loc));
+                    }
                 }
                 VelosiParseTreeUnitNode::Method(method) => {
                     let m = Rc::new(ast_result_unwrap!(
@@ -843,11 +946,12 @@ impl VelosiAstUnitStaticMap {
         let outbitwidth = if let Some((obw, _loc)) = outbitwidth {
             obw
         } else {
-            let msg = "Unit has no output bitwidth definition. Assuming 64 bits.";
-            let err = VelosiAstErrBuilder::warn(msg.to_string())
-                .add_location(pt.loc.from_self_with_subrange(0..1))
-                .build();
-            issues.push(err);
+            // XXX: not sure if output bitwidth actually makes sense for static maps
+            // let msg = "Unit has no output bitwidth definition. Assuming 64 bits.";
+            // let err = VelosiAstErrBuilder::warn(msg.to_string())
+            //     .add_location(pt.loc.from_self_with_subrange(0..1))
+            //     .build();
+            // issues.push(err);
 
             64
         };
