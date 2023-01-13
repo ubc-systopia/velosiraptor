@@ -36,7 +36,7 @@ use clap::{arg, command};
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, LevelPadding, TermLogger, TerminalMode};
 
 use velosiast::{AstResult, VelosiAst};
-use velosisynth::Z3Synth;
+// use velosisynth::Z3Synth;
 
 pub fn main() {
     // get the command line argumentts
@@ -66,7 +66,7 @@ pub fn main() {
         .set_location_level(LevelFilter::Off)
         .build();
 
-    let ncores = matches
+    let _ncores = matches
         .get_one::<String>("cores")
         .unwrap()
         .parse::<usize>()
@@ -80,7 +80,7 @@ pub fn main() {
     )
     .expect("failed to setup logger");
 
-    let t_start = Instant::now();
+    let _t_start = Instant::now();
 
     let ast = match matches.get_one::<String>("fname") {
         Some(filename) => VelosiAst::from_file(filename),

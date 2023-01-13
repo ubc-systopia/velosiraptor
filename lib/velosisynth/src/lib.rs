@@ -108,9 +108,9 @@ impl<'a> Z3Synth<'a> {
         let batch_size = std::cmp::max(5, z3.num_workers() / 2);
 
         // create the queries
-        let map_queries = vmops::map::get_program_iter(&unit, batch_size);
-        let unmap_queries = vmops::unmap::get_program_iter(&unit, batch_size);
-        let protect_queries = vmops::protect::get_program_iter(&unit, batch_size);
+        let map_queries = vmops::map::get_program_iter(unit, batch_size);
+        let unmap_queries = vmops::unmap::get_program_iter(unit, batch_size);
+        let protect_queries = vmops::protect::get_program_iter(unit, batch_size);
 
         Self {
             z3,

@@ -257,7 +257,7 @@ impl VelosiAstUnitSegment {
                             .add_hint(hint.to_string())
                             .add_location(loc.clone())
                             .build();
-                        issues.push(err.into());
+                        issues.push(err);
                         // just assigning 64 for now...
                         64
                     };
@@ -286,7 +286,7 @@ impl VelosiAstUnitSegment {
                             .add_hint(hint.to_string())
                             .add_location(loc.clone())
                             .build();
-                        issues.push(err.into());
+                        issues.push(err);
                         // just assigning 64 for now...
                         64
                     };
@@ -820,7 +820,7 @@ impl VelosiAstUnitStaticMap {
                             .add_hint(hint.to_string())
                             .add_location(loc.clone())
                             .build();
-                        issues.push(err.into());
+                        issues.push(err);
                         // just assigning 64 for now...
                         64
                     };
@@ -849,7 +849,7 @@ impl VelosiAstUnitStaticMap {
                             .add_hint(hint.to_string())
                             .add_location(loc.clone())
                             .build();
-                        issues.push(err.into());
+                        issues.push(err);
                         // just assigning 64 for now...
                         64
                     };
