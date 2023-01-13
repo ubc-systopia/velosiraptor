@@ -344,11 +344,14 @@ impl VelosiAstStaticMapElement {
         let dest = ast_result_unwrap!(VelosiAstFnCallExpr::from_parse_tree_raw(pt.dst, st), issues);
 
         // get the destnation unit
-        let destsym = st.lookup(dest.ident()).unwrap(); // that shouldn't fail
-        let bitwidth = if let VelosiAstNode::Unit(u) = &destsym.ast_node {
-            u.input_bitwidth()
+        let bitwidth = if let Some(destsym) = st.lookup(dest.ident()) {
+            if let VelosiAstNode::Unit(u) = &destsym.ast_node {
+                u.input_bitwidth()
+            } else {
+                64
+            }
         } else {
-            unreachable!()
+            64
         };
 
         let offset = if let Some(offset) = pt.offset {
