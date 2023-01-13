@@ -181,9 +181,9 @@ pub enum VelosiParseTreeUnitNode {
     /// A constant definition
     Const(VelosiParseTreeConstDef),
     /// Input bit width
-    InBitWidth(u64, VelosiTokenStream),
+    InBitWidth(VelosiParseTreeExpr, VelosiTokenStream),
     /// Output bit width
-    OutBitWidth(u64, VelosiTokenStream),
+    OutBitWidth(VelosiParseTreeExpr, VelosiTokenStream),
     /// Flag definition
     Flags(VelosiParseTreeFlags),
     /// State definition
@@ -206,11 +206,11 @@ impl Display for VelosiParseTreeUnitNode {
                 write!(f, "  ")?;
                 Display::fmt(const_def, f)?;
             }
-            VelosiParseTreeUnitNode::InBitWidth(bit_width, _) => {
-                write!(f, "  inbitwidth = {};", bit_width)?;
+            VelosiParseTreeUnitNode::InBitWidth(e, _) => {
+                write!(f, "  inbitwidth = {};", e)?;
             }
-            VelosiParseTreeUnitNode::OutBitWidth(bit_width, _) => {
-                write!(f, "  outbitwidth = {};", bit_width)?;
+            VelosiParseTreeUnitNode::OutBitWidth(e, _) => {
+                write!(f, "  outbitwidth = {};", e)?;
             }
             VelosiParseTreeUnitNode::Flags(flags) => {
                 write!(f, "  ")?;
