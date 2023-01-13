@@ -31,18 +31,37 @@
  * ```
  */
 
+
+const PTABLE_ENTRIES    : size = 1024;
+const PTABLE_ENTRY_SIZE : size = 4;
+const PTABLE_SIZE       :size = (PTABLE_ENTRIES * PTABLE_ENTRY_SIZE);
+const PTABLE_ALIGNMENT  : size = PTABLE_SIZE;
+
+
+const BASE_PAGE_BITS  : size = 12;
+const BASE_PAGE_SIZE  : size = (1 << BASE_PAGE_BITS); // 4 KiB
+
+const LARGE_PAGE_BITS : size = 22;
+const LARGE_PAGE_SIZE : size = (1 << LARGE_PAGE_BITS); // 4 MiB
+
+const PHYS_ADDR_BITS : size = 32;
+const PHYS_ADDR_MAX  : size = (1 << PHYS_ADDR_BITS);
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// x86_32 Page Table
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // represents an x86 page table entry
-segment X86PageTableEntry(base : addr) {
-
-    const PAGE_SIZE : size = 4096;
-
-const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
+segment X86_32_PageTableEntry(base : addr) {
 
     // there are there are 4 KiB pages
-    inbitwidth = 12;
+    inbitwidth = BASE_PAGE_BITS;
 
     // it's a 32-bit machine
-    outbitwidth = 32;
+    outbitwidth = PHYS_ADDR_BITS;
 
     flags = {
         writable,
@@ -66,17 +85,12 @@ const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
             8 ..  9 global,
             9 .. 12 ignored,
            12 .. 32 base,
-        },
-        // mem pte [base, 0, 4],
-        // mem pte2 [base2, 0, 4],
-        // mem pte3 [base, 0, 4],
-        reg cr4 [4],
-        // reg cr4 [4],
+        }
     };
 
     interface = InterfaceDef(base : addr) {
         mem pte [base, 0, 4] {
-
+            // this ones are in fact optional...
             Layout {
                 // the following fields at starting bit, ending bit, name
                     0 ..  1 present,
@@ -97,14 +111,8 @@ const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
             WriteAction {
                 interface.pte -> state.pte;
             },
-        },
-        reg cr4 [4],
+        }
     };
-
-    fn valid() -> bool {
-        state.pte.present == 1
-    }
-
 
     // matches a translation flags,
     fn matchflags(flgs : flags) -> bool
@@ -122,51 +130,40 @@ const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
          && (state.pte.dirty == 0)
     }
 
-
-
     // the translation semantics, adding an option type?
     fn translate(va: vaddr) -> paddr
-        requires va < 4096;
+        requires va < BASE_PAGE_SIZE;
         requires state.pte.present == 1;
+        requires state.pte.global == 0;
     {
-        va + (state.pte.base << 12)
+        va + (state.pte.base << BASE_PAGE_BITS)
     }
 
     // unmapping an entry
     synth fn unmap(va: vaddr, sz: size)
         requires (va == 0);
-        requires sz == PAGE_SIZE;
+        requires sz == BASE_PAGE_SIZE;
     {}
 
     // mapping an entry
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
         requires va == 0;
-        requires sz == PAGE_SIZE;
-        requires (pa & 0xfff) == 0;
-
-        // need a way to express types:
-        // type(addr) == Memory || type(addr) == DevMemory;
-        // type(addr) == DevMemory ==> flgs & CACHE_DISABLED
-        //
-    {}
-
+        requires sz == BASE_PAGE_SIZE;
+        requires (pa & (BASE_PAGE_SIZE - 1)) == 0;
 
     // protecting the entry, i.e., change its permission
     synth fn protect(va: vaddr, sz: size, flgs: flags)
-    {}
-
-
-    fn foo(va: vaddr) -> bool
-        requires (va < 0) && (va > 0);
-        requires (va < 0) && ((va > 0) || (va == 0));
-        requires !(va == 1 || va ==2)
-    {
-        true
-    }
 }
 
 
 // represents an x86 page table entry
-staticmap X86PageTable(base : addr) {
-    mapdef = [ X86PageTableEntry(base + i * 4) for i in 0..1024 ];
+staticmap X86_32_PageTable(base : addr) {
+    mapdef = [ X86_32_PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..1024 ];
 }
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// x86_32 Page Directory
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
