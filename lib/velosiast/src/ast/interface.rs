@@ -366,18 +366,35 @@ fn handle_nodes(
                 if nodes.is_empty() {
                     // all is empty, just take the things from the state field
 
+                    // copy over the layout from the state field, replace state with interface
+                    for slice in &sf.layout {
+                        let mut ifslice = slice.as_ref().clone();
+                        ifslice.ident.ident =
+                            Rc::new(ifslice.ident.ident.replace("state", "interface"));
+                        ifslice.ident.path =
+                            Rc::new(ifslice.ident.path.replace("state", "interface"));
+                        nodes.layout.push(Rc::new(ifslice));
+                    }
+
+                    let stident =
+                        VelosiAstIdentifier::new("", sf.path().to_string(), sf.loc.clone());
                     let stexpr = VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
-                        vec![sf.ident.clone()],
-                        VelosiAstTypeInfo::Integer,
-                        VelosiTokenStream::default(),
-                    ));
-                    let ifexpr = VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
-                        vec![ident.clone()],
+                        vec![stident],
                         VelosiAstTypeInfo::Integer,
                         VelosiTokenStream::default(),
                     ));
 
-                    nodes.layout = sf.layout.clone();
+                    let sifdent = VelosiAstIdentifier::new(
+                        "",
+                        sf.path().replace("state", "interface"),
+                        sf.loc.clone(),
+                    );
+                    let ifexpr = VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
+                        vec![sifdent],
+                        VelosiAstTypeInfo::Integer,
+                        VelosiTokenStream::default(),
+                    ));
+
                     nodes.writeactions = vec![VelosiAstInterfaceAction::new(
                         ifexpr.clone(),
                         stexpr.clone(),
@@ -433,6 +450,7 @@ fn handle_nodes(
                     .build();
                 issues.push(err);
             } else {
+                // have warning here!
             }
         }
     }
