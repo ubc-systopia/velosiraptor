@@ -41,7 +41,7 @@ pub fn check_upper_case(issues: &mut VelosiAstIssues, id: &VelosiAstIdentifier) 
     let name = id.ident();
     let allupper = name
         .chars()
-        .all(|x| x.is_ascii_uppercase() || !x.is_alphanumeric());
+        .all(|x| x.is_ascii_uppercase() || !x.is_alphabetic());
     if !allupper {
         let msg = format!("identifier `{}` should have an upper case name", name);
         let hint = format!(
@@ -471,6 +471,7 @@ pub fn check_element_ranges(
                 .add_related_location(related, elms[prev_idx].loc.clone())
                 .build();
             issues.push(err);
+            break;
         }
         if *end > prev_end {
             prev_end = *end;
