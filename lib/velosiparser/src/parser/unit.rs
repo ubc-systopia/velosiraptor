@@ -39,15 +39,15 @@ use nom::{
 use crate::error::IResult;
 use crate::parser::{
     constdef,
+    expr::expr,
     interface::interface,
-    // flags, interface, state
     map::staticmap,
     method::method,
     param::parameter,
     state::state,
     terminals::{
         assign, colon, comma, ident, kw_abstract, kw_enum, kw_flags, kw_inbitwidth, kw_outbitwidth,
-        kw_segment, kw_staticmap, lbrace, lparen, num, rbrace, rparen, semicolon,
+        kw_segment, kw_staticmap, lbrace, lparen, rbrace, rparen, semicolon,
     },
 };
 use crate::parsetree::{
@@ -153,7 +153,7 @@ fn unit_header(input: VelosiTokenStream) -> IResult<VelosiTokenStream, UnitHeade
 ///
 /// # Grammar
 ///
-/// `INBITWIDTH_CLAUSE := KW_INBITWIDTH ASSIGN NUM SEMICOLON`
+/// `INBITWIDTH_CLAUSE := KW_INBITWIDTH ASSIGN CONST_EXPR SEMICOLON`
 ///
 /// # Example
 ///
@@ -163,10 +163,10 @@ fn inbitwidth_clause(
 ) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
     let mut pos = input.clone();
     let (i1, _) = kw_inbitwidth(input)?;
-    let (i2, n) = cut(delimited(assign, num, semicolon))(i1)?;
+    let (i2, e) = cut(delimited(assign, expr, semicolon))(i1)?;
 
     pos.span_until_start(&i2);
-    Ok((i2, VelosiParseTreeUnitNode::InBitWidth(n, pos)))
+    Ok((i2, VelosiParseTreeUnitNode::InBitWidth(e, pos)))
 }
 
 /// parses the output bitwidth clause of the unit
@@ -182,7 +182,7 @@ fn inbitwidth_clause(
 ///
 /// # Grammar
 ///
-/// `OUTBITWIDTH_CLAUSE := KW_OUTBITWIDTH ASSIGN NUM SEMICOLON`
+/// `OUTBITWIDTH_CLAUSE := KW_OUTBITWIDTH ASSIGN CONST_EXPR SEMICOLON`
 ///
 /// # Example
 ///
@@ -193,10 +193,10 @@ fn outbitwidth_clause(
 ) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
     let mut pos = input.clone();
     let (i1, _) = kw_outbitwidth(input)?;
-    let (i2, n) = cut(delimited(assign, num, semicolon))(i1)?;
+    let (i2, e) = cut(delimited(assign, expr, semicolon))(i1)?;
 
     pos.span_until_start(&i2);
-    Ok((i2, VelosiParseTreeUnitNode::OutBitWidth(n, pos)))
+    Ok((i2, VelosiParseTreeUnitNode::OutBitWidth(e, pos)))
 }
 
 ////
