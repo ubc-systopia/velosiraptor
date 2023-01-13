@@ -891,7 +891,7 @@ impl VelosiAstIdentLiteralExpr {
 /// Implementation of [Display] for [VelosiAstIdentLiteralExpr]
 impl Display for VelosiAstIdentLiteralExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
-        write!(format, "{}", self.ident())
+        write!(format, "{}", self.path())
     }
 }
 
@@ -1581,6 +1581,16 @@ impl VelosiAstExpr {
         matches!(self, NumLiteral(_) | BoolLiteral(_))
     }
 
+    // obtains the result of a const expression returning an numeric value
+    pub fn const_expr_result_num(&self) -> Option<u64> {
+        use VelosiAstExpr::*;
+        match self {
+            NumLiteral(e) => Some(e.val),
+            _ => None,
+        }
+    }
+
+    // obtains the result type of the epxression
     pub fn result_type(&self) -> &VelosiAstTypeInfo {
         use VelosiAstExpr::*;
         match self {
