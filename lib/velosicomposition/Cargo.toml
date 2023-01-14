@@ -1,0 +1,28 @@
+[package]
+name = "velosicomposition"
+description = "Higher-level composition Library for the Velosiraptor"
+license = "MIT"
+version = "0.1.0"
+authors = ["Reto Achermann <achreto@cs.ubc.ca>"]
+edition = "2018"
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+velosiast = { path = "../velosiast" }
+colored = "2.0.0"
+log = { version = "0.4.17", features = ["max_level_trace", "release_max_level_warn"] }
+simplelog = { version = "^0.12.0", features = ["paris"] }
+clap = { version = "4.0.24", features = [ "derive" ] }
+
+[features]
+# none
+
+[lib]
+name = "velosicomposition"
+path = "src/lib.rs"
+
+[[bin]]
+name = "velosicomposition"
+path = "src/bin.rs"
