@@ -936,7 +936,7 @@ impl VelosiAstNumLiteralExpr {
 /// Implementation of [Display] for [VelosiAstNumLiteralExpr]
 impl Display for VelosiAstNumLiteralExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
-        write!(format, "{}", self.val)
+        write!(format, "0x{:x}", self.val)
     }
 }
 

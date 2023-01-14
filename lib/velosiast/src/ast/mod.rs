@@ -249,6 +249,23 @@ impl VelosiAstRoot {
         }
     }
 
+    pub fn unit_map(&self) -> HashMap<Rc<String>, VelosiAstUnit> {
+        let mut units = HashMap::new();
+        for u in self.segments_map.values() {
+            if u.is_abstract {
+                continue;
+            }
+            units.insert(u.ident().clone(), VelosiAstUnit::Segment(u.clone()));
+        }
+        for u in self.staticmap_map.values() {
+            units.insert(u.ident().clone(), VelosiAstUnit::StaticMap(u.clone()));
+        }
+        for u in self.enum_map.values() {
+            units.insert(u.ident().clone(), VelosiAstUnit::Enum(u.clone()));
+        }
+        units
+    }
+
     pub fn from_parse_tree(pt: VelosiParseTree) -> AstResult<VelosiAstRoot, VelosiAstIssues> {
         let mut root = Self::new(pt.context.unwrap_or_else(|| "$buf".to_string()));
 

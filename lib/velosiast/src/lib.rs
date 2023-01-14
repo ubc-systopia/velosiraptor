@@ -30,6 +30,7 @@
 
 // used standard library functionality
 
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
@@ -47,7 +48,7 @@ use error::{VelosiAstErrBuilder, VelosiAstIssues};
 use symboltable::{Symbol, SymbolTable};
 use velosiparser::VelosiParseTree;
 
-use crate::ast::{VelosiAstRoot, VelosiAstUnitSegment, VelosiAstUnitStaticMap};
+pub use crate::ast::{VelosiAstRoot, VelosiAstUnit, VelosiAstUnitSegment, VelosiAstUnitStaticMap};
 
 // custom error definitions
 pub enum AstResult<T, E> {
@@ -164,6 +165,13 @@ impl VelosiAst {
     pub fn staticmap_units(&self) -> impl Iterator<Item = &Rc<VelosiAstUnitStaticMap>> {
         self.root.staticmap_map.values()
     }
+
+    /// get a map of all non-abstract units
+    pub fn unit_map(&self) -> HashMap<Rc<String>, VelosiAstUnit> {
+        self.root.unit_map()
+    }
+
+
 }
 
 /// Implementation of [Display] for [VelosiAst]

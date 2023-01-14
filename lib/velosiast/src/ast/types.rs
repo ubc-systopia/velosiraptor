@@ -97,6 +97,24 @@ impl VelosiAstTypeInfo {
         matches!(self, VelosiAstTypeInfo::Flags)
     }
 
+    // whether this is an address type
+    pub fn is_addr(&self) -> bool {
+        use VelosiAstTypeInfo::*;
+        matches!(self, GenAddr | VirtAddr | PhysAddr)
+    }
+
+    // whether this is type refereces of another unit
+    pub fn is_typeref(&self) -> bool {
+        matches!(self, VelosiAstTypeInfo::TypeRef(_))
+    }
+
+    pub fn typeref(&self) -> Option<&Rc<String>> {
+        match self {
+            VelosiAstTypeInfo::TypeRef(name) => Some(name),
+            _ => None,
+        }
+    }
+
     /// check whether the type is compatible with the other.
     ///
     /// The two types are compatible if they have the same kind
@@ -264,6 +282,20 @@ impl VelosiAstType {
     /// whether or not the type is flags
     pub fn is_flags(&self) -> bool {
         self.typeinfo.is_flags()
+    }
+
+    // whether this is an address type
+    pub fn is_addr(&self) -> bool {
+        self.typeinfo.is_addr()
+    }
+
+    // whether this is type refereces of another unit
+    pub fn is_typeref(&self) -> bool {
+        self.typeinfo.is_typeref()
+    }
+
+    pub fn typeref(&self) -> Option<&Rc<String>> {
+        self.typeinfo.typeref()
     }
 
     /// check whether the type is compatible with the other.
