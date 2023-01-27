@@ -286,7 +286,7 @@ impl VelosiAstStateRegisterField {
     /// obtains a bitmask for the refrenced slices in the supplied refs
     pub fn get_slice_mask_for_refs(&self, refs: &HashSet<Rc<String>>) -> u64 {
         self.layout.iter().fold(0, |acc, slice| {
-            if refs.contains(slice.ident()) {
+            if refs.contains(slice.path()) {
                 acc | slice.mask()
             } else {
                 acc
@@ -559,8 +559,8 @@ impl VelosiAstStateDef {
                 use VelosiAstStateField::*;
                 if let (Memory(m1), Memory(m2)) = (f1.as_ref(), f2.as_ref()) {
                     if (m1.ident == m2.ident)
-                        || (m1.offset + m1.size < m2.offset)
-                        || (m2.offset + m2.size < m1.offset)
+                        || (m1.offset + m1.size <= m2.offset)
+                        || (m2.offset + m2.size <= m1.offset)
                     {
                         continue;
                     }
