@@ -420,13 +420,13 @@ pub fn op_to_c_expr(
             let fname = field_slice_extract_fn_name_str(unit, field, slice);
             c.fn_call(&fname, vec![]);
         }
-        VelosiOperation::WriteAction(field) => {
+        VelosiOperation::WriteActions(field) => {
             let fname = if_field_wr_fn_name_str(unit, field);
             let u = vars.get("unit").unwrap();
             let f = vars.get(field.as_str()).unwrap();
             c.fn_call(&fname, vec![u.clone(), f.clone()]);
         }
-        VelosiOperation::ReadAction(field) => {
+        VelosiOperation::ReadActions(field) => {
             let fname = if_field_rd_fn_name_str(unit, field);
             let u = vars.get("unit").unwrap();
             let f = vars.get(field.as_str()).unwrap();
