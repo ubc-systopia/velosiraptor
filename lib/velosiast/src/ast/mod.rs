@@ -116,7 +116,7 @@ impl VelosiAstNode {
 }
 
 /// represents an identifier token
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstIdentifier {
     /// the identifier
     pub ident: Rc<String>,
@@ -124,6 +124,12 @@ pub struct VelosiAstIdentifier {
     pub path: Rc<String>,
     /// the location of the identifier in the source pos
     pub loc: VelosiTokenStream,
+}
+
+impl PartialEq for VelosiAstIdentifier {
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path && self.ident == other.ident
+    }
 }
 
 /// the path separator
