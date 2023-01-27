@@ -229,7 +229,7 @@ impl VelosiAstInterfaceAction {
                 // do the back projection of the bits of the state to the interface
                 // loop over the ifbits and pick the slices that matter.
                 for (fld, b) in if_bits {
-                    if fld.starts_with(src_ref.as_str()) &&  bits & b != 0 {
+                    if fld.starts_with(src_ref.as_str()) && bits & b != 0 {
                         res.insert(fld.clone());
                     }
                 }
@@ -384,7 +384,8 @@ fn handle_nodes(
                         let mut ifslice = slice.as_ref().clone();
                         ifslice.ident.ident =
                             Rc::new(ifslice.ident.ident.replace("state", "interface"));
-                        ifslice.ident.path = Rc::new(ifslice.ident.path.replace("state", "interface"));
+                        ifslice.ident.path =
+                            Rc::new(ifslice.ident.path.replace("state", "interface"));
                         nodes.layout.push(Rc::new(ifslice));
                     }
                 } else {
@@ -458,7 +459,8 @@ fn handle_nodes(
                         let mut ifslice = slice.as_ref().clone();
                         ifslice.ident.ident =
                             Rc::new(ifslice.ident.ident.replace("state", "interface"));
-                        ifslice.ident.path = Rc::new(ifslice.ident.path.replace("state", "interface"));
+                        ifslice.ident.path =
+                            Rc::new(ifslice.ident.path.replace("state", "interface"));
                         nodes.layout.push(Rc::new(ifslice));
                     }
                 } else {
