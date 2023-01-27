@@ -190,13 +190,13 @@ pub fn get_program_iter(unit: &VelosiAstUnitSegment, batch_size: usize) -> Prote
     let mut protec_queries = Vec::with_capacity(2);
 
     if let Some(p) =
-        semantics::semantic_query(unit, m_fn.clone(), t_fn.clone(), &f_fn, true, batch_size).take()
+        semantics::semantic_query(unit, m_fn.clone(), t_fn.clone(), f_fn, true, batch_size).take()
     {
         protec_queries.push(p);
     }
 
     if let Some(p) =
-        semantics::semantic_query(unit, m_fn.clone(), f_fn.clone(), &f_fn, false, batch_size).take()
+        semantics::semantic_query(unit, m_fn.clone(), f_fn.clone(), f_fn, false, batch_size).take()
     {
         protec_queries.push(p);
     }

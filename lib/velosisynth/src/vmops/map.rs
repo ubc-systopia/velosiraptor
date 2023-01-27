@@ -227,13 +227,13 @@ pub fn get_program_iter(unit: &VelosiAstUnitSegment, batch_size: usize) -> MapPr
     }
 
     if let Some(p) =
-        semantics::semantic_query(unit, m_fn.clone(), t_fn.clone(), &t_fn, false, batch_size).take()
+        semantics::semantic_query(unit, m_fn.clone(), t_fn.clone(), t_fn, false, batch_size).take()
     {
         map_queries.push(PartQueries::Semantic(p));
     }
 
     if let Some(p) =
-        semantics::semantic_query(unit, m_fn.clone(), f_fn.clone(), &f_fn, false, batch_size).take()
+        semantics::semantic_query(unit, m_fn.clone(), f_fn.clone(), f_fn, false, batch_size).take()
     {
         map_queries.push(PartQueries::Semantic(p));
     }

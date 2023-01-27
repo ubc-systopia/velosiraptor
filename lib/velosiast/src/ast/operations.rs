@@ -69,8 +69,8 @@ pub enum VelosiOperation {
     InsertSlice(Rc<String>, Rc<String>, VelosiOpExpr),
     ExtractSlice(Rc<String>, Rc<String>),
     InsertField(Rc<String>, VelosiOpExpr),
-    WriteActions(Rc<String>),
-    ReadActions(Rc<String>),
+    WriteAction(Rc<String>),
+    ReadAction(Rc<String>),
     Return,
 }
 
@@ -80,8 +80,8 @@ impl VelosiOperation {
             VelosiOperation::InsertSlice(s, _, _) => s,
             VelosiOperation::InsertField(s, _) => s,
             VelosiOperation::ExtractSlice(s, _) => s,
-            VelosiOperation::WriteActions(s) => s,
-            VelosiOperation::ReadActions(s) => s,
+            VelosiOperation::WriteAction(s) => s,
+            VelosiOperation::ReadAction(s) => s,
             VelosiOperation::Return => "",
         }
     }
