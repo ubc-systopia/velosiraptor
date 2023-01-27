@@ -349,7 +349,7 @@ fn readactions(
 ) -> IResult<VelosiTokenStream, VelosiParseTreeInterfaceFieldNode> {
     let mut pos = input.clone();
 
-    // try parsing the ReadAction keyword
+    // try parsing the ReadActions keyword
     let (i1, _) = kw_readaction(input)?;
 
     // now parse the actions block
@@ -384,7 +384,7 @@ fn writeactions(
 ) -> IResult<VelosiTokenStream, VelosiParseTreeInterfaceFieldNode> {
     let mut pos = input.clone();
 
-    // try parsing the WriteAction keyword
+    // try parsing the WriteActions keyword
     let (i1, _) = kw_writeaction(input)?;
 
     // now parse the actions block
