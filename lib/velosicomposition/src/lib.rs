@@ -23,10 +23,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! # VelosiParser -- The Velosiraptor Parser
+//! # VelosiCompositino -- Composing Higher-Level Units
 //!
-//! The VelosiParser consumes the lexed TokenStream and produces a parse tree for the
-//! for further processing.
+//!
+//!
+//!
 
 // used standard library functionality
 
@@ -71,12 +72,12 @@ impl Relations {
     fn do_print_unit_hierarchy(&self, root: &VelosiAstUnit, indent: usize) {
         use VelosiAstUnit::*;
         let prefix = match root {
-            Segment(u) => "~ ",
-            StaticMap(u) => {
+            Segment(_u) => "~ ",
+            StaticMap(_u) => {
                 println!();
                 "# "
             }
-            Enum(u) => "",
+            Enum(_u) => "",
         };
 
         println!(
@@ -120,7 +121,7 @@ impl Relations {
                     unreachable!();
                 }
             },
-            Enum(u) => {}
+            Enum(_u) => {}
         }
 
         if let Some(children) = self.0.get(root.ident()) {
