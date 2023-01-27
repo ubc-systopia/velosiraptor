@@ -25,7 +25,7 @@
 
 //! State Synthesis Module: Rosette
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 // rosette language library imports
@@ -34,6 +34,10 @@ use smt2::{Function, Smt2Context, SortedVar, Term};
 // crate imports
 use super::{expr, types};
 use velosiast::ast::{VelosiAstMethod, VelosiAstParam};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Function Names
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn translate_map_result_name(idx: Option<usize>) -> String {
     if let Some(i) = idx {
@@ -83,6 +87,10 @@ pub fn method_assms_name(mname: &str) -> String {
     format!("{}.assms", mname)
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Matchflags Parts
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn add_matchflags_parts(smt: &mut Smt2Context, method: &VelosiAstMethod) -> usize {
     let parts = method.body.as_ref().unwrap().clone().split_cnf();
     for (i, pre) in parts
@@ -110,36 +118,70 @@ fn add_matchflags_parts(smt: &mut Smt2Context, method: &VelosiAstMethod) -> usiz
     parts.len()
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Functino Pre Conditions
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// three types of pre-conditions:
+//   - pure state ref:      state.length.present == 1;
+//        -> get translated into pre-conditions that must be satisfied
+//   - pure arg ref:        va >= 0;
+//        -> get translated into assumptions
+//   - mixed arg/state ref: va < (state.length.bytes << 4);
+//        -> gets extracted into separate method to be checked.
+
 fn add_method_preconditions(smt: &mut Smt2Context, method: &VelosiAstMethod) {
     // ---------------------------------------------------------------------------------------------
     // Adding Individual Function Pre-Conditions
     // ---------------------------------------------------------------------------------------------
 
-    for (i, pre) in method
-        .requires
-        .iter()
-        //        .filter(|p| p.has_state_references())
-        .enumerate()
-    {
-        if !pre.has_state_references() {
-            continue;
-        }
+    // get the method params as a hashset
+    let mut params = HashSet::new();
+    for p in method.params.iter() {
+        params.insert(p.ident().as_str());
+    }
 
+    for (i, pre) in method.requires.iter().enumerate() {
         let name = method_precond_i_name(method.ident(), i);
         let mut f = Function::new(name, types::boolean());
-        f.add_comment(format!(
-            "Function Preconditions part {}: {}, {}",
-            i,
-            method.ident(),
-            method.loc.loc()
-        ));
 
         f.add_arg(String::from("st!0"), types::model());
         for a in method.params.iter() {
             f.add_arg(a.ident_to_string(), types::type_to_smt2(&a.ptype));
         }
 
-        f.add_body(expr::expr_to_smt2(pre, "st!0"));
+        let body = if !pre.has_state_references() {
+            // if it has no state references, then we simply add a true body as this is
+            // an assumption
+
+            f.add_comment(format!(
+                "Function Preconditions part {} (is pure arg ref --> assm): {}, {}",
+                i,
+                method.ident(),
+                method.loc.loc()
+            ));
+
+            smt2::Term::binary(true)
+        } else if pre.has_var_references(&params) {
+            f.add_comment(format!(
+                "Function Preconditions part {} (is mixed state/arg ref --> handled separately): {}, {}",
+                i,
+                method.ident(),
+                method.loc.loc()
+            ));
+
+            smt2::Term::binary(true)
+        } else {
+            f.add_comment(format!(
+                "Function Preconditions part {} (pure state ref): {}, {}",
+                i,
+                method.ident(),
+                method.loc.loc()
+            ));
+            expr::expr_to_smt2(pre, "st!0")
+        };
+
+        f.add_body(body);
         smt.function(f);
     }
 
@@ -160,11 +202,12 @@ fn add_method_preconditions(smt: &mut Smt2Context, method: &VelosiAstMethod) {
         f.add_arg(a.ident_to_string(), types::type_to_smt2(&a.ptype));
     }
 
+    // construct the body of the comined function with pure state references
     let expr = Term::Binary(true);
     let expr = method
         .requires
         .iter()
-        .filter(|p| p.has_state_references())
+        .filter(|p| p.has_state_references() && !p.has_var_references(&params))
         .fold(expr, |e, p| Term::land(e, expr::expr_to_smt2(p, "st!0")));
 
     f.add_body(expr);
@@ -192,6 +235,8 @@ fn add_method_assms(smt: &mut Smt2Context, method: &VelosiAstMethod) {
         Term::land(e, types::type_to_assms_fn(&a.ptype, a.ident_to_string()))
     });
 
+    // get all expressions from the pre-condtion that do not have state references,
+    // those should be pure assumptions
     let expr = method
         .requires
         .iter()
@@ -211,17 +256,6 @@ pub fn add_methods(
     smt.section(String::from("Methods"));
 
     for m in methods {
-        // if matches!(
-        //     m.ident(),
-        //     "translate" | "matchflags" | "map" | "unmap" | "protect"
-        // ) {
-        //     smt.comment(format!(
-        //         "skipping method {}, handled elsewhere",
-        //         m.ident()
-        //     ));
-        //     continue;
-        // }
-
         // -----------------------------------------------------------------------------------------
         // Define the Function
         // -----------------------------------------------------------------------------------------
@@ -248,6 +282,7 @@ pub fn add_methods(
                 }
                 "translate" => {
                     add_translate_result_checks(smt);
+                    add_translate_range_checks(smt, m.as_ref());
                 }
                 _ => (),
             }
@@ -264,7 +299,16 @@ pub fn add_methods(
     }
 }
 
+// the range checks are only for the translate function, it checks whether the
+// given virtual address would translate
+pub fn add_translate_range_checks(smt: &mut Smt2Context, method: &VelosiAstMethod) {}
+
 pub fn add_translate_result_checks(smt: &mut Smt2Context) {
+    // basically: forall i : vaddr_t ::
+    //  &&  i < va ==> !does_translate(st, i)
+    //  &&  va <= i < va + size ==> translate_result(st, va)
+    //  &&  i >= va + size ==> !does_translate(st, i)
+
     // ---------------------------------------------------------------------------------------------
     // Result when mapping
     // ---------------------------------------------------------------------------------------------

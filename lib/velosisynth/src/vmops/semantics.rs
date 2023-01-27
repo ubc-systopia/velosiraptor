@@ -122,15 +122,19 @@ pub fn semantic_query(
     unit: &VelosiAstUnitSegment,
     m_op: Rc<VelosiAstMethod>,
     m_goal: Rc<VelosiAstMethod>,
+    m_cond: &VelosiAstMethod,
     no_change: bool,
     batch_size: usize,
-) -> ProgramQueries<SemanticQueries> {
+) -> Option<ProgramQueries<SemanticQueries>> {
     if let Some(body) = &m_goal.body {
         if body.result_type().is_boolean() {
             let body = body.clone();
             let mut program_queries = Vec::new();
             for (idx, e) in body.split_cnf().iter().enumerate() {
                 let programs = utils::make_program_builder(unit, m_op.as_ref(), e).into_iter();
+                if !programs.has_programs() {
+                    continue;
+                }
                 let b = SemanticQueryBuilder::new(
                     programs,
                     m_op.clone(),
@@ -142,17 +146,37 @@ pub fn semantic_query(
 
                 program_queries.push(q);
             }
-            let programs = MultiDimProgramQueries::new(program_queries);
 
-            let b = SemanticQueryBuilder::new(programs, m_op, m_goal.clone(), None, no_change);
-            ProgramQueries::new(SemanticQueries::MultiQuery(b))
+            if program_queries.is_empty() {
+                None
+            } else {
+                let programs = MultiDimProgramQueries::new(program_queries);
+
+                let b = SemanticQueryBuilder::new(programs, m_op, m_goal.clone(), None, no_change);
+                Some(ProgramQueries::new(SemanticQueries::MultiQuery(b)))
+            }
         } else {
             // case 1: we just have a single body element, so no need to split up.
 
-            let programs = utils::make_program_builder(unit, m_op.as_ref(), body).into_iter();
-            let b = SemanticQueryBuilder::new(programs, m_op, m_goal.clone(), None, no_change);
+            // here we have the the case where we need to synthesize for the result of
+            let programs = if no_change {
+                let body = m_cond.body.as_ref().unwrap();
+                utils::make_program_builder(unit, m_op.as_ref(), body).into_iter()
+            } else {
+                utils::make_program_builder(unit, m_op.as_ref(), body).into_iter()
+            };
 
-            ProgramQueries::with_batchsize(SemanticQueries::SingleQuery(b), batch_size)
+            // XXX: this produces programs where it shouldn't...
+            if !programs.has_programs() {
+                None
+            } else {
+                let b = SemanticQueryBuilder::new(programs, m_op, m_goal.clone(), None, no_change);
+
+                Some(ProgramQueries::with_batchsize(
+                    SemanticQueries::SingleQuery(b),
+                    batch_size,
+                ))
+            }
         }
     } else {
         unreachable!("all methods should have a body here.");

@@ -204,6 +204,7 @@ fn add_model_iface_accessors(smt: &mut Smt2Context, iface: &VelosiAstInterface) 
         for s in f.layout() {
             add_model_slice_accessor(smt, IFACE_PREFIX, f.ident(), s.ident());
         }
+        // add the full field accessor
     }
 }
 

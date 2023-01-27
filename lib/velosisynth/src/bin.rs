@@ -144,7 +144,7 @@ pub fn main() {
                 println!("Synthesizing ALL for unit {}", synth.unit_ident());
                 synth.synthesize();
                 if synth.has_result() {
-                    log::info!(target: "main", "synthesis completed:\n{}", synth);
+                    log::warn!(target: "main", "synthesis completed:\n{}", synth);
                 } else {
                     log::error!(target: "main", "synthesis failed:\n{}", synth);
                 }
@@ -153,7 +153,7 @@ pub fn main() {
             Some("map") => {
                 println!("Synthesizing MAP for unit {}", synth.unit_ident());
                 match synth.synthesize_map() {
-                    Ok(p) => log::info!(target: "main", "Programs: {}", p),
+                    Ok(p) => log::warn!(target: "main", "Programs: {}", p),
                     Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
                 }
             }
@@ -161,7 +161,7 @@ pub fn main() {
             Some("unmap") => {
                 println!("Synthesizing UNMAP for unit {}", synth.unit_ident());
                 match synth.synthesize_unmap() {
-                    Ok(p) => log::info!(target: "main", "Programs: {}", p),
+                    Ok(p) => log::warn!(target: "main", "Programs: {}", p),
                     Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
                 }
             }
@@ -169,7 +169,7 @@ pub fn main() {
             Some("protect") => {
                 println!("Synthesizing PROTECT for unit {}", synth.unit_ident());
                 match synth.synthesize_protect() {
-                    Ok(p) => log::info!(target: "main", "Programs: {}", p),
+                    Ok(p) => log::warn!(target: "main", "Programs: {}", p),
                     Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
                 }
             }

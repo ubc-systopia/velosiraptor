@@ -39,7 +39,7 @@ pub enum MaybeResult<T> {
     Some(T),
     /// the result is not yet available
     Pending,
-    /// There are no more results here
+    /// There are no results here, no programs that are being built
     None,
 }
 
@@ -280,6 +280,7 @@ where
         }
 
         if had_none {
+            self.all_done = true;
             log::warn!("one of the programs was empty!");
             return MaybeResult::None;
         }

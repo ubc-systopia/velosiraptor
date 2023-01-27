@@ -213,36 +213,31 @@ pub fn get_program_iter(unit: &VelosiAstUnitSegment, batch_size: usize) -> MapPr
     // Translate: Add a query for each of the pre-conditions of the function
     // ---------------------------------------------------------------------------------------------
 
-    let map_queries = vec![
-        PartQueries::Precond(precond::precond_query(
-            unit,
-            m_fn.clone(),
-            t_fn.clone(),
-            false,
-            batch_size,
-        )),
-        PartQueries::Precond(precond::precond_query(
-            unit,
-            m_fn.clone(),
-            f_fn.clone(),
-            false,
-            batch_size,
-        )),
-        PartQueries::Semantic(semantics::semantic_query(
-            unit,
-            m_fn.clone(),
-            t_fn.clone(),
-            false,
-            batch_size,
-        )),
-        PartQueries::Semantic(semantics::semantic_query(
-            unit,
-            m_fn.clone(),
-            f_fn.clone(),
-            false,
-            batch_size,
-        )),
-    ];
+    let mut map_queries = Vec::new();
+    if let Some(p) =
+        precond::precond_query(unit, m_fn.clone(), t_fn.clone(), false, batch_size).take()
+    {
+        map_queries.push(PartQueries::Precond(p));
+    }
+
+    if let Some(p) =
+        precond::precond_query(unit, m_fn.clone(), f_fn.clone(), false, batch_size).take()
+    {
+        map_queries.push(PartQueries::Precond(p));
+    }
+
+    if let Some(p) =
+        semantics::semantic_query(unit, m_fn.clone(), t_fn.clone(), &t_fn, false, batch_size).take()
+    {
+        map_queries.push(PartQueries::Semantic(p));
+    }
+
+    if let Some(p) =
+        semantics::semantic_query(unit, m_fn.clone(), f_fn.clone(), &f_fn, false, batch_size).take()
+    {
+        map_queries.push(PartQueries::Semantic(p));
+    }
+
     let programs = MultiDimProgramQueries::new(map_queries);
 
     MapPrograms::new(programs, m_fn.clone(), t_fn.clone(), f_fn.clone())
