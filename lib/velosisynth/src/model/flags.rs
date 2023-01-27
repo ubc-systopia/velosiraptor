@@ -34,7 +34,7 @@ use velosiast::ast::VelosiAstFlags;
 use super::types;
 
 pub fn flags_get_fn_name(flag: &str) -> String {
-    format!("Flags.{}.get!", flag)
+    format!("Flags.{flag}.get!")
 }
 
 pub fn add_flags(smt: &mut Smt2Context, ctxt: &str, flags: &VelosiAstFlags) {
@@ -67,7 +67,7 @@ pub fn add_flags(smt: &mut Smt2Context, ctxt: &str, flags: &VelosiAstFlags) {
         );
         let attrs = vec![Attribute::with_value(
             "pattern".to_string(),
-            format!("({} flgs@)", f_get_fn_name),
+            format!("({f_get_fn_name} flgs@)"),
         )];
 
         let e = Term::attributed(e, attrs);

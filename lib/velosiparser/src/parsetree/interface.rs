@@ -72,7 +72,7 @@ impl VelosiParseTreeInterfaceActions {
 impl Display for VelosiParseTreeInterfaceActions {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         for a in &self.actions {
-            writeln!(f, "        {},", a)?;
+            writeln!(f, "        {a},")?;
         }
         Ok(())
     }
@@ -92,7 +92,7 @@ impl Display for VelosiParseTreeInterfaceFieldNode {
             VelosiParseTreeInterfaceFieldNode::Layout(l) => {
                 writeln!(f, "      Layout {{")?;
                 for s in l {
-                    writeln!(f, "        {},", s)?;
+                    writeln!(f, "        {s},")?;
                 }
             }
             VelosiParseTreeInterfaceFieldNode::ReadActions(a) => {

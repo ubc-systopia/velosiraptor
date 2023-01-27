@@ -43,7 +43,7 @@ pub fn check_upper_case(issues: &mut VelosiAstIssues, id: &VelosiAstIdentifier) 
         .chars()
         .all(|x| x.is_ascii_uppercase() || !x.is_alphabetic());
     if !allupper {
-        let msg = format!("identifier `{}` should have an upper case name", name);
+        let msg = format!("identifier `{name}` should have an upper case name");
         let hint = format!(
             "convert the identifier to upper case (notice the capitalization): `{}`",
             name.to_ascii_uppercase()
@@ -64,7 +64,7 @@ pub fn check_snake_case(issues: &mut VelosiAstIssues, id: &VelosiAstIdentifier) 
         .chars()
         .all(|x| x.is_ascii_lowercase() || !x.is_alphabetic());
     if !allupper {
-        let msg = format!("identifier `{}` should have an snake case name", name);
+        let msg = format!("identifier `{name}` should have an snake case name");
         let hint = format!(
             "convert the identifier to lower case (notice the snake_case): `{}`",
             name.to_ascii_lowercase()
@@ -159,7 +159,7 @@ pub fn check_addressing_width(issues: &mut VelosiAstIssues, w: u64, loc: VelosiT
 pub fn check_field_size(issues: &mut VelosiAstIssues, size: u64, loc: &VelosiTokenStream) -> u64 {
     if ![1, 2, 4, 8].contains(&size) {
         if [8, 16, 32, 64].contains(&size) {
-            let msg = format!("Size in bits given, bytes expected. Converting to {}", size);
+            let msg = format!("Size in bits given, bytes expected. Converting to {size}");
             let hint = "Change the size information to one of 1, 2, 4, 8.";
             let err = VelosiAstErrBuilder::warn(msg)
                 .add_hint(hint.to_string())
@@ -168,7 +168,7 @@ pub fn check_field_size(issues: &mut VelosiAstIssues, size: u64, loc: &VelosiTok
             issues.push(err);
             return size / 8;
         } else {
-            let msg = format!("Unsupported size of the memory field: {}", size);
+            let msg = format!("Unsupported size of the memory field: {size}");
             let hint = "Change the size information to one of 1, 2, 4, 8.";
             let err = VelosiAstErrBuilder::err(msg)
                 .add_hint(hint.to_string())
@@ -198,7 +198,7 @@ pub fn slice_overlap_check(
                 break;
             }
             if let Some(s) = e {
-                let msg = format!("Field slices overlap at bit {}", i);
+                let msg = format!("Field slices overlap at bit {i}");
                 let hint = format!("This slices overlaps with slice `{}`", s.ident);
                 let related = "This is the slice that overlaps with.";
                 let err = VelosiAstErrBuilder::err(msg)
@@ -376,7 +376,7 @@ pub fn check_element_ranges(
         if let Some(range) = &e.src {
             // check if the range is const
             if !range.is_const() {
-                let msg = format!("evaluated source range `{}` is not constant", range);
+                let msg = format!("evaluated source range `{range}` is not constant");
                 let hint = "convert this to a constant expression";
                 let err = VelosiAstErrBuilder::err(msg)
                     .add_hint(hint.to_string())
@@ -393,7 +393,7 @@ pub fn check_element_ranges(
 
             // figure out power of two!
             if (rangesize & (rangesize - 1)) != 0 {
-                let msg = format!("Range has not a power of two size ({})", rangesize);
+                let msg = format!("Range has not a power of two size ({rangesize})");
                 let hint = "Change the range to be a power of two";
                 let err = VelosiAstErrBuilder::err(msg.to_string())
                     .add_hint(hint.to_string())
@@ -404,7 +404,7 @@ pub fn check_element_ranges(
 
             // check if range size <= unitsize
             if rangesize > unit_end_offset {
-                let msg = format!("evaluated source range `{}` exceeds input unit size", range);
+                let msg = format!("evaluated source range `{range}` exceeds input unit size");
                 let hint = "reduce the spanned input range here";
                 let err = VelosiAstErrBuilder::err(msg)
                     .add_hint(hint.to_string())
@@ -426,7 +426,7 @@ pub fn check_element_ranges(
         if let Some(offset) = &e.offset {
             // not constant
             if !offset.is_const_expr() {
-                let msg = format!("evaluated offset expression `{}` is not constant", offset);
+                let msg = format!("evaluated offset expression `{offset}` is not constant");
                 let hint = "convert this to a constant expression";
                 let err = VelosiAstErrBuilder::err(msg)
                     .add_hint(hint.to_string())
@@ -467,10 +467,9 @@ pub fn check_element_ranges(
     for (idx, start, end) in iter {
         // this doesn't find all the previous overlaps, but catches at least one
         if *start >= *end {
-            let msg = format!("range overlap: range 0x{:x}..0x{:x} overlaps with range 0x{:x}..0x{:x}  (entries {} andd {})",
-                prev_start, prev_end, start, end, prev_idx, idx);
-            let hint = format!("this entry here (var = {})", idx);
-            let related = format!("this is the overlapping entry (var = {})", idx);
+            let msg = format!("range overlap: range 0x{prev_start:x}..0x{prev_end:x} overlaps with range 0x{start:x}..0x{end:x}  (entries {prev_idx} andd {idx})");
+            let hint = format!("this entry here (var = {idx})");
+            let related = format!("this is the overlapping entry (var = {idx})");
             let err = VelosiAstErrBuilder::err(msg)
                 .add_hint(hint)
                 .add_location(elms[*idx].loc.clone())

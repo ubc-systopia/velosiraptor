@@ -171,7 +171,7 @@ impl Display for SymbolTableContext {
         writeln!(f, "Context: {}", self.ctxt)?;
         writeln!(f, "Kind         Type       Name                    Loc")?;
         for c in self.syms.values() {
-            writeln!(f, "{}", c)?;
+            writeln!(f, "{c}")?;
         }
         Ok(())
     }
@@ -275,7 +275,7 @@ impl Display for SymbolTable {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         writeln!(f, "SYMBOL TABLE\n")?;
         for c in &self.syms {
-            writeln!(f, "{}", c)?;
+            writeln!(f, "{c}")?;
         }
         Ok(())
     }

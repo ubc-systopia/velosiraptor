@@ -210,7 +210,7 @@ fn program_to_query(
             .filter_map(|p| {
                 if p.has_state_references() {
                     if negate {
-                        Some(format!("!{}", p))
+                        Some(format!("!{p}"))
                     } else {
                         Some(p.to_string())
                     }

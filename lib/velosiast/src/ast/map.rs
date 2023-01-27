@@ -169,7 +169,7 @@ impl VelosiAstStaticMapListComp {
         let num = range.end - range.start;
 
         if (num & (num - 1)) != 0 {
-            let msg = format!("Range has not a power of two size ({})", num);
+            let msg = format!("Range has not a power of two size ({num})");
             let hint = "Change the range to be a power of two";
             let err = VelosiAstErrBuilder::err(msg)
                 .add_hint(hint.to_string())
@@ -199,7 +199,7 @@ impl VelosiAstStaticMapListComp {
             if let VelosiAstNode::Unit(u) = &u.ast_node {
                 inputbits = u.input_bitwidth() + numbits;
                 if inputbits >= 64 {
-                    let msg = format!("Inputbitwidth of {} exceeds maximum of 64 bits", inputbits);
+                    let msg = format!("Inputbitwidth of {inputbits} exceeds maximum of 64 bits");
                     let hint = "reduce the range, or the input bitwidth of the element.";
                     let err = VelosiAstErrBuilder::err(msg)
                         .add_hint(hint.to_string())
@@ -371,12 +371,12 @@ impl VelosiAstStaticMapElement {
 impl Display for VelosiAstStaticMapElement {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         if let Some(src) = &self.src {
-            write!(f, "{} -> ", src)?;
+            write!(f, "{src} -> ")?;
         }
 
         Display::fmt(&self.dst, f)?;
         if let Some(offset) = &self.offset {
-            write!(f, " @ {}", offset)?;
+            write!(f, " @ {offset}")?;
         }
 
         Ok(())

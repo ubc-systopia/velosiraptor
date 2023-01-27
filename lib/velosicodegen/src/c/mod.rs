@@ -31,7 +31,6 @@ use std::path::PathBuf;
 
 use crustal as C;
 
-use velosiast::ast::VelosiAstUnit;
 use velosiast::VelosiAst;
 
 use crate::VelosiCodeGenError;

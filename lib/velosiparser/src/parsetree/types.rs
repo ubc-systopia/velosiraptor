@@ -80,7 +80,7 @@ impl Display for VelosiParseTreeTypeInfo {
             PhysAddr => write!(f, "paddr"),
             Size => write!(f, "size"),
             Flags => write!(f, "flags"),
-            TypeRef(name) => write!(f, "{}", name),
+            TypeRef(name) => write!(f, "{name}"),
         }
     }
 }

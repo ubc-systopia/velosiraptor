@@ -160,13 +160,13 @@ impl fmt::Display for BVOp {
             BVOp::BVGe => ">=",
         };
 
-        write!(f, "{}", opstr)
+        write!(f, "{opstr}")
     }
 }
 
 impl RExpr {
     pub fn constraint(var: String, op: BVOp, value: u64) -> RExpr {
-        println!("adding constraint: {} {} {}", var, op, value);
+        println!("adding constraint: {var} {op} {value}");
         RExpr::assume(RExpr::BVBinOp {
             op,
             lhs: Box::new(RExpr::var(var)),
@@ -186,7 +186,7 @@ impl RExpr {
             8 => String::from("eighth"),
             9 => String::from("ninth"),
             10 => String::from("tenth"),
-            _ => panic!("can't handle more! {}", idx),
+            _ => panic!("can't handle more! {idx}"),
         };
 
         RExpr::FnCall {
@@ -366,10 +366,10 @@ impl RExpr {
         let istr = " ".repeat(indent);
         use RExpr::*;
         match self {
-            Variable { name } => format!("{}{}", istr, name),
-            Comment { comment } => format!("{}; {}\n", istr, comment),
-            Text { text } => format!("{}\"{}\"", istr, text),
-            Const { value, .. } => format!("{}(int #x{:x})", istr, value),
+            Variable { name } => format!("{istr}{name}"),
+            Comment { comment } => format!("{istr}; {comment}\n"),
+            Text { text } => format!("{istr}\"{text}\""),
+            Const { value, .. } => format!("{istr}(int #x{value:x})"),
             BVNot { expr } => format!("{}(not\n {})", istr, expr.to_code(indent + 2)),
 
             LOr { lhs, rhs } => format!(
@@ -396,7 +396,7 @@ impl RExpr {
             ),
             FnCall { ident, args } => {
                 if args.is_empty() {
-                    format!("{}({})", istr, ident)
+                    format!("{istr}({ident})")
                 } else {
                     let args = args
                         .iter()
@@ -480,8 +480,8 @@ impl RExpr {
                     istr,
                 )
             }
-            Param { param } => format!("{}#:{}", istr, param),
-            x => format!("UNKNOWN! {:?}\n", x),
+            Param { param } => format!("{istr}#:{param}"),
+            x => format!("UNKNOWN! {x:?}\n"),
         }
     }
 }

@@ -77,7 +77,7 @@ pub fn parse_result(res: &str) -> Result<Vec<u64>, ()> {
             Ok(symvars.into_iter().map(|(_, v)| v).collect())
         }
         Err(e) => {
-            println!("SYNTH: ERROR PARSING OUTPUT: {:?}\n", e);
+            println!("SYNTH: ERROR PARSING OUTPUT: {e:?}\n");
             Err(())
         }
     }

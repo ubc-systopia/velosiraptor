@@ -181,14 +181,14 @@ impl VelosiParseTree {
 impl Display for VelosiParseTree {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         if let Some(c) = &self.context {
-            writeln!(f, "VelosiParseTree({})", c)?;
+            writeln!(f, "VelosiParseTree({c})")?;
         } else {
             writeln!(f, "VelosiParseTree($buf)")?;
         }
 
         writeln!(f, "---------------------------------------------")?;
         for n in &self.nodes {
-            writeln!(f, "{}\n", n)?;
+            writeln!(f, "{n}\n")?;
         }
         writeln!(f, "---------------------------------------------")?;
         Ok(())

@@ -61,11 +61,11 @@ fn check_precondition_pair(
     smt.variable(VarDecl::new("pa".to_string(), types::paddr()));
 
     // smt.comment(format!("{}: {}", fn_1.ident(), p1));
-    let name1 = format!("fn_1-{}", i1);
+    let name1 = format!("fn_1-{i1}");
     smt.assert(Term::named(expr::expr_to_smt2(p1, "st"), name1));
 
     // smt.comment(format!("{}: {}", fn_2.ident(), p2));
-    let name2 = format!("fn_2-{}", i2);
+    let name2 = format!("fn_2-{i2}");
     smt.assert(Term::named(expr::expr_to_smt2(p2, "st"), name2));
 
     // ---------------------------------------------------------------------------------------------
@@ -150,7 +150,7 @@ fn check_satisfy_fn_results(
 
         if result.has_errors() {
             for l in result.collect_errors() {
-                let msg = format!("Z3 Error: {}", l);
+                let msg = format!("Z3 Error: {l}");
                 let e = VelosiSynthErrorBuilder::err(msg).build();
                 issues.push(e)
             }

@@ -284,7 +284,7 @@ impl VelosiAstBinOpExpr {
         // evaluate whether the types are ok
         if !op.types_ok(lhs_type, rhs_type) {
             let msg = "Unsupported type combination in binary operation";
-            let hint = format!("No implementation for `{} {} {}`", lhs_type, op, rhs_type);
+            let hint = format!("No implementation for `{lhs_type} {op} {rhs_type}`");
 
             let err = VelosiAstErrBuilder::err(msg.to_string())
                 .add_hint(hint)
@@ -541,7 +541,7 @@ impl VelosiAstUnOpExpr {
         // evaluate whether the types are ok
         if !op.types_ok(expr_type) {
             let msg = "Unsupported type combination in unary operation";
-            let hint = format!("No implementation for `{} {}`", op, expr_type);
+            let hint = format!("No implementation for `{op} {expr_type}`");
 
             let err = VelosiAstErrBuilder::err(msg.to_string())
                 .add_hint(hint)
@@ -1203,7 +1203,7 @@ impl Display for VelosiAstFnCallExpr {
             if i != 0 {
                 write!(format, ".")?;
             }
-            write!(format, "{}", p)?;
+            write!(format, "{p}")?;
         }
         write!(format, ")")
     }
@@ -1251,7 +1251,7 @@ impl VelosiAstIfElseExpr {
 
         let cond_type = cond.result_type();
         if *cond_type != VelosiAstTypeInfo::Bool {
-            let msg = format!("Expected boolean expression was {} expression.", cond_type);
+            let msg = format!("Expected boolean expression was {cond_type} expression.");
             let hint = "Convert this expression into a boolean expression";
 
             let err = VelosiAstErrBuilder::err(msg)
@@ -1266,7 +1266,7 @@ impl VelosiAstIfElseExpr {
 
         if !other_type.compatible(&then_type) {
             let msg = "The two branches of the if-then-else expression have different types";
-            let hint = format!("Convert this expression into a {} exoression", then_type);
+            let hint = format!("Convert this expression into a {then_type} exoression");
 
             let err = VelosiAstErrBuilder::err(msg.to_string())
                 .add_hint(hint)

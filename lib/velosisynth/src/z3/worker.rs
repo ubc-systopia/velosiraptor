@@ -104,14 +104,14 @@ impl Z3Worker {
         let logfile = if let Some(logpath) = logpath {
             // create the log directory if it does not exist
             fs::create_dir_all(logpath).expect("failed to create the log directory");
-            Some(logpath.join(format!("z3-worker-{}-log.smt2", wid)))
+            Some(logpath.join(format!("z3-worker-{wid}-log.smt2")))
         } else {
             None
         };
 
         // create the threads
         let thread = thread::Builder::new()
-            .name(format!("z3-worker-{}", wid))
+            .name(format!("z3-worker-{wid}"))
             .spawn(move || {
 
                 let mut z3 = if let Some(logfile) = logfile {

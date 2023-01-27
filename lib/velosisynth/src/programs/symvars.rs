@@ -47,7 +47,7 @@ impl SymbolicVars {
     pub fn add_to_context(&self, smt: &mut Smt2Context) {
         smt.comment("Variable Definitions".to_string());
         for i in 0..self.counter {
-            let name = format!("symvar!{}", i);
+            let name = format!("symvar!{i}");
             smt.variable(VarDecl::new(name, model::types::num()));
         }
     }
@@ -60,7 +60,7 @@ impl SymbolicVars {
         }
         let mut terms = Vec::new();
         for i in 0..self.counter {
-            let name = format!("symvar!{}", i);
+            let name = format!("symvar!{i}");
             terms.push(Term::ident(name));
         }
 

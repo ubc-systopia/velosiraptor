@@ -50,14 +50,14 @@ impl Require {
 
     // adds a comment to the requires expression
     pub fn add_comment(&mut self, comment: String) {
-        self.comment = Some(comment.replace("\n", ";\n"));
+        self.comment = Some(comment.replace('\n', ";\n"));
     }
 
     /// formats the requires block into code
     pub fn to_code(&self) -> String {
         let req = format!("(require {})\n", self.path);
         if let Some(c) = &self.comment {
-            let mut comment = format!("; {}\n", c);
+            let mut comment = format!("; {c}\n");
             comment.push_str(req.as_str());
             return comment;
         }

@@ -84,7 +84,7 @@ impl Display for VelosiParseTreeMapExplicit {
             if i != 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "{}", e)?;
+            write!(f, "{e}")?;
         }
 
         write!(f, "]")
@@ -150,11 +150,11 @@ impl VelosiParseTreeMapElement {
 impl Display for VelosiParseTreeMapElement {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         if let Some(src) = &self.src {
-            write!(f, "{} => ", src)?;
+            write!(f, "{src} => ")?;
         }
         write!(f, "{}", self.dst)?;
         if let Some(offset) = &self.offset {
-            write!(f, " @ {}", offset)?;
+            write!(f, " @ {offset}")?;
         }
         Ok(())
     }

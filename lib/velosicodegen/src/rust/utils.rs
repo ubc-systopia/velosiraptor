@@ -77,7 +77,7 @@ pub fn to_mask_str(m: u64, len: u64) -> String {
         0..=8 => format!("0x{:02x}", (m & 0xff) as u8),
         9..=16 => format!("0x{:04x}", (m & 0xffff) as u16),
         17..=32 => format!("0x{:08x}", (m & 0xffffffff) as u32),
-        33..=64 => format!("0x{:016x}", m),
+        33..=64 => format!("0x{m:016x}"),
         _ => String::from("unknown"),
     }
 }
@@ -85,7 +85,7 @@ pub fn to_mask_str(m: u64, len: u64) -> String {
 /// writes the scope to a file or to stdout
 pub fn save_scope(_scope: CG::Scope, outdir: &Path, name: &str) -> Result<(), VelosiCodeGenError> {
     // set the path to the file
-    let _file = outdir.join(format!("{}.rs", name));
+    let _file = outdir.join(format!("{name}.rs"));
 
     // write the file, return IOError otherwise
     // fs::write(file, scope.to_string().as_bytes())?;

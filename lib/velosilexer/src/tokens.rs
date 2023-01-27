@@ -563,13 +563,13 @@ impl Display for VelosiTokenKind {
         use VelosiTokenKind::*;
         match self {
             Illegal => write!(f, "Illegal"),
-            NumLiteral(n) => write!(f, "{}", n),
-            BoolLiteral(n) => write!(f, "{}", n),
-            Identifier(n) => write!(f, "{}", n),
-            Keyword(n) => write!(f, "{}", n),
-            Comment(n) => write!(f, "// {}", n),
-            BlockComment(n) => write!(f, " /* {} */", n),
-            OpToken(n) => write!(f, "{}", n),
+            NumLiteral(n) => write!(f, "{n}"),
+            BoolLiteral(n) => write!(f, "{n}"),
+            Identifier(n) => write!(f, "{n}"),
+            Keyword(n) => write!(f, "{n}"),
+            Comment(n) => write!(f, "// {n}"),
+            BlockComment(n) => write!(f, " /* {n} */"),
+            OpToken(n) => write!(f, "{n}"),
         }
     }
 }

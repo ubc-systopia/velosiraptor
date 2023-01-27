@@ -229,7 +229,7 @@ impl Display for VelosiParseTreeQuantifierExpr {
             if i != 0 {
                 write!(format, ", ")?;
             }
-            write!(format, "{}", p)?;
+            write!(format, "{p}")?;
         }
         write!(format, " :: {})", self.expr)
     }
@@ -259,7 +259,7 @@ impl Display for VelosiParseTreeIdentifierLiteral {
             if i != 0 {
                 write!(format, ".")?;
             }
-            write!(format, "{}", p)?;
+            write!(format, "{p}")?;
         }
         Ok(())
     }
@@ -342,7 +342,7 @@ impl Display for VelosiParseTreeFnCallExpr {
             if i != 0 {
                 write!(format, ".")?;
             }
-            write!(format, "{}", p)?;
+            write!(format, "{p}")?;
         }
         write!(format, ")")
     }
