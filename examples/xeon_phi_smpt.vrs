@@ -9,75 +9,64 @@
  * mechanisms.
  */
 
+const SMPT_ENTRY_SIZE : size = 4;
+const SMTP_PAGE_BITS  : size = 34;
+const SMTP_PAGE_SIZE  : size = (1 << SMTP_PAGE_BITS);  // 16 GB
+
 // This defines an SMPT Entry
-unit smpte : Segment {
+segment SMPTE(base: addr) {
 
-    // the size of the entry is 34 bits or 16G
-    size = 34;
+    inbitwidth = SMTP_PAGE_BITS;
+    outbitwidth = 64;
 
-    // the state is given as a register (interal)
-    state = Register {
-        entry [_, 0, 4] {
-            0  0  snoop_disabled;
-            1  1  _;
-            2 31  host_address;
-        };
+    flags = {
+        snoot_disabled,
     };
 
-    // the interface is given by the MMIO register
-    interface = MMIORegisterInterface(base) {
-        // this is a direct pass through to the state, a slice of the address gets mapped
-        base[0..4] => state.entry;
+    state = StateDef() {
+        reg entry [ 4 ] {
+            0 ..  1  snoop_disabled,
+            1 ..  2  _,
+            2 .. 32  host_address,
+        }
     };
 
-    // constructor equivalent taking the base address as an argument
-    smpte(base : Memory) {
-        assert aligned(base, 4);
-        assert size(base) == 4;
+    interface = InterfaceDef(base: addr) {
+        mmio entry [ base, 0, 4 ] {
+            Layout {
+                0 ..  1  snoop_disabled,
+                1 ..  2  _,
+                2 .. 32  host_address,
+            },
+            ReadActions {
+                state.entry -> interface.entry;
+            },
+            WriteActions {
+                interface.entry -> state.entry;
+            }
+        }
+    };
+
+    fn matchflags(flgs : flags) -> bool
+    {
+        true
     }
 
-    /* segment specific elements */
-
-    // the base address is the entry shifted by 34 (16 GB)
-    get_base() {
-        return state.entry.host_address << 34;
+    fn translate(va: vaddr) -> paddr
+        requires va < SMTP_PAGE_SIZE;
+    {
+        va + (state.entry.host_address << 34)
     }
 
-    // the size is 16GB
-    get_size() {
-        return 16 << 30;
-    }
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+        requires va == 0 && sz == SMTP_PAGE_SIZE
+        requires (pa & (SMTP_PAGE_SIZE - 1) == 0)
 
-    match_flags(flags) {
-        return true;
-    }
-
-    map(addr, flags) {
-        assert type(addr) == Memory || type(addr) == MMIO;
-        assert aligned(addr, 16G);
-        assert size(addr) == 16G;
-    }
-
-    // cant unmap or protect
-    unmap();
-    protect();
+    // can't actually do anything to protect or unmap
+    synth fn protect(va: vaddr, sz: size, flgs: flags);
+    synth fn unmap(va: vaddr, sz: size);
  }
 
-
-unit smpt : StaticMap {
-    // the smpt constructur
-    smpt(base : MemRef) {
-        assert aligned(base, 4);
-        assert size(base) == 128;
-
-        // construct the map of entries, a slice of the incoming range
-        map = [ smpt(base[i*4..(i+1)*4])  for i in 0..32  ]
-    }
-
-    // other functions here will be initialized based on the `map`
+staticmap SMPT(base: addr) {
+    mapdef = [ SMPTE(base + i * SMPT_ENTRY_SIZE) for i in 0..32 ];
 }
-
-
-
-
-

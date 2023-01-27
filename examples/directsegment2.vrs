@@ -39,10 +39,10 @@ unit DirectSegment2(base : addr) : Segment {
             Layout {
                12 63  address;
             };
-            ReadAction {
+            ReadActions {
                 interface.base.address <- state.base.address >> 12;
             };
-            WriteAction {
+            WriteActions {
                 interface.base.address << 12 -> state.base.address;
             };
         };
@@ -51,10 +51,10 @@ unit DirectSegment2(base : addr) : Segment {
             Layout {
                 0 39 bytes;
             };
-            ReadAction {
+            ReadActions {
                 interface.length <- state.length;
             };
-            WriteAction {
+            WriteActions {
                 interface.length -> state.length;
             };
         };

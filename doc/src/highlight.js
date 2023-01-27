@@ -331,7 +331,7 @@ begin:t.concat(/\b/,/(?!let\b)/,e.IDENT_RE,t.lookahead(/\s*\(/))
 },i="([ui](8|16|32|64|128|size)|f(32|64))?",s=["state","interface","assert","staticmap"]
 ;return{name:"VelosiRaptor Specification Language",aliases:["vrs"],keywords:{
 $pattern:e.IDENT_RE+"!?",type:["int","addr","bool","size"],
-keyword:["bool","const","else","ensures","exists","fn","for","forall","if","import","in","Layout","let","map","Memory","MMIO","ReadAction","Register","requires","return","unit","WriteAction"],
+keyword:["bool","const","else","ensures","exists","fn","for","forall","if","import","in","Layout","let","map","Memory","MMIO","ReadActions","Register","requires","return","unit","WriteActions"],
 literal:["true","false","None"],built_in:s},illegal:"</",
 contains:[e.C_LINE_COMMENT_MODE,e.COMMENT("/\\*","\\*/",{contains:["self"]
 }),e.inherit(e.QUOTE_STRING_MODE,{begin:/b?"/,illegal:null}),{
