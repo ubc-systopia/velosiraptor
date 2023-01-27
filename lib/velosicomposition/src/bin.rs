@@ -88,16 +88,16 @@ pub fn main() {
         }
     };
 
-    let mut ast = match ast {
+    let ast = match ast {
         AstResult::Ok(ast) => ast,
         AstResult::Issues(ast, err) => {
             eprintln!("{}: parsing warnings.\n", "warning".bold().yellow());
-            eprintln!("{}", err);
+            eprintln!("{err}");
             ast
         }
         AstResult::Err(err) => {
             eprintln!("{}: parsing error.\n", "error".bold().red());
-            eprintln!("{}", err);
+            eprintln!("{err}");
             return;
         }
     };

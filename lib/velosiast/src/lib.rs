@@ -109,25 +109,25 @@ impl VelosiAst {
         match res {
             Ok(ptree) => VelosiAst::from_parse_tree(ptree),
             Err(VelosiParserError::ReadSourceFile { e }) => {
-                let msg = format!("Failed to read the source file: `{}`", e);
+                let msg = format!("Failed to read the source file: `{e}`");
                 let err = VelosiAstErrBuilder::err(msg).build();
                 AstResult::Err(err.into())
             }
 
             Err(VelosiParserError::ImportFailure { e }) => {
-                let msg = format!("Import failure: {}", e);
+                let msg = format!("Import failure: {e}");
                 let err = VelosiAstErrBuilder::err(msg).build();
                 AstResult::Err(err.into())
             }
 
             Err(VelosiParserError::LexingFailure { e }) => {
-                let msg = format!("Lexing failure. \n\n{}", e);
+                let msg = format!("Lexing failure. \n\n{e}");
                 let err = VelosiAstErrBuilder::err(msg).build();
                 AstResult::Err(err.into())
             }
 
             Err(VelosiParserError::ParsingFailure { e }) => {
-                let msg = format!("Parsing failure. \n\n{}", e);
+                let msg = format!("Parsing failure. \n\n{e}");
                 let err = VelosiAstErrBuilder::err(msg).build();
                 AstResult::Err(err.into())
             }

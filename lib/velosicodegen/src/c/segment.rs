@@ -64,7 +64,7 @@ fn add_unit_flags(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
         scope.new_comment("Unit has no defined flags");
         scope.new_struct(&structname);
     }
-    let tyname = format!("{}_t", structname);
+    let tyname = format!("{structname}_t");
     scope.new_typedef(&tyname, C::Type::new_struct(&structname));
 }
 

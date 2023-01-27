@@ -62,7 +62,7 @@ impl FunctionDef {
 
     /// adds a comment to the function
     pub fn add_comment(&mut self, comment: String) {
-        self.doc = Some(comment.replace("\n", ";\n"));
+        self.doc = Some(comment.replace('\n', ";\n"));
     }
 
     /// adds a suffix to the define clause
@@ -79,7 +79,7 @@ impl FunctionDef {
             .collect::<Vec<String>>();
 
         let suffix = match &self.suffix {
-            Some(s) => format!("-{}", s),
+            Some(s) => format!("-{s}"),
             None => String::new(),
         };
 
@@ -91,7 +91,7 @@ impl FunctionDef {
             body.join("\n")
         );
         if let Some(c) = &self.doc {
-            let mut doc = format!("; {}\n", c);
+            let mut doc = format!("; {c}\n");
             doc.push_str(f.as_str());
             return doc;
         }

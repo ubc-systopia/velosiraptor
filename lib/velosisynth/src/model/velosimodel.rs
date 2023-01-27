@@ -58,8 +58,8 @@ fn add_model(smt: &mut Smt2Context) {
     smt.section(String::from("Model"));
     let mut dt = DataType::new(MODEL_PREFIX.to_string(), 0);
     dt.add_comment("Model Definition".to_string());
-    dt.add_field(format!("{}.{}", MODEL_PREFIX, STATE_PREFIX), types::state());
-    dt.add_field(format!("{}.{}", MODEL_PREFIX, IFACE_PREFIX), types::iface());
+    dt.add_field(format!("{MODEL_PREFIX}.{STATE_PREFIX}"), types::state());
+    dt.add_field(format!("{MODEL_PREFIX}.{IFACE_PREFIX}"), types::iface());
 
     let accessors = dt.to_field_accessor();
     smt.datatype(dt);
@@ -78,31 +78,31 @@ use super::field::{
 pub fn model_slice_get_fn_name(ctxt: &str, field: &str, slice: &str) -> String {
     let slice = slice.split('.').last().unwrap();
     let field = field.split('.').last().unwrap();
-    format!("Model.{}.{}.{}.get!", ctxt, field, slice)
+    format!("Model.{ctxt}.{field}.{slice}.get!")
 }
 
 pub fn model_slice_set_fn_name(ctxt: &str, field: &str, slice: &str) -> String {
     let slice = slice.split('.').last().unwrap();
     let field = field.split('.').last().unwrap();
-    format!("Model.{}.{}.{}.set!", ctxt, field, slice)
+    format!("Model.{ctxt}.{field}.{slice}.set!")
 }
 
 pub fn model_field_get_fn_name(ctxt: &str, field: &str) -> String {
     let field = field.split('.').last().unwrap();
-    format!("Model.{}.{}.get!", ctxt, field)
+    format!("Model.{ctxt}.{field}.get!")
 }
 
 pub fn model_field_set_fn_name(ctxt: &str, field: &str) -> String {
     let field = field.split('.').last().unwrap();
-    format!("Model.{}.{}.set!", ctxt, field)
+    format!("Model.{ctxt}.{field}.set!")
 }
 
 pub fn model_get_fn_name(ctxt: &str) -> String {
-    format!("Model.{}.get!", ctxt)
+    format!("Model.{ctxt}.get!")
 }
 
 pub fn model_set_fn_name(ctxt: &str) -> String {
-    format!("Model.{}.set!", ctxt)
+    format!("Model.{ctxt}.set!")
 }
 
 fn add_model_field_accessor(smt: &mut Smt2Context, ftype: &str, fieldname: &str) {
@@ -214,10 +214,7 @@ fn add_model_iface_accessors(smt: &mut Smt2Context, iface: &VelosiAstInterface) 
 
 fn action_fn_name(fieldname: &str, ty: &str) -> String {
     let fieldname = fieldname.split('.').last().unwrap();
-    format!(
-        "{}.{}.{}.{}action!",
-        MODEL_PREFIX, IFACE_PREFIX, fieldname, ty
-    )
+    format!("{MODEL_PREFIX}.{IFACE_PREFIX}.{fieldname}.{ty}action!")
 }
 
 fn add_field_action(
@@ -230,7 +227,7 @@ fn add_field_action(
     let name = action_fn_name(fieldname, ty);
     let mut f = Function::new(name, types::model());
     f.add_arg(String::from("st"), types::model());
-    f.add_comment(format!("performs the write actions of {}", fieldname));
+    f.add_comment(format!("performs the write actions of {fieldname}"));
 
     let mut defs = Vec::new();
     let mut stvar = String::from("st");

@@ -117,7 +117,7 @@ impl BackendRust {
 
         // create the source directory
         let srcdir = self.outdir.join("src");
-        fs::create_dir_all(&srcdir)?;
+        fs::create_dir_all(srcdir)?;
 
         Ok(())
     }
@@ -227,8 +227,8 @@ impl BackendRust {
 
         let consts = ast.consts();
         if !consts.is_empty() {
-            scope.raw(&format!("pub mod {};", MOD_CONSTS));
-            scope.raw(&format!("pub use {}::*;", MOD_CONSTS));
+            scope.raw(&format!("pub mod {MOD_CONSTS};"));
+            scope.raw(&format!("pub use {MOD_CONSTS}::*;"));
         } else {
             scope.new_comment("no constants defined");
         }

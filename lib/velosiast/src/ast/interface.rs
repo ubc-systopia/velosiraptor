@@ -86,7 +86,7 @@ impl VelosiAstInterfaceAction {
 
         // the destination must be an lvalue that can be assigned to.
         if !dst.is_lvalue() {
-            let msg = format!("Destination of action `{}` is not an lvalue", dst);
+            let msg = format!("Destination of action `{dst}` is not an lvalue");
             let hint = "Convert the expression to an lvalue";
             let err = VelosiAstErrBuilder::err(msg)
                 .add_hint(hint.to_string())
@@ -600,7 +600,7 @@ impl VelosiAstInterfaceMemoryField {
         if offset % size != 0 {
             // warning
             let msg = "Offset is not a multiple of size size of the memory field";
-            let hint = format!("Change offset to be a multiple of {}", size);
+            let hint = format!("Change offset to be a multiple of {size}");
             let err = VelosiAstErrBuilder::err(msg.to_string())
                 .add_hint(hint)
                 .add_location(pt.loc.from_self_with_subrange(7..8))
@@ -805,7 +805,7 @@ impl VelosiAstInterfaceMmioField {
         if offset % size != 0 {
             // warning
             let msg = "Offset is not a multiple of size size of the memory field";
-            let hint = format!("Change offset to be a multiple of {}", size);
+            let hint = format!("Change offset to be a multiple of {size}");
             let err = VelosiAstErrBuilder::err(msg.to_string())
                 .add_hint(hint)
                 .add_location(pt.loc.from_self_with_subrange(7..8))

@@ -43,7 +43,7 @@ fn print_location_line(f: &mut Formatter<'_>, tokstream: &VelosiTokenStream) -> 
     // location information
     let location = tokstream.span();
     writeln!(f, "     {} {}", blue("-->"), location.loc())?;
-    writeln!(f, "      {}", pipe)
+    writeln!(f, "      {pipe}")
 }
 
 fn print_location_context(
@@ -253,7 +253,7 @@ impl Display for VelosiAstErrCustom {
 
         if !self.related.is_empty() {
             writeln!(f, "   {}", blue("..."))?;
-            writeln!(f, "      {}", pipe)?;
+            writeln!(f, "      {pipe}")?;
         }
 
         for (message, tokstream) in &self.related {
@@ -308,13 +308,13 @@ impl Display for VelosiAstErrDoubleDef {
 
         // location information
         writeln!(f, "     {} {}", blue("-->"), self.second.loc())?;
-        writeln!(f, "      {}", pipe)?;
+        writeln!(f, "      {pipe}")?;
 
         print_location_context(f, false, &self.first)?;
         let m = format!("previous definition of `{}` was here", self.name);
         writeln!(f, " {}", red(m.as_str()))?;
         writeln!(f, "   {}", blue("..."))?;
-        writeln!(f, "      {}", pipe)?;
+        writeln!(f, "      {pipe}")?;
         print_location_context(f, false, &self.second)?;
         writeln!(f, " {}", red("duplicate definition"))
 

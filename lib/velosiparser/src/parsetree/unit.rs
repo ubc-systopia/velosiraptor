@@ -79,10 +79,10 @@ impl Display for VelosiParseTreeMethod {
             if i > 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "{}", param)?;
+            write!(f, "{param}")?;
         }
         if let Some(rtype) = &self.rettype {
-            write!(f, ") -> {}", rtype)?;
+            write!(f, ") -> {rtype}")?;
         } else {
             write!(f, ")")?;
         }
@@ -91,10 +91,10 @@ impl Display for VelosiParseTreeMethod {
             if i == 0 {
                 writeln!(f)?;
             }
-            writeln!(f, "    requires {}", require)?;
+            writeln!(f, "    requires {require}")?;
         }
         if let Some(body) = &self.body {
-            writeln!(f, "  {{\n    {}\n  }}", body)?;
+            writeln!(f, "  {{\n    {body}\n  }}")?;
         }
         Ok(())
     }
@@ -207,10 +207,10 @@ impl Display for VelosiParseTreeUnitNode {
                 Display::fmt(const_def, f)?;
             }
             VelosiParseTreeUnitNode::InBitWidth(e, _) => {
-                write!(f, "  inbitwidth = {};", e)?;
+                write!(f, "  inbitwidth = {e};")?;
             }
             VelosiParseTreeUnitNode::OutBitWidth(e, _) => {
-                write!(f, "  outbitwidth = {};", e)?;
+                write!(f, "  outbitwidth = {e};")?;
             }
             VelosiParseTreeUnitNode::Flags(flags) => {
                 write!(f, "  ")?;
@@ -298,18 +298,18 @@ impl Display for VelosiParseTreeUnitDef {
                 if i > 0 {
                     write!(f, ", ")?;
                 }
-                write!(f, "{}", param)?;
+                write!(f, "{param}")?;
             }
             write!(f, ")")?;
         }
 
         if let Some(derived) = &self.derived {
-            write!(f, " : {}", derived)?;
+            write!(f, " : {derived}")?;
         }
 
         writeln!(f, " {{")?;
         for n in self.nodes.iter() {
-            writeln!(f, "{}", n)?;
+            writeln!(f, "{n}")?;
         }
 
         writeln!(f, "}}")

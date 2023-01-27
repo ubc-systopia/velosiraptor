@@ -54,11 +54,11 @@ pub fn main() {
     };
 
     match ast {
-        AstResult::Ok(ast) => println!("{}", ast),
+        AstResult::Ok(ast) => println!("{ast}"),
         AstResult::Issues(ast, err) => {
-            println!("{}", ast);
-            println!("{}", err);
+            println!("{ast}");
+            println!("{err}");
         }
-        AstResult::Err(err) => println!("{}", err),
+        AstResult::Err(err) => println!("{err}"),
     }
 }

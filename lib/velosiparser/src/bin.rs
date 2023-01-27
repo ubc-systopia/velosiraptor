@@ -55,24 +55,24 @@ pub fn main() {
 
     match res {
         Ok(tokens) => {
-            println!("{}", tokens);
+            println!("{tokens}");
         }
         Err(VelosiParserError::ReadSourceFile { e }) => {
-            println!("Failed to open the source file: {}", e);
+            println!("Failed to open the source file: {e}");
         }
 
         Err(VelosiParserError::LexingFailure { e }) => {
             println!("Lexing Failure");
-            println!("{}", e);
+            println!("{e}");
         }
 
         Err(VelosiParserError::ParsingFailure { e }) => {
             println!("Parsing Failure");
-            println!("{}", e);
+            println!("{e}");
         }
         Err(VelosiParserError::ImportFailure { e }) => {
             println!("Import resolution failure");
-            println!("{}", e);
+            println!("{e}");
         }
     }
 }

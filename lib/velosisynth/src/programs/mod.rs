@@ -87,10 +87,9 @@ impl Literal {
             Literal::Num => Term::ident(symvars.get()),
             Literal::Var(v) => Term::ident(v.to_string()),
             Literal::Val(v) => Term::num(*v),
-            Literal::Flag(v, f) => Term::fn_apply(
-                format!("Flags.{}.get!", f),
-                vec![Term::ident(v.to_string())],
-            ),
+            Literal::Flag(v, f) => {
+                Term::fn_apply(format!("Flags.{f}.get!"), vec![Term::ident(v.to_string())])
+            }
         }
     }
 }
@@ -406,7 +405,7 @@ impl FieldOp {
         match self {
             FieldOp::InsertField(arg) => {
                 let arg = arg.to_smt2_term(symvars);
-                let fname = format!("Model.IFace.{}.set!", fieldname);
+                let fname = format!("Model.IFace.{fieldname}.set!");
                 smtops.push((fname, Some(arg)));
             }
             FieldOp::InsertFieldSlices(sliceops) => {
@@ -415,7 +414,7 @@ impl FieldOp {
                     .for_each(|f| f.to_smt2_term(fieldname, smtops, symvars));
             }
             FieldOp::ReadAction => {
-                let fname = format!("Model.IFace.{}.readaction! ", fieldname);
+                let fname = format!("Model.IFace.{fieldname}.readaction! ");
                 smtops.push((fname, None));
             } // FieldOp::WriteAction => {
               //     let fname = format!("Model.IFace.{}.writeaction! ", fieldname);
@@ -723,7 +722,7 @@ impl From<Program> for Vec<VelosiOperation> {
 impl Display for Program {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         for a in self.0.iter() {
-            writeln!(f, "{}", a)?;
+            writeln!(f, "{a}")?;
         }
         Ok(())
     }

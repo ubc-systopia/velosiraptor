@@ -97,7 +97,7 @@ impl Display for VelosiParseTreeField {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "    {} [", self.name)?;
         if let Some((name, num)) = &self.offset {
-            write!(f, "{}, {}, ", name, num)?;
+            write!(f, "{name}, {num}, ")?;
         }
         write!(f, "{}", self.size)?;
         writeln!(f, "] {{")?;

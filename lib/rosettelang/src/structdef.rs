@@ -57,7 +57,7 @@ impl StructDef {
 
     /// adds documentation to the struct definition
     pub fn add_doc(&mut self, doc: String) {
-        self.doc = Some(doc.replace("\n", ";\n"));
+        self.doc = Some(doc.replace('\n', ";\n"));
     }
 
     /// formats corresponding rosette code
@@ -69,7 +69,7 @@ impl StructDef {
             self.attrib
         );
         if let Some(doc) = &self.doc {
-            let mut structdef = format!("; {}\n", doc);
+            let mut structdef = format!("; {doc}\n");
             structdef.push_str(sdef.as_str());
             return structdef;
         }

@@ -65,7 +65,7 @@ impl Relations {
     }
 
     pub fn insert(&mut self, key: Rc<String>, value: VelosiAstUnit) {
-        let entry = self.0.entry(key).or_insert_with(|| Vec::new());
+        let entry = self.0.entry(key).or_insert_with(Vec::new);
         entry.push(value);
     }
 
@@ -127,7 +127,7 @@ impl Relations {
         if let Some(children) = self.0.get(root.ident()) {
             for c in children.iter().rev() {
                 //let indent = if !c.is_enum() { indent + 2 } else { indent };
-                self.do_print_unit_hierarchy(&c, indent + 2);
+                self.do_print_unit_hierarchy(c, indent + 2);
             }
         }
     }
@@ -187,12 +187,12 @@ pub fn extract_composition(ast: &VelosiAst) {
 
     let roots = all_units.sub(&referenced_units);
 
-    println!("All units: {:?}", all_units);
-    println!("Referenced units: {:?}", referenced_units);
-    println!("Roots: {:?}", roots);
+    println!("All units: {all_units:?}");
+    println!("Referenced units: {referenced_units:?}");
+    println!("Roots: {roots:?}");
 
     for root in &roots {
-        println!("Root: {:?}", root);
+        println!("Root: {root:?}");
         relations.print_unit_hierarchy(units.get(root).unwrap());
     }
 }

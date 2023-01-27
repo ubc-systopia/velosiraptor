@@ -94,10 +94,7 @@ impl VelosiAstFieldSlice {
         }
 
         if pt.end > maxbits {
-            let msg = format!(
-                "End of range exceeds maximum number of bits of field ({}).",
-                maxbits
-            );
+            let msg = format!("End of range exceeds maximum number of bits of field ({maxbits}).");
             let hint = "Reduce the end of the range.";
             let err = VelosiAstErrBuilder::err(msg)
                 .add_hint(hint.to_string())

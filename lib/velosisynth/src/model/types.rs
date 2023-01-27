@@ -46,7 +46,7 @@ pub fn state() -> String {
 }
 
 pub fn ctxt(c: &str) -> String {
-    format!("{}_t", c)
+    format!("{c}_t")
 }
 
 pub fn num() -> String {
@@ -80,9 +80,9 @@ pub fn flags() -> String {
 pub fn field_type(ctxt: &str, name: &str) -> String {
     let mut i = name.split('.');
     match (i.next(), i.next()) {
-        (Some("state"), Some(name)) => format!("{}Field.{}_t", STATE_PREFIX, name),
-        (Some("interface"), Some(name)) => format!("{}Field.{}_t", IFACE_PREFIX, name),
-        (Some(name), None) => format!("{}Field.{}_t", ctxt, name),
+        (Some("state"), Some(name)) => format!("{STATE_PREFIX}Field.{name}_t"),
+        (Some("interface"), Some(name)) => format!("{IFACE_PREFIX}Field.{name}_t"),
+        (Some(name), None) => format!("{ctxt}Field.{name}_t"),
         _ => panic!("{} {}", ctxt, name),
     }
 }
@@ -93,9 +93,9 @@ pub fn add_type_def(smt: &mut Smt2Context, name: String, sort: String) {
 }
 
 pub fn add_type_constraints(smt: &mut Smt2Context, name: String, maxbits: u64) {
-    let fnname = format!("{}.assms", name);
+    let fnname = format!("{name}.assms");
     let mut f = Function::new(fnname, boolean());
-    f.add_comment(format!("Type constraints {}", name));
+    f.add_comment(format!("Type constraints {name}"));
     f.add_arg(String::from("v"), name);
 
     let body = if maxbits == DEFAULT_BIT_WIDTH {
@@ -113,9 +113,9 @@ pub fn add_type_constraints(smt: &mut Smt2Context, name: String, maxbits: u64) {
 }
 
 fn add_type_constraints_size(smt: &mut Smt2Context, name: String, maxbits: u64) {
-    let fnname = format!("{}.assms", name);
+    let fnname = format!("{name}.assms");
     let mut f = Function::new(fnname, boolean());
-    f.add_comment(format!("Type constraints {}", name));
+    f.add_comment(format!("Type constraints {name}"));
     f.add_arg(String::from("v"), name);
 
     let body = if maxbits == DEFAULT_BIT_WIDTH {
@@ -135,7 +135,7 @@ fn add_type_constraints_size(smt: &mut Smt2Context, name: String, maxbits: u64) 
 pub fn add_type_defs(smt: &mut Smt2Context, inaddr: u64, outaddr: u64) {
     smt.section(String::from("Type Definitions"));
 
-    let default_sort = format!("(_ BitVec {})", DEFAULT_BIT_WIDTH);
+    let default_sort = format!("(_ BitVec {DEFAULT_BIT_WIDTH})");
     add_type_def(smt, num(), default_sort.clone());
     add_type_def(smt, addr(), default_sort.clone());
     add_type_def(smt, vaddr(), default_sort.clone());

@@ -315,19 +315,19 @@ impl<'a> Display for Z3Synth<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         if self.is_done() {
             if let Some(prog) = &self.map_program {
-                writeln!(f, "map: {}", prog)?;
+                writeln!(f, "map: {prog}")?;
             } else {
                 writeln!(f, "map: synthesis failed")?;
             }
 
             if let Some(prog) = &self.unmap_program {
-                writeln!(f, "unmap: {}", prog)?;
+                writeln!(f, "unmap: {prog}")?;
             } else {
                 writeln!(f, "unmap: synthesis failed")?;
             }
 
             if let Some(prog) = &self.protect_program {
-                writeln!(f, "protect: {}", prog)
+                writeln!(f, "protect: {prog}")
             } else {
                 writeln!(f, "protect: synthesis failed")
             }

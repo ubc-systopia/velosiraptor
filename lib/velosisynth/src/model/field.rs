@@ -42,35 +42,35 @@ use super::velosimodel::{IFACE_PREFIX, STATE_PREFIX};
 fn field_slice_extract_fn_name(ctxt: &str, field: &str, slice: &str) -> String {
     let sname = slice.split('.').last().unwrap();
     let field = field.split('.').last().unwrap();
-    format!("{}Field.{}.{}.get!", ctxt, field, sname)
+    format!("{ctxt}Field.{field}.{sname}.get!")
 }
 
 fn field_slice_insert_fn_name(ctxt: &str, field: &str, slice: &str) -> String {
     let sname = slice.split('.').last().unwrap();
     let field = field.split('.').last().unwrap();
-    format!("{}Field.{}.{}.set!", ctxt, field, sname)
+    format!("{ctxt}Field.{field}.{sname}.set!")
 }
 
 pub fn field_slice_get_fn_name(ctxt: &str, field: &str, slice: &str) -> String {
     let sname = slice.split('.').last().unwrap();
     let field = field.split('.').last().unwrap();
-    format!("{}.{}.{}.get!", ctxt, field, sname)
+    format!("{ctxt}.{field}.{sname}.get!")
 }
 
 pub fn field_slice_set_fn_name(ctxt: &str, field: &str, slice: &str) -> String {
     let sname = slice.split('.').last().unwrap();
     let field = field.split('.').last().unwrap();
-    format!("{}.{}.{}.set!", ctxt, field, sname)
+    format!("{ctxt}.{field}.{sname}.set!")
 }
 
 pub fn field_get_fn_name(ctxt: &str, field: &str) -> String {
     let field = field.split('.').last().unwrap();
-    format!("{}.{}.get!", ctxt, field)
+    format!("{ctxt}.{field}.get!")
 }
 
 pub fn field_set_fn_name(ctxt: &str, field: &str) -> String {
     let field = field.split('.').last().unwrap();
-    format!("{}.{}.set!", ctxt, field)
+    format!("{ctxt}.{field}.set!")
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -97,7 +97,7 @@ fn add_field_common(
     //       from the field into account.
     //
     let fieldtype = types::field_type(ctxt, fieldname);
-    smt.comment(format!("Type for the {}", fieldtype));
+    smt.comment(format!("Type for the {fieldtype}"));
     smt.sort(Sort::new_def(fieldtype.clone(), types::num()));
 
     //
@@ -131,7 +131,7 @@ fn add_field_common(
         );
         let attrs = vec![Attribute::with_value(
             "pattern".to_string(),
-            format!("({} x@)", s_get_fn_name),
+            format!("({s_get_fn_name} x@)"),
         )];
 
         let e = Term::attributed(e, attrs);
@@ -172,7 +172,7 @@ fn add_field_common(
         );
         let attrs = vec![Attribute::with_value(
             "pattern".to_string(),
-            format!("({} x@ v@)", s_set_fn_name),
+            format!("({s_set_fn_name} x@ v@)"),
         )];
 
         let e = Term::attributed(e, attrs);

@@ -430,8 +430,8 @@ impl VelosiAstMethod {
                 (true, false) => ("abstract ", 0..1),
                 (false, false) => unreachable!(),
             };
-            let msg = format!("method defined as {} cannot have a body.", ms);
-            let hint = format!("remove the `{}` modifier", ms);
+            let msg = format!("method defined as {ms} cannot have a body.");
+            let hint = format!("remove the `{ms}` modifier");
             let err = VelosiAstErrBuilder::err(msg)
                 .add_hint(hint)
                 .add_location(pt.pos.from_self_with_subrange(range))
@@ -497,7 +497,7 @@ impl VelosiAstMethod {
     ///
     fn check_rettype(&self, issues: &mut VelosiAstIssues, sig: &str, ty: VelosiAstTypeInfo) {
         if self.rtype.typeinfo != ty {
-            let msg = format!("mismatched return type in special method: `{}`", sig);
+            let msg = format!("mismatched return type in special method: `{sig}`");
             let hint = format!("expected {}, found {}", ty, self.rtype.typeinfo);
             let err = VelosiAstErrBuilder::err(msg)
                 .add_hint(hint)
@@ -526,10 +526,7 @@ impl VelosiAstMethod {
         params: &[(&str, VelosiAstTypeInfo)],
     ) {
         if self.params.len() != params.len() {
-            let msg = format!(
-                "mismatched number of parameter in special method: `{}`",
-                sig
-            );
+            let msg = format!("mismatched number of parameter in special method: `{sig}`");
             let hint = format!("expected {}, found {}", params.len(), self.params.len());
             let err = VelosiAstErrBuilder::err(msg)
                 .add_hint(hint)
@@ -540,7 +537,7 @@ impl VelosiAstMethod {
 
         for (i, p) in self.params.iter().enumerate() {
             if i >= params.len() {
-                let msg = format!("unexpected parameter in special method: `{}`", sig);
+                let msg = format!("unexpected parameter in special method: `{sig}`");
                 let hint = "remove this parameter of the function";
                 let err = VelosiAstErrBuilder::err(msg)
                     .add_hint(hint.to_string())
@@ -550,7 +547,7 @@ impl VelosiAstMethod {
                 continue;
             }
             if p.ident().as_str() != params[i].0 {
-                let msg = format!("mismatch of parameter name in special method: `{}`", sig);
+                let msg = format!("mismatch of parameter name in special method: `{sig}`");
                 let hint = format!("expected {}, found {}", params[i].0, p.ident());
                 let err = VelosiAstErrBuilder::err(msg)
                     .add_hint(hint)
@@ -560,7 +557,7 @@ impl VelosiAstMethod {
             }
 
             if p.ptype.typeinfo != params[i].1 {
-                let msg = format!("mismatch of parameter type in special method: `{}`", sig);
+                let msg = format!("mismatch of parameter type in special method: `{sig}`");
                 let hint = format!("expected {}, found {}", params[i].1, p.ptype);
                 let err = VelosiAstErrBuilder::err(msg.to_string())
                     .add_hint(hint)
@@ -730,7 +727,7 @@ impl Display for VelosiAstMethod {
         if !self.requires.is_empty() {
             writeln!(f)?;
             for r in &self.requires {
-                writeln!(f, "    requires {};", r)?;
+                writeln!(f, "    requires {r};")?;
             }
         } else {
             writeln!(f, "\n    requires true;")?;

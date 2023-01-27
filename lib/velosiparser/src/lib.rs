@@ -80,7 +80,7 @@ impl From<VelosiLexerError> for VelosiParserError {
         match err {
             VelosiLexerError::ReadSourceFile { e } => {
                 // could not read the soruce file
-                let message = format!("Could not read the source file: {}", e);
+                let message = format!("Could not read the source file: {e}");
                 let e = VelosiParserErrBuilder::new(message).build();
                 VelosiParserError::LexingFailure { e }
             }
@@ -241,7 +241,7 @@ impl VelosiParser {
                     .collect::<Vec<String>>()
                     .join(" -> ");
 
-                let msg = format!("circular dependency detected:\n  {} -> {}", s, filename);
+                let msg = format!("circular dependency detected:\n  {s} -> {filename}");
                 let hint = "try removing the following import";
                 let e = VelosiParserErrBuilder::new(msg)
                     .add_tokstream(import.loc().clone())
@@ -261,7 +261,7 @@ impl VelosiParser {
                     resolved_imports.push(pt);
                 }
                 Err(VelosiParserError::ReadSourceFile { e: _ }) => {
-                    let msg = format!("Failed to resolve error: file not found: {}", filename);
+                    let msg = format!("Failed to resolve error: file not found: {filename}");
                     let hint = "Remove this import or ensure the module is part of the search path";
                     let e = VelosiParserErrBuilder::new(msg)
                         .add_tokstream(import.loc().clone())
@@ -270,7 +270,7 @@ impl VelosiParser {
                     return Err(VelosiParserError::ImportFailure { e });
                 }
                 Err(VelosiParserError::ImportFailure { e }) => {
-                    let msg = format!("failed to resolve {}", filename);
+                    let msg = format!("failed to resolve {filename}");
                     let hint = "Imported from here.";
                     let err = VelosiParserErrBuilder::new(msg)
                         .add_tokstream(import.loc().clone())
@@ -281,7 +281,7 @@ impl VelosiParser {
                     return Err(VelosiParserError::ImportFailure { e });
                 }
                 Err(VelosiParserError::ParsingFailure { e }) => {
-                    let msg = format!("failed to resolve {}", filename);
+                    let msg = format!("failed to resolve {filename}");
                     let hint = "Imported from here.";
                     let err = VelosiParserErrBuilder::new(msg)
                         .add_tokstream(import.loc().clone())

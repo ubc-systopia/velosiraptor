@@ -41,7 +41,7 @@ use velosiast::ast::{VelosiAstMethod, VelosiAstParam};
 
 pub fn translate_map_result_name(idx: Option<usize>) -> String {
     if let Some(i) = idx {
-        format!("translate.map.result.{}", i)
+        format!("translate.map.result.{i}")
     } else {
         "translate.map.result".to_string()
     }
@@ -49,7 +49,7 @@ pub fn translate_map_result_name(idx: Option<usize>) -> String {
 
 pub fn translate_protect_result_name(idx: Option<usize>) -> String {
     if let Some(i) = idx {
-        format!("translate.protect.result.{}", i)
+        format!("translate.protect.result.{i}")
     } else {
         "translate.protect.result".to_string()
     }
@@ -57,7 +57,7 @@ pub fn translate_protect_result_name(idx: Option<usize>) -> String {
 
 pub fn matchflags_map_result_name(idx: Option<usize>) -> String {
     if let Some(i) = idx {
-        format!("matchflags.map.result.{}", i)
+        format!("matchflags.map.result.{i}")
     } else {
         "matchflags.map.result".to_string()
     }
@@ -65,26 +65,26 @@ pub fn matchflags_map_result_name(idx: Option<usize>) -> String {
 
 pub fn matchflags_protect_result_name(idx: Option<usize>) -> String {
     if let Some(i) = idx {
-        format!("matchflags.protect.result.{}", i)
+        format!("matchflags.protect.result.{i}")
     } else {
         "matchflags.protect.result".to_string()
     }
 }
 
 pub fn method_precond_name(mname: &str) -> String {
-    format!("{}.pre", mname)
+    format!("{mname}.pre")
 }
 
 pub fn method_precond_i_name(mname: &str, i: usize) -> String {
-    format!("{}.pre.{}", mname, i)
+    format!("{mname}.pre.{i}")
 }
 
 pub fn method_part_i_name(mname: &str, i: usize) -> String {
-    format!("{}.part.{}", mname, i)
+    format!("{mname}.part.{i}")
 }
 
 pub fn method_assms_name(mname: &str) -> String {
-    format!("{}.assms", mname)
+    format!("{mname}.assms")
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -301,7 +301,7 @@ pub fn add_methods(
 
 // the range checks are only for the translate function, it checks whether the
 // given virtual address would translate
-pub fn add_translate_range_checks(smt: &mut Smt2Context, method: &VelosiAstMethod) {}
+pub fn add_translate_range_checks(_smt: &mut Smt2Context, _method: &VelosiAstMethod) {}
 
 pub fn add_translate_result_checks(smt: &mut Smt2Context) {
     // basically: forall i : vaddr_t ::

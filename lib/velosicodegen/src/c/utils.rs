@@ -299,7 +299,7 @@ pub fn to_mask_str(m: u64, len: u64) -> String {
         0..=8 => format!("0x{:02x}", (m & 0xff) as u8),
         9..=16 => format!("0x{:04x}", (m & 0xffff) as u16),
         17..=32 => format!("0x{:08x}U", (m & 0xffffffff) as u32),
-        33..=64 => format!("0x{:016x}ULL", m),
+        33..=64 => format!("0x{m:016x}ULL"),
         _ => String::from("unknown"),
     }
 }
@@ -319,9 +319,9 @@ pub fn add_const_def(scope: &mut C::Scope, c: &VelosiAstConst) {
     let mut m = C::Macro::new(c.ident());
 
     if c.value.result_type().is_numeric() {
-        m.set_value(&format!("(uint64_t)({})", c));
+        m.set_value(&format!("(uint64_t)({c})"));
     } else {
-        m.set_value(&format!("{}", c));
+        m.set_value(&format!("{c}"));
     }
 
     // add some documentation

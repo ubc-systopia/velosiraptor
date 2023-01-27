@@ -68,7 +68,7 @@ fn add_field_constants(
 
 /// generates the path of the header file
 pub fn if_field_header_path(name: &str) -> String {
-    format!("{}_field.h", name)
+    format!("{name}_field.h")
 }
 
 fn add_struct_definition(

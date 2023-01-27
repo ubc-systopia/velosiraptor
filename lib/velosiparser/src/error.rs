@@ -107,7 +107,7 @@ impl Display for VelosiParserErrCustom {
 
             // location information
             writeln!(f, "     {} {}", blue("-->"), location.loc())?;
-            writeln!(f, "      {}", pipe)?;
+            writeln!(f, "      {pipe}")?;
 
             let linenum = location.line().to_string();
 
@@ -225,7 +225,7 @@ impl Display for VelosiParserErrExpected {
 
             // location information
             writeln!(f, "     {} {}", blue("-->"), location.loc())?;
-            writeln!(f, "      {}", pipe)?;
+            writeln!(f, "      {pipe}")?;
 
             let linenum = location.line().to_string();
 
@@ -316,7 +316,7 @@ impl Display for VelosiParserErr {
             VelosiParserErr::Expected(e) => e.fmt(f),
             VelosiParserErr::Custom(e) => e.fmt(f),
             VelosiParserErr::Lexer(e) => e.fmt(f),
-            VelosiParserErr::Kind(k) => writeln!(f, "Nom kind: {:?}", k),
+            VelosiParserErr::Kind(k) => writeln!(f, "Nom kind: {k:?}"),
             VelosiParserErr::Stack(s) => {
                 for e in s {
                     e.fmt(f)?;

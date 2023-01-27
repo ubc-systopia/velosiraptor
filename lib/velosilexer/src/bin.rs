@@ -55,13 +55,13 @@ pub fn main() {
 
     match res {
         Ok(tokens) => {
-            println!("{}", tokens);
+            println!("{tokens}");
         }
         Err(VelosiLexerError::LexingFailure { r }) => {
-            println!("{}", r);
+            println!("{r}");
         }
         Err(VelosiLexerError::ReadSourceFile { e }) => {
-            println!("Failed to open the source file: {}", e);
+            println!("Failed to open the source file: {e}");
         }
         Err(VelosiLexerError::LexingIncomplete) => {
             println!("Lexing failed (incomplete input");

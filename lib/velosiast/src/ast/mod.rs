@@ -144,7 +144,7 @@ impl VelosiAstIdentifier {
         let path = if prefix.is_empty() {
             ident.clone()
         } else {
-            let path = format!("{}{}{}", prefix, IDENT_PATH_SEP, name);
+            let path = format!("{prefix}{IDENT_PATH_SEP}{name}");
             Rc::new(path)
         };
 

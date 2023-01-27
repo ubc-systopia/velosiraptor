@@ -195,14 +195,14 @@ impl RosetteFile {
                 Expr(e) => e.to_code(0),
                 Raw(s) => s.clone(),
                 Function(f) => format!("\n{}", f.to_code()),
-                Comment(s) => format!("; {}\n", s),
+                Comment(s) => format!("; {s}\n"),
                 Section(s) => {
                     let sep = ";".repeat(80);
-                    format!("\n;{}\n; {}\n;{}\n\n", sep, s, sep)
+                    format!("\n;{sep}\n; {s}\n;{sep}\n\n")
                 }
                 SubSection(s) => {
                     let sep = "-".repeat(80);
-                    format!("\n; {}\n;{}\n", s, sep)
+                    format!("\n; {s}\n;{sep}\n")
                 }
             };
             s.push_str(code.as_str());
@@ -230,17 +230,17 @@ impl RosetteFile {
         // grab the stdout
         let s = match String::from_utf8(output.stdout) {
             Ok(v) => v,
-            Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+            Err(e) => panic!("Invalid UTF-8 sequence: {e}"),
         };
 
         // if it's empty, assume error
         if s.is_empty() {
             let e = match String::from_utf8(output.stderr) {
                 Ok(v) => v,
-                Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+                Err(e) => panic!("Invalid UTF-8 sequence: {e}"),
             };
             println!("rosette failure!");
-            println!("{}", e);
+            println!("{e}");
         }
         // return the output caputured from stdout
         // TODO: properly handle errors

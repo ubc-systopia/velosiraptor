@@ -106,7 +106,7 @@ impl Display for VelosiLexerErr {
 
             // location information
             writeln!(f, "     {} {}", blue("-->"), self.location.loc())?;
-            writeln!(f, "      {}", pipe)?;
+            writeln!(f, "      {pipe}")?;
 
             let linenum = self.location.line().to_string();
 

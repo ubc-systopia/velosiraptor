@@ -431,7 +431,7 @@ impl VelosiAstUnitSegment {
 
         if !methods_map.contains_key("map") && !pt.is_abstract {
             let msg = "Segment unit has no `map` method defined. Using default implementation";
-            let hint = format!("add method with signature `{}` to unit", FN_SIG_MAP);
+            let hint = format!("add method with signature `{FN_SIG_MAP}` to unit");
             let err = VelosiAstErrBuilder::warn(msg.to_string())
                 .add_hint(hint)
                 .add_location(pt.loc.from_self_with_subrange(0..1))
@@ -444,7 +444,7 @@ impl VelosiAstUnitSegment {
 
         if !methods_map.contains_key("unmap") && !pt.is_abstract {
             let msg = "Segment unit has no `unmap` method defined. Using default implementation";
-            let hint = format!("add method with signature `{}` to unit", FN_SIG_UNMAP);
+            let hint = format!("add method with signature `{FN_SIG_UNMAP}` to unit");
             let err = VelosiAstErrBuilder::warn(msg.to_string())
                 .add_hint(hint)
                 .add_location(pt.loc.from_self_with_subrange(0..1))
@@ -457,7 +457,7 @@ impl VelosiAstUnitSegment {
 
         if !methods_map.contains_key("protect") && !pt.is_abstract {
             let msg = "Segment unit has no `protect` method defined. Using default implementation";
-            let hint = format!("add method with signature `{}` to unit", FN_SIG_PROTECT);
+            let hint = format!("add method with signature `{FN_SIG_PROTECT}` to unit");
             let err = VelosiAstErrBuilder::warn(msg.to_string())
                 .add_hint(hint)
                 .add_location(pt.loc.from_self_with_subrange(0..1))
@@ -470,7 +470,7 @@ impl VelosiAstUnitSegment {
 
         if !methods_map.contains_key("translate") && !pt.is_abstract {
             let msg = "Segment unit has no `protect` method defined. Using default implementation";
-            let hint = format!("add method with signature `{}` to unit", FN_SIG_TRANSLATE);
+            let hint = format!("add method with signature `{FN_SIG_TRANSLATE}` to unit");
             let err = VelosiAstErrBuilder::warn(msg.to_string())
                 .add_hint(hint)
                 .add_location(pt.loc.from_self_with_subrange(0..1))
@@ -483,7 +483,7 @@ impl VelosiAstUnitSegment {
 
         if !methods_map.contains_key("matchflags") && !pt.is_abstract {
             let msg = "Segment unit has no `protect` method defined. Using default implementation";
-            let hint = format!("add method with signature `{}` to unit", FN_SIG_MATCHFLAGS);
+            let hint = format!("add method with signature `{FN_SIG_MATCHFLAGS}` to unit");
             let err = VelosiAstErrBuilder::warn(msg.to_string())
                 .add_hint(hint)
                 .add_location(pt.loc.from_self_with_subrange(0..1))
@@ -669,7 +669,7 @@ impl Display for VelosiAstUnitSegment {
         }
         write!(f, ")")?;
         if let Some(d) = &self.derived {
-            write!(f, " : {}", d)?;
+            write!(f, " : {d}")?;
         }
         writeln!(f, " {{")?;
 
@@ -1041,7 +1041,7 @@ impl Display for VelosiAstUnitStaticMap {
         }
         write!(f, ")")?;
         if let Some(d) = &self.derived {
-            write!(f, " : {}", d)?;
+            write!(f, " : {d}")?;
         }
         writeln!(f, " {{")?;
 
@@ -1146,8 +1146,7 @@ impl VelosiAstUnitEnum {
                         if let VelosiAstNode::Unit(u) = &sym.ast_node {
                             if let VelosiAstUnit::Enum(e) = u {
                                 let msg = format!(
-                                    "unit `{}` is an enum. nested enums are not supported",
-                                    ident
+                                    "unit `{ident}` is an enum. nested enums are not supported"
                                 );
                                 // let hint = "merge the two enums together";
                                 let err = VelosiAstErrBuilder::err(msg)
@@ -1165,8 +1164,7 @@ impl VelosiAstUnitEnum {
                                 inbitwidth = u.input_bitwidth();
                             } else if inbitwidth != u.input_bitwidth() {
                                 let msg = format!(
-                                    "unit `{}` has a different inbitwidth to the enum",
-                                    ident
+                                    "unit `{ident}` has a different inbitwidth to the enum"
                                 );
                                 let hint = format!(
                                     "expected {} bits but referenced unit has {}",
@@ -1384,12 +1382,12 @@ impl Display for VelosiAstUnitEnum {
         writeln!(f, "  outbitwidth = {};\n", self.outbitwidth)?;
 
         for (e, p) in &self.enums {
-            write!(f, "  {}(", e)?;
+            write!(f, "  {e}(")?;
             for (i, p) in p.iter().enumerate() {
                 if i > 0 {
                     write!(f, ", ")?;
                 }
-                write!(f, "{}", p)?;
+                write!(f, "{p}")?;
             }
             writeln!(f, "  ),")?;
         }
