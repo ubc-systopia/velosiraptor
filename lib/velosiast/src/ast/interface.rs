@@ -152,15 +152,15 @@ impl VelosiAstInterfaceAction {
         let mut dst_refs = HashSet::new();
         self.dst.get_state_references(&mut dst_refs);
         if dst_refs.is_empty() {
-            // there were no stare references
+            // there were no stare references, return empty
             return dst_refs;
         }
 
         let mut src_refs = HashSet::new();
         self.src.get_interface_references(&mut src_refs);
         if src_refs.is_empty() {
-            // there were no interface references
-            return dst_refs;
+            // there were no interface references, but we had a state reference
+            return src_refs;
         }
 
         // we should not have multiple state or interface references in an lvalue
@@ -209,13 +209,28 @@ impl VelosiAstInterfaceAction {
             //  - `interface.field       -> state.field;`
             (2, 2) => {
                 // add the interface elements that actually match the used state elements.
+
                 let mut res = HashSet::new();
                 //res.insert(src_ref.clone());
-                let bits = state_bits.get(dst_ref).unwrap();
+                let bits = *state_bits.get(dst_ref).unwrap();
+
+                // nothing to be returned here
+                if bits == 0 {
+                    return res;
+                }
+
+                if bits == 0xffffffffffffffff {
+                    // all bits are set, we can return the interface reference
+                    res.insert(src_ref.clone());
+                    // println!("  --> 2,2   {}: {} -> return {:?}", dst_ref, bits, res);
+                    return res;
+                }
+
+                // do the back projection of the bits of the state to the interface
+                // loop over the ifbits and pick the slices that matter.
                 for (fld, b) in if_bits {
-                    if bits & b != 0 {
+                    if fld.starts_with(src_ref.as_str()) &&  bits & b != 0 {
                         res.insert(fld.clone());
-                    } else {
                     }
                 }
                 res
@@ -360,98 +375,153 @@ fn handle_nodes(
         return ast_result_return!(nodes, issues);
     };
 
-    match sym.as_ref() {
-        VelosiAstStateField::Memory(sf) => {
-            if is_memory {
-                if nodes.is_empty() {
-                    // all is empty, just take the things from the state field
-
+    match (is_memory, sym.as_ref()) {
+        (true, VelosiAstStateField::Memory(sf)) => {
+            if nodes.layout.is_empty() {
+                if sf.size == size {
                     // copy over the layout from the state field, replace state with interface
                     for slice in &sf.layout {
                         let mut ifslice = slice.as_ref().clone();
                         ifslice.ident.ident =
                             Rc::new(ifslice.ident.ident.replace("state", "interface"));
-                        ifslice.ident.path =
-                            Rc::new(ifslice.ident.path.replace("state", "interface"));
+                        ifslice.ident.path = Rc::new(ifslice.ident.path.replace("state", "interface"));
                         nodes.layout.push(Rc::new(ifslice));
                     }
-
-                    let stident =
-                        VelosiAstIdentifier::new("", sf.path().to_string(), sf.loc.clone());
-                    let stexpr = VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
-                        vec![stident],
-                        VelosiAstTypeInfo::Integer,
-                        VelosiTokenStream::default(),
-                    ));
-
-                    let sifdent = VelosiAstIdentifier::new(
-                        "",
-                        sf.path().replace("state", "interface"),
-                        sf.loc.clone(),
-                    );
-                    let ifexpr = VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
-                        vec![sifdent],
-                        VelosiAstTypeInfo::Integer,
-                        VelosiTokenStream::default(),
-                    ));
-
-                    nodes.writeactions = vec![VelosiAstInterfaceAction::new(
-                        ifexpr.clone(),
-                        stexpr.clone(),
-                        VelosiTokenStream::default(),
-                    )];
-                    nodes.readactions = vec![VelosiAstInterfaceAction::new(
-                        stexpr,
-                        ifexpr,
-                        VelosiTokenStream::default(),
-                    )];
                 } else {
-                    if nodes.layout.is_empty() {
-                        let msg = "Interface field misses layout. Taking layout from state field with the same name.";
-                        let related = "Layout taken from this state field";
-                        let err = VelosiAstErrBuilder::warn(msg.to_string())
-                            .add_location(loc.clone())
-                            .add_related_location(related.to_string(), sf.loc.clone())
-                            .build();
-                        issues.push(err);
-
-                        nodes.layout = sf.layout.clone();
-                    }
-
-                    if nodes.writeactions.is_empty() {}
-
-                    if nodes.readactions.is_empty() {}
+                    // size mismatch!
+                    // statefield with the same name exists, but is of a different type
+                    let msg = "State and interface have a field with the same name, but of differnet size.";
+                    let hint = "Change this field size to match the state field size";
+                    let related = "This is the location of the state field definition";
+                    let err = VelosiAstErrBuilder::warn(msg.to_string())
+                        .add_location(loc.clone())
+                        .add_hint(hint.to_string())
+                        .add_related_location(related.to_string(), sf.loc.clone())
+                        .build();
+                    issues.push(err);
                 }
-            } else {
-                // statefield with the same name exists, but is of a different type
-                let msg =
-                    "State and interface have a field with the same name, but of different kind.";
-                let hint = "Change this field type to `memory`";
-                let related = "This is the location of the state field definition";
-                let err = VelosiAstErrBuilder::warn(msg.to_string())
-                    .add_location(loc.clone())
-                    .add_hint(hint.to_string())
-                    .add_related_location(related.to_string(), sf.loc.clone())
-                    .build();
-                issues.push(err);
+            }
+
+            let stident = VelosiAstIdentifier::new("", sf.path().to_string(), sf.loc.clone());
+
+            let stexpr = VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
+                vec![stident],
+                VelosiAstTypeInfo::Integer,
+                VelosiTokenStream::default(),
+            ));
+
+            let sifdent = VelosiAstIdentifier::new(
+                "",
+                sf.path().replace("state", "interface"),
+                sf.loc.clone(),
+            );
+            let ifexpr = VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
+                vec![sifdent],
+                VelosiAstTypeInfo::Integer,
+                VelosiTokenStream::default(),
+            ));
+
+            if nodes.writeactions.is_empty() {
+                nodes.writeactions = vec![VelosiAstInterfaceAction::new(
+                    ifexpr.clone(),
+                    stexpr.clone(),
+                    VelosiTokenStream::default(),
+                )];
+            }
+
+            if nodes.readactions.is_empty() {
+                nodes.readactions = vec![VelosiAstInterfaceAction::new(
+                    stexpr,
+                    ifexpr,
+                    VelosiTokenStream::default(),
+                )];
             }
         }
-        VelosiAstStateField::Register(sf) => {
-            if is_memory {
-                // statefield with the same name exists, but is of a different type
-                let msg =
-                    "State and interface have a field with the same name, but of different kind.";
-                let hint = "Change this field type to `reg` or `mmio`";
-                let related = "This is the location of the state field definition";
-                let err = VelosiAstErrBuilder::warn(msg.to_string())
-                    .add_location(loc.clone())
-                    .add_hint(hint.to_string())
-                    .add_related_location(related.to_string(), sf.loc.clone())
-                    .build();
-                issues.push(err);
-            } else {
-                // have warning here!
+        (false, VelosiAstStateField::Memory(sf)) => {
+            // statefield with the same name exists, but is of a different type
+            let msg = "State and interface have a field with the same name, but of different kind.";
+            let hint = "Change this field type to `memory`";
+            let related = "This is the location of the state field definition";
+            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                .add_location(loc.clone())
+                .add_hint(hint.to_string())
+                .add_related_location(related.to_string(), sf.loc.clone())
+                .build();
+            issues.push(err);
+        }
+
+        (false, VelosiAstStateField::Register(sf)) => {
+            if nodes.layout.is_empty() {
+                if sf.size == size {
+                    // copy over the layout from the state field, replace state with interface
+                    for slice in &sf.layout {
+                        let mut ifslice = slice.as_ref().clone();
+                        ifslice.ident.ident =
+                            Rc::new(ifslice.ident.ident.replace("state", "interface"));
+                        ifslice.ident.path = Rc::new(ifslice.ident.path.replace("state", "interface"));
+                        nodes.layout.push(Rc::new(ifslice));
+                    }
+                } else {
+                    // size mismatch!
+                    // statefield with the same name exists, but is of a different type
+                    let msg = "State and interface have a field with the same name, but of differnet size.";
+                    let hint = "Change this field size to match the state field size";
+                    let related = "This is the location of the state field definition";
+                    let err = VelosiAstErrBuilder::warn(msg.to_string())
+                        .add_location(loc.clone())
+                        .add_hint(hint.to_string())
+                        .add_related_location(related.to_string(), sf.loc.clone())
+                        .build();
+                    issues.push(err);
+                }
             }
+
+            let stident = VelosiAstIdentifier::new("", sf.path().to_string(), sf.loc.clone());
+
+            let stexpr = VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
+                vec![stident],
+                VelosiAstTypeInfo::Integer,
+                VelosiTokenStream::default(),
+            ));
+
+            let sifdent = VelosiAstIdentifier::new(
+                "",
+                sf.path().replace("state", "interface"),
+                sf.loc.clone(),
+            );
+            let ifexpr = VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
+                vec![sifdent],
+                VelosiAstTypeInfo::Integer,
+                VelosiTokenStream::default(),
+            ));
+
+            if nodes.writeactions.is_empty() {
+                nodes.writeactions = vec![VelosiAstInterfaceAction::new(
+                    ifexpr.clone(),
+                    stexpr.clone(),
+                    VelosiTokenStream::default(),
+                )];
+            }
+
+            if nodes.readactions.is_empty() {
+                nodes.readactions = vec![VelosiAstInterfaceAction::new(
+                    stexpr,
+                    ifexpr,
+                    VelosiTokenStream::default(),
+                )];
+            }
+        }
+        (true, VelosiAstStateField::Register(sf)) => {
+            // statefield with the same name exists, but is of a different type
+            let msg = "State and interface have a field with the same name, but of different kind.";
+            let hint = "Change this field type to `reg` or `mmio`";
+            let related = "This is the location of the state field definition";
+            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                .add_location(loc.clone())
+                .add_hint(hint.to_string())
+                .add_related_location(related.to_string(), sf.loc.clone())
+                .build();
+            issues.push(err);
         }
     }
 
@@ -1395,8 +1465,8 @@ impl VelosiAstInterfaceDef {
                 use VelosiAstInterfaceField::*;
                 if let (Memory(m1), Memory(m2)) = (f1.as_ref(), f2.as_ref()) {
                     if (m1.ident == m2.ident)
-                        || (m1.offset + m1.size < m2.offset)
-                        || (m2.offset + m2.size < m1.offset)
+                        || (m1.offset + m1.size <= m2.offset)
+                        || (m2.offset + m2.size <= m1.offset)
                     {
                         continue;
                     }
