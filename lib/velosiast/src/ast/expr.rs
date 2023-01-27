@@ -412,6 +412,10 @@ impl VelosiAstBinOpExpr {
         self.lhs.has_interface_references() || self.rhs.has_interface_references()
     }
 
+    pub fn has_var_references(&self, vars: &HashSet<&str>) -> bool {
+        self.lhs.has_var_references(vars) || self.rhs.has_var_references(vars)
+    }
+
     pub fn result_type(&self) -> &VelosiAstTypeInfo {
         self.op.result_type()
     }
@@ -600,6 +604,10 @@ impl VelosiAstUnOpExpr {
         self.expr.has_interface_references()
     }
 
+    pub fn has_var_references(&self, vars: &HashSet<&str>) -> bool {
+        self.expr.has_var_references(vars)
+    }
+
     pub fn result_type(&self) -> &VelosiAstTypeInfo {
         self.op.result_type()
     }
@@ -715,6 +723,11 @@ impl VelosiAstQuantifierExpr {
 
     pub fn has_state_references(&self) -> bool {
         self.expr.has_state_references()
+    }
+
+    pub fn has_var_references(&self, _vars: &HashSet<&str>) -> bool {
+        unimplemented!("should check the quantifier variables and remove them!\n");
+        // self.expr.has_var_references(vars)
     }
 
     pub fn has_interface_references(&self) -> bool {
@@ -883,6 +896,10 @@ impl VelosiAstIdentLiteralExpr {
         self.path().starts_with("state")
     }
 
+    pub fn has_var_references(&self, vars: &HashSet<&str>) -> bool {
+        vars.contains(self.path().as_str())
+    }
+
     pub fn has_interface_references(&self) -> bool {
         self.path().starts_with("interface")
     }
@@ -929,6 +946,10 @@ impl VelosiAstNumLiteralExpr {
     }
 
     pub fn has_interface_references(&self) -> bool {
+        false
+    }
+
+    pub fn has_var_references(&self, _vars: &HashSet<&str>) -> bool {
         false
     }
 }
@@ -980,6 +1001,10 @@ impl VelosiAstBoolLiteralExpr {
     }
 
     pub fn has_interface_references(&self) -> bool {
+        false
+    }
+
+    pub fn has_var_references(&self, _vars: &HashSet<&str>) -> bool {
         false
     }
 }
@@ -1162,6 +1187,10 @@ impl VelosiAstFnCallExpr {
         self.args.iter().any(|a| a.has_interface_references())
     }
 
+    pub fn has_var_references(&self, vars: &HashSet<&str>) -> bool {
+        self.args.iter().any(|a| a.has_var_references(vars))
+    }
+
     pub fn result_type(&self) -> &VelosiAstTypeInfo {
         &self.etype
     }
@@ -1296,6 +1325,12 @@ impl VelosiAstIfElseExpr {
             || self.cond.has_interface_references()
     }
 
+    pub fn has_var_references(&self, vars: &HashSet<&str>) -> bool {
+        self.then.has_var_references(vars)
+            || self.other.has_var_references(vars)
+            || self.cond.has_var_references(vars)
+    }
+
     pub fn result_type(&self) -> &VelosiAstTypeInfo {
         &self.etype
     }
@@ -1396,6 +1431,10 @@ impl VelosiAstRangeExpr {
     }
 
     pub fn has_state_references(&self) -> bool {
+        false
+    }
+
+    pub fn has_var_references(&self, _vars: &HashSet<&str>) -> bool {
         false
     }
 
@@ -1500,6 +1539,10 @@ impl VelosiAstSliceExpr {
 
     pub fn has_state_references(&self) -> bool {
         self.ident.has_state_references() || self.range.has_state_references()
+    }
+
+    pub fn has_var_references(&self, vars: &HashSet<&str>) -> bool {
+        self.ident.has_var_references(vars) || self.range.has_var_references(vars)
     }
 
     pub fn has_interface_references(&self) -> bool {
@@ -1651,6 +1694,22 @@ impl VelosiAstExpr {
             IfElse(i) => i.has_state_references(),
             Slice(i) => i.has_state_references(),
             Range(i) => i.has_state_references(),
+        }
+    }
+
+    pub fn has_var_references(&self, vars: &HashSet<&str>) -> bool {
+        use VelosiAstExpr::*;
+        match self {
+            IdentLiteral(i) => i.has_var_references(vars),
+            NumLiteral(i) => i.has_var_references(vars),
+            BoolLiteral(i) => i.has_var_references(vars),
+            BinOp(i) => i.has_var_references(vars),
+            UnOp(i) => i.has_var_references(vars),
+            Quantifier(i) => i.has_var_references(vars),
+            FnCall(i) => i.has_var_references(vars),
+            IfElse(i) => i.has_var_references(vars),
+            Slice(i) => i.has_var_references(vars),
+            Range(i) => i.has_var_references(vars),
         }
     }
 
