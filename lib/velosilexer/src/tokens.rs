@@ -94,9 +94,9 @@ pub enum VelosiKeyword {
     // Interface descriptions
     //
     /// A read action from the interface on the state
-    ReadAction,
+    ReadActions,
     /// A write action from the interface on the state
-    WriteAction,
+    WriteActions,
     /// Used in identifying the Bitslice layout of an Interface field
     Layout,
 
@@ -189,8 +189,8 @@ impl VelosiKeyword {
             VelosiKeyword::Mmio => "mmio",
 
             //
-            VelosiKeyword::ReadAction => "ReadAction",
-            VelosiKeyword::WriteAction => "WriteAction",
+            VelosiKeyword::ReadActions => "ReadActions",
+            VelosiKeyword::WriteActions => "WriteActions",
             VelosiKeyword::Layout => "Layout",
 
             VelosiKeyword::If => "if",
@@ -250,8 +250,8 @@ impl<'a> TryFrom<&'a str> for VelosiKeyword {
             "mem" => Ok(VelosiKeyword::Mem),
             "mmio" => Ok(VelosiKeyword::Mmio),
             //
-            "ReadAction" => Ok(VelosiKeyword::ReadAction),
-            "WriteAction" => Ok(VelosiKeyword::WriteAction),
+            "ReadActions" => Ok(VelosiKeyword::ReadActions),
+            "WriteActions" => Ok(VelosiKeyword::WriteActions),
             "Layout" => Ok(VelosiKeyword::Layout),
             //
             "if" => Ok(VelosiKeyword::If),
@@ -667,10 +667,10 @@ fn test_enum_str() {
     assert_eq!("mmio".try_into(), Ok(VelosiKeyword::Mmio));
     assert_eq!(VelosiKeyword::Mmio.as_str(), "mmio");
 
-    assert_eq!("ReadAction".try_into(), Ok(VelosiKeyword::ReadAction));
-    assert_eq!(VelosiKeyword::ReadAction.as_str(), "ReadAction");
-    assert_eq!("WriteAction".try_into(), Ok(VelosiKeyword::WriteAction));
-    assert_eq!(VelosiKeyword::WriteAction.as_str(), "WriteAction");
+    assert_eq!("ReadActions".try_into(), Ok(VelosiKeyword::ReadActions));
+    assert_eq!(VelosiKeyword::ReadActions.as_str(), "ReadActions");
+    assert_eq!("WriteActions".try_into(), Ok(VelosiKeyword::WriteActions));
+    assert_eq!(VelosiKeyword::WriteActions.as_str(), "WriteActions");
     assert_eq!("Layout".try_into(), Ok(VelosiKeyword::Layout));
     assert_eq!(VelosiKeyword::Layout.as_str(), "Layout");
 
