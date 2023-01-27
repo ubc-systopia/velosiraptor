@@ -51,10 +51,10 @@ unit Simple(base : addr) : Segment {
             Layout {
                 0  63 base
             };
-            ReadAction {
+            ReadActions {
                 interface.address <- state.address;
             };
-            WriteAction {
+            WriteActions {
                 interface.address -> state.address;
             };
         };
@@ -62,10 +62,10 @@ unit Simple(base : addr) : Segment {
             Layout {
                 0  63 bytes
             };
-            ReadAction {
+            ReadActions {
                 interface.sz <- state.sz;
             };
-            WriteAction {
+            WriteActions {
                 interface.sz -> state.sz;
             };
         };
@@ -73,10 +73,10 @@ unit Simple(base : addr) : Segment {
             Layout {
                 0 0 present
             };
-            ReadAction {
+            ReadActions {
                 interface.flags <- state.flags;
             };
-            WriteAction {
+            WriteActions {
                 interface.flags -> state.flags;
             };
         };

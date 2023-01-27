@@ -14,134 +14,59 @@
  */
 
 // This defines an SMPT Entry
-segment DirectSegment(base : addr) : Segment {
+segment DirectSegment(base : addr) {
 
     // let's assume the maximum size of the segment is 40 bits.
-    inbitwidth= 40;
+    inbitwidth= 48;
 
     // let's assume the maximum output bit size is 64 bits
-    outbitwidth = 64;
+    outbitwidth = 48;
+
+    flags = {
+        writable,
+        readable,
+        executable,
+    };
 
     // the state will be two registers:
-    state = Register {
-
-        address [8] {
-             0 63  address;
-        };
-
-        length [8] {
-            0 39 bytes;
-        };
-
-        perms [1] {
-            0 0 enabled;
-            1 1 read;
-            2 2 write;
-            3 3 execute;
-        };
+    state = StateDef(base: addr) {
+        reg address [ 8 ] {
+            0 .. 48 val,
+        },
+        reg length [ 8 ] {
+            0 ..  1 present,
+            1 ..  2 rw,
+            2 ..  3 exec,
+            4 .. 48 bytes,
+        }
     };
 
-    // the interface is a register interface, assume there are two registers
-    // called `base` and `size`. They can be updated using load/store instructions
-    interface = MMIO(base : addr) {
-
-        address [base, 0, 8] {
-            Layout {
-               0 63  address;
-            };
-            ReadAction {
-                interface.address <- state.address;
-            };
-            WriteAction {
-                interface.address -> state.address;
-            };
-        };
-
-        length [base, 8, 8] {
-            Layout {
-                0 39 bytes;
-            };
-            ReadAction {
-                interface.length <- state.length;
-            };
-            WriteAction {
-                interface.length -> state.length;
-            };
-        };
-
-        perms [base, 16, 1] {
-            Layout {
-                0 0 enabled;
-                1 1 read;
-                2 2 write;
-                3 3 execute;
-            };
-            ReadAction {
-                interface.perms <- state.perms;
-            };
-            WriteAction {
-                interface.perms -> state.perms;
-            };
-        };
+    // the state will be two registers:
+    interface = InterfaceDef(base: addr) {
+        mmio address [ base, 0, 8 ],
+        mmio length [ base, 8, 8 ],
     };
 
-    // unmapping an entry
-    fn unmap(va: addr, sz: size) -> bool
-        // need a way to express:
-        // forall a | va <= a < va + sz :: fail(translate(a, ANY))
-        ensures translate(va, 0) == 0;
-    ;
-
-    // mapping an entry
-    fn map(va: addr, sz: size, flgs: flags, pa : addr) -> bool
-        //requires (addr %  4096) == 0;
-        // need a way to express types:
-        // type(addr) == Memory || type(addr) == DevMemory;
-        // type(addr) == DevMemory ==> flags & CACHE_DISABLED
-        //
-        // the va should be 0 here
-        requires va == 0;
-
-        requires 1 <= sz;
-        requires sz < 0xff_ffff_ffff;
-
-        requires 0 <= pa;
-        requires pa & 0xfff == 0;
-        requires (pa >> 12) << 12 == pa;
-        requires pa <= 0xff_ffff_ffff;
-
-        ensures forall i : addr :: 0 <= i && i < sz && remap(va + i, flgs) == pa + i;
-        ensures remap(va, flgs) == pa;
-    ;
-
-
-    // protecting the entry, i.e., change its permission
-    fn protect(flgs: flags) -> bool
+    fn matchflags(flgs : flags) -> bool
+        requires state.length.present == 1;
     {
-        // update the entry
-        // ensures match_flags(flags) ==> translate(a) == translate(a)
-        return true;
+        flgs.writable == state.length.rw && flgs.executable == state.length.exec
     }
 
-
-    // to be defined
-    fn matchflags(flgs: flags) -> bool {
-        return state.perms.enabled == 1;
-    }
-
-    // the translation semantics, adding an option type?
-    fn translate(va: addr) -> addr
-        requires va < state.length.bytes;
+    fn translate(va: vaddr) -> paddr
+        requires state.length.present == 1;
+        requires va < (state.length.bytes << 4);
     {
-        return va + state.address.address;
+        va + state.address.val
     }
 
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+        requires sz < (1 << 48)
+        requires sz >= (1 << 4)
+        requires va == 0
+        requires (pa & 0xf == 0)
 
-    // implicit
-    fn remap(va: addr, flgs: flags) -> addr
-        requires matchflags(flgs);
-    {
-        return translate(va);
-    }
+    synth fn protect(va: vaddr, sz: size, flgs: flags);
 
+    synth fn unmap(va: vaddr, sz: size);
  }

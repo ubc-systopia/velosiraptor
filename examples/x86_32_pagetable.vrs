@@ -105,10 +105,10 @@ segment X86_32_PageTableEntry(base : addr) {
                     9 .. 12 ignored,
                 12 .. 32 base,
             },
-            ReadAction {
+            ReadActions {
                 interface.pte <- state.pte;
             },
-            WriteAction {
+            WriteActions {
                 interface.pte -> state.pte;
             },
         }

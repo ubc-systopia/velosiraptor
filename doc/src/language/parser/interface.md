@@ -55,10 +55,10 @@ interface = Memory(base : addr) {
         Layout {
             0  63 base
         };
-        ReadAction {
+        ReadActions {
             interface.address <- state.address;
         };
-        WriteAction {
+        WriteActions {
             interface.address -> state.address;
         };
     };
@@ -66,10 +66,10 @@ interface = Memory(base : addr) {
         Layout {
             0  63 bytes
         };
-        ReadAction {
+        ReadActions {
             interface.sz <- state.sz;
         };
-        WriteAction {
+        WriteActions {
             interface.sz -> state.sz;
         };
     };
@@ -116,10 +116,10 @@ interface = Memory(base : addr) {
         Layout {
             0  63 base
         };
-        ReadAction {
+        ReadActions {
             interface.address <- state.address;
         };
-        WriteAction {
+        WriteActions {
             interface.address -> state.address;
         };
     };

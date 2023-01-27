@@ -34,10 +34,10 @@ unit FixedSegment(base : addr) : Segment {
             Layout {
                0 63  address;
             };
-            ReadAction {
+            ReadActions {
                 interface.base <- state.base;
             };
-            WriteAction {
+            WriteActions {
                 interface.base.address -> state.base.address;
             };
         };

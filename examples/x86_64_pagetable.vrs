@@ -210,7 +210,7 @@ segment X86_64_PDirEntryTable(base : addr) : X86_64_PTableDescriptor {
     inbitwidth = LARGE_PAGE_BITS;
 
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : X86_64_PageTable)
-        requires va == 0 && sz == LARGE_PAGE_SIZE
+        requires va >= 0 && va < LARGE_PAGE_SIZE && 0 <= sz && sz <= LARGE_PAGE_SIZE
 
     synth fn protect(va: vaddr, sz: size, flgs: flags);
 
@@ -310,7 +310,7 @@ segment X86_64_PDPTEntryTable(base : addr) : X86_64_PTableDescriptor {
     inbitwidth = HUGE_PAGE_BITS;
 
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : X86_64_PDir)
-        requires va == 0 && sz == HUGE_PAGE_SIZE
+        requires va >= 0 && va < HUGE_PAGE_SIZE && 0 <= sz && sz <= HUGE_PAGE_SIZE
 
     synth fn protect(va: vaddr, sz: size, flgs: flags);
 
@@ -407,7 +407,7 @@ segment X86_64_PML4Entry(base : addr) : X86_64_PTableDescriptor {
     inbitwidth = PML4_PAGE_BITS;
 
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : X86_64_PDPT)
-        requires va == 0 && sz == PML4_PAGE_SIZE
+        requires va >= 0 && va < PML4_PAGE_SIZE && 0 <= sz && sz <= PML4_PAGE_SIZE
 
     synth fn protect(va: vaddr, sz: size, flgs: flags);
 

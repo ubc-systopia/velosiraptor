@@ -84,10 +84,10 @@ const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
                     9 .. 12 ignored,
                 12 .. 32 base,
             },
-            ReadAction {
+            ReadActions {
                 interface.pte <- state.pte;
             },
-            WriteAction {
+            WriteActions {
                 interface.pte -> state.pte;
             },
         },
@@ -115,13 +115,13 @@ const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
     }
 
     // unmapping an entry
-    fn unmap(va: vaddr, sz: size)
+    synth fn unmap(va: vaddr, sz: size)
         requires (va == 0);
         requires sz == PAGE_SIZE;
     {}
 
     // mapping an entry
-    fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
         requires va == 0;
         requires sz == PAGE_SIZE;
         requires (pa & 0xfff) == 0;
@@ -134,7 +134,7 @@ const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
 
 
     // protecting the entry, i.e., change its permission
-    fn protect(va: vaddr, sz: size, flgs: flags)
+    synth fn protect(va: vaddr, sz: size, flgs: flags)
     {}
 
 
@@ -142,6 +142,9 @@ const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
         requires (va < 0) && (va > 0);
         requires (va < 0) && ((va > 0) || (va == 0));
         requires !(va == 1 || va ==2)
+    {
+        true
+    }
 }
 
 

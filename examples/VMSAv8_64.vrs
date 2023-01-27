@@ -328,10 +328,10 @@ const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
                     9 .. 12 ignored,
                 12 .. 32 base,
             },
-            ReadAction {
+            ReadActions {
                 interface.pte <- state.pte;
             },
-            WriteAction {
+            WriteActions {
                 interface.pte -> state.pte;
             },
         },

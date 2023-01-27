@@ -36,12 +36,12 @@ export default function(hljs) {
     "map",
     "Memory",
     "MMIO",
-    "ReadAction",
+    "ReadActions",
     "Register",
     "requires",
     "return",
     "unit",
-    "WriteAction",
+    "WriteActions",
   ];
   const LITERALS = [
     "true",
