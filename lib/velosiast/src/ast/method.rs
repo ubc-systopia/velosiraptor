@@ -566,6 +566,18 @@ impl VelosiAstMethod {
         }
     }
 
+    fn check_not_synth(&self, issues: &mut VelosiAstIssues) {
+        if self.is_synth {
+            let msg = "this special method should not be synth";
+            let hint = "remove the `synth`";
+            let err = VelosiAstErrBuilder::err(msg.to_string())
+                .add_hint(hint.to_string())
+                .add_location(self.loc.from_self_with_subrange(0..1))
+                .build();
+            issues.push(err);
+        }
+    }
+
     fn check_special_methods(&self, issues: &mut VelosiAstIssues) {
         match self.ident().as_str() {
             "translate" => {
@@ -575,6 +587,7 @@ impl VelosiAstMethod {
                     FN_SIG_TRANSLATE,
                     &[("va", VelosiAstTypeInfo::VirtAddr)],
                 );
+                self.check_not_synth(issues);
             }
             "matchflags" => {
                 // fn matchflags(flgs: flags) -> bool
@@ -584,6 +597,7 @@ impl VelosiAstMethod {
                     FN_SIG_MATCHFLAGS,
                     &[("flgs", VelosiAstTypeInfo::Flags)],
                 );
+                self.check_not_synth(issues);
             }
             "map" => {
                 // fn map(va: vaddr, sz: size, flgs: flags, pa: paddr)

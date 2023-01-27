@@ -545,7 +545,7 @@ impl Display for VelosiAstIssues {
         if self.num_errors > 0 {
             writeln!(
                 f,
-                "{}{} could not compile due to {} previous errors; {} warnigns emitted",
+                "{}{} could not compile due to {} previous errors; {} warnings emitted",
                 red("error"),
                 ":".bold(),
                 self.num_errors,
