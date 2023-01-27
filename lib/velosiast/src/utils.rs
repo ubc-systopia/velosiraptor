@@ -287,7 +287,13 @@ pub fn check_fn_call_args(
                 nargs - nparam,
                 if nargs - nparam == 1 { "" } else { "s" }
             );
-            let mut loc = args[nargs - nparam].loc().clone();
+
+            let mut loc = if nparam == 0 {
+                callsite.clone()
+            } else {
+                args[nparam].loc().clone()
+            };
+
             loc.expand_until_end(args[nargs - 1].loc());
             (hint, loc)
         } else {
