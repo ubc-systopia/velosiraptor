@@ -229,7 +229,7 @@ fn main() {
                     "error".bold().red(),
                     "compilation failed due to errors (Werror)".bold()
                 );
-                println!("{}", err);
+                println!("{err}");
                 exit(-1);
             }
         }
@@ -239,7 +239,7 @@ fn main() {
                 "error".bold().red(),
                 infile.bold()
             );
-            println!("{}", err);
+            println!("{err}");
             exit(-1);
         }
     };
