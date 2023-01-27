@@ -41,7 +41,7 @@ use crate::{
     utils, AstResult,
 };
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, Eq, Clone)]
 pub struct VelosiAstFlags {
     /// vector of defined flags
     pub flags: Vec<Rc<VelosiAstIdentifier>>,
@@ -49,13 +49,23 @@ pub struct VelosiAstFlags {
     pub loc: VelosiTokenStream,
 }
 
+impl PartialEq for VelosiAstFlags {
+    fn eq(&self, other: &Self) -> bool {
+        self.flags == other.flags
+    }
+}
+
 impl VelosiAstFlags {
     pub fn new(flags: Vec<Rc<VelosiAstIdentifier>>, loc: VelosiTokenStream) -> VelosiAstFlags {
         VelosiAstFlags { flags, loc }
     }
 
-    pub fn derive_from(&mut self, _other: &Self) {
-        unimplemented!("FLAGS DERIVATION NOT DONE YET!");
+    pub fn derive_from(&mut self, other: &Self) {
+        for flag in &other.flags {
+            if !self.flags.contains(flag) {
+                self.flags.push(flag.clone());
+            }
+        }
     }
 
     pub fn from_parse_tree(pt: VelosiParseTreeFlags) -> AstResult<Self, VelosiAstIssues> {
