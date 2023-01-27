@@ -478,7 +478,6 @@ impl VelosiAstMethod {
         ast_result_return!(res, issues)
     }
 
-
     /// obtains the parameter with the given name
     pub fn get_param(&self, name: &str) -> Option<&Rc<VelosiAstParam>> {
         self.params_map.get(name)

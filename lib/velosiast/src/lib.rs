@@ -170,8 +170,6 @@ impl VelosiAst {
     pub fn unit_map(&self) -> HashMap<Rc<String>, VelosiAstUnit> {
         self.root.unit_map()
     }
-
-
 }
 
 /// Implementation of [Display] for [VelosiAst]
