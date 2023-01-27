@@ -184,20 +184,14 @@ impl VelosiAstUnitSegment {
             derived_outbitwidth = Some(unit.output_bitwidth());
             outbitwidth = Some((unit.output_bitwidth(), unit.loc().clone()));
 
-            derived_flags = unit.flags();
-            flags = unit.flags();
-
-            // TODO: add to the symbol table!
-
             derived_interface = unit.interface();
             interface = unit.interface();
-
-            // TODO: add to the symbol table!
 
             derived_state = unit.state();
             state = unit.state();
 
-            println!("DERIVATION OF Flags\n");
+            derived_flags = unit.flags();
+            flags = unit.flags()
         }
 
         // add the elements to the symbol table
