@@ -138,10 +138,10 @@ fn op_to_rust_expr(op: &Operation) -> String {
         Operation::Extract { field, slice: None } => {
             format!("v_{}.get_val();", field)
         }
-        Operation::WriteAction { field } => {
+        Operation::WriteActions { field } => {
             format!("self.interface.write_{}(v_{});", field, field)
         }
-        Operation::ReadAction { field } => {
+        Operation::ReadActions { field } => {
             format!("self.interface.read_{}();", field)
         }
         Operation::Return => String::new(),
