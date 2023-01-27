@@ -187,23 +187,21 @@ pub fn get_program_iter(unit: &VelosiAstUnitSegment, batch_size: usize) -> Prote
     // Translate: Add a query for each of the pre-conditions of the function
     // ---------------------------------------------------------------------------------------------
 
-    let map_queries = vec![
-        // PartQueries::Precond(precond::precond_query(
-        //     unit,
-        //     m_fn.clone(),
-        //     t_fn.clone(),
-        //     false,
-        // )),
-        // PartQueries::Precond(precond::precond_query(
-        //     unit,
-        //     m_fn.clone(),
-        //     f_fn.clone(),
-        //     false,
-        // )),
-        semantics::semantic_query(unit, m_fn.clone(), t_fn.clone(), true, batch_size),
-        semantics::semantic_query(unit, m_fn.clone(), f_fn.clone(), false, batch_size),
-    ];
-    let programs = MultiDimProgramQueries::new(map_queries);
+    let mut protec_queries = Vec::with_capacity(2);
+
+    if let Some(p) =
+        semantics::semantic_query(unit, m_fn.clone(), t_fn.clone(), &f_fn, true, batch_size).take()
+    {
+        protec_queries.push(p);
+    }
+
+    if let Some(p) =
+        semantics::semantic_query(unit, m_fn.clone(), f_fn.clone(), &f_fn, false, batch_size).take()
+    {
+        protec_queries.push(p);
+    }
+
+    let programs = MultiDimProgramQueries::new(protec_queries);
 
     ProtectPrograms::new(programs, m_fn.clone(), t_fn.clone(), f_fn.clone())
 }

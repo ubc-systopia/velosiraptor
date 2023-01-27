@@ -25,6 +25,7 @@
 
 //! Synthesis of Virtual Memory Operations: Map
 
+use std::collections::HashSet;
 use std::rc::Rc;
 
 use smt2::{Smt2Context, SortedVar, Term};
@@ -112,22 +113,41 @@ pub fn precond_query(
     m_goal: Rc<VelosiAstMethod>,
     negate: bool,
     batch_size: usize,
-) -> PrecondQueries {
+) -> Option<PrecondQueries> {
+    let mut params = HashSet::new();
+    for p in m_goal.params.iter() {
+        params.insert(p.ident().as_str());
+    }
+
     let mut program_queries = Vec::with_capacity(m_goal.requires.len());
     for (i, pre) in m_goal.requires.iter().enumerate() {
+        // if there are no state references, then this is an assumption and we can skip it
         if !pre.has_state_references() {
             continue;
         }
+
+        // if there were variable refernces, we can skip the query as this is handled elsewhere
+        if pre.has_var_references(&params) {
+            continue;
+        }
+
         let programs = utils::make_program_builder(unit, m_op.as_ref(), pre).into_iter();
+        if !programs.has_programs() {
+            continue;
+        }
         let b = PrecondQueryBuilder::new(programs, m_op.clone(), m_goal.clone(), Some(i), negate);
         let q = ProgramQueries::with_batchsize(b, batch_size);
         program_queries.push(q);
     }
 
-    let programs = MultiDimProgramQueries::new(program_queries);
+    if program_queries.is_empty() {
+        None
+    } else {
+        let programs = MultiDimProgramQueries::new(program_queries);
 
-    let b = PrecondQueryBuilder::new(programs, m_op, m_goal, None, negate);
-    ProgramQueries::new(b)
+        let b = PrecondQueryBuilder::new(programs, m_op, m_goal, None, negate);
+        Some(ProgramQueries::new(b))
+    }
 }
 
 fn program_to_query(

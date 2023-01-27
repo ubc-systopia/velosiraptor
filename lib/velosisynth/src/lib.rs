@@ -107,7 +107,7 @@ impl<'a> Z3Synth<'a> {
     pub(crate) fn new(z3: Z3WorkerPool, unit: &'a mut VelosiAstUnitSegment) -> Self {
         let batch_size = std::cmp::max(5, z3.num_workers() / 2);
 
-        // create the queries
+        // XXX: move this to the the syntheisze() step.
         let map_queries = vmops::map::get_program_iter(unit, batch_size);
         let unmap_queries = vmops::unmap::get_program_iter(unit, batch_size);
         let protect_queries = vmops::protect::get_program_iter(unit, batch_size);

@@ -40,6 +40,10 @@ impl ProgramsIter {
     pub fn next_program(&mut self) -> Option<Program> {
         self.programs.pop()
     }
+
+    pub fn has_programs(&self) -> bool {
+        !self.programs.is_empty()
+    }
 }
 
 pub struct ProgramsBuilder {
@@ -60,6 +64,11 @@ impl ProgramsBuilder {
         }
     }
 
+    // whether there are any programs
+    pub fn has_programs(&self) -> bool {
+        !self.fields.is_empty()
+    }
+
     /// adds a field slice to the builder
     pub fn add_field_slice(&mut self, field: &str, slice: &str, bits: usize) -> &mut Self {
         self.fields
@@ -70,9 +79,9 @@ impl ProgramsBuilder {
     }
 
     /// adds a full field to the builder
-    pub fn add_field(&mut self, field: String, slices: Vec<(String, usize)>) -> &mut Self {
-        let slices = slices.into_iter().map(|(s, b)| (Arc::new(s), b)).collect();
-        self.fields.insert(Arc::new(field), slices);
+    pub fn add_field(&mut self, field: String) -> &mut Self {
+        //let slices = slices.into_iter().map(|(s, b)| (Arc::new(s), b)).collect();
+        self.fields.insert(Arc::new(field), Vec::new());
         self
     }
 

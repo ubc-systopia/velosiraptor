@@ -168,7 +168,7 @@ impl ProgramBuilder for UnmapPrograms {
 pub fn get_program_iter(unit: &VelosiAstUnitSegment, batch_size: usize) -> UnmapPrograms {
     log::info!(
         target : "[synth::unmap]",
-        "starting synthesizing the map operation"
+        "starting synthesizing the unmap operation"
     );
 
     // obtain the functions for the map operation
@@ -182,10 +182,19 @@ pub fn get_program_iter(unit: &VelosiAstUnitSegment, batch_size: usize) -> Unmap
 
     let _t_start = Instant::now();
 
-    let unmap_queries = vec![
-        precond::precond_query(unit, m_fn.clone(), t_fn.clone(), true, batch_size),
-        precond::precond_query(unit, m_fn.clone(), f_fn.clone(), true, batch_size),
-    ];
+    let mut unmap_queries = Vec::new();
+    if let Some(p) =
+        precond::precond_query(unit, m_fn.clone(), f_fn.clone(), true, batch_size).take()
+    {
+        unmap_queries.push(p);
+    }
+
+    if let Some(p) =
+        precond::precond_query(unit, m_fn.clone(), t_fn.clone(), true, batch_size).take()
+    {
+        unmap_queries.push(p);
+    }
+
     let programs = MultiDimProgramQueries::new(unmap_queries);
     UnmapPrograms::new(programs, m_fn.clone(), t_fn.clone(), f_fn.clone())
 }

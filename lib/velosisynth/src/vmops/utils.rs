@@ -86,8 +86,7 @@ pub fn make_program_builder(
             let slice = field.slice(slicename).expect("didn't find the slice");
             builder.add_field_slice(fieldname, slicename, slice.nbits() as usize);
         } else {
-            unimplemented!("not yet implementation");
-            //builder.add_field(field);
+            builder.add_field(fieldname.to_string());
         }
     }
 
