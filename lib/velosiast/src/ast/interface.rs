@@ -261,9 +261,9 @@ struct FieldNodes {
 }
 
 impl FieldNodes {
-    pub fn is_empty(&self) -> bool {
-        self.layout.is_empty() && self.readactions.is_empty() && self.writeactions.is_empty()
-    }
+    // pub fn is_empty(&self) -> bool {
+    //     self.layout.is_empty() && self.readactions.is_empty() && self.writeactions.is_empty()
+    // }
 }
 
 fn handle_nodes(
