@@ -34,8 +34,8 @@ use std::rc::Rc;
 use velosiparser::{VelosiParseTreeMethod, VelosiTokenStream};
 
 use crate::ast::{
-    VelosiAstExpr, VelosiAstIdentLiteralExpr, VelosiAstIdentifier, VelosiAstNode, VelosiAstParam,
-    VelosiAstType, VelosiAstTypeInfo, VelosiOperation,
+    VelosiAstBinOp, VelosiAstExpr, VelosiAstIdentLiteralExpr, VelosiAstIdentifier, VelosiAstNode,
+    VelosiAstParam, VelosiAstType, VelosiAstTypeInfo, VelosiOperation,
 };
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
@@ -580,6 +580,55 @@ impl VelosiAstMethod {
         }
     }
 
+    fn check_translate_preconds(&self, issues: &mut VelosiAstIssues) {
+        let mut params = HashSet::new();
+        for p in self.params.iter() {
+            params.insert(p.ident().as_str());
+        }
+
+        for pre in self.requires.iter() {
+            if !pre.has_state_references() {
+                continue;
+            }
+
+            if !pre.has_var_references(&params) {
+                continue;
+            }
+
+            let mut format_mismatch = true;
+            if let VelosiAstExpr::BinOp(pre) = pre {
+                let mut found = false;
+                if let VelosiAstExpr::IdentLiteral(i) = pre.lhs.as_ref() {
+                    found |= params.contains(i.ident().as_str());
+                }
+
+                if let VelosiAstExpr::IdentLiteral(i) = pre.rhs.as_ref() {
+                    found |= params.contains(i.ident().as_str());
+                }
+
+                format_mismatch = !(found
+                    & matches!(
+                        pre.op,
+                        // VelosiAstBinOp::Eq
+                        //     | VelosiAstBinOp::Ne
+                        |VelosiAstBinOp::Lt| VelosiAstBinOp::Gt
+                            | VelosiAstBinOp::Le
+                            | VelosiAstBinOp::Ge
+                    ));
+            }
+
+            if format_mismatch {
+                let msg = "unsupported mixed pre-condition form detected.";
+                let hint = "remove this precondition or convert it to ident [<,>, <=, >=] expr";
+                let err = VelosiAstErrBuilder::err(msg.to_string())
+                    .add_hint(hint.to_string())
+                    .add_location(pre.loc().clone())
+                    .build();
+                issues.push(err);
+            }
+        }
+    }
+
     fn check_special_methods(&self, issues: &mut VelosiAstIssues) {
         match self.ident().as_str() {
             "translate" => {
@@ -590,6 +639,7 @@ impl VelosiAstMethod {
                     &[("va", VelosiAstTypeInfo::VirtAddr)],
                 );
                 self.check_not_synth(issues);
+                self.check_translate_preconds(issues);
             }
             "matchflags" => {
                 // fn matchflags(flgs: flags) -> bool
@@ -701,6 +751,14 @@ impl VelosiAstMethod {
             .filter(|p| p.ptype.is_flags())
             .map(|p| p.ident().clone())
             .collect()
+    }
+
+    pub fn get_param_names(&self) -> HashSet<&str> {
+        let mut params = HashSet::new();
+        for p in self.params.iter() {
+            params.insert(p.ident().as_str());
+        }
+        params
     }
 }
 
