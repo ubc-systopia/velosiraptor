@@ -239,9 +239,9 @@ fn program_to_query(
 
     // create and submit query
     let mut query = if no_change {
-        Z3Query::from(smtctx)
-    } else {
         Z3Query::new()
+    } else {
+        Z3Query::from(smtctx)
     };
     query.set_program(prog).set_goal(goal);
     Box::new(query)
