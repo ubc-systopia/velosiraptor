@@ -33,7 +33,7 @@ use crate::{
         call_method, call_method_assms, call_method_result_check_part, combine_method_params,
     },
     model::types,
-    z3::{Z3Query, Z3Ticket, Z3WorkerPool},
+    z3::{Z3Query, Z3TaskPriority, Z3Ticket, Z3WorkerPool},
     Program,
 };
 
@@ -86,7 +86,7 @@ where
     T: ProgramBuilder,
 {
     /// returns the next query to be submitted, or None if all have been submitted
-    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Z3Query> {
+    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Box<Z3Query>> {
         match self.programs.next(z3) {
             MaybeResult::Some(prog) => MaybeResult::Some(program_to_query(
                 &self.m_op,
@@ -110,7 +110,7 @@ pub enum SemanticQueries {
 }
 
 impl QueryBuilder for SemanticQueries {
-    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Z3Query> {
+    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Box<Z3Query>> {
         match self {
             Self::SingleQuery(q) => q.next(z3),
             Self::MultiQuery(q) => q.next(z3),
@@ -142,7 +142,7 @@ pub fn semantic_query(
                     Some(idx),
                     no_change,
                 );
-                let q = ProgramQueries::with_batchsize(b, batch_size);
+                let q = ProgramQueries::with_batchsize(b, batch_size, Z3TaskPriority::Low);
 
                 program_queries.push(q);
             }
@@ -153,18 +153,35 @@ pub fn semantic_query(
                 let programs = MultiDimProgramQueries::new(program_queries);
 
                 let b = SemanticQueryBuilder::new(programs, m_op, m_goal.clone(), None, no_change);
-                Some(ProgramQueries::new(SemanticQueries::MultiQuery(b)))
+                Some(ProgramQueries::new(
+                    SemanticQueries::MultiQuery(b),
+                    Z3TaskPriority::Medium,
+                ))
             }
         } else {
             // case 1: we just have a single body element, so no need to split up.
 
-            // here we have the the case where we need to synthesize for the result of
-            let programs = if no_change {
+            // here we have the the case where we need to synthesize for the result of translate
+
+            let mut builder = if no_change {
                 let body = m_cond.body.as_ref().unwrap();
-                utils::make_program_builder(unit, m_op.as_ref(), body).into_iter()
+
+                // utils::make_program_builder_no_params(unit, body)
+                utils::make_program_builder(unit, m_op.as_ref(), body)
             } else {
-                utils::make_program_builder(unit, m_op.as_ref(), body).into_iter()
+                utils::make_program_builder_no_params(unit, body)
+                // utils::make_program_builder(unit, m_op.as_ref(), body).into_iter()
             };
+
+            if m_op.get_param("va").is_some() {
+                builder.add_var(String::from("va"));
+            }
+
+            if m_op.get_param("pa").is_some() {
+                builder.add_var(String::from("pa"));
+            }
+
+            let programs = builder.into_iter();
 
             // XXX: this produces programs where it shouldn't...
             if !programs.has_programs() {
@@ -175,6 +192,7 @@ pub fn semantic_query(
                 Some(ProgramQueries::with_batchsize(
                     SemanticQueries::SingleQuery(b),
                     batch_size,
+                    Z3TaskPriority::Low,
                 ))
             }
         }
@@ -189,7 +207,7 @@ fn program_to_query(
     idx: Option<usize>,
     prog: Program,
     no_change: bool,
-) -> Z3Query {
+) -> Box<Z3Query> {
     // convert the program to a smt2 term
     let (mut smt, symvars) = prog.to_smt2_term(m_op.ident(), m_op.params.as_slice());
 
@@ -239,7 +257,7 @@ fn program_to_query(
     // create and submit query
     let mut query = Z3Query::from(smtctx);
     query.set_program(prog).set_goal(goal);
-    query
+    Box::new(query)
 }
 
 pub fn submit_program_query(
@@ -251,5 +269,6 @@ pub fn submit_program_query(
     no_change: bool,
 ) -> Z3Ticket {
     let query = program_to_query(m_op, m_goal, idx, prog, no_change);
-    z3.submit_query(query).expect("failed to submit query")
+    z3.submit_query(query, Z3TaskPriority::High)
+        .expect("failed to submit query")
 }

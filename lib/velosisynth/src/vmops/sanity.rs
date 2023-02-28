@@ -29,7 +29,7 @@ use velosiast::ast::{VelosiAstExpr, VelosiAstMethod, VelosiAstUnitSegment};
 
 use crate::error::{VelosiSynthErrorBuilder, VelosiSynthErrorUnsatDef, VelosiSynthIssues};
 use crate::model::{expr, types};
-use crate::z3::{Z3Query, Z3Ticket, Z3WorkerPool};
+use crate::z3::{Z3Query, Z3TaskPriority, Z3Ticket, Z3WorkerPool};
 
 fn check_precondition_pair(
     z3: &mut Z3WorkerPool,
@@ -86,8 +86,9 @@ fn check_precondition_pair(
     let mut smtctx = Smt2Context::new();
     smtctx.level(smt);
 
-    let q = Z3Query::from(smtctx);
-    z3.submit_query(q).expect("failed to submit query")
+    let q = Box::new(Z3Query::from(smtctx));
+    z3.submit_query(q, Z3TaskPriority::Medium)
+        .expect("failed to submit query")
 }
 
 fn check_satisfy_fn_pair(

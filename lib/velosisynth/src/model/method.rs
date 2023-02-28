@@ -33,11 +33,19 @@ use smt2::{Function, Smt2Context, SortedVar, Term};
 
 // crate imports
 use super::{expr, types};
-use velosiast::ast::{VelosiAstMethod, VelosiAstParam};
+use velosiast::ast::{VelosiAstBinOp, VelosiAstExpr, VelosiAstMethod, VelosiAstParam};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Function Names
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn translate_range_name(idx: Option<usize>) -> String {
+    if let Some(i) = idx {
+        format!("translate.range.{i}")
+    } else {
+        "translate.range".to_string()
+    }
+}
 
 pub fn translate_map_result_name(idx: Option<usize>) -> String {
     if let Some(i) = idx {
@@ -301,7 +309,175 @@ pub fn add_methods(
 
 // the range checks are only for the translate function, it checks whether the
 // given virtual address would translate
-pub fn add_translate_range_checks(_smt: &mut Smt2Context, _method: &VelosiAstMethod) {}
+pub fn add_translate_range_checks(smt: &mut Smt2Context, method: &VelosiAstMethod) {
+    // basically: forall i : vaddr_t ::
+    //  &&  i < va ==> !does_translate(st, i)
+    //  &&  va <= i < va + size ==> translate_result(st, va)
+    //  &&  i >= va + size ==> !does_translate(st, i)
+
+    let mut vars = HashSet::new();
+    vars.insert("va");
+
+    let mut conds = Vec::new();
+
+    for (i, pre) in method.requires.iter().enumerate() {
+        if !pre.has_state_references() || !pre.has_var_references(&vars) {
+            continue;
+        }
+
+        // we do have a mixed pre-condition here, get the binop out
+
+        let binop = if let VelosiAstExpr::BinOp(pre) = pre {
+            pre
+        } else {
+            panic!("expected a binary operation");
+        };
+
+        // figure out whether we have a upper bound or a lower bound
+        let (var, stref, lower_bound) = if binop.lhs.has_var_references(&method.get_param_names()) {
+            // lhs is the var, so if we have a > or >= then this is the lower bound
+            (
+                &binop.lhs,
+                &binop.rhs,
+                matches!(binop.op, VelosiAstBinOp::Gt | VelosiAstBinOp::Ge),
+            )
+        } else {
+            // rhs is the var, so if we have a < or <= then this is the lower bound
+            (
+                &binop.rhs,
+                &binop.lhs,
+                matches!(binop.op, VelosiAstBinOp::Lt | VelosiAstBinOp::Le),
+            )
+        };
+
+        // the var string for the forall variable, we use va here otherwise we need to rewrite the
+        // precondition expression
+        let varstr = "va".to_string();
+
+        let (expr, comment) = if lower_bound {
+            // we have something of the for `expr < var` or `expr <= var`
+            // forall i. (i < va <==> !pre) && (va <= i <==> pri)
+
+            // forall i. pri == (va <= i)
+
+            (
+                Term::bvge(Term::ident(varstr.clone()), Term::ident("va!".to_string()))
+                    .eq(expr::expr_to_smt2(pre, "st!0")),
+                "forall i. pri == (va <= i)",
+            )
+        } else {
+            // we have something of the for `expr > var` or `expr >= var`
+            // forall i. (i < va + sz ==> pre) && (i >= va + sz ==> !pre)
+            // forall i. pre == i < va + sz
+            (
+                Term::bvlt(
+                    Term::ident(varstr.clone()),
+                    Term::bvadd(
+                        Term::ident("va!".to_string()),
+                        Term::ident("sz".to_string()),
+                    ),
+                )
+                .eq(expr::expr_to_smt2(pre, "st!0")),
+                "forall i. pri == (i < va + size)",
+            )
+        };
+
+        let mut f = Function::new(translate_range_name(Some(i)), types::boolean());
+        f.add_comment("Checking the translate range".to_string());
+        f.add_comment(comment.to_string());
+
+        f.add_arg(String::from("st!0"), types::model());
+        f.add_arg(String::from("va"), types::vaddr());
+        f.add_arg(String::from("va!"), types::vaddr());
+        f.add_arg(String::from("sz"), types::size());
+        f.add_arg(String::from("flgs"), types::flags());
+        f.add_arg(String::from("pa!"), types::paddr());
+
+        // let forallvars = vec![SortedVar::new(varstr.clone(), types::vaddr())];
+
+        // let varconstraints = Term::fn_apply(
+        //     "VAddr_t.assms".to_string(),
+        //     vec![Term::ident(varstr.clone())],
+        // );
+
+        // let body = Term::forall(forallvars, varconstraints.implies(expr));
+        // f.add_body(body);
+        f.add_body(expr);
+
+        smt.function(f);
+
+        conds.push(pre);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Adding a Combined Function Pre-Condition
+    // ---------------------------------------------------------------------------------------------
+
+    let name = translate_range_name(None);
+    let mut f = Function::new(name, types::boolean());
+    f.add_comment(format!(
+        "Function Semantic Preconditions: {}, {}",
+        method.ident(),
+        method.loc.loc()
+    ));
+
+    f.add_arg(String::from("st!0"), types::model());
+    f.add_arg(String::from("va"), types::vaddr());
+    f.add_arg(String::from("va!"), types::vaddr());
+    f.add_arg(String::from("sz"), types::size());
+    f.add_arg(String::from("flgs"), types::flags());
+    f.add_arg(String::from("pa!"), types::paddr());
+
+    let expr = Term::Binary(true);
+
+    let expr = method
+        .requires
+        .iter()
+        .filter(|p| p.has_state_references() && p.has_var_references(&vars))
+        .fold(expr, |e, p| Term::land(e, expr::expr_to_smt2(p, "st!0")));
+
+    // the var string for the forall variable, we use va here otherwise we need to rewrite the
+    // precondition expression
+    let varstr = "va".to_string();
+    let forallvars = vec![SortedVar::new(varstr.clone(), types::vaddr())];
+
+    let body = Term::land(
+        Term::land(
+            // i < va ==> !(pre)
+            Term::bvlt(Term::ident(varstr.clone()), Term::ident("va!".to_string()))
+                .implies(Term::lnot(expr.clone())),
+            // i >= va + size ==> !(pre)
+            Term::bvge(
+                Term::ident(varstr.clone()),
+                Term::bvadd(
+                    Term::ident("va!".to_string()),
+                    Term::ident("sz".to_string()),
+                ),
+            )
+            .implies(Term::lnot(expr.clone())),
+        ),
+        Term::land(
+            Term::bvge(
+                Term::ident(varstr.clone()),
+                Term::bvadd(
+                    Term::ident("va!".to_string()),
+                    Term::ident("sz".to_string()),
+                ),
+            ),
+            Term::bvlt(
+                Term::ident(varstr),
+                Term::bvadd(
+                    Term::ident("va!".to_string()),
+                    Term::ident("sz".to_string()),
+                ),
+            ),
+        )
+        .implies(expr),
+    );
+
+    f.add_body(Term::forall(forallvars, body));
+    smt.function(f);
+}
 
 pub fn add_translate_result_checks(smt: &mut Smt2Context) {
     // basically: forall i : vaddr_t ::
@@ -500,6 +676,15 @@ pub fn call_method_pre(m: &VelosiAstMethod, idx: Option<usize>, args: Vec<Term>)
         method_precond_name(m.ident())
     };
     Term::fn_apply(name, check_args)
+}
+
+pub fn call_method_sempre(m: &VelosiAstMethod, idx: Option<usize>, args: Vec<Term>) -> Term {
+    let mut check_args = args;
+    for a in m.params.iter() {
+        check_args.push(Term::ident(a.ident_to_string()));
+    }
+
+    Term::fn_apply(translate_range_name(idx), check_args)
 }
 
 pub fn call_method_result_check_part(

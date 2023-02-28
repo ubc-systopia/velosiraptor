@@ -32,18 +32,21 @@ use velosiast::ast::{VelosiAstMethod, VelosiAstUnitSegment};
 
 use crate::{programs::Program, z3::Z3WorkerPool, VelosiSynthIssues};
 
-use super::{precond, semantics, utils};
+use super::{precond, semantics, semprecond, utils};
 
 use crate::vmops::precond::PrecondQueries;
 use crate::vmops::queryhelper::MultiDimProgramQueries;
 use crate::vmops::queryhelper::ProgramQueries;
 use crate::vmops::queryhelper::{MaybeResult, ProgramBuilder};
 use crate::vmops::semantics::SemanticQueries;
+use crate::vmops::semprecond::SemPrecondQueries;
 use crate::Z3Ticket;
+use crate::DEFAULT_BATCH_SIZE;
 
 pub enum PartQueries {
     Precond(PrecondQueries),
     Semantic(ProgramQueries<SemanticQueries>),
+    SemPrecond(SemPrecondQueries),
 }
 
 impl ProgramBuilder for PartQueries {
@@ -51,6 +54,7 @@ impl ProgramBuilder for PartQueries {
         match self {
             Self::Precond(q) => q.next(z3),
             Self::Semantic(q) => q.next(z3),
+            Self::SemPrecond(q) => q.next(z3),
         }
     }
 }
@@ -58,7 +62,7 @@ impl ProgramBuilder for PartQueries {
 pub struct MapPrograms {
     programs: MultiDimProgramQueries<PartQueries>,
     programs_done: bool,
-    queries: LinkedList<(Program, [Option<Z3Ticket>; 4])>,
+    queries: LinkedList<(Program, [Option<Z3Ticket>; 5])>,
     candidates: Vec<Program>,
 
     m_fn: Rc<VelosiAstMethod>,
@@ -143,13 +147,24 @@ impl ProgramBuilder for MapPrograms {
                     false,
                 );
 
+                let semprodoncs = semprecond::submit_program_query(
+                    z3,
+                    self.m_fn.as_ref(),
+                    self.t_fn.as_ref(),
+                    None,
+                    false,
+                    false,
+                    prog.clone(),
+                );
+
                 self.queries.push_back((
                     prog,
                     [
-                        Some(translate_preconds),
+                        Some(semprodoncs),
                         Some(translate_semantics),
-                        Some(matchflags_preconds),
                         Some(matchflags_semantics),
+                        Some(translate_preconds),
+                        Some(matchflags_preconds),
                     ],
                 ));
             }
@@ -227,6 +242,12 @@ pub fn get_program_iter(unit: &VelosiAstUnitSegment, batch_size: usize) -> MapPr
     }
 
     if let Some(p) =
+        semprecond::semprecond_query(unit, m_fn.clone(), t_fn.clone(), false, batch_size).take()
+    {
+        map_queries.push(PartQueries::SemPrecond(p));
+    }
+
+    if let Some(p) =
         semantics::semantic_query(unit, m_fn.clone(), t_fn.clone(), t_fn, false, batch_size).take()
     {
         map_queries.push(PartQueries::Semantic(p));
@@ -247,7 +268,7 @@ pub fn synthesize(
     z3: &mut Z3WorkerPool,
     unit: &VelosiAstUnitSegment,
 ) -> Result<Program, VelosiSynthIssues> {
-    let batch_size = std::cmp::max(5, z3.num_workers() / 2);
+    let batch_size = std::cmp::max(DEFAULT_BATCH_SIZE, z3.num_workers());
     let mut progs = get_program_iter(unit, batch_size);
     loop {
         match progs.next(z3) {

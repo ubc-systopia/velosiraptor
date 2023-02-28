@@ -38,6 +38,7 @@ use crate::vmops::precond::PrecondQueries;
 use crate::vmops::queryhelper::MultiDimProgramQueries;
 use crate::vmops::queryhelper::{MaybeResult, ProgramBuilder};
 use crate::Z3Ticket;
+use crate::DEFAULT_BATCH_SIZE;
 
 use std::time::Instant;
 
@@ -93,11 +94,7 @@ impl ProgramBuilder for UnmapPrograms {
 
         // we have at least one candidate program
         const CONFIG_MAX_QUERIES: usize = 4;
-        loop {
-            if self.queries.len() >= CONFIG_MAX_QUERIES || self.candidates.is_empty() {
-                break;
-            }
-
+        if self.queries.len() < CONFIG_MAX_QUERIES {
             if let Some(prog) = self.candidates.pop() {
                 let translate_preconds = precond::submit_program_query(
                     z3,
@@ -203,7 +200,7 @@ pub fn synthesize(
     z3: &mut Z3WorkerPool,
     unit: &VelosiAstUnitSegment,
 ) -> Result<Program, VelosiSynthIssues> {
-    let batch_size = std::cmp::max(5, z3.num_workers() / 2);
+    let batch_size = std::cmp::max(DEFAULT_BATCH_SIZE, z3.num_workers());
     let mut progs = get_program_iter(unit, batch_size);
     loop {
         match progs.next(z3) {
