@@ -26,7 +26,7 @@
 //! Z3 Worker Thread
 
 // std library imports
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::fs;
 use std::num::NonZeroUsize;
 use std::ops::Deref;
@@ -40,7 +40,7 @@ use std::thread;
 
 // own create imports
 use super::query::{Z3Query, Z3Result, Z3Ticket};
-use super::Z3Instance;
+use super::{TaskQ, Z3Instance, Z3TaskPriority};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Z3 Worker -- A thread with a Z3 Instance
@@ -58,23 +58,20 @@ pub struct Z3Worker {
     id: usize,
     /// handle to the worker thread join handle
     thread: Option<thread::JoinHandle<()>>,
-
+    /// the context of the worker
     context: Arc<Mutex<Z3Context>>,
-
     /// whether the worker is currently running
     running: Arc<AtomicBool>,
-
     /// reset
     reset: Arc<AtomicBool>,
-
-    ///
+    /// whether to restart the current atomic bool
     restart: Arc<AtomicBool>,
 }
 
 impl Z3Worker {
     pub fn new(
         id: usize,
-        tasks: Arc<Mutex<VecDeque<(Z3Ticket, Z3Query)>>>,
+        tasks: TaskQ,
         results: Sender<(Z3Ticket, Z3Result)>,
         logpath: Option<&PathBuf>,
     ) -> Self {
@@ -83,7 +80,7 @@ impl Z3Worker {
 
     pub fn with_context(
         wid: usize,
-        tasks: Arc<Mutex<VecDeque<(Z3Ticket, Z3Query)>>>,
+        tasks: TaskQ,
         results: Sender<(Z3Ticket, Z3Result)>,
         logpath: Option<&PathBuf>,
         start_context: Arc<Z3Query>,
@@ -166,11 +163,13 @@ impl Z3Worker {
                     // }
 
                     // get a task
-                    let mut task_q = tasks.lock().unwrap();
-                    let task = task_q.pop_front();
-                    drop(task_q); // drop the lock again
 
-                    if let Some((ticket, mut query)) = task {
+                    // let mut task_q = tasks.lock().unwrap();
+                    // let task = task_q.pop_front();
+                    // drop(task_q); // drop the lock again
+
+                    if let Some((ticket, mut query)) = tasks.pop() {
+                       // println!("worker {} got task {:?}", wid, ticket);
                         // run the query
                         query.timestamp("request");
                         let result = z3.exec(ticket, &mut query);
@@ -219,7 +218,16 @@ impl Z3Worker {
 
     /// performs a reset of the z3 worker's Z3 instance
     pub fn reset(&mut self) {
+        self.do_reset();
+        self.wait_reset_done();
+    }
+
+    fn do_reset(&mut self) {
         self.reset.store(true, Ordering::Relaxed);
+    }
+
+    ///
+    pub fn wait_reset_done(&mut self) {
         while self.reset.load(Ordering::Relaxed) {
             thread::yield_now();
         }
@@ -252,7 +260,7 @@ impl Z3Worker {
         let mut context = self.context.as_ref().lock().unwrap();
         *context = Z3Context::Query(ctx);
         drop(context);
-        self.reset();
+        self.do_reset();
         // let mut context = self.context.lock().unwrap();
         // if let Z3Context::Result(res) = &*context {
         //     *context = Z3Context::None;
@@ -289,7 +297,7 @@ pub struct Z3WorkerPool {
     ///
     query_cache: HashMap<Z3Query, Result<Z3Result, Vec<Z3Ticket>>>,
     /// tasks that haven't been dispatched to the client
-    taskq: Arc<Mutex<VecDeque<(Z3Ticket, Z3Query)>>>,
+    taskq: TaskQ,
     resultq: Receiver<(Z3Ticket, Z3Result)>,
     /// stored results that haven't been collected by the client
     results: HashMap<Z3Ticket, Z3Result>,
@@ -334,7 +342,8 @@ impl Z3WorkerPool {
         );
 
         // create the task and results
-        let taskq = Arc::new(Mutex::new(VecDeque::<(Z3Ticket, Z3Query)>::new()));
+        let taskq = TaskQ::new();
+        //let taskq = Arc::new(Mutex::new(VecDeque::<(Z3Ticket, Z3Query)>::new()));
 
         let (results_tx, resultq) = mpsc::channel::<(Z3Ticket, Z3Result)>();
 
@@ -379,7 +388,11 @@ impl Z3WorkerPool {
         }
     }
 
-    pub fn submit_query(&mut self, mut task: Z3Query) -> Result<Z3Ticket, Z3Query> {
+    pub fn submit_query(
+        &mut self,
+        mut task: Box<Z3Query>,
+        priority: Z3TaskPriority,
+    ) -> Result<Z3Ticket, Box<Z3Query>> {
         log::trace!(target : "[Z3WorkerPool]", " submitting query");
         // take the timestamp
         task.timestamp("submit");
@@ -406,10 +419,10 @@ impl Z3WorkerPool {
                 // we haven't seen this query before, add it to the cache
                 self.query_cache
                     .insert(task.clone_without_timestamps(), Err(vec![id]));
-
-                let mut taskq = self.taskq.lock().unwrap();
-                taskq.push_back((id, task));
-                drop(taskq);
+                self.taskq.push(priority, id, task);
+                // let mut taskq = self.taskq.lock().unwrap();
+                // taskq.push_back((id, task));
+                // drop(taskq);
             }
         }
 
@@ -419,12 +432,11 @@ impl Z3WorkerPool {
     fn drain_taskq(&mut self) {
         log::trace!(target : "[Z3WorkerPool]", "draining task queue");
         // XXX: that one here just makes sure there are no new tasks...
-        let mut taskq = self.taskq.lock().unwrap();
-        taskq.clear(); // just drop everything
+        self.taskq.drain();
     }
 
     fn drain_resultq(&mut self) {
-        log::trace!(target : "[Z3WorkerPool]", "draining result queue");
+        // log::trace!(target : "[Z3WorkerPool]", "draining result queue");
         // XXX: that one here just makes sure there are no new tasks...
         loop {
             match self.resultq.try_recv() {
@@ -497,6 +509,10 @@ impl Z3WorkerPool {
         self.drain_taskq();
         for worker in self.workers.iter_mut() {
             worker.reset_with_context(query.clone());
+        }
+
+        for worker in self.workers.iter_mut() {
+            worker.wait_reset_done();
         }
         self.drain_resultq();
         self.results.clear();

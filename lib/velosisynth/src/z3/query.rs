@@ -241,7 +241,7 @@ impl Hash for Z3Query {
 #[derive(Clone)]
 pub struct Z3Result {
     /// returns the task again
-    query: Option<Z3Query>,
+    query: Option<Box<Z3Query>>,
 
     /// the result of the task
     result: String,
@@ -256,7 +256,7 @@ impl Z3Result {
         }
     }
 
-    pub fn clone_with_query(&self, query: Z3Query) -> Self {
+    pub fn clone_with_query(&self, query: Box<Z3Query>) -> Self {
         Self {
             query: Some(query),
             result: self.result.clone(),
@@ -264,7 +264,7 @@ impl Z3Result {
     }
 
     /// creates a new Z3 result with the given query
-    pub fn with_query(query: Z3Query, result: String) -> Self {
+    pub fn with_query(query: Box<Z3Query>, result: String) -> Self {
         Self {
             query: Some(query),
             result,
@@ -278,7 +278,7 @@ impl Z3Result {
     }
 
     /// sets the query with the result
-    pub fn set_query(&mut self, query: Z3Query) {
+    pub fn set_query(&mut self, query: Box<Z3Query>) {
         self.query = Some(query);
     }
 
@@ -297,7 +297,7 @@ impl Z3Result {
     }
 
     /// takes the query from the result
-    pub fn take_query(&mut self) -> Option<Z3Query> {
+    pub fn take_query(&mut self) -> Option<Box<Z3Query>> {
         self.query.take()
     }
 
@@ -334,8 +334,14 @@ impl Debug for Z3Result {
     }
 }
 
-impl From<Z3Result> for Z3Query {
+impl From<Z3Result> for Box<Z3Query> {
     fn from(item: Z3Result) -> Self {
         item.query.unwrap()
+    }
+}
+
+impl From<Z3Result> for Z3Query {
+    fn from(item: Z3Result) -> Self {
+        *item.query.unwrap()
     }
 }

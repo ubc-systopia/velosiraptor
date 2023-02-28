@@ -36,6 +36,7 @@ mod instance_library;
 mod instance_standalone;
 
 mod query;
+mod taskq;
 mod worker;
 
 // public re-exports
@@ -45,6 +46,8 @@ pub use instance_library::Z3Instance;
 pub use instance_standalone::Z3Instance;
 
 pub use query::{Z3Query, Z3Result, Z3Ticket};
+use taskq::TaskQ;
+pub use taskq::Z3TaskPriority;
 pub use worker::{Z3Worker, Z3WorkerPool};
 
 /// Errors reported by Z3
