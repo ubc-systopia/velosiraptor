@@ -13,8 +13,7 @@
  * The translation size is a multiple of 64 bytes.
  */
 
-// This defines an SMPT Entry
-segment DirectSegment(base : addr) {
+segment TLB(base : addr) {
 
     // let's assume the maximum size of the segment is 40 bits.
     inbitwidth= 48;
@@ -30,7 +29,10 @@ segment DirectSegment(base : addr) {
 
     // the state will be two registers:
     state = StateDef(base: addr) {
-        reg address [ 8 ] {
+        reg inaddr [ 8 ] {
+            0 .. 48 val,
+        },
+        reg outaddr [ 8 ] {
             0 .. 48 val,
         },
         reg length [ 8 ] {
@@ -43,8 +45,9 @@ segment DirectSegment(base : addr) {
 
     // the state will be two registers:
     interface = InterfaceDef(base: addr) {
-        mmio address [ base, 0, 8 ],
-        mmio length [ base, 8, 8 ],
+        mmio inaddr [ base, 0, 8 ],
+        mmio outaddr [ base, 8, 8 ],
+        mmio length [ base, 16, 8 ],
     };
 
     fn matchflags(flgs : flags) -> bool
@@ -55,15 +58,14 @@ segment DirectSegment(base : addr) {
 
     fn translate(va: vaddr) -> paddr
         requires state.length.present == 1;
-        requires va < (state.length.bytes << 4);
+        requires state.inaddr.val <= va && va < (state.inaddr.val + (state.length.bytes << 4));
     {
-        va + state.address.val
+        (va + state.outaddr.val) - state.inaddr.val
     }
 
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
         requires sz < (1 << 40)
         requires sz > 0 && ((sz & 0xf) == 0)
-        requires va == 0
         requires (pa & 0xf == 0)
 
     synth fn protect(va: vaddr, sz: size, flgs: flags);
