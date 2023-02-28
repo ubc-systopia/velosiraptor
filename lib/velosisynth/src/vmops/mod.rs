@@ -32,6 +32,7 @@ mod queryhelper;
 mod resultparser;
 pub mod sanity;
 mod semantics;
+mod semprecond;
 pub mod unmap;
 mod utils;
 

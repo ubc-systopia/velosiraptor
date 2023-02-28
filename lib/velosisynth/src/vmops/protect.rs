@@ -33,19 +33,20 @@ use velosiast::ast::{VelosiAstMethod, VelosiAstUnitSegment};
 use crate::error::VelosiSynthErrorBuilder;
 use crate::{programs::Program, z3::Z3WorkerPool, VelosiSynthIssues};
 
-use super::{semantics, utils};
+use super::{semantics, semprecond, utils};
 
 use crate::vmops::queryhelper::MultiDimProgramQueries;
 use crate::vmops::queryhelper::ProgramQueries;
 use crate::vmops::queryhelper::{MaybeResult, ProgramBuilder};
 use crate::vmops::semantics::SemanticQueries;
 use crate::Z3Ticket;
+use crate::DEFAULT_BATCH_SIZE;
 
 pub struct ProtectPrograms {
     programs: MultiDimProgramQueries<ProgramQueries<SemanticQueries>>,
     programs_done: bool,
 
-    queries: LinkedList<(Program, [Option<Z3Ticket>; 2])>,
+    queries: LinkedList<(Program, [Option<Z3Ticket>; 3])>,
     candidates: Vec<Program>,
 
     m_fn: Rc<VelosiAstMethod>,
@@ -114,9 +115,19 @@ impl ProgramBuilder for ProtectPrograms {
                     false,
                 );
 
+                // let semprodoncs = semprecond::submit_program_query(
+                //     z3,
+                //     self.m_fn.as_ref(),
+                //     self.t_fn.as_ref(),
+                //     None,
+                //     false,
+                //     true,
+                //     prog.clone(),
+                // );
+
                 self.queries.push_back((
                     prog,
-                    [Some(translate_semantics), Some(matchflags_semantics)],
+                    [None, Some(translate_semantics), Some(matchflags_semantics)],
                 ));
             }
         }
@@ -189,11 +200,11 @@ pub fn get_program_iter(unit: &VelosiAstUnitSegment, batch_size: usize) -> Prote
 
     let mut protec_queries = Vec::with_capacity(2);
 
-    if let Some(p) =
-        semantics::semantic_query(unit, m_fn.clone(), t_fn.clone(), t_fn, true, batch_size).take()
-    {
-        protec_queries.push(p);
-    }
+    // if let Some(p) =
+    //     semantics::semantic_query(unit, m_fn.clone(), t_fn.clone(), f_fn, true, batch_size).take()
+    // {
+    //     protec_queries.push(p);
+    // }
 
     if let Some(p) =
         semantics::semantic_query(unit, m_fn.clone(), f_fn.clone(), f_fn, false, batch_size).take()
@@ -210,7 +221,7 @@ pub fn synthesize(
     z3: &mut Z3WorkerPool,
     unit: &VelosiAstUnitSegment,
 ) -> Result<Program, VelosiSynthIssues> {
-    let batch_size = std::cmp::max(5, z3.num_workers() / 2);
+    let batch_size = std::cmp::max(DEFAULT_BATCH_SIZE, z3.num_workers());
     let mut progs = get_program_iter(unit, batch_size);
     loop {
         match progs.next(z3) {

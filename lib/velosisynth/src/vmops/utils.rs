@@ -34,9 +34,8 @@ use crate::{Program, ProgramsBuilder};
 
 use super::resultparser;
 
-pub fn make_program_builder(
+pub fn make_program_builder_no_params(
     unit: &VelosiAstUnitSegment,
-    m_goal: &VelosiAstMethod,
     pre: &VelosiAstExpr,
 ) -> ProgramsBuilder {
     log::info!(target: "[vmops::utils]", "constructing programs;");
@@ -55,23 +54,6 @@ pub fn make_program_builder(
     // construct the program builder
     let mut builder = ProgramsBuilder::new();
 
-    // add the variables that the function talks about
-    for v in m_goal.params.iter() {
-        // flags show up differently
-        if v.ptype.is_flags() {
-            if let Some(flags) = &unit.flags {
-                let var = Arc::new(v.ident_to_string());
-                for f in flags.flags.iter() {
-                    builder.add_flags(var.clone(), f.to_string());
-                }
-            } else {
-                unreachable!("shoudl have defined flags!");
-            }
-        } else {
-            builder.add_var(v.ident_to_string());
-        }
-    }
-
     // add the fields to the program builder
     for f in st_access_fields.iter() {
         let mut parts = f.split('.');
@@ -87,6 +69,33 @@ pub fn make_program_builder(
             builder.add_field_slice(fieldname, slicename, slice.nbits() as usize);
         } else {
             builder.add_field(fieldname.to_string());
+        }
+    }
+
+    builder
+}
+
+pub fn make_program_builder(
+    unit: &VelosiAstUnitSegment,
+    m_goal: &VelosiAstMethod,
+    pre: &VelosiAstExpr,
+) -> ProgramsBuilder {
+    let mut builder = make_program_builder_no_params(unit, pre);
+
+    // add the variables that the function talks about
+    for v in m_goal.params.iter() {
+        // flags show up differently
+        if v.ptype.is_flags() {
+            if let Some(flags) = &unit.flags {
+                let var = Arc::new(v.ident_to_string());
+                for f in flags.flags.iter() {
+                    builder.add_flags(var.clone(), f.to_string());
+                }
+            } else {
+                unreachable!("shoudl have defined flags!");
+            }
+        } else {
+            builder.add_var(v.ident_to_string());
         }
     }
 

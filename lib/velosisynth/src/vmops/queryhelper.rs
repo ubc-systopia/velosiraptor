@@ -28,10 +28,8 @@
 use std::collections::VecDeque;
 
 use super::utils;
-use crate::Z3Query;
-use crate::Z3Ticket;
-use crate::Z3WorkerPool;
 use crate::{Program, ProgramsIter};
+use crate::{Z3Query, Z3TaskPriority, Z3Ticket, Z3WorkerPool};
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum MaybeResult<T> {
@@ -46,7 +44,7 @@ pub enum MaybeResult<T> {
 /// query builder trait that provides a squence of queries to be submitted to Z3
 pub trait QueryBuilder {
     /// returns the next query to be submitted, or None if all have been submitted
-    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Z3Query>;
+    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Box<Z3Query>>;
 }
 
 /// produces a new program
@@ -62,6 +60,8 @@ where
 {
     /// sequence of queries to be submitted
     queries: T,
+    ///
+    priority: Z3TaskPriority,
     /// the submitted queries
     submitted: Vec<Z3Ticket>,
     /// programs that had SAT results
@@ -74,14 +74,15 @@ impl<T> ProgramQueries<T>
 where
     T: QueryBuilder,
 {
-    pub fn new(queries: T) -> Self {
-        Self::with_batchsize(queries, 1)
+    pub fn new(queries: T, priority: Z3TaskPriority) -> Self {
+        Self::with_batchsize(queries, 5, priority)
     }
 
-    pub fn with_batchsize(queries: T, batch_size: usize) -> Self {
+    pub fn with_batchsize(queries: T, batch_size: usize, priority: Z3TaskPriority) -> Self {
         let batch_size = std::cmp::min(batch_size, 1);
         ProgramQueries {
             queries,
+            priority,
             submitted: Vec::with_capacity(batch_size),
             completed: VecDeque::with_capacity(batch_size),
             batch_size,
@@ -93,35 +94,38 @@ where
     // }
 
     fn maybe_submit(&mut self, z3: &mut Z3WorkerPool) -> bool {
-        loop {
-            // don't submit more than the batch size, there may be other pending queries
-            if self.submitted.len() >= self.batch_size {
-                return true;
-            }
-
+        // don't submit more than the batch size, there may be other pending queries
+        // if self.submitted.len() >= self.batch_size {
+        //     return true;
+        // }
+        let mut pending = false;
+        for _ in 0..self.batch_size {
             // get the next query and try to submit it
             match self.queries.next(z3) {
                 MaybeResult::Some(query) => {
-                    match z3.submit_query(query) {
+                    pending = true;
+                    match z3.submit_query(query, self.priority) {
                         Ok(ticket) => self.submitted.push(ticket),
                         Err(e) => panic!("Error submitting query: {}", e),
                     }
-                    continue;
                 }
                 MaybeResult::Pending => {
                     return true;
                 }
                 MaybeResult::None => {
-                    return false;
+                    return pending;
                 }
             }
         }
+
+        true
     }
 
     fn check_submitted(&mut self, z3: &mut Z3WorkerPool) -> bool {
         // submit queries, if it's pending and submitted is empty, return as we need to wait
-        if self.maybe_submit(z3) && self.submitted.is_empty() {
-            return true;
+        let has_pending = self.maybe_submit(z3);
+        if self.submitted.is_empty() {
+            return has_pending;
         }
 
         // get the new submitted array
@@ -142,7 +146,8 @@ where
 
         self.submitted = submitted;
 
-        self.maybe_submit(z3)
+        // self.maybe_submit(z3)
+        true
     }
 }
 
@@ -156,7 +161,7 @@ where
         if let Some(p) = self.completed.pop_front() {
             MaybeResult::Some(p)
         } else if self.submitted.is_empty() && !pending {
-            debug_assert!(self.queries.next(z3) == MaybeResult::None);
+            assert!(self.queries.next(z3) == MaybeResult::None);
             MaybeResult::None
         } else {
             MaybeResult::Pending
@@ -267,7 +272,12 @@ where
             }
 
             if self.programs[i].is_empty() {
-                log::warn!("Programs {} is empty", i);
+                log::warn!(
+                    "Programs {} / {} is empty current idx: {}",
+                    i,
+                    self.programs.len(),
+                    self.idx
+                );
             }
 
             had_none |= self.programs[i].is_empty();
