@@ -50,7 +50,9 @@ use velosiast::ast::VelosiAstUnitSegment;
 use crate::vmops::{MapPrograms, MaybeResult, ProgramBuilder, ProtectPrograms, UnmapPrograms};
 pub use error::{VelosiSynthError, VelosiSynthIssues};
 pub use programs::{Program, ProgramsBuilder, ProgramsIter};
-pub use z3::{Z3Query, Z3Ticket, Z3Worker, Z3WorkerPool};
+pub use z3::{Z3Query, Z3TaskPriority, Z3Ticket, Z3Worker, Z3WorkerPool};
+
+const DEFAULT_BATCH_SIZE: usize = 32;
 
 #[macro_export]
 macro_rules! synth_result_return (($res: expr, $issues: expr) => (
@@ -105,7 +107,7 @@ pub struct Z3Synth<'a> {
 impl<'a> Z3Synth<'a> {
     /// creates a new synthesis handle with the given worker poopl and the unit
     pub(crate) fn new(z3: Z3WorkerPool, unit: &'a mut VelosiAstUnitSegment) -> Self {
-        let batch_size = std::cmp::max(5, z3.num_workers() / 2);
+        let batch_size = std::cmp::max(DEFAULT_BATCH_SIZE, z3.num_workers());
 
         // XXX: move this to the the syntheisze() step.
         let map_queries = vmops::map::get_program_iter(unit, batch_size);
