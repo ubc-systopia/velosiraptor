@@ -93,7 +93,10 @@ impl ProgramsBuilder {
 
     // adds a variable to the builder
     pub fn add_var(&mut self, var: String) -> &mut Self {
-        self.vars.push(Arc::new(var));
+        let var = Arc::new(var);
+        if !self.vars.contains(&var) {
+            self.vars.push(var);
+        }
         self
     }
 
@@ -141,8 +144,8 @@ impl ProgramsBuilder {
 
         // binary expressions
         //expr_combinator2!(expr, Expression::RShift, vars, vals);
-        expr_combinator2!(expr, Expression::LShift, vars, vals);
-        expr_combinator2!(expr, Expression::Add, vars, vals);
+        // expr_combinator2!(expr, Expression::LShift, vars, vals);
+        // expr_combinator2!(expr, Expression::Add, vars, vals);
         expr_combinator2!(expr, Expression::Sub, vars, vals);
         expr_combinator2!(expr, Expression::And, vars, vals);
         expr_combinator2!(expr, Expression::Or, vars, vals);
@@ -173,8 +176,8 @@ impl ProgramsBuilder {
         }
 
         // put the multiply stuff at the end
-        let just_num = vec![Literal::Num];
-        expr_combinator2!(expr, Expression::Mul, vars, just_num);
+        // let just_num = vec![Literal::Num];
+        // expr_combinator2!(expr, Expression::Mul, vars, just_num);
         // expr_combinator2!(expr, Expression::Div, vars, just_num);
 
         // and we're done
@@ -253,14 +256,20 @@ impl ProgramsBuilder {
 
             // field ops now has all the possible field operations, programs of size 1
             let mut fieldprogs = Vec::with_capacity(fieldops.len());
-            for op in &fieldops {
-                fieldprogs.push(Arc::new(FieldActions(field.clone(), vec![op.clone()])));
-            }
+            // for op in &fieldops {
+            //fieldprogs.push(Arc::new(FieldActions(field.clone(), vec![op.clone()])));
+            // }
 
             for op in &fieldops {
                 if matches!(*op, FieldOp::ReadAction | FieldOp::InsertField(_)) {
                     continue;
                 }
+
+                // read first
+                fieldprogs.push(Arc::new(FieldActions(
+                    field.clone(),
+                    vec![FieldOp::ReadAction, op.clone()],
+                )));
 
                 // zero first
                 fieldprogs.push(Arc::new(FieldActions(
@@ -269,12 +278,6 @@ impl ProgramsBuilder {
                         FieldOp::InsertField(Arc::new(Expression::Lit(Literal::Val(0)))),
                         op.clone(),
                     ],
-                )));
-
-                // read first
-                fieldprogs.push(Arc::new(FieldActions(
-                    field.clone(),
-                    vec![FieldOp::ReadAction, op.clone()],
                 )));
             }
 
@@ -319,6 +322,7 @@ impl ProgramsBuilder {
         }
 
         log::info!(target : "[ProgramsBuilder]", "constructed {} programs", programs.len());
+
         for (i, p) in programs.iter().enumerate() {
             log::debug!(target : "[ProgramsBuilder]", "  - p{}: {:?}", i, p);
         }
