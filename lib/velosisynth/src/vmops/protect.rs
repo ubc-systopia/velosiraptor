@@ -33,7 +33,7 @@ use velosiast::ast::{VelosiAstMethod, VelosiAstUnitSegment};
 use crate::error::VelosiSynthErrorBuilder;
 use crate::{programs::Program, z3::Z3WorkerPool, VelosiSynthIssues};
 
-use super::{semantics, semprecond, utils};
+use super::{semantics, utils};
 
 use crate::vmops::queryhelper::MultiDimProgramQueries;
 use crate::vmops::queryhelper::ProgramQueries;
