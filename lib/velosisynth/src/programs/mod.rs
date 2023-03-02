@@ -26,7 +26,7 @@
 //! Synthesis Module: Operations
 
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter, Result as FmtResult};
+use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -106,6 +106,17 @@ impl From<&Literal> for VelosiOpExpr {
             }
             Literal::Var(v) => VelosiOpExpr::Var(v.to_string()),
             Literal::Flag(v, f) => VelosiOpExpr::Flags(v.to_string(), f.to_string()),
+        }
+    }
+}
+
+impl Display for Literal {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            Literal::Val(v) => write!(f, "0x{:x}", v),
+            Literal::Num => write!(f, "?"),
+            Literal::Var(v) => write!(f, "{}", v),
+            Literal::Flag(v, fl) => write!(f, "{}.{}", v, fl),
         }
     }
 }
@@ -327,6 +338,24 @@ impl From<&Expression> for VelosiOpExpr {
     }
 }
 
+impl Display for Expression {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        use Expression::*;
+        match self {
+            Lit(l) => Display::fmt(&l, f),
+            LShift(x, y) => write!(f, "{} << {}", x, y),
+            Div(x, y) => write!(f, "{} / {}", x, y),
+            Mul(x, y) => write!(f, "{} * {}", x, y),
+            Add(x, y) => write!(f, "{} + {}", x, y),
+            Sub(x, y) => write!(f, "{} - {}", x, y),
+            And(x, y) => write!(f, "{} & {}", x, y),
+            Or(x, y) => write!(f, "{} | {}", x, y),
+            Not(x) => write!(f, "!{}", x),
+            ShiftMask(x, y, z) => write!(f, "({} >> {}) & {}", x, y, z),
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Field Slice Operations
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -359,6 +388,12 @@ impl FieldSliceOp {
     }
 }
 
+impl Display for FieldSliceOp {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, ".set_{}({})", self.0, self.1)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Field Operations
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -377,6 +412,23 @@ pub enum FieldOp {
     ReadAction,
     // /// performs the write action on the field
     // WriteAction,
+}
+
+impl Display for FieldOp {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            FieldOp::InsertField(e) => {
+                write!(f, ".set({}).write()", e)
+            }
+            FieldOp::InsertFieldSlices(ops) => {
+                for op in ops {
+                    Display::fmt(&op, f)?;
+                }
+                write!(f, ".write()")
+            }
+            FieldOp::ReadAction => write!(f, ".read()"),
+        }
+    }
 }
 
 impl FieldOp {
@@ -470,7 +522,7 @@ impl FieldOp {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Field Actions -- A sequence of field operations on a field
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(PartialEq, Eq, Clone, Hash)]
 struct FieldActions(Arc<String>, Vec<FieldOp>);
 
 impl FieldActions {
@@ -522,6 +574,46 @@ impl From<&FieldActions> for Vec<VelosiOperation> {
 
 impl Display for FieldActions {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        let mut newline = true;
+        for a in self.1.iter() {
+            if newline {
+                write!(f, "\n  {}", self.0)?;
+                newline = false;
+            }
+            match a {
+                FieldOp::InsertField(e) => {
+                    if !newline {
+                        write!(f, "\n    ")?;
+                    }
+                    write!(f, ".set({})", e)?;
+                    if !newline {
+                        write!(f, "\n    ")?;
+                    }
+                    write!(f, ".write()")?;
+                    newline = true;
+                }
+                FieldOp::InsertFieldSlices(ops) => {
+                    for op in ops {
+                        if !newline {
+                            write!(f, "\n    ")?;
+                        }
+                        Display::fmt(&op, f)?;
+                    }
+                    if !newline {
+                        write!(f, "\n    ")?;
+                    }
+                    write!(f, ".write()")?;
+                    newline = true;
+                }
+                FieldOp::ReadAction => write!(f, ".read()")?,
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Debug for FieldActions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         for a in self.1.iter() {
             write!(f, "{}.{:?}; ", self.0, a)?;
         }
@@ -537,7 +629,7 @@ impl Display for FieldActions {
 ///
 /// A program represents the sequence of operations on fields that perform the configuration
 /// sequence.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Program(Vec<Arc<FieldActions>>);
 
 impl Program {
@@ -722,8 +814,17 @@ impl From<Program> for Vec<VelosiOperation> {
 impl Display for Program {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         for a in self.0.iter() {
-            writeln!(f, "{a}")?;
+            write!(f, "{a}")?;
         }
-        Ok(())
+        writeln!(f)
+    }
+}
+
+impl Debug for Program {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        for a in self.0.iter() {
+            write!(f, "{a}")?;
+        }
+        writeln!(f)
     }
 }
