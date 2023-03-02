@@ -334,7 +334,8 @@ pub fn add_translate_range_checks(smt: &mut Smt2Context, method: &VelosiAstMetho
         };
 
         // figure out whether we have a upper bound or a lower bound
-        let (var, stref, lower_bound) = if binop.lhs.has_var_references(&method.get_param_names()) {
+        let (_var, _stref, lower_bound) = if binop.lhs.has_var_references(&method.get_param_names())
+        {
             // lhs is the var, so if we have a > or >= then this is the lower bound
             (
                 &binop.lhs,

@@ -48,7 +48,7 @@ pub fn create(unit: &VelosiAstUnitSegment) -> Smt2Context {
     // TODO: adding global constants
 
     // adding the model
-    consts::add_consts(&mut smt, unit.ident(), unit.consts.as_slice());
+    consts::add_consts(&mut smt, unit.ident(), Box::new(unit.consts()));
     if let Some(flags) = &unit.flags {
         flags::add_flags(&mut smt, unit.ident(), flags);
     }
@@ -56,7 +56,7 @@ pub fn create(unit: &VelosiAstUnitSegment) -> Smt2Context {
     state::add_state_def(&mut smt, &unit.state);
     interface::add_interface_def(&mut smt, &unit.interface);
     velosimodel::add_model_def(&mut smt, unit);
-    method::add_methods(&mut smt, unit.methods());
+    method::add_methods(&mut smt, Box::new(unit.methods()));
 
     smt
 }
