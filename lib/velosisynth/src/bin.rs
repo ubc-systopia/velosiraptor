@@ -35,7 +35,7 @@ use std::time::Instant;
 use clap::{arg, command};
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, LevelPadding, TermLogger, TerminalMode};
 
-use velosiast::{AstResult, VelosiAst};
+use velosiast::{AstResult, VelosiAst, VelosiAstUnit};
 use velosisynth::Z3SynthFactory;
 
 pub fn main() {
@@ -112,83 +112,97 @@ pub fn main() {
 
     let t_parsing = Instant::now();
 
-    let mut t_synth = Vec::new();
-
     let mut synthfactory = Z3SynthFactory::new();
     synthfactory.num_workers(ncores).default_log_dir();
 
-    let mut segments = Vec::new();
-    while let Some(mut seg) = ast.take_segment_unit() {
-        let mut t_synth_segment = Vec::new();
+    let mut t_synth = Vec::new();
+    for unit in ast.units_mut() {
+        use std::rc::Rc;
+        match unit {
+            VelosiAstUnit::Segment(u) => {
+                let seg = Rc::get_mut(u);
 
-        t_synth_segment.push(("start", Instant::now()));
+                if seg.is_none() {
+                    println!("could not obtain mutable reference to segment unit\n");
+                    continue;
+                }
 
-        let mut synth = synthfactory.create(&mut seg);
+                let seg = seg.unwrap();
 
-        synth.create_model();
+                let mut t_synth_segment = Vec::new();
 
-        t_synth_segment.push(("Model Creation", Instant::now()));
+                t_synth_segment.push(("start", Instant::now()));
 
-        let sanity_check = synth.sanity_check();
+                let mut synth = synthfactory.create(seg);
 
-        t_synth_segment.push(("Sanity Check", Instant::now()));
+                synth.create_model();
 
-        if let Err(e) = sanity_check {
-            println!("{}", e);
-            log::error!(target: "main", "skipped synthesizing due to errors");
-            continue;
+                t_synth_segment.push(("Model Creation", Instant::now()));
+
+                let sanity_check = synth.sanity_check();
+
+                t_synth_segment.push(("Sanity Check", Instant::now()));
+
+                if let Err(e) = sanity_check {
+                    println!("{}", e);
+                    log::error!(target: "main", "skipped synthesizing due to errors");
+                    continue;
+                }
+
+                match matches.get_one::<String>("synth").map(|s| s.as_str()) {
+                    Some("all") => {
+                        println!("Synthesizing ALL for unit {}", synth.unit_ident());
+                        synth.synthesize();
+                        match synth.finalize() {
+                            Ok(p) => log::warn!(target: "main", "synthesis completed: {}", p),
+                            Err(e) => log::error!(target: "main", "synthesis failed\n{}", e),
+                        }
+                    }
+
+                    Some("map") => {
+                        println!("Synthesizing MAP for unit {}", synth.unit_ident());
+                        match synth.synthesize_map() {
+                            Ok(p) => log::warn!(target: "main", "Program: {}", p),
+                            Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
+                        }
+                    }
+
+                    Some("unmap") => {
+                        println!("Synthesizing UNMAP for unit {}", synth.unit_ident());
+                        match synth.synthesize_unmap() {
+                            Ok(p) => log::warn!(target: "main", "Program: {}", p),
+                            Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
+                        }
+                    }
+
+                    Some("protect") => {
+                        println!("Synthesizing PROTECT for unit {}", synth.unit_ident());
+                        match synth.synthesize_protect() {
+                            Ok(p) => log::warn!(target: "main", "Program: {}", p),
+                            Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
+                        }
+                    }
+                    Some(x) => {
+                        log::error!(target: "main", "unknown synth model '{}'", x);
+                        return;
+                    }
+                    None => {
+                        log::error!(target: "main", "synth mode not set");
+                        return;
+                    }
+                }
+
+                t_synth_segment.push(("Synthesis", Instant::now()));
+
+                t_synth.push((seg.ident_to_string(), t_synth_segment));
+            }
+            VelosiAstUnit::StaticMap(_s) => {
+                // nothing to synthesize here
+            }
+            VelosiAstUnit::Enum(_e) => {
+                // nothing to synthesize here
+            }
         }
-
-        match matches.get_one::<String>("synth").map(|s| s.as_str()) {
-            Some("all") => {
-                println!("Synthesizing ALL for unit {}", synth.unit_ident());
-                synth.synthesize();
-                if synth.has_result() {
-                    log::warn!(target: "main", "synthesis completed:\n{}", synth);
-                } else {
-                    log::error!(target: "main", "synthesis failed:\n{}", synth);
-                }
-            }
-
-            Some("map") => {
-                println!("Synthesizing MAP for unit {}", synth.unit_ident());
-                match synth.synthesize_map() {
-                    Ok(p) => log::warn!(target: "main", "Programs: {}", p),
-                    Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
-                }
-            }
-
-            Some("unmap") => {
-                println!("Synthesizing UNMAP for unit {}", synth.unit_ident());
-                match synth.synthesize_unmap() {
-                    Ok(p) => log::warn!(target: "main", "Programs: {}", p),
-                    Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
-                }
-            }
-
-            Some("protect") => {
-                println!("Synthesizing PROTECT for unit {}", synth.unit_ident());
-                match synth.synthesize_protect() {
-                    Ok(p) => log::warn!(target: "main", "Programs: {}", p),
-                    Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
-                }
-            }
-            Some(x) => {
-                log::error!(target: "main", "unknown synth model '{}'", x);
-                return;
-            }
-            None => {
-                log::error!(target: "main", "synth mode not set");
-                return;
-            }
-        }
-
-        synth.finalize();
-
-        t_synth_segment.push(("Synthesis", Instant::now()));
-
-        t_synth.push((seg.ident_to_string(), t_synth_segment));
-        segments.push(seg);
     }
 
     let t_end = Instant::now();
