@@ -93,7 +93,7 @@ impl Display for SynthResult {
 pub struct Z3Synth<'a> {
     z3: Z3WorkerPool,
     // unit: Option<Rc<VelosiAstUnitSegment>>,
-    unit: Option<&'a mut VelosiAstUnitSegment>,
+    unit: &'a mut VelosiAstUnitSegment,
     map_queries: MapPrograms,
     map_program: Option<Program>,
     unmap_queries: UnmapPrograms,
@@ -116,7 +116,7 @@ impl<'a> Z3Synth<'a> {
 
         Self {
             z3,
-            unit: Some(unit),
+            unit,
             map_queries,
             map_program: None,
             unmap_queries,
@@ -128,19 +128,19 @@ impl<'a> Z3Synth<'a> {
         }
     }
 
+    fn destroy(self) -> &'a mut VelosiAstUnitSegment {
+        self.unit
+    }
+
     pub fn unit_ident(&self) -> &str {
-        if let Some(unit) = &self.unit {
-            unit.ident()
-        } else {
-            "unknown"
-        }
+        self.unit.ident()
     }
 
     /// creates the model for the synthesis for this handle
     pub fn create_model(&mut self) {
-        if !self.model_created && self.unit.is_some() {
+        if !self.model_created {
             self.model_created = true;
-            let ctx = model::create(self.unit.as_ref().unwrap());
+            let ctx = model::create(self.unit);
             self.z3.reset_with_context(Z3Query::from(ctx));
         }
     }
@@ -151,62 +151,64 @@ impl<'a> Z3Synth<'a> {
         log::info!(target: "[Z3Synth]", "running sanity checks on the model.");
         let mut issues = VelosiSynthIssues::new();
 
-        let unit = self.unit.as_ref().unwrap();
-
         issues.merge_result(vmops::sanity::check_precondition_satisfiability(
             &mut self.z3,
-            unit,
+            self.unit,
             "map",
         ));
         issues.merge_result(vmops::sanity::check_precondition_satisfiability(
             &mut self.z3,
-            unit,
+            self.unit,
             "unmap",
         ));
         issues.merge_result(vmops::sanity::check_precondition_satisfiability(
             &mut self.z3,
-            unit,
+            self.unit,
             "protect",
         ));
 
         synth_result_return!((), issues)
     }
 
-    /// obtains the unit with the updated operations
-    pub fn take_unit(&mut self) -> Result<&VelosiAstUnitSegment, ()> {
+    pub fn finalize(mut self) -> Result<bool, Self> {
         if !self.is_done() {
-            return Err(());
+            log::error!("called finalize() but synthesis is not done yet.");
+            return Err(self);
         }
 
-        if let Some(unit) = self.unit.take() {
-            // TODO: set errors here
+        // obtain the programs and drop the references
+        let map_program = self.map_program.take();
+        let unmap_program = self.unmap_program.take();
+        let protect_program = self.protect_program.take();
+        let unit = self.destroy();
 
-            if let Some(prog) = self.map_program.take() {
-                unit.set_method_ops("map", prog.into());
-            }
-
-            if let Some(prog) = self.unmap_program.take() {
-                unit.set_method_ops("unmap", prog.into());
-            }
-
-            if let Some(prog) = self.protect_program.take() {
-                unit.set_method_ops("protect", prog.into());
-            }
-
-            // finally return the updated unit
-            Ok(unit)
+        if let Some(prog) = map_program {
+            log::warn!(target : "[Z3Synth]", "successfully synthesized program\nmap() {{ {} }}", prog);
+            unit.set_method_ops("map", prog.into());
         } else {
-            Err(())
+            log::warn!(target : "[Z3Synth]", "map() {{ UNKNOWN }} ");
         }
-    }
 
-    pub fn finalize(&mut self) -> bool {
-        self.take_unit().is_ok()
+        if let Some(prog) = unmap_program {
+            log::warn!(target : "[Z3Synth]", "successfully synthesized program\nunmap() {{ {} }}", prog);
+            unit.set_method_ops("unmap", prog.into());
+        } else {
+            log::warn!(target : "[Z3Synth]", "unmap() {{ UNKNOWN }}");
+        }
+
+        if let Some(prog) = protect_program {
+            log::warn!(target : "[Z3Synth]", "successfully synthesized program\nprotect() {{ {} }}", prog);
+            unit.set_method_ops("protect", prog.into());
+        } else {
+            log::warn!(target : "[Z3Synth]", "protect() {{ UNKNOWN }}");
+        }
+
+        Ok(true)
     }
 
     /// checks whether the synthesis has completed, either with result or not
     pub fn is_done(&self) -> bool {
-        self.done || self.unit.is_none()
+        self.done
     }
 
     /// checks whether we have a result
@@ -290,21 +292,21 @@ impl<'a> Z3Synth<'a> {
         // have this more conditional
         self.create_model();
         self.done = true;
-        vmops::map::synthesize(&mut self.z3, self.unit.as_ref().unwrap())
+        vmops::map::synthesize(&mut self.z3, self.unit)
     }
 
     pub fn synthesize_unmap(&mut self) -> Result<Program, VelosiSynthIssues> {
         // have this more conditional
         self.create_model();
         self.done = true;
-        vmops::unmap::synthesize(&mut self.z3, self.unit.as_ref().unwrap())
+        vmops::unmap::synthesize(&mut self.z3, self.unit)
     }
 
     pub fn synthesize_protect(&mut self) -> Result<Program, VelosiSynthIssues> {
         // have this more conditional
         self.create_model();
         self.done = true;
-        vmops::protect::synthesize(&mut self.z3, self.unit.as_ref().unwrap())
+        vmops::protect::synthesize(&mut self.z3, self.unit)
     }
 
     /// terminates the worker pool
