@@ -35,6 +35,7 @@ use smt2::{Function, Smt2Context, Term, VarBinding};
 use velosiast::ast::{VelosiAstParam, VelosiOpExpr, VelosiOperation};
 
 use crate::model;
+use crate::model::velosimodel::{IFACE_PREFIX, WBUFFER_PREFIX};
 
 mod builder;
 mod statevars;
@@ -53,7 +54,7 @@ pub use symvars::SymbolicVars;
 /// Literals -- Integers, Symbolic variables, and Flags
 ///
 /// Literals form the terminals of the grammar for constructing programs.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Literal {
     /// a constant, arbitrary 64-bit number, common used values are 0 and 1
     Val(u64),
@@ -63,6 +64,17 @@ pub enum Literal {
     Var(Arc<String>),
     /// represents a flag  var.flag
     Flag(Arc<String>, Arc<String>),
+}
+
+impl std::fmt::Debug for Literal {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            Self::Val(arg0) => write!(f, "Val(0x{arg0:x?})"),
+            Self::Num => write!(f, "Num"),
+            Self::Var(arg0) => f.debug_tuple("Var").field(arg0).finish(),
+            Self::Flag(arg0, arg1) => f.debug_tuple("Flag").field(arg0).field(arg1).finish(),
+        }
+    }
 }
 
 impl Literal {
@@ -383,7 +395,7 @@ impl FieldSliceOp {
         symvars: &mut SymbolicVars,
     ) {
         let arg = self.1.to_smt2_term(symvars);
-        let fname = format!("Model.IFace.{}.{}.set!", fieldname, self.0);
+        let fname = format!("Model.{WBUFFER_PREFIX}.{}.{}.set!", fieldname, self.0);
         smtops.push((fname, Some(arg)));
     }
 }
@@ -457,7 +469,7 @@ impl FieldOp {
         match self {
             FieldOp::InsertField(arg) => {
                 let arg = arg.to_smt2_term(symvars);
-                let fname = format!("Model.IFace.{fieldname}.set!");
+                let fname = format!("Model.{WBUFFER_PREFIX}.{fieldname}.set!");
                 smtops.push((fname, Some(arg)));
             }
             FieldOp::InsertFieldSlices(sliceops) => {
@@ -466,7 +478,7 @@ impl FieldOp {
                     .for_each(|f| f.to_smt2_term(fieldname, smtops, symvars));
             }
             FieldOp::ReadAction => {
-                let fname = format!("Model.IFace.{fieldname}.readaction! ");
+                let fname = format!("Model.{IFACE_PREFIX}.{fieldname}.readaction! ");
                 smtops.push((fname, None));
             } // FieldOp::WriteAction => {
               //     let fname = format!("Model.IFace.{}.writeaction! ", fieldname);
@@ -555,7 +567,9 @@ impl FieldActions {
             .for_each(|f| f.to_smt2_term(self.0.as_str(), smtops, symvars));
 
         // field actions always end with a write action
-        let fname = format!("Model.IFace.{}.writeaction! ", self.0);
+        let fname = format!("Model.{IFACE_PREFIX}.{}.storeaction! ", self.0);
+        smtops.push((fname, None));
+        let fname = format!("Model.{IFACE_PREFIX}.{}.writeaction! ", self.0);
         smtops.push((fname, None));
     }
 }
