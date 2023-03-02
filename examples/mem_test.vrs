@@ -1,0 +1,65 @@
+const PTABLE_ENTRIES    : size = 1024;
+const PTABLE_ENTRY_SIZE : size = 4;
+const PTABLE_SIZE       : size = (PTABLE_ENTRIES * PTABLE_ENTRY_SIZE);
+const PTABLE_ALIGNMENT  : size = PTABLE_SIZE;
+
+const BASE_PAGE_BITS  : size = 12;
+const BASE_PAGE_SIZE  : size = (1 << BASE_PAGE_BITS); // 4 KiB
+
+const LARGE_PAGE_BITS : size = 22;
+const LARGE_PAGE_SIZE : size = (1 << LARGE_PAGE_BITS); // 4 MiB
+
+const PHYS_ADDR_BITS : size = 32;
+const PHYS_ADDR_MAX  : size = (1 << PHYS_ADDR_BITS);
+
+segment PageTableEntry(base : addr) {
+
+    // there are there are 4 KiB pages
+    inbitwidth = BASE_PAGE_BITS;
+
+    // it's a 32-bit machine
+    outbitwidth = PHYS_ADDR_BITS;
+
+    flags = {
+    };
+
+    state = StateDef(base: addr) {
+        mem pte [base, 0, 4] {
+           12 .. 32 base,
+        }
+    };
+
+    interface = InterfaceDef(base : addr) {
+        mem pte [base, 0, 4] 
+    };
+
+    fn matchflags(flgs : flags) -> bool
+    {
+        true
+    }
+
+    // the translation semantics, adding an option type?
+    fn translate(va: vaddr) -> paddr
+        requires va < BASE_PAGE_SIZE;
+    {
+        va + (state.pte.base << BASE_PAGE_BITS)
+    }
+
+    // unmapping an entry
+    synth fn unmap(va: vaddr, sz: size)
+        requires (va == 0);
+        requires sz == BASE_PAGE_SIZE;
+
+    // mapping an entry
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+        requires va == 0;
+        requires sz == BASE_PAGE_SIZE;
+        requires (pa & (BASE_PAGE_SIZE - 1)) == 0;
+
+    // protecting the entry, i.e., change its permission
+    synth fn protect(va: vaddr, sz: size, flgs: flags)
+}
+
+staticmap PageTable(base : addr) {
+    mapdef = [ PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..1024 ];
+}
