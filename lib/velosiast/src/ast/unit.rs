@@ -27,6 +27,7 @@
 //!
 //! This module defines the Constant AST nodes of the langauge
 
+use std::collections::hash_map::{Values, ValuesMut};
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
@@ -84,12 +85,11 @@ pub struct VelosiAstUnitSegment {
     /// the interface of the unit
     pub interface: Rc<VelosiAstInterface>,
     ///
-    pub consts: Vec<Rc<VelosiAstConst>>,
-    pub consts_map: HashMap<String, Rc<VelosiAstConst>>,
+    pub consts: HashMap<String, Rc<VelosiAstConst>>,
 
     pub flags: Option<Rc<VelosiAstFlags>>,
 
-    pub methods_map: HashMap<String, Rc<VelosiAstMethod>>,
+    pub methods: HashMap<String, Rc<VelosiAstMethod>>,
 
     /// the location of the type clause
     pub loc: VelosiTokenStream,
@@ -121,9 +121,8 @@ impl VelosiAstUnitSegment {
             }
         }
 
-        let mut methods_map = HashMap::new();
-        let mut consts_map = HashMap::new();
-        let mut consts = Vec::new();
+        let mut methods = HashMap::new();
+        let mut consts = HashMap::new();
 
         let mut inbitwidth = None;
         let mut derived_inbitwidth = None;
@@ -147,7 +146,6 @@ impl VelosiAstUnitSegment {
             None
         };
 
-        // TODO: handle the drivation...
         if let Some(d) = &derived {
             let sym = st.lookup(d.path()).unwrap();
             let unit = if let VelosiAstNode::Unit(u) = &sym.ast_node {
@@ -169,13 +167,12 @@ impl VelosiAstUnitSegment {
 
             // merge all the constants
             for c in unit.consts() {
-                consts.push(c.clone());
-                consts_map.insert(c.ident_to_string(), c.clone());
+                consts.insert(c.ident_to_string(), c.clone());
             }
 
             // merge all the methods, we'll deal with overwriting abstract ones later
             for m in unit.methods() {
-                methods_map.insert(m.ident_to_string(), m.clone());
+                methods.insert(m.ident_to_string(), m.clone());
             }
 
             derived_inbitwidth = Some(unit.input_bitwidth());
@@ -196,12 +193,12 @@ impl VelosiAstUnitSegment {
 
         // add the elements to the symbol table
 
-        consts_map.values().for_each(|c| {
+        consts.values().for_each(|c| {
             st.insert(c.clone().into())
                 .expect("could not insert into symbol table")
         });
 
-        methods_map.values().for_each(|c| {
+        methods.values().for_each(|c| {
             st.insert(c.clone().into())
                 .expect("could not insert into symbol table")
         });
@@ -235,8 +232,7 @@ impl VelosiAstUnitSegment {
                     if let Err(e) = st.insert(c.clone().into()) {
                         issues.push(*e);
                     } else {
-                        consts.push(c.clone());
-                        consts_map.insert(c.ident_to_string(), c);
+                        consts.insert(c.ident_to_string(), c);
                     }
                 }
                 VelosiParseTreeUnitNode::InBitWidth(e, loc) => {
@@ -376,7 +372,7 @@ impl VelosiAstUnitSegment {
                         // exists already,
                         if let VelosiAstNode::Method(md) = &mderiv.ast_node {
                             if md.is_abstract {
-                                methods_map.insert(m.ident_to_string(), m);
+                                methods.insert(m.ident_to_string(), m);
                             } else {
                                 // double defined!
                                 let err = VelosiAstErrDoubleDef::new(
@@ -398,7 +394,7 @@ impl VelosiAstUnitSegment {
                     } else {
                         st.insert(m.clone().into())
                             .expect("method already exists in symbol table?");
-                        methods_map.insert(m.ident_to_string(), m);
+                        methods.insert(m.ident_to_string(), m);
                     }
                 }
                 VelosiParseTreeUnitNode::EnumEntry(f) => ignored_node!(
@@ -429,7 +425,7 @@ impl VelosiAstUnitSegment {
             Rc::new(VelosiAstState::NoneState(pt.loc.clone()))
         };
 
-        if !methods_map.contains_key("map") && !pt.is_abstract {
+        if !methods.contains_key("map") && !pt.is_abstract {
             let msg = "Segment unit has no `map` method defined. Using default implementation";
             let hint = format!("add method with signature `{FN_SIG_MAP}` to unit");
             let err = VelosiAstErrBuilder::warn(msg.to_string())
@@ -439,10 +435,10 @@ impl VelosiAstUnitSegment {
             issues.push(err);
 
             let m = Rc::new(VelosiAstMethod::default_map());
-            methods_map.insert(m.ident_to_string(), m);
+            methods.insert(m.ident_to_string(), m);
         }
 
-        if !methods_map.contains_key("unmap") && !pt.is_abstract {
+        if !methods.contains_key("unmap") && !pt.is_abstract {
             let msg = "Segment unit has no `unmap` method defined. Using default implementation";
             let hint = format!("add method with signature `{FN_SIG_UNMAP}` to unit");
             let err = VelosiAstErrBuilder::warn(msg.to_string())
@@ -452,10 +448,10 @@ impl VelosiAstUnitSegment {
             issues.push(err);
 
             let m = Rc::new(VelosiAstMethod::default_unmap());
-            methods_map.insert(m.ident_to_string(), m);
+            methods.insert(m.ident_to_string(), m);
         }
 
-        if !methods_map.contains_key("protect") && !pt.is_abstract {
+        if !methods.contains_key("protect") && !pt.is_abstract {
             let msg = "Segment unit has no `protect` method defined. Using default implementation";
             let hint = format!("add method with signature `{FN_SIG_PROTECT}` to unit");
             let err = VelosiAstErrBuilder::warn(msg.to_string())
@@ -465,10 +461,10 @@ impl VelosiAstUnitSegment {
             issues.push(err);
 
             let m = Rc::new(VelosiAstMethod::default_protect());
-            methods_map.insert(m.ident_to_string(), m);
+            methods.insert(m.ident_to_string(), m);
         }
 
-        if !methods_map.contains_key("translate") && !pt.is_abstract {
+        if !methods.contains_key("translate") && !pt.is_abstract {
             let msg = "Segment unit has no `protect` method defined. Using default implementation";
             let hint = format!("add method with signature `{FN_SIG_TRANSLATE}` to unit");
             let err = VelosiAstErrBuilder::warn(msg.to_string())
@@ -478,10 +474,10 @@ impl VelosiAstUnitSegment {
             issues.push(err);
 
             let m = Rc::new(VelosiAstMethod::default_translate());
-            methods_map.insert(m.ident_to_string(), m);
+            methods.insert(m.ident_to_string(), m);
         }
 
-        if !methods_map.contains_key("matchflags") && !pt.is_abstract {
+        if !methods.contains_key("matchflags") && !pt.is_abstract {
             let msg = "Segment unit has no `protect` method defined. Using default implementation";
             let hint = format!("add method with signature `{FN_SIG_MATCHFLAGS}` to unit");
             let err = VelosiAstErrBuilder::warn(msg.to_string())
@@ -491,12 +487,12 @@ impl VelosiAstUnitSegment {
             issues.push(err);
 
             let m = Rc::new(VelosiAstMethod::default_matchflags());
-            methods_map.insert(m.ident_to_string(), m);
+            methods.insert(m.ident_to_string(), m);
         }
 
         // check the methods whether they are still abstract
         if !pt.is_abstract {
-            for m in methods_map.values() {
+            for m in methods.values() {
                 if m.is_abstract {
                     let msg = format!(
                         "Method `{}::{}` is declared abstract, but enclosing unit is not.",
@@ -567,9 +563,8 @@ impl VelosiAstUnitSegment {
             state,
             interface,
             consts,
-            consts_map,
             flags,
-            methods_map,
+            methods,
             loc: pt.loc,
         };
 
@@ -604,11 +599,23 @@ impl VelosiAstUnitSegment {
     }
 
     pub fn get_method(&self, name: &str) -> Option<&Rc<VelosiAstMethod>> {
-        self.methods_map.get(name)
+        self.methods.get(name)
     }
 
-    pub fn methods(&self) -> Box<dyn Iterator<Item = &Rc<VelosiAstMethod>> + '_> {
-        Box::new(self.methods_map.values())
+    pub fn methods(&self) -> Values<String, Rc<VelosiAstMethod>> {
+        self.methods.values()
+    }
+
+    pub fn methods_mut(&mut self) -> ValuesMut<String, Rc<VelosiAstMethod>> {
+        self.methods.values_mut()
+    }
+
+    pub fn consts(&self) -> Values<String, Rc<VelosiAstConst>> {
+        self.consts.values()
+    }
+
+    pub fn consts_mut(&mut self) -> ValuesMut<String, Rc<VelosiAstConst>> {
+        self.consts.values_mut()
     }
 
     pub fn vaddr_max(&self) -> u64 {
@@ -628,7 +635,7 @@ impl VelosiAstUnitSegment {
     }
 
     pub fn set_method_ops(&mut self, method: &str, ops: Vec<VelosiOperation>) {
-        if let Some(m) = self.methods_map.get_mut(method) {
+        if let Some(m) = self.methods.get_mut(method) {
             if let Some(m) = Rc::get_mut(m) {
                 m.ops = ops;
                 return;
@@ -673,7 +680,7 @@ impl Display for VelosiAstUnitSegment {
         }
         writeln!(f, " {{")?;
 
-        for c in &self.consts {
+        for c in self.consts.values() {
             write!(f, "  ")?;
             Display::fmt(c, f)?;
             writeln!(f)?;
@@ -710,7 +717,7 @@ impl Display for VelosiAstUnitSegment {
             Display::fmt(m, f)?;
         }
 
-        if self.methods_map.is_empty() {
+        if self.methods.is_empty() {
             write!(f, "  // no methods")?;
         }
 
@@ -732,11 +739,9 @@ pub struct VelosiAstUnitStaticMap {
     pub outbitwidth: u64,
 
     ///
-    pub consts: Vec<Rc<VelosiAstConst>>,
-    pub consts_map: HashMap<String, Rc<VelosiAstConst>>,
+    pub consts: HashMap<String, Rc<VelosiAstConst>>,
 
-    pub methods: Vec<Rc<VelosiAstMethod>>,
-    pub methods_map: HashMap<String, Rc<VelosiAstMethod>>,
+    pub methods: HashMap<String, Rc<VelosiAstMethod>>,
 
     pub map: VelosiAstStaticMap,
 
@@ -781,10 +786,8 @@ impl VelosiAstUnitStaticMap {
 
         // TODO: handle the drivation...
 
-        let mut methods_map = HashMap::new();
-        let mut methods = Vec::new();
-        let mut consts_map = HashMap::new();
-        let mut consts = Vec::new();
+        let mut methods = HashMap::new();
+        let mut consts = HashMap::new();
         let mut inbitwidth: Option<(u64, VelosiTokenStream)> = None;
         let mut outbitwidth: Option<(u64, VelosiTokenStream)> = None;
         let mut map: Option<VelosiAstStaticMap> = None;
@@ -798,8 +801,7 @@ impl VelosiAstUnitStaticMap {
                     if let Err(e) = st.insert(c.clone().into()) {
                         issues.push(*e);
                     } else {
-                        consts.push(c.clone());
-                        consts_map.insert(c.ident_to_string(), c);
+                        consts.insert(c.ident_to_string(), c);
                     }
                 }
                 VelosiParseTreeUnitNode::InBitWidth(e, loc) => {
@@ -868,8 +870,7 @@ impl VelosiAstUnitStaticMap {
                     if let Err(e) = st.insert(m.clone().into()) {
                         issues.push(*e);
                     } else {
-                        methods.push(m.clone());
-                        methods_map.insert(m.ident_to_string(), m);
+                        methods.insert(m.ident_to_string(), m);
                     }
                 }
                 VelosiParseTreeUnitNode::Map(m) => {
@@ -967,9 +968,7 @@ impl VelosiAstUnitStaticMap {
             inbitwidth,
             outbitwidth,
             consts,
-            consts_map,
             methods,
-            methods_map,
             map,
             loc: pt.loc,
         };
@@ -1001,7 +1000,23 @@ impl VelosiAstUnitStaticMap {
     }
 
     pub fn get_method(&self, name: &str) -> Option<&Rc<VelosiAstMethod>> {
-        self.methods_map.get(name)
+        self.methods.get(name)
+    }
+
+    pub fn methods(&self) -> Values<String, Rc<VelosiAstMethod>> {
+        self.methods.values()
+    }
+
+    pub fn methods_mut(&mut self) -> ValuesMut<String, Rc<VelosiAstMethod>> {
+        self.methods.values_mut()
+    }
+
+    pub fn consts(&self) -> Values<String, Rc<VelosiAstConst>> {
+        self.consts.values()
+    }
+
+    pub fn consts_mut(&mut self) -> ValuesMut<String, Rc<VelosiAstConst>> {
+        self.consts.values_mut()
     }
 
     pub fn params_as_slice(&self) -> &[Rc<VelosiAstParam>] {
@@ -1045,7 +1060,7 @@ impl Display for VelosiAstUnitStaticMap {
         }
         writeln!(f, " {{")?;
 
-        for c in &self.consts {
+        for c in self.consts.values() {
             write!(f, "  ")?;
             Display::fmt(c, f)?;
             writeln!(f)?;
@@ -1059,7 +1074,7 @@ impl Display for VelosiAstUnitStaticMap {
         writeln!(f, "  inbitwidth = {};", self.inbitwidth)?;
         writeln!(f, "  outbitwidth = {};\n", self.outbitwidth)?;
 
-        for (i, m) in self.methods.iter().enumerate() {
+        for (i, m) in self.methods.values().enumerate() {
             if i > 0 {
                 writeln!(f, "\n")?;
             }
@@ -1527,7 +1542,7 @@ impl VelosiAstUnit {
     pub fn methods(&self) -> Box<dyn Iterator<Item = &Rc<VelosiAstMethod>> + '_> {
         use VelosiAstUnit::*;
         match self {
-            StaticMap(staticmap) => Box::new(staticmap.methods.iter()),
+            StaticMap(staticmap) => Box::new(staticmap.methods()),
             Segment(segment) => Box::new(segment.methods()),
             Enum(_) => Box::new(std::iter::empty()),
         }
@@ -1542,12 +1557,12 @@ impl VelosiAstUnit {
         }
     }
 
-    pub fn consts(&self) -> &[Rc<VelosiAstConst>] {
+    pub fn consts(&self) -> Box<dyn Iterator<Item = &Rc<VelosiAstConst>> + '_> {
         use VelosiAstUnit::*;
         match self {
-            StaticMap(staticmap) => staticmap.consts.as_slice(),
-            Segment(segment) => segment.consts.as_slice(),
-            Enum(_) => &[],
+            StaticMap(staticmap) => Box::new(staticmap.consts()),
+            Segment(segment) => Box::new(segment.consts()),
+            Enum(_) => Box::new(std::iter::empty()),
         }
     }
 
