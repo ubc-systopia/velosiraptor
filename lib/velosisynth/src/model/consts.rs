@@ -36,7 +36,11 @@ use velosiast::ast::VelosiAstConst;
 use crate::model::types;
 
 /// adds constant definitions to the current context
-pub fn add_consts(smt: &mut Smt2Context, context: &str, consts: &[Rc<VelosiAstConst>]) {
+pub fn add_consts(
+    smt: &mut Smt2Context,
+    context: &str,
+    consts: Box<dyn Iterator<Item = &Rc<VelosiAstConst>> + '_>,
+) {
     smt.section(format!("Constants for unit {context}"));
     for c in consts {
         if c.ctype.is_numeric() {
