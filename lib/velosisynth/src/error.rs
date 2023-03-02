@@ -133,15 +133,15 @@ pub(crate) struct VelosiSynthErrorBuilder {
 }
 
 impl VelosiSynthErrorBuilder {
-    pub fn warn(message: String) -> Self {
-        Self {
-            warn: true,
-            message,
-            hint: None,
-            tokstream: None,
-            related: Vec::new(),
-        }
-    }
+    // pub fn warn(message: String) -> Self {
+    //     Self {
+    //         warn: true,
+    //         message,
+    //         hint: None,
+    //         tokstream: None,
+    //         related: Vec::new(),
+    //     }
+    // }
 
     pub fn err(message: String) -> Self {
         Self {
@@ -154,10 +154,10 @@ impl VelosiSynthErrorBuilder {
     }
 
     /// Adds a hint to the error message
-    pub fn add_hint(&mut self, hint: String) -> &mut Self {
-        self.hint = Some(hint);
-        self
-    }
+    // pub fn add_hint(&mut self, hint: String) -> &mut Self {
+    //     self.hint = Some(hint);
+    //     self
+    // }
 
     /// Adds a location to the error information
     pub fn add_location(&mut self, tokstream: VelosiTokenStream) -> &mut Self {
@@ -165,14 +165,14 @@ impl VelosiSynthErrorBuilder {
         self
     }
 
-    pub fn add_related_location(
-        &mut self,
-        message: String,
-        tokstream: VelosiTokenStream,
-    ) -> &mut Self {
-        self.related.push((message, tokstream));
-        self
-    }
+    // pub fn add_related_location(
+    //     &mut self,
+    //     message: String,
+    //     tokstream: VelosiTokenStream,
+    // ) -> &mut Self {
+    //     self.related.push((message, tokstream));
+    //     self
+    // }
 
     pub fn build(&mut self) -> VelosiSynthError {
         if self.hint.is_none() && self.tokstream.is_none() && !self.related.is_empty() {
