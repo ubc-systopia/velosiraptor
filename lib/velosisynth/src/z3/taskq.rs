@@ -91,9 +91,8 @@ impl TaskQ {
 
     pub fn drain(&mut self) {
         for i in 0..4 {
-            if let mut q = self.task_queues[i].lock().unwrap() {
-                q.clear();
-            }
+            let mut q = self.task_queues[i].lock().unwrap();
+            q.clear();
             self.task_counts[i].store(0, Ordering::SeqCst);
         }
     }
