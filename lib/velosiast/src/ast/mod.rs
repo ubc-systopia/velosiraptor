@@ -28,10 +28,11 @@
 //! This module defines the AST of the langauge
 
 // used standard library functionality
+use core::str::Split;
+use std::collections::hash_map::{Keys, Values, ValuesMut};
+use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
-
-use std::collections::HashMap;
 
 use velosiparser::{
     VelosiParseTree, VelosiParseTreeContextNode, VelosiParseTreeIdentifier, VelosiTokenStream,
@@ -135,8 +136,6 @@ impl PartialEq for VelosiAstIdentifier {
 /// the path separator
 pub const IDENT_PATH_SEP: &str = ".";
 
-use core::str::Split;
-
 impl VelosiAstIdentifier {
     /// creates a new identifier token
     fn new(prefix: &str, name: String, loc: VelosiTokenStream) -> Self {
@@ -210,73 +209,24 @@ impl Display for VelosiAstIdentifier {
 /// Defines the root note of the ast
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstRoot {
-    pub consts: Vec<Rc<VelosiAstConst>>,
-    pub consts_map: HashMap<String, Rc<VelosiAstConst>>,
-    // pub abstract_map : HashMap<>,
-    pub segments_map: HashMap<String, Rc<VelosiAstUnitSegment>>,
-    pub staticmap_map: HashMap<String, Rc<VelosiAstUnitStaticMap>>,
-    pub enum_map: HashMap<String, Rc<VelosiAstUnitEnum>>,
+    pub consts: HashMap<String, Rc<VelosiAstConst>>,
+    pub units: HashMap<String, VelosiAstUnit>,
     pub context: String,
 }
 
 impl VelosiAstRoot {
     pub fn new(context: String) -> Self {
         Self {
-            consts: Vec::new(),
-            consts_map: HashMap::new(),
-            segments_map: HashMap::new(),
-            staticmap_map: HashMap::new(),
-            enum_map: HashMap::new(),
+            consts: HashMap::new(),
+            units: HashMap::new(),
             context,
         }
-    }
-
-    pub fn add_const(&mut self, c: VelosiAstConst) {
-        let c = Rc::new(c);
-        self.add_const_rc(c)
-    }
-
-    fn add_const_rc(&mut self, c: Rc<VelosiAstConst>) {
-        self.consts_map.insert(c.ident_to_string(), c.clone());
-        self.consts.push(c);
-    }
-
-    pub fn add_unit(&mut self, u: VelosiAstUnit) {
-        match u {
-            VelosiAstUnit::Segment(s) => {
-                self.segments_map.insert(s.ident_to_string(), s.clone());
-            }
-            VelosiAstUnit::StaticMap(s) => {
-                self.staticmap_map.insert(s.ident_to_string(), s.clone());
-            }
-            VelosiAstUnit::Enum(f) => {
-                self.enum_map.insert(f.ident_to_string(), f.clone());
-            }
-        }
-    }
-
-    pub fn unit_map(&self) -> HashMap<Rc<String>, VelosiAstUnit> {
-        let mut units = HashMap::new();
-        for u in self.segments_map.values() {
-            if u.is_abstract {
-                continue;
-            }
-            units.insert(u.ident().clone(), VelosiAstUnit::Segment(u.clone()));
-        }
-        for u in self.staticmap_map.values() {
-            units.insert(u.ident().clone(), VelosiAstUnit::StaticMap(u.clone()));
-        }
-        for u in self.enum_map.values() {
-            units.insert(u.ident().clone(), VelosiAstUnit::Enum(u.clone()));
-        }
-        units
     }
 
     pub fn from_parse_tree(pt: VelosiParseTree) -> AstResult<VelosiAstRoot, VelosiAstIssues> {
         let mut root = Self::new(pt.context.unwrap_or_else(|| "$buf".to_string()));
 
         // create the symbol table
-
         let mut st = SymbolTable::new();
         let mut issues = VelosiAstIssues::new();
 
@@ -292,7 +242,7 @@ impl VelosiAstRoot {
                     if let Err(e) = st.insert(c.clone().into()) {
                         issues.push(*e);
                     } else {
-                        root.add_const_rc(c);
+                        root.consts.insert(c.ident_to_string(), c);
                     }
                 }
                 VelosiParseTreeContextNode::Unit(u) => {
@@ -300,7 +250,7 @@ impl VelosiAstRoot {
                     if let Err(e) = st.insert(c.clone().into()) {
                         issues.push(*e);
                     } else {
-                        root.add_unit(c);
+                        root.units.insert(c.ident_to_string(), c);
                     }
                 }
                 VelosiParseTreeContextNode::Import(_i) => {
@@ -312,24 +262,93 @@ impl VelosiAstRoot {
         ast_result_return!(root, issues)
     }
 
-    pub fn consts(&self) -> &[Rc<VelosiAstConst>] {
-        self.consts.as_slice()
+    pub fn add_const(&mut self, c: VelosiAstConst) {
+        self.consts.insert(c.ident_to_string(), Rc::new(c));
     }
 
-    pub fn put_segment_unit(&mut self, unit: VelosiAstUnitSegment) {
-        self.segments_map
-            .insert(unit.ident_to_string(), Rc::new(unit));
+    pub fn consts(&self) -> Values<String, Rc<VelosiAstConst>> {
+        self.consts.values()
     }
 
-    pub fn take_segment_unit(&mut self) -> Option<VelosiAstUnitSegment> {
-        if let Some((k, v)) = self.segments_map.drain().next() {
-            if Rc::weak_count(&v) > 1 || Rc::strong_count(&v) > 1 {
-                panic!("Segment unit {} is still in use!", k);
-            }
-            Some(Rc::try_unwrap(v).unwrap())
+    pub fn consts_mut(&mut self) -> ValuesMut<String, Rc<VelosiAstConst>> {
+        self.consts.values_mut()
+    }
+
+    pub fn consts_idents(&self) -> Keys<String, Rc<VelosiAstConst>> {
+        self.consts.keys()
+    }
+
+    pub fn get_const(&self, ident: &str) -> Option<&VelosiAstConst> {
+        if let Some(c) = self.consts.get(ident) {
+            Some(c.as_ref())
         } else {
             None
         }
+    }
+
+    pub fn get_const_mut(&mut self, ident: &str) -> Option<&mut VelosiAstConst> {
+        if let Some(c) = self.consts.get_mut(ident) {
+            if Rc::weak_count(c) > 1 || Rc::strong_count(c) > 1 {
+                // warn!
+            }
+            Rc::get_mut(c)
+        } else {
+            None
+        }
+    }
+
+    pub fn add_unit(&mut self, u: VelosiAstUnit) {
+        self.units.insert(u.ident_to_string(), u);
+    }
+
+    pub fn units(&self) -> Values<String, VelosiAstUnit> {
+        self.units.values()
+    }
+
+    pub fn units_mut(&mut self) -> ValuesMut<String, VelosiAstUnit> {
+        self.units.values_mut()
+    }
+
+    pub fn units_idents(&self) -> Keys<String, VelosiAstUnit> {
+        self.units.keys()
+    }
+
+    pub fn get_unit(&self, ident: &str) -> Option<&VelosiAstUnit> {
+        self.units.get(ident)
+    }
+
+    pub fn get_unit_mut(&mut self, ident: &str) -> Option<&mut VelosiAstUnit> {
+        self.units.get_mut(ident)
+    }
+
+    pub fn segments(&self) -> Vec<&VelosiAstUnitSegment> {
+        self.units
+            .iter()
+            .filter_map(|(_k, v)| match v {
+                VelosiAstUnit::Segment(e) => Some(e.as_ref()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    pub fn staticmaps(&self) -> Vec<&VelosiAstUnitStaticMap> {
+        self.units
+            .iter()
+            .filter_map(|(_k, v)| match v {
+                VelosiAstUnit::StaticMap(e) => Some(e.as_ref()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    pub fn enums(&self) -> Vec<&VelosiAstUnitEnum> {
+        self.units
+            .iter()
+            .filter_map(|(_k, v)| match v {
+                VelosiAstUnit::Enum(e) => Some(e.as_ref()),
+                _ => None,
+            })
+            .collect()
     }
 }
 
@@ -343,7 +362,7 @@ impl Display for VelosiAstRoot {
         )?;
         writeln!(f, "\nConsts:")?;
 
-        for c in self.consts.iter() {
+        for c in self.consts.values() {
             writeln!(f)?;
             Display::fmt(c, f)?;
             writeln!(f)?;
@@ -353,29 +372,14 @@ impl Display for VelosiAstRoot {
             writeln!(f, "  <none>")?;
         }
 
-        writeln!(f, "\nSegment Units:")?;
+        writeln!(f, "\\b Units:")?;
 
-        for u in self.segments_map.values() {
+        for u in self.units.values() {
             writeln!(f)?;
             Display::fmt(u, f)?;
             writeln!(f)?;
         }
 
-        if self.segments_map.is_empty() {
-            writeln!(f, "  <none>")?;
-        }
-
-        writeln!(f, "\nStaticMap Units:")?;
-
-        for u in self.staticmap_map.values() {
-            writeln!(f)?;
-            Display::fmt(u, f)?;
-            writeln!(f)?;
-        }
-
-        if self.segments_map.is_empty() {
-            writeln!(f, "  <none>")?;
-        }
         writeln!(
             f,
             "--------------------------------------------------------"

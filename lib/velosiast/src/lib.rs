@@ -30,11 +30,10 @@
 
 // used standard library functionality
 
-use std::collections::HashMap;
+use std::collections::hash_map::{Keys, Values, ValuesMut};
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
-use ast::VelosiAstConst;
 // public re-exports
 pub use velosiparser::{VelosiParser, VelosiParserError, VelosiTokenStream};
 
@@ -48,7 +47,10 @@ use error::{VelosiAstErrBuilder, VelosiAstIssues};
 use symboltable::{Symbol, SymbolTable};
 use velosiparser::VelosiParseTree;
 
-pub use crate::ast::{VelosiAstRoot, VelosiAstUnit, VelosiAstUnitSegment, VelosiAstUnitStaticMap};
+pub use crate::ast::{
+    VelosiAstConst, VelosiAstRoot, VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment,
+    VelosiAstUnitStaticMap,
+};
 
 // custom error definitions
 pub enum AstResult<T, E> {
@@ -142,33 +144,56 @@ impl VelosiAst {
         Self::from_parse_result(VelosiParser::parse_file(filename, true))
     }
 
-    pub fn consts(&self) -> &[Rc<VelosiAstConst>] {
+    pub fn consts(&self) -> Values<String, Rc<VelosiAstConst>> {
         self.root.consts()
     }
 
-    pub fn take_segment_unit(&mut self) -> Option<VelosiAstUnitSegment> {
-        self.root.take_segment_unit()
+    pub fn consts_idents(&self) -> Keys<String, Rc<VelosiAstConst>> {
+        self.root.consts_idents()
     }
 
-    pub fn put_segment_unit(&mut self, unit: VelosiAstUnitSegment) {
-        self.root.put_segment_unit(unit)
+    pub fn consts_mut(&mut self) -> ValuesMut<String, Rc<VelosiAstConst>> {
+        self.root.consts_mut()
     }
 
-    pub fn segment_units(&self) -> impl Iterator<Item = &Rc<VelosiAstUnitSegment>> {
-        self.root.segments_map.values()
+    pub fn get_const(&self, ident: &str) -> Option<&VelosiAstConst> {
+        self.root.get_const(ident)
     }
 
-    pub fn segment_units_mut(&mut self) -> impl Iterator<Item = &mut Rc<VelosiAstUnitSegment>> {
-        self.root.segments_map.values_mut()
+    pub fn get_const_mut(&mut self, ident: &str) -> Option<&mut VelosiAstConst> {
+        self.root.get_const_mut(ident)
     }
 
-    pub fn staticmap_units(&self) -> impl Iterator<Item = &Rc<VelosiAstUnitStaticMap>> {
-        self.root.staticmap_map.values()
+    pub fn units(&self) -> Values<String, VelosiAstUnit> {
+        self.root.units()
     }
 
-    /// get a map of all non-abstract units
-    pub fn unit_map(&self) -> HashMap<Rc<String>, VelosiAstUnit> {
-        self.root.unit_map()
+    pub fn units_mut(&mut self) -> ValuesMut<String, VelosiAstUnit> {
+        self.root.units_mut()
+    }
+
+    pub fn units_idents(&self) -> Keys<String, VelosiAstUnit> {
+        self.root.units_idents()
+    }
+
+    pub fn get_unit(&self, ident: &str) -> Option<&VelosiAstUnit> {
+        self.root.get_unit(ident)
+    }
+
+    pub fn get_unit_mut(&mut self, ident: &str) -> Option<&mut VelosiAstUnit> {
+        self.root.get_unit_mut(ident)
+    }
+
+    pub fn segments(&self) -> Vec<&VelosiAstUnitSegment> {
+        self.root.segments()
+    }
+
+    pub fn staticmaps(&self) -> Vec<&VelosiAstUnitStaticMap> {
+        self.root.staticmaps()
+    }
+
+    pub fn enums(&self) -> Vec<&VelosiAstUnitEnum> {
+        self.root.enums()
     }
 }
 
