@@ -62,7 +62,7 @@ fn add_model(smt: &mut Smt2Context) {
     dt.add_comment("Model Definition".to_string());
     dt.add_field(format!("{MODEL_PREFIX}.{STATE_PREFIX}"), types::state());
     dt.add_field(format!("{MODEL_PREFIX}.{IFACE_PREFIX}"), types::iface());
-    dt.add_field(format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}"), types::iface());
+    dt.add_field(format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}"), types::wbuffer());
 
     let accessors = dt.to_field_accessor();
     smt.datatype(dt);
@@ -108,16 +108,16 @@ pub fn model_set_fn_name(ctxt: &str) -> String {
     format!("Model.{ctxt}.set!")
 }
 
-fn add_model_field_accessor(smt: &mut Smt2Context, ftype: &str, mtype: &str, fieldname: &str) {
+fn add_model_field_accessor(smt: &mut Smt2Context, ftype: &str, fieldname: &str) {
     //
     // Model Field Get
     //
-    let name = model_field_get_fn_name(mtype, fieldname);
+    let name = model_field_get_fn_name(ftype, fieldname);
     let mut f = Function::new(name, types::field_type(ftype, fieldname));
     f.add_arg(String::from("st"), types::model());
 
     let arg = Term::ident(String::from("st"));
-    let st = Term::fn_apply(model_get_fn_name(mtype), vec![arg]);
+    let st = Term::fn_apply(model_get_fn_name(ftype), vec![arg]);
     let e = Term::fn_apply(field_get_fn_name(ftype, fieldname), vec![st]);
     f.add_body(e);
     smt.function(f);
@@ -125,7 +125,7 @@ fn add_model_field_accessor(smt: &mut Smt2Context, ftype: &str, mtype: &str, fie
     //
     // Model Field Set
     //
-    let name = model_field_set_fn_name(mtype, fieldname);
+    let name = model_field_set_fn_name(ftype, fieldname);
     let mut f = Function::new(name, types::model());
     f.add_arg(String::from("st"), types::model());
     f.add_arg(String::from("val"), types::field_type(ftype, fieldname));
@@ -133,32 +133,26 @@ fn add_model_field_accessor(smt: &mut Smt2Context, ftype: &str, mtype: &str, fie
     let arg = Term::ident(String::from("st"));
     let arg2 = Term::ident(String::from("val"));
 
-    let st = Term::fn_apply(model_get_fn_name(mtype), vec![arg.clone()]);
+    let st = Term::fn_apply(model_get_fn_name(ftype), vec![arg.clone()]);
 
     let st = Term::fn_apply(field_set_fn_name(ftype, fieldname), vec![st, arg2]);
-    let e = Term::fn_apply(model_set_fn_name(mtype), vec![arg, st]);
+    let e = Term::fn_apply(model_set_fn_name(ftype), vec![arg, st]);
     f.add_body(e);
 
     smt.function(f);
 }
 
-fn add_model_slice_accessor(
-    smt: &mut Smt2Context,
-    ftype: &str,
-    mtype: &str,
-    fieldname: &str,
-    slice: &str,
-) {
+fn add_model_slice_accessor(smt: &mut Smt2Context, ftype: &str, fieldname: &str, slice: &str) {
     //
     // Model Field Slice Get
     //
 
-    let name = model_slice_get_fn_name(mtype, fieldname, slice);
+    let name = model_slice_get_fn_name(ftype, fieldname, slice);
     let mut f = Function::new(name, types::num());
     f.add_arg(String::from("st"), types::model());
 
     let arg = Term::ident(String::from("st"));
-    let st = Term::fn_apply(model_get_fn_name(mtype), vec![arg]);
+    let st = Term::fn_apply(model_get_fn_name(ftype), vec![arg]);
     let e = Term::fn_apply(field_slice_get_fn_name(ftype, fieldname, slice), vec![st]);
     f.add_body(e);
 
@@ -168,7 +162,7 @@ fn add_model_slice_accessor(
     // Model Field Slice Set
     //
 
-    let name = model_slice_set_fn_name(mtype, fieldname, slice);
+    let name = model_slice_set_fn_name(ftype, fieldname, slice);
     let mut f = Function::new(name, types::model());
     f.add_arg(String::from("st"), types::model());
     f.add_arg(String::from("val"), types::num());
@@ -176,7 +170,7 @@ fn add_model_slice_accessor(
     let arg = Term::ident(String::from("st"));
     let arg2 = Term::ident(String::from("val"));
 
-    let st = Term::fn_apply(model_get_fn_name(mtype), vec![arg.clone()]);
+    let st = Term::fn_apply(model_get_fn_name(ftype), vec![arg.clone()]);
 
     // get the state
 
@@ -186,7 +180,68 @@ fn add_model_slice_accessor(
         vec![st, arg2],
     );
 
-    let e = Term::fn_apply(model_set_fn_name(mtype), vec![arg, st]);
+    let e = Term::fn_apply(model_set_fn_name(ftype), vec![arg, st]);
+    f.add_body(e);
+
+    smt.function(f);
+}
+
+fn add_model_wbuffer_slice_set(smt: &mut Smt2Context, fieldname: &str, slice: &str) {
+    let name = model_slice_set_fn_name(WBUFFER_PREFIX, fieldname, slice);
+    let mut f = Function::new(name, types::model());
+    f.add_arg(String::from("st"), types::model());
+    f.add_arg(String::from("val"), types::num());
+
+    let arg = Term::ident(String::from("st"));
+    let arg2 = Term::ident(String::from("val"));
+
+    let st = Term::fn_apply(model_get_fn_name(WBUFFER_PREFIX), vec![arg.clone()]);
+    let lambda = Term::fn_apply(
+        "lambda".to_string(),
+        vec![
+            // TODO: hack using ident
+            Term::ident("((m Model_t))".to_string()),
+            Term::fn_apply(
+                model_slice_set_fn_name(IFACE_PREFIX, fieldname, slice),
+                vec![Term::ident("m".to_string()), arg2],
+            ),
+        ],
+    );
+
+    let st = Term::fn_apply("insert".to_string(), vec![lambda, st]);
+    let e = Term::fn_apply(model_set_fn_name(WBUFFER_PREFIX), vec![arg, st]);
+    f.add_body(e);
+
+    smt.function(f);
+}
+
+fn add_model_wbuffer_field_set(smt: &mut Smt2Context, fieldname: &str) {
+    let name = model_field_set_fn_name(WBUFFER_PREFIX, fieldname);
+    let mut f = Function::new(name, types::model());
+    f.add_arg(String::from("st"), types::model());
+    f.add_arg(
+        String::from("val"),
+        types::field_type(IFACE_PREFIX, fieldname),
+    );
+
+    let arg = Term::ident(String::from("st"));
+    let arg2 = Term::ident(String::from("val"));
+
+    let st = Term::fn_apply(model_get_fn_name(WBUFFER_PREFIX), vec![arg.clone()]);
+    // TODO: hack using ident
+    let lambda = Term::fn_apply(
+        "lambda".to_string(),
+        vec![
+            Term::ident("((m Model_t))".to_string()),
+            Term::fn_apply(
+                model_field_set_fn_name(IFACE_PREFIX, fieldname),
+                vec![Term::ident("m".to_string()), arg2],
+            ),
+        ],
+    );
+
+    let st = Term::fn_apply("insert".to_string(), vec![lambda, st]);
+    let e = Term::fn_apply(model_set_fn_name(WBUFFER_PREFIX), vec![arg, st]);
     f.add_body(e);
 
     smt.function(f);
@@ -196,10 +251,10 @@ fn add_model_state_accessors(smt: &mut Smt2Context, state: &VelosiAstState) {
     smt.section(String::from("Model State Accessors"));
     for f in state.fields() {
         smt.subsection(format!("state field: {}", f.ident()));
-        add_model_field_accessor(smt, STATE_PREFIX, STATE_PREFIX, f.ident());
+        add_model_field_accessor(smt, STATE_PREFIX, f.ident());
 
         for s in f.layout_as_slice() {
-            add_model_slice_accessor(smt, STATE_PREFIX, STATE_PREFIX, f.ident(), s.ident());
+            add_model_slice_accessor(smt, STATE_PREFIX, f.ident(), s.ident());
         }
     }
 }
@@ -209,22 +264,23 @@ fn add_model_iface_accessors(smt: &mut Smt2Context, iface: &VelosiAstInterface) 
 
     for f in iface.fields() {
         smt.subsection(format!("interface field: {}", f.ident()));
-        add_model_field_accessor(smt, IFACE_PREFIX, IFACE_PREFIX, f.ident());
+        add_model_field_accessor(smt, IFACE_PREFIX, f.ident());
         for s in f.layout() {
-            add_model_slice_accessor(smt, IFACE_PREFIX, IFACE_PREFIX, f.ident(), s.ident());
+            add_model_slice_accessor(smt, IFACE_PREFIX, f.ident(), s.ident());
         }
         // add the full field accessor
     }
 }
 
 fn add_model_wbuffer_accessors(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
-    smt.section(String::from("Model Local Variables Accessors"));
+    smt.section(String::from("Model Write Buffer Accessors"));
 
     for f in iface.fields() {
-        smt.subsection(format!("local variable field: {}", f.ident()));
-        add_model_field_accessor(smt, IFACE_PREFIX, WBUFFER_PREFIX, f.ident());
+        smt.subsection(format!("write buffer field: {}", f.ident()));
+        add_model_wbuffer_field_set(smt, f.ident());
+
         for s in f.layout() {
-            add_model_slice_accessor(smt, IFACE_PREFIX, WBUFFER_PREFIX, f.ident(), s.ident());
+            add_model_wbuffer_slice_set(smt, f.ident(), s.ident());
         }
     }
 }
@@ -286,30 +342,63 @@ fn add_field_action(
     smt.function(f);
 }
 
+fn add_pop_action(smt: &mut Smt2Context) {
+    let name = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.popaction!");
+    let mut f = Function::new(name, types::model());
+    f.add_arg(String::from("st"), types::model());
+    f.add_comment(format!(
+        "takes one item off the write buffer and writes it to backing interface"
+    ));
+
+    let body = Term::letexpr(
+        vec![VarBinding::new(
+            "wb".to_string(),
+            Term::fn_apply(
+                model_get_fn_name(WBUFFER_PREFIX),
+                vec![Term::ident("st".to_string())],
+            ),
+        )],
+        Term::letexpr(
+            vec![
+                VarBinding::new(
+                    "callback".to_string(),
+                    Term::fn_apply("head".to_string(), vec![Term::ident("wb".to_string())]),
+                ),
+                VarBinding::new(
+                    "new_wb".to_string(),
+                    Term::fn_apply("tail".to_string(), vec![Term::ident("wb".to_string())]),
+                ),
+            ],
+            Term::letexpr(
+                vec![VarBinding::new(
+                    "new_st".to_string(),
+                    Term::fn_apply(
+                        model_set_fn_name(WBUFFER_PREFIX),
+                        vec![
+                            Term::ident("st".to_string()),
+                            Term::ident("new_wb".to_string()),
+                        ],
+                    ),
+                )],
+                Term::fn_apply(
+                    "select".to_string(),
+                    vec![
+                        Term::ident("callback".to_string()),
+                        Term::ident("new_st".to_string()),
+                    ],
+                ),
+            ),
+        ),
+    );
+
+    f.add_body(body);
+    smt.function(f);
+}
+
 fn add_actions(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
     smt.section(String::from("Actions"));
     for f in iface.fields() {
         smt.subsection(format!("interface field: {}", f.ident()));
-
-        // TODO: hard-coded for now
-        let write_buffer_action = VelosiAstInterfaceAction::new(
-            VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
-                "WBuffer.pte".to_string(),
-                VelosiAstTypeInfo::Integer,
-            )),
-            VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
-                "interface.pte".to_string(),
-                VelosiAstTypeInfo::Integer,
-            )),
-            Default::default(),
-        );
-        add_field_action(
-            smt,
-            &[write_buffer_action],
-            f.ident(),
-            "store",
-            f.size() * 8,
-        );
 
         add_field_action(
             smt,
@@ -326,4 +415,6 @@ fn add_actions(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
             f.size() * 8,
         );
     }
+
+    add_pop_action(smt);
 }
