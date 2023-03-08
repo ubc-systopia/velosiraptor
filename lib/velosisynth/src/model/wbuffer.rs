@@ -1,4 +1,4 @@
-// Velosiraptor Synthesizer
+// Velosiraptor Code Generator
 //
 //
 // MIT License
@@ -23,42 +23,25 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use smt2::{Smt2Context, Smt2Option};
-use velosiast::ast::VelosiAstUnitSegment;
+//! State Synthesis Module: Z3
 
-pub mod consts;
-pub mod expr;
-pub mod field;
-pub mod flags;
-pub mod interface;
-pub mod method;
-pub mod state;
-pub mod types;
-pub mod velosimodel;
-pub mod wbuffer;
+use smt2::Smt2Context;
+use smt2::Sort;
 
-pub fn create(unit: &VelosiAstUnitSegment) -> Smt2Context {
-    let mut smt = Smt2Context::new();
+use super::types;
 
-    // set the options
-    smt.set_option(Smt2Option::ProduceUnsatCores(true));
+/// adds the write buffer definitions to the model
+///
+/// Note: this doesn't include the write buffer actions
+pub fn add_wbuffer_def(smt: &mut Smt2Context) {
+    smt.section(String::from("Write Buffer"));
 
-    // adding general type definitions
-    types::add_type_defs(&mut smt, unit.inbitwidth, unit.outbitwidth);
-
-    // TODO: adding global constants
-
-    // adding the model
-    consts::add_consts(&mut smt, unit.ident(), Box::new(unit.consts()));
-    if let Some(flags) = &unit.flags {
-        flags::add_flags(&mut smt, unit.ident(), flags);
-    }
-
-    state::add_state_def(&mut smt, &unit.state);
-    interface::add_interface_def(&mut smt, &unit.interface);
-    wbuffer::add_wbuffer_def(&mut smt);
-    velosimodel::add_model_def(&mut smt, unit);
-    method::add_methods(&mut smt, Box::new(unit.methods()));
-
-    smt
+    smt.sort(Sort::new_def(
+        types::callback(),
+        format!("(Array {} {})", types::iface(), types::iface()),
+    ));
+    smt.sort(Sort::new_def(
+        types::wbuffer(),
+        format!("(List {})", types::callback()),
+    ));
 }
