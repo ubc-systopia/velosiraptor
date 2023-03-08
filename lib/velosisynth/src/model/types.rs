@@ -45,6 +45,10 @@ pub fn state() -> String {
     "State_t".to_string()
 }
 
+pub fn wbuffer() -> String {
+    format!("(List (Array {} {}))", model(), model())
+}
+
 pub fn ctxt(c: &str) -> String {
     format!("{c}_t")
 }
@@ -134,6 +138,14 @@ fn add_type_constraints_size(smt: &mut Smt2Context, name: String, maxbits: u64) 
 
 pub fn add_type_defs(smt: &mut Smt2Context, inaddr: u64, outaddr: u64) {
     smt.section(String::from("Type Definitions"));
+
+    // TODO: reset removes the built-in list type, otherwise this would not be needed
+    smt.raw(
+        "(declare-datatype List (par (E)
+  ( (nil)
+    (insert (head E) (tail (List E)) ))))"
+            .to_string(),
+    );
 
     let default_sort = format!("(_ BitVec {DEFAULT_BIT_WIDTH})");
     add_type_def(smt, num(), default_sort.clone());

@@ -35,7 +35,7 @@ use smt2::{Function, Smt2Context, Term, VarBinding};
 use velosiast::ast::{VelosiAstParam, VelosiOpExpr, VelosiOperation};
 
 use crate::model;
-use crate::model::velosimodel::{IFACE_PREFIX, WBUFFER_PREFIX};
+use crate::model::velosimodel::{IFACE_PREFIX, MODEL_PREFIX, WBUFFER_PREFIX};
 
 mod builder;
 mod statevars;
@@ -395,7 +395,10 @@ impl FieldSliceOp {
         symvars: &mut SymbolicVars,
     ) {
         let arg = self.1.to_smt2_term(symvars);
-        let fname = format!("Model.{WBUFFER_PREFIX}.{}.{}.set!", fieldname, self.0);
+        let fname = format!(
+            "{MODEL_PREFIX}.{WBUFFER_PREFIX}.{}.{}.set!",
+            fieldname, self.0
+        );
         smtops.push((fname, Some(arg)));
     }
 }
@@ -469,7 +472,7 @@ impl FieldOp {
         match self {
             FieldOp::InsertField(arg) => {
                 let arg = arg.to_smt2_term(symvars);
-                let fname = format!("Model.{WBUFFER_PREFIX}.{fieldname}.set!");
+                let fname = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.{fieldname}.set!");
                 smtops.push((fname, Some(arg)));
             }
             FieldOp::InsertFieldSlices(sliceops) => {
@@ -478,10 +481,10 @@ impl FieldOp {
                     .for_each(|f| f.to_smt2_term(fieldname, smtops, symvars));
             }
             FieldOp::ReadAction => {
-                let fname = format!("Model.{IFACE_PREFIX}.{fieldname}.readaction! ");
+                let fname = format!("{MODEL_PREFIX}.{IFACE_PREFIX}.{fieldname}.readaction! ");
                 smtops.push((fname, None));
             } // FieldOp::WriteAction => {
-              //     let fname = format!("Model.IFace.{}.writeaction! ", fieldname);
+              //     let fname = format!("{MODEL_PREFIX}.IFace.{}.writeaction! ", fieldname);
               //     smtops.push((fname, None));
               // }
         }
@@ -567,9 +570,9 @@ impl FieldActions {
             .for_each(|f| f.to_smt2_term(self.0.as_str(), smtops, symvars));
 
         // field actions always end with a write action
-        let fname = format!("Model.{IFACE_PREFIX}.{}.storeaction! ", self.0);
+        let fname = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.popaction! ");
         smtops.push((fname, None));
-        let fname = format!("Model.{IFACE_PREFIX}.{}.writeaction! ", self.0);
+        let fname = format!("{MODEL_PREFIX}.{IFACE_PREFIX}.{}.writeaction! ", self.0);
         smtops.push((fname, None));
     }
 }
@@ -689,7 +692,7 @@ impl Program {
         //   let st1 = op1(st)
         //   let st2 = op2(st1)
         //   st2
-        let mut f = Function::new(fnname.to_string(), String::from("Model_t"));
+        let mut f = Function::new(fnname.to_string(), model::types::model());
         f.add_arg(stvar.current(), model::types::model());
         for arg in args.iter() {
             f.add_arg(
