@@ -30,8 +30,8 @@ use super::types;
 
 use smt2::{DataType, Function, Smt2Context, Term, VarBinding};
 use velosiast::ast::{
-    VelosiAstExpr, VelosiAstField, VelosiAstIdentLiteralExpr, VelosiAstInterface,
-    VelosiAstInterfaceAction, VelosiAstState, VelosiAstTypeInfo, VelosiAstUnitSegment,
+    VelosiAstExpr, VelosiAstField, VelosiAstInterface, VelosiAstInterfaceAction, VelosiAstState,
+    VelosiAstUnitSegment,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
