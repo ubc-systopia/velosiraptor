@@ -186,35 +186,6 @@ fn add_model_slice_accessor(smt: &mut Smt2Context, ftype: &str, fieldname: &str,
     smt.function(f);
 }
 
-fn add_model_wbuffer_slice_set(smt: &mut Smt2Context, fieldname: &str, slice: &str) {
-    let name = model_slice_set_fn_name(WBUFFER_PREFIX, fieldname, slice);
-    let mut f = Function::new(name, types::model());
-    f.add_arg(String::from("st"), types::model());
-    f.add_arg(String::from("val"), types::num());
-
-    let arg = Term::ident(String::from("st"));
-    let arg2 = Term::ident(String::from("val"));
-
-    let st = Term::fn_apply(model_get_fn_name(WBUFFER_PREFIX), vec![arg.clone()]);
-    let lambda = Term::fn_apply(
-        "lambda".to_string(),
-        vec![
-            // TODO: hack using ident
-            Term::ident("((m Model_t))".to_string()),
-            Term::fn_apply(
-                model_slice_set_fn_name(IFACE_PREFIX, fieldname, slice),
-                vec![Term::ident("m".to_string()), arg2],
-            ),
-        ],
-    );
-
-    let st = Term::fn_apply("insert".to_string(), vec![lambda, st]);
-    let e = Term::fn_apply(model_set_fn_name(WBUFFER_PREFIX), vec![arg, st]);
-    f.add_body(e);
-
-    smt.function(f);
-}
-
 fn add_model_wbuffer_field_set(smt: &mut Smt2Context, fieldname: &str) {
     let name = model_field_set_fn_name(WBUFFER_PREFIX, fieldname);
     let mut f = Function::new(name, types::model());
@@ -232,10 +203,39 @@ fn add_model_wbuffer_field_set(smt: &mut Smt2Context, fieldname: &str) {
     let lambda = Term::fn_apply(
         "lambda".to_string(),
         vec![
-            Term::ident("((m Model_t))".to_string()),
+            Term::ident("((iface IFace_t))".to_string()),
             Term::fn_apply(
-                model_field_set_fn_name(IFACE_PREFIX, fieldname),
-                vec![Term::ident("m".to_string()), arg2],
+                field_set_fn_name(IFACE_PREFIX, fieldname),
+                vec![Term::ident("iface".to_string()), arg2],
+            ),
+        ],
+    );
+
+    let st = Term::fn_apply("insert".to_string(), vec![lambda, st]);
+    let e = Term::fn_apply(model_set_fn_name(WBUFFER_PREFIX), vec![arg, st]);
+    f.add_body(e);
+
+    smt.function(f);
+}
+
+fn add_model_wbuffer_slice_set(smt: &mut Smt2Context, fieldname: &str, slice: &str) {
+    let name = model_slice_set_fn_name(WBUFFER_PREFIX, fieldname, slice);
+    let mut f = Function::new(name, types::model());
+    f.add_arg(String::from("st"), types::model());
+    f.add_arg(String::from("val"), types::num());
+
+    let arg = Term::ident(String::from("st"));
+    let arg2 = Term::ident(String::from("val"));
+
+    let st = Term::fn_apply(model_get_fn_name(WBUFFER_PREFIX), vec![arg.clone()]);
+    let lambda = Term::fn_apply(
+        "lambda".to_string(),
+        vec![
+            // TODO: hack using ident
+            Term::ident("((iface IFace_t))".to_string()),
+            Term::fn_apply(
+                field_slice_set_fn_name(IFACE_PREFIX, fieldname, slice),
+                vec![Term::ident("iface".to_string()), arg2],
             ),
         ],
     );
@@ -371,20 +371,29 @@ fn add_pop_action(smt: &mut Smt2Context) {
             ],
             Term::letexpr(
                 vec![VarBinding::new(
-                    "new_st".to_string(),
+                    "new_iface".to_string(),
                     Term::fn_apply(
-                        model_set_fn_name(WBUFFER_PREFIX),
+                        "select".to_string(),
                         vec![
-                            Term::ident("st".to_string()),
-                            Term::ident("new_wb".to_string()),
+                            Term::ident("callback".to_string()),
+                            Term::fn_apply(
+                                model_get_fn_name(IFACE_PREFIX),
+                                vec![Term::ident("st".to_string())],
+                            ),
                         ],
                     ),
                 )],
                 Term::fn_apply(
-                    "select".to_string(),
+                    model_set_fn_name(IFACE_PREFIX),
                     vec![
-                        Term::ident("callback".to_string()),
-                        Term::ident("new_st".to_string()),
+                        Term::fn_apply(
+                            model_set_fn_name(WBUFFER_PREFIX),
+                            vec![
+                                Term::ident("st".to_string()),
+                                Term::ident("new_wb".to_string()),
+                            ],
+                        ),
+                        Term::ident("new_iface".to_string()),
                     ],
                 ),
             ),

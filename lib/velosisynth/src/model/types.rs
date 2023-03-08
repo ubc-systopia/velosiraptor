@@ -29,7 +29,7 @@ use velosiast::ast::{VelosiAstType, VelosiAstTypeInfo};
 
 use smt2::{Function, Smt2Context, Sort, Term};
 
-use super::velosimodel::{IFACE_PREFIX, STATE_PREFIX};
+use super::velosimodel::{IFACE_PREFIX, STATE_PREFIX, WBUFFER_PREFIX};
 
 pub const DEFAULT_BIT_WIDTH: u64 = 64;
 
@@ -46,7 +46,11 @@ pub fn state() -> String {
 }
 
 pub fn wbuffer() -> String {
-    format!("(List (Array {} {}))", model(), model())
+    ctxt(WBUFFER_PREFIX)
+}
+
+pub fn callback() -> String {
+    ctxt("Callback")
 }
 
 pub fn ctxt(c: &str) -> String {
