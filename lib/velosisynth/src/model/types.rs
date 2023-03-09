@@ -29,7 +29,7 @@ use velosiast::ast::{VelosiAstType, VelosiAstTypeInfo};
 
 use smt2::{Function, Smt2Context, Sort, Term};
 
-use super::velosimodel::{IFACE_PREFIX, STATE_PREFIX, WBUFFER_PREFIX};
+use super::velosimodel::{IFACE_PREFIX, STATE_PREFIX};
 
 pub const DEFAULT_BIT_WIDTH: u64 = 64;
 
@@ -46,11 +46,11 @@ pub fn state() -> String {
 }
 
 pub fn wbuffer() -> String {
-    ctxt(WBUFFER_PREFIX)
+    "WBuffer_t".to_string()
 }
 
 pub fn callback() -> String {
-    ctxt("Callback")
+    "Callback_t".to_string()
 }
 
 pub fn ctxt(c: &str) -> String {
@@ -142,14 +142,6 @@ fn add_type_constraints_size(smt: &mut Smt2Context, name: String, maxbits: u64) 
 
 pub fn add_type_defs(smt: &mut Smt2Context, inaddr: u64, outaddr: u64) {
     smt.section(String::from("Type Definitions"));
-
-    // TODO: reset removes the built-in list type, otherwise this would not be needed
-    smt.raw(
-        "(declare-datatype List (par (E)
-  ( (nil)
-    (insert (head E) (tail (List E)) ))))"
-            .to_string(),
-    );
 
     let default_sort = format!("(_ BitVec {DEFAULT_BIT_WIDTH})");
     add_type_def(smt, num(), default_sort.clone());

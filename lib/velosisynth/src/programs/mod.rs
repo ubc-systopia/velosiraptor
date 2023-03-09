@@ -570,7 +570,7 @@ impl FieldActions {
             .for_each(|f| f.to_smt2_term(self.0.as_str(), smtops, symvars));
 
         // field actions always end with a write action
-        let fname = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.popaction! ");
+        let fname = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.flushaction! ");
         smtops.push((fname, None));
         let fname = format!("{MODEL_PREFIX}.{IFACE_PREFIX}.{}.writeaction! ", self.0);
         smtops.push((fname, None));
