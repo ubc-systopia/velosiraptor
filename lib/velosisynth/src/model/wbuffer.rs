@@ -42,6 +42,6 @@ pub fn add_wbuffer_def(smt: &mut Smt2Context) {
     ));
     smt.sort(Sort::new_def(
         types::wbuffer(),
-        format!("(List {})", types::callback()),
+        format!("(Seq {})", types::callback()),
     ));
 }
