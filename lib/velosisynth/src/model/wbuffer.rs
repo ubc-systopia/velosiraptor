@@ -25,8 +25,7 @@
 
 //! State Synthesis Module: Z3
 
-use smt2::Smt2Context;
-use smt2::Sort;
+use smt2::{Smt2Context, Sort};
 
 use super::types;
 
