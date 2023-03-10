@@ -35,7 +35,7 @@ use smt2::{Function, Smt2Context, Term, VarBinding};
 use velosiast::ast::{VelosiAstParam, VelosiOpExpr, VelosiOperation};
 
 use crate::model;
-use crate::model::velosimodel::{IFACE_PREFIX, MODEL_PREFIX, WBUFFER_PREFIX};
+use crate::model::velosimodel::{IFACE_PREFIX, LOCAL_VARS_PREFIX, MODEL_PREFIX, WBUFFER_PREFIX};
 
 mod builder;
 mod statevars;
@@ -396,7 +396,7 @@ impl FieldSliceOp {
     ) {
         let arg = self.1.to_smt2_term(symvars);
         let fname = format!(
-            "{MODEL_PREFIX}.{WBUFFER_PREFIX}.{}.{}.set!",
+            "{MODEL_PREFIX}.{LOCAL_VARS_PREFIX}.{}.{}.set!",
             fieldname, self.0
         );
         smtops.push((fname, Some(arg)));
@@ -472,7 +472,7 @@ impl FieldOp {
         match self {
             FieldOp::InsertField(arg) => {
                 let arg = arg.to_smt2_term(symvars);
-                let fname = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.{fieldname}.set!");
+                let fname = format!("{MODEL_PREFIX}.{LOCAL_VARS_PREFIX}.{fieldname}.set!");
                 smtops.push((fname, Some(arg)));
             }
             FieldOp::InsertFieldSlices(sliceops) => {
@@ -570,8 +570,12 @@ impl FieldActions {
             .for_each(|f| f.to_smt2_term(self.0.as_str(), smtops, symvars));
 
         // field actions always end with a write action
-        let fname = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.flushaction! ");
+        let fname = format!("{MODEL_PREFIX}.{LOCAL_VARS_PREFIX}.{}.storeaction!", self.0);
         smtops.push((fname, None));
+        // TODO: only flush once at end
+        let fname = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.flushaction!");
+        smtops.push((fname, None));
+        // TODO: combine into flush action
         let fname = format!("{MODEL_PREFIX}.{IFACE_PREFIX}.{}.writeaction! ", self.0);
         smtops.push((fname, None));
     }

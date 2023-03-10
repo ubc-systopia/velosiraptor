@@ -30,8 +30,8 @@ use super::types;
 
 use smt2::{DataType, Function, Smt2Context, SortedVar, Term, VarBinding};
 use velosiast::ast::{
-    VelosiAstExpr, VelosiAstField, VelosiAstInterface, VelosiAstInterfaceAction, VelosiAstState,
-    VelosiAstUnitSegment,
+    VelosiAstExpr, VelosiAstField, VelosiAstIdentLiteralExpr, VelosiAstInterface,
+    VelosiAstInterfaceAction, VelosiAstState, VelosiAstTypeInfo, VelosiAstUnitSegment,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,6 +42,7 @@ pub const IFACE_PREFIX: &str = "IFace";
 pub const STATE_PREFIX: &str = "State";
 pub const MODEL_PREFIX: &str = "Model";
 pub const WBUFFER_PREFIX: &str = "WBuffer";
+pub const LOCAL_VARS_PREFIX: &str = "LocalVars";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Model
@@ -53,6 +54,7 @@ pub fn add_model_def(smt: &mut Smt2Context, unit: &VelosiAstUnitSegment) {
     add_model_state_accessors(smt, &unit.state);
     add_model_iface_accessors(smt, &unit.interface);
     add_model_wbuffer_accessors(smt, &unit.interface);
+    add_model_local_vars_accessors(smt, &unit.interface);
     add_actions(smt, &unit.interface)
 }
 
@@ -63,6 +65,10 @@ fn add_model(smt: &mut Smt2Context) {
     dt.add_field(format!("{MODEL_PREFIX}.{STATE_PREFIX}"), types::state());
     dt.add_field(format!("{MODEL_PREFIX}.{IFACE_PREFIX}"), types::iface());
     dt.add_field(format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}"), types::wbuffer());
+    dt.add_field(
+        format!("{MODEL_PREFIX}.{LOCAL_VARS_PREFIX}"),
+        types::iface(),
+    );
 
     let accessors = dt.to_field_accessor();
     smt.datatype(dt);
@@ -108,16 +114,16 @@ pub fn model_set_fn_name(ctxt: &str) -> String {
     format!("Model.{ctxt}.set!")
 }
 
-fn add_model_field_accessor(smt: &mut Smt2Context, ftype: &str, fieldname: &str) {
+fn add_model_field_accessor(smt: &mut Smt2Context, ftype: &str, mtype: &str, fieldname: &str) {
     //
     // Model Field Get
     //
-    let name = model_field_get_fn_name(ftype, fieldname);
+    let name = model_field_get_fn_name(mtype, fieldname);
     let mut f = Function::new(name, types::field_type(ftype, fieldname));
     f.add_arg(String::from("st"), types::model());
 
     let arg = Term::ident(String::from("st"));
-    let st = Term::fn_apply(model_get_fn_name(ftype), vec![arg]);
+    let st = Term::fn_apply(model_get_fn_name(mtype), vec![arg]);
     let e = Term::fn_apply(field_get_fn_name(ftype, fieldname), vec![st]);
     f.add_body(e);
     smt.function(f);
@@ -125,7 +131,7 @@ fn add_model_field_accessor(smt: &mut Smt2Context, ftype: &str, fieldname: &str)
     //
     // Model Field Set
     //
-    let name = model_field_set_fn_name(ftype, fieldname);
+    let name = model_field_set_fn_name(mtype, fieldname);
     let mut f = Function::new(name, types::model());
     f.add_arg(String::from("st"), types::model());
     f.add_arg(String::from("val"), types::field_type(ftype, fieldname));
@@ -133,26 +139,32 @@ fn add_model_field_accessor(smt: &mut Smt2Context, ftype: &str, fieldname: &str)
     let arg = Term::ident(String::from("st"));
     let arg2 = Term::ident(String::from("val"));
 
-    let st = Term::fn_apply(model_get_fn_name(ftype), vec![arg.clone()]);
+    let st = Term::fn_apply(model_get_fn_name(mtype), vec![arg.clone()]);
 
     let st = Term::fn_apply(field_set_fn_name(ftype, fieldname), vec![st, arg2]);
-    let e = Term::fn_apply(model_set_fn_name(ftype), vec![arg, st]);
+    let e = Term::fn_apply(model_set_fn_name(mtype), vec![arg, st]);
     f.add_body(e);
 
     smt.function(f);
 }
 
-fn add_model_slice_accessor(smt: &mut Smt2Context, ftype: &str, fieldname: &str, slice: &str) {
+fn add_model_slice_accessor(
+    smt: &mut Smt2Context,
+    ftype: &str,
+    mtype: &str,
+    fieldname: &str,
+    slice: &str,
+) {
     //
     // Model Field Slice Get
     //
 
-    let name = model_slice_get_fn_name(ftype, fieldname, slice);
+    let name = model_slice_get_fn_name(mtype, fieldname, slice);
     let mut f = Function::new(name, types::num());
     f.add_arg(String::from("st"), types::model());
 
     let arg = Term::ident(String::from("st"));
-    let st = Term::fn_apply(model_get_fn_name(ftype), vec![arg]);
+    let st = Term::fn_apply(model_get_fn_name(mtype), vec![arg]);
     let e = Term::fn_apply(field_slice_get_fn_name(ftype, fieldname, slice), vec![st]);
     f.add_body(e);
 
@@ -162,7 +174,7 @@ fn add_model_slice_accessor(smt: &mut Smt2Context, ftype: &str, fieldname: &str,
     // Model Field Slice Set
     //
 
-    let name = model_slice_set_fn_name(ftype, fieldname, slice);
+    let name = model_slice_set_fn_name(mtype, fieldname, slice);
     let mut f = Function::new(name, types::model());
     f.add_arg(String::from("st"), types::model());
     f.add_arg(String::from("val"), types::num());
@@ -170,7 +182,7 @@ fn add_model_slice_accessor(smt: &mut Smt2Context, ftype: &str, fieldname: &str,
     let arg = Term::ident(String::from("st"));
     let arg2 = Term::ident(String::from("val"));
 
-    let st = Term::fn_apply(model_get_fn_name(ftype), vec![arg.clone()]);
+    let st = Term::fn_apply(model_get_fn_name(mtype), vec![arg.clone()]);
 
     // get the state
 
@@ -180,7 +192,7 @@ fn add_model_slice_accessor(smt: &mut Smt2Context, ftype: &str, fieldname: &str,
         vec![st, arg2],
     );
 
-    let e = Term::fn_apply(model_set_fn_name(ftype), vec![arg, st]);
+    let e = Term::fn_apply(model_set_fn_name(mtype), vec![arg, st]);
     f.add_body(e);
 
     smt.function(f);
@@ -214,39 +226,14 @@ fn add_model_wbuffer_field_set(smt: &mut Smt2Context, fieldname: &str) {
     smt.function(f);
 }
 
-fn add_model_wbuffer_slice_set(smt: &mut Smt2Context, fieldname: &str, slice: &str) {
-    let name = model_slice_set_fn_name(WBUFFER_PREFIX, fieldname, slice);
-    let mut f = Function::new(name, types::model());
-    f.add_arg(String::from("st"), types::model());
-    f.add_arg(String::from("val"), types::num());
-
-    let arg = Term::ident(String::from("st"));
-    let arg2 = Term::ident(String::from("val"));
-
-    let st = Term::fn_apply(model_get_fn_name(WBUFFER_PREFIX), vec![arg.clone()]);
-    let lambda = Term::lambda(
-        vec![SortedVar::new("iface".to_string(), types::iface())],
-        Term::fn_apply(
-            field_slice_set_fn_name(IFACE_PREFIX, fieldname, slice),
-            vec![Term::ident("iface".to_string()), arg2],
-        ),
-    );
-
-    let st = smt2::seq::concat(vec![st, smt2::seq::unit(lambda)]);
-    let e = Term::fn_apply(model_set_fn_name(WBUFFER_PREFIX), vec![arg, st]);
-    f.add_body(e);
-
-    smt.function(f);
-}
-
 fn add_model_state_accessors(smt: &mut Smt2Context, state: &VelosiAstState) {
     smt.section(String::from("Model State Accessors"));
     for f in state.fields() {
         smt.subsection(format!("state field: {}", f.ident()));
-        add_model_field_accessor(smt, STATE_PREFIX, f.ident());
+        add_model_field_accessor(smt, STATE_PREFIX, STATE_PREFIX, f.ident());
 
         for s in f.layout_as_slice() {
-            add_model_slice_accessor(smt, STATE_PREFIX, f.ident(), s.ident());
+            add_model_slice_accessor(smt, STATE_PREFIX, STATE_PREFIX, f.ident(), s.ident());
         }
     }
 }
@@ -256,9 +243,9 @@ fn add_model_iface_accessors(smt: &mut Smt2Context, iface: &VelosiAstInterface) 
 
     for f in iface.fields() {
         smt.subsection(format!("interface field: {}", f.ident()));
-        add_model_field_accessor(smt, IFACE_PREFIX, f.ident());
+        add_model_field_accessor(smt, IFACE_PREFIX, IFACE_PREFIX, f.ident());
         for s in f.layout() {
-            add_model_slice_accessor(smt, IFACE_PREFIX, f.ident(), s.ident());
+            add_model_slice_accessor(smt, IFACE_PREFIX, IFACE_PREFIX, f.ident(), s.ident());
         }
         // add the full field accessor
     }
@@ -270,9 +257,16 @@ fn add_model_wbuffer_accessors(smt: &mut Smt2Context, iface: &VelosiAstInterface
     for f in iface.fields() {
         smt.subsection(format!("write buffer field: {}", f.ident()));
         add_model_wbuffer_field_set(smt, f.ident());
+    }
+}
 
+fn add_model_local_vars_accessors(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
+    smt.section(String::from("Local Variable Accessors"));
+
+    for f in iface.fields() {
+        add_model_field_accessor(smt, IFACE_PREFIX, LOCAL_VARS_PREFIX, f.ident());
         for s in f.layout() {
-            add_model_wbuffer_slice_set(smt, f.ident(), s.ident());
+            add_model_slice_accessor(smt, IFACE_PREFIX, LOCAL_VARS_PREFIX, f.ident(), s.ident());
         }
     }
 }
@@ -281,19 +275,20 @@ fn add_model_wbuffer_accessors(smt: &mut Smt2Context, iface: &VelosiAstInterface
 // Actions
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn action_fn_name(fieldname: &str, ty: &str) -> String {
+fn action_fn_name(modelname: &str, fieldname: &str, ty: &str) -> String {
     let fieldname = fieldname.split('.').last().unwrap();
-    format!("{MODEL_PREFIX}.{IFACE_PREFIX}.{fieldname}.{ty}action!")
+    format!("{MODEL_PREFIX}.{modelname}.{fieldname}.{ty}action!")
 }
 
 fn add_field_action(
     smt: &mut Smt2Context,
     actions: &[VelosiAstInterfaceAction],
+    modelname: &str,
     fieldname: &str,
     ty: &str,
     _fieldwidth: u64,
 ) {
-    let name = action_fn_name(fieldname, ty);
+    let name = action_fn_name(modelname, fieldname, ty);
     let mut f = Function::new(name, types::model());
     f.add_arg(String::from("st"), types::model());
     f.add_comment(format!("performs the write actions of {fieldname}"));
@@ -397,19 +392,42 @@ fn add_flush_action(smt: &mut Smt2Context) {
 fn add_actions(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
     smt.section(String::from("Actions"));
     for f in iface.fields() {
-        smt.subsection(format!("interface field: {}", f.ident()));
+        let fieldname = f.ident();
+        smt.subsection(format!("interface field: {fieldname}"));
+
+        let store_action = VelosiAstInterfaceAction::new(
+            VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
+                format!("{LOCAL_VARS_PREFIX}.{fieldname}"),
+                VelosiAstTypeInfo::Integer,
+            )),
+            VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
+                format!("{WBUFFER_PREFIX}.{fieldname}"),
+                VelosiAstTypeInfo::Integer,
+            )),
+            Default::default(),
+        );
+        add_field_action(
+            smt,
+            &[store_action],
+            LOCAL_VARS_PREFIX,
+            f.ident(),
+            "store",
+            f.size() * 8,
+        );
 
         add_field_action(
             smt,
             f.write_actions_as_ref(),
-            f.ident(),
+            IFACE_PREFIX,
+            fieldname,
             "write",
             f.size() * 8,
         );
         add_field_action(
             smt,
             f.read_actions_as_ref(),
-            f.ident(),
+            IFACE_PREFIX,
+            fieldname,
             "read",
             f.size() * 8,
         );
