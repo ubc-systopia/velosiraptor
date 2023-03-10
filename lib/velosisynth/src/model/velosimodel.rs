@@ -343,55 +343,49 @@ fn add_flush_action(smt: &mut Smt2Context) {
     ));
 
     let body = Term::letexpr(
-        vec![VarBinding::new(
-            "wb".to_string(),
-            Term::fn_apply(
-                model_get_fn_name(WBUFFER_PREFIX),
-                vec![Term::ident("st".to_string())],
-            ),
-        )],
-        Term::letexpr(
-            vec![
-                VarBinding::new(
-                    "callback".to_string(),
-                    smt2::seq::nth(Term::ident("wb".to_string()), Term::ident("0".to_string())),
-                ),
-                VarBinding::new("new_wb".to_string(), smt2::seq::empty(types::wbuffer())),
-            ],
-            Term::letexpr(
-                vec![VarBinding::new(
-                    "new_iface".to_string(),
-                    smt2::seq::foldl(
-                        Term::lambda(
-                            vec![
-                                SortedVar::new("acc".to_string(), types::iface()),
-                                SortedVar::new("f".to_string(), types::callback()),
-                            ],
-                            Term::select(
-                                Term::ident("f".to_string()),
-                                vec![Term::ident("acc".to_string())],
-                            ),
-                        ),
-                        Term::fn_apply(
-                            model_get_fn_name(IFACE_PREFIX),
-                            vec![Term::ident("st".to_string())],
-                        ),
-                        Term::ident("wb".to_string()),
-                    ),
-                )],
+        vec![
+            VarBinding::new(
+                "wb".to_string(),
                 Term::fn_apply(
-                    model_set_fn_name(IFACE_PREFIX),
-                    vec![
-                        Term::fn_apply(
-                            model_set_fn_name(WBUFFER_PREFIX),
-                            vec![
-                                Term::ident("st".to_string()),
-                                Term::ident("new_wb".to_string()),
-                            ],
-                        ),
-                        Term::ident("new_iface".to_string()),
-                    ],
+                    model_get_fn_name(WBUFFER_PREFIX),
+                    vec![Term::ident("st".to_string())],
                 ),
+            ),
+            VarBinding::new("new_wb".to_string(), smt2::seq::empty(types::wbuffer())),
+        ],
+        Term::letexpr(
+            vec![VarBinding::new(
+                "new_iface".to_string(),
+                smt2::seq::foldl(
+                    Term::lambda(
+                        vec![
+                            SortedVar::new("acc".to_string(), types::iface()),
+                            SortedVar::new("f".to_string(), types::callback()),
+                        ],
+                        Term::select(
+                            Term::ident("f".to_string()),
+                            vec![Term::ident("acc".to_string())],
+                        ),
+                    ),
+                    Term::fn_apply(
+                        model_get_fn_name(IFACE_PREFIX),
+                        vec![Term::ident("st".to_string())],
+                    ),
+                    Term::ident("wb".to_string()),
+                ),
+            )],
+            Term::fn_apply(
+                model_set_fn_name(IFACE_PREFIX),
+                vec![
+                    Term::fn_apply(
+                        model_set_fn_name(WBUFFER_PREFIX),
+                        vec![
+                            Term::ident("st".to_string()),
+                            Term::ident("new_wb".to_string()),
+                        ],
+                    ),
+                    Term::ident("new_iface".to_string()),
+                ],
             ),
         ),
     );
