@@ -25,22 +25,39 @@
 
 //! State Synthesis Module: Z3
 
-use smt2::{Smt2Context, Sort};
+use smt2::{DataType, Smt2Context, Sort};
+use velosiast::ast::{VelosiAstField, VelosiAstInterface};
 
-use super::types;
+use super::{types, velosimodel::WBUFFER_ENTRY_PREFIX};
 
 /// adds the write buffer definitions to the model
 ///
 /// Note: this doesn't include the write buffer actions
-pub fn add_wbuffer_def(smt: &mut Smt2Context) {
+pub fn add_wbuffer_def(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
     smt.section(String::from("Write Buffer"));
 
-    smt.sort(Sort::new_def(
-        types::callback(),
-        format!("(Array {} {})", types::iface(), types::iface()),
+    // create an enum of the different fields, used for tagging
+    smt.raw(format!(
+        "(declare-datatypes () (({} {})))",
+        types::field_tag(),
+        iface
+            .fields()
+            .iter()
+            .map(|x| types::field_tag_enum(x.ident().as_str()))
+            .collect::<Vec<_>>()
+            .join(" ")
     ));
+
+    let mut dt = DataType::new(String::from(WBUFFER_ENTRY_PREFIX), 0);
+    dt.add_field(format!("{WBUFFER_ENTRY_PREFIX}.tag"), types::field_tag());
+    dt.add_field(format!("{WBUFFER_ENTRY_PREFIX}.val"), types::num());
+
+    let accessors = dt.to_field_accessor();
+    smt.datatype(dt);
+    smt.merge(accessors);
+
     smt.sort(Sort::new_def(
         types::wbuffer(),
-        format!("(Seq {})", types::callback()),
+        format!("(Seq {})", types::wbuffer_entry()),
     ));
 }
