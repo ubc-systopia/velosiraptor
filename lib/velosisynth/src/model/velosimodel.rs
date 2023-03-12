@@ -28,7 +28,7 @@
 use super::expr::{expr_to_smt2, p2p};
 use super::types;
 
-use smt2::{DataType, Function, Smt2Context, SortedVar, Term, VarBinding};
+use smt2::{DataType, Function, MatchCase, Pattern, Smt2Context, SortedVar, Term, VarBinding};
 use velosiast::ast::{
     VelosiAstExpr, VelosiAstField, VelosiAstIdentLiteralExpr, VelosiAstInterface,
     VelosiAstInterfaceAction, VelosiAstState, VelosiAstTypeInfo, VelosiAstUnitSegment,
@@ -42,6 +42,7 @@ pub const IFACE_PREFIX: &str = "IFace";
 pub const STATE_PREFIX: &str = "State";
 pub const MODEL_PREFIX: &str = "Model";
 pub const WBUFFER_PREFIX: &str = "WBuffer";
+pub const WBUFFER_ENTRY_PREFIX: &str = "WBufferEntry";
 pub const LOCAL_VARS_PREFIX: &str = "LocalVars";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -211,15 +212,12 @@ fn add_model_wbuffer_field_set(smt: &mut Smt2Context, fieldname: &str) {
     let arg2 = Term::ident(String::from("val"));
 
     let st = Term::fn_apply(model_get_fn_name(WBUFFER_PREFIX), vec![arg.clone()]);
-    let lambda = Term::lambda(
-        vec![SortedVar::new("iface".to_string(), types::iface())],
-        Term::fn_apply(
-            field_set_fn_name(IFACE_PREFIX, fieldname),
-            vec![Term::ident("iface".to_string()), arg2],
-        ),
+    let wbuffer_entry = Term::fn_apply(
+        WBUFFER_ENTRY_PREFIX.to_string(),
+        vec![Term::ident(types::field_tag_enum(fieldname)), arg2],
     );
 
-    let st = smt2::seq::concat(vec![st, smt2::seq::unit(lambda)]);
+    let st = smt2::seq::concat(vec![st, smt2::seq::unit(wbuffer_entry)]);
     let e = Term::fn_apply(model_set_fn_name(WBUFFER_PREFIX), vec![arg, st]);
     f.add_body(e);
 
@@ -275,9 +273,9 @@ fn add_model_local_vars_accessors(smt: &mut Smt2Context, iface: &VelosiAstInterf
 // Actions
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn action_fn_name(modelname: &str, fieldname: &str, ty: &str) -> String {
+fn action_fn_name(ctxt: &str, fieldname: &str, ty: &str) -> String {
     let fieldname = fieldname.split('.').last().unwrap();
-    format!("{MODEL_PREFIX}.{modelname}.{fieldname}.{ty}action!")
+    format!("{MODEL_PREFIX}.{ctxt}.{fieldname}.{ty}action!")
 }
 
 fn add_field_action(
@@ -329,59 +327,87 @@ fn add_field_action(
     smt.function(f);
 }
 
+fn add_apply_entry_action(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
+    let name = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.applyentryaction!");
+    let mut f = Function::new(name, types::model());
+    f.add_arg(String::from("st"), types::model());
+    f.add_arg(String::from("entry"), types::wbuffer_entry());
+    f.add_comment(format!(
+        "applies the given write buffer entry to the model, writing the value and applying the write action on the right field"
+    ));
+
+    let st = Term::ident(String::from("st"));
+    let entry = Term::ident(String::from("entry"));
+    let body = Term::Match(
+        Box::new(Term::fn_apply(
+            field_get_fn_name(WBUFFER_ENTRY_PREFIX, "tag"),
+            vec![entry.clone()],
+        )),
+        iface
+            .fields()
+            .iter()
+            .map(|field| field.ident())
+            .map(|fieldname| {
+                MatchCase::new(
+                    Pattern::new(vec![types::field_tag_enum(fieldname)]),
+                    Term::fn_apply(
+                        format!("{MODEL_PREFIX}.{IFACE_PREFIX}.{fieldname}.writeaction!"),
+                        vec![Term::fn_apply(
+                            model_field_set_fn_name(IFACE_PREFIX, fieldname),
+                            vec![
+                                st.clone(),
+                                Term::fn_apply(
+                                    field_get_fn_name(WBUFFER_ENTRY_PREFIX, "val"),
+                                    vec![entry.clone()],
+                                ),
+                            ],
+                        )],
+                    ),
+                )
+            })
+            .collect(),
+    );
+
+    f.add_body(body);
+    smt.function(f);
+}
+
 fn add_flush_action(smt: &mut Smt2Context) {
     let name = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.flushaction!");
     let mut f = Function::new(name, types::model());
     f.add_arg(String::from("st"), types::model());
     f.add_comment(format!(
-        "takes one item off the write buffer and writes it to backing interface"
+        "flushes the write buffer, writing values back to the interface and applying their write actions"
     ));
 
+    let st = Term::ident(String::from("st"));
     let body = Term::letexpr(
         vec![
             VarBinding::new(
                 "wb".to_string(),
-                Term::fn_apply(
-                    model_get_fn_name(WBUFFER_PREFIX),
-                    vec![Term::ident("st".to_string())],
-                ),
+                Term::fn_apply(model_get_fn_name(WBUFFER_PREFIX), vec![st.clone()]),
             ),
             VarBinding::new("new_wb".to_string(), smt2::seq::empty(types::wbuffer())),
         ],
-        Term::letexpr(
-            vec![VarBinding::new(
-                "new_iface".to_string(),
-                smt2::seq::foldl(
-                    Term::lambda(
-                        vec![
-                            SortedVar::new("acc".to_string(), types::iface()),
-                            SortedVar::new("f".to_string(), types::callback()),
-                        ],
-                        Term::select(
-                            Term::ident("f".to_string()),
-                            vec![Term::ident("acc".to_string())],
-                        ),
-                    ),
-                    Term::fn_apply(
-                        model_get_fn_name(IFACE_PREFIX),
-                        vec![Term::ident("st".to_string())],
-                    ),
-                    Term::ident("wb".to_string()),
-                ),
-            )],
-            Term::fn_apply(
-                model_set_fn_name(IFACE_PREFIX),
+        smt2::seq::foldl(
+            Term::lambda(
                 vec![
-                    Term::fn_apply(
-                        model_set_fn_name(WBUFFER_PREFIX),
-                        vec![
-                            Term::ident("st".to_string()),
-                            Term::ident("new_wb".to_string()),
-                        ],
-                    ),
-                    Term::ident("new_iface".to_string()),
+                    SortedVar::new("model".to_string(), types::model()),
+                    SortedVar::new("entry".to_string(), types::wbuffer_entry()),
                 ],
+                Term::fn_apply(
+                    format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.applyentryaction!"),
+                    vec![
+                        Term::ident("model".to_string()),
+                        Term::ident("entry".to_string()),
+                    ],
+                ),
             ),
+            Term::fn_apply(
+                model_set_fn_name(WBUFFER_PREFIX),
+                vec![st, Term::ident("new_wb".to_string())],
+            ),
+            Term::ident("wb".to_string()),
         ),
     );
 
@@ -433,5 +459,6 @@ fn add_actions(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
         );
     }
 
+    add_apply_entry_action(smt, iface);
     add_flush_action(smt);
 }

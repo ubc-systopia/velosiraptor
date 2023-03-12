@@ -572,12 +572,6 @@ impl FieldActions {
         // field actions always end with a write action
         let fname = format!("{MODEL_PREFIX}.{LOCAL_VARS_PREFIX}.{}.storeaction!", self.0);
         smtops.push((fname, None));
-        // TODO: only flush once at end
-        let fname = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.flushaction!");
-        smtops.push((fname, None));
-        // TODO: combine into flush action
-        let fname = format!("{MODEL_PREFIX}.{IFACE_PREFIX}.{}.writeaction! ", self.0);
-        smtops.push((fname, None));
     }
 }
 
@@ -685,6 +679,10 @@ impl Program {
         self.0
             .iter()
             .for_each(|f| f.to_smt2_term(&mut smtops, &mut symvar));
+
+        // do one flush at the end
+        let fname = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.flushaction!");
+        smtops.push((fname, None));
 
         // the state variable of the current state
         let mut stvar = StateVars::new();
