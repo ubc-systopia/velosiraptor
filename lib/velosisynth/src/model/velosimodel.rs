@@ -88,31 +88,31 @@ use super::field::{
 pub fn model_slice_get_fn_name(ctxt: &str, field: &str, slice: &str) -> String {
     let slice = slice.split('.').last().unwrap();
     let field = field.split('.').last().unwrap();
-    format!("Model.{ctxt}.{field}.{slice}.get!")
+    format!("{MODEL_PREFIX}.{ctxt}.{field}.{slice}.get!")
 }
 
 pub fn model_slice_set_fn_name(ctxt: &str, field: &str, slice: &str) -> String {
     let slice = slice.split('.').last().unwrap();
     let field = field.split('.').last().unwrap();
-    format!("Model.{ctxt}.{field}.{slice}.set!")
+    format!("{MODEL_PREFIX}.{ctxt}.{field}.{slice}.set!")
 }
 
 pub fn model_field_get_fn_name(ctxt: &str, field: &str) -> String {
     let field = field.split('.').last().unwrap();
-    format!("Model.{ctxt}.{field}.get!")
+    format!("{MODEL_PREFIX}.{ctxt}.{field}.get!")
 }
 
 pub fn model_field_set_fn_name(ctxt: &str, field: &str) -> String {
     let field = field.split('.').last().unwrap();
-    format!("Model.{ctxt}.{field}.set!")
+    format!("{MODEL_PREFIX}.{ctxt}.{field}.set!")
 }
 
 pub fn model_get_fn_name(ctxt: &str) -> String {
-    format!("Model.{ctxt}.get!")
+    format!("{MODEL_PREFIX}.{ctxt}.get!")
 }
 
 pub fn model_set_fn_name(ctxt: &str) -> String {
-    format!("Model.{ctxt}.set!")
+    format!("{MODEL_PREFIX}.{ctxt}.set!")
 }
 
 fn add_model_field_accessor(smt: &mut Smt2Context, ftype: &str, mtype: &str, fieldname: &str) {
@@ -449,9 +449,21 @@ fn add_actions(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
             "write",
             f.size() * 8,
         );
+
+        let update_local_vars_action = VelosiAstInterfaceAction::new(
+            VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
+                format!("{IFACE_PREFIX}.{fieldname}"),
+                VelosiAstTypeInfo::Integer,
+            )),
+            VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
+                format!("{LOCAL_VARS_PREFIX}.{fieldname}"),
+                VelosiAstTypeInfo::Integer,
+            )),
+            Default::default(),
+        );
         add_field_action(
             smt,
-            f.read_actions_as_ref(),
+            &[f.read_actions_as_ref(), &[update_local_vars_action]].concat(),
             IFACE_PREFIX,
             fieldname,
             "read",
