@@ -35,6 +35,7 @@ pub mod method;
 pub mod state;
 pub mod types;
 pub mod velosimodel;
+#[cfg(feature = "mem-model")]
 pub mod wbuffer;
 
 pub fn create(unit: &VelosiAstUnitSegment) -> Smt2Context {
@@ -56,6 +57,7 @@ pub fn create(unit: &VelosiAstUnitSegment) -> Smt2Context {
 
     state::add_state_def(&mut smt, &unit.state);
     interface::add_interface_def(&mut smt, &unit.interface);
+    #[cfg(feature = "mem-model")]
     wbuffer::add_wbuffer_def(&mut smt, &unit.interface);
     velosimodel::add_model_def(&mut smt, unit);
     method::add_methods(&mut smt, Box::new(unit.methods()));
