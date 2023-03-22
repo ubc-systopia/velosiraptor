@@ -163,6 +163,8 @@ fn program_to_query(
     let pre1 = call_method_assms(m_op, "st!0");
     let pre2 = call_method_assms(m_goal, "st!0");
     let pre = Term::land(pre1, pre2);
+    #[cfg(feature = "mem-model")]
+    let pre = utils::add_empty_wbuffer_precond(pre);
 
     // construct the predicate call
     let m_op_call = call_method(m_op, vec![Term::from("st!0")]);
