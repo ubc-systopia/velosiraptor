@@ -30,7 +30,13 @@ use std::sync::Arc;
 
 use velosiast::ast::{VelosiAstExpr, VelosiAstMethod, VelosiAstUnitSegment};
 
+#[cfg(feature = "mem-model")]
+use crate::model::types;
+#[cfg(feature = "mem-model")]
+use crate::model::velosimodel::{model_get_fn_name, WBUFFER_PREFIX};
 use crate::{Program, ProgramsBuilder};
+#[cfg(feature = "mem-model")]
+use smt2::Term;
 
 use super::resultparser;
 
@@ -159,4 +165,18 @@ pub fn check_result(output: &str, program: &mut Program) -> QueryResult {
             unreachable!("unexpected none output")
         }
     }
+}
+
+#[cfg(feature = "mem-model")]
+pub fn add_empty_wbuffer_precond(pre: Term) -> Term {
+    Term::land(
+        Term::eq(
+            smt2::seq::empty(types::wbuffer()),
+            Term::fn_apply(
+                model_get_fn_name(WBUFFER_PREFIX),
+                vec![Term::ident("st!0".to_string())],
+            ),
+        ),
+        pre,
+    )
 }
