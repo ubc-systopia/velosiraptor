@@ -30,12 +30,13 @@ use std::sync::Arc;
 
 use velosiast::ast::{VelosiAstExpr, VelosiAstMethod, VelosiAstUnitSegment};
 
-#[cfg(feature = "mem-model")]
-use crate::model::types;
-#[cfg(feature = "mem-model")]
-use crate::model::velosimodel::{model_get_fn_name, WBUFFER_PREFIX};
-use crate::{Program, ProgramsBuilder};
-#[cfg(feature = "mem-model")]
+use crate::{
+    model::{
+        types,
+        velosimodel::{model_get_fn_name, WBUFFER_PREFIX},
+    },
+    Program, ProgramsBuilder, ProgramsIter,
+};
 use smt2::Term;
 
 use super::resultparser;
@@ -108,6 +109,12 @@ pub fn make_program_builder(
     builder
 }
 
+pub fn make_program_iter_mem(prog: Program) -> ProgramsIter {
+    ProgramsIter {
+        programs: vec![prog],
+    }
+}
+
 #[derive(PartialEq, Eq)]
 pub enum QueryResult {
     Sat,
@@ -167,7 +174,6 @@ pub fn check_result(output: &str, program: &mut Program) -> QueryResult {
     }
 }
 
-#[cfg(feature = "mem-model")]
 pub fn add_empty_wbuffer_precond(pre: Term) -> Term {
     Term::land(
         Term::eq(

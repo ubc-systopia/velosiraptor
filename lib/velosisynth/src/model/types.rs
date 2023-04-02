@@ -45,22 +45,18 @@ pub fn state() -> String {
     "State_t".to_string()
 }
 
-#[cfg(feature = "mem-model")]
 pub fn wbuffer() -> String {
     "WBuffer_t".to_string()
 }
 
-#[cfg(feature = "mem-model")]
 pub fn wbuffer_entry() -> String {
     "WBufferEntry_t".to_string()
 }
 
-#[cfg(feature = "mem-model")]
 pub fn field_tag() -> String {
     "FieldTag_t".to_string()
 }
 
-#[cfg(feature = "mem-model")]
 pub fn field_tag_enum(fieldname: &str) -> String {
     let mut enum_name = fieldname.to_string();
     enum_name.get_mut(0..1).unwrap().make_ascii_uppercase();

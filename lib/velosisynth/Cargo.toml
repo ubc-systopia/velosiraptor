@@ -28,7 +28,6 @@ z3-standalone = []
 z3-library = ["dep:z3-sys"]
 # restart z3 instead of simply resetting
 z3-restart = []
-mem-model = []
 
 [lib]
 name = "velosisynth"

@@ -51,6 +51,8 @@ pub struct UnmapPrograms {
     m_fn: Rc<VelosiAstMethod>,
     t_fn: Rc<VelosiAstMethod>,
     f_fn: Rc<VelosiAstMethod>,
+
+    mem_model: bool,
 }
 
 impl UnmapPrograms {
@@ -59,6 +61,7 @@ impl UnmapPrograms {
         m_fn: Rc<VelosiAstMethod>,
         t_fn: Rc<VelosiAstMethod>,
         f_fn: Rc<VelosiAstMethod>,
+        mem_model: bool,
     ) -> Self {
         Self {
             programs,
@@ -68,6 +71,7 @@ impl UnmapPrograms {
             m_fn,
             t_fn,
             f_fn,
+            mem_model,
         }
     }
 }
@@ -103,6 +107,7 @@ impl ProgramBuilder for UnmapPrograms {
                     None,
                     true,
                     prog.clone(),
+                    self.mem_model,
                 );
 
                 let matchflags_preconds = precond::submit_program_query(
@@ -112,6 +117,7 @@ impl ProgramBuilder for UnmapPrograms {
                     None,
                     true,
                     prog.clone(),
+                    self.mem_model,
                 );
 
                 self.queries
@@ -162,7 +168,11 @@ impl ProgramBuilder for UnmapPrograms {
     }
 }
 
-pub fn get_program_iter(unit: &VelosiAstUnitSegment, batch_size: usize) -> UnmapPrograms {
+pub fn get_program_iter(
+    unit: &VelosiAstUnitSegment,
+    batch_size: usize,
+    starting_prog: Option<Program>,
+) -> UnmapPrograms {
     log::info!(
         target : "[synth::unmap]",
         "starting synthesizing the unmap operation"
@@ -177,31 +187,49 @@ pub fn get_program_iter(unit: &VelosiAstUnitSegment, batch_size: usize) -> Unmap
     // Translate: Add a query for each of the pre-conditions of the function
     // ---------------------------------------------------------------------------------------------
 
+    let mem_model = starting_prog.is_some();
     let _t_start = Instant::now();
 
     let mut unmap_queries = Vec::new();
-    if let Some(p) =
-        precond::precond_query(unit, m_fn.clone(), f_fn.clone(), true, batch_size).take()
-    {
+    if let Some(p) = precond::precond_query(
+        unit,
+        m_fn.clone(),
+        f_fn.clone(),
+        true,
+        batch_size,
+        starting_prog.clone(),
+    ) {
         unmap_queries.push(p);
     }
 
-    if let Some(p) =
-        precond::precond_query(unit, m_fn.clone(), t_fn.clone(), true, batch_size).take()
-    {
+    if let Some(p) = precond::precond_query(
+        unit,
+        m_fn.clone(),
+        t_fn.clone(),
+        true,
+        batch_size,
+        starting_prog,
+    ) {
         unmap_queries.push(p);
     }
 
     let programs = MultiDimProgramQueries::new(unmap_queries);
-    UnmapPrograms::new(programs, m_fn.clone(), t_fn.clone(), f_fn.clone())
+    UnmapPrograms::new(
+        programs,
+        m_fn.clone(),
+        t_fn.clone(),
+        f_fn.clone(),
+        mem_model,
+    )
 }
 
 pub fn synthesize(
     z3: &mut Z3WorkerPool,
     unit: &VelosiAstUnitSegment,
+    starting_prog: Option<Program>,
 ) -> Result<Program, VelosiSynthIssues> {
     let batch_size = std::cmp::max(DEFAULT_BATCH_SIZE, z3.num_workers());
-    let mut progs = get_program_iter(unit, batch_size);
+    let mut progs = get_program_iter(unit, batch_size, starting_prog);
     loop {
         match progs.next(z3) {
             MaybeResult::Some(prog) => return Ok(prog),

@@ -127,9 +127,9 @@ impl<'a> Z3Synth<'a> {
         let batch_size = std::cmp::max(DEFAULT_BATCH_SIZE, z3.num_workers());
 
         // XXX: move this to the the syntheisze() step.
-        let map_queries = vmops::map::get_program_iter(unit, batch_size);
-        let unmap_queries = vmops::unmap::get_program_iter(unit, batch_size);
-        let protect_queries = vmops::protect::get_program_iter(unit, batch_size);
+        let map_queries = vmops::map::get_program_iter(unit, batch_size, None);
+        let unmap_queries = vmops::unmap::get_program_iter(unit, batch_size, None);
+        let protect_queries = vmops::protect::get_program_iter(unit, batch_size, None);
 
         Self {
             z3,
@@ -165,7 +165,7 @@ impl<'a> Z3Synth<'a> {
         if !self.model_created {
             let t_start = Instant::now();
             self.model_created = true;
-            let ctx = model::create(self.unit);
+            let ctx = model::create(self.unit, false);
             let t_reset = Instant::now();
             self.z3.reset_with_context(Z3Query::from(ctx));
             let t_end = Instant::now();
@@ -322,39 +322,85 @@ impl<'a> Z3Synth<'a> {
 
         // update the all done flag
         self.done = all_done;
-
-        // if we are done, terminate the worker pool
-        if all_done {
-            self.terminate();
-        }
     }
 
     /// synthesizes the program for the unit, returns when done
-    pub fn synthesize(&mut self) {
+    pub fn synthesize(&mut self, mem_model: bool) {
         while !self.is_done() {
             self.synthesize_step();
         }
+
+        if mem_model && self.has_result() {
+            self.done = false;
+
+            // generate the new z3 model, taking into account the memory model
+            let ctx = model::create(self.unit, true);
+            self.z3.reset_with_context(Z3Query::from(ctx));
+
+            let unit = &self.unit;
+            let batch_size = std::cmp::max(DEFAULT_BATCH_SIZE, self.z3.num_workers());
+
+            // use the previously generated programs as a starting point
+            self.map_queries =
+                vmops::map::get_program_iter(unit, batch_size, self.map_program.take());
+            self.unmap_queries =
+                vmops::unmap::get_program_iter(unit, batch_size, self.unmap_program.take());
+            self.protect_queries =
+                vmops::protect::get_program_iter(unit, batch_size, self.protect_program.take());
+
+            // do the synthesis step again
+            while !self.is_done() {
+                self.synthesize_step();
+            }
+        }
     }
 
-    pub fn synthesize_map(&mut self) -> Result<Program, VelosiSynthIssues> {
+    pub fn synthesize_map(&mut self, mem_model: bool) -> Result<Program, VelosiSynthIssues> {
         // have this more conditional
         self.create_model();
         self.done = true;
-        vmops::map::synthesize(&mut self.z3, self.unit)
+
+        let prog = vmops::map::synthesize(&mut self.z3, self.unit, None)?;
+        if mem_model {
+            let ctx = model::create(self.unit, true);
+            self.z3.reset_with_context(Z3Query::from(ctx));
+
+            vmops::map::synthesize(&mut self.z3, self.unit, Some(prog))
+        } else {
+            Ok(prog)
+        }
     }
 
-    pub fn synthesize_unmap(&mut self) -> Result<Program, VelosiSynthIssues> {
+    pub fn synthesize_unmap(&mut self, mem_model: bool) -> Result<Program, VelosiSynthIssues> {
         // have this more conditional
         self.create_model();
         self.done = true;
-        vmops::unmap::synthesize(&mut self.z3, self.unit)
+
+        let prog = vmops::unmap::synthesize(&mut self.z3, self.unit, None)?;
+        if mem_model {
+            let ctx = model::create(self.unit, true);
+            self.z3.reset_with_context(Z3Query::from(ctx));
+
+            vmops::unmap::synthesize(&mut self.z3, self.unit, Some(prog))
+        } else {
+            Ok(prog)
+        }
     }
 
-    pub fn synthesize_protect(&mut self) -> Result<Program, VelosiSynthIssues> {
+    pub fn synthesize_protect(&mut self, mem_model: bool) -> Result<Program, VelosiSynthIssues> {
         // have this more conditional
         self.create_model();
         self.done = true;
-        vmops::protect::synthesize(&mut self.z3, self.unit)
+
+        let prog = vmops::protect::synthesize(&mut self.z3, self.unit, None)?;
+        if mem_model {
+            let ctx = model::create(self.unit, true);
+            self.z3.reset_with_context(Z3Query::from(ctx));
+
+            vmops::protect::synthesize(&mut self.z3, self.unit, Some(prog))
+        } else {
+            Ok(prog)
+        }
     }
 
     /// terminates the worker pool

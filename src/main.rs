@@ -318,7 +318,8 @@ fn main() {
                 }
 
                 println!("Synthesizing ALL for unit {}", synth.unit_ident());
-                synth.synthesize();
+                // TODO: update to use memory model flag?
+                synth.synthesize(false);
 
                 match synth.finalize() {
                     Ok(p) => log::warn!(target: "main", "synthesis completed: {}", p),
