@@ -46,6 +46,9 @@ pub fn main() {
         ))
         .arg(arg!(-c --cores <VALUE>).default_value("1"))
         .arg(arg!(-s --synth <VALUE>).default_value("all"))
+        .arg(arg!(
+            -m --"mem-model" "Synthesize using the abstract memory model"
+        ))
         .arg(arg!([fname] "Optional name to operate on"))
         .get_matches();
 
@@ -156,11 +159,12 @@ pub fn main() {
                 }
 
                 let mut synth_breakdown = Vec::new();
+                let mem_model = matches.get_flag("mem-model");
 
                 match matches.get_one::<String>("synth").map(|s| s.as_str()) {
                     Some("all") => {
                         println!("Synthesizing ALL for unit {}", synth.unit_ident());
-                        synth.synthesize();
+                        synth.synthesize(mem_model);
                         synth_breakdown = vec![
                             ("map", synth.t_map_synthesis),
                             ("protect", synth.t_protect_synthesis),
@@ -174,7 +178,7 @@ pub fn main() {
 
                     Some("map") => {
                         println!("Synthesizing MAP for unit {}", synth.unit_ident());
-                        match synth.synthesize_map() {
+                        match synth.synthesize_map(mem_model) {
                             Ok(p) => log::warn!(target: "main", "Program: {}", p),
                             Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
                         }
@@ -182,7 +186,7 @@ pub fn main() {
 
                     Some("unmap") => {
                         println!("Synthesizing UNMAP for unit {}", synth.unit_ident());
-                        match synth.synthesize_unmap() {
+                        match synth.synthesize_unmap(mem_model) {
                             Ok(p) => log::warn!(target: "main", "Program: {}", p),
                             Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
                         }
@@ -190,7 +194,7 @@ pub fn main() {
 
                     Some("protect") => {
                         println!("Synthesizing PROTECT for unit {}", synth.unit_ident());
-                        match synth.synthesize_protect() {
+                        match synth.synthesize_protect(mem_model) {
                             Ok(p) => log::warn!(target: "main", "Program: {}", p),
                             Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
                         }

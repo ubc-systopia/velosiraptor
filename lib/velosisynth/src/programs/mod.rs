@@ -34,10 +34,10 @@ use smt2::{Function, Smt2Context, Term, VarBinding};
 
 use velosiast::ast::{VelosiAstParam, VelosiOpExpr, VelosiOperation};
 
-use crate::model;
-use crate::model::velosimodel::{IFACE_PREFIX, MODEL_PREFIX};
-#[cfg(feature = "mem-model")]
-use crate::model::velosimodel::{LOCAL_VARS_PREFIX, WBUFFER_PREFIX};
+use crate::model::{
+    self,
+    velosimodel::{IFACE_PREFIX, LOCAL_VARS_PREFIX, MODEL_PREFIX, WBUFFER_PREFIX},
+};
 
 mod builder;
 mod statevars;
@@ -395,19 +395,21 @@ impl FieldSliceOp {
         fieldname: &str,
         smtops: &mut Vec<(String, Option<Term>)>,
         symvars: &mut SymbolicVars,
+        mem_model: bool,
     ) {
         let arg = self.1.to_smt2_term(symvars);
 
-        #[cfg(feature = "mem-model")]
-        let fname = format!(
-            "{MODEL_PREFIX}.{LOCAL_VARS_PREFIX}.{}.{}.set!",
-            fieldname, self.0
-        );
-        #[cfg(not(feature = "mem-model"))]
-        let fname = format!(
-            "{MODEL_PREFIX}.{IFACE_PREFIX}.{}.{}.set!",
-            fieldname, self.0
-        );
+        let fname = if mem_model {
+            format!(
+                "{MODEL_PREFIX}.{LOCAL_VARS_PREFIX}.{}.{}.set!",
+                fieldname, self.0
+            )
+        } else {
+            format!(
+                "{MODEL_PREFIX}.{IFACE_PREFIX}.{}.{}.set!",
+                fieldname, self.0
+            )
+        };
         smtops.push((fname, Some(arg)));
     }
 }
@@ -477,21 +479,23 @@ impl FieldOp {
         fieldname: &str,
         smtops: &mut Vec<(String, Option<Term>)>,
         symvars: &mut SymbolicVars,
+        mem_model: bool,
     ) {
         match self {
             FieldOp::InsertField(arg) => {
                 let arg = arg.to_smt2_term(symvars);
 
-                #[cfg(feature = "mem-model")]
-                let fname = format!("{MODEL_PREFIX}.{LOCAL_VARS_PREFIX}.{fieldname}.set!");
-                #[cfg(not(feature = "mem-model"))]
-                let fname = format!("{MODEL_PREFIX}.{IFACE_PREFIX}.{fieldname}.set!");
+                let fname = if mem_model {
+                    format!("{MODEL_PREFIX}.{LOCAL_VARS_PREFIX}.{fieldname}.set!")
+                } else {
+                    format!("{MODEL_PREFIX}.{IFACE_PREFIX}.{fieldname}.set!")
+                };
                 smtops.push((fname, Some(arg)));
             }
             FieldOp::InsertFieldSlices(sliceops) => {
                 sliceops
                     .iter()
-                    .for_each(|f| f.to_smt2_term(fieldname, smtops, symvars));
+                    .for_each(|f| f.to_smt2_term(fieldname, smtops, symvars, mem_model));
             }
             FieldOp::ReadAction => {
                 let fname = format!("{MODEL_PREFIX}.{IFACE_PREFIX}.{fieldname}.readaction! ");
@@ -577,18 +581,19 @@ impl FieldActions {
         &self,
         smtops: &mut Vec<(String, Option<Term>)>,
         symvars: &mut SymbolicVars,
+        mem_model: bool,
     ) {
         self.1
             .iter()
-            .for_each(|f| f.to_smt2_term(self.0.as_str(), smtops, symvars));
+            .for_each(|f| f.to_smt2_term(self.0.as_str(), smtops, symvars, mem_model));
 
-        // field actions always end with a store action
-        #[cfg(feature = "mem-model")]
-        let fname = format!("{MODEL_PREFIX}.{LOCAL_VARS_PREFIX}.{}.storeaction!", self.0);
-
-        // field actions always end with a write action
-        #[cfg(not(feature = "mem-model"))]
-        let fname = format!("{MODEL_PREFIX}.{IFACE_PREFIX}.{}.writeaction! ", self.0);
+        let fname = if mem_model {
+            // field actions always end with a store action
+            format!("{MODEL_PREFIX}.{LOCAL_VARS_PREFIX}.{}.storeaction!", self.0)
+        } else {
+            // field actions always end with a write action
+            format!("{MODEL_PREFIX}.{IFACE_PREFIX}.{}.writeaction! ", self.0)
+        };
         smtops.push((fname, None));
     }
 }
@@ -688,6 +693,7 @@ impl Program {
         &self,
         fnname: &str,
         args: &[Rc<VelosiAstParam>],
+        mem_model: bool,
     ) -> (Smt2Context, SymbolicVars) {
         // new symbolic variables
         let mut symvar = SymbolicVars::new();
@@ -696,13 +702,13 @@ impl Program {
         let mut smtops = Vec::new();
         self.0
             .iter()
-            .for_each(|f| f.to_smt2_term(&mut smtops, &mut symvar));
+            .for_each(|f| f.to_smt2_term(&mut smtops, &mut symvar, mem_model));
 
         // do one flush at the end
-        #[cfg(feature = "mem-model")]
-        let fname = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.flushaction!");
-        #[cfg(feature = "mem-model")]
-        smtops.push((fname, None));
+        if mem_model {
+            let fname = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.flushaction!");
+            smtops.push((fname, None));
+        }
 
         // the state variable of the current state
         let mut stvar = StateVars::new();

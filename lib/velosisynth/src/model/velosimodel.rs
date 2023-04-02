@@ -28,16 +28,11 @@
 use super::expr::{expr_to_smt2, p2p};
 use super::types;
 
-use smt2::{DataType, Function, Smt2Context, Term, VarBinding};
+use smt2::{DataType, Function, MatchCase, Pattern, Smt2Context, SortedVar, Term, VarBinding};
 use velosiast::ast::{
-    VelosiAstExpr, VelosiAstField, VelosiAstInterface, VelosiAstInterfaceAction, VelosiAstState,
-    VelosiAstUnitSegment,
+    VelosiAstExpr, VelosiAstField, VelosiAstIdentLiteralExpr, VelosiAstInterface,
+    VelosiAstInterfaceAction, VelosiAstState, VelosiAstTypeInfo, VelosiAstUnitSegment,
 };
-
-#[cfg(feature = "mem-model")]
-use smt2::{MatchCase, Pattern, SortedVar};
-#[cfg(feature = "mem-model")]
-use velosiast::ast::{VelosiAstIdentLiteralExpr, VelosiAstTypeInfo};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Constants
@@ -46,11 +41,8 @@ use velosiast::ast::{VelosiAstIdentLiteralExpr, VelosiAstTypeInfo};
 pub const IFACE_PREFIX: &str = "IFace";
 pub const STATE_PREFIX: &str = "State";
 pub const MODEL_PREFIX: &str = "Model";
-#[cfg(feature = "mem-model")]
 pub const WBUFFER_PREFIX: &str = "WBuffer";
-#[cfg(feature = "mem-model")]
 pub const WBUFFER_ENTRY_PREFIX: &str = "WBufferEntry";
-#[cfg(feature = "mem-model")]
 pub const LOCAL_VARS_PREFIX: &str = "LocalVars";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -58,31 +50,31 @@ pub const LOCAL_VARS_PREFIX: &str = "LocalVars";
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Adds the model definition to the context
-pub fn add_model_def(smt: &mut Smt2Context, unit: &VelosiAstUnitSegment) {
-    add_model(smt);
+pub fn add_model_def(smt: &mut Smt2Context, unit: &VelosiAstUnitSegment, mem_model: bool) {
+    add_model(smt, mem_model);
     add_model_state_accessors(smt, &unit.state);
     add_model_iface_accessors(smt, &unit.interface);
-    #[cfg(feature = "mem-model")]
-    add_model_wbuffer_accessors(smt, &unit.interface);
-    #[cfg(feature = "mem-model")]
-    add_model_local_vars_accessors(smt, &unit.interface);
-    add_actions(smt, &unit.interface)
+    if mem_model {
+        add_model_wbuffer_accessors(smt, &unit.interface);
+        add_model_local_vars_accessors(smt, &unit.interface);
+    }
+    add_actions(smt, &unit.interface, mem_model)
 }
 
-fn add_model(smt: &mut Smt2Context) {
+fn add_model(smt: &mut Smt2Context, mem_model: bool) {
     smt.section(String::from("Model"));
     let mut dt = DataType::new(MODEL_PREFIX.to_string(), 0);
     dt.add_comment("Model Definition".to_string());
     dt.add_field(format!("{MODEL_PREFIX}.{STATE_PREFIX}"), types::state());
     dt.add_field(format!("{MODEL_PREFIX}.{IFACE_PREFIX}"), types::iface());
 
-    #[cfg(feature = "mem-model")]
-    dt.add_field(format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}"), types::wbuffer());
-    #[cfg(feature = "mem-model")]
-    dt.add_field(
-        format!("{MODEL_PREFIX}.{LOCAL_VARS_PREFIX}"),
-        types::iface(),
-    );
+    if mem_model {
+        dt.add_field(format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}"), types::wbuffer());
+        dt.add_field(
+            format!("{MODEL_PREFIX}.{LOCAL_VARS_PREFIX}"),
+            types::iface(),
+        );
+    }
 
     let accessors = dt.to_field_accessor();
     smt.datatype(dt);
@@ -212,7 +204,6 @@ fn add_model_slice_accessor(
     smt.function(f);
 }
 
-#[cfg(feature = "mem-model")]
 fn add_model_wbuffer_field_set(smt: &mut Smt2Context, fieldname: &str) {
     let name = model_field_set_fn_name(WBUFFER_PREFIX, fieldname);
     let mut f = Function::new(name, types::model());
@@ -263,7 +254,6 @@ fn add_model_iface_accessors(smt: &mut Smt2Context, iface: &VelosiAstInterface) 
     }
 }
 
-#[cfg(feature = "mem-model")]
 fn add_model_wbuffer_accessors(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
     smt.section(String::from("Model Write Buffer Accessors"));
 
@@ -273,7 +263,6 @@ fn add_model_wbuffer_accessors(smt: &mut Smt2Context, iface: &VelosiAstInterface
     }
 }
 
-#[cfg(feature = "mem-model")]
 fn add_model_local_vars_accessors(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
     smt.section(String::from("Local Variable Accessors"));
 
@@ -343,7 +332,6 @@ fn add_field_action(
     smt.function(f);
 }
 
-#[cfg(feature = "mem-model")]
 fn add_apply_entry_action(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
     let name = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.applyentryaction!");
     let mut f = Function::new(name, types::model());
@@ -389,7 +377,6 @@ fn add_apply_entry_action(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
     smt.function(f);
 }
 
-#[cfg(feature = "mem-model")]
 fn add_flush_action(smt: &mut Smt2Context) {
     let name = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.flushaction!");
     let mut f = Function::new(name, types::model());
@@ -433,33 +420,33 @@ fn add_flush_action(smt: &mut Smt2Context) {
     smt.function(f);
 }
 
-fn add_actions(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
+fn add_actions(smt: &mut Smt2Context, iface: &VelosiAstInterface, mem_model: bool) {
     smt.section(String::from("Actions"));
     for f in iface.fields() {
         let fieldname = f.ident();
         smt.subsection(format!("interface field: {fieldname}"));
 
-        #[cfg(feature = "mem-model")]
-        let store_action = VelosiAstInterfaceAction::new(
-            VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
-                format!("{LOCAL_VARS_PREFIX}.{fieldname}"),
-                VelosiAstTypeInfo::Integer,
-            )),
-            VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
-                format!("{WBUFFER_PREFIX}.{fieldname}"),
-                VelosiAstTypeInfo::Integer,
-            )),
-            Default::default(),
-        );
-        #[cfg(feature = "mem-model")]
-        add_field_action(
-            smt,
-            &[store_action],
-            LOCAL_VARS_PREFIX,
-            f.ident(),
-            "store",
-            f.size() * 8,
-        );
+        if mem_model {
+            let store_action = VelosiAstInterfaceAction::new(
+                VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
+                    format!("{LOCAL_VARS_PREFIX}.{fieldname}"),
+                    VelosiAstTypeInfo::Integer,
+                )),
+                VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
+                    format!("{WBUFFER_PREFIX}.{fieldname}"),
+                    VelosiAstTypeInfo::Integer,
+                )),
+                Default::default(),
+            );
+            add_field_action(
+                smt,
+                &[store_action],
+                LOCAL_VARS_PREFIX,
+                f.ident(),
+                "store",
+                f.size() * 8,
+            );
+        }
 
         add_field_action(
             smt,
@@ -470,41 +457,40 @@ fn add_actions(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
             f.size() * 8,
         );
 
-        #[cfg(feature = "mem-model")]
-        let update_local_vars_action = VelosiAstInterfaceAction::new(
-            VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
-                format!("{IFACE_PREFIX}.{fieldname}"),
-                VelosiAstTypeInfo::Integer,
-            )),
-            VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
-                format!("{LOCAL_VARS_PREFIX}.{fieldname}"),
-                VelosiAstTypeInfo::Integer,
-            )),
-            Default::default(),
-        );
-        #[cfg(feature = "mem-model")]
-        add_field_action(
-            smt,
-            &[f.read_actions_as_ref(), &[update_local_vars_action]].concat(),
-            IFACE_PREFIX,
-            fieldname,
-            "read",
-            f.size() * 8,
-        );
-
-        #[cfg(not(feature = "mem-model"))]
-        add_field_action(
-            smt,
-            f.read_actions_as_ref(),
-            IFACE_PREFIX,
-            fieldname,
-            "read",
-            f.size() * 8,
-        );
+        if mem_model {
+            let update_local_vars_action = VelosiAstInterfaceAction::new(
+                VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
+                    format!("{IFACE_PREFIX}.{fieldname}"),
+                    VelosiAstTypeInfo::Integer,
+                )),
+                VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
+                    format!("{LOCAL_VARS_PREFIX}.{fieldname}"),
+                    VelosiAstTypeInfo::Integer,
+                )),
+                Default::default(),
+            );
+            add_field_action(
+                smt,
+                &[f.read_actions_as_ref(), &[update_local_vars_action]].concat(),
+                IFACE_PREFIX,
+                fieldname,
+                "read",
+                f.size() * 8,
+            );
+        } else {
+            add_field_action(
+                smt,
+                f.read_actions_as_ref(),
+                IFACE_PREFIX,
+                fieldname,
+                "read",
+                f.size() * 8,
+            );
+        }
     }
 
-    #[cfg(feature = "mem-model")]
-    add_apply_entry_action(smt, iface);
-    #[cfg(feature = "mem-model")]
-    add_flush_action(smt);
+    if mem_model {
+        add_apply_entry_action(smt, iface);
+        add_flush_action(smt);
+    }
 }

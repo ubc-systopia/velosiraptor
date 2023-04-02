@@ -68,6 +68,8 @@ pub struct MapPrograms {
     m_fn: Rc<VelosiAstMethod>,
     t_fn: Rc<VelosiAstMethod>,
     f_fn: Rc<VelosiAstMethod>,
+
+    mem_model: bool,
 }
 
 impl MapPrograms {
@@ -76,6 +78,7 @@ impl MapPrograms {
         m_fn: Rc<VelosiAstMethod>,
         t_fn: Rc<VelosiAstMethod>,
         f_fn: Rc<VelosiAstMethod>,
+        mem_model: bool,
     ) -> Self {
         Self {
             programs,
@@ -85,6 +88,7 @@ impl MapPrograms {
             m_fn,
             t_fn,
             f_fn,
+            mem_model,
         }
     }
 }
@@ -120,6 +124,7 @@ impl ProgramBuilder for MapPrograms {
                     None,
                     false,
                     prog.clone(),
+                    self.mem_model,
                 );
                 let translate_semantics = semantics::submit_program_query(
                     z3,
@@ -128,6 +133,7 @@ impl ProgramBuilder for MapPrograms {
                     None,
                     prog.clone(),
                     false,
+                    self.mem_model,
                 );
 
                 let matchflags_preconds = precond::submit_program_query(
@@ -137,6 +143,7 @@ impl ProgramBuilder for MapPrograms {
                     None,
                     false,
                     prog.clone(),
+                    self.mem_model,
                 );
                 let matchflags_semantics = semantics::submit_program_query(
                     z3,
@@ -145,6 +152,7 @@ impl ProgramBuilder for MapPrograms {
                     None,
                     prog.clone(),
                     false,
+                    self.mem_model,
                 );
 
                 let semprodoncs = semprecond::submit_program_query(
@@ -155,6 +163,7 @@ impl ProgramBuilder for MapPrograms {
                     false,
                     false,
                     prog.clone(),
+                    self.mem_model,
                 );
 
                 self.queries.push_back((
@@ -213,7 +222,11 @@ impl ProgramBuilder for MapPrograms {
     }
 }
 
-pub fn get_program_iter(unit: &VelosiAstUnitSegment, batch_size: usize) -> MapPrograms {
+pub fn get_program_iter(
+    unit: &VelosiAstUnitSegment,
+    batch_size: usize,
+    starting_prog: Option<Program>,
+) -> MapPrograms {
     log::info!(
         target : "[synth::map]",
         "starting synthesizing the map operation"
@@ -230,48 +243,83 @@ pub fn get_program_iter(unit: &VelosiAstUnitSegment, batch_size: usize) -> MapPr
     // Translate: Add a query for each of the pre-conditions of the function
     // ---------------------------------------------------------------------------------------------
 
+    let mem_model = starting_prog.is_some();
     let mut map_queries = Vec::new();
-    if let Some(p) =
-        precond::precond_query(unit, m_fn.clone(), t_fn.clone(), false, batch_size).take()
-    {
+    if let Some(p) = precond::precond_query(
+        unit,
+        m_fn.clone(),
+        t_fn.clone(),
+        false,
+        batch_size,
+        starting_prog.clone(),
+    ) {
         map_queries.push(PartQueries::Precond(p));
     }
 
-    if let Some(p) =
-        precond::precond_query(unit, m_fn.clone(), f_fn.clone(), false, batch_size).take()
-    {
+    if let Some(p) = precond::precond_query(
+        unit,
+        m_fn.clone(),
+        f_fn.clone(),
+        false,
+        batch_size,
+        starting_prog.clone(),
+    ) {
         map_queries.push(PartQueries::Precond(p));
     }
 
-    if let Some(p) =
-        semprecond::semprecond_query(unit, m_fn.clone(), t_fn.clone(), false, batch_size).take()
-    {
+    if let Some(p) = semprecond::semprecond_query(
+        unit,
+        m_fn.clone(),
+        t_fn.clone(),
+        false,
+        batch_size,
+        starting_prog.clone(),
+    ) {
         map_queries.push(PartQueries::SemPrecond(p));
     }
 
-    if let Some(p) =
-        semantics::semantic_query(unit, m_fn.clone(), t_fn.clone(), t_fn, false, batch_size).take()
-    {
+    if let Some(p) = semantics::semantic_query(
+        unit,
+        m_fn.clone(),
+        t_fn.clone(),
+        t_fn,
+        false,
+        batch_size,
+        starting_prog.clone(),
+    ) {
         map_queries.push(PartQueries::Semantic(p));
     }
 
-    if let Some(p) =
-        semantics::semantic_query(unit, m_fn.clone(), f_fn.clone(), f_fn, false, batch_size).take()
-    {
+    if let Some(p) = semantics::semantic_query(
+        unit,
+        m_fn.clone(),
+        f_fn.clone(),
+        f_fn,
+        false,
+        batch_size,
+        starting_prog,
+    ) {
         map_queries.push(PartQueries::Semantic(p));
     }
 
     let programs = MultiDimProgramQueries::new(map_queries);
 
-    MapPrograms::new(programs, m_fn.clone(), t_fn.clone(), f_fn.clone())
+    MapPrograms::new(
+        programs,
+        m_fn.clone(),
+        t_fn.clone(),
+        f_fn.clone(),
+        mem_model,
+    )
 }
 
 pub fn synthesize(
     z3: &mut Z3WorkerPool,
     unit: &VelosiAstUnitSegment,
+    starting_prog: Option<Program>,
 ) -> Result<Program, VelosiSynthIssues> {
     let batch_size = std::cmp::max(DEFAULT_BATCH_SIZE, z3.num_workers());
-    let mut progs = get_program_iter(unit, batch_size);
+    let mut progs = get_program_iter(unit, batch_size, starting_prog);
     loop {
         match progs.next(z3) {
             MaybeResult::Some(prog) => return Ok(prog),

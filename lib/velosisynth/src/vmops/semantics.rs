@@ -58,6 +58,8 @@ where
     idx: Option<usize>,
     /// whether the result should not change
     no_change: bool,
+    /// whether to account for the memory model
+    mem_model: bool,
 }
 
 impl<T> SemanticQueryBuilder<T>
@@ -70,6 +72,7 @@ where
         m_goal: Rc<VelosiAstMethod>,
         idx: Option<usize>,
         no_change: bool,
+        mem_model: bool,
     ) -> Self {
         Self {
             programs,
@@ -77,6 +80,7 @@ where
             m_goal,
             idx,
             no_change,
+            mem_model,
         }
     }
 }
@@ -94,6 +98,7 @@ where
                 self.idx,
                 prog,
                 self.no_change,
+                self.mem_model,
             )),
             MaybeResult::Pending => MaybeResult::Pending,
             MaybeResult::None => MaybeResult::None,
@@ -125,13 +130,19 @@ pub fn semantic_query(
     m_cond: &VelosiAstMethod,
     no_change: bool,
     batch_size: usize,
+    starting_prog: Option<Program>,
 ) -> Option<ProgramQueries<SemanticQueries>> {
+    let mem_model = starting_prog.is_some();
+
     if let Some(body) = &m_goal.body {
         if body.result_type().is_boolean() {
             let body = body.clone();
             let mut program_queries = Vec::new();
             for (idx, e) in body.split_cnf().iter().enumerate() {
-                let programs = utils::make_program_builder(unit, m_op.as_ref(), e).into_iter();
+                let programs = match starting_prog.clone() {
+                    Some(prog) => utils::make_program_iter_mem(prog),
+                    None => utils::make_program_builder(unit, m_op.as_ref(), e).into_iter(),
+                };
                 if !programs.has_programs() {
                     continue;
                 }
@@ -141,6 +152,7 @@ pub fn semantic_query(
                     m_goal.clone(),
                     Some(idx),
                     no_change,
+                    mem_model,
                 );
                 let q = ProgramQueries::with_batchsize(b, batch_size, Z3TaskPriority::Low);
 
@@ -152,7 +164,14 @@ pub fn semantic_query(
             } else {
                 let programs = MultiDimProgramQueries::new(program_queries);
 
-                let b = SemanticQueryBuilder::new(programs, m_op, m_goal.clone(), None, no_change);
+                let b = SemanticQueryBuilder::new(
+                    programs,
+                    m_op,
+                    m_goal.clone(),
+                    None,
+                    no_change,
+                    mem_model,
+                );
                 Some(ProgramQueries::new(
                     SemanticQueries::MultiQuery(b),
                     Z3TaskPriority::Medium,
@@ -181,13 +200,23 @@ pub fn semantic_query(
                 builder.add_var(String::from("pa"));
             }
 
-            let programs = builder.into_iter();
+            let programs = match starting_prog.clone() {
+                Some(prog) => utils::make_program_iter_mem(prog),
+                None => builder.into_iter(),
+            };
 
             // XXX: this produces programs where it shouldn't...
             if !programs.has_programs() {
                 None
             } else {
-                let b = SemanticQueryBuilder::new(programs, m_op, m_goal.clone(), None, no_change);
+                let b = SemanticQueryBuilder::new(
+                    programs,
+                    m_op,
+                    m_goal.clone(),
+                    None,
+                    no_change,
+                    mem_model,
+                );
 
                 Some(ProgramQueries::with_batchsize(
                     SemanticQueries::SingleQuery(b),
@@ -207,16 +236,18 @@ fn program_to_query(
     idx: Option<usize>,
     prog: Program,
     no_change: bool,
+    mem_model: bool,
 ) -> Box<Z3Query> {
     // convert the program to a smt2 term
-    let (mut smt, symvars) = prog.to_smt2_term(m_op.ident(), m_op.params.as_slice());
+    let (mut smt, symvars) = prog.to_smt2_term(m_op.ident(), m_op.params.as_slice(), mem_model);
 
     // build up the pre-conditions
     let pre1 = call_method_assms(m_op, "st!0");
     let pre2 = call_method_assms(m_goal, "st!0");
-    let pre = Term::land(pre1, pre2);
-    #[cfg(feature = "mem-model")]
-    let pre = utils::add_empty_wbuffer_precond(pre);
+    let mut pre = Term::land(pre1, pre2);
+    if mem_model {
+        pre = utils::add_empty_wbuffer_precond(pre);
+    }
 
     // construct the predicate call
 
@@ -269,8 +300,9 @@ pub fn submit_program_query(
     idx: Option<usize>,
     prog: Program,
     no_change: bool,
+    mem_model: bool,
 ) -> Z3Ticket {
-    let query = program_to_query(m_op, m_goal, idx, prog, no_change);
+    let query = program_to_query(m_op, m_goal, idx, prog, no_change, mem_model);
     z3.submit_query(query, Z3TaskPriority::High)
         .expect("failed to submit query")
 }
