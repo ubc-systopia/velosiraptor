@@ -550,6 +550,47 @@ impl FieldOp {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+// Program Actions -- A sequence of program operations
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Program Actions -- A sequence of operations on the program
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+enum ProgramActions {
+    GlobalBarrier,
+    FieldActions(Arc<FieldActions>),
+}
+
+impl ProgramActions {
+    /// Converts the [Expression] into a [Term] for smt query
+    pub fn to_smt2_term(
+        &self,
+        smtops: &mut Vec<(String, Option<Term>)>,
+        symvars: &mut SymbolicVars,
+        mem_model: bool,
+    ) {
+        match self {
+            ProgramActions::GlobalBarrier => {
+                if mem_model {
+                    let fname = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.flushaction!");
+                    smtops.push((fname, None));
+                }
+            }
+            ProgramActions::FieldActions(f) => f.to_smt2_term(smtops, symvars, mem_model),
+        }
+    }
+}
+
+impl Display for ProgramActions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            Self::GlobalBarrier => write!(f, "GlobalBarrier; ",)?,
+            Self::FieldActions(a) => write!(f, "{}", a)?,
+        }
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // Field Actions -- A sequence of field operations
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -666,9 +707,9 @@ impl Debug for FieldActions {
 /// Program -- A sequence of field operations
 ///
 /// A program represents the sequence of operations on fields that perform the configuration
-/// sequence.
+/// sequence and possibly some memory model operations.
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Program(Vec<Arc<FieldActions>>);
+pub struct Program(Vec<ProgramActions>);
 
 impl Program {
     pub fn new() -> Self {
@@ -682,6 +723,10 @@ impl Program {
     pub fn replace_symbolic_values(&mut self, vals: &mut Vec<u64>) {
         self.0
             .iter_mut()
+            .filter_map(|f| match f {
+                ProgramActions::GlobalBarrier => None,
+                ProgramActions::FieldActions(a) => Some(a),
+            })
             .for_each(|a| *a = Arc::new(a.replace_symbolic_values(vals)));
     }
 
@@ -703,12 +748,6 @@ impl Program {
         self.0
             .iter()
             .for_each(|f| f.to_smt2_term(&mut smtops, &mut symvar, mem_model));
-
-        // do one flush at the end
-        if mem_model {
-            let fname = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.flushaction!");
-            smtops.push((fname, None));
-        }
 
         // the state variable of the current state
         let mut stvar = StateVars::new();
@@ -779,7 +818,10 @@ impl Program {
         log::debug!("  {:?}", other);
 
         // struct FieldActions(Arc<String>, Vec<Arc<FieldOp>>);
-        for op in self.0.iter() {
+        for op in self.0.iter().filter_map(|f| match f {
+            ProgramActions::GlobalBarrier => None,
+            ProgramActions::FieldActions(a) => Some(a),
+        }) {
             if let Some(x) = field_operations.get_mut(&op.0) {
                 // insert the field actions into the map by extending the current one
                 x.extend(op.1.clone());
@@ -789,7 +831,10 @@ impl Program {
             }
         }
 
-        for op in other.0.iter() {
+        for op in other.0.iter().filter_map(|f| match f {
+            ProgramActions::GlobalBarrier => None,
+            ProgramActions::FieldActions(a) => Some(a),
+        }) {
             if let Some(existing_ops) = field_operations.get_mut(&op.0) {
                 // merge the field actions, for all other actions just insert the ones that
                 for other_op in op.1.iter() {
@@ -820,21 +865,43 @@ impl Program {
 
         // by now we should have all field programs ready
 
-        for fop in self.0.iter_mut() {
+        for fop in self.0.iter_mut().filter_map(|f| match f {
+            ProgramActions::GlobalBarrier => None,
+            ProgramActions::FieldActions(a) => Some(a),
+        }) {
             let fld = fop.0.clone();
             let ops = field_operations.remove(&fld).unwrap();
             *fop = Arc::new(FieldActions(fld.clone(), ops))
         }
 
-        for fop in other.0.iter() {
+        for fop in other.0.iter().filter_map(|f| match f {
+            ProgramActions::GlobalBarrier => None,
+            ProgramActions::FieldActions(a) => Some(a),
+        }) {
             if let Some(ops) = field_operations.remove(&fop.0) {
                 let fld = fop.0.clone();
-                self.0.push(Arc::new(FieldActions(fld, ops)))
+                self.0
+                    .push(ProgramActions::FieldActions(Arc::new(FieldActions(
+                        fld, ops,
+                    ))))
             }
         }
 
         log::debug!("  {:?}", self);
         self
+    }
+
+    pub fn generate_possible_barriers(&self) -> Vec<Program> {
+        let mut possibilities = vec![self.clone()];
+        let len = self.0.len();
+
+        for i in 1..=len {
+            let mut new_prog = self.clone();
+            new_prog.0.insert(i, ProgramActions::GlobalBarrier);
+            possibilities.push(new_prog);
+        }
+
+        possibilities
     }
 }
 
@@ -849,6 +916,10 @@ impl From<Program> for Vec<VelosiOperation> {
         let mut ops: Vec<VelosiOperation> = prog
             .0
             .iter_mut()
+            .filter_map(|f| match f {
+                ProgramActions::GlobalBarrier => None,
+                ProgramActions::FieldActions(a) => Some(a),
+            })
             .flat_map(|o| <&FieldActions as std::convert::Into<Vec<VelosiOperation>>>::into(o))
             .collect();
         ops.push(VelosiOperation::Return);

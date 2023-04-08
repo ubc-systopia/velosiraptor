@@ -111,7 +111,7 @@ pub fn make_program_builder(
 
 pub fn make_program_iter_mem(prog: Program) -> ProgramsIter {
     ProgramsIter {
-        programs: vec![prog],
+        programs: prog.generate_possible_barriers(),
     }
 }
 

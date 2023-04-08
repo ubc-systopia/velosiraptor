@@ -39,11 +39,25 @@ use crate::vmops::queryhelper::MultiDimProgramQueries;
 use crate::vmops::queryhelper::ProgramQueries;
 use crate::vmops::queryhelper::{MaybeResult, ProgramBuilder};
 use crate::vmops::semantics::SemanticQueries;
-use crate::Z3Ticket;
 use crate::DEFAULT_BATCH_SIZE;
+use crate::{ProgramsIter, Z3Ticket};
+
+pub enum ProtectProgramQueries {
+    SingleQuery(ProgramsIter),
+    MultiQuery(MultiDimProgramQueries<ProgramQueries<SemanticQueries>>),
+}
+
+impl ProgramBuilder for ProtectProgramQueries {
+    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
+        match self {
+            Self::SingleQuery(q) => q.next(z3),
+            Self::MultiQuery(q) => q.next(z3),
+        }
+    }
+}
 
 pub struct ProtectPrograms {
-    programs: MultiDimProgramQueries<ProgramQueries<SemanticQueries>>,
+    programs: ProtectProgramQueries,
     programs_done: bool,
 
     queries: LinkedList<(Program, [Option<Z3Ticket>; 3])>,
@@ -58,7 +72,7 @@ pub struct ProtectPrograms {
 
 impl ProtectPrograms {
     pub fn new(
-        programs: MultiDimProgramQueries<ProgramQueries<SemanticQueries>>,
+        programs: ProtectProgramQueries,
         m_fn: Rc<VelosiAstMethod>,
         t_fn: Rc<VelosiAstMethod>,
         f_fn: Rc<VelosiAstMethod>,
@@ -204,40 +218,46 @@ pub fn get_program_iter(
     let t_fn = unit.get_method("translate").unwrap();
     let f_fn = unit.get_method("matchflags").unwrap();
 
-    // ---------------------------------------------------------------------------------------------
-    // Translate: Add a query for each of the pre-conditions of the function
-    // ---------------------------------------------------------------------------------------------
+    if let Some(prog) = starting_prog {
+        // ---------------------------------------------------------------------------------------------
+        // Translate: Add a query for each possible barrier position
+        // ---------------------------------------------------------------------------------------------
+        ProtectPrograms::new(
+            ProtectProgramQueries::SingleQuery(utils::make_program_iter_mem(prog)),
+            m_fn.clone(),
+            t_fn.clone(),
+            f_fn.clone(),
+            true,
+        )
+    } else {
+        // ---------------------------------------------------------------------------------------------
+        // Translate: Add a query for each of the pre-conditions of the function
+        // ---------------------------------------------------------------------------------------------
 
-    let mem_model = starting_prog.is_some();
-    let mut protec_queries = Vec::with_capacity(2);
+        let mut protec_queries = Vec::with_capacity(2);
 
-    // if let Some(p) =
-    //     semantics::semantic_query(unit, m_fn.clone(), t_fn.clone(), f_fn, true, batch_size)
-    // {
-    //     protec_queries.push(p);
-    // }
+        // if let Some(p) =
+        //     semantics::semantic_query(unit, m_fn.clone(), t_fn.clone(), f_fn, true, batch_size)
+        // {
+        //     protec_queries.push(p);
+        // }
 
-    if let Some(p) = semantics::semantic_query(
-        unit,
-        m_fn.clone(),
-        f_fn.clone(),
-        f_fn,
-        false,
-        batch_size,
-        starting_prog,
-    ) {
-        protec_queries.push(p);
+        if let Some(p) =
+            semantics::semantic_query(unit, m_fn.clone(), f_fn.clone(), f_fn, false, batch_size)
+        {
+            protec_queries.push(p);
+        }
+
+        let programs = MultiDimProgramQueries::new(protec_queries);
+
+        ProtectPrograms::new(
+            ProtectProgramQueries::MultiQuery(programs),
+            m_fn.clone(),
+            t_fn.clone(),
+            f_fn.clone(),
+            false,
+        )
     }
-
-    let programs = MultiDimProgramQueries::new(protec_queries);
-
-    ProtectPrograms::new(
-        programs,
-        m_fn.clone(),
-        t_fn.clone(),
-        f_fn.clone(),
-        mem_model,
-    )
 }
 
 pub fn synthesize(

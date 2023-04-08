@@ -37,13 +37,27 @@ use super::{precond, utils};
 use crate::vmops::precond::PrecondQueries;
 use crate::vmops::queryhelper::MultiDimProgramQueries;
 use crate::vmops::queryhelper::{MaybeResult, ProgramBuilder};
-use crate::Z3Ticket;
 use crate::DEFAULT_BATCH_SIZE;
+use crate::{ProgramsIter, Z3Ticket};
 
 use std::time::Instant;
 
+pub enum UnmapProgramQueries {
+    SingleQuery(ProgramsIter),
+    MultiQuery(MultiDimProgramQueries<PrecondQueries>),
+}
+
+impl ProgramBuilder for UnmapProgramQueries {
+    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
+        match self {
+            Self::SingleQuery(q) => q.next(z3),
+            Self::MultiQuery(q) => q.next(z3),
+        }
+    }
+}
+
 pub struct UnmapPrograms {
-    programs: MultiDimProgramQueries<PrecondQueries>,
+    programs: UnmapProgramQueries,
     programs_done: bool,
     queries: LinkedList<(Program, [Option<Z3Ticket>; 2])>,
     candidates: Vec<Program>,
@@ -57,7 +71,7 @@ pub struct UnmapPrograms {
 
 impl UnmapPrograms {
     pub fn new(
-        programs: MultiDimProgramQueries<PrecondQueries>,
+        programs: UnmapProgramQueries,
         m_fn: Rc<VelosiAstMethod>,
         t_fn: Rc<VelosiAstMethod>,
         f_fn: Rc<VelosiAstMethod>,
@@ -183,44 +197,44 @@ pub fn get_program_iter(
     let t_fn = unit.get_method("translate").unwrap();
     let f_fn = unit.get_method("matchflags").unwrap();
 
-    // ---------------------------------------------------------------------------------------------
-    // Translate: Add a query for each of the pre-conditions of the function
-    // ---------------------------------------------------------------------------------------------
+    if let Some(prog) = starting_prog {
+        // ---------------------------------------------------------------------------------------------
+        // Translate: Add a query for each possible barrier position
+        // ---------------------------------------------------------------------------------------------
+        UnmapPrograms::new(
+            UnmapProgramQueries::SingleQuery(utils::make_program_iter_mem(prog)),
+            m_fn.clone(),
+            t_fn.clone(),
+            f_fn.clone(),
+            true,
+        )
+    } else {
+        // ---------------------------------------------------------------------------------------------
+        // Translate: Add a query for each of the pre-conditions of the function
+        // ---------------------------------------------------------------------------------------------
 
-    let mem_model = starting_prog.is_some();
-    let _t_start = Instant::now();
+        let _t_start = Instant::now();
 
-    let mut unmap_queries = Vec::new();
-    if let Some(p) = precond::precond_query(
-        unit,
-        m_fn.clone(),
-        f_fn.clone(),
-        true,
-        batch_size,
-        starting_prog.clone(),
-    ) {
-        unmap_queries.push(p);
+        let mut unmap_queries = Vec::new();
+        if let Some(p) = precond::precond_query(unit, m_fn.clone(), f_fn.clone(), true, batch_size)
+        {
+            unmap_queries.push(p);
+        }
+
+        if let Some(p) = precond::precond_query(unit, m_fn.clone(), t_fn.clone(), true, batch_size)
+        {
+            unmap_queries.push(p);
+        }
+
+        let programs = MultiDimProgramQueries::new(unmap_queries);
+        UnmapPrograms::new(
+            UnmapProgramQueries::MultiQuery(programs),
+            m_fn.clone(),
+            t_fn.clone(),
+            f_fn.clone(),
+            false,
+        )
     }
-
-    if let Some(p) = precond::precond_query(
-        unit,
-        m_fn.clone(),
-        t_fn.clone(),
-        true,
-        batch_size,
-        starting_prog,
-    ) {
-        unmap_queries.push(p);
-    }
-
-    let programs = MultiDimProgramQueries::new(unmap_queries);
-    UnmapPrograms::new(
-        programs,
-        m_fn.clone(),
-        t_fn.clone(),
-        f_fn.clone(),
-        mem_model,
-    )
 }
 
 pub fn synthesize(
