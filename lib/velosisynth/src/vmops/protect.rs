@@ -154,9 +154,8 @@ impl ProgramBuilder for ProtectPrograms {
 
         let mut res_program = None;
         let mut remaining_queries = LinkedList::new();
-        while let Some((prog, mut tickets)) = self.queries.pop_front() {
+        'outer: while let Some((prog, mut tickets)) = self.queries.pop_front() {
             let mut all_done = true;
-            let mut unsat_part = false;
             for (_i, maybe_ticket) in tickets.iter_mut().enumerate() {
                 if let Some(ticket) = maybe_ticket {
                     if let Some(result) = z3.get_result(*ticket) {
@@ -167,19 +166,13 @@ impl ProgramBuilder for ProtectPrograms {
                             *maybe_ticket = None;
                             // record that we've found a program that satisfies the first query
                         } else {
-                            // unsat result, just drop it
-                            unsat_part = true;
-                            break;
+                            // unsat result, just drop the program and the tickets
+                            continue 'outer;
                         }
                     } else {
                         all_done = false;
                     }
                 }
-            }
-
-            if unsat_part {
-                // drop the program and the tickets as it contains one unsar part
-                continue;
             }
 
             // store the result
