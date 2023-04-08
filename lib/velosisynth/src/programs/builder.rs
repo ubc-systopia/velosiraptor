@@ -28,6 +28,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::programs::ProgramActions;
+
 use super::{Expression, FieldActions, FieldOp, FieldSliceOp, Literal, Program};
 
 pub struct ProgramsIter {
@@ -318,7 +320,9 @@ impl ProgramsBuilder {
             for (i, e) in conf.iter().enumerate() {
                 prog.push(fieldprograms[i][*e].clone());
             }
-            programs.push(Program(prog));
+            programs.push(Program(
+                prog.into_iter().map(ProgramActions::FieldActions).collect(),
+            ));
         }
 
         log::info!(target : "[ProgramsBuilder]", "constructed {} programs", programs.len());

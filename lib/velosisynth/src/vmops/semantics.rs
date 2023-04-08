@@ -58,8 +58,6 @@ where
     idx: Option<usize>,
     /// whether the result should not change
     no_change: bool,
-    /// whether to account for the memory model
-    mem_model: bool,
 }
 
 impl<T> SemanticQueryBuilder<T>
@@ -72,7 +70,6 @@ where
         m_goal: Rc<VelosiAstMethod>,
         idx: Option<usize>,
         no_change: bool,
-        mem_model: bool,
     ) -> Self {
         Self {
             programs,
@@ -80,7 +77,6 @@ where
             m_goal,
             idx,
             no_change,
-            mem_model,
         }
     }
 }
@@ -98,7 +94,7 @@ where
                 self.idx,
                 prog,
                 self.no_change,
-                self.mem_model,
+                false,
             )),
             MaybeResult::Pending => MaybeResult::Pending,
             MaybeResult::None => MaybeResult::None,
@@ -130,19 +126,13 @@ pub fn semantic_query(
     m_cond: &VelosiAstMethod,
     no_change: bool,
     batch_size: usize,
-    starting_prog: Option<Program>,
 ) -> Option<ProgramQueries<SemanticQueries>> {
-    let mem_model = starting_prog.is_some();
-
     if let Some(body) = &m_goal.body {
         if body.result_type().is_boolean() {
             let body = body.clone();
             let mut program_queries = Vec::new();
             for (idx, e) in body.split_cnf().iter().enumerate() {
-                let programs = match starting_prog.clone() {
-                    Some(prog) => utils::make_program_iter_mem(prog),
-                    None => utils::make_program_builder(unit, m_op.as_ref(), e).into_iter(),
-                };
+                let programs = utils::make_program_builder(unit, m_op.as_ref(), e).into_iter();
                 if !programs.has_programs() {
                     continue;
                 }
@@ -152,7 +142,6 @@ pub fn semantic_query(
                     m_goal.clone(),
                     Some(idx),
                     no_change,
-                    mem_model,
                 );
                 let q = ProgramQueries::with_batchsize(b, batch_size, Z3TaskPriority::Low);
 
@@ -164,14 +153,7 @@ pub fn semantic_query(
             } else {
                 let programs = MultiDimProgramQueries::new(program_queries);
 
-                let b = SemanticQueryBuilder::new(
-                    programs,
-                    m_op,
-                    m_goal.clone(),
-                    None,
-                    no_change,
-                    mem_model,
-                );
+                let b = SemanticQueryBuilder::new(programs, m_op, m_goal.clone(), None, no_change);
                 Some(ProgramQueries::new(
                     SemanticQueries::MultiQuery(b),
                     Z3TaskPriority::Medium,
@@ -200,23 +182,13 @@ pub fn semantic_query(
                 builder.add_var(String::from("pa"));
             }
 
-            let programs = match starting_prog.clone() {
-                Some(prog) => utils::make_program_iter_mem(prog),
-                None => builder.into_iter(),
-            };
+            let programs = builder.into_iter();
 
             // XXX: this produces programs where it shouldn't...
             if !programs.has_programs() {
                 None
             } else {
-                let b = SemanticQueryBuilder::new(
-                    programs,
-                    m_op,
-                    m_goal.clone(),
-                    None,
-                    no_change,
-                    mem_model,
-                );
+                let b = SemanticQueryBuilder::new(programs, m_op, m_goal.clone(), None, no_change);
 
                 Some(ProgramQueries::with_batchsize(
                     SemanticQueries::SingleQuery(b),

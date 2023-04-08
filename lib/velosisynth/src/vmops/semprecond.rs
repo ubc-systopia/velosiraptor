@@ -57,8 +57,6 @@ where
     negate: bool,
     /// the entry in the pre-condition
     idx: Option<usize>,
-    /// whether to account for the memory model
-    mem_model: bool,
 }
 
 impl<T> SemPrecondQueryBuilder<T>
@@ -71,7 +69,6 @@ where
         m_goal: Rc<VelosiAstMethod>,
         idx: Option<usize>,
         negate: bool,
-        mem_model: bool,
     ) -> Self {
         Self {
             programs,
@@ -79,7 +76,6 @@ where
             m_goal,
             negate,
             idx,
-            mem_model,
         }
     }
 }
@@ -100,7 +96,7 @@ where
                     prog,
                     self.negate,
                     false,
-                    self.mem_model,
+                    false,
                 ))
             }
             MaybeResult::Pending => MaybeResult::Pending,
@@ -119,7 +115,6 @@ pub fn semprecond_query(
     m_goal: Rc<VelosiAstMethod>,
     negate: bool,
     batch_size: usize,
-    starting_prog: Option<Program>,
 ) -> Option<SemPrecondQueries> {
     if m_goal.ident().as_str() != "translate" {
         println!("{}", m_goal);
@@ -131,7 +126,6 @@ pub fn semprecond_query(
         params.insert(p.ident().as_str());
     }
 
-    let mem_model = starting_prog.is_some();
     let mut program_queries = Vec::with_capacity(m_goal.requires.len());
     for (i, pre) in m_goal.requires.iter().enumerate() {
         // if there are no state references, then this is an assumption and we can skip it
@@ -148,21 +142,12 @@ pub fn semprecond_query(
         builder.add_var(String::from("va"));
         builder.add_var(String::from("sz"));
 
-        let programs = match starting_prog.clone() {
-            Some(prog) => utils::make_program_iter_mem(prog),
-            None => builder.into_iter(),
-        };
+        let programs = builder.into_iter();
         if !programs.has_programs() {
             continue;
         }
-        let b = SemPrecondQueryBuilder::new(
-            programs,
-            m_op.clone(),
-            m_goal.clone(),
-            Some(i),
-            negate,
-            mem_model,
-        );
+        let b =
+            SemPrecondQueryBuilder::new(programs, m_op.clone(), m_goal.clone(), Some(i), negate);
         let q = ProgramQueries::with_batchsize(b, batch_size, Z3TaskPriority::Low);
         program_queries.push(q);
     }
@@ -172,7 +157,7 @@ pub fn semprecond_query(
     } else {
         let programs = MultiDimProgramQueries::new(program_queries);
 
-        let b = SemPrecondQueryBuilder::new(programs, m_op, m_goal, None, negate, mem_model);
+        let b = SemPrecondQueryBuilder::new(programs, m_op, m_goal, None, negate);
         Some(ProgramQueries::new(b, Z3TaskPriority::Medium))
     }
 }

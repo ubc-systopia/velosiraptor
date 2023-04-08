@@ -30,6 +30,7 @@ use std::rc::Rc;
 
 use velosiast::ast::{VelosiAstMethod, VelosiAstUnitSegment};
 
+use crate::ProgramsIter;
 use crate::{programs::Program, z3::Z3WorkerPool, VelosiSynthIssues};
 
 use super::{precond, semantics, semprecond, utils};
@@ -59,8 +60,22 @@ impl ProgramBuilder for PartQueries {
     }
 }
 
+pub enum MapProgramQueries {
+    SingleQuery(ProgramsIter),
+    MultiQuery(MultiDimProgramQueries<PartQueries>),
+}
+
+impl ProgramBuilder for MapProgramQueries {
+    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
+        match self {
+            Self::SingleQuery(q) => q.next(z3),
+            Self::MultiQuery(q) => q.next(z3),
+        }
+    }
+}
+
 pub struct MapPrograms {
-    programs: MultiDimProgramQueries<PartQueries>,
+    programs: MapProgramQueries,
     programs_done: bool,
     queries: LinkedList<(Program, [Option<Z3Ticket>; 5])>,
     candidates: Vec<Program>,
@@ -74,7 +89,7 @@ pub struct MapPrograms {
 
 impl MapPrograms {
     pub fn new(
-        programs: MultiDimProgramQueries<PartQueries>,
+        programs: MapProgramQueries,
         m_fn: Rc<VelosiAstMethod>,
         t_fn: Rc<VelosiAstMethod>,
         f_fn: Rc<VelosiAstMethod>,
@@ -239,78 +254,61 @@ pub fn get_program_iter(
     let t_fn = unit.get_method("translate").unwrap();
     let f_fn = unit.get_method("matchflags").unwrap();
 
-    // ---------------------------------------------------------------------------------------------
-    // Translate: Add a query for each of the pre-conditions of the function
-    // ---------------------------------------------------------------------------------------------
+    if let Some(prog) = starting_prog {
+        // ---------------------------------------------------------------------------------------------
+        // Translate: Add a query for each possible barrier position
+        // ---------------------------------------------------------------------------------------------
+        MapPrograms::new(
+            MapProgramQueries::SingleQuery(utils::make_program_iter_mem(prog)),
+            m_fn.clone(),
+            t_fn.clone(),
+            f_fn.clone(),
+            true,
+        )
+    } else {
+        // ---------------------------------------------------------------------------------------------
+        // Translate: Add a query for each of the pre-conditions of the function
+        // ---------------------------------------------------------------------------------------------
 
-    let mem_model = starting_prog.is_some();
-    let mut map_queries = Vec::new();
-    if let Some(p) = precond::precond_query(
-        unit,
-        m_fn.clone(),
-        t_fn.clone(),
-        false,
-        batch_size,
-        starting_prog.clone(),
-    ) {
-        map_queries.push(PartQueries::Precond(p));
+        let mut map_queries = Vec::new();
+        if let Some(p) = precond::precond_query(unit, m_fn.clone(), t_fn.clone(), false, batch_size)
+        {
+            map_queries.push(PartQueries::Precond(p));
+        }
+
+        if let Some(p) = precond::precond_query(unit, m_fn.clone(), f_fn.clone(), false, batch_size)
+        {
+            map_queries.push(PartQueries::Precond(p));
+        }
+
+        if let Some(p) =
+            semprecond::semprecond_query(unit, m_fn.clone(), t_fn.clone(), false, batch_size)
+        {
+            map_queries.push(PartQueries::SemPrecond(p));
+        }
+
+        if let Some(p) =
+            semantics::semantic_query(unit, m_fn.clone(), t_fn.clone(), t_fn, false, batch_size)
+        {
+            map_queries.push(PartQueries::Semantic(p));
+        }
+
+        if let Some(p) =
+            semantics::semantic_query(unit, m_fn.clone(), f_fn.clone(), f_fn, false, batch_size)
+        {
+            map_queries.push(PartQueries::Semantic(p));
+        }
+
+        let programs = MultiDimProgramQueries::new(map_queries);
+
+        MapPrograms::new(
+            MapProgramQueries::MultiQuery(programs),
+            m_fn.clone(),
+            t_fn.clone(),
+            f_fn.clone(),
+            false,
+        )
     }
-
-    if let Some(p) = precond::precond_query(
-        unit,
-        m_fn.clone(),
-        f_fn.clone(),
-        false,
-        batch_size,
-        starting_prog.clone(),
-    ) {
-        map_queries.push(PartQueries::Precond(p));
-    }
-
-    if let Some(p) = semprecond::semprecond_query(
-        unit,
-        m_fn.clone(),
-        t_fn.clone(),
-        false,
-        batch_size,
-        starting_prog.clone(),
-    ) {
-        map_queries.push(PartQueries::SemPrecond(p));
-    }
-
-    if let Some(p) = semantics::semantic_query(
-        unit,
-        m_fn.clone(),
-        t_fn.clone(),
-        t_fn,
-        false,
-        batch_size,
-        starting_prog.clone(),
-    ) {
-        map_queries.push(PartQueries::Semantic(p));
-    }
-
-    if let Some(p) = semantics::semantic_query(
-        unit,
-        m_fn.clone(),
-        f_fn.clone(),
-        f_fn,
-        false,
-        batch_size,
-        starting_prog,
-    ) {
-        map_queries.push(PartQueries::Semantic(p));
-    }
-
-    let programs = MultiDimProgramQueries::new(map_queries);
-
-    MapPrograms::new(
-        programs,
-        m_fn.clone(),
-        t_fn.clone(),
-        f_fn.clone(),
-        mem_model,
-    )
 }
 
 pub fn synthesize(

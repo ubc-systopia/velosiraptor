@@ -60,8 +60,6 @@ where
     negate: bool,
     /// the entry in the pre-condition
     idx: Option<usize>,
-    /// whether to account for the memory model
-    mem_model: bool,
 }
 
 impl<T> PrecondQueryBuilder<T>
@@ -74,7 +72,6 @@ where
         m_goal: Rc<VelosiAstMethod>,
         idx: Option<usize>,
         negate: bool,
-        mem_model: bool,
     ) -> Self {
         Self {
             programs,
@@ -82,7 +79,6 @@ where
             m_goal,
             negate,
             idx,
-            mem_model,
         }
     }
 }
@@ -100,7 +96,7 @@ where
                 self.idx,
                 self.negate,
                 prog,
-                self.mem_model,
+                false,
             )),
             MaybeResult::Pending => MaybeResult::Pending,
             MaybeResult::None => MaybeResult::None,
@@ -118,14 +114,12 @@ pub fn precond_query(
     m_goal: Rc<VelosiAstMethod>,
     negate: bool,
     batch_size: usize,
-    starting_prog: Option<Program>,
 ) -> Option<PrecondQueries> {
     let mut params = HashSet::new();
     for p in m_goal.params.iter() {
         params.insert(p.ident().as_str());
     }
 
-    let mem_model = starting_prog.is_some();
     let mut program_queries = Vec::with_capacity(m_goal.requires.len());
     for (i, pre) in m_goal.requires.iter().enumerate() {
         // if there are no state references, then this is an assumption and we can skip it
@@ -137,21 +131,11 @@ pub fn precond_query(
         if pre.has_var_references(&params) {
             continue;
         }
-        let programs = match starting_prog.clone() {
-            Some(prog) => utils::make_program_iter_mem(prog),
-            None => utils::make_program_builder(unit, m_op.as_ref(), pre).into_iter(),
-        };
+        let programs = utils::make_program_builder(unit, m_op.as_ref(), pre).into_iter();
         if !programs.has_programs() {
             continue;
         }
-        let b = PrecondQueryBuilder::new(
-            programs,
-            m_op.clone(),
-            m_goal.clone(),
-            Some(i),
-            negate,
-            mem_model,
-        );
+        let b = PrecondQueryBuilder::new(programs, m_op.clone(), m_goal.clone(), Some(i), negate);
         let q = ProgramQueries::with_batchsize(b, batch_size, Z3TaskPriority::Low);
         program_queries.push(q);
     }
@@ -161,7 +145,7 @@ pub fn precond_query(
     } else {
         let programs = MultiDimProgramQueries::new(program_queries);
 
-        let b = PrecondQueryBuilder::new(programs, m_op, m_goal, None, negate, mem_model);
+        let b = PrecondQueryBuilder::new(programs, m_op, m_goal, None, negate);
         Some(ProgramQueries::new(b, Z3TaskPriority::Medium))
     }
 }
