@@ -141,7 +141,7 @@ impl ProgramBuilder for UnmapPrograms {
 
         let mut res_program = None;
         let mut remaining_queries = LinkedList::new();
-        while let Some((prog, mut tickets)) = self.queries.pop_front() {
+        'outer: while let Some((prog, mut tickets)) = self.queries.pop_front() {
             let mut all_done = true;
             for maybe_ticket in tickets.iter_mut() {
                 if let Some(ticket) = maybe_ticket {
@@ -152,8 +152,8 @@ impl ProgramBuilder for UnmapPrograms {
                             // set the ticket to none to mark completion
                             *maybe_ticket = None;
                         } else {
-                            // unsat result, just drop it
-                            break;
+                            // unsat result, just drop the program and the tickets
+                            continue 'outer;
                         }
                     } else {
                         all_done = false;
