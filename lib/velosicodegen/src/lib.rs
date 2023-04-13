@@ -106,4 +106,12 @@ impl VelosiCodeGen {
             VelosiCodeGen::C(b) => b.finalize(ast),
         }
     }
+
+    pub fn generate(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
+        self.prepare()?;
+        self.generate_globals(ast)?;
+        self.generate_interface(ast)?;
+        self.generate_units(ast)?;
+        self.finalize(ast)
+    }
 }
