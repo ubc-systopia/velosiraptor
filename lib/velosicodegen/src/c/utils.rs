@@ -31,267 +31,549 @@ use std::collections::HashMap;
 use crustal as C;
 
 use velosiast::ast::{
-    VelosiAstConst, VelosiAstExpr, VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField,
-    VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField, VelosiAstInterfaceRegisterField,
-    VelosiAstMethod, VelosiAstType, VelosiAstTypeInfo, VelosiAstUnitSegment,
-    VelosiAstUnitStaticMap, VelosiOpExpr, VelosiOperation,
+    VelosiAstBinOp, VelosiAstConst, VelosiAstExpr, VelosiAstField, VelosiAstFieldSlice,
+    VelosiAstInterfaceField, VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField,
+    VelosiAstInterfaceRegisterField, VelosiAstMethod, VelosiAstType, VelosiAstTypeInfo,
+    VelosiAstUnOp, VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment, VelosiAstUnitStaticMap,
+    VelosiOpExpr, VelosiOperation,
 };
 
 use crate::COPYRIGHT;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Unit Utilities
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn unit_type_str(ident: &str) -> String {
+    format!("{}__t", ident.to_ascii_lowercase())
+}
+
+pub fn flags_type_str(unit: &str) -> String {
+    format!("{}_flags__t", unit.to_ascii_lowercase())
+}
 
 pub fn unit_struct_field_name(name: &str) -> String {
     format!("_{}", name.to_ascii_lowercase())
 }
 
-pub fn unit_struct_name(unit_name: &str) -> String {
-    unit_name.to_lowercase()
+pub trait UnitUtils {
+    /// returns the identifier of the unit
+    fn my_ident(&self) -> &str;
+
+    /// returns the type name of the unit `myunit_t`
+    fn to_type_name(&self) -> String {
+        unit_type_str(self.my_ident())
+    }
+
+    fn to_ctype(&self) -> C::Type {
+        C::Type::new_typedef(&self.to_type_name())
+    }
+
+    /// returns the struct name of the unit `myunit`
+    fn to_struct_name(&self) -> String {
+        self.my_ident().to_ascii_lowercase()
+    }
+
+    /// returns the type name for the unit's flags `myunit_flags_t`
+    fn to_flags_type(&self) -> String {
+        flags_type_str(self.my_ident())
+    }
+
+    fn to_flags_struct_name(&self) -> String {
+        format!("{}_flags", self.my_ident().to_ascii_lowercase())
+    }
+
+    fn to_op_fn_name(&self, op: &VelosiAstMethod) -> String {
+        format!("{}_{}", self.my_ident().to_ascii_lowercase(), op.ident())
+    }
+
+    fn translate_fn_name(&self) -> String {
+        format!("{}_resolve", self.my_ident().to_ascii_lowercase())
+    }
+
+    fn constructor_fn_name(&self) -> String {
+        format!("{}_init", self.my_ident().to_ascii_lowercase())
+    }
+
+    fn new_scope(&self, title: &str) -> C::Scope {
+        // the code generation scope
+        let mut scope = C::Scope::new();
+
+        // constant definitions
+        let title = format!("{} Definitions for `{}`", title, self.my_ident());
+        add_header(&mut scope, &title);
+
+        scope
+    }
+
+    fn ptype_to_ctype(&self, ptype: &VelosiAstTypeInfo) -> C::Type {
+        match ptype {
+            VelosiAstTypeInfo::Integer => C::Type::new_uint64(),
+            VelosiAstTypeInfo::Bool => C::Type::new_bool(),
+            VelosiAstTypeInfo::GenAddr => C::Type::new_typedef("genaddr_t"),
+            VelosiAstTypeInfo::VirtAddr => C::Type::new_typedef("vaddr_t"),
+            VelosiAstTypeInfo::PhysAddr => C::Type::new_typedef("paddr_t"),
+            VelosiAstTypeInfo::Size => C::Type::new_typedef("size_t"),
+            VelosiAstTypeInfo::Flags => C::Type::new_typedef(&self.to_flags_type()),
+            VelosiAstTypeInfo::TypeRef(s) => {
+                let name = unit_type_str(s.as_str());
+                C::Type::new_typedef(&name)
+            }
+            _ => todo!(),
+        }
+    }
 }
 
-pub fn unit_flags_type(unit: &VelosiAstUnitSegment) -> String {
-    format!("{}_flags_t", unit.ident())
+impl UnitUtils for &VelosiAstUnit {
+    fn my_ident(&self) -> &str {
+        self.ident()
+    }
 }
 
-pub fn segment_struct_name(unit: &VelosiAstUnitSegment) -> String {
-    unit_struct_name(unit.ident())
+impl UnitUtils for &VelosiAstUnitSegment {
+    fn my_ident(&self) -> &str {
+        self.ident()
+    }
 }
 
-pub fn staticmap_struct_name(unit: &VelosiAstUnitStaticMap) -> String {
-    unit_struct_name(unit.ident())
+impl UnitUtils for &VelosiAstUnitStaticMap {
+    fn my_ident(&self) -> &str {
+        self.ident()
+    }
 }
 
-pub fn unit_type_name_str(unit: &str) -> String {
-    format!("{}_t", unit.to_lowercase())
+impl UnitUtils for &VelosiAstUnitEnum {
+    fn my_ident(&self) -> &str {
+        self.ident()
+    }
 }
 
-pub fn segment_type_name(unit: &VelosiAstUnitSegment) -> String {
-    unit_type_name_str(unit.ident())
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Interface Field Utils
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn field_wr_fn_name_str(unit: &str, field: &str) -> String {
+    format!("{}_{}__wr", unit.to_lowercase(), field.to_lowercase())
 }
 
-pub fn staticmap_type_name(unit: &VelosiAstUnitStaticMap) -> String {
-    unit_type_name_str(unit.ident())
-}
-
-/// constructs the struct type name
-pub fn field_struct_name(segment: &VelosiAstUnitSegment, field: &dyn VelosiAstField) -> String {
-    format!("{}_{}", segment.ident().to_lowercase(), field.ident())
-}
-
-/// constructs the field type name for a given field.
-pub fn field_type_name(segment: &VelosiAstUnitSegment, field: &dyn VelosiAstField) -> String {
-    format!("{}__t", field_struct_name(segment, field))
-}
-
-pub fn field_mask_name(segment: &VelosiAstUnitSegment, field: &dyn VelosiAstField) -> String {
-    format!(
-        "{}_{}__MASK",
-        segment.ident().to_uppercase(),
-        field.ident().to_uppercase()
-    )
-}
-
-pub fn if_field_wr_fn_name_str(unit_name: &str, fieldname: &str) -> String {
-    format!("{}_{}__wr", unit_name.to_lowercase(), fieldname)
-}
-
-pub fn if_field_wr_fn_name(segment: &VelosiAstUnitSegment, field: &dyn VelosiAstField) -> String {
-    if_field_wr_fn_name_str(segment.ident(), field.ident())
-}
-
-pub fn if_field_rd_fn_name_str(unit: &str, fieldname: &str) -> String {
-    format!("{}_{}__rd", unit.to_lowercase(), fieldname)
-}
-
-pub fn if_field_rd_fn_name(segment: &VelosiAstUnitSegment, field: &dyn VelosiAstField) -> String {
-    if_field_rd_fn_name_str(segment.ident(), field.ident())
-}
-
-pub fn if_field_wr_slice_fn_name_str(unit: &str, field: &str, slice: &str) -> String {
-    format!("{}_{}_{}__wr", unit.to_lowercase(), field, slice)
-}
-
-pub fn if_field_wr_slice_fn_name(
-    segment: &VelosiAstUnitSegment,
-    field: &dyn VelosiAstField,
-    sl: &VelosiAstFieldSlice,
-) -> String {
-    if_field_wr_slice_fn_name_str(segment.ident(), field.ident(), sl.ident())
-}
-
-pub fn if_field_rd_slice_fn_name_str(unit: &str, field: &str, slice: &str) -> String {
-    format!("{}_{}_{}__rd", unit.to_lowercase(), field, slice)
-}
-
-pub fn if_field_rd_slice_fn_name(
-    unit: &VelosiAstUnitSegment,
-    field: &dyn VelosiAstField,
-    sl: &VelosiAstFieldSlice,
-) -> String {
-    if_field_rd_slice_fn_name_str(unit.ident(), field.ident(), sl.ident())
-}
-
-pub fn field_slice_extract_fn_name_str(unit: &str, field: &str, sl: &str) -> String {
-    format!("{}_{}__extract_{}", unit.to_lowercase(), field, sl)
-}
-
-pub fn field_slice_extract_fn_name(
-    unit: &VelosiAstUnitSegment,
-    field: &dyn VelosiAstField,
-    sl: &VelosiAstFieldSlice,
-) -> String {
-    field_slice_extract_fn_name_str(unit.ident(), field.ident(), sl.ident())
-}
-
-pub fn field_slice_insert_fn_name_str(unit: &str, field: &str, sl: &str) -> String {
-    format!(
-        "{}_{}__insert_{}",
-        unit.to_lowercase(),
-        field.to_lowercase(),
-        sl.to_lowercase()
-    )
-}
-
-pub fn field_slice_insert_fn_name(
-    unit: &VelosiAstUnitSegment,
-    field: &dyn VelosiAstField,
-    sl: &VelosiAstFieldSlice,
-) -> String {
-    field_slice_insert_fn_name_str(unit.ident(), field.ident(), sl.ident())
+pub fn field_rd_fn_name_str(unit: &str, field: &str) -> String {
+    format!("{}_{}__rd", unit.to_lowercase(), field.to_lowercase())
 }
 
 pub fn field_get_raw_fn_name_str(unit: &str, field: &str) -> String {
     format!("{}_{}__get_raw", unit.to_lowercase(), field)
 }
 
-pub fn field_get_raw_fn_name(unit: &VelosiAstUnitSegment, field: &dyn VelosiAstField) -> String {
-    field_get_raw_fn_name_str(unit.ident(), field.ident())
-}
-
 pub fn field_set_raw_fn_name_str(unit: &str, field: &str) -> String {
     format!("{}_{}__set_raw", unit.to_lowercase(), field.to_lowercase())
 }
 
-pub fn field_set_raw_fn_name(unit: &VelosiAstUnitSegment, field: &dyn VelosiAstField) -> String {
-    field_set_raw_fn_name_str(unit.ident(), field.ident())
-}
+pub trait FieldUtils<U>
+where
+    U: UnitUtils,
+{
+    /// returns the identifier of the unit
+    fn my_ident(&self) -> &str;
 
-pub fn op_fn_name(unit: &VelosiAstUnitSegment, op: &VelosiAstMethod) -> String {
-    format!("{}_{}", unit.ident().to_lowercase(), op.ident())
-}
+    fn to_os_write_fn_name(&self) -> String;
 
-pub fn translate_fn_name(unit_name: &str) -> String {
-    format!("{}_resolve", unit_name.to_lowercase())
-}
+    fn to_os_read_fn_name(&self) -> String;
 
-pub fn constructor_fn_name(unit_name: &str) -> String {
-    format!("{}_init", unit_name.to_lowercase())
-}
+    fn base(&self) -> Option<(&str, u64)> {
+        None
+    }
 
-pub fn os_mmio_register_read_fn(
-    unit_var: &C::Expr,
-    field: &VelosiAstInterfaceMmioField,
-) -> C::Expr {
-    let fnname = format!("os_mmio_register_read_{}", field.nbits());
-    let base = format!("_{}", field.base);
+    fn to_struct_name(&self, unit: U) -> String {
+        format!("{}_{}", unit.to_struct_name(), self.my_ident())
+    }
 
-    C::Expr::fn_call(
-        &fnname,
-        vec![
-            C::Expr::field_access(unit_var, &base),
-            C::Expr::new_num(field.offset),
-        ],
-    )
-}
+    fn to_type_name(&self, unit: U) -> String {
+        let mut s = self.to_struct_name(unit);
+        s.push_str("__t");
+        s
+    }
 
-pub fn os_mmio_register_write_fn(
-    unit_var: &C::Expr,
-    field: &VelosiAstInterfaceMmioField,
-    val: &C::Expr,
-) -> C::Expr {
-    let fnname = format!("os_mmio_register_write_{}", field.nbits());
-    let base = format!("_{}", field.base.as_str());
+    fn to_ctype(&self, unit: U) -> C::Type {
+        C::Type::new_typedef(&self.to_type_name(unit))
+    }
 
-    C::Expr::fn_call(
-        &fnname,
-        vec![
-            C::Expr::field_access(unit_var, &base),
-            C::Expr::new_num(field.offset),
-            val.clone(),
-        ],
-    )
-}
+    fn to_mask_name(&self, unit: U) -> String {
+        format!(
+            "{}_{}__MASK",
+            unit.my_ident().to_uppercase(),
+            self.my_ident().to_uppercase()
+        )
+    }
 
-pub fn os_register_write_fn(
-    _unit_var: &C::Expr,
-    field: &VelosiAstInterfaceRegisterField,
-    val: &C::Expr,
-) -> C::Expr {
-    let fnname = format!("os_register_write_{}", field.nbits());
+    fn to_wr_fn(&self, unit: U) -> String {
+        field_wr_fn_name_str(unit.my_ident(), self.my_ident())
+    }
 
-    C::Expr::fn_call(&fnname, vec![val.clone()])
-}
+    fn to_wr_fn_call(&self, unit: U, unit_var: C::Expr, val: C::Expr) -> C::Expr {
+        let fname = self.to_wr_fn(unit);
+        C::Expr::fn_call(&fname, vec![unit_var, val])
+    }
 
-pub fn os_register_read_fn(
-    _unit_var: &C::Expr,
-    field: &VelosiAstInterfaceRegisterField,
-    val: &C::Expr,
-) -> C::Expr {
-    let fnname = format!("os_register_read_{}", field.nbits());
+    fn to_rd_fn(&self, unit: U) -> String {
+        field_rd_fn_name_str(unit.my_ident(), self.my_ident())
+    }
 
-    C::Expr::fn_call(&fnname, vec![val.clone()])
-}
+    fn to_rd_fn_call(&self, unit: U, unit_var: C::Expr) -> C::Expr {
+        let fname = self.to_rd_fn(unit);
+        C::Expr::fn_call(&fname, vec![unit_var])
+    }
 
-pub fn os_memory_write_fn(
-    unit_var: &C::Expr,
-    field: &VelosiAstInterfaceMemoryField,
-    val: &C::Expr,
-) -> C::Expr {
-    let fnname = format!("os_memory_write_{}", field.nbits());
-    let base = format!("_{}", field.base.as_str());
+    fn to_get_val_fn(&self, unit: U) -> String {
+        field_get_raw_fn_name_str(unit.my_ident(), self.my_ident())
+    }
 
-    C::Expr::fn_call(
-        &fnname,
-        vec![
-            C::Expr::field_access(unit_var, &base),
-            C::Expr::new_num(field.offset),
-            val.clone(),
-        ],
-    )
-}
+    /// obtains the raw value from the field struct
+    fn to_get_val_fn_call(&self, unit: U, val: C::Expr) -> C::Expr {
+        let fname = self.to_get_val_fn(unit);
+        C::Expr::fn_call(&fname, vec![val])
+    }
 
-pub fn os_memory_read_fn(
-    unit_var: &C::Expr,
-    field: &VelosiAstInterfaceMemoryField,
-    _val: &C::Expr,
-) -> C::Expr {
-    let fnname = format!("os_memory_read_{}", field.nbits());
-    let base = format!("_{}", field.base);
+    fn to_set_val_fn(&self, unit: U) -> String {
+        field_set_raw_fn_name_str(unit.my_ident(), self.my_ident())
+    }
 
-    C::Expr::fn_call(
-        &fnname,
-        vec![
-            C::Expr::field_access(unit_var, &base),
-            C::Expr::new_num(field.offset),
-        ],
-    )
-}
+    /// calls the initializer for the field struct with the raw value
+    fn to_set_val_fn_call(&self, unit: U, val: C::Expr) -> C::Expr {
+        let fname = self.to_set_val_fn(unit);
+        C::Expr::fn_call(&fname, vec![val])
+    }
 
-pub fn interface_write_fn(
-    unit_var: &C::Expr,
-    field: &VelosiAstInterfaceField,
-    val: &C::Expr,
-) -> C::Expr {
-    match field {
-        VelosiAstInterfaceField::Memory(mem) => os_memory_write_fn(unit_var, mem, val),
-        VelosiAstInterfaceField::Register(reg) => {
-            // cpu register
-            os_register_write_fn(unit_var, reg, val)
+    fn to_os_wr_fn(&self, _unit: U, unit_var: &C::Expr, val: &C::Expr) -> C::Expr {
+        let fname = self.to_os_write_fn_name();
+        let mut args = Vec::new();
+        if let Some((base, offset)) = self.base() {
+            args.push(C::Expr::field_access(unit_var, base));
+            args.push(C::Expr::new_num(offset))
         }
-        VelosiAstInterfaceField::Mmio(mmio) => {
-            // write to mmio register
-            os_mmio_register_write_fn(unit_var, mmio, val)
+        args.push(val.clone());
+
+        C::Expr::fn_call(&fname, args)
+    }
+
+    fn to_os_rd_fn(&self, _unit: U, unit_var: &C::Expr) -> C::Expr {
+        let fname = self.to_os_read_fn_name();
+        let mut args = Vec::new();
+        if let Some((base, offset)) = self.base() {
+            args.push(C::Expr::field_access(unit_var, base));
+            args.push(C::Expr::new_num(offset))
+        }
+        C::Expr::fn_call(&fname, args)
+    }
+}
+
+impl<U> FieldUtils<U> for &VelosiAstInterfaceField
+where
+    U: UnitUtils,
+{
+    fn my_ident(&self) -> &str {
+        self.ident()
+    }
+
+    fn base(&self) -> Option<(&str, u64)> {
+        match self {
+            VelosiAstInterfaceField::Memory(mem) => Some((mem.ident().as_str(), mem.offset)),
+            VelosiAstInterfaceField::Register(_reg) => None,
+            VelosiAstInterfaceField::Mmio(mmio) => Some((mmio.ident().as_str(), mmio.offset)),
+        }
+    }
+
+    fn to_os_write_fn_name(&self) -> String {
+        match self {
+            VelosiAstInterfaceField::Memory(mem) => os_memory_write_fn_name(mem),
+            VelosiAstInterfaceField::Register(reg) => os_register_write_fn_name(reg),
+            VelosiAstInterfaceField::Mmio(mmio) => os_mmio_write_fn_name(mmio),
+        }
+    }
+
+    fn to_os_read_fn_name(&self) -> String {
+        match self {
+            VelosiAstInterfaceField::Memory(mem) => os_memory_read_fn_name(mem),
+            VelosiAstInterfaceField::Register(reg) => os_register_read_fn_name(reg),
+            VelosiAstInterfaceField::Mmio(mmio) => os_mmio_read_fn_name(mmio),
         }
     }
 }
+
+impl<U> FieldUtils<U> for &VelosiAstInterfaceRegisterField
+where
+    U: UnitUtils,
+{
+    fn my_ident(&self) -> &str {
+        self.ident()
+    }
+
+    fn to_os_write_fn_name(&self) -> String {
+        os_register_write_fn_name(self)
+    }
+
+    fn to_os_read_fn_name(&self) -> String {
+        os_register_read_fn_name(self)
+    }
+}
+
+impl<U> FieldUtils<U> for &dyn VelosiAstField
+where
+    U: UnitUtils,
+{
+    fn my_ident(&self) -> &str {
+        self.ident()
+    }
+
+    fn base(&self) -> Option<(&str, u64)> {
+        if let Some(field) = self.as_any().downcast_ref::<VelosiAstInterfaceField>() {
+            match field {
+                VelosiAstInterfaceField::Memory(mem) => Some((mem.ident().as_str(), mem.offset)),
+                VelosiAstInterfaceField::Register(_reg) => None,
+                VelosiAstInterfaceField::Mmio(mmio) => Some((mmio.ident().as_str(), mmio.offset)),
+            }
+        } else {
+            None
+        }
+    }
+
+    fn to_os_write_fn_name(&self) -> String {
+        if let Some(field) = self.as_any().downcast_ref::<VelosiAstInterfaceField>() {
+            match field {
+                VelosiAstInterfaceField::Memory(mem) => os_memory_write_fn_name(mem),
+                VelosiAstInterfaceField::Register(reg) => os_register_write_fn_name(reg),
+                VelosiAstInterfaceField::Mmio(mmio) => os_mmio_write_fn_name(mmio),
+            }
+        } else {
+            unreachable!();
+        }
+    }
+
+    fn to_os_read_fn_name(&self) -> String {
+        if let Some(field) = self.as_any().downcast_ref::<VelosiAstInterfaceField>() {
+            match field {
+                VelosiAstInterfaceField::Memory(mem) => os_memory_read_fn_name(mem),
+                VelosiAstInterfaceField::Register(reg) => os_register_read_fn_name(reg),
+                VelosiAstInterfaceField::Mmio(mmio) => os_mmio_read_fn_name(mmio),
+            }
+        } else {
+            unreachable!();
+        }
+    }
+}
+
+impl<U> FieldUtils<U> for &VelosiAstInterfaceMemoryField
+where
+    U: UnitUtils,
+{
+    fn my_ident(&self) -> &str {
+        self.ident()
+    }
+
+    fn base(&self) -> Option<(&str, u64)> {
+        Some((self.ident().as_str(), self.offset))
+    }
+
+    fn to_os_write_fn_name(&self) -> String {
+        os_memory_write_fn_name(self)
+    }
+
+    fn to_os_read_fn_name(&self) -> String {
+        os_memory_read_fn_name(self)
+    }
+}
+
+impl<U> FieldUtils<U> for &VelosiAstInterfaceMmioField
+where
+    U: UnitUtils,
+{
+    fn my_ident(&self) -> &str {
+        self.ident()
+    }
+
+    fn base(&self) -> Option<(&str, u64)> {
+        Some((self.ident().as_str(), self.offset))
+    }
+
+    fn to_os_write_fn_name(&self) -> String {
+        os_mmio_write_fn_name(self)
+    }
+
+    fn to_os_read_fn_name(&self) -> String {
+        os_mmio_write_fn_name(self)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Interface Field Slice Utils
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn slice_wr_fn_name_str(unit: &str, field: &str, slice: &str) -> String {
+    format!(
+        "{}_{}_{}__wr",
+        unit.to_lowercase(),
+        field.to_lowercase(),
+        slice.to_lowercase()
+    )
+}
+
+pub fn slice_rd_fn_name_str(unit: &str, field: &str, slice: &str) -> String {
+    format!(
+        "{}_{}_{}__rd",
+        unit.to_lowercase(),
+        field.to_lowercase(),
+        slice.to_lowercase()
+    )
+}
+
+pub fn slice_insert_fn_name_str(unit: &str, field: &str, slice: &str) -> String {
+    format!(
+        "{}_{}_{}__insert",
+        unit.to_lowercase(),
+        field.to_lowercase(),
+        slice.to_lowercase()
+    )
+}
+
+pub fn slice_extract_fn_name_str(unit: &str, field: &str, slice: &str) -> String {
+    format!(
+        "{}_{}_{}__extract",
+        unit.to_lowercase(),
+        field.to_lowercase(),
+        slice.to_lowercase()
+    )
+}
+
+pub trait SliceUtils<U, F>
+where
+    U: UnitUtils,
+    F: FieldUtils<U>,
+{
+    fn my_ident(&self) -> &str;
+
+    fn to_wr_fn(&self, unit: U, field: F) -> String {
+        slice_wr_fn_name_str(unit.my_ident(), field.my_ident(), self.my_ident())
+    }
+
+    fn to_rd_fn(&self, unit: U, field: F) -> String {
+        slice_rd_fn_name_str(unit.my_ident(), field.my_ident(), self.my_ident())
+    }
+
+    fn to_insert_fn(&self, unit: U, field: F) -> String {
+        slice_insert_fn_name_str(unit.my_ident(), field.my_ident(), self.my_ident())
+    }
+
+    fn to_insert_fn_call(
+        &self,
+        unit: U,
+        field: F,
+        field_var: C::Expr,
+        val_var: C::Expr,
+    ) -> C::Expr {
+        let insert_fn = self.to_insert_fn(unit, field);
+        C::Expr::fn_call(&insert_fn, vec![field_var, val_var])
+    }
+
+    fn to_extract_fn(&self, unit: U, field: F) -> String {
+        slice_extract_fn_name_str(unit.my_ident(), field.my_ident(), self.my_ident())
+    }
+
+    fn to_extract_fn_call(&self, unit: U, field: F, field_var: C::Expr) -> C::Expr {
+        let extract_fn = self.to_extract_fn(unit, field);
+        C::Expr::fn_call(&extract_fn, vec![field_var])
+    }
+}
+
+impl<U, F> SliceUtils<U, F> for &VelosiAstFieldSlice
+where
+    U: UnitUtils,
+    F: FieldUtils<U>,
+{
+    fn my_ident(&self) -> &str {
+        self.ident()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// OS Support Functions
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn os_mmio_read_fn_name(field: &VelosiAstInterfaceMmioField) -> String {
+    format!("os_mmio_read_{}", field.nbits())
+}
+
+fn os_mmio_write_fn_name(field: &VelosiAstInterfaceMmioField) -> String {
+    format!("os_mmio_write_{}", field.nbits())
+}
+
+fn os_register_read_fn_name(field: &VelosiAstInterfaceRegisterField) -> String {
+    format!("os_register_read_{}", field.ident())
+}
+
+fn os_register_write_fn_name(field: &VelosiAstInterfaceRegisterField) -> String {
+    format!("os_register_write_{}", field.ident())
+}
+
+fn os_memory_read_fn_name(field: &VelosiAstInterfaceMemoryField) -> String {
+    format!("os_memory_read_{}", field.nbits())
+}
+
+fn os_memory_write_fn_name(field: &VelosiAstInterfaceMemoryField) -> String {
+    format!("os_memory_write_{}", field.nbits())
+}
+
+// pub fn os_register_write_fn(
+//     _unit_var: &C::Expr,
+//     field: &VelosiAstInterfaceRegisterField,
+//     val: &C::Expr,
+// ) -> C::Expr {
+//     let fnname = format!("os_register_write_{}", field.nbits());
+
+//     C::Expr::fn_call(&fnname, vec![val.clone()])
+// }
+
+// pub fn os_register_read_fn(
+//     _unit_var: &C::Expr,
+//     field: &VelosiAstInterfaceRegisterField,
+// ) -> C::Expr {
+//     let fnname = format!("os_register_read_{}", field.nbits());
+
+//     C::Expr::fn_call(&fnname, vec![])
+// }
+
+// pub fn os_memory_write_fn(
+//     unit_var: &C::Expr,
+//     field: &VelosiAstInterfaceMemoryField,
+//     val: &C::Expr,
+// ) -> C::Expr {
+//     let fnname = format!("os_memory_write_{}", field.nbits());
+//     let base = format!("_{}", field.base.as_str());
+
+//     C::Expr::fn_call(
+//         &fnname,
+//         vec![
+//             C::Expr::field_access(unit_var, &base),
+//             C::Expr::new_num(field.offset),
+//             val.clone(),
+//         ],
+//     )
+// }
+
+// pub fn os_memory_read_fn(unit_var: &C::Expr, field: &VelosiAstInterfaceMemoryField) -> C::Expr {
+//     let fnname = format!("os_memory_read_{}", field.nbits());
+//     let base = format!("_{}", field.base);
+
+//     C::Expr::fn_call(
+//         &fnname,
+//         vec![
+//             C::Expr::field_access(unit_var, &base),
+//             C::Expr::new_num(field.offset),
+//         ],
+//     )
+// }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Others
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// creates a strng reprsenting the mask value
 pub fn to_mask_str(m: u64, len: u64) -> String {
@@ -319,9 +601,9 @@ pub fn add_const_def(scope: &mut C::Scope, c: &VelosiAstConst) {
     let mut m = C::Macro::new(c.ident());
 
     if c.value.result_type().is_numeric() {
-        m.set_value(&format!("(uint64_t)({c})"));
+        m.set_value(&format!("(uint64_t)({})", c.value));
     } else {
-        m.set_value(&format!("{c}"));
+        m.set_value(&format!("{}", c.value));
     }
 
     // add some documentation
@@ -398,8 +680,7 @@ pub fn op_to_c_expr(
 ) {
     match op {
         VelosiOperation::InsertSlice(field, slice, arg) => {
-            let fname = field_slice_insert_fn_name_str(unit, field, slice);
-            //format!("v_{}.insert_{}({});", field, slice, oparg_to_rust_expr(arg))
+            let fname = slice_insert_fn_name_str(unit, field, slice);
             let v = vars.get(field.as_str()).unwrap();
             let mut args = vec![v.clone()];
             if let Some(a) = oparg_to_rust_expr(arg) {
@@ -417,17 +698,17 @@ pub fn op_to_c_expr(
             c.assign(v.clone(), C::Expr::fn_call(&fname, args));
         }
         VelosiOperation::ExtractSlice(field, slice) => {
-            let fname = field_slice_extract_fn_name_str(unit, field, slice);
+            let fname = slice_extract_fn_name_str(unit, field, slice);
             c.fn_call(&fname, vec![]);
         }
         VelosiOperation::WriteAction(field) => {
-            let fname = if_field_wr_fn_name_str(unit, field);
+            let fname = field_wr_fn_name_str(unit, field);
             let u = vars.get("unit").unwrap();
             let f = vars.get(field.as_str()).unwrap();
             c.fn_call(&fname, vec![u.clone(), f.clone()]);
         }
         VelosiOperation::ReadAction(field) => {
-            let fname = if_field_rd_fn_name_str(unit, field);
+            let fname = field_rd_fn_name_str(unit, field);
             let u = vars.get("unit").unwrap();
             let f = vars.get(field.as_str()).unwrap();
             c.assign(f.clone(), C::Expr::fn_call(&fname, vec![u.clone()]));
@@ -436,36 +717,90 @@ pub fn op_to_c_expr(
     }
 }
 
-pub fn ptype_to_ctype(ptype: &VelosiAstType, unit: &VelosiAstUnitSegment) -> C::Type {
-    match &ptype.typeinfo {
-        VelosiAstTypeInfo::Integer => C::Type::new_typedef("uint64_t"),
-        VelosiAstTypeInfo::Bool => C::Type::new_typedef("bool"),
-        VelosiAstTypeInfo::GenAddr => C::Type::new_typedef("genaddr_t"),
-        VelosiAstTypeInfo::VirtAddr => C::Type::new_typedef("vaddr_t"),
-        VelosiAstTypeInfo::PhysAddr => C::Type::new_typedef("paddr_t"),
-        VelosiAstTypeInfo::Size => C::Type::new_typedef("size_t"),
-        VelosiAstTypeInfo::Flags => C::Type::new_typedef(&unit_flags_type(unit)),
-        VelosiAstTypeInfo::TypeRef(s) => {
-            let name = unit_type_name_str(s.as_str());
-            C::Type::new_typedef(&name)
-        }
-        _ => todo!(),
-    }
-}
-
-fn expr_to_cpp(_unit: &str, expr: &VelosiAstExpr) -> C::Expr {
+pub fn expr_to_cpp(unit: &VelosiAstUnitSegment, expr: &VelosiAstExpr) -> C::Expr {
     use VelosiAstExpr::*;
     match expr {
-        IdentLiteral(_i) => panic!("don't know how to handle quantifier"),
-        NumLiteral(_i) => panic!("don't know how to handle quantifier"),
-        BoolLiteral(_i) => panic!("don't know how to handle quantifier"),
-        BinOp(_i) => panic!("don't know how to handle quantifier"),
-        UnOp(_i) => panic!("don't know how to handle quantifier"),
+        IdentLiteral(i) => {
+            C::Expr::new_var(i.ident().as_str(), unit.ptype_to_ctype(expr.result_type()))
+        }
+        NumLiteral(i) => C::Expr::new_num(i.val),
+        BoolLiteral(i) => {
+            if i.val {
+                C::Expr::btrue()
+            } else {
+                C::Expr::bfalse()
+            }
+        }
+        BinOp(i) => match i.op {
+            VelosiAstBinOp::LShift => {
+                C::Expr::binop(expr_to_cpp(unit, &i.lhs), "<<", expr_to_cpp(unit, &i.rhs))
+            }
+            VelosiAstBinOp::RShift => {
+                C::Expr::binop(expr_to_cpp(unit, &i.lhs), ">>", expr_to_cpp(unit, &i.rhs))
+            }
+            VelosiAstBinOp::And => {
+                C::Expr::binop(expr_to_cpp(unit, &i.lhs), "&", expr_to_cpp(unit, &i.rhs))
+            }
+            VelosiAstBinOp::Or => {
+                C::Expr::binop(expr_to_cpp(unit, &i.lhs), "|", expr_to_cpp(unit, &i.rhs))
+            }
+            VelosiAstBinOp::Xor => {
+                C::Expr::binop(expr_to_cpp(unit, &i.lhs), "^", expr_to_cpp(unit, &i.rhs))
+            }
+            VelosiAstBinOp::Plus => {
+                C::Expr::binop(expr_to_cpp(unit, &i.lhs), "+", expr_to_cpp(unit, &i.rhs))
+            }
+            VelosiAstBinOp::Minus => {
+                C::Expr::binop(expr_to_cpp(unit, &i.lhs), "-", expr_to_cpp(unit, &i.rhs))
+            }
+            VelosiAstBinOp::Multiply => {
+                C::Expr::binop(expr_to_cpp(unit, &i.lhs), "*", expr_to_cpp(unit, &i.rhs))
+            }
+            VelosiAstBinOp::Divide => {
+                C::Expr::binop(expr_to_cpp(unit, &i.lhs), "/", expr_to_cpp(unit, &i.rhs))
+            }
+            VelosiAstBinOp::Modulo => {
+                C::Expr::binop(expr_to_cpp(unit, &i.lhs), "%", expr_to_cpp(unit, &i.rhs))
+            }
+            VelosiAstBinOp::Eq => {
+                C::Expr::binop(expr_to_cpp(unit, &i.lhs), "==", expr_to_cpp(unit, &i.rhs))
+            }
+            VelosiAstBinOp::Ne => {
+                C::Expr::binop(expr_to_cpp(unit, &i.lhs), "!=", expr_to_cpp(unit, &i.rhs))
+            }
+            VelosiAstBinOp::Lt => {
+                C::Expr::binop(expr_to_cpp(unit, &i.lhs), "<", expr_to_cpp(unit, &i.rhs))
+            }
+            VelosiAstBinOp::Gt => {
+                C::Expr::binop(expr_to_cpp(unit, &i.lhs), ">", expr_to_cpp(unit, &i.rhs))
+            }
+            VelosiAstBinOp::Le => {
+                C::Expr::binop(expr_to_cpp(unit, &i.lhs), "<=", expr_to_cpp(unit, &i.rhs))
+            }
+            VelosiAstBinOp::Ge => {
+                C::Expr::binop(expr_to_cpp(unit, &i.lhs), ">=", expr_to_cpp(unit, &i.rhs))
+            }
+            VelosiAstBinOp::Land => {
+                C::Expr::binop(expr_to_cpp(unit, &i.lhs), "&&", expr_to_cpp(unit, &i.rhs))
+            }
+            VelosiAstBinOp::Lor => {
+                C::Expr::binop(expr_to_cpp(unit, &i.lhs), "||", expr_to_cpp(unit, &i.rhs))
+            }
+            VelosiAstBinOp::Implies => C::Expr::binop(
+                C::Expr::uop("!", expr_to_cpp(unit, &i.lhs)),
+                "||",
+                expr_to_cpp(unit, &i.rhs),
+            ),
+        },
+        UnOp(i) => match i.op {
+            VelosiAstUnOp::Not => C::Expr::uop("~", expr_to_cpp(unit, &i.expr)),
+            VelosiAstUnOp::LNot => C::Expr::uop("!", expr_to_cpp(unit, &i.expr)),
+        },
         Quantifier(_i) => panic!("don't know how to handle quantifier"),
-        FnCall(_i) => panic!("don't know how to handle quantifier"),
-        IfElse(_i) => panic!("don't know how to handle quantifier"),
+        FnCall(_i) => panic!("don't know how to handle fncalls"),
+        IfElse(_i) => panic!("don't know how to handle ifelse"),
         Slice(_i) => panic!("don't know how to handle slices"),
-        Range(_i) => panic!("don't know how to handle quantifier"),
+        Range(_i) => panic!("don't know how to handle range"),
     }
 
     // use VelosiAstExpr::*;

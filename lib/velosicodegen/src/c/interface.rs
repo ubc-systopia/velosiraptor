@@ -26,104 +26,19 @@
 //! Interface Generation (C/CPP)
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crustal as C;
 
-use velosiast::ast::{
-    VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField, VelosiAstInterfaceMemoryField,
-    VelosiAstInterfaceMmioField, VelosiAstInterfaceRegisterField, VelosiAstUnitSegment,
+use velosiast::{
+    VelosiAst, VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField, VelosiAstUnit,
 };
 
-use super::{field, utils};
+use super::{
+    field,
+    utils::{FieldUtils, SliceUtils, UnitUtils},
+};
 use crate::VelosiCodeGenError;
-
-/// Generates the method to read
-///
-/// ## Generate function:
-///
-/// ```c
-/// field_type_t read_mmio_register(unit_t *unit) {
-///    field_type_t val;
-///    val = field_set_raw(mmio_register_read(addr, offset));
-///    return val;
-/// }
-/// ```
-// fn generate_read_memory(scope: &mut C::Scope, unit: &VelosiAstUnitSegment, field: &Field) {
-//     // adding the get value function
-//     let fnname = utils::if_field_rd_fn_name(unit, field);
-//     let fieldtype = C::Type::new_typedef(&utils::field_type_name(unit, field));
-//     let mut f = C::Function::with_string(fnname, fieldtype.clone());
-
-//     f.set_static().set_inline();
-//     f.push_doc_str(&format!("reads the mmio register `{}`", field.name));
-
-//     let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::segment_type_name(unit)));
-//     let p = f.new_param("unit", unittype);
-//     let unit_var = p.to_expr();
-
-//     //  let unit_var = C::Expr::from_fn_param(p);
-//     let field_var_decl = C::Variable::new("val", fieldtype);
-//     let field_var = field_var_decl.to_expr();
-
-//     let set_val_fn = utils::field_set_raw_fn_name(unit, field);
-//     let reg_read_fn = utils::mmio_register_read_fn(&unit_var, field);
-//     f.body()
-//         .variable(field_var_decl)
-//         .assign(
-//             field_var.clone(),
-//             C::Expr::fn_call(&set_val_fn, vec![reg_read_fn]),
-//         )
-//         .return_expr(field_var);
-//     scope.push_function(f);
-// }
-
-// /// Generates the
-// ///
-// fn generate_write_memory(scope: &mut C::Scope, unit: &VelosiAstUnitSegment, field: &Field) {
-//     // adding the set value function
-//     let fnname = utils::if_field_wr_fn_name(unit, field);
-//     let mut f = C::Function::with_string(fnname, C::Type::new_void());
-
-//     f.set_static().set_inline();
-//     f.push_doc_str(&format!("writes the mmio register `{}`", field.name));
-
-//     let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::segment_type_name(unit)));
-//     let p = f.new_param("unit", unittype);
-//     let unit_var = p.to_expr();
-//     let fieldtype = C::Type::new_typedef(&utils::field_type_name(unit, field));
-//     let v = f.new_param("val", fieldtype);
-//     let val_var = v.to_expr();
-
-//     let get_val_fn = utils::field_get_raw_fn_name(unit, field);
-//     f.body().raw_expr(utils::mmio_register_write_fn(
-//         &unit_var,
-//         field,
-//         &C::Expr::fn_call(&get_val_fn, vec![val_var]),
-//     ));
-
-//     // let p = f.new_param("field");
-//     // let lhs = C::Expr::from_fn_param(p);
-//     // let v = f.new_param("val", C::Type::new_uint(field.nbits()));
-//     // let rhs = C::Expr::from_fn_param(v);
-//     scope.push_function(f);
-// }
-
-// pub fn generate_memory_interface(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
-//     for if_field in unit.interface.fields() {
-//         let field = &if_field.field;
-
-//         generate_read_memory(scope, unit, field);
-//         for sl in &field.layout {
-//             generate_read_slice_fn(scope, unit, field, sl)
-//         }
-
-//         generate_write_memory(scope, unit, field);
-//         for sl in &field.layout {
-//             generate_write_slice_fn(scope, unit, field, sl);
-//         }
-//     }
-// }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Slice Access
@@ -131,16 +46,13 @@ use crate::VelosiCodeGenError;
 
 fn generate_read_slice_fn(
     scope: &mut C::Scope,
-    unit: &VelosiAstUnitSegment,
+    unit: &VelosiAstUnit,
     field: &dyn VelosiAstField,
     slice: &VelosiAstFieldSlice,
 ) {
-    let fnname = utils::if_field_rd_slice_fn_name(unit, field, slice);
-
-    let mut f = C::Function::with_string(fnname, C::Type::new_int(field.nbits()));
-
-    let fieldtype = C::Type::new_typedef(&utils::field_type_name(unit, field));
-
+    // create the function
+    let mut f =
+        C::Function::with_string(slice.to_rd_fn(unit, field), C::Type::new_uint(field.nbits()));
     f.set_static().set_inline();
     f.push_doc_str(&format!(
         "reads the value `{}.{}` from the interface",
@@ -148,38 +60,35 @@ fn generate_read_slice_fn(
         slice.ident()
     ));
 
-    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::segment_type_name(unit)));
-    let p = f.new_param("unit", unittype);
-    let unit_var = p.to_expr();
+    // add function paramters
+    let unit_param = f.new_param("unit", C::Type::to_ptr(&unit.to_ctype()));
+    let unit_var = unit_param.to_expr();
 
-    let field_var_decl = C::Variable::new("val", fieldtype);
+    // declare local variable for reading the field
+    let fieldtype = C::Type::new_typedef(&field.to_type_name(unit));
+    let field_var_decl = f.body().new_variable("val", fieldtype);
     let field_var = field_var_decl.to_expr();
 
-    let get_val_fn = utils::if_field_rd_fn_name(unit, field);
-    let extract_fn = utils::field_slice_extract_fn_name(unit, field, slice);
-
+    // read teh field value into local variable
     f.body()
-        .variable(field_var_decl)
-        .assign(
-            field_var.clone(),
-            C::Expr::fn_call(&get_val_fn, vec![unit_var]),
-        )
-        .return_expr(C::Expr::fn_call(&extract_fn, vec![field_var]));
+        .assign(field_var.clone(), field.to_rd_fn_call(unit, unit_var));
+
+    // return the extracted value
+    f.body()
+        .return_expr(slice.to_extract_fn_call(unit, field, field_var));
+
+    // add the function to the scope
     scope.push_function(f);
 }
 
 fn generate_write_slice_fn(
     scope: &mut C::Scope,
-    unit: &VelosiAstUnitSegment,
+    unit: &VelosiAstUnit,
     field: &dyn VelosiAstField,
     slice: &VelosiAstFieldSlice,
 ) {
-    let fnname = utils::if_field_wr_slice_fn_name(unit, field, slice);
-
-    let mut f = C::Function::with_string(fnname, C::Type::new_void());
-
-    let fieldtype = C::Type::new_typedef(&utils::field_type_name(unit, field));
-
+    // create the function
+    let mut f = C::Function::with_string(slice.to_wr_fn(unit, field), C::Type::new_void());
     f.set_static().set_inline();
     f.push_doc_str(&format!(
         "writes the value `{}.{}` from the interface",
@@ -187,204 +96,88 @@ fn generate_write_slice_fn(
         slice.ident()
     ));
 
-    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::segment_type_name(unit)));
-    let p = f.new_param("unit", unittype);
-    let unit_var = p.to_expr();
+    // add the unit and value parameters
+    let unit_param = f.new_param("unit", C::Type::to_ptr(&unit.to_ctype()));
+    let unit_var = unit_param.to_expr();
+    let val_param = f.new_param("val", C::Type::new_uint(slice.nbits()));
+    let val_var = val_param.to_expr();
 
-    let unittype = C::Type::new_int(slice.nbits());
-    let p = f.new_param("val", unittype);
-    let val_var = p.to_expr();
 
-    let field_var_decl = C::Variable::new("field", fieldtype);
+    // declare the local variable for the field
+    let fieldtype = C::Type::new_typedef(&field.to_type_name(unit));
+    let field_var_decl = f.body().new_variable("field", fieldtype);
     let field_var = field_var_decl.to_expr();
 
-    let get_val_fn = utils::if_field_rd_fn_name(unit, field);
-    let insert_fn = utils::field_slice_insert_fn_name(unit, field, slice);
-    let set_val_fn = utils::if_field_wr_fn_name(unit, field);
+    // read the field value
+    f.body().assign(field_var.clone(), field.to_rd_fn_call(unit, unit_var.clone()));
 
-    f.body()
-        .variable(field_var_decl)
-        .assign(
-            field_var.clone(),
-            C::Expr::fn_call(&get_val_fn, vec![unit_var.clone()]),
-        )
-        .assign(
-            field_var.clone(),
-            C::Expr::fn_call(&insert_fn, vec![field_var.clone(), val_var]),
-        )
-        .fn_call(&set_val_fn, vec![unit_var, field_var]);
+    // insert the field value
+    f.body().assign(
+        field_var.clone(),
+        slice.to_insert_fn_call(unit, field, field_var.clone(), val_var)
+    );
+
+    // write the value to the field
+    f.body().fn_call(&field.to_wr_fn(unit), vec![unit_var, field_var]);
+
+    // add function to the scope
     scope.push_function(f);
 }
 
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// MMIO Register Interface Fields
+//Field Write/Read
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Generates the method to read
-///
-/// ## Generate function:
-///
-/// ```c
-/// field_type_t read_mmio_register(unit_t *unit) {
-///    field_type_t val;
-///    val = field_set_raw(mmio_register_read(addr, offset));
-///    return val;
-/// }
-/// ```
-fn generate_read_mmio_register(
-    scope: &mut C::Scope,
-    unit: &VelosiAstUnitSegment,
-    field: &VelosiAstInterfaceMmioField,
-) {
-    // adding the get value function
-    let fnname = utils::if_field_rd_fn_name(unit, field);
-    let fieldtype = C::Type::new_typedef(&utils::field_type_name(unit, field));
-    let mut f = C::Function::with_string(fnname, fieldtype.clone());
-
+/// Generates the method to read the entire field
+fn generate_read_field(scope: &mut C::Scope, unit: &VelosiAstUnit, field: &dyn VelosiAstField) {
+    // define the function sigature
+    let fieldtype = C::Type::new_typedef(&field.to_type_name(unit));
+    let mut f = C::Function::with_string(field.to_rd_fn(unit), fieldtype.clone());
     f.set_static().set_inline();
-    f.push_doc_str(&format!("reads the mmio register `{}`", field.ident()));
+    f.push_doc_str(&format!("reads the `{}` interface field", field.ident()));
 
-    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::segment_type_name(unit)));
-    let p = f.new_param("unit", unittype);
-    let unit_var = p.to_expr();
+    // add the function parametes
+    let unit_param = f.new_param("unit", C::Type::to_ptr(&unit.to_ctype()));
+    let unit_var = unit_param.to_expr();
 
-    //  let unit_var = C::Expr::from_fn_param(p);
-    let field_var_decl = C::Variable::new("val", fieldtype);
+    // body: declare local variable with the type of the field
+    let field_var_decl = f.body().new_variable("val", fieldtype);
     let field_var = field_var_decl.to_expr();
 
-    let set_val_fn = utils::field_set_raw_fn_name(unit, field);
-    let reg_read_fn = utils::os_mmio_register_read_fn(&unit_var, field);
-    f.body()
-        .variable(field_var_decl)
-        .assign(
-            field_var.clone(),
-            C::Expr::fn_call(&set_val_fn, vec![reg_read_fn]),
-        )
-        .return_expr(field_var);
+    // assign to the declared variable
+    let reg_read_fn = field.to_os_rd_fn(unit, &unit_var);
+    f.body().assign(
+        field_var.clone(),
+        field.to_set_val_fn_call(unit, reg_read_fn),
+    );
+
+    // return the value
+    f.body().return_expr(field_var);
+
+    // add the function to the scope
     scope.push_function(f);
 }
 
-/// Generates the
-///
-fn generate_write_mmio_register(
-    scope: &mut C::Scope,
-    unit: &VelosiAstUnitSegment,
-    field: &VelosiAstInterfaceMmioField,
-) {
+/// Generates the write method for the entire field
+fn generate_write_field(scope: &mut C::Scope, unit: &VelosiAstUnit, field: &dyn VelosiAstField) {
     // adding the set value function
-    let fnname = utils::if_field_wr_fn_name(unit, field);
-    let mut f = C::Function::with_string(fnname, C::Type::new_void());
-
+    let mut f = C::Function::with_string(field.to_wr_fn(unit), C::Type::new_void());
     f.set_static().set_inline();
-    f.push_doc_str(&format!("writes the mmio register `{}`", field.ident()));
+    f.push_doc_str(&format!("writes the `{}` interface field", field.ident()));
 
-    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::segment_type_name(unit)));
-    let p = f.new_param("unit", unittype);
-    let unit_var = p.to_expr();
-    let fieldtype = C::Type::new_typedef(&utils::field_type_name(unit, field));
-    let v = f.new_param("val", fieldtype);
-    let val_var = v.to_expr();
+    // add the function parameters
+    let unit_param = f.new_param("unit", C::Type::to_ptr(&unit.to_ctype()));
+    let unit_var = unit_param.to_expr();
+    let val_param = f.new_param("val", field.to_ctype(unit));
+    let val_var = val_param.to_expr();
 
-    let get_val_fn = utils::field_get_raw_fn_name(unit, field);
-    f.body().raw_expr(utils::os_mmio_register_write_fn(
-        &unit_var,
-        field,
-        &C::Expr::fn_call(&get_val_fn, vec![val_var]),
-    ));
+    // call the write function
+    let reg_write_fn = field.to_os_wr_fn(unit, &unit_var, &field.to_get_val_fn_call(unit, val_var));
+    f.body().raw_expr(reg_write_fn);
 
-    // let p = f.new_param("field");
-    // let lhs = C::Expr::from_fn_param(p);
-    // let v = f.new_param("val", C::Type::new_uint(field.nbits()));
-    // let rhs = C::Expr::from_fn_param(v);
+    // add the function to the scope
     scope.push_function(f);
-}
-
-pub fn generate_mmio_interface_field(
-    scope: &mut C::Scope,
-    unit: &VelosiAstUnitSegment,
-    field: &VelosiAstInterfaceMmioField,
-) {
-    generate_read_mmio_register(scope, unit, field);
-    for sl in &field.layout {
-        generate_read_slice_fn(scope, unit, field, sl)
-    }
-
-    generate_write_mmio_register(scope, unit, field);
-    for sl in &field.layout {
-        generate_write_slice_fn(scope, unit, field, sl);
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Memory Interface Fields
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn generate_write_memory(
-    _scope: &mut C::Scope,
-    _unit: &VelosiAstUnitSegment,
-    _field: &VelosiAstInterfaceMemoryField,
-) {
-    panic!("not implemented");
-}
-
-fn generate_read_memory(
-    _scope: &mut C::Scope,
-    _unit: &VelosiAstUnitSegment,
-    _field: &VelosiAstInterfaceMemoryField,
-) {
-    panic!("not implemented");
-}
-
-pub fn generate_memory_interface_field(
-    scope: &mut C::Scope,
-    unit: &VelosiAstUnitSegment,
-    field: &VelosiAstInterfaceMemoryField,
-) {
-    generate_read_memory(scope, unit, field);
-    for sl in &field.layout {
-        generate_read_slice_fn(scope, unit, field, sl)
-    }
-
-    generate_write_memory(scope, unit, field);
-    for sl in &field.layout {
-        generate_write_slice_fn(scope, unit, field, sl);
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Register Interface Fields
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn generate_write_register(
-    _scope: &mut C::Scope,
-    _unit: &VelosiAstUnitSegment,
-    _field: &VelosiAstInterfaceRegisterField,
-) {
-    panic!("not implemented");
-}
-
-fn generate_read_register(
-    _scope: &mut C::Scope,
-    _unit: &VelosiAstUnitSegment,
-    _field: &VelosiAstInterfaceRegisterField,
-) {
-    panic!("not implemented");
-}
-
-pub fn generate_register_interface_field(
-    scope: &mut C::Scope,
-    unit: &VelosiAstUnitSegment,
-    field: &VelosiAstInterfaceRegisterField,
-) {
-    generate_read_register(scope, unit, field);
-    for sl in &field.layout {
-        generate_read_slice_fn(scope, unit, field, sl)
-    }
-
-    generate_write_register(scope, unit, field);
-    for sl in &field.layout {
-        generate_write_slice_fn(scope, unit, field, sl);
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -392,28 +185,29 @@ pub fn generate_register_interface_field(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// generates the field types for the interface
-fn generate_interface_fields(
-    unit: &VelosiAstUnitSegment,
-    outdir: &Path,
+fn generate_interface_field_accessors(
+    scope: &mut C::Scope,
+    unit: &VelosiAstUnit,
+    field: &VelosiAstInterfaceField,
 ) -> Result<(), VelosiCodeGenError> {
-    let fields = unit.interface.fields();
+    scope.new_comment("Reading interface fields");
+    generate_read_field(scope, unit, field);
+    for slice in field.layout() {
+        generate_read_slice_fn(scope, unit, field, slice);
+    }
 
-    let res: Result<(), VelosiCodeGenError> = Ok(());
-    fields
-        .iter()
-        .fold(res, |res: Result<(), VelosiCodeGenError>, field| {
-            let r = field::generate(unit, field, outdir);
-            if res.is_err() {
-                res
-            } else {
-                r
-            }
-        })
+    scope.new_comment("Writing interface fields");
+    generate_write_field(scope, unit, field);
+    for slice in field.layout() {
+        generate_write_slice_fn(scope, unit, field, slice);
+    }
+
+    Ok(())
 }
 
-fn generate_unit_struct(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
+fn generate_unit_struct(scope: &mut C::Scope, unit: &VelosiAstUnit) {
     let fields = unit
-        .params
+        .params_as_slice()
         .iter()
         .map(|x| {
             let n = format!("_{}", x.ident());
@@ -421,69 +215,90 @@ fn generate_unit_struct(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
         })
         .collect();
 
-    let sn = utils::segment_struct_name(unit);
+    let sn = unit.to_struct_name();
     let mut s = C::Struct::with_fields(&sn, fields);
 
     s.push_doc_str(&format!("Unit Type `{}`", unit.ident()));
     s.push_doc_str("");
-    s.push_doc_str(&format!("@loc: {}", unit.loc.loc()));
+    s.push_doc_str(&format!("@loc: {}", unit.loc().loc()));
 
     let stype = s.to_type();
 
     scope.push_struct(s);
 
     // adding a type def;
-    let fieldtype = utils::segment_type_name(unit);
+    let fieldtype = unit.to_type_name();
     scope.new_typedef(&fieldtype, stype);
 }
 
-/// generates the Unit definitions
-pub fn generate(unit: &VelosiAstUnitSegment, outdir: &Path) -> Result<(), VelosiCodeGenError> {
-    // the code generation scope
-    let mut scope = C::Scope::new();
+/// generates the interface for a segment unit
+fn generate_segment(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), VelosiCodeGenError> {
+    let mut scope = unit.new_scope("Interface");
 
-    // constant definitions
-    let title = format!("Interface Definitions for `{}`", unit.ident());
-    utils::add_header(&mut scope, &title);
-
+    // add the header guard
     let hdrguard = format!("{}_INTERFACE_H_", unit.ident().to_uppercase());
     let guard = scope.new_ifdef(&hdrguard);
     let s = guard.guard().then_scope();
 
-    for f in unit.interface.fields() {
-        let fieldname = format!("fields/{}_field.h", f.ident());
-        s.new_include(&fieldname, false);
-    }
+    // generate the interface
+    if let Some(interface) = unit.interface() {
+        // include all the field headers
+        for f in interface.fields() {
+            let fieldname = format!("fields/{}_field.h", f.ident());
+            s.new_include(&fieldname, false);
+        }
 
-    if unit.interface.is_none() {
+        // add the OS support includes
+        s.new_include("os/mmio.h", true);
+        s.new_include("os/registers.h", true);
+        s.new_include("os/memory.h", true);
+
+        // generate the field accessors
+        for f in interface.fields() {
+            generate_interface_field_accessors(s, unit, f).expect("generation failed");
+        }
+    } else {
         s.new_comment("No interface defined for this unit.");
     }
 
-    s.new_include("os/mmio.h", true);
-    s.new_include("os/registers.h", true);
-    s.new_include("os/memory.h", true);
-
-    for f in unit.interface.fields() {
-        match f.as_ref() {
-            VelosiAstInterfaceField::Memory(field) => {
-                generate_memory_interface_field(s, unit, field);
-            }
-            VelosiAstInterfaceField::Register(field) => {
-                generate_register_interface_field(s, unit, field);
-            }
-            VelosiAstInterfaceField::Mmio(field) => {
-                generate_mmio_interface_field(s, unit, field);
-            }
-        }
-    }
-
+    // generate the unit struct
     generate_unit_struct(s, unit);
 
+    // save the file
     scope.set_filename("interface.h");
     scope.to_file(outdir, true)?;
 
     // generate the interface fields
-    let fieldspath = outdir.join("fields");
-    fs::create_dir_all(&fieldspath)?;
-    generate_interface_fields(unit, &fieldspath)
+
+    if let Some(interface) = unit.interface() {
+        let fieldspath = outdir.join("fields");
+        fs::create_dir_all(&fieldspath)?;
+        for f in interface.fields() {
+            field::generate(unit, f, &fieldspath).expect("generation failed");
+        }
+    }
+
+    Ok(())
+}
+
+/// starts the interface code generation
+pub fn generate(ast: &VelosiAst, mut outdir: PathBuf) -> Result<(), VelosiCodeGenError> {
+    for unit in ast.units() {
+        // create the unit dir
+        let dirname = unit.ident().to_lowercase();
+        outdir.push(dirname);
+
+        // create the directory
+        fs::create_dir_all(&outdir)?;
+
+        if matches!(unit, VelosiAstUnit::Segment(_)) {
+            generate_segment(unit, &outdir)?;
+        } else {
+            // the other unit types don't have an interface
+        }
+
+        outdir.pop();
+    }
+
+    Ok(())
 }

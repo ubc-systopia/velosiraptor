@@ -11,3 +11,4 @@ Cargo.lock
 
 # the logs directory
 logs
+out

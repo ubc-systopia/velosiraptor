@@ -32,7 +32,7 @@ use crustal as C;
 
 use velosiast::ast::{VelosiAstMethod, VelosiAstUnitSegment};
 
-use super::utils;
+use super::utils::{self, UnitUtils, FieldUtils};
 use crate::VelosiCodeGenError;
 
 /// adds the constants defined in the unit to the scope
@@ -44,13 +44,14 @@ fn add_unit_constants(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
     }
 
     // now add the constants
-    for c in &unit.consts {
+    for c in unit.consts() {
         utils::add_const_def(scope, c);
     }
 }
 
 fn add_unit_flags(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
-    let structname = format!("{}_flags", unit.ident());
+    let structname = unit.to_flags_struct_name();
+
     if let Some(flags) = &unit.flags {
         scope.new_comment("Defined unit flags");
 
@@ -64,8 +65,8 @@ fn add_unit_flags(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
         scope.new_comment("Unit has no defined flags");
         scope.new_struct(&structname);
     }
-    let tyname = format!("{structname}_t");
-    scope.new_typedef(&tyname, C::Type::new_struct(&structname));
+
+    scope.new_typedef(&unit.to_flags_type(), C::Type::new_struct(&structname));
 }
 
 // /// adds the struct definition of the unit to the scope
@@ -92,57 +93,59 @@ fn add_unit_flags(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
 // }
 
 fn add_constructor_function(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
-    let fname = utils::constructor_fn_name(unit.ident());
 
-    let unittype = C::Type::new_typedef(&utils::segment_type_name(unit));
-
-    let mut fun = C::Function::with_string(fname, unittype);
+    // define the function
+    let mut fun = C::Function::with_string(unit.constructor_fn_name(), unit.to_ctype());
     fun.set_static().set_inline();
 
+    // add the function parameter
     let mut params = Vec::new();
     for p in &unit.params {
-        let param = fun.new_param(p.ident(), C::Type::new_uint64()).to_expr();
+        let ty = unit.ptype_to_ctype(&p.ptype.typeinfo);
+        let param = fun.new_param(p.ident(), ty).to_expr();
         params.push((p.ident(), param));
     }
 
     let body = fun.body();
 
-    let unittype = C::Type::new_typedef(&utils::segment_type_name(unit));
-    let tunit = body.new_variable("targetunit", unittype).to_expr();
+    // declare a new variable
+    let tunit = body.new_variable("targetunit", unit.to_ctype()).to_expr();
 
+    // set the fields
     for (name, p) in params {
         let n = utils::unit_struct_field_name(name);
         body.assign(C::Expr::field_access(&tunit, &n), p);
     }
 
+    // add the return expression
     body.return_expr(tunit);
 
     scope.push_function(fun);
 }
 
-fn state_field_access(unit: &str, path: &[String]) -> C::Expr {
-    let unit_var = C::Expr::new_var("unit", C::Type::new_void());
-    if path.len() == 1 {
-        let fname = utils::if_field_rd_fn_name_str(unit, &path[0]);
-        return C::Expr::fn_call(&fname, vec![unit_var]);
-    }
+// fn state_field_access(unit: &str, path: &[String]) -> C::Expr {
+//     let unit_var = C::Expr::new_var("unit", C::Type::new_void());
+//     if path.len() == 1 {
+//         let fname = utils::if_field_rd_fn_name_str(unit, &path[0]);
+//         return C::Expr::fn_call(&fname, vec![unit_var]);
+//     }
 
-    if path.len() == 2 {
-        let fname = utils::if_field_rd_slice_fn_name_str(unit, &path[0], &path[1]);
-        return C::Expr::fn_call(&fname, vec![unit_var]);
-    }
+//     if path.len() == 2 {
+//         let fname = utils::if_field_rd_slice_fn_name_str(unit, &path[0], &path[1]);
+//         return C::Expr::fn_call(&fname, vec![unit_var]);
+//     }
 
-    panic!("unhandled!")
-}
+//     panic!("unhandled!")
+// }
 
-fn add_translate_function(_scope: &mut C::Scope, _unit: &VelosiAstUnitSegment) {
+// fn add_translate_function(_scope: &mut C::Scope, _unit: &VelosiAstUnitSegment) {
     // let fname = utils::translate_fn_name(unit.ident());
 
     // let mut fun = C::Function::with_string(fname, C::Type::new_bool());
     // fun.set_static().set_inline();
 
     // let mut field_vars = HashMap::new();
-    // let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::segment_type_name(unit.ident())));
+    // let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::unit_type_name(unit.ident())));
 
     // let v = fun.new_param("unit", unittype);
     // field_vars.insert(String::from("unit"), v.to_expr());
@@ -182,21 +185,35 @@ fn add_translate_function(_scope: &mut C::Scope, _unit: &VelosiAstUnitSegment) {
     // fun.new_param("flags", C::Type::new_int(64));
 
     // scope.push_function(fun);
-}
+// }
 
 fn add_op_fn(scope: &mut C::Scope, unit: &VelosiAstUnitSegment, op: &VelosiAstMethod) {
-    let fname = utils::op_fn_name(unit, op);
-    let mut fun = C::Function::with_string(fname, C::Type::new_bool());
+
+    // declare the function
+    let mut fun = C::Function::with_string(unit.to_op_fn_name(op), C::Type::new_bool());
     fun.set_static().set_inline();
 
+    // add the parameters
     let mut field_vars = HashMap::new();
-    let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::segment_type_name(unit)));
 
-    let v = fun.new_param("unit", unittype);
+    let v = fun.new_param("unit", C::Type::to_ptr(&unit.to_ctype()));
     field_vars.insert(String::from("unit"), v.to_expr());
 
     for f in op.params.iter() {
-        fun.new_param(f.ident(), utils::ptype_to_ctype(&f.ptype, unit));
+        let p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo));
+    }
+
+
+    if op.requires.is_empty() {
+        fun.body().new_comment("no requires clauses");
+    } else {
+        fun.body().new_comment("asserts for the requires clauses");
+    }
+    for r in op.requires.iter() {
+        // add asserts!
+        fun.body().fn_call("assert", vec![
+            utils::expr_to_cpp(unit, r)
+        ]);
     }
 
     if !op.ops.is_empty() {
@@ -213,13 +230,13 @@ fn add_op_fn(scope: &mut C::Scope, unit: &VelosiAstUnitSegment, op: &VelosiAstMe
         for field in &fields {
             if let Some(f) = unit.interface.field(field) {
                 // get the field from the unit
-                let field_type = utils::field_type_name(unit, f);
+                let field_type = f.to_type_name(unit);
 
                 let var = fun
                     .body()
                     .new_variable(field, C::Type::new_typedef(&field_type));
 
-                let fncall_name = utils::field_set_raw_fn_name(unit, f);
+                let fncall_name = f.to_set_val_fn(unit);
                 var.set_value(C::Expr::fn_call(&fncall_name, vec![C::Expr::new_num(0)]));
                 field_vars.insert(field.clone(), var.to_expr());
             }
@@ -229,8 +246,10 @@ fn add_op_fn(scope: &mut C::Scope, unit: &VelosiAstUnitSegment, op: &VelosiAstMe
         for op in &op.ops {
             utils::op_to_c_expr(unit.ident(), fun.body(), op, &field_vars);
         }
+        fun.body().return_expr(C::Expr::btrue());
     } else {
         fun.body().new_comment("there is no configuration sequence");
+        fun.body().return_expr(C::Expr::bfalse());
     }
 
     scope.push_function(fun);
@@ -253,6 +272,9 @@ fn add_protect_function(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
 
 /// generates the VelosiAstUnitSegment definitions
 pub fn generate(unit: &VelosiAstUnitSegment, outdir: &Path) -> Result<(), VelosiCodeGenError> {
+
+    log::info!("Generating segment unit {}", unit.ident());
+
     // the code generation scope
     let mut scope = C::Scope::new();
 
@@ -265,8 +287,8 @@ pub fn generate(unit: &VelosiAstUnitSegment, outdir: &Path) -> Result<(), Velosi
     let s = guard.guard().then_scope();
 
     // add the header comments
-    let title = format!("`{}` Unit definition ", unit.ident());
-    utils::add_header(s, &title);
+    s.new_include("stddef.h", true);
+    s.new_include("assert.h", true);
 
     s.new_include("interface.h", false);
 
@@ -277,8 +299,9 @@ pub fn generate(unit: &VelosiAstUnitSegment, outdir: &Path) -> Result<(), Velosi
     add_map_function(s, unit);
     add_unmap_function(s, unit);
     add_protect_function(s, unit);
-    add_translate_function(s, unit);
+    // add_translate_function(s, unit);
 
+    log::debug!("saving the scope!");
     // save the scope
     scope.set_filename("unit.h");
     scope.to_file(outdir, true)?;

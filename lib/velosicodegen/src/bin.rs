@@ -30,13 +30,15 @@
 use std::env;
 use std::io;
 use std::io::Read;
+use std::path::Path;
 use std::time::Instant;
 
-use clap::{arg, command};
+use clap::{arg, command, ArgAction, Arg};
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, LevelPadding, TermLogger, TerminalMode};
 
-use velosiast::{AstResult, VelosiAst};
-// use velosisynth::Z3Synth;
+use velosiast::{AstResult, VelosiAst, VelosiAstUnit};
+use velosicodegen::VelosiCodeGen;
+use velosisynth::Z3SynthFactory;
 
 pub fn main() {
     // get the command line argumentts
@@ -45,7 +47,16 @@ pub fn main() {
             -v --verbose ... "Turn debugging verbosity on"
         ))
         .arg(arg!(-c --cores <VALUE>).default_value("1"))
-        .arg(arg!(-s --synth <VALUE>).default_value("all"))
+        .arg(
+            Arg::new("nosynth")
+                .short('n')
+                .long("no-synth")
+                .action(ArgAction::SetTrue)
+                ,
+        )
+        .arg(arg!(-o --output <VALUE>).default_value("out"))
+        .arg(arg!(-l --lang <VALUE>).default_value("c"))
+        .arg(arg!(-p --pkg <VALUE>).default_value("myunit"))
         .arg(arg!([fname] "Optional name to operate on"))
         .get_matches();
 
@@ -66,11 +77,14 @@ pub fn main() {
         .set_location_level(LevelFilter::Off)
         .build();
 
-    let _ncores = matches
+    let ncores = matches
         .get_one::<String>("cores")
         .unwrap()
         .parse::<usize>()
         .unwrap();
+
+    let no_synth = matches.get_flag("nosynth");
+
 
     TermLogger::init(
         filter_level,
@@ -81,6 +95,24 @@ pub fn main() {
     .expect("failed to setup logger");
 
     let _t_start = Instant::now();
+
+    let pgk = matches.get_one::<String>("pkg").unwrap();
+    let path = Path::new(matches.get_one::<String>("output").unwrap());
+
+    let codegen = match matches.get_one::<String>("lang") {
+        Some(cd) => match cd.as_str() {
+            "c" => VelosiCodeGen::new_c(path, pgk.to_string()),
+            "rust" => VelosiCodeGen::new_rust(path, pgk.to_string()),
+            _ => {
+                log::error!(target: "main", "unsupported language specified");
+                return;
+            }
+        },
+        None => {
+            log::error!(target: "main", "no language specified");
+            return;
+        }
+    };
 
     let ast = match matches.get_one::<String>("fname") {
         Some(filename) => VelosiAst::from_file(filename),
@@ -94,7 +126,7 @@ pub fn main() {
         }
     };
 
-    let _ast = match ast {
+    let mut ast = match ast {
         AstResult::Ok(ast) => {
             // println!("{}", ast);
             ast
@@ -110,5 +142,61 @@ pub fn main() {
         }
     };
 
-    // TODO: finish this
+    if !no_synth {
+        let mut synthfactory = Z3SynthFactory::new();
+        synthfactory.num_workers(ncores).default_log_dir();
+
+        for unit in ast.units_mut() {
+            use std::rc::Rc;
+            match unit {
+                VelosiAstUnit::Segment(u) => {
+                    let seg = Rc::get_mut(u);
+
+                    if seg.is_none() {
+                        println!("could not obtain mutable reference to segment unit\n");
+                        continue;
+                    }
+
+                    let seg = seg.unwrap();
+
+                    let mut t_synth_segment = Vec::new();
+
+                    t_synth_segment.push(("start", Instant::now()));
+
+                    let mut synth = synthfactory.create(seg);
+
+                    synth.create_model();
+
+                    t_synth_segment.push(("Model Creation", Instant::now()));
+
+                    let sanity_check = synth.sanity_check();
+
+                    t_synth_segment.push(("Sanity Check", Instant::now()));
+
+                    if let Err(e) = sanity_check {
+                        println!("{}", e);
+                        log::error!(target: "main", "skipped synthesizing due to errors");
+                        continue;
+                    }
+
+                    println!("Synthesizing ALL for unit {}", synth.unit_ident());
+                    synth.synthesize();
+                    match synth.finalize() {
+                        Ok(p) => log::warn!(target: "main", "synthesis completed: {}", p),
+                        Err(e) => log::error!(target: "main", "synthesis failed\n{}", e),
+                    }
+                }
+                VelosiAstUnit::StaticMap(_s) => {
+                    // nothing to synthesize here
+                }
+                VelosiAstUnit::Enum(_e) => {
+                    // nothing to synthesize here
+                }
+            }
+        }
+    }
+
+    if let Err(e) = codegen.generate(&ast) {
+        log::error!(target: "main", "code generation failed\n{:?}", e);
+    }
 }
