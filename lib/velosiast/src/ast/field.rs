@@ -29,6 +29,7 @@
 
 use crate::ast::VelosiAstFieldSlice;
 use std::rc::Rc;
+use std::any::Any;
 
 pub trait VelosiAstField {
     /// obtains a reference to the identifier
@@ -48,4 +49,9 @@ pub trait VelosiAstField {
 
     /// the size of the field in bits
     fn nbits(&self) -> u64;
+
+    // /// obtain the field type
+    // fn ftype(&self) -> VelosiAstFieldType;
+
+    fn as_any(&self) -> &dyn Any;
 }

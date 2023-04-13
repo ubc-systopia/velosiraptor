@@ -27,6 +27,7 @@
 //!
 //! This module defines the State AST nodes of the langauge
 
+use std::any::Any;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
@@ -207,6 +208,10 @@ impl VelosiAstField for VelosiAstStateMemoryField {
     fn nbits(&self) -> u64 {
         self.size * 8
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -324,6 +329,10 @@ impl VelosiAstField for VelosiAstStateRegisterField {
     /// the size of the field in bits
     fn nbits(&self) -> u64 {
         self.size * 8
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 

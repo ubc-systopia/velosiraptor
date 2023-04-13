@@ -27,6 +27,7 @@
 //!
 //! This module defines the Constant AST nodes of the langauge
 
+use std::any::Any;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
@@ -680,6 +681,10 @@ impl VelosiAstField for VelosiAstInterfaceMemoryField {
     fn nbits(&self) -> u64 {
         self.size * 8
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstInterfaceMemoryField]
@@ -905,6 +910,10 @@ impl VelosiAstField for VelosiAstInterfaceMmioField {
     fn nbits(&self) -> u64 {
         self.size * 8
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstInterfaceRegisterField]
@@ -1114,6 +1123,10 @@ impl VelosiAstField for VelosiAstInterfaceRegisterField {
     /// the size of the field in bits
     fn nbits(&self) -> u64 {
         self.size * 8
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
@@ -1338,6 +1351,10 @@ impl VelosiAstField for VelosiAstInterfaceField {
             VelosiAstInterfaceField::Register(field) => field.nbits(),
             VelosiAstInterfaceField::Mmio(field) => field.nbits(),
         }
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
