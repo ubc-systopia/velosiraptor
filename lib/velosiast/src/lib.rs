@@ -49,7 +49,10 @@ use velosiparser::VelosiParseTree;
 
 pub use crate::ast::{
     VelosiAstConst, VelosiAstRoot, VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment,
-    VelosiAstUnitStaticMap,
+    VelosiAstUnitStaticMap, VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField,
+    VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField,
+    VelosiAstInterfaceRegisterField,VelosiAstStaticMap, VelosiAstStaticMapElement, VelosiAstStaticMapExplicit,
+    VelosiAstStaticMapListComp, VelosiAstMethod,
 };
 
 // custom error definitions
