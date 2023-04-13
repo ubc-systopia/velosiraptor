@@ -128,10 +128,6 @@ impl BackendRust {
     /// The file won't be produced if there are no globally defined constants
     pub fn generate_globals(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
         let consts = ast.consts();
-        // no need to create anything if there are no constants defined
-        if consts.is_empty() {
-            return Ok(());
-        }
 
         // get the source directory
         let srcdir = self.outdir.join("src");
@@ -155,7 +151,7 @@ impl BackendRust {
         // get the source dir
         let mut srcdir = self.outdir.join("src");
 
-        for unit in ast.segment_units() {
+        for unit in ast.segments() {
             srcdir.push(unit.ident().to_lowercase());
             // the root directory as supplied by backend
             fs::create_dir_all(&srcdir)?;
@@ -173,7 +169,7 @@ impl BackendRust {
 
         println!("##### rust generat_units");
 
-        for _unit in ast.segment_units() {
+        for _unit in ast.segments() {
             // srcdir.push(unit.ident().to_lowercase());
 
             // // generate the unit
@@ -225,18 +221,14 @@ impl BackendRust {
         // import the constants
         scope.new_comment("import constant definitions ");
 
-        let consts = ast.consts();
-        if !consts.is_empty() {
-            scope.raw(&format!("pub mod {MOD_CONSTS};"));
-            scope.raw(&format!("pub use {MOD_CONSTS}::*;"));
-        } else {
-            scope.new_comment("no constants defined");
-        }
+        scope.raw(&format!("pub mod {MOD_CONSTS};"));
+        scope.raw(&format!("pub use {MOD_CONSTS}::*;"));
+
 
         // impor the units
         scope.new_comment("import the unit modules");
 
-        let units = ast.segment_units();
+        let units = ast.segments();
 
         for unit in units {
             scope.raw(&format!("pub mod {};", unit.ident().to_lowercase()));

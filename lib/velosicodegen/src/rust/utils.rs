@@ -91,7 +91,7 @@ pub fn save_scope(_scope: CG::Scope, outdir: &Path, name: &str) -> Result<(), Ve
     // fs::write(file, scope.to_string().as_bytes())?;
     panic!("nyi");
 
-    Ok(())
+    //Ok(())
 }
 
 /// adds the header to the file
