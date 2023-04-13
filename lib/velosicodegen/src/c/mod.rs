@@ -31,16 +31,18 @@ use std::path::PathBuf;
 
 use crustal as C;
 
-use velosiast::VelosiAst;
+use velosiast::VelosiAstUnitEnum;
+use velosiast::{VelosiAst, VelosiAstUnit};
 
 use crate::VelosiCodeGenError;
 
 use utils::{add_const_def, add_header};
 
 mod field;
+mod enums;
 mod interface;
 mod segment;
-// mod staticmap;
+mod staticmap;
 mod utils;
 
 /// The C backend
@@ -89,13 +91,16 @@ impl BackendC {
         let s = guard.guard().then_scope();
 
         let consts = ast.consts();
-        if consts.is_empty() {
-            s.new_comment("No global constants defined");
-        }
 
         // now add the constants
-        for c in consts {
+        let mut n_const = 0;
+        for (i, c) in consts.enumerate() {
             add_const_def(s, c);
+            n_const = i;
+        };
+
+        if n_const == 0 {
+            s.new_comment("No global constants defined");
         }
 
         scope.set_filename("consts.h");
@@ -105,40 +110,36 @@ impl BackendC {
     }
 
     pub fn generate_interfaces(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
-        let mut srcdir = self.outdir.clone();
-
-        // get the source dir
-        for unit in ast.segment_units() {
-            // create the unit dir
-            let dirname = unit.ident().to_lowercase();
-            srcdir.push(dirname);
-
-            // create the directory
-            fs::create_dir_all(&srcdir)?;
-
-            interface::generate(unit, &srcdir)?;
-
-            srcdir.pop();
-        }
-        Ok(())
+        let srcdir = self.outdir.clone();
+        interface::generate(ast, srcdir)
     }
 
     pub fn generate_units(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
         let mut srcdir = self.outdir.clone();
 
-        for segment in ast.segment_units() {
-            if segment.is_abstract {
-                log::info!("Skipping abstract segment unit {}", segment.ident());
-                continue;
+        for unit in ast.units() {
+            match unit {
+                VelosiAstUnit::Segment(segment) => {
+                    if segment.is_abstract {
+                        log::info!("Skipping abstract segment unit {}", segment.ident());
+                        continue;
+                    }
+                    srcdir.push(segment.ident().to_lowercase());
+                    segment::generate(segment, &srcdir).expect("code generation failed\n");
+                    srcdir.pop();
+                }
+                VelosiAstUnit::StaticMap(staticmap) => {
+                    srcdir.push(staticmap.ident().to_lowercase());
+                    staticmap::generate(ast, staticmap, &srcdir).expect("code generation failed\n");
+                    srcdir.pop();
+                }
+                VelosiAstUnit::Enum(e) => {
+                    srcdir.push(e.ident().to_lowercase());
+                    enums::generate(ast, e, &srcdir).expect("code generation failed\n");
+                    srcdir.pop();
+                }
             }
-
-            log::info!("Generating segment unit {}", segment.ident());
-            srcdir.push(segment.ident().to_lowercase());
-
-            segment::generate(segment, &srcdir).expect("code generation failed\n");
         }
-
-        log::warn!("todo: handle the static map generation!");
 
         Ok(())
     }

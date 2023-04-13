@@ -31,22 +31,22 @@ use std::path::Path;
 // get the code generator
 use crustal as C;
 
-use velosiast::ast::{
-    VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField, VelosiAstUnitSegment,
+use velosiast::{
+    VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField, VelosiAstUnit,
 };
 
 // library internal includes
-use super::utils;
+use super::utils::{self, SliceUtils, FieldUtils};
 use crate::VelosiCodeGenError;
 
 /// adding a constant value for the mask : const FIELD_MASK : type = value;
 fn add_field_constants(
     scope: &mut C::Scope,
-    unit: &VelosiAstUnitSegment,
+    unit: &VelosiAstUnit,
     field: &VelosiAstInterfaceField,
 ) {
     // construct the constant name
-    let maskname = utils::field_mask_name(unit, field);
+    let maskname = field.to_mask_name(unit);
 
     let maskvalue = format!("(uint{}_t)0x{:x}", field.nbits(), field.mask());
 
@@ -73,10 +73,10 @@ pub fn if_field_header_path(name: &str) -> String {
 
 fn add_struct_definition(
     scope: &mut C::Scope,
-    unit: &VelosiAstUnitSegment,
+    unit: &VelosiAstUnit,
     field: &VelosiAstInterfaceField,
 ) {
-    let sn = utils::field_struct_name(unit, field);
+    let sn = field.to_struct_name(unit);
     let mut s = C::Struct::with_fields(
         &sn,
         vec![C::Field::new("_val", C::Type::new_uint(field.nbits()))],
@@ -90,11 +90,11 @@ fn add_struct_definition(
     scope.push_struct(s);
 
     // adding a type def;
-    let fieldtype = utils::field_type_name(unit, field);
+    let fieldtype = field.to_type_name(unit);
     scope.new_typedef(&fieldtype, stype);
 
     // adding the get value function
-    let fnname = utils::field_get_raw_fn_name(unit, field);
+    let fnname = field.to_get_val_fn(unit);
     let mut f = C::Function::with_string(fnname, C::Type::new_uint(field.nbits()));
     f.set_static().set_inline();
     f.push_doc_str(&format!("gets value {} in field", field.ident()));
@@ -105,14 +105,14 @@ fn add_struct_definition(
 
     // adding the set value function
 
-    let fnname = utils::field_set_raw_fn_name(unit, field);
+    let fnname = field.to_set_val_fn(unit);
     let mut f = C::Function::with_string(fnname, C::Type::new_typedef(&fieldtype));
     f.set_static().set_inline();
     f.push_doc_str(&format!("sets value {} in field", field.ident()));
     let v = f.new_param("val", C::Type::new_uint(field.nbits()));
     let rhs = C::Expr::from_fn_param(v);
 
-    let maskname = utils::field_mask_name(unit, field);
+    let maskname = field.to_mask_name(unit);
     let field_var_decl = C::Variable::new("field", C::Type::new_typedef(&fieldtype));
     let field_var = field_var_decl.to_expr();
 
@@ -133,14 +133,14 @@ fn add_struct_definition(
 /// adds an extraction function
 fn add_extract_fn(
     scope: &mut C::Scope,
-    unit: &VelosiAstUnitSegment,
+    unit: &VelosiAstUnit,
     field: &VelosiAstInterfaceField,
     sl: &VelosiAstFieldSlice,
 ) {
-    let fieldtype = utils::field_type_name(unit, field);
+    let fieldtype = field.to_type_name(unit);
 
     // adding the get value function
-    let fnname = utils::field_slice_extract_fn_name(unit, field, sl);
+    let fnname = sl.to_extract_fn(unit, field);
     let mut f = C::Function::with_string(fnname, C::Type::new_uint(field.nbits()));
     f.set_static().set_inline();
 
@@ -177,13 +177,13 @@ fn add_extract_fn(
 /// Generates an insert function taht sets the value of a field value
 fn add_insert_fn(
     scope: &mut C::Scope,
-    unit: &VelosiAstUnitSegment,
+    unit: &VelosiAstUnit,
     field: &VelosiAstInterfaceField,
     sl: &VelosiAstFieldSlice,
 ) {
-    let fieldtype = utils::field_type_name(unit, field);
+    let fieldtype = field.to_type_name(unit);
 
-    let fnname = utils::field_slice_insert_fn_name(unit, field, sl);
+    let fnname = sl.to_insert_fn(unit, field);
     let mut f = C::Function::with_string(fnname, C::Type::new_typedef(&fieldtype));
     f.set_static().set_inline();
 
@@ -224,7 +224,7 @@ fn add_insert_fn(
 
 /// generates the field value interface
 pub fn generate(
-    unit: &VelosiAstUnitSegment,
+    unit: &VelosiAstUnit,
     field: &VelosiAstInterfaceField,
     outdir: &Path,
 ) -> Result<(), VelosiCodeGenError> {
@@ -243,6 +243,7 @@ pub fn generate(
     let guard = scope.new_ifdef(&hdrguard);
     let s = guard.guard().then_scope();
 
+    // includes
     s.new_include("stdint.h", true);
 
     // add the definitions
