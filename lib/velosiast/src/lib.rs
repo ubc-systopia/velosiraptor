@@ -48,11 +48,11 @@ use symboltable::{Symbol, SymbolTable};
 use velosiparser::VelosiParseTree;
 
 pub use crate::ast::{
-    VelosiAstConst, VelosiAstRoot, VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment,
-    VelosiAstUnitStaticMap, VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField,
-    VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField,
-    VelosiAstInterfaceRegisterField,VelosiAstStaticMap, VelosiAstStaticMapElement, VelosiAstStaticMapExplicit,
-    VelosiAstStaticMapListComp, VelosiAstMethod,
+    VelosiAstConst, VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField,
+    VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField, VelosiAstInterfaceRegisterField,
+    VelosiAstMethod, VelosiAstRoot, VelosiAstStaticMap, VelosiAstStaticMapElement,
+    VelosiAstStaticMapExplicit, VelosiAstStaticMapListComp, VelosiAstUnit, VelosiAstUnitEnum,
+    VelosiAstUnitSegment, VelosiAstUnitStaticMap,
 };
 
 // custom error definitions

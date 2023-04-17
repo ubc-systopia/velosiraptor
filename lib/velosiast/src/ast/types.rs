@@ -28,6 +28,7 @@
 //! This module defines type information nodes of the VelosiAst
 
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 // parser types
@@ -41,7 +42,7 @@ use crate::error::VelosiAstIssues;
 use crate::{ast_result_return, AstResult, SymbolTable};
 
 /// Represents the type information, either built in or a type ref
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub enum VelosiAstTypeInfo {
     /// built-in integer type
     Integer,
@@ -203,7 +204,7 @@ impl Display for VelosiAstTypeInfo {
 }
 
 /// Represents the type information
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstType {
     /// the type information
     pub typeinfo: VelosiAstTypeInfo,
@@ -317,6 +318,26 @@ impl VelosiAstType {
         } else {
             self.typeinfo.as_str()
         }
+    }
+}
+
+/// Implementation of [PartialEq] for [VelosiAstType]
+///
+/// We implement our own variant of partial equality as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl PartialEq for VelosiAstType {
+    fn eq(&self, other: &Self) -> bool {
+        self.typeinfo == other.typeinfo
+    }
+}
+
+/// Implementation of [Hash] for [VelosiAstType]
+///
+/// We implement our own variant of hash as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl Hash for VelosiAstType {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.typeinfo.hash(state);
     }
 }
 

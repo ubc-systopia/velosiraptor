@@ -28,8 +28,8 @@
 //! This module defines the State AST nodes of the langauge
 
 use crate::ast::VelosiAstFieldSlice;
-use std::rc::Rc;
 use std::any::Any;
+use std::rc::Rc;
 
 pub trait VelosiAstField {
     /// obtains a reference to the identifier

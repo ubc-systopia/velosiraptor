@@ -1256,13 +1256,43 @@ impl VelosiAstUnitEnum {
 
                                 let param = &u.params_as_slice()[i];
 
+                                // let's force the same same name for now to avoid checking for
+                                // renaming, plus the types must match exactly.
+
+                                if param.ident().as_str() != arg.ident().as_str() {
+                                    let msg = "inconsistency with unit parameter name";
+                                    let hint = format!(
+                                        "change this argument to `{}`",
+                                        param.ident().as_str()
+                                    );
+
+                                    let err = VelosiAstErrBuilder::err(msg.to_string())
+                                        .add_hint(hint)
+                                        .add_location(arg.loc.clone())
+                                        .build();
+                                    issues.push(err);
+                                }
+
                                 if let Some(s) = st.lookup(arg.ident()) {
                                     if let VelosiAstNode::Param(p) = &s.ast_node {
                                         // there is a unit with that type, so we're good
                                         if !param.ptype.typeinfo.compatible(&p.ptype.typeinfo) {
                                             let msg = "mismatched types";
                                             let hint = format!(
-                                                "expected {}, found {}",
+                                                "types not compatible expected {}, found {}",
+                                                param.ptype, p.ptype
+                                            );
+                                            let err = VelosiAstErrBuilder::err(msg.to_string())
+                                                .add_hint(hint)
+                                                .add_location(arg.loc.clone())
+                                                .build();
+                                            issues.push(err);
+                                        }
+
+                                        if param.ptype.typeinfo != p.ptype.typeinfo {
+                                            let msg = "mismatched types";
+                                            let hint = format!(
+                                                "types must match exactly. expected {}, found {}",
                                                 param.ptype, p.ptype
                                             );
                                             let err = VelosiAstErrBuilder::err(msg.to_string())
@@ -1274,6 +1304,19 @@ impl VelosiAstUnitEnum {
                                     } else {
                                         unreachable!()
                                     }
+                                } else {
+                                    let msg = "undefined symbol";
+                                    let hint = format!(
+                                        "argument `{}` is unknown. Add `{}` to the unit parameters",
+                                        arg.ident(),
+                                        param.ident()
+                                    );
+
+                                    let err = VelosiAstErrBuilder::err(msg.to_string())
+                                        .add_hint(hint)
+                                        .add_location(arg.loc.clone())
+                                        .build();
+                                    issues.push(err);
                                 }
                             }
                         } else {
