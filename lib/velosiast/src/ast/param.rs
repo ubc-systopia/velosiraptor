@@ -28,6 +28,7 @@
 //! This module defines the Parameter AST nodes of the langauge
 
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 use velosiparser::{VelosiParseTreeIdentifier, VelosiParseTreeParam, VelosiTokenStream};
@@ -39,7 +40,7 @@ use crate::ast::{
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstParam {
     /// the identifier of the constant
     pub ident: VelosiAstIdentifier,
@@ -128,6 +129,27 @@ impl VelosiAstParam {
 
         let res = Self::new(ident, ptype, loc);
         ast_result_return!(res, issues)
+    }
+}
+
+/// Implementation of [PartialEq] for [VelosiAstParam]
+///
+/// We implement our own variant of partial equality as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl PartialEq for VelosiAstParam {
+    fn eq(&self, other: &Self) -> bool {
+        self.ident == other.ident && self.ptype == other.ptype
+    }
+}
+
+/// Implementation of [Hash] for [VelosiAstParam]
+///
+/// We implement our own variant of hash as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl Hash for VelosiAstParam {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.ident.hash(state);
+        self.ptype.hash(state);
     }
 }
 

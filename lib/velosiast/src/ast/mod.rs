@@ -32,6 +32,7 @@ use core::str::Split;
 use std::collections::hash_map::{Keys, Values, ValuesMut};
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 use velosiparser::{
@@ -130,6 +131,17 @@ pub struct VelosiAstIdentifier {
 impl PartialEq for VelosiAstIdentifier {
     fn eq(&self, other: &Self) -> bool {
         self.path == other.path && self.ident == other.ident
+    }
+}
+
+/// Implementation of [Hash] for [VelosiAstIdentifier]
+///
+/// We implement our own variant of hash as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl Hash for VelosiAstIdentifier {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.ident.hash(state);
+        self.path.hash(state);
     }
 }
 

@@ -27,6 +27,7 @@ use std::collections::HashSet;
 ///! Ast Module of the Velosiraptor Compiler
 // used standard library functionality
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 // used crate functionality
@@ -48,7 +49,7 @@ use super::VelosiAstTypeInfo;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Binary operations for [VelosiAstExpr] <OP> [VelosiAstExpr]
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum VelosiAstBinOp {
     // arithmetic opreators: Numeric <OP> Numeric -> Numeric
     Plus,
@@ -243,7 +244,7 @@ impl From<VelosiParseTreeBinOp> for VelosiAstBinOp {
 }
 
 /// Represents a binary operation `expr <op> expr`
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstBinOpExpr {
     pub lhs: Box<VelosiAstExpr>,
     pub op: VelosiAstBinOp,
@@ -421,6 +422,28 @@ impl VelosiAstBinOpExpr {
     }
 }
 
+/// Implementation of [PartialEq] for [VelosiAstBinOpExpr]
+///
+/// We implement our own variant of partial equality as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl PartialEq for VelosiAstBinOpExpr {
+    fn eq(&self, other: &Self) -> bool {
+        self.op == other.op && self.lhs == other.lhs && self.rhs == other.rhs
+    }
+}
+
+/// Implementation of [Hash] for [VelosiAstBinOpExpr]
+///
+/// We implement our own variant of hash as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl Hash for VelosiAstBinOpExpr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.op.hash(state);
+        self.lhs.hash(state);
+        self.rhs.hash(state);
+    }
+}
+
 impl Display for VelosiAstBinOpExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
         write!(format, "({} {} {})", self.lhs, self.op, self.rhs)
@@ -432,7 +455,7 @@ impl Display for VelosiAstBinOpExpr {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents an unary operator
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum VelosiAstUnOp {
     // arithmetic operators
     Not,
@@ -505,7 +528,7 @@ impl From<VelosiParseTreeUnOp> for VelosiAstUnOp {
 }
 
 /// Represents an unary operation
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstUnOpExpr {
     pub op: VelosiAstUnOp,
     pub expr: Box<VelosiAstExpr>,
@@ -613,6 +636,27 @@ impl VelosiAstUnOpExpr {
     }
 }
 
+/// Implementation of [PartialEq] for [VelosiAstUnOpExpr]
+///
+/// We implement our own variant of partial equality as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl PartialEq for VelosiAstUnOpExpr {
+    fn eq(&self, other: &Self) -> bool {
+        self.op == other.op && self.expr == other.expr
+    }
+}
+
+/// Implementation of [Hash] for [VelosiAstUnOpExpr]
+///
+/// We implement our own variant of hash as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl Hash for VelosiAstUnOpExpr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.op.hash(state);
+        self.expr.hash(state);
+    }
+}
+
 impl Display for VelosiAstUnOpExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
         write!(format, "{}({})", self.op, self.expr)
@@ -624,7 +668,7 @@ impl Display for VelosiAstUnOpExpr {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// representation of a quantifier
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum VelosiAstQuantifier {
     Forall,
     Exists,
@@ -653,7 +697,7 @@ impl Display for VelosiAstQuantifier {
 }
 
 /// Represents an unary operation
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstQuantifierExpr {
     pub quant: VelosiAstQuantifier,
     pub params: Vec<Rc<VelosiAstParam>>,
@@ -735,6 +779,28 @@ impl VelosiAstQuantifierExpr {
     }
 }
 
+/// Implementation of [PartialEq] for [VelosiAstQuantifierExpr]
+///
+/// We implement our own variant of partial equality as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl PartialEq for VelosiAstQuantifierExpr {
+    fn eq(&self, other: &Self) -> bool {
+        self.quant == other.quant && self.params == other.params && self.expr == other.expr
+    }
+}
+
+/// Implementation of [Hash] for [VelosiAstQuantifierExpr]
+///
+/// We implement our own variant of hash as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl Hash for VelosiAstQuantifierExpr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.quant.hash(state);
+        self.params.hash(state);
+        self.expr.hash(state);
+    }
+}
+
 /// Implementation of [Display] for [VelosiParseTreeQuantifierExpr]
 impl Display for VelosiAstQuantifierExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
@@ -754,7 +820,7 @@ impl Display for VelosiAstQuantifierExpr {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents an identifier literal expression
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstIdentLiteralExpr {
     pub ident: VelosiAstIdentifier,
     pub etype: VelosiAstTypeInfo,
@@ -905,6 +971,27 @@ impl VelosiAstIdentLiteralExpr {
     }
 }
 
+/// Implementation of [PartialEq] for [VelosiAstIdentLiteralExpr]
+///
+/// We implement our own variant of partial equality as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl PartialEq for VelosiAstIdentLiteralExpr {
+    fn eq(&self, other: &Self) -> bool {
+        self.ident == other.ident && self.etype == other.etype
+    }
+}
+
+/// Implementation of [Hash] for [VelosiAstIdentLiteralExpr]
+///
+/// We implement our own variant of hash as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl Hash for VelosiAstIdentLiteralExpr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.ident.hash(state);
+        self.etype.hash(state);
+    }
+}
+
 /// Implementation of [Display] for [VelosiAstIdentLiteralExpr]
 impl Display for VelosiAstIdentLiteralExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
@@ -913,7 +1000,7 @@ impl Display for VelosiAstIdentLiteralExpr {
 }
 
 /// Represents an numeric literal expression
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstNumLiteralExpr {
     pub val: u64,
     pub loc: VelosiTokenStream,
@@ -954,6 +1041,26 @@ impl VelosiAstNumLiteralExpr {
     }
 }
 
+/// Implementation of [PartialEq] for [VelosiAstNumLiteralExpr]
+///
+/// We implement our own variant of partial equality as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl PartialEq for VelosiAstNumLiteralExpr {
+    fn eq(&self, other: &Self) -> bool {
+        self.val == other.val
+    }
+}
+
+/// Implementation of [Hash] for [VelosiAstNumLiteralExpr]
+///
+/// We implement our own variant of hash as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl Hash for VelosiAstNumLiteralExpr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.val.hash(state);
+    }
+}
+
 /// Implementation of [Display] for [VelosiAstNumLiteralExpr]
 impl Display for VelosiAstNumLiteralExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
@@ -968,7 +1075,7 @@ impl From<u64> for VelosiAstNumLiteralExpr {
 }
 
 /// Represents an boolean literal expression
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstBoolLiteralExpr {
     pub val: bool,
     pub loc: VelosiTokenStream,
@@ -1009,6 +1116,26 @@ impl VelosiAstBoolLiteralExpr {
     }
 }
 
+/// Implementation of [PartialEq] for [VelosiAstBoolLiteralExpr]
+///
+/// We implement our own variant of partial equality as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl PartialEq for VelosiAstBoolLiteralExpr {
+    fn eq(&self, other: &Self) -> bool {
+        self.val == other.val
+    }
+}
+
+/// Implementation of [Hash] for [VelosiAstBoolLiteralExpr]
+///
+/// We implement our own variant of hash as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl Hash for VelosiAstBoolLiteralExpr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.val.hash(state);
+    }
+}
+
 impl From<bool> for VelosiAstBoolLiteralExpr {
     fn from(val: bool) -> Self {
         Self::new(val, VelosiTokenStream::default())
@@ -1027,7 +1154,7 @@ impl Display for VelosiAstBoolLiteralExpr {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents an boolean literal expression
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstFnCallExpr {
     pub ident: VelosiAstIdentifier,
     pub args: Vec<VelosiAstExpr>,
@@ -1196,6 +1323,29 @@ impl VelosiAstFnCallExpr {
     }
 }
 
+/// Implementation of [PartialEq] for [VelosiAstFnCallExpr]
+///
+/// We implement our own variant of partial equality as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl PartialEq for VelosiAstFnCallExpr {
+    fn eq(&self, other: &Self) -> bool {
+        // TODO: what does make sens here?
+        self.ident == other.ident && self.args == other.args && self.etype == other.etype
+    }
+}
+
+/// Implementation of [Hash] for [VelosiAstFnCallExpr]
+///
+/// We implement our own variant of hash as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl Hash for VelosiAstFnCallExpr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.ident.hash(state);
+        self.args.hash(state);
+        self.etype.hash(state);
+    }
+}
+
 impl Display for VelosiAstFnCallExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
         write!(format, "{}(", self.ident())?;
@@ -1214,7 +1364,7 @@ impl Display for VelosiAstFnCallExpr {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents an boolean literal expression
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstIfElseExpr {
     pub cond: Box<VelosiAstExpr>,
     pub then: Box<VelosiAstExpr>,
@@ -1336,6 +1486,32 @@ impl VelosiAstIfElseExpr {
     }
 }
 
+/// Implementation of [PartialEq] for [VelosiAstIfElseExpr]
+///
+/// We implement our own variant of partial equality as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl PartialEq for VelosiAstIfElseExpr {
+    fn eq(&self, other: &Self) -> bool {
+        self.cond == other.cond
+            && self.then == other.then
+            && self.other == other.other
+            && self.etype == other.etype
+    }
+}
+
+/// Implementation of [Hash] for [VelosiAstIfElseExpr]
+///
+/// We implement our own variant of hash as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl Hash for VelosiAstIfElseExpr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.cond.hash(state);
+        self.then.hash(state);
+        self.other.hash(state);
+        self.etype.hash(state);
+    }
+}
+
 impl Display for VelosiAstIfElseExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
         write!(
@@ -1351,7 +1527,7 @@ impl Display for VelosiAstIfElseExpr {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents an boolean literal expression
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstRangeExpr {
     pub start: u64,
     pub end: u64,
@@ -1443,6 +1619,27 @@ impl VelosiAstRangeExpr {
     }
 }
 
+/// Implementation of [PartialEq] for [VelosiAstRangeExpr]
+///
+/// We implement our own variant of partial equality as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl PartialEq for VelosiAstRangeExpr {
+    fn eq(&self, other: &Self) -> bool {
+        self.start == other.start && self.end == other.end
+    }
+}
+
+/// Implementation of [Hash] for [VelosiAstRangeExpr]
+///
+/// We implement our own variant of hash as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl Hash for VelosiAstRangeExpr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.start.hash(state);
+        self.end.hash(state);
+    }
+}
+
 impl Display for VelosiAstRangeExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
         write!(format, "{}..{}", self.start, self.end)
@@ -1454,7 +1651,7 @@ impl Display for VelosiAstRangeExpr {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents an boolean literal expression
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstSliceExpr {
     pub ident: VelosiAstIdentLiteralExpr,
     pub range: VelosiAstRangeExpr,
@@ -1550,6 +1747,27 @@ impl VelosiAstSliceExpr {
     }
 }
 
+/// Implementation of [PartialEq] for [VelosiAstSliceExpr]
+///
+/// We implement our own variant of partial equality as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl PartialEq for VelosiAstSliceExpr {
+    fn eq(&self, other: &Self) -> bool {
+        self.ident == other.ident && self.range == other.range
+    }
+}
+
+/// Implementation of [Hash] for [VelosiAstSliceExpr]
+///
+/// We implement our own variant of hash as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl Hash for VelosiAstSliceExpr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.ident.hash(state);
+        self.range.hash(state);
+    }
+}
+
 impl Display for VelosiAstSliceExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
         write!(
@@ -1567,7 +1785,7 @@ impl Display for VelosiAstSliceExpr {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents an expression in the parse tree
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub enum VelosiAstExpr {
     IdentLiteral(VelosiAstIdentLiteralExpr),
     NumLiteral(VelosiAstNumLiteralExpr),
