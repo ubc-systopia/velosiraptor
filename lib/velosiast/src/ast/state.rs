@@ -212,6 +212,13 @@ impl VelosiAstField for VelosiAstStateMemoryField {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn compare(&self, other: &Self) -> bool {
+        self.ident == other.ident
+            && self.size == other.size
+            && self.base == other.base
+            && self.offset == other.offset
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -334,6 +341,10 @@ impl VelosiAstField for VelosiAstStateRegisterField {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn compare(&self, other: &Self) -> bool {
+        self.ident == other.ident && self.size == other.size
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstStateRegisterField]
@@ -440,6 +451,16 @@ impl VelosiAstStateField {
         match pt {
             Memory(pt) => VelosiAstStateMemoryField::from_parse_tree(pt, st),
             Register(pt) => VelosiAstStateRegisterField::from_parse_tree(pt, st),
+        }
+    }
+
+    pub fn compare(&self, other: &Self) -> bool {
+        match (self, other) {
+            (VelosiAstStateField::Memory(m1), VelosiAstStateField::Memory(m2)) => m1.compare(m2),
+            (VelosiAstStateField::Register(r1), VelosiAstStateField::Register(r2)) => {
+                r1.compare(r2)
+            }
+            _ => false,
         }
     }
 }
@@ -624,6 +645,34 @@ impl VelosiAstStateDef {
         }
         hs
     }
+
+    pub fn compare(&self, other: &Self) -> bool {
+        if self.params.len() != other.params.len() {
+            return false;
+        }
+
+        if self.fields.len() != other.fields.len() {
+            return false;
+        }
+
+        for (i, p) in self.params.iter().enumerate() {
+            if p != &other.params[i] {
+                return false;
+            }
+        }
+
+        for f1 in self.fields.iter() {
+            if let Some(f2) = other.fields_map.get(f1.ident().as_str()) {
+                if !f1.compare(f2) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+
+        true
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstStateDef]
@@ -731,6 +780,14 @@ impl VelosiAstState {
         match self {
             VelosiAstState::StateDef(s) => s.get_field_slice_refs(refs),
             VelosiAstState::NoneState(_s) => HashMap::new(),
+        }
+    }
+
+    pub fn compare(&self, other: &Self) -> bool {
+        match (self, other) {
+            (VelosiAstState::StateDef(s), VelosiAstState::StateDef(o)) => s.compare(o),
+            (VelosiAstState::NoneState(_), VelosiAstState::NoneState(_)) => true,
+            _ => false,
         }
     }
 }

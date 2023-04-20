@@ -685,6 +685,14 @@ impl VelosiAstField for VelosiAstInterfaceMemoryField {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn compare(&self, other: &Self) -> bool {
+        self.ident == other.ident
+            && self.size == other.size
+            && self.base == other.base
+            && self.offset == other.offset
+        // TODO: compare actions
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstInterfaceMemoryField]
@@ -914,6 +922,14 @@ impl VelosiAstField for VelosiAstInterfaceMmioField {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn compare(&self, other: &Self) -> bool {
+        self.ident == other.ident
+            && self.size == other.size
+            && self.base == other.base
+            && self.offset == other.offset
+        // TODO: compare actions
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstInterfaceRegisterField]
@@ -1127,6 +1143,11 @@ impl VelosiAstField for VelosiAstInterfaceRegisterField {
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn compare(&self, other: &Self) -> bool {
+        self.ident == other.ident && self.size == other.size
+        // TODO: compare actions
     }
 }
 
@@ -1356,6 +1377,21 @@ impl VelosiAstField for VelosiAstInterfaceField {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn compare(&self, other: &Self) -> bool {
+        match (self, other) {
+            (VelosiAstInterfaceField::Memory(f1), VelosiAstInterfaceField::Memory(f2)) => {
+                f1.compare(f2)
+            }
+            (VelosiAstInterfaceField::Register(f1), VelosiAstInterfaceField::Register(f2)) => {
+                f1.compare(f2)
+            }
+            (VelosiAstInterfaceField::Mmio(f1), VelosiAstInterfaceField::Mmio(f2)) => {
+                f1.compare(f2)
+            }
+            _ => false,
+        }
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstInterfaceField]
@@ -1545,6 +1581,34 @@ impl VelosiAstInterfaceDef {
         }
         hs
     }
+
+    pub fn compare(&self, other: &Self) -> bool {
+        if self.params.len() != other.params.len() {
+            return false;
+        }
+
+        if self.fields.len() != other.fields.len() {
+            return false;
+        }
+
+        for (i, p) in self.params.iter().enumerate() {
+            if p != &other.params[i] {
+                return false;
+            }
+        }
+
+        for f1 in self.fields.iter() {
+            if let Some(f2) = other.fields_map.get(f1.ident().as_str()) {
+                if !f1.compare(f2) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+
+        true
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstInterfaceDef]
@@ -1656,6 +1720,16 @@ impl VelosiAstInterface {
         match self {
             VelosiAstInterface::InterfaceDef(s) => s.fields_accessing_state(state_syms, state_bits),
             VelosiAstInterface::NoneInterface(_s) => HashSet::new(),
+        }
+    }
+
+    pub fn compare(&self, other: &Self) -> bool {
+        match (self, other) {
+            (VelosiAstInterface::InterfaceDef(s), VelosiAstInterface::InterfaceDef(o)) => {
+                s.compare(o)
+            }
+            (VelosiAstInterface::NoneInterface(_), VelosiAstInterface::NoneInterface(_)) => true,
+            _ => false,
         }
     }
 }
