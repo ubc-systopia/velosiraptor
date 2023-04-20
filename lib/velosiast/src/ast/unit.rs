@@ -1129,14 +1129,25 @@ impl VelosiAstUnitEnum {
 
         // TODO: handle the drivation...
 
-        let mut enums = Vec::new();
+        let mut enums: HashMap<VelosiAstIdentifier, Vec<VelosiAstIdentifier>> = HashMap::new();
         let mut inbitwidth = 0;
         let outbitwidth = 0;
+
         for node in pt.nodes.into_iter() {
             match node {
                 VelosiParseTreeUnitNode::EnumEntry(e) => {
                     // covert the identifiers..
                     let ident = VelosiAstIdentifier::from(e.ident);
+
+                    if let Some((k, _v)) = enums.get_key_value(&ident) {
+                        let err = VelosiAstErrDoubleDef::new(
+                            ident.ident.clone(),
+                            k.loc.clone(),
+                            ident.loc.clone(),
+                        );
+                        issues.push(err.into());
+                        continue;
+                    }
 
                     let args: Vec<VelosiAstIdentifier> = e
                         .params
@@ -1329,7 +1340,7 @@ impl VelosiAstUnitEnum {
                         issues.push(err.into());
                     }
 
-                    enums.push((ident, args));
+                    enums.insert(ident, args);
                 }
                 VelosiParseTreeUnitNode::Const(c) => {
                     ignored_node!(VelosiParseTreeUnitNode::Const, c, &mut issues, "Enum")
@@ -1350,6 +1361,50 @@ impl VelosiAstUnitEnum {
                 }
                 VelosiParseTreeUnitNode::Map(m) => {
                     ignored_node!(VelosiParseTreeUnitNode::Map, m, &mut issues, "Enum")
+                }
+            }
+        }
+
+        let enums: Vec<(VelosiAstIdentifier, Vec<VelosiAstIdentifier>)> =
+            enums.into_iter().collect();
+
+        for i in 0..enums.len() {
+            for j in i..enums.len() {
+                let unit1_sym = st
+                    .lookup(enums[i].0.ident())
+                    .expect("BUG: no unit with that identifier");
+                let unit2_sym = st
+                    .lookup(enums[j].0.ident())
+                    .expect("BUG: no unit with that identifier");
+
+                match (&unit1_sym.ast_node, &unit2_sym.ast_node) {
+                    (VelosiAstNode::Unit(unit1), VelosiAstNode::Unit(unit2)) => {
+                        // TODO: Give more details on what doesn't compare
+                        if !unit1.compare_state(unit2) {
+                            let msg = "Units in enum have incompatible state";
+                            let hint = "This unit has incompatible state with another unit in the same enum";
+                            let msg2 = "This is the other unit with incompatible state";
+                            let err = VelosiAstErrBuilder::err(msg.to_string())
+                                .add_hint(hint.to_string())
+                                .add_location(enums[i].0.loc.clone())
+                                .add_related_location(msg2.to_string(), enums[j].0.loc.clone())
+                                .build();
+                            issues.push(err);
+                        }
+
+                        if !unit1.compare_interface(unit2) {
+                            let msg = "Units in enum have incompatible interface";
+                            let hint = "This unit has incompatible interface with another unit in the same enum";
+                            let msg2 = "This is the other unit with incompatible interface";
+                            let err = VelosiAstErrBuilder::err(msg.to_string())
+                                .add_hint(hint.to_string())
+                                .add_location(enums[i].0.loc.clone())
+                                .add_related_location(msg2.to_string(), enums[j].0.loc.clone())
+                                .build();
+                            issues.push(err);
+                        }
+                    }
+                    _ => unreachable!(),
                 }
             }
         }
@@ -1624,6 +1679,16 @@ impl VelosiAstUnit {
         }
     }
 
+    pub fn compare_interface(&self, other: &VelosiAstUnit) -> bool {
+        use VelosiAstUnit::*;
+        match (self, other) {
+            (Segment(s1), Segment(s2)) => s1.interface.compare(&s2.interface),
+            (StaticMap(_), StaticMap(_)) => true,
+            (Enum(_), Enum(_)) => true,
+            _ => false,
+        }
+    }
+
     pub fn state(&self) -> Option<Rc<VelosiAstState>> {
         use VelosiAstUnit::*;
         match self {
@@ -1636,6 +1701,16 @@ impl VelosiAstUnit {
                 }
             }
             Enum(_) => None,
+        }
+    }
+
+    pub fn compare_state(&self, other: &VelosiAstUnit) -> bool {
+        use VelosiAstUnit::*;
+        match (self, other) {
+            (Segment(s1), Segment(s2)) => s1.state.compare(&s2.state),
+            (StaticMap(_), StaticMap(_)) => true,
+            (Enum(_), Enum(_)) => true,
+            _ => false,
         }
     }
 
