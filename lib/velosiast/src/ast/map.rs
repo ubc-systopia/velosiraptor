@@ -27,6 +27,7 @@
 //!
 //! This module defines the Constant AST nodes of the langauge
 
+use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
@@ -315,12 +316,17 @@ impl VelosiAstStaticMapElement {
         let v = Rc::new(VelosiAstConst::new_int(var, val));
         st.insert(v.into()).expect("couldn't insert the symbol");
 
-        let src = self.src.as_ref().map(|src| src.clone().flatten_raw(st));
-        let dst = self.dst.clone().flatten_raw(st);
+        let mapping = HashMap::new();
+
+        let src = self
+            .src
+            .as_ref()
+            .map(|src| src.clone().flatten_raw(st, &mapping));
+        let dst = self.dst.clone().flatten_raw(st, &mapping);
         let offset = self
             .offset
             .as_ref()
-            .map(|offset| offset.clone().flatten(st));
+            .map(|offset| offset.clone().flatten(st, &mapping));
 
         Self::new(src, dst, self.dst_bitwidth, offset, self.loc.clone())
     }
