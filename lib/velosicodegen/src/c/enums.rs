@@ -101,7 +101,7 @@ fn add_is_function(
 
     let mut preconds = HashSet::new();
 
-    for (i, (variant, params)) in unit.enums.iter().enumerate() {
+    for (i, (variant, _params)) in unit.enums.iter().enumerate() {
         let variant_unit = ast.get_unit(variant.as_str()).expect("unit not found!");
         let variant_op = variant_unit
             .get_method("translate")
@@ -123,7 +123,7 @@ fn add_is_function(
         println!("precond: {}", i);
     }
 
-    for (variant, params) in unit.enums.iter() {
+    for (variant, _params) in unit.enums.iter() {
         // lookup the unit
         let variant_unit = ast.get_unit(variant.as_str()).expect("unit not found!");
         let variant_op = variant_unit
@@ -161,7 +161,7 @@ fn add_is_function(
         // TODO:
         // here we actually need a way to access the relevant part of the state...
         // in theory reading the interface may cause some state transition.
-        let mut args = variant_unit
+        let args = variant_unit
             .params_as_slice()
             .iter()
             .map(|p| C::Expr::field_access(&v_expr, p.ident().as_str()))
@@ -172,7 +172,7 @@ fn add_is_function(
             C::Expr::fn_call(&variant_unit.constructor_fn_name(), args),
         );
 
-        let res_expr = body.new_variable("res", C::Type::new_bool()).to_expr();
+        let _res_expr = body.new_variable("res", C::Type::new_bool()).to_expr();
 
         let res_var = C::Expr::new_var("res", C::Type::new_bool());
         for (i, e) in variant_op.requires.iter().enumerate() {
@@ -204,7 +204,7 @@ fn add_map_function(
     //  -> create state struct
     //  -> call map()
 
-    for (variant, params) in unit.enums.iter() {
+    for (variant, _params) in unit.enums.iter() {
         // lookup the unit
 
         let variant_unit = ast.get_unit(variant.as_str()).expect("unit not found!");
@@ -233,7 +233,7 @@ fn add_map_function(
         let v_expr = v.to_expr();
 
         for f in variant_op.params.iter() {
-            let p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo));
+            let _p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo));
         }
 
         let body = fun.body();
@@ -244,7 +244,7 @@ fn add_map_function(
             .new_variable("targetunit", variant_unit.to_ctype())
             .to_expr();
         // st = variant_unit.constructor_fn_name()
-        let mut args = variant_unit
+        let args = variant_unit
             .params_as_slice()
             .iter()
             .map(|p| C::Expr::field_access(&v_expr, p.ident().as_str()))
@@ -272,9 +272,9 @@ fn add_map_function(
 }
 
 fn add_unmap_function(
-    ast: &VelosiAst,
-    unit: &VelosiAstUnitEnum,
-    outdir: &Path,
+    _ast: &VelosiAst,
+    _unit: &VelosiAstUnitEnum,
+    _outdir: &Path,
 ) -> Result<(), VelosiCodeGenError> {
     // forall variants, generate one function. that's basically a pass-through!
     // map_page() map_ptable()
@@ -285,17 +285,17 @@ fn add_unmap_function(
 }
 
 fn add_protect_function(
-    ast: &VelosiAst,
-    unit: &VelosiAstUnitEnum,
-    outdir: &Path,
+    _ast: &VelosiAst,
+    _unit: &VelosiAstUnitEnum,
+    _outdir: &Path,
 ) -> Result<(), VelosiCodeGenError> {
     Ok(())
 }
 
 fn add_translate_function(
-    ast: &VelosiAst,
-    unit: &VelosiAstUnitEnum,
-    outdir: &Path,
+    _ast: &VelosiAst,
+    _unit: &VelosiAstUnitEnum,
+    _outdir: &Path,
 ) -> Result<(), VelosiCodeGenError> {
     Ok(())
 }

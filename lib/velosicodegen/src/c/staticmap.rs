@@ -48,7 +48,7 @@ fn add_unit_constants(scope: &mut C::Scope, unit: &VelosiAstUnitStaticMap) {
     }
 }
 
-fn add_unit_flags(scope: &mut C::Scope, unit: &VelosiAstUnitStaticMap) {
+fn add_unit_flags(_scope: &mut C::Scope, _unit: &VelosiAstUnitStaticMap) {
 
     // TODO: add the flags as a union of all other units this one maps to?
 }
@@ -442,7 +442,7 @@ fn add_unit_flags(scope: &mut C::Scope, unit: &VelosiAstUnitStaticMap) {
 
 fn add_op_fn(
     scope: &mut C::Scope,
-    ast: &VelosiAst,
+    _ast: &VelosiAst,
     unit: &VelosiAstUnitStaticMap,
     op: &VelosiAstMethod,
 ) {
@@ -454,7 +454,7 @@ fn add_op_fn(
     scope.push_function(fun);
 }
 
-fn add_op_functions(scope: &mut C::Scope, ast: &VelosiAst, unit: &VelosiAstUnitStaticMap) {
+fn add_op_functions(scope: &mut C::Scope, _ast: &VelosiAst, unit: &VelosiAstUnitStaticMap) {
     match &unit.map {
         VelosiAstStaticMap::Explicit(_) => {
             scope.new_comment("Explicit map");
@@ -538,7 +538,7 @@ pub fn generate(
     let s = guard.guard().then_scope();
 
     // add the header comments
-    let title = format!("`{}` Unit definition ", unit.ident());
+    let _title = format!("`{}` Unit definition ", unit.ident());
 
     // add systems include
     s.new_include("stddef.h", true);
