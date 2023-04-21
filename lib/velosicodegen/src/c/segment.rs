@@ -198,7 +198,7 @@ fn add_op_fn(scope: &mut C::Scope, unit: &VelosiAstUnitSegment, op: &VelosiAstMe
     field_vars.insert(String::from("unit"), v.to_expr());
 
     for f in op.params.iter() {
-        let p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo));
+        let _p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo));
     }
 
     if op.requires.is_empty() {
