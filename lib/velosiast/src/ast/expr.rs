@@ -1693,9 +1693,9 @@ impl VelosiAstIfElseExpr {
             issues.push(err);
         }
 
-        let mut mapping = HashMap::new();
-        let e = VelosiAstIfElseExpr::new(cond, then, other, then_type, pt.loc)
-            .flatten(st, &mut mapping);
+        let mapping = HashMap::new();
+        let e =
+            VelosiAstIfElseExpr::new(cond, then, other, then_type, pt.loc).flatten(st, &mapping);
         if issues.is_ok() {
             AstResult::Ok(e)
         } else {
@@ -2259,7 +2259,7 @@ impl VelosiAstExpr {
         use VelosiAstExpr::*;
         use VelosiAstUnOp::*;
 
-        let mut mapping = HashMap::new();
+        let mapping = HashMap::new();
 
         if let BinOp(outer) = &self {
             // distributive law
@@ -2273,16 +2273,16 @@ impl VelosiAstExpr {
                         *inner.lhs.clone(),
                         outer.loc.clone(),
                     )
-                    .flatten(st, &mut mapping);
+                    .flatten(st, &mapping);
                     let rhs = VelosiAstBinOpExpr::new(
                         *outer.lhs.clone(),
                         Lor,
                         *inner.rhs.clone(),
                         outer.loc.clone(),
                     )
-                    .flatten(st, &mut mapping);
+                    .flatten(st, &mapping);
                     let res = VelosiAstBinOpExpr::new(lhs, Land, rhs, outer.loc.clone())
-                        .flatten(st, &mut mapping);
+                        .flatten(st, &mapping);
                     // println!("into_cnf | rewrite: applying distributive law");
                     // println!("  {} -> {}", self, res);
                     return res;
@@ -2299,16 +2299,16 @@ impl VelosiAstExpr {
                         *inner.lhs.clone(),
                         outer.loc.clone(),
                     )
-                    .flatten(st, &mut mapping);
+                    .flatten(st, &mapping);
                     let rhs = VelosiAstBinOpExpr::new(
                         *outer.rhs.clone(),
                         Lor,
                         *inner.rhs.clone(),
                         outer.loc.clone(),
                     )
-                    .flatten(st, &mut mapping);
+                    .flatten(st, &mapping);
                     let res = VelosiAstBinOpExpr::new(lhs, Land, rhs, outer.loc.clone())
-                        .flatten(st, &mut mapping);
+                        .flatten(st, &mapping);
                     // println!("into_cnf | rewrite: applying distributive law");
                     // println!("  {} -> {}", self, res);
                     return res;
@@ -2320,11 +2320,11 @@ impl VelosiAstExpr {
                 // !(p or q) == !p and !q
                 if ue.op == LNot && be.op == Lor {
                     let lhs = VelosiAstUnOpExpr::new(LNot, *be.lhs.clone(), be.loc.clone())
-                        .flatten(st, &mut mapping);
+                        .flatten(st, &mapping);
                     let rhs = VelosiAstUnOpExpr::new(LNot, *be.rhs.clone(), be.loc.clone())
-                        .flatten(st, &mut mapping);
+                        .flatten(st, &mapping);
                     let res = VelosiAstBinOpExpr::new(lhs, Land, rhs, ue.loc.clone())
-                        .flatten(st, &mut mapping);
+                        .flatten(st, &mapping);
                     // println!("into_cnf | rewrite: applying demorgan's law");
                     // println!("  {} -> {}", self, res);
                     return res;
