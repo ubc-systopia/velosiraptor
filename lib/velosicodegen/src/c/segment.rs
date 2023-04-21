@@ -32,7 +32,7 @@ use crustal as C;
 
 use velosiast::ast::{VelosiAstMethod, VelosiAstUnitSegment};
 
-use super::utils::{self, UnitUtils, FieldUtils};
+use super::utils::{self, FieldUtils, UnitUtils};
 use crate::VelosiCodeGenError;
 
 /// adds the constants defined in the unit to the scope
@@ -93,7 +93,6 @@ fn add_unit_flags(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
 // }
 
 fn add_constructor_function(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
-
     // define the function
     let mut fun = C::Function::with_string(unit.constructor_fn_name(), unit.to_ctype());
     fun.set_static().set_inline();
@@ -139,56 +138,55 @@ fn add_constructor_function(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
 // }
 
 // fn add_translate_function(_scope: &mut C::Scope, _unit: &VelosiAstUnitSegment) {
-    // let fname = utils::translate_fn_name(unit.ident());
+// let fname = utils::translate_fn_name(unit.ident());
 
-    // let mut fun = C::Function::with_string(fname, C::Type::new_bool());
-    // fun.set_static().set_inline();
+// let mut fun = C::Function::with_string(fname, C::Type::new_bool());
+// fun.set_static().set_inline();
 
-    // let mut field_vars = HashMap::new();
-    // let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::unit_type_name(unit.ident())));
+// let mut field_vars = HashMap::new();
+// let unittype = C::Type::to_ptr(&C::Type::new_typedef(&utils::unit_type_name(unit.ident())));
 
-    // let v = fun.new_param("unit", unittype);
-    // field_vars.insert(String::from("unit"), v.to_expr());
-    // fun.new_param("va", C::Type::new_uint64());
-    // fun.new_param("pa", C::Type::new_uint64().to_ptr());
+// let v = fun.new_param("unit", unittype);
+// field_vars.insert(String::from("unit"), v.to_expr());
+// fun.new_param("va", C::Type::new_uint64());
+// fun.new_param("pa", C::Type::new_uint64().to_ptr());
 
-    // if !unit.state().is_memory() {
-    //     fun.body().return_expr(C::Expr::bfalse());
-    //     scope.push_function(fun);
-    //     return;
-    // }
+// if !unit.state().is_memory() {
+//     fun.body().return_expr(C::Expr::bfalse());
+//     scope.push_function(fun);
+//     return;
+// }
 
-    // if let Some(f) = unit.get_method("translate") {
-    //     let body = fun.body();
+// if let Some(f) = unit.get_method("translate") {
+//     let body = fun.body();
 
-    //     for c in &f.requires {
-    //         body.new_ifelse(&C::Expr::not(expr_to_cpp(unit.ident(), c)))
-    //             .then_branch()
-    //             .new_return(Some(&C::Expr::bfalse()));
-    //     }
+//     for c in &f.requires {
+//         body.new_ifelse(&C::Expr::not(expr_to_cpp(unit.ident(), c)))
+//             .then_branch()
+//             .new_return(Some(&C::Expr::bfalse()));
+//     }
 
-    //     if let Some(stmt) = &f.stmts {
-    //         body.merge(stmt_to_cpp(unit.ident(), stmt));
-    //     }
-    // } else {
-    //     fun.body().new_comment("there was no translate method");
-    // }
+//     if let Some(stmt) = &f.stmts {
+//         body.merge(stmt_to_cpp(unit.ident(), stmt));
+//     }
+// } else {
+//     fun.body().new_comment("there was no translate method");
+// }
 
-    // if !(va < 4096) || state.pte.present != 1 {
-    //    return false;
-    // }
-    // *pa = va + (state.pte.base << 12);
-    // return true;
+// if !(va < 4096) || state.pte.present != 1 {
+//    return false;
+// }
+// *pa = va + (state.pte.base << 12);
+// return true;
 
-    // fun.new_param("size", C::Type::new_size());
-    // fun.new_param("pa", C::Type::new_uint64());
-    // fun.new_param("flags", C::Type::new_int(64));
+// fun.new_param("size", C::Type::new_size());
+// fun.new_param("pa", C::Type::new_uint64());
+// fun.new_param("flags", C::Type::new_int(64));
 
-    // scope.push_function(fun);
+// scope.push_function(fun);
 // }
 
 fn add_op_fn(scope: &mut C::Scope, unit: &VelosiAstUnitSegment, op: &VelosiAstMethod) {
-
     // declare the function
     let mut fun = C::Function::with_string(unit.to_op_fn_name(op), C::Type::new_bool());
     fun.set_static().set_inline();
@@ -203,7 +201,6 @@ fn add_op_fn(scope: &mut C::Scope, unit: &VelosiAstUnitSegment, op: &VelosiAstMe
         let p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo));
     }
 
-
     if op.requires.is_empty() {
         fun.body().new_comment("no requires clauses");
     } else {
@@ -211,9 +208,8 @@ fn add_op_fn(scope: &mut C::Scope, unit: &VelosiAstUnitSegment, op: &VelosiAstMe
     }
     for r in op.requires.iter() {
         // add asserts!
-        fun.body().fn_call("assert", vec![
-            utils::expr_to_cpp(unit, r)
-        ]);
+        fun.body()
+            .fn_call("assert", vec![utils::expr_to_cpp(unit, r)]);
     }
 
     if !op.ops.is_empty() {
@@ -272,7 +268,6 @@ fn add_protect_function(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
 
 /// generates the VelosiAstUnitSegment definitions
 pub fn generate(unit: &VelosiAstUnitSegment, outdir: &Path) -> Result<(), VelosiCodeGenError> {
-
     log::info!("Generating segment unit {}", unit.ident());
 
     // the code generation scope

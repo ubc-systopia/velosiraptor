@@ -25,17 +25,13 @@
 
 //! StaticMap Generation (C)
 
-use std::collections::HashMap;
 use std::path::Path;
 
 use crustal as C;
 
-use velosiast::{VelosiAst,
-    VelosiAstStaticMap, VelosiAstStaticMapElement, VelosiAstStaticMapExplicit,
-    VelosiAstStaticMapListComp, VelosiAstUnitStaticMap, VelosiAstMethod
-};
+use velosiast::{VelosiAst, VelosiAstMethod, VelosiAstStaticMap, VelosiAstUnitStaticMap};
 
-use super::utils::{self,UnitUtils};
+use super::utils::{self, UnitUtils};
 use crate::VelosiCodeGenError;
 
 /// adds the constants defined in the unit to the scope
@@ -79,8 +75,6 @@ fn add_unit_flags(scope: &mut C::Scope, unit: &VelosiAstUnitStaticMap) {
 // //     // it has a single field, called 'val'
 // //     //st.field("val", to_rust_type(field.nbits()));
 // // }
-
-
 
 // fn add_list_comp_translate_body(
 //     scope: &mut C::Block,
@@ -446,7 +440,12 @@ fn add_unit_flags(scope: &mut C::Scope, unit: &VelosiAstUnitStaticMap) {
 //     scope.push_function(fun);
 // }
 
-fn add_op_fn(scope: &mut C::Scope, ast: &VelosiAst, unit: &VelosiAstUnitStaticMap, op: &VelosiAstMethod) {
+fn add_op_fn(
+    scope: &mut C::Scope,
+    ast: &VelosiAst,
+    unit: &VelosiAstUnitStaticMap,
+    op: &VelosiAstMethod,
+) {
     // declare the function
     let mut fun = C::Function::with_string(unit.to_op_fn_name(op), C::Type::new_bool());
     fun.set_static().set_inline();
@@ -495,7 +494,7 @@ fn generate_unit_struct(scope: &mut C::Scope, unit: &VelosiAstUnitStaticMap) {
 }
 
 fn add_constructor_function(scope: &mut C::Scope, unit: &VelosiAstUnitStaticMap) {
-    let mut fun = C::Function::with_string(unit.constructor_fn_name(),  unit.to_ctype());
+    let mut fun = C::Function::with_string(unit.constructor_fn_name(), unit.to_ctype());
     fun.set_static().set_inline();
 
     let mut params = Vec::new();
@@ -519,10 +518,12 @@ fn add_constructor_function(scope: &mut C::Scope, unit: &VelosiAstUnitStaticMap)
     scope.push_function(fun);
 }
 
-
 /// generates the staticmap definitions
-pub fn generate(ast: &VelosiAst, unit: &VelosiAstUnitStaticMap, outdir: &Path) -> Result<(), VelosiCodeGenError> {
-
+pub fn generate(
+    ast: &VelosiAst,
+    unit: &VelosiAstUnitStaticMap,
+    outdir: &Path,
+) -> Result<(), VelosiCodeGenError> {
     log::info!("Generating staticmap unit {}", unit.ident());
 
     // the code generation scope

@@ -33,9 +33,9 @@ use crustal as C;
 use velosiast::ast::{
     VelosiAstBinOp, VelosiAstConst, VelosiAstExpr, VelosiAstField, VelosiAstFieldSlice,
     VelosiAstInterfaceField, VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField,
-    VelosiAstInterfaceRegisterField, VelosiAstMethod, VelosiAstType, VelosiAstTypeInfo,
-    VelosiAstUnOp, VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment, VelosiAstUnitStaticMap,
-    VelosiOpExpr, VelosiOperation,
+    VelosiAstInterfaceRegisterField, VelosiAstMethod, VelosiAstTypeInfo, VelosiAstUnOp,
+    VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment, VelosiAstUnitStaticMap, VelosiOpExpr,
+    VelosiOperation,
 };
 
 use crate::COPYRIGHT;
@@ -120,6 +120,93 @@ pub trait UnitUtils {
                 C::Type::new_typedef(&name)
             }
             _ => todo!(),
+        }
+    }
+
+    fn expr_to_cpp(&self, expr: &VelosiAstExpr) -> C::Expr {
+        use VelosiAstExpr::*;
+        match expr {
+            IdentLiteral(i) => {
+                C::Expr::new_var(i.ident().as_str(), self.ptype_to_ctype(expr.result_type()))
+            }
+            NumLiteral(i) => C::Expr::new_num(i.val),
+            BoolLiteral(i) => {
+                if i.val {
+                    C::Expr::btrue()
+                } else {
+                    C::Expr::bfalse()
+                }
+            }
+            BinOp(i) => match i.op {
+                VelosiAstBinOp::LShift => {
+                    C::Expr::binop(self.expr_to_cpp(&i.lhs), "<<", self.expr_to_cpp(&i.rhs))
+                }
+                VelosiAstBinOp::RShift => {
+                    C::Expr::binop(self.expr_to_cpp(&i.lhs), ">>", self.expr_to_cpp(&i.rhs))
+                }
+                VelosiAstBinOp::And => {
+                    C::Expr::binop(self.expr_to_cpp(&i.lhs), "&", self.expr_to_cpp(&i.rhs))
+                }
+                VelosiAstBinOp::Or => {
+                    C::Expr::binop(self.expr_to_cpp(&i.lhs), "|", self.expr_to_cpp(&i.rhs))
+                }
+                VelosiAstBinOp::Xor => {
+                    C::Expr::binop(self.expr_to_cpp(&i.lhs), "^", self.expr_to_cpp(&i.rhs))
+                }
+                VelosiAstBinOp::Plus => {
+                    C::Expr::binop(self.expr_to_cpp(&i.lhs), "+", self.expr_to_cpp(&i.rhs))
+                }
+                VelosiAstBinOp::Minus => {
+                    C::Expr::binop(self.expr_to_cpp(&i.lhs), "-", self.expr_to_cpp(&i.rhs))
+                }
+                VelosiAstBinOp::Multiply => {
+                    C::Expr::binop(self.expr_to_cpp(&i.lhs), "*", self.expr_to_cpp(&i.rhs))
+                }
+                VelosiAstBinOp::Divide => {
+                    C::Expr::binop(self.expr_to_cpp(&i.lhs), "/", self.expr_to_cpp(&i.rhs))
+                }
+                VelosiAstBinOp::Modulo => {
+                    C::Expr::binop(self.expr_to_cpp(&i.lhs), "%", self.expr_to_cpp(&i.rhs))
+                }
+                VelosiAstBinOp::Eq => {
+                    C::Expr::binop(self.expr_to_cpp(&i.lhs), "==", self.expr_to_cpp(&i.rhs))
+                }
+                VelosiAstBinOp::Ne => {
+                    C::Expr::binop(self.expr_to_cpp(&i.lhs), "!=", self.expr_to_cpp(&i.rhs))
+                }
+                VelosiAstBinOp::Lt => {
+                    C::Expr::binop(self.expr_to_cpp(&i.lhs), "<", self.expr_to_cpp(&i.rhs))
+                }
+                VelosiAstBinOp::Gt => {
+                    C::Expr::binop(self.expr_to_cpp(&i.lhs), ">", self.expr_to_cpp(&i.rhs))
+                }
+                VelosiAstBinOp::Le => {
+                    C::Expr::binop(self.expr_to_cpp(&i.lhs), "<=", self.expr_to_cpp(&i.rhs))
+                }
+                VelosiAstBinOp::Ge => {
+                    C::Expr::binop(self.expr_to_cpp(&i.lhs), ">=", self.expr_to_cpp(&i.rhs))
+                }
+                VelosiAstBinOp::Land => {
+                    C::Expr::binop(self.expr_to_cpp(&i.lhs), "&&", self.expr_to_cpp(&i.rhs))
+                }
+                VelosiAstBinOp::Lor => {
+                    C::Expr::binop(self.expr_to_cpp(&i.lhs), "||", self.expr_to_cpp(&i.rhs))
+                }
+                VelosiAstBinOp::Implies => C::Expr::binop(
+                    C::Expr::uop("!", self.expr_to_cpp(&i.lhs)),
+                    "||",
+                    self.expr_to_cpp(&i.rhs),
+                ),
+            },
+            UnOp(i) => match i.op {
+                VelosiAstUnOp::Not => C::Expr::uop("~", self.expr_to_cpp(&i.expr)),
+                VelosiAstUnOp::LNot => C::Expr::uop("!", self.expr_to_cpp(&i.expr)),
+            },
+            Quantifier(_i) => panic!("don't know how to handle quantifier"),
+            FnCall(i) => C::Expr::fn_call(i.ident(), vec![]),
+            IfElse(_i) => panic!("don't know how to handle ifelse"),
+            Slice(_i) => panic!("don't know how to handle slices"),
+            Range(_i) => panic!("don't know how to handle range"),
         }
     }
 }
@@ -802,46 +889,4 @@ pub fn expr_to_cpp(unit: &VelosiAstUnitSegment, expr: &VelosiAstExpr) -> C::Expr
         Slice(_i) => panic!("don't know how to handle slices"),
         Range(_i) => panic!("don't know how to handle range"),
     }
-
-    // use VelosiAstExpr::*;
-    // match expr {
-    //     Identifier { path, .. } => {
-    //         match path[0].as_str() {
-    //             "state" => {
-    //                 // this->_state.control_field()
-    //                 state_field_access(unit, &path[1..])
-    //             }
-    //             "interface" => panic!("state not implemented"),
-    //             p => C::Expr::new_var(p, C::Type::new_int(64)),
-    //         }
-    //     }
-    //     Number { value, .. } => C::Expr::new_num(*value),
-    //     Boolean { value: true, .. } => C::Expr::btrue(),
-    //     Boolean { value: false, .. } => C::Expr::bfalse(),
-    //     BinaryOperation { op, lhs, rhs, .. } => {
-    //         let o = format!("{}", op);
-    //         let e = expr_to_cpp(unit, lhs);
-    //         let e2 = expr_to_cpp(unit, rhs);
-    //         C::Expr::binop(e, &o, e2)
-    //     }
-    //     UnaryOperation { op, val, .. } => {
-    //         let o = format!("{}", op);
-    //         let e = expr_to_cpp(unit, val);
-    //         C::Expr::uop(&o, e)
-    //     }
-    //     FnCall { path, args, .. } => {
-    //         if path.len() != 1 {
-    //             panic!("TODO: handle multiple path components");
-    //         }
-    //         C::Expr::method_call(
-    //             &C::Expr::this(),
-    //             &path[0],
-    //             args.iter().map(|x| expr_to_cpp(unit, x)).collect(),
-    //         )
-    //     }
-    //     Slice { .. } => panic!("don't know how to handle slice"),
-    //     Element { .. } => panic!("don't know how to handle element"),
-    //     Range { .. } => panic!("don't know how to handle range"),
-    //     Quantifier { .. } => panic!("don't know how to handle quantifier"),
-    // }
 }

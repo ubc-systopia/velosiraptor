@@ -224,7 +224,6 @@ impl BackendRust {
         scope.raw(&format!("pub mod {MOD_CONSTS};"));
         scope.raw(&format!("pub use {MOD_CONSTS}::*;"));
 
-
         // impor the units
         scope.new_comment("import the unit modules");
 
