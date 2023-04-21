@@ -1140,7 +1140,6 @@ impl VelosiAstIdentLiteralExpr {
                 _ => VelosiAstExpr::IdentLiteral(self),
             }
         } else if let Some(expr) = mapping.get(self.path()) {
-            println!("rewriting: {} -> {}", self.path(), expr);
             expr.clone().clone()
         } else {
             VelosiAstExpr::IdentLiteral(self)
