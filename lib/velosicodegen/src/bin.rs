@@ -33,7 +33,7 @@ use std::io::Read;
 use std::path::Path;
 use std::time::Instant;
 
-use clap::{arg, command, ArgAction, Arg};
+use clap::{arg, command, Arg, ArgAction};
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, LevelPadding, TermLogger, TerminalMode};
 
 use velosiast::{AstResult, VelosiAst, VelosiAstUnit};
@@ -51,8 +51,7 @@ pub fn main() {
             Arg::new("nosynth")
                 .short('n')
                 .long("no-synth")
-                .action(ArgAction::SetTrue)
-                ,
+                .action(ArgAction::SetTrue),
         )
         .arg(arg!(-o --output <VALUE>).default_value("out"))
         .arg(arg!(-l --lang <VALUE>).default_value("c"))
@@ -84,7 +83,6 @@ pub fn main() {
         .unwrap();
 
     let no_synth = matches.get_flag("nosynth");
-
 
     TermLogger::init(
         filter_level,

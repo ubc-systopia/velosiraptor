@@ -31,15 +31,14 @@ use std::path::PathBuf;
 
 use crustal as C;
 
-use velosiast::VelosiAstUnitEnum;
 use velosiast::{VelosiAst, VelosiAstUnit};
 
 use crate::VelosiCodeGenError;
 
 use utils::{add_const_def, add_header};
 
-mod field;
 mod enums;
+mod field;
 mod interface;
 mod segment;
 mod staticmap;
@@ -97,7 +96,7 @@ impl BackendC {
         for (i, c) in consts.enumerate() {
             add_const_def(s, c);
             n_const = i;
-        };
+        }
 
         if n_const == 0 {
             s.new_comment("No global constants defined");

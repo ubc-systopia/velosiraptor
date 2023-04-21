@@ -51,8 +51,10 @@ fn generate_read_slice_fn(
     slice: &VelosiAstFieldSlice,
 ) {
     // create the function
-    let mut f =
-        C::Function::with_string(slice.to_rd_fn(unit, field), C::Type::new_uint(field.nbits()));
+    let mut f = C::Function::with_string(
+        slice.to_rd_fn(unit, field),
+        C::Type::new_uint(field.nbits()),
+    );
     f.set_static().set_inline();
     f.push_doc_str(&format!(
         "reads the value `{}.{}` from the interface",
@@ -102,28 +104,30 @@ fn generate_write_slice_fn(
     let val_param = f.new_param("val", C::Type::new_uint(slice.nbits()));
     let val_var = val_param.to_expr();
 
-
     // declare the local variable for the field
     let fieldtype = C::Type::new_typedef(&field.to_type_name(unit));
     let field_var_decl = f.body().new_variable("field", fieldtype);
     let field_var = field_var_decl.to_expr();
 
     // read the field value
-    f.body().assign(field_var.clone(), field.to_rd_fn_call(unit, unit_var.clone()));
+    f.body().assign(
+        field_var.clone(),
+        field.to_rd_fn_call(unit, unit_var.clone()),
+    );
 
     // insert the field value
     f.body().assign(
         field_var.clone(),
-        slice.to_insert_fn_call(unit, field, field_var.clone(), val_var)
+        slice.to_insert_fn_call(unit, field, field_var.clone(), val_var),
     );
 
     // write the value to the field
-    f.body().fn_call(&field.to_wr_fn(unit), vec![unit_var, field_var]);
+    f.body()
+        .fn_call(&field.to_wr_fn(unit), vec![unit_var, field_var]);
 
     // add function to the scope
     scope.push_function(f);
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //Field Write/Read

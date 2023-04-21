@@ -31,12 +31,10 @@ use std::path::Path;
 // get the code generator
 use crustal as C;
 
-use velosiast::{
-    VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField, VelosiAstUnit,
-};
+use velosiast::{VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField, VelosiAstUnit};
 
 // library internal includes
-use super::utils::{self, SliceUtils, FieldUtils};
+use super::utils::{self, FieldUtils, SliceUtils};
 use crate::VelosiCodeGenError;
 
 /// adding a constant value for the mask : const FIELD_MASK : type = value;
