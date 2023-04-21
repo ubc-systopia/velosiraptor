@@ -154,6 +154,13 @@ impl VelosiAstStateMemoryField {
             }
         })
     }
+
+    fn compare(&self, other: &Self) -> bool {
+        self.ident == other.ident
+            && self.size == other.size
+            && self.base == other.base
+            && self.offset == other.offset
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstStateMemoryField]
@@ -211,13 +218,6 @@ impl VelosiAstField for VelosiAstStateMemoryField {
 
     fn as_any(&self) -> &dyn Any {
         self
-    }
-
-    fn compare(&self, other: &Self) -> bool {
-        self.ident == other.ident
-            && self.size == other.size
-            && self.base == other.base
-            && self.offset == other.offset
     }
 }
 
@@ -305,6 +305,10 @@ impl VelosiAstStateRegisterField {
             }
         })
     }
+
+    fn compare(&self, other: &Self) -> bool {
+        self.ident == other.ident && self.size == other.size
+    }
 }
 
 impl VelosiAstField for VelosiAstStateRegisterField {
@@ -340,10 +344,6 @@ impl VelosiAstField for VelosiAstStateRegisterField {
 
     fn as_any(&self) -> &dyn Any {
         self
-    }
-
-    fn compare(&self, other: &Self) -> bool {
-        self.ident == other.ident && self.size == other.size
     }
 }
 

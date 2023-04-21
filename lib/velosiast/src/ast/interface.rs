@@ -649,6 +649,14 @@ impl VelosiAstInterfaceMemoryField {
         }
         mask
     }
+
+    fn compare(&self, other: &Self) -> bool {
+        self.ident == other.ident
+            && self.size == other.size
+            && self.base == other.base
+            && self.offset == other.offset
+        // TODO: compare actions
+    }
 }
 
 impl VelosiAstField for VelosiAstInterfaceMemoryField {
@@ -684,14 +692,6 @@ impl VelosiAstField for VelosiAstInterfaceMemoryField {
 
     fn as_any(&self) -> &dyn Any {
         self
-    }
-
-    fn compare(&self, other: &Self) -> bool {
-        self.ident == other.ident
-            && self.size == other.size
-            && self.base == other.base
-            && self.offset == other.offset
-        // TODO: compare actions
     }
 }
 
@@ -886,6 +886,14 @@ impl VelosiAstInterfaceMmioField {
         }
         mask
     }
+
+    fn compare(&self, other: &Self) -> bool {
+        self.ident == other.ident
+            && self.size == other.size
+            && self.base == other.base
+            && self.offset == other.offset
+        // TODO: compare actions
+    }
 }
 
 impl VelosiAstField for VelosiAstInterfaceMmioField {
@@ -921,14 +929,6 @@ impl VelosiAstField for VelosiAstInterfaceMmioField {
 
     fn as_any(&self) -> &dyn Any {
         self
-    }
-
-    fn compare(&self, other: &Self) -> bool {
-        self.ident == other.ident
-            && self.size == other.size
-            && self.base == other.base
-            && self.offset == other.offset
-        // TODO: compare actions
     }
 }
 
@@ -1108,6 +1108,11 @@ impl VelosiAstInterfaceRegisterField {
         }
         mask
     }
+
+    fn compare(&self, other: &Self) -> bool {
+        self.ident == other.ident && self.size == other.size
+        // TODO: compare actions
+    }
 }
 
 impl VelosiAstField for VelosiAstInterfaceRegisterField {
@@ -1143,11 +1148,6 @@ impl VelosiAstField for VelosiAstInterfaceRegisterField {
 
     fn as_any(&self) -> &dyn Any {
         self
-    }
-
-    fn compare(&self, other: &Self) -> bool {
-        self.ident == other.ident && self.size == other.size
-        // TODO: compare actions
     }
 }
 
@@ -1317,6 +1317,21 @@ impl VelosiAstInterfaceField {
             Mmio(pt) => VelosiAstInterfaceMmioField::from_parse_tree(pt, st),
         }
     }
+
+    fn compare(&self, other: &Self) -> bool {
+        match (self, other) {
+            (VelosiAstInterfaceField::Memory(f1), VelosiAstInterfaceField::Memory(f2)) => {
+                f1.compare(f2)
+            }
+            (VelosiAstInterfaceField::Register(f1), VelosiAstInterfaceField::Register(f2)) => {
+                f1.compare(f2)
+            }
+            (VelosiAstInterfaceField::Mmio(f1), VelosiAstInterfaceField::Mmio(f2)) => {
+                f1.compare(f2)
+            }
+            _ => false,
+        }
+    }
 }
 
 impl VelosiAstField for VelosiAstInterfaceField {
@@ -1376,21 +1391,6 @@ impl VelosiAstField for VelosiAstInterfaceField {
 
     fn as_any(&self) -> &dyn Any {
         self
-    }
-
-    fn compare(&self, other: &Self) -> bool {
-        match (self, other) {
-            (VelosiAstInterfaceField::Memory(f1), VelosiAstInterfaceField::Memory(f2)) => {
-                f1.compare(f2)
-            }
-            (VelosiAstInterfaceField::Register(f1), VelosiAstInterfaceField::Register(f2)) => {
-                f1.compare(f2)
-            }
-            (VelosiAstInterfaceField::Mmio(f1), VelosiAstInterfaceField::Mmio(f2)) => {
-                f1.compare(f2)
-            }
-            _ => false,
-        }
     }
 }
 
