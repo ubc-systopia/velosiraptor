@@ -54,6 +54,4 @@ pub trait VelosiAstField {
     // fn ftype(&self) -> VelosiAstFieldType;
 
     fn as_any(&self) -> &dyn Any;
-
-    fn compare(&self, other: &Self) -> bool;
 }
