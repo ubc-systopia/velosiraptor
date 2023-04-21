@@ -383,6 +383,21 @@ impl VelosiAstMethod {
             requires.extend(exp.split_cnf());
         }
 
+        // a simple filter with obvioius duplicates
+        let mut requires_set = HashSet::new();
+        let requires = requires
+            .into_iter()
+            .filter(|r| {
+                let r_str = r.to_string();
+                if !requires_set.contains(&r_str) {
+                    requires_set.insert(r_str);
+                    true
+                } else {
+                    false
+                }
+            })
+            .collect();
+
         let body = if let Some(b) = pt.body {
             let body = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(b, st), issues);
 
