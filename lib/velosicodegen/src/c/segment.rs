@@ -112,8 +112,7 @@ fn add_constructor_function(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
 
     // set the fields
     for (name, p) in params {
-        let n = utils::unit_struct_field_name(name);
-        body.assign(C::Expr::field_access(&tunit, &n), p);
+        body.assign(C::Expr::field_access(&tunit, name), p);
     }
 
     // add the return expression
@@ -208,8 +207,9 @@ fn add_op_fn(scope: &mut C::Scope, unit: &VelosiAstUnitSegment, op: &VelosiAstMe
     }
     for r in op.requires.iter() {
         // add asserts!
+        let vars = HashMap::new();
         fun.body()
-            .fn_call("assert", vec![utils::expr_to_cpp(unit, r)]);
+            .fn_call("assert", vec![unit.expr_to_cpp(&vars, r)]);
     }
 
     if !op.ops.is_empty() {
