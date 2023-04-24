@@ -29,7 +29,7 @@ use std::path::Path;
 
 use crustal as C;
 
-use velosiast::{VelosiAst, VelosiAstUnitEnum};
+use velosiast::{VelosiAst, VelosiAstMethod, VelosiAstUnitEnum};
 
 use super::utils::{self, UnitUtils};
 use crate::VelosiCodeGenError;
@@ -39,8 +39,7 @@ fn generate_unit_struct(scope: &mut C::Scope, unit: &VelosiAstUnitEnum) {
         .params
         .iter()
         .map(|x| {
-            let n = utils::unit_struct_field_name(x.ident());
-            C::Field::with_string(n, C::Type::new_uintptr())
+            C::Field::with_string(x.ident().to_string(), C::Type::new_uintptr())
         })
         .collect();
 
@@ -75,8 +74,7 @@ fn add_constructor_function(scope: &mut C::Scope, unit: &VelosiAstUnitEnum) {
     let tunit = body.new_variable("targetunit", unittype).to_expr();
 
     for (name, p) in params {
-        let n = utils::unit_struct_field_name(name);
-        body.assign(C::Expr::field_access(&tunit, &n), p);
+        body.assign(C::Expr::field_access(&tunit, name), p);
     }
 
     body.return_expr(tunit);
@@ -84,6 +82,7 @@ fn add_constructor_function(scope: &mut C::Scope, unit: &VelosiAstUnitEnum) {
     scope.push_function(fun);
 }
 
+use std::collections::HashMap;
 use std::collections::HashSet;
 
 fn add_is_function(
@@ -99,28 +98,32 @@ fn add_is_function(
     // 2) back project onto the interface to find out how to obtain the state
     // 3) read the interface such that the translation behavior doesn't change
 
-    let mut preconds = HashSet::new();
-
+    let mut preconds_state_bits = HashMap::new();
     for (i, (variant, _params)) in unit.enums.iter().enumerate() {
         let variant_unit = ast.get_unit(variant.as_str()).expect("unit not found!");
         let variant_op = variant_unit
             .get_method("translate")
             .expect("map method not found!");
 
-        let mut my_preconds = HashSet::new();
-        for e in variant_op.requires.iter() {
-            my_preconds.insert(e);
+        let mut state_refs = HashSet::new();
+        for (j, e) in variant_op.requires.iter().enumerate() {
+            e.get_state_references(&mut state_refs);
         }
 
-        if i == 0 {
-            preconds = my_preconds;
+        let my_precond_state_bits = if let Some(state) = variant_unit.state() {
+            state.get_field_slice_refs(&state_refs)
         } else {
-            preconds = preconds.intersection(&my_preconds).cloned().collect();
-        }
-    }
+            HashMap::new()
+        };
 
-    for i in preconds.iter() {
-        println!("precond: {}", i);
+        // construct the intersection of all bits
+        for (k, v) in my_precond_state_bits.iter() {
+            if let Some(v2) = preconds_state_bits.get_mut(k) {
+                *v2 = *v2 & v;
+            } else {
+                preconds_state_bits.insert(k.clone(), *v);
+            }
+        }
     }
 
     for (variant, _params) in unit.enums.iter() {
@@ -175,15 +178,45 @@ fn add_is_function(
         let _res_expr = body.new_variable("res", C::Type::new_bool()).to_expr();
 
         let res_var = C::Expr::new_var("res", C::Type::new_bool());
-        for (i, e) in variant_op.requires.iter().enumerate() {
+        let mut idx = 0;
+        for e in variant_op.requires.iter() {
+            let mut state_refs = HashSet::new();
+            // let _state_bits = e.get_state_references(&mut state_refs);
+
+            let mut my_precond_state_bits = if let Some(state) = variant_unit.state() {
+                state.get_field_slice_refs(&state_refs)
+            } else {
+                HashMap::new()
+            };
+
+            for (k, v) in my_precond_state_bits.iter_mut() {
+                let mask = preconds_state_bits.get(k).expect("state bit not found!");
+                *v &= *mask;
+            }
+
+            let st_access_fields = if let Some(interface) = variant_unit.interface() {
+                interface.fields_accessing_state(&state_refs, &my_precond_state_bits)
+            } else {
+                HashSet::new()
+            };
+
+            if st_access_fields.is_empty() {
+                continue;
+            }
+
+            // this is a part of the state that is present in both.
+
+            let vars = HashMap::new();
             // TODO: need to to a back projection here, and select the right interface
             // more over, do the intersection of all of them
-            if i == 0 {
-                body.assign(res_var.clone(), variant_unit.expr_to_cpp(e));
+            if idx == 0 {
+                body.assign(res_var.clone(), variant_unit.expr_to_cpp(&vars, e));
             } else {
-                let val = C::Expr::binop(res_var.clone(), "&&", variant_unit.expr_to_cpp(e));
+                let val = C::Expr::binop(res_var.clone(), "&&", variant_unit.expr_to_cpp(&vars, e));
                 body.assign(res_var.clone(), val);
             }
+
+            idx = idx + 1;
         }
 
         body.return_expr(res_var);
@@ -271,25 +304,112 @@ fn add_map_function(
     Ok(())
 }
 
-fn add_unmap_function(
-    _ast: &VelosiAst,
-    _unit: &VelosiAstUnitEnum,
-    _outdir: &Path,
+fn add_op_function(
+    scope: &mut C::Scope,
+    ast: &VelosiAst,
+    unit: &VelosiAstUnitEnum,
+    op: &VelosiAstMethod,
 ) -> Result<(), VelosiCodeGenError> {
     // forall variants, generate one function. that's basically a pass-through!
     // map_page() map_ptable()
     //  -> create state struct
     //  -> call map()
+    let mut fun = C::Function::with_string(unit.to_op_fn_name(op), C::Type::new_bool());
+    fun.set_static().set_inline();
 
+    let v = fun
+        .new_param("unit", C::Type::to_ptr(&unit.to_ctype()))
+        .to_expr();
+
+    let mut call_exprs = Vec::new();
+    for f in op.params.iter() {
+        let p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo));
+        call_exprs.push(p.to_expr());
+    }
+
+    // adding asserts
+    if op.requires.is_empty() {
+        fun.body().new_comment("no requires clauses");
+    } else {
+        fun.body().new_comment("asserts for the requires clauses");
+    }
+    // for r in op.requires.iter() {
+    //     // add asserts!
+    //     fun.body()
+    //         .fn_call("assert", vec![utils::expr_to_cpp(unit, r)]);
+    // }
+    let mut block = C::Block::new();
+    block.fn_call("assert", vec![C::Expr::bfalse()]);
+
+    for (_i, (variant, _params)) in unit.enums.iter().enumerate() {
+        let variant_unit = ast.get_unit(variant.as_str()).expect("unit not found!");
+        // let variant_op = variant_unit
+        //     .get_method("translate")
+        //     .expect("map method not found!");
+
+        let mut fn_name = unit.to_struct_name();
+        fn_name.push_str("_is_");
+        fn_name.push_str(
+            &variant_unit
+                .ident()
+                .replace(unit.ident().as_str(), "")
+                .to_ascii_lowercase(),
+        );
+
+        let mut then = C::Block::new();
+        let tunit = then
+            .new_variable("targetunit", variant_unit.to_ctype())
+            .to_expr();
+
+        // st = variant_unit.constructor_fn_name()
+        let args = variant_unit
+            .params_as_slice()
+            .iter()
+            .map(|p| C::Expr::field_access(&v, p.ident().as_str()))
+            .collect();
+
+        then.assign(
+            tunit.clone(),
+            C::Expr::fn_call(&variant_unit.constructor_fn_name(), args),
+        );
+
+        let mut args = Vec::new();
+        args.push(C::Expr::addr_of(&tunit));
+        args.extend(call_exprs.clone());
+
+        then.fn_call(&variant_unit.to_op_fn_name(op), args);
+
+        let cond = C::Expr::fn_call(fn_name.as_str(), vec![v.clone()]);
+        let mut ifelse = C::IfElse::new(&cond);
+        ifelse.set_then(then).set_other(block);
+
+        let mut block_new = C::Block::new();
+        block_new.ifelse(ifelse);
+        block = block_new;
+    }
+
+    fun.set_body(block);
+
+    scope.push_function(fun);
     Ok(())
 }
 
-fn add_protect_function(
-    _ast: &VelosiAst,
-    _unit: &VelosiAstUnitEnum,
-    _outdir: &Path,
+fn add_unmap_function(
+    scope: &mut C::Scope,
+    ast: &VelosiAst,
+    unit: &VelosiAstUnitEnum,
 ) -> Result<(), VelosiCodeGenError> {
-    Ok(())
+    let op = unit.methods.get("unmap").expect("unmap method not found!");
+    add_op_function(scope, ast, unit, op)
+}
+
+fn add_protect_function(
+    scope: &mut C::Scope,
+    ast: &VelosiAst,
+    unit: &VelosiAstUnitEnum,
+) -> Result<(), VelosiCodeGenError> {
+    let op = unit.methods.get("unmap").expect("unmap method not found!");
+    add_op_function(scope, ast, unit, op)
 }
 
 fn add_translate_function(
@@ -325,8 +445,8 @@ pub fn generate(
     add_constructor_function(s, unit);
     add_is_function(s, ast, unit)?;
     add_map_function(s, ast, unit)?;
-
-    // add_op_functions(s, ast, unit);
+    add_unmap_function(s, ast, unit)?;
+    add_protect_function(s, ast, unit)?;
     // add_translate_function(s, unit);
 
     // save the scope

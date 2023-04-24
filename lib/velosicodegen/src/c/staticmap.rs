@@ -25,11 +25,15 @@
 
 //! StaticMap Generation (C)
 
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use crustal as C;
 
-use velosiast::{VelosiAst, VelosiAstMethod, VelosiAstStaticMap, VelosiAstUnitStaticMap};
+use velosiast::{
+    VelosiAst, VelosiAstMethod, VelosiAstStaticMap, VelosiAstStaticMapListComp,
+    VelosiAstUnitStaticMap,
+};
 
 use super::utils::{self, UnitUtils};
 use crate::VelosiCodeGenError;
@@ -440,9 +444,86 @@ fn add_unit_flags(_scope: &mut C::Scope, _unit: &VelosiAstUnitStaticMap) {
 //     scope.push_function(fun);
 // }
 
-fn add_op_fn(
+fn add_op_fn_body_listcomp(
+    scope: &mut C::Block,
+    ast: &VelosiAst,
+    unit: &VelosiAstUnitStaticMap,
+    map: &VelosiAstStaticMapListComp,
+    op: &VelosiAstMethod,
+    mut params_exprs: HashMap<&str, C::Expr>,
+) {
+
+    scope.new_comment(map.to_string().as_str());
+
+
+    let idx_var = scope.new_variable("idx", C::Type::new_size()).to_expr();
+
+    let dest_unit = ast.get_unit(map.elm.dst.ident().as_str()).unwrap();
+    let va_var = params_exprs.get("va").unwrap();
+
+    // idx = va / element_size
+    scope.assign(
+        idx_var.clone(),
+        C::Expr::binop(
+            va_var.clone(),
+            ">>",
+            C::Expr::ConstNum(dest_unit.input_bitwidth()),
+        ),
+    );
+
+    // va = va & (element_size - 1)
+    scope.assign(
+        va_var.clone(),
+        C::Expr::binop(
+            va_var.clone(),
+            "&",
+            C::Expr::binop(
+                C::Expr::binop(
+                    C::Expr::ConstNum(1),
+                    "<<",
+                    C::Expr::ConstNum(dest_unit.input_bitwidth()),
+                ),
+                "-",
+                C::Expr::ConstNum(1),
+            ),
+        ),
+    );
+
+    // nee d
+
+    let tunit = scope
+        .new_variable("targetunit", dest_unit.to_ctype())
+        .to_expr();
+
+
+
+    let unit_var = params_exprs.get("unit").unwrap();
+    let mut var_mappings = HashMap::new();
+    for p in unit.params_as_slice() {
+        var_mappings.insert(p.ident().as_str(), C::Expr::field_access(&unit_var, p.ident().as_str()));
+    }
+
+    var_mappings.insert(map.var.ident().as_str(), idx_var.clone());
+
+    // TODO here!
+    let args = map.elm.dst.args.iter().map(|p| unit.expr_to_cpp(&var_mappings, p)).collect();
+
+    scope.assign(
+        tunit.clone(),
+        C::Expr::fn_call(&dest_unit.constructor_fn_name(), args),
+    );
+
+    let mut args = vec![C::Expr::addr_of(&tunit)];
+    for arg in op.params.iter() {
+        let e = params_exprs.remove(arg.ident().as_str()).unwrap();
+        args.push(e);
+    }
+    scope.return_expr(C::Expr::fn_call(&dest_unit.to_op_fn_name(op), args));
+}
+
+fn add_op_function(
     scope: &mut C::Scope,
-    _ast: &VelosiAst,
+    ast: &VelosiAst,
     unit: &VelosiAstUnitStaticMap,
     op: &VelosiAstMethod,
 ) {
@@ -450,22 +531,45 @@ fn add_op_fn(
     let mut fun = C::Function::with_string(unit.to_op_fn_name(op), C::Type::new_bool());
     fun.set_static().set_inline();
 
+    let mut param_exprs = HashMap::new();
+
+    let v = fun
+        .new_param("unit", C::Type::to_ptr(&unit.to_ctype()))
+        .to_expr();
+    param_exprs.insert("unit", v);
+    for f in op.params.iter() {
+        let p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo));
+        param_exprs.insert(f.ident().as_str(), p.to_expr());
+    }
+
+    // todo: add requires
+
+    match &unit.map {
+        VelosiAstStaticMap::Explicit(_) => {
+            fun.body().new_comment("TODO: Explicit map");
+        }
+        VelosiAstStaticMap::ListComp(map) => {
+            add_op_fn_body_listcomp(fun.body(), ast, unit, map, op, param_exprs);
+        }
+        VelosiAstStaticMap::None(_) => {
+            fun.body().new_comment("No map defined for this unit");
+        }
+    }
+
     // push the function to the scope
     scope.push_function(fun);
 }
 
-fn add_op_functions(scope: &mut C::Scope, _ast: &VelosiAst, unit: &VelosiAstUnitStaticMap) {
-    match &unit.map {
-        VelosiAstStaticMap::Explicit(_) => {
-            scope.new_comment("Explicit map");
-        }
-        VelosiAstStaticMap::ListComp(_e) => {
-            scope.new_comment("List comperehension map");
-        }
-        VelosiAstStaticMap::None(_) => {
-            scope.new_comment("No map defined for this unit");
-        }
-    }
+fn add_op_functions(scope: &mut C::Scope, ast: &VelosiAst, unit: &VelosiAstUnitStaticMap) {
+    let op = unit.methods.get("map").expect("unmap method not found!");
+    add_op_function(scope, ast, unit, op);
+    let op = unit.methods.get("unmap").expect("unmap method not found!");
+    add_op_function(scope, ast, unit, op);
+    let op = unit
+        .methods
+        .get("protect")
+        .expect("unmap method not found!");
+    add_op_function(scope, ast, unit, op);
 }
 
 fn generate_unit_struct(scope: &mut C::Scope, unit: &VelosiAstUnitStaticMap) {
@@ -473,8 +577,7 @@ fn generate_unit_struct(scope: &mut C::Scope, unit: &VelosiAstUnitStaticMap) {
         .params
         .iter()
         .map(|x| {
-            let n = utils::unit_struct_field_name(x.ident());
-            C::Field::with_string(n, C::Type::new_uintptr())
+            C::Field::with_string(x.ident().to_string(), C::Type::new_uintptr())
         })
         .collect();
 
@@ -509,8 +612,7 @@ fn add_constructor_function(scope: &mut C::Scope, unit: &VelosiAstUnitStaticMap)
     let tunit = body.new_variable("targetunit", unittype).to_expr();
 
     for (name, p) in params {
-        let n = utils::unit_struct_field_name(name);
-        body.assign(C::Expr::field_access(&tunit, &n), p);
+        body.assign(C::Expr::field_access(&tunit, name), p);
     }
 
     body.return_expr(tunit);
