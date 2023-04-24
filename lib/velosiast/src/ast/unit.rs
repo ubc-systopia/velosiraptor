@@ -952,6 +952,19 @@ impl VelosiAstUnitStaticMap {
             issues.push(err);
         }
 
+
+        if !methods.contains_key("map") {
+            methods.insert("map".to_string(), Rc::new(VelosiAstMethod::default_map()));
+        }
+
+        if !methods.contains_key("unmap") {
+            methods.insert("unmap".to_string(), Rc::new(VelosiAstMethod::default_unmap()));
+        }
+
+        if !methods.contains_key("protect") {
+            methods.insert("protect".to_string(), Rc::new(VelosiAstMethod::default_protect()));
+        }
+
         let res = Self {
             ident: VelosiAstIdentifier::from(pt.name),
             params,
@@ -1095,6 +1108,8 @@ pub struct VelosiAstUnitEnum {
     pub outbitwidth: u64,
 
     pub enums: Vec<(VelosiAstIdentifier, Vec<VelosiAstIdentifier>)>,
+
+    pub methods: HashMap<String, Rc<VelosiAstMethod>>,
 
     /// the location of the type clause
     pub loc: VelosiTokenStream,
@@ -1409,12 +1424,19 @@ impl VelosiAstUnitEnum {
             }
         }
 
+        let mut methods = HashMap::new();
+        methods.insert("map".to_string(), Rc::new(VelosiAstMethod::default_map()));
+        methods.insert("unmap".to_string(), Rc::new(VelosiAstMethod::default_unmap()));
+        methods.insert("protect".to_string(), Rc::new(VelosiAstMethod::default_protect()));
+
+
         let res = Self {
             ident: VelosiAstIdentifier::from(pt.name),
             params,
             inbitwidth,
             outbitwidth,
             enums,
+            methods,
             loc: pt.loc,
         };
 
