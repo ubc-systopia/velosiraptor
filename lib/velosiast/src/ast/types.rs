@@ -132,7 +132,7 @@ impl VelosiAstTypeInfo {
             Size => other.is_numeric(),
             Flags => other.is_boolean() || other.is_numeric() || other.is_flags(),
             Range => false,
-            TypeRef(_) => self == other,
+            TypeRef(_) => other.is_numeric(), //self == other,
             State => false,
             Interface => false,
             Void => *other == Void,

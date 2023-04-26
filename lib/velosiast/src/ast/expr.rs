@@ -1719,9 +1719,32 @@ impl VelosiAstIfElseExpr {
                 other
             }
         } else {
-            let restype = then.result_type().clone();
-            let e = VelosiAstIfElseExpr::new(cond, then, other, restype, self.loc);
-            VelosiAstExpr::IfElse(e)
+            if then.result_type().is_boolean() {
+                let then_expr = VelosiAstBinOpExpr::new(
+                    cond.clone(),
+                    VelosiAstBinOp::Implies,
+                    then,
+                    self.loc.clone(),
+                );
+                let cond_neg = VelosiAstUnOpExpr::new(VelosiAstUnOp::LNot, cond, self.loc.clone());
+                let other_expr = VelosiAstBinOpExpr::new(
+                    VelosiAstExpr::UnOp(cond_neg),
+                    VelosiAstBinOp::Implies,
+                    other,
+                    self.loc.clone(),
+                );
+                let e = VelosiAstBinOpExpr::new(
+                    VelosiAstExpr::BinOp(then_expr),
+                    VelosiAstBinOp::Land,
+                    VelosiAstExpr::BinOp(other_expr),
+                    self.loc.clone(),
+                );
+                VelosiAstExpr::BinOp(e)
+            } else {
+                let restype = then.result_type().clone();
+                let e = VelosiAstIfElseExpr::new(cond, then, other, restype, self.loc);
+                VelosiAstExpr::IfElse(e)
+            }
         }
     }
 
