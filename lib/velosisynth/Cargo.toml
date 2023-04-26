@@ -21,7 +21,7 @@ clap = { version = "4.0.24", features = [ "cargo" ] }
 z3-sys = { path = "../z3/z3-sys", features = ["static-link-z3"], optional = true }
 
 [features]
-default = ["z3-library"]
+default = ["z3-standalone"]
 # Enable standalone Z3 instead of using the library
 z3-standalone = []
 # Enable the use of the z3-library
