@@ -452,9 +452,7 @@ fn add_op_fn_body_listcomp(
     op: &VelosiAstMethod,
     mut params_exprs: HashMap<&str, C::Expr>,
 ) {
-
     scope.new_comment(map.to_string().as_str());
-
 
     let idx_var = scope.new_variable("idx", C::Type::new_size()).to_expr();
 
@@ -495,18 +493,25 @@ fn add_op_fn_body_listcomp(
         .new_variable("targetunit", dest_unit.to_ctype())
         .to_expr();
 
-
-
     let unit_var = params_exprs.get("unit").unwrap();
     let mut var_mappings = HashMap::new();
     for p in unit.params_as_slice() {
-        var_mappings.insert(p.ident().as_str(), C::Expr::field_access(&unit_var, p.ident().as_str()));
+        var_mappings.insert(
+            p.ident().as_str(),
+            C::Expr::field_access(&unit_var, p.ident().as_str()),
+        );
     }
 
     var_mappings.insert(map.var.ident().as_str(), idx_var.clone());
 
     // TODO here!
-    let args = map.elm.dst.args.iter().map(|p| unit.expr_to_cpp(&var_mappings, p)).collect();
+    let args = map
+        .elm
+        .dst
+        .args
+        .iter()
+        .map(|p| unit.expr_to_cpp(&var_mappings, p))
+        .collect();
 
     scope.assign(
         tunit.clone(),
@@ -576,9 +581,7 @@ fn generate_unit_struct(scope: &mut C::Scope, unit: &VelosiAstUnitStaticMap) {
     let fields = unit
         .params
         .iter()
-        .map(|x| {
-            C::Field::with_string(x.ident().to_string(), C::Type::new_uintptr())
-        })
+        .map(|x| C::Field::with_string(x.ident().to_string(), C::Type::new_uintptr()))
         .collect();
 
     let mut s = C::Struct::with_fields(&unit.to_struct_name(), fields);
