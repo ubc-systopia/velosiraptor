@@ -952,17 +952,22 @@ impl VelosiAstUnitStaticMap {
             issues.push(err);
         }
 
-
         if !methods.contains_key("map") {
             methods.insert("map".to_string(), Rc::new(VelosiAstMethod::default_map()));
         }
 
         if !methods.contains_key("unmap") {
-            methods.insert("unmap".to_string(), Rc::new(VelosiAstMethod::default_unmap()));
+            methods.insert(
+                "unmap".to_string(),
+                Rc::new(VelosiAstMethod::default_unmap()),
+            );
         }
 
         if !methods.contains_key("protect") {
-            methods.insert("protect".to_string(), Rc::new(VelosiAstMethod::default_protect()));
+            methods.insert(
+                "protect".to_string(),
+                Rc::new(VelosiAstMethod::default_protect()),
+            );
         }
 
         let res = Self {
@@ -1426,9 +1431,14 @@ impl VelosiAstUnitEnum {
 
         let mut methods = HashMap::new();
         methods.insert("map".to_string(), Rc::new(VelosiAstMethod::default_map()));
-        methods.insert("unmap".to_string(), Rc::new(VelosiAstMethod::default_unmap()));
-        methods.insert("protect".to_string(), Rc::new(VelosiAstMethod::default_protect()));
-
+        methods.insert(
+            "unmap".to_string(),
+            Rc::new(VelosiAstMethod::default_unmap()),
+        );
+        methods.insert(
+            "protect".to_string(),
+            Rc::new(VelosiAstMethod::default_protect()),
+        );
 
         let res = Self {
             ident: VelosiAstIdentifier::from(pt.name),
