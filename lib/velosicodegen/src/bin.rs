@@ -148,6 +148,11 @@ pub fn main() {
             use std::rc::Rc;
             match unit {
                 VelosiAstUnit::Segment(u) => {
+                    if u.is_abstract {
+                        // don't do anythign with abstract segments
+                        continue;
+                    }
+
                     let seg = Rc::get_mut(u);
 
                     if seg.is_none() {

@@ -123,7 +123,6 @@ pub trait UnitUtils {
         use VelosiAstExpr::*;
         match expr {
             IdentLiteral(i) => {
-
                 if let Some(e) = var_mappings.get(i.ident().as_str()) {
                     e.clone()
                 } else {
@@ -139,69 +138,105 @@ pub trait UnitUtils {
                 }
             }
             BinOp(i) => match i.op {
-                VelosiAstBinOp::LShift => {
-                    C::Expr::binop(self.expr_to_cpp(var_mappings,&i.lhs), "<<", self.expr_to_cpp(var_mappings,&i.rhs))
-                }
-                VelosiAstBinOp::RShift => {
-                    C::Expr::binop(self.expr_to_cpp(var_mappings,&i.lhs), ">>", self.expr_to_cpp(var_mappings,&i.rhs))
-                }
-                VelosiAstBinOp::And => {
-                    C::Expr::binop(self.expr_to_cpp(var_mappings,&i.lhs), "&", self.expr_to_cpp(var_mappings,&i.rhs))
-                }
-                VelosiAstBinOp::Or => {
-                    C::Expr::binop(self.expr_to_cpp(var_mappings,&i.lhs), "|", self.expr_to_cpp(var_mappings,&i.rhs))
-                }
-                VelosiAstBinOp::Xor => {
-                    C::Expr::binop(self.expr_to_cpp(var_mappings,&i.lhs), "^", self.expr_to_cpp(var_mappings,&i.rhs))
-                }
-                VelosiAstBinOp::Plus => {
-                    C::Expr::binop(self.expr_to_cpp(var_mappings,&i.lhs), "+", self.expr_to_cpp(var_mappings,&i.rhs))
-                }
-                VelosiAstBinOp::Minus => {
-                    C::Expr::binop(self.expr_to_cpp(var_mappings,&i.lhs), "-", self.expr_to_cpp(var_mappings,&i.rhs))
-                }
-                VelosiAstBinOp::Multiply => {
-                    C::Expr::binop(self.expr_to_cpp(var_mappings,&i.lhs), "*", self.expr_to_cpp(var_mappings,&i.rhs))
-                }
-                VelosiAstBinOp::Divide => {
-                    C::Expr::binop(self.expr_to_cpp(var_mappings,&i.lhs), "/", self.expr_to_cpp(var_mappings,&i.rhs))
-                }
-                VelosiAstBinOp::Modulo => {
-                    C::Expr::binop(self.expr_to_cpp(var_mappings,&i.lhs), "%", self.expr_to_cpp(var_mappings,&i.rhs))
-                }
-                VelosiAstBinOp::Eq => {
-                    C::Expr::binop(self.expr_to_cpp(var_mappings,&i.lhs), "==", self.expr_to_cpp(var_mappings,&i.rhs))
-                }
-                VelosiAstBinOp::Ne => {
-                    C::Expr::binop(self.expr_to_cpp(var_mappings,&i.lhs), "!=", self.expr_to_cpp(var_mappings,&i.rhs))
-                }
-                VelosiAstBinOp::Lt => {
-                    C::Expr::binop(self.expr_to_cpp(var_mappings,&i.lhs), "<", self.expr_to_cpp(var_mappings,&i.rhs))
-                }
-                VelosiAstBinOp::Gt => {
-                    C::Expr::binop(self.expr_to_cpp(var_mappings,&i.lhs), ">", self.expr_to_cpp(var_mappings,&i.rhs))
-                }
-                VelosiAstBinOp::Le => {
-                    C::Expr::binop(self.expr_to_cpp(var_mappings,&i.lhs), "<=", self.expr_to_cpp(var_mappings,&i.rhs))
-                }
-                VelosiAstBinOp::Ge => {
-                    C::Expr::binop(self.expr_to_cpp(var_mappings,&i.lhs), ">=", self.expr_to_cpp(var_mappings,&i.rhs))
-                }
-                VelosiAstBinOp::Land => {
-                    C::Expr::binop(self.expr_to_cpp(var_mappings,&i.lhs), "&&", self.expr_to_cpp(var_mappings,&i.rhs))
-                }
-                VelosiAstBinOp::Lor => {
-                    C::Expr::binop(self.expr_to_cpp(var_mappings,&i.lhs), "||", self.expr_to_cpp(var_mappings,&i.rhs))
-                }
-                VelosiAstBinOp::Implies => C::Expr::binop(
-                    C::Expr::uop("!", self.expr_to_cpp(var_mappings,&i.lhs)),
+                VelosiAstBinOp::LShift => C::Expr::binop(
+                    self.expr_to_cpp(var_mappings, &i.lhs),
+                    "<<",
+                    self.expr_to_cpp(var_mappings, &i.rhs),
+                ),
+                VelosiAstBinOp::RShift => C::Expr::binop(
+                    self.expr_to_cpp(var_mappings, &i.lhs),
+                    ">>",
+                    self.expr_to_cpp(var_mappings, &i.rhs),
+                ),
+                VelosiAstBinOp::And => C::Expr::binop(
+                    self.expr_to_cpp(var_mappings, &i.lhs),
+                    "&",
+                    self.expr_to_cpp(var_mappings, &i.rhs),
+                ),
+                VelosiAstBinOp::Or => C::Expr::binop(
+                    self.expr_to_cpp(var_mappings, &i.lhs),
+                    "|",
+                    self.expr_to_cpp(var_mappings, &i.rhs),
+                ),
+                VelosiAstBinOp::Xor => C::Expr::binop(
+                    self.expr_to_cpp(var_mappings, &i.lhs),
+                    "^",
+                    self.expr_to_cpp(var_mappings, &i.rhs),
+                ),
+                VelosiAstBinOp::Plus => C::Expr::binop(
+                    self.expr_to_cpp(var_mappings, &i.lhs),
+                    "+",
+                    self.expr_to_cpp(var_mappings, &i.rhs),
+                ),
+                VelosiAstBinOp::Minus => C::Expr::binop(
+                    self.expr_to_cpp(var_mappings, &i.lhs),
+                    "-",
+                    self.expr_to_cpp(var_mappings, &i.rhs),
+                ),
+                VelosiAstBinOp::Multiply => C::Expr::binop(
+                    self.expr_to_cpp(var_mappings, &i.lhs),
+                    "*",
+                    self.expr_to_cpp(var_mappings, &i.rhs),
+                ),
+                VelosiAstBinOp::Divide => C::Expr::binop(
+                    self.expr_to_cpp(var_mappings, &i.lhs),
+                    "/",
+                    self.expr_to_cpp(var_mappings, &i.rhs),
+                ),
+                VelosiAstBinOp::Modulo => C::Expr::binop(
+                    self.expr_to_cpp(var_mappings, &i.lhs),
+                    "%",
+                    self.expr_to_cpp(var_mappings, &i.rhs),
+                ),
+                VelosiAstBinOp::Eq => C::Expr::binop(
+                    self.expr_to_cpp(var_mappings, &i.lhs),
+                    "==",
+                    self.expr_to_cpp(var_mappings, &i.rhs),
+                ),
+                VelosiAstBinOp::Ne => C::Expr::binop(
+                    self.expr_to_cpp(var_mappings, &i.lhs),
+                    "!=",
+                    self.expr_to_cpp(var_mappings, &i.rhs),
+                ),
+                VelosiAstBinOp::Lt => C::Expr::binop(
+                    self.expr_to_cpp(var_mappings, &i.lhs),
+                    "<",
+                    self.expr_to_cpp(var_mappings, &i.rhs),
+                ),
+                VelosiAstBinOp::Gt => C::Expr::binop(
+                    self.expr_to_cpp(var_mappings, &i.lhs),
+                    ">",
+                    self.expr_to_cpp(var_mappings, &i.rhs),
+                ),
+                VelosiAstBinOp::Le => C::Expr::binop(
+                    self.expr_to_cpp(var_mappings, &i.lhs),
+                    "<=",
+                    self.expr_to_cpp(var_mappings, &i.rhs),
+                ),
+                VelosiAstBinOp::Ge => C::Expr::binop(
+                    self.expr_to_cpp(var_mappings, &i.lhs),
+                    ">=",
+                    self.expr_to_cpp(var_mappings, &i.rhs),
+                ),
+                VelosiAstBinOp::Land => C::Expr::binop(
+                    self.expr_to_cpp(var_mappings, &i.lhs),
+                    "&&",
+                    self.expr_to_cpp(var_mappings, &i.rhs),
+                ),
+                VelosiAstBinOp::Lor => C::Expr::binop(
+                    self.expr_to_cpp(var_mappings, &i.lhs),
                     "||",
-                    self.expr_to_cpp(var_mappings,&i.rhs),
+                    self.expr_to_cpp(var_mappings, &i.rhs),
+                ),
+                VelosiAstBinOp::Implies => C::Expr::binop(
+                    C::Expr::uop("!", self.expr_to_cpp(var_mappings, &i.lhs)),
+                    "||",
+                    self.expr_to_cpp(var_mappings, &i.rhs),
                 ),
             },
             UnOp(i) => match i.op {
-                VelosiAstUnOp::Not => C::Expr::uop("~", self.expr_to_cpp(var_mappings,&i.expr)),
-                VelosiAstUnOp::LNot => C::Expr::uop("!", self.expr_to_cpp(var_mappings,&i.expr)),
+                VelosiAstUnOp::Not => C::Expr::uop("~", self.expr_to_cpp(var_mappings, &i.expr)),
+                VelosiAstUnOp::LNot => C::Expr::uop("!", self.expr_to_cpp(var_mappings, &i.expr)),
             },
             Quantifier(_i) => panic!("don't know how to handle quantifier"),
             FnCall(i) => C::Expr::fn_call(i.ident(), vec![]),
@@ -804,5 +839,3 @@ pub fn op_to_c_expr(
         VelosiOperation::Return => (),
     }
 }
-
-

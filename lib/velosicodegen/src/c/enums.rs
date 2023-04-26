@@ -38,9 +38,7 @@ fn generate_unit_struct(scope: &mut C::Scope, unit: &VelosiAstUnitEnum) {
     let fields = unit
         .params
         .iter()
-        .map(|x| {
-            C::Field::with_string(x.ident().to_string(), C::Type::new_uintptr())
-        })
+        .map(|x| C::Field::with_string(x.ident().to_string(), C::Type::new_uintptr()))
         .collect();
 
     let mut s = C::Struct::with_fields(&unit.to_struct_name(), fields);
