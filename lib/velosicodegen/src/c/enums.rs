@@ -97,14 +97,14 @@ fn add_is_function(
     // 3) read the interface such that the translation behavior doesn't change
 
     let mut preconds_state_bits = HashMap::new();
-    for (i, (variant, _params)) in unit.enums.iter().enumerate() {
+    for (_i, (variant, _params)) in unit.enums.iter().enumerate() {
         let variant_unit = ast.get_unit(variant.as_str()).expect("unit not found!");
         let variant_op = variant_unit
             .get_method("translate")
             .expect("map method not found!");
 
         let mut state_refs = HashSet::new();
-        for (j, e) in variant_op.requires.iter().enumerate() {
+        for (_j, e) in variant_op.requires.iter().enumerate() {
             e.get_state_references(&mut state_refs);
         }
 
@@ -117,7 +117,7 @@ fn add_is_function(
         // construct the intersection of all bits
         for (k, v) in my_precond_state_bits.iter() {
             if let Some(v2) = preconds_state_bits.get_mut(k) {
-                *v2 = *v2 & v;
+                *v2 &= v;
             } else {
                 preconds_state_bits.insert(k.clone(), *v);
             }
@@ -178,7 +178,7 @@ fn add_is_function(
         let res_var = C::Expr::new_var("res", C::Type::new_bool());
         let mut idx = 0;
         for e in variant_op.requires.iter() {
-            let mut state_refs = HashSet::new();
+            let state_refs = HashSet::new();
             // let _state_bits = e.get_state_references(&mut state_refs);
 
             let mut my_precond_state_bits = if let Some(state) = variant_unit.state() {
@@ -214,7 +214,7 @@ fn add_is_function(
                 body.assign(res_var.clone(), val);
             }
 
-            idx = idx + 1;
+            idx += 1;
         }
 
         body.return_expr(res_var);
@@ -411,9 +411,9 @@ fn add_protect_function(
 }
 
 fn add_translate_function(
+    _scope: &mut C::Scope,
     _ast: &VelosiAst,
     _unit: &VelosiAstUnitEnum,
-    _outdir: &Path,
 ) -> Result<(), VelosiCodeGenError> {
     Ok(())
 }
@@ -445,7 +445,7 @@ pub fn generate(
     add_map_function(s, ast, unit)?;
     add_unmap_function(s, ast, unit)?;
     add_protect_function(s, ast, unit)?;
-    // add_translate_function(s, unit);
+    add_translate_function(s, ast, unit)?;
 
     // save the scope
     log::debug!("saving the scope!");

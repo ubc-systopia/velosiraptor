@@ -40,47 +40,47 @@ use crate::COPYRIGHT;
 
 /// converts a string slice into a rustified string name
 /// field_name  --> struct FieldName
-pub fn to_struct_name(s: &str, suffix: Option<&str>) -> String {
-    let mut c = s.chars();
-    let mut s = match c.next() {
-        None => String::new(),
-        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-    }
-    .replace('_', "");
+// pub fn to_struct_name(s: &str, suffix: Option<&str>) -> String {
+//     let mut c = s.chars();
+//     let mut s = match c.next() {
+//         None => String::new(),
+//         Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+//     }
+//     .replace('_', "");
 
-    if let Some(x) = suffix {
-        s.push_str(x);
-    }
-    s
-}
+//     if let Some(x) = suffix {
+//         s.push_str(x);
+//     }
+//     s
+// }
 
 /// converts a string slice into a rusified constant identifier
-pub fn to_const_name(s: &str) -> String {
-    s.to_uppercase()
-}
+// pub fn to_const_name(s: &str) -> String {
+//     s.to_uppercase()
+// }
 
 /// obtains the appropriate rust type for
-pub fn to_rust_type(l: u64) -> &'static str {
-    match l {
-        0..=8 => "u8",
-        9..=16 => "u16",
-        17..=32 => "u32",
-        33..=64 => "u64",
-        65..=128 => "u128",
-        _ => "unknown",
-    }
-}
+// pub fn to_rust_type(l: u64) -> &'static str {
+//     match l {
+//         0..=8 => "u8",
+//         9..=16 => "u16",
+//         17..=32 => "u32",
+//         33..=64 => "u64",
+//         65..=128 => "u128",
+//         _ => "unknown",
+//     }
+// }
 
 /// creates a strng reprsenting the mask value
-pub fn to_mask_str(m: u64, len: u64) -> String {
-    match len {
-        0..=8 => format!("0x{:02x}", (m & 0xff) as u8),
-        9..=16 => format!("0x{:04x}", (m & 0xffff) as u16),
-        17..=32 => format!("0x{:08x}", (m & 0xffffffff) as u32),
-        33..=64 => format!("0x{m:016x}"),
-        _ => String::from("unknown"),
-    }
-}
+// pub fn to_mask_str(m: u64, len: u64) -> String {
+//     match len {
+//         0..=8 => format!("0x{:02x}", (m & 0xff) as u8),
+//         9..=16 => format!("0x{:04x}", (m & 0xffff) as u16),
+//         17..=32 => format!("0x{:08x}", (m & 0xffffffff) as u32),
+//         33..=64 => format!("0x{m:016x}"),
+//         _ => String::from("unknown"),
+//     }
+// }
 
 /// writes the scope to a file or to stdout
 pub fn save_scope(_scope: CG::Scope, outdir: &Path, name: &str) -> Result<(), VelosiCodeGenError> {

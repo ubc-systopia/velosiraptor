@@ -25,7 +25,7 @@
 
 //! StaticMap Generation (C)
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::Path;
 
 use crustal as C;
@@ -498,11 +498,11 @@ fn add_op_fn_body_listcomp(
     for p in unit.params_as_slice() {
         var_mappings.insert(
             p.ident().as_str(),
-            C::Expr::field_access(&unit_var, p.ident().as_str()),
+            C::Expr::field_access(unit_var, p.ident().as_str()),
         );
     }
 
-    var_mappings.insert(map.var.ident().as_str(), idx_var.clone());
+    var_mappings.insert(map.var.ident().as_str(), idx_var);
 
     // TODO here!
     let args = map
