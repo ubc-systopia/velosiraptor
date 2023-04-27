@@ -36,7 +36,8 @@ use std::path::Path;
 use std::process::exit;
 
 // get the parser module
-use velosiast::{AstResult, VelosiAst};
+use velosiast::{AstResult, VelosiAst, VelosiAstUnit};
+use velosicodegen::VelosiCodeGen;
 use velosisynth::Z3SynthFactory;
 
 #[derive(Debug, Parser)]
@@ -278,50 +279,64 @@ fn main() {
 
     let synth_path = Arc::new(outpath.join("synth"));
 
-    for seg in ast.segment_units_mut() {
-        if Rc::strong_count(seg) > 1 {
-            println!("Unit `{}` has > 1 strong references", seg.ident());
-        }
-        if Rc::weak_count(seg) > 1 {
-            println!("Unit `{}` has > 1 weak references", seg.ident());
-        }
+    let mut synthfactory = Z3SynthFactory::new();
+    synthfactory
+        .logdir(synth_path)
+        .logging(cli.logsmt)
+        .num_workers(cli.parallelism);
 
-        if let Some(unit) = Rc::get_mut(seg) {
-            let mut synth = Z3SynthFactory::new()
-                .logdir(synth_path.clone())
-                .logging(cli.logsmt)
-                .num_workers(cli.parallelism)
-                .create(unit);
-            synth.create_model();
+    for unit in ast.units_mut() {
+        match unit {
+            VelosiAstUnit::Segment(u) => {
+                if u.is_abstract {
+                    // don't do anythign with abstract segments
+                    continue;
+                }
 
-            if let Err(_e) = synth.sanity_check() {
-                eprintln!(
-                    "{}{}.\n",
-                    "error".bold().red(),
-                    ": model sanity check has failed".bold()
-                );
-                exit(-1);
+                let seg = Rc::get_mut(u);
+                if seg.is_none() {
+                    eprintln!(
+                        "{}{}.\n",
+                        "error".bold().red(),
+                        ": could not obtain mutable reference".bold()
+                    );
+                    exit(-1);
+                }
+
+                let seg = seg.unwrap();
+                let mut synth = synthfactory.create(seg);
+
+                synth.create_model();
+
+                if let Err(_e) = synth.sanity_check() {
+                    eprintln!(
+                        "{}{}.\n",
+                        "error".bold().red(),
+                        ": model sanity check has failed".bold()
+                    );
+                    exit(-1);
+                }
+
+                println!("Synthesizing ALL for unit {}", synth.unit_ident());
+                synth.synthesize();
+
+                match synth.finalize() {
+                    Ok(p) => log::warn!(target: "main", "synthesis completed: {}", p),
+                    Err(_e) => {
+                        eprintln!(
+                            "{}{}.\n",
+                            "error".bold().red(),
+                            ": synthesis has failed".bold(),
+                        );
+                        exit(-1);
+                    }
+                }
             }
-
-            // perform synthesis of the programs
-            synth.synthesize();
-
-            if !synth.has_result() {
-                eprintln!(
-                    "{}{}.\n",
-                    "error".bold().red(),
-                    ": synthesis has failed".bold(),
-                );
-                exit(-1);
+            VelosiAstUnit::StaticMap(_s) => {
+                // nothing to synthesize here
             }
-
-            if !synth.finalize() {
-                eprintln!(
-                    "{}{}.\n",
-                    "error".bold().red(),
-                    ": synthesis has failed".bold(),
-                );
-                exit(-1);
+            VelosiAstUnit::Enum(_e) => {
+                // nothing to synthesize here
             }
         }
     }
@@ -332,10 +347,21 @@ fn main() {
 
     eprintln!("{:>8}: {}...\n", "codegen".bold().green(), infile);
 
-    // eprintln!(
-    //     "{:>8}: prepare for code generation...\n",
-    //     "generate".bold().green(),
-    // );
+    let code_path = Arc::new(outpath.join("code"));
+
+    let codegen = match cli.language {
+        OutputLanguage::C => VelosiCodeGen::new_c(&code_path, cli.name.clone()),
+        OutputLanguage::Rust => VelosiCodeGen::new_rust(&code_path, cli.name.clone()),
+    };
+
+    if let Err(_e) = codegen.generate(&ast) {
+        eprintln!(
+            "{}{}.\n",
+            "error".bold().red(),
+            ": code generation failed".bold(),
+        );
+        exit(-1);
+    }
 
     // let codegen = match backend {
     //     "rust" => CodeGen::new_rust(outpath, pkgname.clone()),
