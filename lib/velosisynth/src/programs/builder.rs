@@ -198,9 +198,9 @@ impl ProgramsBuilder {
             exprs.len()
         );
 
-        log::debug!(target : "[ProgramsBuilder]", "Vars: {:?}", self.vars);
-        log::debug!(target : "[ProgramsBuilder]", "Flags: {:?}", self.flags);
-        log::debug!(target : "[ProgramsBuilder]", "Fields: {:?}", self.fields);
+        log::info!(target : "[ProgramsBuilder]", "Vars: {:?}", self.vars);
+        log::info!(target : "[ProgramsBuilder]", "Flags: {:?}", self.flags);
+        log::info!(target : "[ProgramsBuilder]", "Fields: {:?}", self.fields);
 
         log::debug!(target : "[ProgramsBuilder]", "Expressions:");
         for (i, e) in exprs.iter().enumerate() {
