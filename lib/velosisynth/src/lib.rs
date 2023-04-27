@@ -35,6 +35,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use std::fmt::{Display, Formatter, Result as FmtResult};
+use std::time::{Duration, Instant};
 
 // public re-exports
 
@@ -102,6 +103,22 @@ pub struct Z3Synth<'a> {
     protect_program: Option<Program>,
     done: bool,
     model_created: bool,
+
+    // stats
+    /// the time to create the smtlib2 context of the model
+    pub t_create_model: Duration,
+    /// the time to populate Z3 with the model
+    pub t_reset_model: Duration,
+    /// runtime for the sanity check
+    pub t_sanity_check: Duration,
+    /// the time to synthesize the map program
+    pub t_map_synthesis: Duration,
+    /// the time to synthesize the unmap program
+    pub t_unmap_synthesis: Duration,
+    /// the time to synthesize the protect program
+    pub t_protect_synthesis: Duration,
+    /// the point in time when the synthesis started
+    t_synth_start: Option<Instant>,
 }
 
 impl<'a> Z3Synth<'a> {
@@ -125,6 +142,13 @@ impl<'a> Z3Synth<'a> {
             protect_program: None,
             done: false,
             model_created: false,
+            t_create_model: Duration::from_secs(0),
+            t_reset_model: Duration::from_secs(0),
+            t_sanity_check: Duration::from_secs(0),
+            t_map_synthesis: Duration::from_secs(0),
+            t_unmap_synthesis: Duration::from_secs(0),
+            t_protect_synthesis: Duration::from_secs(0),
+            t_synth_start: None,
         }
     }
 
@@ -139,14 +163,20 @@ impl<'a> Z3Synth<'a> {
     /// creates the model for the synthesis for this handle
     pub fn create_model(&mut self) {
         if !self.model_created {
+            let t_start = Instant::now();
             self.model_created = true;
             let ctx = model::create(self.unit);
+            let t_reset = Instant::now();
             self.z3.reset_with_context(Z3Query::from(ctx));
+            let t_end = Instant::now();
+            self.t_create_model = t_reset - t_start;
+            self.t_reset_model = t_end - t_reset;
         }
     }
 
     pub fn sanity_check(&mut self) -> Result<(), VelosiSynthIssues> {
         self.create_model();
+        let t_start = Instant::now();
 
         log::info!(target: "[Z3Synth]", "running sanity checks on the model.");
         let mut issues = VelosiSynthIssues::new();
@@ -167,6 +197,9 @@ impl<'a> Z3Synth<'a> {
             "protect",
         ));
 
+        let t_end = Instant::now();
+        self.t_sanity_check = t_end - t_start;
+
         synth_result_return!((), issues)
     }
 
@@ -183,21 +216,21 @@ impl<'a> Z3Synth<'a> {
         let unit = self.destroy();
 
         if let Some(prog) = map_program {
-            log::warn!(target : "[Z3Synth]", "successfully synthesized program\nmap() {{ {} }}", prog);
+            log::info!(target : "[Z3Synth]", "successfully synthesized program\n{}.map() {{ {} }}", unit.ident(), prog);
             unit.set_method_ops("map", prog.into());
         } else {
             log::warn!(target : "[Z3Synth]", "map() {{ UNKNOWN }} ");
         }
 
         if let Some(prog) = unmap_program {
-            log::warn!(target : "[Z3Synth]", "successfully synthesized program\nunmap() {{ {} }}", prog);
+            log::info!(target : "[Z3Synth]", "successfully synthesized program\n{}.unmap() {{ {} }}", unit.ident(), prog);
             unit.set_method_ops("unmap", prog.into());
         } else {
             log::warn!(target : "[Z3Synth]", "unmap() {{ UNKNOWN }}");
         }
 
         if let Some(prog) = protect_program {
-            log::warn!(target : "[Z3Synth]", "successfully synthesized program\nprotect() {{ {} }}", prog);
+            log::info!(target : "[Z3Synth]", "successfully synthesized program\n{}.protect() {{ {} }}", unit.ident(),prog);
             unit.set_method_ops("protect", prog.into());
         } else {
             log::warn!(target : "[Z3Synth]", "protect() {{ UNKNOWN }}");
@@ -221,9 +254,15 @@ impl<'a> Z3Synth<'a> {
 
     /// performs a synthesis step for all operations that haven't completed yet
     pub fn synthesize_step(&mut self) {
+        if self.t_synth_start.is_none() {
+            self.t_synth_start = Some(Instant::now());
+        }
+
         if self.done {
             return;
         }
+
+        let t_synth_start = self.t_synth_start.unwrap();
 
         // create the model of not done yet
         self.create_model();
@@ -235,11 +274,14 @@ impl<'a> Z3Synth<'a> {
                 MaybeResult::Some(mp) => {
                     all_done &= true;
                     self.map_program = Some(mp);
+                    self.t_map_synthesis = Instant::now() - t_synth_start;
                 }
                 MaybeResult::Pending => all_done = false,
                 MaybeResult::None => {
                     all_done = true;
+                    log::warn!("did not find a map program");
                     self.map_program = Some(Program::new());
+                    self.t_map_synthesis = Instant::now() - t_synth_start;
                 }
             }
         }
@@ -249,11 +291,14 @@ impl<'a> Z3Synth<'a> {
                 MaybeResult::Some(mp) => {
                     all_done &= true;
                     self.unmap_program = Some(mp);
+                    self.t_unmap_synthesis = Instant::now() - t_synth_start;
                 }
                 MaybeResult::Pending => all_done = false,
                 MaybeResult::None => {
                     all_done = true;
+                    log::warn!("did not find a unmap program");
                     self.unmap_program = Some(Program::new());
+                    self.t_unmap_synthesis = Instant::now() - t_synth_start;
                 }
             }
         }
@@ -263,11 +308,14 @@ impl<'a> Z3Synth<'a> {
                 MaybeResult::Some(mp) => {
                     all_done &= true;
                     self.protect_program = Some(mp);
+                    self.t_protect_synthesis = Instant::now() - t_synth_start;
                 }
                 MaybeResult::Pending => all_done = false,
                 MaybeResult::None => {
+                    log::warn!("did not find a protect program");
                     all_done = true;
                     self.protect_program = Some(Program::new());
+                    self.t_protect_synthesis = Instant::now() - t_synth_start;
                 }
             }
         }
@@ -388,6 +436,10 @@ impl Z3SynthFactory {
     }
 
     pub fn create<'a>(&self, unit: &'a mut VelosiAstUnitSegment) -> Z3Synth<'a> {
+        if unit.is_abstract {
+            panic!("Cannot synthesize abstract units");
+        }
+
         let logpath = if let Some(logdir) = &self.logdir {
             if self.logging {
                 Some(Arc::new(logdir.join(unit.ident().as_str())))
