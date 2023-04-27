@@ -120,6 +120,10 @@ pub fn main() {
         use std::rc::Rc;
         match unit {
             VelosiAstUnit::Segment(u) => {
+                if u.is_abstract {
+                    // don't handle abstract units
+                    continue;
+                }
                 let seg = Rc::get_mut(u);
 
                 if seg.is_none() {
@@ -135,6 +139,8 @@ pub fn main() {
 
                 let mut synth = synthfactory.create(seg);
 
+                t_synth_segment.push(("init", Instant::now()));
+
                 synth.create_model();
 
                 t_synth_segment.push(("Model Creation", Instant::now()));
@@ -149,10 +155,17 @@ pub fn main() {
                     continue;
                 }
 
+                let mut synth_breakdown = Vec::new();
+
                 match matches.get_one::<String>("synth").map(|s| s.as_str()) {
                     Some("all") => {
                         println!("Synthesizing ALL for unit {}", synth.unit_ident());
                         synth.synthesize();
+                        synth_breakdown = vec![
+                            ("map", synth.t_map_synthesis),
+                            ("protect", synth.t_protect_synthesis),
+                            ("unmap", synth.t_unmap_synthesis),
+                        ];
                         match synth.finalize() {
                             Ok(p) => log::warn!(target: "main", "synthesis completed: {}", p),
                             Err(e) => log::error!(target: "main", "synthesis failed\n{}", e),
@@ -194,7 +207,7 @@ pub fn main() {
 
                 t_synth_segment.push(("Synthesis", Instant::now()));
 
-                t_synth.push((seg.ident_to_string(), t_synth_segment));
+                t_synth.push((seg.ident_to_string(), t_synth_segment, synth_breakdown));
             }
             VelosiAstUnit::StaticMap(_s) => {
                 // nothing to synthesize here
@@ -224,7 +237,7 @@ pub fn main() {
         "  Synthesis time         {:6} ms",
         t_synth_end.duration_since(t_synth_start).as_millis()
     );
-    for (unit, t) in t_synth {
+    for (unit, t, breakdown) in t_synth {
         println!(
             "---------------------------------------------------------------------------------"
         );
@@ -243,6 +256,11 @@ pub fn main() {
                 t.duration_since(t_prev).as_millis()
             );
             t_prev = *t;
+            if *name == "Synthesis" {
+                for (name, t) in breakdown.iter() {
+                    println!("     - {:15.15}   {:6} ms", name, t.as_millis());
+                }
+            }
         }
     }
     println!("=================================================================================\n");
