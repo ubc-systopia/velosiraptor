@@ -172,7 +172,11 @@ pub fn typeinfo_to_smt2(ty: &VelosiAstTypeInfo) -> String {
         // built in range type
         Range => unimplemented!("don't know how to handle ranges yet"),
         // type referece to user-define type
-        TypeRef(_s) => unimplemented!("don't know how to handle typerefs yet"),
+        TypeRef(_s) => {
+            // here we just return the paddr instead.
+            paddr()
+            //unimplemented!("don't know how to handle typerefs yet ({s})"),
+        }
         // Reference to the state
         State => panic!("state type not expected here"),
         // Reference to the interface
