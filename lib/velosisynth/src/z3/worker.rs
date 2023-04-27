@@ -57,7 +57,7 @@ pub struct Z3Worker {
     /// the worker identifier
     id: usize,
     /// handle to the worker thread join handle
-    thread: Option<thread::JoinHandle<()>>,
+    thread: Option<thread::JoinHandle<usize>>,
     /// the context of the worker
     context: Arc<Mutex<Z3Context>>,
     /// whether the worker is currently running
@@ -110,6 +110,8 @@ impl Z3Worker {
         let thread = thread::Builder::new()
             .name(format!("z3-worker-{wid}"))
             .spawn(move || {
+
+                let mut num_queries = 0;
 
                 let mut z3 = if let Some(logfile) = logfile {
                     Z3Instance::with_logfile(wid, logfile)
@@ -169,6 +171,8 @@ impl Z3Worker {
                     // drop(task_q); // drop the lock again
 
                     if let Some((ticket, mut query)) = tasks.pop() {
+                        num_queries += 1;
+
                        // println!("worker {} got task {:?}", wid, ticket);
                         // run the query
                         query.timestamp("request");
@@ -189,6 +193,9 @@ impl Z3Worker {
 
                 // finally terminate
                 z3.terminate();
+
+                // return the number of queries
+                num_queries
             })
             .unwrap();
 
@@ -208,11 +215,13 @@ impl Z3Worker {
     }
 
     /// stops the execution of the worker
-    pub fn terminate(&mut self) {
+    pub fn terminate(&mut self) -> usize {
         // set the termintation flag
         self.running.store(false, Ordering::Relaxed);
         if let Some(thread) = self.thread.take() {
-            thread.join().expect("thread join failed");
+            thread.join().expect("thread join failed")
+        } else {
+            0
         }
     }
 
@@ -520,7 +529,7 @@ impl Z3WorkerPool {
     }
 
     pub fn terminate(&mut self) {
-        log::warn!(target : "[Z3WorkerPool]", "Terminating worker pool...");
+        log::info!(target : "[Z3WorkerPool]", "Terminating worker pool...");
 
         self.drain_taskq();
         for worker in self.workers.iter_mut() {
@@ -530,7 +539,7 @@ impl Z3WorkerPool {
         self.results.clear();
         self.query_cache.clear();
 
-        log::warn!(target : "[Z3WorkerPool]", "terminated.");
+        log::info!(target : "[Z3WorkerPool]", "terminated.");
     }
 
     pub fn num_workers(&self) -> usize {

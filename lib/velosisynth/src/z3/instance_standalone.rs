@@ -23,11 +23,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use std::fs::{self, File};
+use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
-use std::thread;
 use std::time::Instant;
 
 use super::query::{Z3Query, Z3Result, Z3Ticket};
@@ -51,6 +50,8 @@ pub struct Z3Instance {
 
     t_prepare: u64,
     t_query: u64,
+    t_longest_query: u64,
+    num_queries: u64,
 }
 
 impl Z3Instance {
@@ -64,6 +65,8 @@ impl Z3Instance {
             logfile: None,
             t_prepare: 0,
             t_query: 0,
+            t_longest_query: 0,
+            num_queries: 0,
         }
     }
 
@@ -90,6 +93,8 @@ impl Z3Instance {
             logfile,
             t_prepare: 0,
             t_query: 0,
+            t_longest_query: 0,
+            num_queries: 0,
         }
     }
 
@@ -107,7 +112,7 @@ impl Z3Instance {
     /// terminates the z3 instance
     pub fn terminate(&mut self) {
         if self.z3_proc.kill().is_ok() {
-            log::warn!(target : "[Z3Instance]", "{} forcefully terminated z3 instance", self.id);
+            log::info!(target : "[Z3Instance]", "{} forcefully terminated z3 instance", self.id);
         }
         self.z3_proc
             .wait()
@@ -203,9 +208,12 @@ impl Z3Instance {
         };
 
         let t_query = Instant::now();
-
+        let t_query = t_query.duration_since(t_prepare).as_millis() as u64;
         self.t_prepare += t_prepare.duration_since(t_start).as_millis() as u64;
-        self.t_query += t_query.duration_since(t_prepare).as_millis() as u64;
+        self.t_query += t_query;
+
+        self.t_longest_query = std::cmp::max(self.t_longest_query, t_query);
+        self.num_queries += 1;
 
         log::trace!(target : "[Z3Instance]", "{} query result is '{}'", self.id, result);
         Ok(Z3Result::new(result))
@@ -265,9 +273,12 @@ impl Z3Instance {
         };
 
         let t_query = Instant::now();
-
+        let t_query = t_query.duration_since(t_prepare).as_millis() as u64;
         self.t_prepare += t_prepare.duration_since(t_start).as_millis() as u64;
-        self.t_query += t_query.duration_since(t_prepare).as_millis() as u64;
+        self.t_query += t_query;
+
+        self.t_longest_query = std::cmp::max(self.t_longest_query, t_query);
+        self.num_queries += 1;
 
         Ok(Z3Result::new(result))
     }
@@ -275,10 +286,9 @@ impl Z3Instance {
 
 impl Drop for Z3Instance {
     fn drop(&mut self) {
-        println!(
-            "[Z3StandaloneInstance]  prepare time: {}ms, query time: {}ms",
-            self.t_prepare, self.t_query
-        );
+        // println!(
+        //     "[Z3StandaloneInstance] #{} prepare time: {}ms, query time: {}ms, longest query: {}ms, num queries: {}",            self.id, self.t_prepare, self.t_query, self.t_longest_query, self.num_queries
+        // );
         self.terminate();
     }
 }
