@@ -220,7 +220,9 @@ pub fn get_program_iter(unit: &VelosiAstUnitSegment, batch_size: usize) -> MapPr
     );
 
     // obtain the functions for the map operation
-    let m_fn = unit.get_method("map").unwrap();
+    let m_fn = unit
+        .get_method("map")
+        .unwrap_or_else(|| panic!("no method 'map' in unit {}", unit.ident()));
     let t_fn = unit.get_method("translate").unwrap();
     let f_fn = unit.get_method("matchflags").unwrap();
 
