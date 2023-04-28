@@ -140,13 +140,13 @@ impl Relations {
 use std::collections::{HashMap, HashSet};
 
 pub fn extract_composition(ast: &VelosiAst) {
-    let units = ast.unit_map();
+    let units = ast.units();
 
     let mut all_units = HashSet::new();
     let mut referenced_units = HashSet::new();
     let mut relations = Relations::new();
 
-    for unit in units.values() {
+    for unit in units {
         all_units.insert(unit.ident().clone());
         use VelosiAstUnit::*;
         match unit {
@@ -155,7 +155,7 @@ pub fn extract_composition(ast: &VelosiAst) {
                 let next = mmap.get_param("pa").unwrap();
                 if next.ptype.is_typeref() {
                     let f = next.ptype.typeref().unwrap().clone();
-                    relations.insert(u.ident().clone(), units.get(&f).unwrap().clone());
+                    relations.insert(u.ident().clone(), ast.get_unit(&f).unwrap().clone());
                     referenced_units.insert(f.clone());
                 } else if !next.ptype.is_addr() {
                     unreachable!();
@@ -165,7 +165,7 @@ pub fn extract_composition(ast: &VelosiAst) {
                 VelosiAstStaticMap::ListComp(m) => {
                     relations.insert(
                         u.ident().clone(),
-                        units.get(m.elm.dst.ident()).unwrap().clone(),
+                        ast.get_unit(m.elm.dst.ident()).unwrap().clone(),
                     );
                     referenced_units.insert(m.elm.dst.ident().clone());
                 }
@@ -178,7 +178,10 @@ pub fn extract_composition(ast: &VelosiAst) {
             },
             Enum(u) => {
                 for (next, _) in &u.enums {
-                    relations.insert(u.ident().clone(), units.get(next.ident()).unwrap().clone());
+                    relations.insert(
+                        u.ident().clone(),
+                        ast.get_unit(next.ident()).unwrap().clone(),
+                    );
                     referenced_units.insert(next.ident().clone());
                 }
             }
@@ -193,7 +196,7 @@ pub fn extract_composition(ast: &VelosiAst) {
 
     for root in &roots {
         println!("Root: {root:?}");
-        relations.print_unit_hierarchy(units.get(root).unwrap());
+        relations.print_unit_hierarchy(ast.get_unit(root).unwrap());
     }
 }
 
