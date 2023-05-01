@@ -77,6 +77,10 @@ struct Cli {
     /// Turn debugging information on
     #[arg(short, long, action = clap::ArgAction::Count)]
     verbose: u8,
+
+    /// Synthesize using the abstract memory model
+    #[arg(short, long, default_value_t = false)]
+    mem_model: bool,
 }
 
 /// defines the output langauge for the generate code
@@ -318,8 +322,7 @@ fn main() {
                 }
 
                 println!("Synthesizing ALL for unit {}", synth.unit_ident());
-                // TODO: update to use memory model flag?
-                synth.synthesize(false);
+                synth.synthesize(cli.mem_model);
 
                 match synth.finalize() {
                     Ok(p) => log::warn!(target: "main", "synthesis completed: {}", p),
