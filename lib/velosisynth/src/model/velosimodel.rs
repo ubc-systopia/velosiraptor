@@ -337,9 +337,7 @@ fn add_apply_entry_action(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
     let mut f = Function::new(name, types::model());
     f.add_arg(String::from("st"), types::model());
     f.add_arg(String::from("entry"), types::wbuffer_entry());
-    f.add_comment(format!(
-        "applies the given write buffer entry to the model, writing the value and applying the write action on the right field"
-    ));
+    f.add_comment("applies the given write buffer entry to the model, writing the value and applying the write action on the right field".to_string());
 
     let st = Term::ident(String::from("st"));
     let entry = Term::ident(String::from("entry"));
@@ -381,9 +379,7 @@ fn add_flush_action(smt: &mut Smt2Context) {
     let name = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.flushaction!");
     let mut f = Function::new(name, types::model());
     f.add_arg(String::from("st"), types::model());
-    f.add_comment(format!(
-        "flushes the write buffer, writing values back to the interface and applying their write actions"
-    ));
+    f.add_comment("flushes the write buffer, writing values back to the interface and applying their write actions".to_string());
 
     let st = Term::ident(String::from("st"));
     let body = Term::letexpr(
