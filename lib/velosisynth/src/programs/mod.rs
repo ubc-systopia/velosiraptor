@@ -583,7 +583,7 @@ impl ProgramActions {
 impl Display for ProgramActions {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            Self::GlobalBarrier => write!(f, "GlobalBarrier; ",)?,
+            Self::GlobalBarrier => write!(f, "\n  global_barrier()",)?,
             Self::FieldActions(a) => write!(f, "{}", a)?,
         }
         Ok(())
