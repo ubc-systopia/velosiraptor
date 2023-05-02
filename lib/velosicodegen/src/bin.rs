@@ -56,6 +56,9 @@ pub fn main() {
         .arg(arg!(-o --output <VALUE>).default_value("out"))
         .arg(arg!(-l --lang <VALUE>).default_value("c"))
         .arg(arg!(-p --pkg <VALUE>).default_value("myunit"))
+        .arg(arg!(
+            -m --"mem-model" "Synthesize using the abstract memory model"
+        ))
         .arg(arg!([fname] "Optional name to operate on"))
         .get_matches();
 
@@ -183,7 +186,7 @@ pub fn main() {
                     }
 
                     println!("Synthesizing ALL for unit {}", synth.unit_ident());
-                    synth.synthesize();
+                    synth.synthesize(matches.get_flag("mem-model"));
                     match synth.finalize() {
                         Ok(p) => log::warn!(target: "main", "synthesis completed: {}", p),
                         Err(e) => log::error!(target: "main", "synthesis failed\n{}", e),
