@@ -252,17 +252,29 @@ fn program_to_query(
     Box::new(query)
 }
 
+pub struct SynthOptions {
+    pub negate: bool,
+    pub no_change: bool,
+    pub mem_model: bool,
+}
+
 pub fn submit_program_query(
     z3: &mut Z3WorkerPool,
     m_op: &VelosiAstMethod,
     m_goal: &VelosiAstMethod,
     idx: Option<usize>,
-    negate: bool,
-    no_change: bool,
     prog: Program,
-    mem_model: bool,
+    options: SynthOptions,
 ) -> Z3Ticket {
-    let query = program_to_query(m_op, m_goal, idx, prog, negate, no_change, mem_model);
+    let query = program_to_query(
+        m_op,
+        m_goal,
+        idx,
+        prog,
+        options.negate,
+        options.no_change,
+        options.mem_model,
+    );
     z3.submit_query(query, Z3TaskPriority::High)
         .expect("failed to submit query")
 }
