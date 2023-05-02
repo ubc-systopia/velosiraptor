@@ -40,7 +40,7 @@ use crate::vmops::queryhelper::MultiDimProgramQueries;
 use crate::vmops::queryhelper::ProgramQueries;
 use crate::vmops::queryhelper::{MaybeResult, ProgramBuilder};
 use crate::vmops::semantics::SemanticQueries;
-use crate::vmops::semprecond::SemPrecondQueries;
+use crate::vmops::semprecond::{SemPrecondQueries, SynthOptions};
 use crate::Z3Ticket;
 use crate::DEFAULT_BATCH_SIZE;
 
@@ -175,10 +175,12 @@ impl ProgramBuilder for MapPrograms {
                     self.m_fn.as_ref(),
                     self.t_fn.as_ref(),
                     None,
-                    false,
-                    false,
                     prog.clone(),
-                    self.mem_model,
+                    SynthOptions {
+                        negate: false,
+                        no_change: false,
+                        mem_model: self.mem_model,
+                    },
                 );
 
                 self.queries.push_back((
