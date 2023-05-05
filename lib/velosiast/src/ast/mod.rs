@@ -174,6 +174,12 @@ impl VelosiAstIdentifier {
         self
     }
 
+    pub fn extend_with_str(&mut self, slice: &str) -> &mut Self {
+        self.ident = Rc::new(format!("{}{}{}", self.ident, IDENT_PATH_SEP, slice));
+        self.path = Rc::new(format!("{}{}{}", self.path, IDENT_PATH_SEP, slice));
+        self
+    }
+
     /// convert the parse tree identifier to a ast identifier with the given prefix
     pub fn from_parse_tree_with_prefix(pt: VelosiParseTreeIdentifier, prefix: &str) -> Self {
         Self::new(prefix, pt.name, pt.loc)

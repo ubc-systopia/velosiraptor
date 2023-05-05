@@ -35,7 +35,9 @@ use std::rc::Rc;
 // used crate functionality
 use crate::ast::{VelosiAstIdentifier, VelosiAstNode, VelosiAstParam};
 use crate::error::{VelosiAstErrBuilder, VelosiAstErrUndef, VelosiAstIssues};
-use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, SymbolTable};
+use crate::{
+    ast_result_return, ast_result_unwrap, utils, AstResult, SymbolTable, VelosiAstFieldSlice,
+};
 use velosiparser::{
     VelosiParseTreeBinOp, VelosiParseTreeBinOpExpr, VelosiParseTreeBoolLiteral,
     VelosiParseTreeExpr, VelosiParseTreeFnCallExpr, VelosiParseTreeIdentifierLiteral,
@@ -1107,10 +1109,16 @@ impl VelosiAstIdentLiteralExpr {
                 litexpr.etype = p.ptype.typeinfo.clone();
                 AstResult::Ok(VelosiAstExpr::IdentLiteral(litexpr))
             }
-            VelosiAstNode::StateField(_) | VelosiAstNode::StateFieldSlice(_) => {
+            VelosiAstNode::StateField(f) => {
+                Self::handle_field_reference(f.layout_as_slice(), litexpr)
+            }
+            VelosiAstNode::StateFieldSlice(_) => {
                 AstResult::Ok(VelosiAstExpr::IdentLiteral(litexpr))
             }
-            VelosiAstNode::InterfaceField(_) | VelosiAstNode::InterfaceFieldSlice(_) => {
+            VelosiAstNode::InterfaceField(f) => {
+                Self::handle_field_reference(f.layout_as_slice(), litexpr)
+            }
+            VelosiAstNode::InterfaceFieldSlice(_) => {
                 AstResult::Ok(VelosiAstExpr::IdentLiteral(litexpr))
             }
             VelosiAstNode::Flag(_) => {
@@ -1197,6 +1205,27 @@ impl VelosiAstIdentLiteralExpr {
 
     pub fn has_interface_references(&self) -> bool {
         self.path().starts_with("interface")
+    }
+
+    fn handle_field_reference(
+        layout: &[Rc<VelosiAstFieldSlice>],
+        mut litexpr: VelosiAstIdentLiteralExpr,
+    ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
+        match layout {
+            [field_slice] => {
+                litexpr.ident.extend_with_str(&field_slice.ident.ident);
+                AstResult::Ok(VelosiAstExpr::IdentLiteral(litexpr))
+            }
+            _ => {
+                let msg = "expected a field slice expression but got the whole field";
+                let hint = "specify a slice of this field";
+                let err = VelosiAstErrBuilder::err(msg.to_string())
+                    .add_hint(hint.to_string())
+                    .add_location(litexpr.loc.clone())
+                    .build();
+                AstResult::Issues(VelosiAstExpr::IdentLiteral(litexpr), err.into())
+            }
+        }
     }
 }
 
