@@ -179,12 +179,6 @@ pub fn registerfield(
 
     pos.span_until_start(&i3);
 
-    let nodes = if let Some(nodes) = nodes {
-        nodes
-    } else {
-        Vec::new()
-    };
-
     let res = VelosiParseTreeInterfaceFieldRegister::new(name, size, nodes, pos);
     Ok((i3, VelosiParseTreeInterfaceField::Register(res)))
 }
@@ -211,12 +205,6 @@ pub fn memoryfield(
     ))(i2)?;
 
     pos.span_until_start(&i3);
-
-    let nodes = if let Some(nodes) = nodes {
-        nodes
-    } else {
-        Vec::new()
-    };
 
     let (base, offset, size) = fieldinfo;
 
@@ -246,12 +234,6 @@ pub fn mmiofield(
     ))(i2)?;
 
     pos.span_until_start(&i3);
-
-    let nodes = if let Some(nodes) = nodes {
-        nodes
-    } else {
-        Vec::new()
-    };
 
     let (base, offset, size) = fieldinfo;
 
