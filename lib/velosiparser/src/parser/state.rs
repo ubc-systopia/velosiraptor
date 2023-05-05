@@ -157,12 +157,6 @@ pub fn memoryfield(
 
     pos.span_until_start(&i3);
 
-    let slices = if let Some(slices) = slices {
-        slices
-    } else {
-        Vec::new()
-    };
-
     let (base, offset, size) = fieldinfo;
 
     let res = VelosiParseTreeStateFieldMemory::new(name, base, offset, size, slices, pos);
@@ -202,12 +196,6 @@ pub fn registerfield(
     ))(i2)?;
 
     pos.span_until_start(&i3);
-
-    let slices = if let Some(slices) = slices {
-        slices
-    } else {
-        Vec::new()
-    };
 
     let res = VelosiParseTreeStateFieldRegister::new(name, size, slices, pos);
     Ok((i3, VelosiParseTreeStateField::Register(res)))

@@ -118,7 +118,7 @@ pub struct VelosiParseTreeInterfaceFieldMemory {
     pub base: VelosiParseTreeIdentifier,
     pub offset: u64,
     pub size: u64,
-    pub nodes: Vec<VelosiParseTreeInterfaceFieldNode>,
+    pub nodes: Option<Vec<VelosiParseTreeInterfaceFieldNode>>,
     pub loc: VelosiTokenStream,
 }
 
@@ -128,7 +128,7 @@ impl VelosiParseTreeInterfaceFieldMemory {
         base: VelosiParseTreeIdentifier,
         offset: u64,
         size: u64,
-        nodes: Vec<VelosiParseTreeInterfaceFieldNode>,
+        nodes: Option<Vec<VelosiParseTreeInterfaceFieldNode>>,
         loc: VelosiTokenStream,
     ) -> Self {
         Self {
@@ -147,13 +147,15 @@ impl Display for VelosiParseTreeInterfaceFieldMemory {
         write!(f, "    mem {} [ ", self.name)?;
         write!(f, "{}, {}, ", self.base, self.offset)?;
         write!(f, "{} ]", self.size)?;
-        if !self.nodes.is_empty() {
-            writeln!(f, " {{")?;
-            for n in &self.nodes {
-                Display::fmt(n, f)?;
-                writeln!(f, ",")?;
+        if let Some(nodes) = &self.nodes {
+            if !nodes.is_empty() {
+                writeln!(f, " {{")?;
+                for n in nodes {
+                    Display::fmt(n, f)?;
+                    writeln!(f, ",")?;
+                }
+                write!(f, "    }}")?;
             }
-            write!(f, "    }}")?;
         }
         Ok(())
     }
@@ -166,7 +168,7 @@ pub struct VelosiParseTreeInterfaceFieldMmio {
     pub base: VelosiParseTreeIdentifier,
     pub offset: u64,
     pub size: u64,
-    pub nodes: Vec<VelosiParseTreeInterfaceFieldNode>,
+    pub nodes: Option<Vec<VelosiParseTreeInterfaceFieldNode>>,
     pub loc: VelosiTokenStream,
 }
 
@@ -176,7 +178,7 @@ impl VelosiParseTreeInterfaceFieldMmio {
         base: VelosiParseTreeIdentifier,
         offset: u64,
         size: u64,
-        nodes: Vec<VelosiParseTreeInterfaceFieldNode>,
+        nodes: Option<Vec<VelosiParseTreeInterfaceFieldNode>>,
         loc: VelosiTokenStream,
     ) -> Self {
         Self {
@@ -195,13 +197,15 @@ impl Display for VelosiParseTreeInterfaceFieldMmio {
         write!(f, "    mmio {} [ ", self.name)?;
         write!(f, "{}, {}, ", self.base, self.offset)?;
         write!(f, "{} ]", self.size)?;
-        if !self.nodes.is_empty() {
-            writeln!(f, " {{")?;
-            for n in &self.nodes {
-                Display::fmt(n, f)?;
-                writeln!(f, ",")?;
+        if let Some(nodes) = &self.nodes {
+            if nodes.is_empty() {
+                writeln!(f, " {{")?;
+                for n in nodes {
+                    Display::fmt(n, f)?;
+                    writeln!(f, ",")?;
+                }
+                write!(f, "    }}")?;
             }
-            write!(f, "    }}")?;
         }
         Ok(())
     }
@@ -212,7 +216,7 @@ impl Display for VelosiParseTreeInterfaceFieldMmio {
 pub struct VelosiParseTreeInterfaceFieldRegister {
     pub name: VelosiParseTreeIdentifier,
     pub size: u64,
-    pub nodes: Vec<VelosiParseTreeInterfaceFieldNode>,
+    pub nodes: Option<Vec<VelosiParseTreeInterfaceFieldNode>>,
     pub loc: VelosiTokenStream,
 }
 
@@ -220,7 +224,7 @@ impl VelosiParseTreeInterfaceFieldRegister {
     pub fn new(
         name: VelosiParseTreeIdentifier,
         size: u64,
-        nodes: Vec<VelosiParseTreeInterfaceFieldNode>,
+        nodes: Option<Vec<VelosiParseTreeInterfaceFieldNode>>,
         loc: VelosiTokenStream,
     ) -> Self {
         Self {
@@ -236,13 +240,15 @@ impl Display for VelosiParseTreeInterfaceFieldRegister {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "    reg {} [ ", self.name)?;
         write!(f, "{} ]", self.size)?;
-        if !self.nodes.is_empty() {
-            writeln!(f, " {{")?;
-            for n in &self.nodes {
-                Display::fmt(n, f)?;
-                writeln!(f, ",")?;
+        if let Some(nodes) = &self.nodes {
+            if nodes.is_empty() {
+                writeln!(f, " {{")?;
+                for n in nodes {
+                    Display::fmt(n, f)?;
+                    writeln!(f, ",")?;
+                }
+                write!(f, "    }}")?;
             }
-            write!(f, "    }}")?;
         }
         Ok(())
     }

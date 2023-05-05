@@ -220,13 +220,6 @@ impl VelosiAstInterfaceAction {
                     return res;
                 }
 
-                if bits == 0xffffffffffffffff {
-                    // all bits are set, we can return the interface reference
-                    res.insert(src_ref.clone());
-                    // println!("  --> 2,2   {}: {} -> return {:?}", dst_ref, bits, res);
-                    return res;
-                }
-
                 // do the back projection of the bits of the state to the interface
                 // loop over the ifbits and pick the slices that matter.
                 for (fld, b) in if_bits {
@@ -255,6 +248,7 @@ impl Display for VelosiAstInterfaceAction {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents the sorted and filtered list of interface field nodes
+#[derive(Debug)]
 struct FieldNodes {
     pub layout: Vec<Rc<VelosiAstFieldSlice>>,
     pub readactions: Vec<VelosiAstInterfaceAction>,
@@ -268,7 +262,7 @@ impl FieldNodes {
 }
 
 fn handle_nodes(
-    ptnodes: Vec<VelosiParseTreeInterfaceFieldNode>,
+    ptnodes: Option<Vec<VelosiParseTreeInterfaceFieldNode>>,
     st: &mut SymbolTable,
     ident: &VelosiAstIdentifier,
     loc: &VelosiTokenStream,
@@ -283,75 +277,91 @@ fn handle_nodes(
         writeactions: Vec::new(),
     };
 
-    for ptn in ptnodes {
-        match ptn {
-            VelosiParseTreeInterfaceFieldNode::Layout(slices) => {
-                if !nodes.layout.is_empty() && !slices.is_empty() {
-                    let msg = "two layout blocks detected. Attempting to merge them.";
-                    let hint = "consider merging with the previous block.";
-                    let related = "this is the previous layout block.";
-                    let err = VelosiAstErrBuilder::warn(msg.to_string())
-                        .add_hint(hint.to_string())
-                        .add_location(slices[0].loc.clone())
-                        .add_related_location(related.to_string(), nodes.layout[0].loc.clone())
-                        .build();
-                    issues.push(err);
-                }
+    if let Some(ptnodes) = ptnodes {
+        // a block was specified, see what nodes are in it
+        if ptnodes.is_empty() {
+            let msg = "empty interface field block";
+            let hint = "remove the block or fill it in explicitly";
+            let err = VelosiAstErrBuilder::err(msg.to_string())
+                .add_hint(hint.to_string())
+                .add_location(loc.clone())
+                .build();
+            issues.push(err);
+        }
 
-                for slice in slices {
-                    let slice = Rc::new(ast_result_unwrap!(
-                        VelosiAstFieldSlice::from_parse_tree(slice, ident.path(), size * 8),
-                        issues
-                    ));
-                    st.insert(slice.clone().into())
-                        .map_err(|e| issues.push(*e))
-                        .ok();
-                    nodes.layout.push(slice);
-                }
-            }
-            VelosiParseTreeInterfaceFieldNode::ReadActions(actions) => {
-                if !nodes.readactions.is_empty() && !actions.actions.is_empty() {
-                    let msg = "two readaction blocks detected. Attempting to merge them.";
-                    let hint = "consider merging with the previous block.";
-                    let related = "this is the previous readaction block.";
-                    let err = VelosiAstErrBuilder::warn(msg.to_string())
-                        .add_hint(hint.to_string())
-                        .add_location(actions.loc.clone())
-                        .add_related_location(related.to_string(), nodes.readactions[0].loc.clone())
-                        .build();
-                    issues.push(err);
-                }
+        for ptn in ptnodes {
+            match ptn {
+                VelosiParseTreeInterfaceFieldNode::Layout(slices) => {
+                    if !nodes.layout.is_empty() && !slices.is_empty() {
+                        let msg = "two layout blocks detected. Attempting to merge them.";
+                        let hint = "consider merging with the previous block.";
+                        let related = "this is the previous layout block.";
+                        let err = VelosiAstErrBuilder::warn(msg.to_string())
+                            .add_hint(hint.to_string())
+                            .add_location(slices[0].loc.clone())
+                            .add_related_location(related.to_string(), nodes.layout[0].loc.clone())
+                            .build();
+                        issues.push(err);
+                    }
 
-                for action in actions.actions {
-                    let action = ast_result_unwrap!(
-                        VelosiAstInterfaceAction::from_parse_tree(action, st),
-                        issues
-                    );
-                    nodes.readactions.push(action);
+                    for slice in slices {
+                        let slice = Rc::new(ast_result_unwrap!(
+                            VelosiAstFieldSlice::from_parse_tree(slice, ident.path(), size * 8),
+                            issues
+                        ));
+                        st.insert(slice.clone().into())
+                            .map_err(|e| issues.push(*e))
+                            .ok();
+                        nodes.layout.push(slice);
+                    }
                 }
-            }
-            VelosiParseTreeInterfaceFieldNode::WriteActions(actions) => {
-                if !nodes.writeactions.is_empty() && !actions.actions.is_empty() {
-                    let msg = "two readaction blocks detected. Attempting to merge them.";
-                    let hint = "consider merging with the previous block.";
-                    let related = "this is the previous readaction block.";
-                    let err = VelosiAstErrBuilder::warn(msg.to_string())
-                        .add_hint(hint.to_string())
-                        .add_location(actions.loc.clone())
-                        .add_related_location(
-                            related.to_string(),
-                            nodes.writeactions[0].loc.clone(),
-                        )
-                        .build();
-                    issues.push(err);
-                }
+                VelosiParseTreeInterfaceFieldNode::ReadActions(actions) => {
+                    if !nodes.readactions.is_empty() && !actions.actions.is_empty() {
+                        let msg = "two readaction blocks detected. Attempting to merge them.";
+                        let hint = "consider merging with the previous block.";
+                        let related = "this is the previous readaction block.";
+                        let err = VelosiAstErrBuilder::warn(msg.to_string())
+                            .add_hint(hint.to_string())
+                            .add_location(actions.loc.clone())
+                            .add_related_location(
+                                related.to_string(),
+                                nodes.readactions[0].loc.clone(),
+                            )
+                            .build();
+                        issues.push(err);
+                    }
 
-                for action in actions.actions {
-                    let action = ast_result_unwrap!(
-                        VelosiAstInterfaceAction::from_parse_tree(action, st),
-                        issues
-                    );
-                    nodes.writeactions.push(action);
+                    for action in actions.actions {
+                        let action = ast_result_unwrap!(
+                            VelosiAstInterfaceAction::from_parse_tree(action, st),
+                            issues
+                        );
+                        nodes.readactions.push(action);
+                    }
+                }
+                VelosiParseTreeInterfaceFieldNode::WriteActions(actions) => {
+                    if !nodes.writeactions.is_empty() && !actions.actions.is_empty() {
+                        let msg = "two readaction blocks detected. Attempting to merge them.";
+                        let hint = "consider merging with the previous block.";
+                        let related = "this is the previous readaction block.";
+                        let err = VelosiAstErrBuilder::warn(msg.to_string())
+                            .add_hint(hint.to_string())
+                            .add_location(actions.loc.clone())
+                            .add_related_location(
+                                related.to_string(),
+                                nodes.writeactions[0].loc.clone(),
+                            )
+                            .build();
+                        issues.push(err);
+                    }
+
+                    for action in actions.actions {
+                        let action = ast_result_unwrap!(
+                            VelosiAstInterfaceAction::from_parse_tree(action, st),
+                            issues
+                        );
+                        nodes.writeactions.push(action);
+                    }
                 }
             }
         }
@@ -373,6 +383,23 @@ fn handle_nodes(
         }
     } else {
         // no symbol, so there is no corresponding state field
+        if nodes.layout.is_empty() {
+            // just add a single slice that takes up the whole field
+            let slice = Rc::new(VelosiAstFieldSlice::new(
+                VelosiAstIdentifier::new(
+                    ident.path(),
+                    "_val".to_string(),
+                    VelosiTokenStream::default(),
+                ),
+                0,
+                size * 8,
+                VelosiTokenStream::default(),
+            ));
+            st.insert(slice.clone().into())
+                .map_err(|e| issues.push(*e))
+                .ok();
+            nodes.layout.push(slice);
+        }
         return ast_result_return!(nodes, issues);
     };
 
