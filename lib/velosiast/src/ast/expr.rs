@@ -23,10 +23,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+//! Ast Module of the Velosiraptor Compiler
+
+// used standard library functionality
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
-///! Ast Module of the Velosiraptor Compiler
-// used standard library functionality
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
