@@ -350,7 +350,6 @@ fn handle_layout(
     let mut issues = VelosiAstIssues::new();
 
     // convert the slices
-
     if ptlayout.is_empty() {
         // if none, add syntactic sugar for a single slice that takes up the whole field
         let slice = Rc::new(VelosiAstFieldSlice::new(
