@@ -34,7 +34,7 @@
 use nom::{
     branch::alt,
     combinator::{cut, opt},
-    multi::{many0, separated_list0},
+    multi::{many0, separated_list0, separated_list1},
     sequence::{delimited, preceded, terminated, tuple},
 };
 
@@ -173,11 +173,17 @@ pub fn registerfield(
 
     let (i3, nodes) = opt(delimited(
         lbrace,
-        terminated(separated_list0(comma, interfacefieldbody), opt(comma)),
+        terminated(separated_list1(comma, interfacefieldbody), opt(comma)),
         cut(rbrace),
     ))(i2)?;
 
     pos.span_until_start(&i3);
+
+    let nodes = if let Some(nodes) = nodes {
+        nodes
+    } else {
+        Vec::new()
+    };
 
     let res = VelosiParseTreeInterfaceFieldRegister::new(name, size, nodes, pos);
     Ok((i3, VelosiParseTreeInterfaceField::Register(res)))
@@ -200,11 +206,17 @@ pub fn memoryfield(
 
     let (i3, nodes) = opt(delimited(
         lbrace,
-        terminated(separated_list0(comma, interfacefieldbody), opt(comma)),
+        terminated(separated_list1(comma, interfacefieldbody), opt(comma)),
         cut(rbrace),
     ))(i2)?;
 
     pos.span_until_start(&i3);
+
+    let nodes = if let Some(nodes) = nodes {
+        nodes
+    } else {
+        Vec::new()
+    };
 
     let (base, offset, size) = fieldinfo;
 
@@ -229,11 +241,17 @@ pub fn mmiofield(
 
     let (i3, nodes) = opt(delimited(
         lbrace,
-        terminated(separated_list0(comma, interfacefieldbody), opt(comma)),
+        terminated(separated_list1(comma, interfacefieldbody), opt(comma)),
         cut(rbrace),
     ))(i2)?;
 
     pos.span_until_start(&i3);
+
+    let nodes = if let Some(nodes) = nodes {
+        nodes
+    } else {
+        Vec::new()
+    };
 
     let (base, offset, size) = fieldinfo;
 

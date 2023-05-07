@@ -42,7 +42,7 @@ pub struct VelosiParseTreeStateFieldMemory {
     pub base: VelosiParseTreeIdentifier,
     pub offset: u64,
     pub size: u64,
-    pub layout: Option<Vec<VelosiParseTreeFieldSlice>>,
+    pub layout: Vec<VelosiParseTreeFieldSlice>,
     pub loc: VelosiTokenStream,
 }
 
@@ -52,7 +52,7 @@ impl VelosiParseTreeStateFieldMemory {
         base: VelosiParseTreeIdentifier,
         offset: u64,
         size: u64,
-        layout: Option<Vec<VelosiParseTreeFieldSlice>>,
+        layout: Vec<VelosiParseTreeFieldSlice>,
         loc: VelosiTokenStream,
     ) -> Self {
         Self {
@@ -71,16 +71,14 @@ impl Display for VelosiParseTreeStateFieldMemory {
         write!(f, "    mem {} [ ", self.name)?;
         write!(f, "{}, {}, ", self.base, self.offset)?;
         write!(f, "{} ]", self.size)?;
-        if let Some(layout) = &self.layout {
-            if layout.is_empty() {
-                writeln!(f, " {{")?;
-                for slice in layout {
-                    write!(f, "      ")?;
-                    Display::fmt(slice, f)?;
-                    writeln!(f, ",")?;
-                }
-                write!(f, "    }}")?;
+        if !self.layout.is_empty() {
+            writeln!(f, " {{")?;
+            for slice in &self.layout {
+                write!(f, "      ")?;
+                Display::fmt(slice, f)?;
+                writeln!(f, ",")?;
             }
+            write!(f, "    }}")?;
         }
         Ok(())
     }
@@ -90,7 +88,7 @@ impl Display for VelosiParseTreeStateFieldMemory {
 pub struct VelosiParseTreeStateFieldRegister {
     pub name: VelosiParseTreeIdentifier,
     pub size: u64,
-    pub layout: Option<Vec<VelosiParseTreeFieldSlice>>,
+    pub layout: Vec<VelosiParseTreeFieldSlice>,
     pub loc: VelosiTokenStream,
 }
 
@@ -98,7 +96,7 @@ impl VelosiParseTreeStateFieldRegister {
     pub fn new(
         name: VelosiParseTreeIdentifier,
         size: u64,
-        layout: Option<Vec<VelosiParseTreeFieldSlice>>,
+        layout: Vec<VelosiParseTreeFieldSlice>,
         loc: VelosiTokenStream,
     ) -> Self {
         Self {
@@ -114,16 +112,14 @@ impl Display for VelosiParseTreeStateFieldRegister {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "    reg {} [", self.name)?;
         write!(f, " {} ]", self.size)?;
-        if let Some(layout) = &self.layout {
-            if layout.is_empty() {
-                writeln!(f, " {{")?;
-                for slice in layout {
-                    write!(f, "      ")?;
-                    Display::fmt(slice, f)?;
-                    writeln!(f, ",")?;
-                }
-                write!(f, "    }}")?;
+        if !self.layout.is_empty() {
+            writeln!(f, " {{")?;
+            for slice in &self.layout {
+                write!(f, "      ")?;
+                Display::fmt(slice, f)?;
+                writeln!(f, ",")?;
             }
+            write!(f, "    }}")?;
         }
         Ok(())
     }
