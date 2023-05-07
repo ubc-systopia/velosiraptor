@@ -125,8 +125,7 @@ impl VelosiAstStateMemoryField {
         utils::check_param_exists(&mut issues, st, &base);
 
         // convert the slices
-        let layout =
-            ast_result_unwrap!(handle_layout(pt.layout, st, &ident, &pt.loc, size), issues);
+        let layout = ast_result_unwrap!(handle_layout(pt.layout, st, &ident, size), issues);
 
         // construct the ast node and return
         let res = Self::new(ident, size, base, offset, layout, pt.loc);
@@ -264,8 +263,7 @@ impl VelosiAstStateRegisterField {
         let size = utils::check_field_size(&mut issues, pt.size, &size_loc);
 
         // convert the slices
-        let layout =
-            ast_result_unwrap!(handle_layout(pt.layout, st, &ident, &pt.loc, size), issues);
+        let layout = ast_result_unwrap!(handle_layout(pt.layout, st, &ident, size), issues);
 
         // construct the ast node and return
         let res = Self::new(ident, size, layout, pt.loc);
@@ -343,56 +341,43 @@ impl Display for VelosiAstStateRegisterField {
 }
 
 fn handle_layout(
-    ptlayout: Option<Vec<VelosiParseTreeFieldSlice>>,
+    ptlayout: Vec<VelosiParseTreeFieldSlice>,
     st: &mut SymbolTable,
     ident: &VelosiAstIdentifier,
-    loc: &VelosiTokenStream,
     size: u64,
 ) -> AstResult<Vec<Rc<VelosiAstFieldSlice>>, VelosiAstIssues> {
     let mut layout = Vec::new();
     let mut issues = VelosiAstIssues::new();
 
     // convert the slices
-    match ptlayout {
-        Some(ptlayout) => {
-            if ptlayout.is_empty() {
-                let msg = "empty state field block";
-                let hint = "remove the block or fill it in explicitly";
-                let err = VelosiAstErrBuilder::err(msg.to_string())
-                    .add_hint(hint.to_string())
-                    .add_location(loc.clone())
-                    .build();
-                issues.push(err);
-            }
 
-            for s in ptlayout.into_iter() {
-                let slice = Rc::new(ast_result_unwrap!(
-                    VelosiAstFieldSlice::from_parse_tree(s, ident.path(), size * 8),
-                    issues
-                ));
-
-                st.insert(slice.clone().into())
-                    .map_err(|e| issues.push(*e))
-                    .ok();
-                layout.push(slice);
-            }
-        }
-        None => {
-            // if none, add syntactic sugar for a single slice that takes up the whole field
-            let slice = Rc::new(VelosiAstFieldSlice::new(
-                VelosiAstIdentifier::new(
-                    ident.path(),
-                    "_val".to_string(),
-                    VelosiTokenStream::default(),
-                ),
-                0,
-                size * 8,
+    if ptlayout.is_empty() {
+        // if none, add syntactic sugar for a single slice that takes up the whole field
+        let slice = Rc::new(VelosiAstFieldSlice::new(
+            VelosiAstIdentifier::new(
+                ident.path(),
+                "_val".to_string(),
                 VelosiTokenStream::default(),
+            ),
+            0,
+            size * 8,
+            VelosiTokenStream::default(),
+        ));
+        st.insert(slice.clone().into())
+            .map_err(|e| issues.push(*e))
+            .ok();
+        layout.push(slice)
+    } else {
+        for s in ptlayout.into_iter() {
+            let slice = Rc::new(ast_result_unwrap!(
+                VelosiAstFieldSlice::from_parse_tree(s, ident.path(), size * 8),
+                issues
             ));
+
             st.insert(slice.clone().into())
                 .map_err(|e| issues.push(*e))
                 .ok();
-            layout.push(slice)
+            layout.push(slice);
         }
     }
 

@@ -29,7 +29,7 @@
 use nom::{
     branch::alt,
     combinator::{cut, opt},
-    multi::separated_list0,
+    multi::{separated_list0, separated_list1},
     sequence::{delimited, preceded, terminated, tuple},
 };
 
@@ -151,11 +151,17 @@ pub fn memoryfield(
 
     let (i3, slices) = opt(delimited(
         lbrace,
-        terminated(separated_list0(comma, statefieldslice), opt(comma)),
+        terminated(separated_list1(comma, statefieldslice), opt(comma)),
         cut(rbrace),
     ))(i2)?;
 
     pos.span_until_start(&i3);
+
+    let slices = if let Some(slices) = slices {
+        slices
+    } else {
+        Vec::new()
+    };
 
     let (base, offset, size) = fieldinfo;
 
@@ -191,11 +197,17 @@ pub fn registerfield(
 
     let (i3, slices) = opt(delimited(
         lbrace,
-        terminated(separated_list0(comma, statefieldslice), opt(comma)),
+        terminated(separated_list1(comma, statefieldslice), opt(comma)),
         cut(rbrace),
     ))(i2)?;
 
     pos.span_until_start(&i3);
+
+    let slices = if let Some(slices) = slices {
+        slices
+    } else {
+        Vec::new()
+    };
 
     let res = VelosiParseTreeStateFieldRegister::new(name, size, slices, pos);
     Ok((i3, VelosiParseTreeStateField::Register(res)))
