@@ -1110,13 +1110,13 @@ impl VelosiAstIdentLiteralExpr {
                 AstResult::Ok(VelosiAstExpr::IdentLiteral(litexpr))
             }
             VelosiAstNode::StateField(f) => {
-                Self::handle_field_reference(f.layout_as_slice(), litexpr)
+                Self::handle_field_reference(f.layout_as_slice(), litexpr, st)
             }
             VelosiAstNode::StateFieldSlice(_) => {
                 AstResult::Ok(VelosiAstExpr::IdentLiteral(litexpr))
             }
             VelosiAstNode::InterfaceField(f) => {
-                Self::handle_field_reference(f.layout_as_slice(), litexpr)
+                Self::handle_field_reference(f.layout_as_slice(), litexpr, st)
             }
             VelosiAstNode::InterfaceFieldSlice(_) => {
                 AstResult::Ok(VelosiAstExpr::IdentLiteral(litexpr))
@@ -1210,6 +1210,7 @@ impl VelosiAstIdentLiteralExpr {
     fn handle_field_reference(
         layout: &[Rc<VelosiAstFieldSlice>],
         mut litexpr: VelosiAstIdentLiteralExpr,
+        st: &SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
         match layout {
             [field_slice] => {
@@ -1217,11 +1218,16 @@ impl VelosiAstIdentLiteralExpr {
                 AstResult::Ok(VelosiAstExpr::IdentLiteral(litexpr))
             }
             _ => {
-                let msg = "expected a field slice expression but got the whole field";
+                let msg = "taking the whole field with more than one slice is not supported";
                 let hint = "specify a slice of this field";
+                let related = "or remove slices from the field definition";
                 let err = VelosiAstErrBuilder::err(msg.to_string())
                     .add_hint(hint.to_string())
                     .add_location(litexpr.loc.clone())
+                    .add_related_location(
+                        related.to_string(),
+                        st.lookup(&litexpr.ident_to_string()).unwrap().loc().clone(),
+                    )
                     .build();
                 AstResult::Issues(VelosiAstExpr::IdentLiteral(litexpr), err.into())
             }
