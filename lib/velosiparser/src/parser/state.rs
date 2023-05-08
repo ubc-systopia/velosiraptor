@@ -29,12 +29,12 @@
 use nom::{
     branch::alt,
     combinator::{cut, opt},
-    multi::{separated_list0, separated_list1},
+    multi::separated_list0,
     sequence::{delimited, preceded, terminated, tuple},
+    Err,
 };
 
 // lexer, parser terminals and ast
-use crate::error::IResult;
 use crate::parser::{
     param::parameter,
     terminals::{
@@ -48,6 +48,10 @@ use crate::parsetree::{
     VelosiParseTreeStateFieldMemory, VelosiParseTreeStateFieldRegister, VelosiParseTreeUnitNode,
 };
 use crate::VelosiTokenStream;
+use crate::{
+    error::{IResult, VelosiParserErrBuilder},
+    VelosiParserErr,
+};
 
 /// parses and consumes the [VelosiParseTreeState] of a unit
 ///
@@ -151,13 +155,16 @@ pub fn memoryfield(
 
     let (i3, slices) = opt(delimited(
         lbrace,
-        terminated(separated_list1(comma, statefieldslice), opt(comma)),
+        terminated(separated_list0(comma, statefieldslice), opt(comma)),
         cut(rbrace),
     ))(i2)?;
 
     pos.span_until_start(&i3);
 
     let slices = if let Some(slices) = slices {
+        if slices.is_empty() {
+            return Err(empty_field_err(i3));
+        }
         slices
     } else {
         Vec::new()
@@ -197,13 +204,16 @@ pub fn registerfield(
 
     let (i3, slices) = opt(delimited(
         lbrace,
-        terminated(separated_list1(comma, statefieldslice), opt(comma)),
+        terminated(separated_list0(comma, statefieldslice), opt(comma)),
         cut(rbrace),
     ))(i2)?;
 
     pos.span_until_start(&i3);
 
     let slices = if let Some(slices) = slices {
+        if slices.is_empty() {
+            return Err(empty_field_err(i3));
+        }
         slices
     } else {
         Vec::new()
@@ -211,6 +221,16 @@ pub fn registerfield(
 
     let res = VelosiParseTreeStateFieldRegister::new(name, size, slices, pos);
     Ok((i3, VelosiParseTreeStateField::Register(res)))
+}
+
+fn empty_field_err(loc: VelosiTokenStream) -> Err<VelosiParserErr> {
+    let errmsg = "empty state field block";
+    let hint = "remove the block or fill it in explicitly";
+    let err = VelosiParserErrBuilder::new(errmsg.to_string())
+        .add_tokstream(loc)
+        .add_hint(hint.to_string())
+        .build();
+    Err::Failure(err)
 }
 
 /// Pares and consumes a state field slice definition

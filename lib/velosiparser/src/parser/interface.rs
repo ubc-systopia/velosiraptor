@@ -34,12 +34,12 @@
 use nom::{
     branch::alt,
     combinator::{cut, opt},
-    multi::{many0, separated_list0, separated_list1},
+    multi::{many0, separated_list0},
     sequence::{delimited, preceded, terminated, tuple},
+    Err,
 };
 
 /// library internal includes
-use crate::error::IResult;
 use crate::parser::{expr::expr, param::parameter, terminals::*};
 use crate::parsetree::{
     VelosiParseTreeFieldSlice, VelosiParseTreeIdentifier, VelosiParseTreeInterface,
@@ -47,6 +47,10 @@ use crate::parsetree::{
     VelosiParseTreeInterfaceField, VelosiParseTreeInterfaceFieldMemory,
     VelosiParseTreeInterfaceFieldMmio, VelosiParseTreeInterfaceFieldNode,
     VelosiParseTreeInterfaceFieldRegister, VelosiParseTreeParam, VelosiParseTreeUnitNode,
+};
+use crate::{
+    error::{IResult, VelosiParserErrBuilder},
+    VelosiParserErr,
 };
 use crate::{VelosiOpToken, VelosiTokenKind, VelosiTokenStream};
 
@@ -173,13 +177,16 @@ pub fn registerfield(
 
     let (i3, nodes) = opt(delimited(
         lbrace,
-        terminated(separated_list1(comma, interfacefieldbody), opt(comma)),
+        terminated(separated_list0(comma, interfacefieldbody), opt(comma)),
         cut(rbrace),
     ))(i2)?;
 
     pos.span_until_start(&i3);
 
     let nodes = if let Some(nodes) = nodes {
+        if nodes.is_empty() {
+            return Err(empty_field_err(i3));
+        }
         nodes
     } else {
         Vec::new()
@@ -206,13 +213,16 @@ pub fn memoryfield(
 
     let (i3, nodes) = opt(delimited(
         lbrace,
-        terminated(separated_list1(comma, interfacefieldbody), opt(comma)),
+        terminated(separated_list0(comma, interfacefieldbody), opt(comma)),
         cut(rbrace),
     ))(i2)?;
 
     pos.span_until_start(&i3);
 
     let nodes = if let Some(nodes) = nodes {
+        if nodes.is_empty() {
+            return Err(empty_field_err(i3));
+        }
         nodes
     } else {
         Vec::new()
@@ -241,13 +251,16 @@ pub fn mmiofield(
 
     let (i3, nodes) = opt(delimited(
         lbrace,
-        terminated(separated_list1(comma, interfacefieldbody), opt(comma)),
+        terminated(separated_list0(comma, interfacefieldbody), opt(comma)),
         cut(rbrace),
     ))(i2)?;
 
     pos.span_until_start(&i3);
 
     let nodes = if let Some(nodes) = nodes {
+        if nodes.is_empty() {
+            return Err(empty_field_err(i3));
+        }
         nodes
     } else {
         Vec::new()
@@ -257,6 +270,16 @@ pub fn mmiofield(
 
     let res = VelosiParseTreeInterfaceFieldMmio::new(name, base, offset, size, nodes, pos);
     Ok((i3, VelosiParseTreeInterfaceField::Mmio(res)))
+}
+
+fn empty_field_err(loc: VelosiTokenStream) -> Err<VelosiParserErr> {
+    let errmsg = "empty interface field block";
+    let hint = "remove the block or fill it in explicitly";
+    let err = VelosiParserErrBuilder::new(errmsg.to_string())
+        .add_tokstream(loc)
+        .add_hint(hint.to_string())
+        .build();
+    Err::Failure(err)
 }
 
 type MemFiledInfo = (VelosiParseTreeIdentifier, u64, u64);
