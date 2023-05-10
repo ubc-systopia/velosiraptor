@@ -156,23 +156,28 @@ pub fn check_addressing_width(issues: &mut VelosiAstIssues, w: u64, loc: VelosiT
 }
 
 /// checks whether the identifier is in snake_case
-pub fn check_field_size(issues: &mut VelosiAstIssues, size: u64, loc: &VelosiTokenStream) -> u64 {
+pub fn check_field_size(
+    issues: &mut VelosiAstIssues,
+    size: u64,
+    size_loc: &VelosiTokenStream,
+) -> u64 {
     if ![1, 2, 4, 8].contains(&size) {
-        if [8, 16, 32, 64].contains(&size) {
-            let msg = format!("Size in bits given, bytes expected. Converting to {size}");
+        if [16, 32, 64].contains(&size) {
+            let bytes = size / 8;
+            let msg = format!("Size in bits given, bytes expected. Converting to {bytes} bytes.");
             let hint = "Change the size information to one of 1, 2, 4, 8.";
             let err = VelosiAstErrBuilder::warn(msg)
                 .add_hint(hint.to_string())
-                .add_location(loc.from_self_with_subrange(7..8))
+                .add_location(size_loc.clone())
                 .build();
             issues.push(err);
-            return size / 8;
+            return bytes;
         } else {
             let msg = format!("Unsupported size of the memory field: {size}");
             let hint = "Change the size information to one of 1, 2, 4, 8.";
             let err = VelosiAstErrBuilder::err(msg)
                 .add_hint(hint.to_string())
-                .add_location(loc.from_self_with_subrange(7..8))
+                .add_location(size_loc.clone())
                 .build();
             issues.push(err);
         }
