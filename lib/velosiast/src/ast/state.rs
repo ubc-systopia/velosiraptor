@@ -103,7 +103,8 @@ impl VelosiAstStateMemoryField {
         utils::check_snake_case(&mut issues, &ident);
 
         // check the size
-        let size = utils::check_field_size(&mut issues, pt.size, &pt.loc);
+        let size_loc = pt.loc.from_self_with_subrange(7..8);
+        let size = utils::check_field_size(&mut issues, pt.size, &size_loc);
 
         // the offset should be aligned to the size
         let offset = pt.offset;
@@ -113,7 +114,7 @@ impl VelosiAstStateMemoryField {
             let hint = format!("Change offset to be a multiple of {size}");
             let err = VelosiAstErrBuilder::err(msg.to_string())
                 .add_hint(hint)
-                .add_location(pt.loc.from_self_with_subrange(7..8))
+                .add_location(pt.loc.from_self_with_subrange(5..6))
                 .build();
             issues.push(err);
         }
@@ -271,7 +272,8 @@ impl VelosiAstStateRegisterField {
         utils::check_snake_case(&mut issues, &ident);
 
         // check the size
-        let size = utils::check_field_size(&mut issues, pt.size, &pt.loc);
+        let size_loc = pt.loc.from_self_with_subrange(3..4);
+        let size = utils::check_field_size(&mut issues, pt.size, &size_loc);
 
         // convert the slices
         let mut layout = Vec::new();

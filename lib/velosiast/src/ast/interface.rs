@@ -569,7 +569,8 @@ impl VelosiAstInterfaceMemoryField {
         utils::check_snake_case(&mut issues, &ident);
 
         // check the size
-        let size = utils::check_field_size(&mut issues, pt.size, &pt.loc);
+        let size_loc = pt.loc.from_self_with_subrange(7..8);
+        let size = utils::check_field_size(&mut issues, pt.size, &size_loc);
 
         // convert the base region, check whether it exists
         let base = VelosiAstIdentifier::from(pt.base);
@@ -604,7 +605,7 @@ impl VelosiAstInterfaceMemoryField {
             let hint = format!("Change offset to be a multiple of {size}");
             let err = VelosiAstErrBuilder::err(msg.to_string())
                 .add_hint(hint)
-                .add_location(pt.loc.from_self_with_subrange(7..8))
+                .add_location(pt.loc.from_self_with_subrange(5..6))
                 .build();
             issues.push(err);
         }
@@ -786,7 +787,8 @@ impl VelosiAstInterfaceMmioField {
         utils::check_snake_case(&mut issues, &ident);
 
         // check the size
-        let size = utils::check_field_size(&mut issues, pt.size, &pt.loc);
+        let size_loc = pt.loc.from_self_with_subrange(7..8);
+        let size = utils::check_field_size(&mut issues, pt.size, &size_loc);
 
         // convert the base region, check whether it exists
         let base = VelosiAstIdentifier::from(pt.base);
@@ -821,7 +823,7 @@ impl VelosiAstInterfaceMmioField {
             let hint = format!("Change offset to be a multiple of {size}");
             let err = VelosiAstErrBuilder::err(msg.to_string())
                 .add_hint(hint)
-                .add_location(pt.loc.from_self_with_subrange(7..8))
+                .add_location(pt.loc.from_self_with_subrange(5..6))
                 .build();
             issues.push(err);
         }
@@ -1046,7 +1048,8 @@ impl VelosiAstInterfaceRegisterField {
         utils::check_snake_case(&mut issues, &ident);
 
         // check the size
-        let size = utils::check_field_size(&mut issues, pt.size, &pt.loc);
+        let size_loc = pt.loc.from_self_with_subrange(3..4);
+        let size = utils::check_field_size(&mut issues, pt.size, &size_loc);
 
         // create dummy memory field
         let n = Self::new(ident.clone(), size, vec![], vec![], vec![], pt.loc.clone());
