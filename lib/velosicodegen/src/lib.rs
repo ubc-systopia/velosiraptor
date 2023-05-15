@@ -42,7 +42,7 @@ use crate::rust::BackendRust;
 use velosiast::VelosiAst;
 
 const COPYRIGHT: &str =
-    "2022 Systopia Lab, Computer Science, University of British Columbia.\nAll rights reserved.";
+    "2022 Systopia Lab, Computer Science, University of British Columbia. All rights reserved.";
 
 #[derive(Debug)]
 pub enum VelosiCodeGenError {

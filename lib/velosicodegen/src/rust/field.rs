@@ -35,20 +35,20 @@ use codegen_rs as CG;
 use super::utils::{
     add_header, save_scope, to_const_name, to_mask_str, to_rust_type, to_struct_name,
 };
-use crate::ast::{BitSlice, Field};
-use crate::codegen::CodeGenError;
+use crate::VelosiCodeGenError;
+use velosiast::{VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField};
 
 /// returns the string of the field type
-pub fn field_type(field: &Field) -> String {
-    to_struct_name(&field.name, Some("Field"))
+pub fn field_type(field: &VelosiAstInterfaceField) -> String {
+    to_struct_name(field.ident(), Some("Field"))
 }
 
 /// adding a constant value for the mask : const FIELD_MASK : type = value;
-fn add_field_constants(scope: &mut CG::Scope, field: &Field) {
+fn add_field_constants(scope: &mut CG::Scope, field: &VelosiAstInterfaceField) {
     // construct the constant name
-    let maskname = format!("{}_MASK", to_const_name(&field.name));
+    let maskname = format!("{}_MASK", to_const_name(field.ident()));
     // print the mask value
-    let maskvalue = format!("0x{:x}", field.mask_value());
+    let maskvalue = format!("0x{:x}", field.mask());
     // create and add the constant to the scope
     let mconst = scope.new_const(&maskname, to_rust_type(field.nbits()), &maskvalue);
     // adding the document comment
@@ -57,7 +57,7 @@ fn add_field_constants(scope: &mut CG::Scope, field: &Field) {
     mconst.vis("pub");
 }
 
-fn add_struct_definition(scope: &mut CG::Scope, field: &Field) {
+fn add_struct_definition(scope: &mut CG::Scope, field: &VelosiAstInterfaceField) {
     // a field is a struct
     //
     // field_name  --> struct FieldName {  val: u64 };
@@ -76,32 +76,32 @@ fn add_struct_definition(scope: &mut CG::Scope, field: &Field) {
     // add the doc field to the struct
     st.doc(&format!(
         "Represents the interface field '{}',\ndefined in: {}",
-        field.name,
-        field.location()
+        field.ident(),
+        field.loc().loc()
     ));
 
     // it has a single field, called 'val'
     st.field("val", to_rust_type(field.nbits()));
 }
 
-fn add_insert_fn(imp: &mut CG::Impl, fname: &str, fbits: u64, sl: &BitSlice) {
-    let fnname = format!("insert_{}", sl.name);
+fn add_insert_fn(imp: &mut CG::Impl, fname: &str, fbits: u64, sl: &VelosiAstFieldSlice) {
+    let fnname = format!("insert_{}", sl.ident());
     let ftype = to_rust_type(sl.nbits());
     let valtype = to_rust_type(fbits);
     // set function
 
     let body = if sl.start != 0 {
         format!(
-            "self.val = (self.val & {}) | (((val as {}) & {}) << {})",
-            to_mask_str(!sl.mask_value(), fbits),
+            "self.val = (&self.val & {}) | (((val as {}) & {}) << {})",
+            to_mask_str(!sl.mask(), fbits),
             valtype,
             to_mask_str(((1u128 << sl.nbits()) - 1) as u64, sl.nbits()),
             sl.start
         )
     } else {
         format!(
-            "self.val = (self.val & {}) | ((val as {}) & {})",
-            to_mask_str(!sl.mask_value(), fbits),
+            "self.val = (&self.val & {}) | ((val as {}) & {})",
+            to_mask_str(!sl.mask(), fbits),
             valtype,
             to_mask_str(((1u128 << sl.nbits()) - 1) as u64, sl.nbits())
         )
@@ -111,24 +111,24 @@ fn add_insert_fn(imp: &mut CG::Impl, fname: &str, fbits: u64, sl: &BitSlice) {
         .vis("pub")
         .arg_mut_self()
         .arg("val", CG::Type::new(ftype))
-        .doc(&format!("inserts value {}.{} in field", fname, sl.name))
+        .doc(&format!("inserts value {}.{} in field", fname, sl.ident()))
         .line(body);
 }
 
-fn add_extract_fn(imp: &mut CG::Impl, fname: &str, sl: &BitSlice) {
-    let fnname = format!("extract_{}", sl.name);
+fn add_extract_fn(imp: &mut CG::Impl, fname: &str, sl: &VelosiAstFieldSlice) {
+    let fnname = format!("extract_{}", sl.ident());
     let ftype = to_rust_type(sl.nbits());
 
     let body = if sl.start != 0 {
         format!(
-            "((self.val >> {}) & {}) as {}",
+            "((&self.val >> {}) & {}) as {}",
             sl.start,
             to_mask_str(((1u128 << sl.nbits()) - 1) as u64, sl.nbits()),
             ftype
         )
     } else {
         format!(
-            "(self.val & {}) as {}",
+            "(&self.val & {}) as {}",
             to_mask_str(((1u128 << sl.nbits()) - 1) as u64, sl.nbits()),
             ftype
         )
@@ -137,31 +137,35 @@ fn add_extract_fn(imp: &mut CG::Impl, fname: &str, sl: &BitSlice) {
     // get function
     imp.new_fn(&fnname)
         .vis("pub")
-        .doc(&format!("extracts value {}.{} from field", fname, sl.name))
+        .doc(&format!(
+            "extracts value {}.{} from field",
+            fname,
+            sl.ident()
+        ))
         .arg_ref_self()
         .ret(CG::Type::new(ftype))
         .line(body);
 }
 
-fn add_struct_impl(scope: &mut CG::Scope, field: &Field) {
+fn add_struct_impl(scope: &mut CG::Scope, field: &VelosiAstInterfaceField) {
     // new implementation
     let imp = scope.new_impl(&field_type(field));
 
     // add the new() function
     imp.new_fn("new")
         .vis("pub")
-        .doc(&format!("creates a new {} field value", field.name))
+        .doc(&format!("creates a new {} field value", field.ident()))
         .ret(CG::Type::new("Self"))
         .line("Self { val: 0 }");
 
     // add the get/set functions
-    for sl in &field.layout {
-        add_insert_fn(imp, &field.name, field.nbits(), sl);
-        add_extract_fn(imp, &field.name, sl);
+    for sl in field.layout() {
+        add_insert_fn(imp, field.ident(), field.nbits(), sl);
+        add_extract_fn(imp, field.ident(), sl);
     }
 }
 
-fn add_default_impl(scope: &mut CG::Scope, field: &Field) {
+fn add_default_impl(scope: &mut CG::Scope, field: &VelosiAstInterfaceField) {
     let imp = scope.new_impl(&field_type(field));
     imp.impl_trait("Default");
 
@@ -171,21 +175,24 @@ fn add_default_impl(scope: &mut CG::Scope, field: &Field) {
 }
 
 /// generates the field value interface
-pub fn generate(unit: &str, field: &Field, outdir: &Path) -> Result<(), CodeGenError> {
+pub fn generate(
+    unit: &str,
+    field: &VelosiAstInterfaceField,
+    outdir: &Path,
+) -> Result<(), VelosiCodeGenError> {
     // the code generation scope
     let mut scope = CG::Scope::new();
 
     // add the header comments
-    let title = format!("Field interface for `{}::{}`", unit, &field.name);
+    let title = format!("Field interface for `{}::{}`", unit, field.ident());
     add_header(&mut scope, &title);
 
     // add the definitions
     add_field_constants(&mut scope, field);
     add_struct_definition(&mut scope, field);
     add_struct_impl(&mut scope, field);
-
     add_default_impl(&mut scope, field);
 
     // save the scope
-    save_scope(scope, outdir, &field.name.to_lowercase())
+    save_scope(scope, outdir, &field.ident().to_lowercase())
 }
