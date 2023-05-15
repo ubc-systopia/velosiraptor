@@ -21,6 +21,7 @@ members = [
     ,"lib/velosiast"
     ,"lib/velosisynth"
     ,"lib/velosicodegen"
+    ,"lib/velosihwgen/"
     ,"lib/velosicomposition"
     ,"lib/z3/z3-sys"
 ]

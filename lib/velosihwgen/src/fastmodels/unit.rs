@@ -35,11 +35,12 @@ use std::path::Path;
 use crustal as C;
 
 // the defined errors
-use crate::ast::{Expr, Method, Stmt, Type, Unit};
-use crate::hwgen::fastmodels::add_header;
-use crate::hwgen::fastmodels::interface::{interface_class_name, interface_header_file};
-use crate::hwgen::fastmodels::state::{state_class_name, state_header_file};
-use crate::hwgen::HWGenError;
+use velosiast::ast::{VelosiAstExpr, VelosiAstMethod, VelosiAstUnit, VelosiAstNumLiteralExpr, VelosiAstBoolLiteralExpr, VelosiAstBinOpExpr, VelosiAstUnOpExpr, VelosiAstFnCallExpr, VelosiAstIdentLiteralExpr, VelosiAstIfElseExpr, VelosiAstTypeInfo, VelosiAstType};
+
+use crate::fastmodels::add_header;
+use crate::fastmodels::interface::{interface_class_name, interface_header_file};
+use crate::fastmodels::state::{state_class_name, state_header_file};
+use crate::HWGenError;
 
 /// generates the name of the state field header file
 pub fn unit_header_file(name: &str) -> String {
@@ -173,7 +174,7 @@ fn add_create(c: &mut C::Class, ucn: &str) {
     // }
 }
 
-fn state_field_access(path: &[String]) -> C::Expr {
+fn state_field_access(path: &Vec<&str>) -> C::Expr {
     let st = C::Expr::field_access(&C::Expr::this(), "_state");
 
     if path.len() == 1 {
@@ -193,51 +194,63 @@ fn state_field_access(path: &[String]) -> C::Expr {
     panic!("unhandled!")
 }
 
-fn expr_to_cpp(expr: &Expr) -> C::Expr {
-    use Expr::*;
+fn expr_to_cpp(expr: &VelosiAstExpr) -> C::Expr {
+    use VelosiAstExpr::*;
     match expr {
-        Identifier { path, .. } => {
-            match path[0].as_str() {
+        IdentLiteral(VelosiAstIdentLiteralExpr{ident, ..}) => {
+            let p: Vec<&str> = ident.path_split().collect();
+            match p[0] {
                 "state" => {
                     // this->_state.control_field()
-                    state_field_access(&path[1..])
+                    state_field_access(&p)
                 }
                 "interface" => panic!("state not implemented"),
-                p => C::Expr::new_var(p, C::Type::new_int(64)),
+                x => C::Expr::new_var(x, C::Type::new_int(64)),
             }
         }
-        Number { value, .. } => C::Expr::new_num(*value),
-        Boolean { value: true, .. } => C::Expr::btrue(),
-        Boolean { value: false, .. } => C::Expr::bfalse(),
-        BinaryOperation { op, lhs, rhs, .. } => {
+        NumLiteral(VelosiAstNumLiteralExpr{val, ..}) => C::Expr::new_num(*val),
+        BoolLiteral(VelosiAstBoolLiteralExpr{val: true, ..}) => C::Expr::btrue(),
+        BoolLiteral(VelosiAstBoolLiteralExpr{val: false, ..}) => C::Expr::bfalse(),
+        BinOp(VelosiAstBinOpExpr{op, lhs, rhs, ..}) => {
             let o = format!("{}", op);
             let e = expr_to_cpp(lhs);
             let e2 = expr_to_cpp(rhs);
             C::Expr::binop(e, &o, e2)
         }
-        UnaryOperation { op, val, .. } => {
+        UnOp(VelosiAstUnOpExpr{op, expr, ..}) => {
             let o = format!("{}", op);
-            let e = expr_to_cpp(val);
+            let e = expr_to_cpp(expr);
             C::Expr::uop(&o, e)
         }
-        FnCall { path, args, .. } => {
-            if path.len() != 1 {
+        FnCall(VelosiAstFnCallExpr{ident, args, ..}) => {
+            let p: Vec<&str> = ident.path_split().collect();
+            if p.len() != 1 {
                 panic!("TODO: handle multiple path components");
             }
             C::Expr::method_call(
                 &C::Expr::this(),
-                &path[0],
+                &p[0],
                 args.iter().map(expr_to_cpp).collect(),
             )
         }
         Slice { .. } => panic!("don't know how to handle slice"),
-        Element { .. } => panic!("don't know how to handle element"),
         Range { .. } => panic!("don't know how to handle range"),
         Quantifier { .. } => panic!("don't know how to handle quantifier"),
+        IfElse(VelosiAstIfElseExpr{cond, then, other, loc, ..}) =>
+            panic!("don't know how to handle if/else"),
+        // {
+        //     let mut b = C::Block::new();
+        //     let mut ifelse = C::IfElse::with_expr(expr_to_cpp(cond));
+        //     if let Some(other) = other.as_ref() {
+        //         ifelse.set_other(stmt_to_cpp(other));
+        //     }
+        //     ifelse.set_then(stmt_to_cpp(then));
+        //     b.ifelse(ifelse);
+        //     b
     }
 }
 
-fn assert_to_cpp(expr: &Expr) -> C::IfElse {
+fn assert_to_cpp(expr: &VelosiAstExpr) -> C::IfElse {
     let mut c = C::IfElse::with_expr(C::Expr::not(expr_to_cpp(expr)));
     c.then_branch()
         .raw(format!(
@@ -248,74 +261,82 @@ fn assert_to_cpp(expr: &Expr) -> C::IfElse {
     c
 }
 
-fn handle_requires_assert(method: &mut C::Method, expr: &Expr) {
+fn handle_requires_assert(method: &mut C::Method, expr: &VelosiAstExpr) {
     method.body().ifelse(assert_to_cpp(expr));
 }
 
-fn stmt_to_cpp(s: &Stmt) -> C::Block {
-    use Stmt::*;
-    match s {
-        Block { stmts, .. } => stmts.iter().fold(C::Block::new(), |mut acc, x| {
-            acc.merge(stmt_to_cpp(x));
-            acc
-        }),
-        Return { expr, .. } => {
-            let mut b = C::Block::new();
-            b.return_expr(expr_to_cpp(expr));
-            b
-        }
-        Let {
-            typeinfo: _,
-            lhs: _,
-            rhs: _,
-            pos: _,
-        } => panic!("not handled yet!"),
-        Assert { expr, pos: _ } => {
-            let mut b = C::Block::new();
-            b.ifelse(assert_to_cpp(expr));
-            b
-        }
-        IfElse {
-            cond,
-            then,
-            other,
-            pos: _,
-        } => {
-            let mut b = C::Block::new();
-            let mut ifelse = C::IfElse::with_expr(expr_to_cpp(cond));
-            if let Some(other) = other.as_ref() {
-                ifelse.set_other(stmt_to_cpp(other));
-            }
-            ifelse.set_then(stmt_to_cpp(then));
-            b.ifelse(ifelse);
-            b
-        }
-    }
-}
+// fn stmt_to_cpp(s: &Stmt) -> C::Block {
+//     use Stmt::*;
+//     match s {
+//         Block { stmts, .. } => stmts.iter().fold(C::Block::new(), |mut acc, x| {
+//             acc.merge(stmt_to_cpp(x));
+//             acc
+//         }),
+//         Return { expr, .. } => {
+//             let mut b = C::Block::new();
+//             b.return_expr(expr_to_cpp(expr));
+//             b
+//         }
+//         Let {
+//             typeinfo: _,
+//             lhs: _,
+//             rhs: _,
+//             pos: _,
+//         } => panic!("not handled yet!"),
+//         Assert { expr, pos: _ } => {
+//             let mut b = C::Block::new();
+//             b.ifelse(assert_to_cpp(expr));
+//             b
+//         }
+//         IfElse {
+//             cond,
+//             then,
+//             other,
+//             pos: _,
+//         } => {
+//             let mut b = C::Block::new();
+//             let mut ifelse = C::IfElse::with_expr(expr_to_cpp(cond));
+//             if let Some(other) = other.as_ref() {
+//                 ifelse.set_other(stmt_to_cpp(other));
+//             }
+//             ifelse.set_then(stmt_to_cpp(then));
+//             b.ifelse(ifelse);
+//             b
+//         }
+//     }
+// }
 
-fn add_translate_remap(c: &mut C::Class, tm: &Method) {
-    let src_addr_param = C::MethodParam::new(&tm.args[0].name, C::Type::new_typedef("lvaddr_t"));
-    let mode_param = C::MethodParam::new(&tm.args[1].name, C::Type::new_typedef("access_mode_t"));
+fn add_translate_remap(c: &mut C::Class, tm: &VelosiAstMethod) {
+    let src_addr_param = C::MethodParam::new(
+        &tm.params[0].ident.ident,
+        C::Type::new_typedef("lvaddr_t")
+    );
+    let mode_param = C::MethodParam::new(
+        &tm.params[1].ident.ident,
+        C::Type::new_typedef("access_mode_t")
+    );
     let m = c
         .new_method("do_translate_remap", C::Type::new_typedef("lpaddr_t"))
         .push_param(src_addr_param)
         .push_param(mode_param);
 
-    if let Some(body) = &tm.stmts {
-        m.set_body(stmt_to_cpp(body));
+    if let Some(body) = &tm.body {
+        let mut b = C::Block::new();
+        b.return_expr(expr_to_cpp(body));
+        m.set_body(b);
     }
 }
 
-fn add_translate(c: &mut C::Class, tm: &Method) {
+fn add_translate(c: &mut C::Class, tm: &VelosiAstMethod) {
     add_translate_remap(c, tm);
 
     // virtual bool do_translate(lvaddr_t src_addr, size_t size, access_mode_t mode,
     // lpaddr_t *dst_addr) set_overridee;
 
-    let src_addr_param = C::MethodParam::new(&tm.args[0].name, C::Type::new_typedef("lvaddr_t"));
+    let src_addr_param = C::MethodParam::new(&tm.params[0].ident.ident, C::Type::new_typedef("lvaddr_t"));
     let src_var = C::Expr::from_method_param(&src_addr_param);
     let size_param = C::MethodParam::new("size", C::Type::new_size());
-    let mode_param = C::MethodParam::new(&tm.args[1].name, C::Type::new_typedef("access_mode_t"));
+    let mode_param = C::MethodParam::new(&tm.params[1].ident.ident, C::Type::new_typedef("access_mode_t"));
     let mode_var = C::Expr::from_method_param(&mode_param);
     let dst_addr_param = C::MethodParam::new(
         "dst_addr",
@@ -327,7 +348,7 @@ fn add_translate(c: &mut C::Class, tm: &Method) {
         .new_method("do_translate", C::Type::new_bool())
         .set_public()
         .set_virtual()
-        .set_override()
+
         .push_param(src_addr_param)
         .push_param(size_param)
         .push_param(mode_param)
@@ -335,7 +356,7 @@ fn add_translate(c: &mut C::Class, tm: &Method) {
 
     m.body().raw(format!(
         "Logging::debug(\"TranslationUnit::translate(%lx)\", {});",
-        &tm.args[0].name
+        &tm.params[0].ident.ident
     ));
 
     for e in &tm.requires {
@@ -353,18 +374,18 @@ fn add_translate(c: &mut C::Class, tm: &Method) {
     m.body().return_expr(C::Expr::btrue());
 }
 
-fn ast_type_to_c_type(t: &Type) -> C::Type {
-    match t {
-        Type::Boolean => C::Type::new_bool(),
-        Type::Integer => C::Type::new_uint(64),
-        Type::Size => C::Type::new_size(),
-        Type::Address => C::Type::new_typedef("genaddr_t"),
+fn ast_type_to_c_type(t: &VelosiAstType) -> C::Type {
+    match t.typeinfo {
+        VelosiAstTypeInfo::Bool => C::Type::new_bool(),
+        VelosiAstTypeInfo::Integer => C::Type::new_uint(64),
+        VelosiAstTypeInfo::Size => C::Type::new_size(),
+        VelosiAstTypeInfo::GenAddr => C::Type::new_typedef("genaddr_t"),
         _ => panic!("unhandled!"),
     }
 }
 
-fn add_method(c: &mut C::Class, tm: &Method) {
-    match &tm.name[..] {
+fn add_method(c: &mut C::Class, tm: &VelosiAstMethod) {
+    match &tm.ident.ident[..] {
         "translate" => {
             add_translate(c, tm);
             return;
@@ -375,21 +396,21 @@ fn add_method(c: &mut C::Class, tm: &Method) {
         _ => (),
     }
 
-    let m = c.new_method(&tm.name, ast_type_to_c_type(&tm.rettype));
-    for p in &tm.args {
-        m.push_param(C::MethodParam::new(&p.name, ast_type_to_c_type(&p.ptype)));
+    let m = c.new_method(&tm.ident.ident, ast_type_to_c_type(&tm.rtype));
+    for p in &tm.params {
+        m.push_param(C::MethodParam::new(&p.ident.ident, ast_type_to_c_type(&p.ptype)));
     }
 
     for e in &tm.requires {
         handle_requires_assert(m, e);
     }
 
-    if let Some(body) = &tm.stmts {
-        m.body().merge(stmt_to_cpp(body));
+    if let Some(body) = &tm.body {
+        m.body().return_expr(expr_to_cpp(body));
     }
 }
 
-pub fn generate_unit_header(name: &str, unit: &Unit, outdir: &Path) -> Result<(), HWGenError> {
+pub fn generate_unit_header(name: &str, unit: &VelosiAstUnit, outdir: &Path) -> Result<(), HWGenError> {
     let mut scope = C::Scope::new();
 
     // document header
@@ -487,7 +508,7 @@ pub fn generate_unit_header(name: &str, unit: &Unit, outdir: &Path) -> Result<()
     Ok(())
 }
 
-pub fn generate_unit_impl(name: &str, unit: &Unit, outdir: &Path) -> Result<(), HWGenError> {
+pub fn generate_unit_impl(name: &str, unit: &VelosiAstUnit, outdir: &Path) -> Result<(), HWGenError> {
     let mut scope = C::Scope::new();
 
     // add the header
