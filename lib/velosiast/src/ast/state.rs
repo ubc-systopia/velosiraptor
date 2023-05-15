@@ -378,7 +378,7 @@ fn handle_layout(
         let slice = Rc::new(VelosiAstFieldSlice::new(
             VelosiAstIdentifier::new(
                 ident.path(),
-                "_val".to_string(),
+                "val".to_string(),
                 VelosiTokenStream::default(),
             ),
             0,
