@@ -37,8 +37,8 @@ use codegen_rs as CG;
 use crate::VelosiCodeGenError;
 use velosiast::VelosiAst;
 
-// mod field;
-// mod interface;
+mod field;
+mod interface;
 // mod unit;
 mod utils;
 
@@ -155,8 +155,7 @@ impl BackendRust {
             srcdir.push(unit.ident().to_lowercase());
             // the root directory as supplied by backend
             fs::create_dir_all(&srcdir)?;
-            log::warn!("TODO: handle interface generation!");
-            //interface::generate(unit, &srcdir)?;
+            interface::generate(unit, &srcdir)?;
             srcdir.pop();
         }
         Ok(())
@@ -167,7 +166,7 @@ impl BackendRust {
         // get the source dir
         let _srcdir = self.outdir.join("src");
 
-        println!("##### rust generat_units");
+        println!("##### rust generate_units");
 
         for _unit in ast.segments() {
             // srcdir.push(unit.ident().to_lowercase());
@@ -224,7 +223,7 @@ impl BackendRust {
         scope.raw(&format!("pub mod {MOD_CONSTS};"));
         scope.raw(&format!("pub use {MOD_CONSTS}::*;"));
 
-        // impor the units
+        // import the units
         scope.new_comment("import the unit modules");
 
         let units = ast.segments();
