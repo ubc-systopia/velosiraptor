@@ -35,11 +35,11 @@ use std::path::Path;
 use crustal as C;
 
 // the defined errors
-use crate::ast::Interface;
-use crate::hwgen::fastmodels::add_header;
-use crate::hwgen::fastmodels::registers::{registers_class_name, registers_header_file};
-use crate::hwgen::fastmodels::state::{state_class_name, state_header_file};
-use crate::hwgen::HWGenError;
+use velosiast::ast::VelosiAstInterface;
+use crate::fastmodels::add_header;
+use crate::fastmodels::registers::{registers_class_name, registers_header_file};
+use crate::fastmodels::state::{state_class_name, state_header_file};
+use crate::HWGenError;
 
 /// generates the name of the state field header file
 pub fn interface_header_file(name: &str) -> String {
@@ -63,7 +63,7 @@ pub fn interface_class_name(name: &str) -> String {
 
 pub fn generate_interface_header(
     name: &str,
-    state: &Interface,
+    state: &VelosiAstInterface,
     outdir: &Path,
 ) -> Result<(), HWGenError> {
     let mut scope = C::Scope::new();
@@ -108,8 +108,8 @@ pub fn generate_interface_header(
     c.new_attribute("_state", state_ptr_type);
 
     for f in state.fields() {
-        let rcn = registers_class_name(&f.field.name);
-        let fieldname = format!("_{}", &f.field.name);
+        let rcn = registers_class_name(&f.to_string());
+        let fieldname = format!("_{}", &f.to_string());
         let ty = C::Type::new_class(&rcn);
         c.new_attribute(&fieldname, ty);
     }
@@ -124,7 +124,7 @@ pub fn generate_interface_header(
 
 pub fn generate_interface_impl(
     name: &str,
-    state: &Interface,
+    state: &VelosiAstInterface,
     outdir: &Path,
 ) -> Result<(), HWGenError> {
     let mut scope = C::Scope::new();
@@ -161,8 +161,8 @@ pub fn generate_interface_impl(
     cons.push_initializer("_state", pa.clone());
 
     for f in state.fields() {
-        let fieldname = format!("_{}", f.field.name);
-        let rcn = registers_class_name(&f.field.name);
+        let fieldname = format!("_{}", f.to_string());
+        let rcn = registers_class_name(&f.to_string());
         cons.push_initializer(fieldname.as_str(), C::Expr::fn_call(&rcn, vec![pa.clone()]));
 
         let this = C::Expr::this();

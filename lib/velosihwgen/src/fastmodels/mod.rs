@@ -36,11 +36,11 @@ use std::path::{Path, PathBuf};
 // other libraries
 use crustal as C;
 
-// the lirbrary
-use crate::ast::AstRoot;
-use crate::hwgen::HWGenBackend;
-use crate::hwgen::HWGenError;
-use crate::hwgen::COPYRIGHT;
+// the library
+use velosiast::VelosiAstRoot;
+use crate::HWGenBackend;
+use crate::HWGenError;
+use crate::COPYRIGHT;
 
 // the generators
 mod state;
@@ -202,34 +202,45 @@ impl HWGenBackend for ArmFastModelsModule {
     }
 
     /// generates the unit
-    fn generate_unit(&self, ast: &AstRoot) -> Result<(), HWGenError> {
-        generate_unit_header(&self.pkgname, &ast.units[0], &self.outdir)
-            .expect("failed to generate the unit header");
-        generate_unit_impl(&self.pkgname, &ast.units[0], &self.outdir)
-            .expect("failed to generate the unit implementation");
-        Ok(())
+    fn generate_unit(&self, ast: &VelosiAstRoot) -> Result<(), HWGenError> {
+        // should use ast.get_unit, but I don't know what the unit is called
+        let u = &ast.units.values().next();
+        match u {
+            None => panic!("no unit found"),
+            Some(u) => {
+                generate_unit_header(&self.pkgname, u, &self.outdir)
+                    .expect("failed to generate the unit header");
+                generate_unit_impl(&self.pkgname, u, &self.outdir)
+                    .expect("failed to generate the unit implementation");
+                Ok(())
+            }
+        }
     }
 
     /// generate the interface definitions
-    fn generate_interface(&self, ast: &AstRoot) -> Result<(), HWGenError> {
-        for unit in ast.segment_units() {
-            generate_register_header(&self.pkgname, &unit.interface, &self.outdir)
-                .expect("failed to generate the interface header");
-            generate_register_impl(&self.pkgname, &unit.interface, &self.outdir)
-                .expect("failed to generate the interface header");
-            generate_interface_header(&self.pkgname, &unit.interface, &self.outdir)
-                .expect("failed to generate the interface header");
-            generate_interface_impl(&self.pkgname, &unit.interface, &self.outdir)
-                .expect("failed to generate the interface implementation");
+    fn generate_interface(&self, ast: &VelosiAstRoot) -> Result<(), HWGenError> {
+        for unit in ast.units.values() {
+            match &unit.interface() {
+                None => (),
+                Some(i) => {
+                    generate_register_header(&self.pkgname, i, &self.outdir)
+                        .expect("failed to generate the interface header");
+                    generate_register_impl(&self.pkgname, i, &self.outdir)
+                        .expect("failed to generate the interface header");
+                    generate_interface_header(&self.pkgname, i, &self.outdir)
+                        .expect("failed to generate the interface header");
+                    generate_interface_impl(&self.pkgname, i, &self.outdir)
+                        .expect("failed to generate the interface implementation");
+                }
+            }
         }
         Ok(())
     }
 
     /// generates the state representation
-    fn generate_state(&self, ast: &AstRoot) -> Result<(), HWGenError> {
+    fn generate_state(&self, ast: &VelosiAstRoot) -> Result<(), HWGenError> {
         println!("GENERATING THE STATE!");
-
-        for unit in ast.segment_units() {
+        for unit in ast.segments() {
             generate_field_header(&self.pkgname, &unit.state, &self.outdir)
                 .expect("failed to generate the fields header");
             generate_field_impl(&self.pkgname, &unit.state, &self.outdir)

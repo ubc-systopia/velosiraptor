@@ -34,11 +34,12 @@ use std::path::Path;
 // other libraries
 use crustal as C;
 
+use velosiast::{VelosiAstField, VelosiAstInterfaceField};
 // the defined errors
-use crate::ast::Interface;
-use crate::hwgen::fastmodels::add_header;
-use crate::hwgen::fastmodels::state::{state_class_name, state_header_file};
-use crate::hwgen::HWGenError;
+use velosiast::ast::VelosiAstInterface;
+use crate::fastmodels::add_header;
+use crate::fastmodels::state::{state_class_name, state_header_file};
+use crate::HWGenError;
 
 /// generates the name of the state field header file
 pub fn registers_header_file(name: &str) -> String {
@@ -63,7 +64,7 @@ pub fn registers_class_name(name: &str) -> String {
 /// generate the header file for the interface registers
 pub fn generate_register_header(
     name: &str,
-    interface: &Interface,
+    interface: &VelosiAstInterface,
     outdir: &Path,
 ) -> Result<(), HWGenError> {
     let mut scope = C::Scope::new();
@@ -86,14 +87,20 @@ pub fn generate_register_header(
     s.new_include(&statehdr, true);
 
     // if the interface is not a register-based interface we skip this
-    if !interface.is_register() {
-        scope.to_file(outdir, true)?;
-        return Ok(());
-    }
+    // if !interface.fields() {
+    //     scope.to_file(outdir, true)?;
+    //     return Ok(());
+    // }
 
     // for each field in the scope create a register class
     for f in interface.fields() {
-        let rcn = registers_class_name(&f.field.name);
+
+        if !matches!(**f, VelosiAstInterfaceField::Register(_)) {
+            // scope.to_file(outdir, true)?;
+            continue;
+        };
+
+        let rcn = registers_class_name(&f.ident());
         // create a new class in the scope
         let c = s.new_class(rcn.as_str());
         c.set_base("RegisterBase", C::Visibility::Public);
@@ -111,6 +118,7 @@ pub fn generate_register_header(
             .set_override()
             .set_public()
             .new_param("data", C::Type::new_uint(64));
+
     }
 
     // done, save the scope
@@ -124,7 +132,7 @@ pub fn generate_register_header(
 /// generate the implementation file for the interface registers
 pub fn generate_register_impl(
     name: &str,
-    interface: &Interface,
+    interface: &VelosiAstInterface,
     outdir: &Path,
 ) -> Result<(), HWGenError> {
     let mut scope = C::Scope::new();
@@ -140,14 +148,14 @@ pub fn generate_register_impl(
     let reghdr = registers_header_file(name);
     scope.new_include(&reghdr, true);
 
-    // if it's not a register file, we skip
-    if !interface.is_register() {
-        scope.to_file(outdir, false)?;
-        return Ok(());
-    }
-
     for f in interface.fields() {
-        let rcn = registers_class_name(&f.field.name);
+        // if it's not a register file, we skip
+        if !matches!(**f, VelosiAstInterfaceField::Register(_)) {
+            // scope.to_file(outdir, false)?;
+            continue;
+        };
+
+        let rcn = registers_class_name(&f.ident());
         // create a new class in the scope
         let c = scope.new_class(rcn.as_str());
         c.set_base("RegisterBase", C::Visibility::Public);
@@ -164,9 +172,9 @@ pub fn generate_register_impl(
         cons.push_parent_initializer(C::Expr::fn_call(
             "RegisterBase",
             vec![
-                C::Expr::new_str(&f.field.name),
-                C::Expr::ConstNum(f.field.offset()),
-                C::Expr::ConstNum(f.field.length),
+                C::Expr::new_str(&f.ident()),
+                // C::Expr::ConstNum(f.offset()), // TODO probably wrong
+                C::Expr::ConstNum(f.size()),
                 C::Expr::Raw(String::from("ACCESS_PERMISSION_ALL")),
                 C::Expr::ConstNum(0),
                 C::Expr::from_method_param(&cparam),
@@ -175,7 +183,7 @@ pub fn generate_register_impl(
         .push_param(cparam);
 
         let mut field_access_expr =
-            C::Expr::method_call(&stvar, &format!("{}_field", f.field.name), vec![]);
+            C::Expr::method_call(&stvar, &format!("{}_field", f.ident()), vec![]);
         field_access_expr.set_ptr();
 
         let m = c

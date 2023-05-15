@@ -35,10 +35,10 @@ use std::path::Path;
 use crustal as C;
 
 // the defined errors
-use crate::ast::State;
-use crate::hwgen::fastmodels::add_header;
-use crate::hwgen::fastmodels::fields::{state_fields_class_name, state_fields_header_file};
-use crate::hwgen::HWGenError;
+use velosiast::ast::VelosiAstState;
+use crate::fastmodels::add_header;
+use crate::fastmodels::fields::{state_fields_class_name, state_fields_header_file};
+use crate::HWGenError;
 
 /// generates the name of the state header file
 pub fn state_header_file(name: &str) -> String {
@@ -60,7 +60,7 @@ pub fn state_class_name(name: &str) -> String {
     format!("{}{}State", name[0..1].to_uppercase(), &name[1..])
 }
 
-pub fn generate_state_header(name: &str, state: &State, outdir: &Path) -> Result<(), HWGenError> {
+pub fn generate_state_header(name: &str, state: &VelosiAstState, outdir: &Path) -> Result<(), HWGenError> {
     let mut scope = C::Scope::new();
 
     let scn = state_class_name(name);
@@ -95,16 +95,16 @@ pub fn generate_state_header(name: &str, state: &State, outdir: &Path) -> Result
 
     // adding field getters and setters
     for f in state.fields() {
-        let fcn = state_fields_class_name(&f.name);
+        let fcn = state_fields_class_name(&f.ident());
         let ty = C::Type::new_class(&fcn);
 
-        let fieldname = format!("_{}", f.name);
+        let fieldname = format!("_{}", f.ident());
 
         // the field access expression: this->_field
         let e_field_acc = C::Expr::field_access(&C::Expr::this(), &fieldname);
 
         // get/set the field
-        let methodname = format!("{}_field", f.name);
+        let methodname = format!("{}_field", f.ident());
         let m = c.new_method(&methodname, C::Type::to_ptr(&ty));
 
         m.set_public()
@@ -113,15 +113,15 @@ pub fn generate_state_header(name: &str, state: &State, outdir: &Path) -> Result
             .return_expr(C::Expr::addr_of(&e_field_acc));
 
         // get/set the field values
-        let methodname = format!("get_{}_val", f.name);
-        let m = c.new_method(&methodname, C::Type::new(C::BaseType::new_int(f.nbits())));
+        let methodname = format!("get_{}_val", f.ident());
+        let m = c.new_method(&methodname, C::Type::new(C::BaseType::new_int(f.size())));
         m.set_public()
             .set_inside_def()
             .body()
             .return_expr(C::Expr::method_call(&e_field_acc, "get_value", vec![]));
 
-        let methodname = format!("set_{}_val", f.name);
-        let arg = C::MethodParam::new("val", C::Type::new(C::BaseType::new_int(f.nbits())));
+        let methodname = format!("set_{}_val", f.ident());
+        let arg = C::MethodParam::new("val", C::Type::new(C::BaseType::new_int(f.size())));
         let argexpr = C::Expr::from_method_param(&arg);
         let m = c.new_method(&methodname, C::Type::new_void());
         m.set_public()
@@ -133,8 +133,8 @@ pub fn generate_state_header(name: &str, state: &State, outdir: &Path) -> Result
 
     // adding the state fields to the class
     for f in state.fields() {
-        let ty = C::BaseType::Class(state_fields_class_name(&f.name));
-        let fieldname = format!("_{}", f.name);
+        let ty = C::BaseType::Class(state_fields_class_name(&f.ident()));
+        let fieldname = format!("_{}", f.ident());
         c.new_attribute(&fieldname, C::Type::new(ty));
     }
 
@@ -146,7 +146,7 @@ pub fn generate_state_header(name: &str, state: &State, outdir: &Path) -> Result
     Ok(())
 }
 
-pub fn generate_state_impl(name: &str, state: &State, outdir: &Path) -> Result<(), HWGenError> {
+pub fn generate_state_impl(name: &str, state: &VelosiAstState, outdir: &Path) -> Result<(), HWGenError> {
     let mut scope = C::Scope::new();
 
     let scn = state_class_name(name);
@@ -172,8 +172,8 @@ pub fn generate_state_impl(name: &str, state: &State, outdir: &Path) -> Result<(
     cons.push_parent_initializer(C::Expr::fn_call("StateBase", vec![]));
 
     for f in state.fields() {
-        let fieldname = format!("_{}", f.name);
-        let fieldclass = state_fields_class_name(&f.name);
+        let fieldname = format!("_{}", f.ident());
+        let fieldclass = state_fields_class_name(&f.ident());
         cons.push_initializer(fieldname.as_str(), C::Expr::fn_call(&fieldclass, vec![]));
 
         let this = C::Expr::this();

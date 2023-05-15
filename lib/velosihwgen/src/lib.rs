@@ -35,7 +35,7 @@ use std::path::Path;
 // the hardware backends
 mod fastmodels;
 
-use velosiast::VelosiAst;
+// use velosiast::VelosiAst;
 
 const COPYRIGHT: &str =
     "2022 Systopia Lab, Computer Science, University of British Columbia.\nAll rights reserved.";
@@ -53,24 +53,24 @@ impl From<std::io::Error> for HWGenError {
 
 
 // the used library modules
-use crate::ast::AstRoot;
-use crate::hwgen::fastmodels::ArmFastModelsModule;
+use velosiast::ast::VelosiAstRoot;
+use crate::fastmodels::ArmFastModelsModule;
 
 // copy right notice for the generated files
-const COPYRIGHT: &str =
-    "Copyright (c) 2022 The University of British Columbia, Vancouver, BC, Canada";
+// const COPYRIGHT: &str =
+//     "Copyright (c) 2022 The University of British Columbia, Vancouver, BC, Canada";
 
 // custom error definitions for the hardware generation
-custom_error! {#[derive(PartialEq, Eq)] pub HWGenError
-    IOError           = "The input file could not be read.",
-    FmtError          = "Could not format in buffer"
-}
+// custom_error! {#[derive(PartialEq, Eq)] pub HWGenError
+//     IOError           = "The input file could not be read.",
+//     FmtError          = "Could not format in buffer"
+// }
 
-impl std::convert::From<std::io::Error> for HWGenError {
-    fn from(_other: std::io::Error) -> HWGenError {
-        HWGenError::IOError
-    }
-}
+// impl std::convert::From<std::io::Error> for HWGenError {
+//     fn from(_other: std::io::Error) -> HWGenError {
+//         HWGenError::IOError
+//     }
+// }
 
 /// the hardware generator context
 pub enum HWGen {
@@ -90,7 +90,7 @@ impl HWGen {
         }
     }
 
-    pub fn generate(&self, ast: &AstRoot) -> Result<(), HWGenError> {
+    pub fn generate(&self, ast: &VelosiAstRoot) -> Result<(), HWGenError> {
         match self {
             HWGen::FastModels(b) => {
                 b.generate_unit(ast)?;
@@ -112,13 +112,13 @@ pub trait HWGenBackend {
     fn prepare(&self) -> Result<(), HWGenError>;
 
     /// generates the unit
-    fn generate_unit(&self, ast: &AstRoot) -> Result<(), HWGenError>;
+    fn generate_unit(&self, ast: &VelosiAstRoot) -> Result<(), HWGenError>;
 
     /// generate the interface definitions
-    fn generate_interface(&self, ast: &AstRoot) -> Result<(), HWGenError>;
+    fn generate_interface(&self, ast: &VelosiAstRoot) -> Result<(), HWGenError>;
 
     /// generates the state representation
-    fn generate_state(&self, ast: &AstRoot) -> Result<(), HWGenError>;
+    fn generate_state(&self, ast: &VelosiAstRoot) -> Result<(), HWGenError>;
 
     /// finalizes the code generation part
     fn finalize(&self) -> Result<(), HWGenError>;
