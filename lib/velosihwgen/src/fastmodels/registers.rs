@@ -39,7 +39,7 @@ use velosiast::{VelosiAstField, VelosiAstInterfaceField};
 use velosiast::ast::VelosiAstInterface;
 use crate::fastmodels::add_header;
 use crate::fastmodels::state::{state_class_name, state_header_file};
-use crate::HWGenError;
+use crate::VelosiHwGenError;
 
 /// generates the name of the state field header file
 pub fn registers_header_file(name: &str) -> String {
@@ -66,7 +66,7 @@ pub fn generate_register_header(
     name: &str,
     interface: &VelosiAstInterface,
     outdir: &Path,
-) -> Result<(), HWGenError> {
+) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
     // document heaeder
@@ -134,7 +134,7 @@ pub fn generate_register_impl(
     name: &str,
     interface: &VelosiAstInterface,
     outdir: &Path,
-) -> Result<(), HWGenError> {
+) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
     // document header

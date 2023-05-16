@@ -38,8 +38,8 @@ use crustal as C;
 
 // the library
 use velosiast::VelosiAstRoot;
-use crate::HWGenBackend;
-use crate::HWGenError;
+use crate::VelosiHwGenBackend;
+use crate::VelosiHwGenError;
 use crate::COPYRIGHT;
 
 // the generators
@@ -94,7 +94,7 @@ impl ArmFastModelsModule {
         }
     }
 
-    fn generate_makefile(&self, name: &str) -> Result<(), HWGenError> {
+    fn generate_makefile(&self, name: &str) -> Result<(), VelosiHwGenError> {
         let makefile = File::create(self.outdir.join("Makefile"))?;
         let mut f = BufWriter::new(makefile);
 
@@ -190,8 +190,8 @@ impl ArmFastModelsModule {
     }
 }
 
-impl HWGenBackend for ArmFastModelsModule {
-    fn prepare(&self) -> Result<(), HWGenError> {
+impl VelosiHwGenBackend for ArmFastModelsModule {
+    fn prepare(&self) -> Result<(), VelosiHwGenError> {
         // outdir/hw/fastmodels/<pkgname>/include
         let includedir = self.outdir.join("include");
 
@@ -202,7 +202,7 @@ impl HWGenBackend for ArmFastModelsModule {
     }
 
     /// generates the unit
-    fn generate_unit(&self, ast: &VelosiAstRoot) -> Result<(), HWGenError> {
+    fn generate_unit(&self, ast: &VelosiAstRoot) -> Result<(), VelosiHwGenError> {
         // should use ast.get_unit, but I don't know what the unit is called
         let u = &ast.units.values().next();
         match u {
@@ -218,7 +218,7 @@ impl HWGenBackend for ArmFastModelsModule {
     }
 
     /// generate the interface definitions
-    fn generate_interface(&self, ast: &VelosiAstRoot) -> Result<(), HWGenError> {
+    fn generate_interface(&self, ast: &VelosiAstRoot) -> Result<(), VelosiHwGenError> {
         for unit in ast.units.values() {
             match &unit.interface() {
                 None => (),
@@ -238,7 +238,7 @@ impl HWGenBackend for ArmFastModelsModule {
     }
 
     /// generates the state representation
-    fn generate_state(&self, ast: &VelosiAstRoot) -> Result<(), HWGenError> {
+    fn generate_state(&self, ast: &VelosiAstRoot) -> Result<(), VelosiHwGenError> {
         println!("GENERATING THE STATE!");
         for unit in ast.segments() {
             generate_field_header(&self.pkgname, &unit.state, &self.outdir)
@@ -255,7 +255,7 @@ impl HWGenBackend for ArmFastModelsModule {
     }
 
     /// finalizes the code generation part
-    fn finalize(&self) -> Result<(), HWGenError> {
+    fn finalize(&self) -> Result<(), VelosiHwGenError> {
         self.generate_makefile(&self.pkgname)
     }
 }
