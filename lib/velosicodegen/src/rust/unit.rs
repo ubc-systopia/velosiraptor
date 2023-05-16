@@ -29,16 +29,16 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use codegen_rs as CG;
+use velosiast::ast::{VelosiOpExpr, VelosiOperation};
 
 use super::utils;
-use crate::ast::{AstNodeGeneric, Unit};
-use crate::codegen::CodeGenError;
-use crate::synth::{OpExpr, Operation};
+use crate::VelosiCodeGenError;
+use velosiast::VelosiAstUnitSegment;
 
 /// adds the constants defined in the unit to the scope
-fn add_unit_constants(scope: &mut CG::Scope, unit: &Unit) {
+fn add_unit_constants(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
     scope.new_comment("Defined unit constants");
-    if unit.consts().is_empty() {
+    if unit.consts.is_empty() {
         scope.new_comment("The unit does not define any constants");
         return;
     }
@@ -50,7 +50,7 @@ fn add_unit_constants(scope: &mut CG::Scope, unit: &Unit) {
 }
 
 /// adds the struct definition of the unit to the scope
-fn add_struct_definition(scope: &mut CG::Scope, unit: &Unit) {
+fn add_struct_definition(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
     // a field is a struct
     //
     // field_name  --> struct FieldName {  val: u64 };
@@ -65,14 +65,14 @@ fn add_struct_definition(scope: &mut CG::Scope, unit: &Unit) {
     st.doc(&format!(
         "Represents the Unit type '{}'.\n@loc: {}",
         unit.ident(),
-        unit.location()
+        unit.loc.loc()
     ));
 
     // it has a single field, called 'val'
     //st.field("val", to_rust_type(field.nbits()));
 }
 
-fn add_constructor_function(imp: &mut CG::Impl, unit: &Unit) {
+fn add_constructor_function(imp: &mut CG::Impl, unit: &VelosiAstUnitSegment) {
     imp.new_fn("new")
         .vis("pub")
         .doc(&format!("Creates a new `{}` unit", unit.ident()))
@@ -86,7 +86,7 @@ fn add_constructor_function(imp: &mut CG::Impl, unit: &Unit) {
         .line("// TODO: SYNTHESIZE ME");
 }
 
-fn add_translate_function(imp: &mut CG::Impl, unit: &Unit) {
+fn add_translate_function(imp: &mut CG::Impl, unit: &VelosiAstUnitSegment) {
     imp.new_fn("translate")
         .vis("pub")
         .doc(&format!("Creates a new {} unit", unit.ident()))
@@ -94,102 +94,74 @@ fn add_translate_function(imp: &mut CG::Impl, unit: &Unit) {
         .line("// TODO: SYNTHESIZE ME");
 }
 
-fn oparg_to_rust_expr(op: &OpExpr) -> String {
+fn oparg_to_rust_expr(op: &VelosiOpExpr) -> String {
     match op {
-        OpExpr::None => String::new(),
-        OpExpr::Num(x) => format!("{:x}", x),
-        OpExpr::Var(x) => x.clone(),
-        OpExpr::Shl(x, y) => format!("({} << {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
-        OpExpr::Shr(x, y) => format!("({} >> {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
-        OpExpr::And(x, y) => format!("({} & {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
-        OpExpr::Or(x, y) => format!("({} | {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
-        OpExpr::Add(x, y) => format!("({} + {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
-        OpExpr::Sub(x, y) => format!("({} - {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
-        OpExpr::Mul(x, y) => format!("({} * {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
-        OpExpr::Div(x, y) => format!("({} / {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
-        OpExpr::Mod(x, y) => format!("({} % {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y)),
-        OpExpr::Flags(_v, _f) => todo!(),
-        OpExpr::Not(x) => format!("!{}", oparg_to_rust_expr(x)),
+        VelosiOpExpr::None => String::new(),
+        VelosiOpExpr::Num(x) => format!("{:x}", x),
+        VelosiOpExpr::Var(x) => x.clone(),
+        VelosiOpExpr::Shl(x, y) => {
+            format!("({} << {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+        }
+        VelosiOpExpr::Shr(x, y) => {
+            format!("({} >> {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+        }
+        VelosiOpExpr::And(x, y) => {
+            format!("({} & {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+        }
+        VelosiOpExpr::Or(x, y) => {
+            format!("({} | {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+        }
+        VelosiOpExpr::Add(x, y) => {
+            format!("({} + {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+        }
+        VelosiOpExpr::Sub(x, y) => {
+            format!("({} - {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+        }
+        VelosiOpExpr::Mul(x, y) => {
+            format!("({} * {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+        }
+        VelosiOpExpr::Div(x, y) => {
+            format!("({} / {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+        }
+        VelosiOpExpr::Mod(x, y) => {
+            format!("({} % {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+        }
+        VelosiOpExpr::Flags(_v, _f) => todo!(),
+        VelosiOpExpr::Not(x) => format!("!{}", oparg_to_rust_expr(x)),
     }
 }
 
-fn op_to_rust_expr(op: &Operation) -> String {
+fn op_to_rust_expr(op: &VelosiOperation) -> String {
     match op {
-        Operation::Insert {
-            field,
-            slice: Some(slice),
-            arg,
-        } => {
+        VelosiOperation::InsertSlice(field, slice, arg) => {
             format!("v_{}.insert_{}({});", field, slice, oparg_to_rust_expr(arg))
         }
-        Operation::Insert {
-            field,
-            slice: None,
-            arg,
-        } => {
+        VelosiOperation::InsertField(field, arg) => {
             format!("v_{}.set_val({});", field, oparg_to_rust_expr(arg))
         }
-        Operation::Extract {
-            field,
-            slice: Some(slice),
-        } => {
+        VelosiOperation::ExtractSlice(field, slice) => {
             format!("v_{}.extract_{}();", field, slice)
         }
-        Operation::Extract { field, slice: None } => {
-            format!("v_{}.get_val();", field)
-        }
-        Operation::WriteActions { field } => {
+        VelosiOperation::WriteAction(field) => {
             format!("self.interface.write_{}(v_{});", field, field)
         }
-        Operation::ReadActions { field } => {
+        VelosiOperation::ReadAction(field) => {
             format!("self.interface.read_{}();", field)
         }
-        Operation::Return => String::new(),
+        VelosiOperation::Return => String::new(),
     }
 }
 
-fn add_map_function(imp: &mut CG::Impl, unit: &Unit) {
-    let mut fields = HashSet::new();
-    if let Some(ops) = unit.map_ops() {
-        for op in ops {
-            let fname = op.fieldname();
-            if fname.is_empty() {
-                continue;
-            }
-            fields.insert(String::from(fname));
-        }
-    }
+fn add_map_function(imp: &mut CG::Impl, unit: &VelosiAstUnitSegment) {
 
-    let m = imp
-        .new_fn("map")
-        .arg_ref_self()
-        .arg("va", "u64")
-        .arg("pa", "u64")
-        .arg("flags", "u64")
+    imp.new_fn("map")
         .vis("pub")
-        .doc(&format!("Creates a new {} unit", unit.ident()));
-    //.ret(CG::Type::new("Self"))
-
-    m.line("// field variable definitions");
-    for f in fields {
-        m.line(format!(
-            "let mut v_{} = {}::new();",
-            f,
-            utils::to_struct_name(&f, Some("Field"))
-        ));
-    }
-
-    m.line("");
-    m.line("//operation sequence");
-
-    if let Some(ops) = unit.map_ops() {
-        for op in ops {
-            m.line(&op_to_rust_expr(op));
-        }
-    }
+        .doc(&format!("Creates a new {} unit", unit.ident()))
+        //.ret(CG::Type::new("Self"))
+        .line("// TODO: SYNTHESIZE ME");
 }
 
-fn add_unmap_function(imp: &mut CG::Impl, unit: &Unit) {
+fn add_unmap_function(imp: &mut CG::Impl, unit: &VelosiAstUnitSegment) {
     imp.new_fn("unmap")
         .vis("pub")
         .doc(&format!("Creates a new {} unit", unit.ident()))
@@ -197,7 +169,7 @@ fn add_unmap_function(imp: &mut CG::Impl, unit: &Unit) {
         .line("// TODO: SYNTHESIZE ME");
 }
 
-fn add_protect_function(imp: &mut CG::Impl, unit: &Unit) {
+fn add_protect_function(imp: &mut CG::Impl, unit: &VelosiAstUnitSegment) {
     imp.new_fn("protect")
         .vis("pub")
         .doc(&format!("Creates a new {} unit", unit.ident()))
@@ -205,7 +177,7 @@ fn add_protect_function(imp: &mut CG::Impl, unit: &Unit) {
         .line("// TODO: SYNTHESIZE ME");
 }
 
-fn add_struct_impl(scope: &mut CG::Scope, unit: &Unit) {
+fn add_struct_impl(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
     // new implementation
     let imp = scope.new_impl(unit.ident());
 
@@ -219,7 +191,7 @@ fn add_struct_impl(scope: &mut CG::Scope, unit: &Unit) {
 }
 
 /// generates the Unit definitions
-pub fn generate(unit: &Unit, outdir: &Path) -> Result<(), CodeGenError> {
+pub fn generate(unit: &VelosiAstUnitSegment, outdir: &Path) -> Result<(), VelosiCodeGenError> {
     // the code generation scope
     let mut scope = CG::Scope::new();
 
