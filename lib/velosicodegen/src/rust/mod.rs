@@ -39,7 +39,7 @@ use velosiast::VelosiAst;
 
 mod field;
 mod interface;
-// mod unit;
+mod unit;
 mod utils;
 
 use utils::{add_const_def, add_header, save_scope};
@@ -164,37 +164,37 @@ impl BackendRust {
     /// Generates the units
     pub fn generate_units(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
         // get the source dir
-        let _srcdir = self.outdir.join("src");
+        let mut srcdir = self.outdir.join("src");
 
         println!("##### rust generate_units");
 
-        for _unit in ast.segments() {
-            // srcdir.push(unit.ident().to_lowercase());
+        for unit in ast.segments() {
+            srcdir.push(unit.ident().to_lowercase());
 
-            // // generate the unit
-            // unit::generate(unit, &srcdir)?;
+            // generate the unit
+            unit::generate(unit, &srcdir)?;
 
-            // // construct the scope
-            // let mut scope = CG::Scope::new();
+            // construct the scope
+            let mut scope = CG::Scope::new();
 
-            // let title = format!("{} translation unit module", unit.ident());
-            // add_header(&mut scope, &title);
+            let title = format!("{} translation unit module", unit.ident());
+            add_header(&mut scope, &title);
 
-            // // the fields
-            // scope.raw("pub mod fields;");
-            // // the unit
-            // scope.raw("mod unit;");
-            // // the unit
-            // scope.raw("pub use unit :: *;");
+            // the fields
+            scope.raw("pub mod fields;");
+            // the unit
+            scope.raw("mod unit;");
+            // the unit
+            scope.raw("pub use unit :: *;");
 
-            // // the unit
-            // scope.raw("mod interface;");
-            // scope.raw("pub use interface :: *;");
+            // the unit
+            scope.raw("mod interface;");
+            scope.raw("pub use interface :: *;");
 
-            // // save the scope
-            // save_scope(scope, &srcdir, "mod")?;
+            // save the scope
+            save_scope(scope, &srcdir, "mod")?;
 
-            // srcdir.pop();
+            srcdir.pop();
         }
 
         Ok(())
