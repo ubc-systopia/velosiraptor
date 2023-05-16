@@ -40,7 +40,7 @@ use velosiast::ast::{VelosiAstExpr, VelosiAstMethod, VelosiAstUnit, VelosiAstNum
 use crate::fastmodels::add_header;
 use crate::fastmodels::interface::{interface_class_name, interface_header_file};
 use crate::fastmodels::state::{state_class_name, state_header_file};
-use crate::HWGenError;
+use crate::VelosiHwGenError;
 
 /// generates the name of the state field header file
 pub fn unit_header_file(name: &str) -> String {
@@ -236,7 +236,7 @@ fn expr_to_cpp(expr: &VelosiAstExpr) -> C::Expr {
         Slice { .. } => panic!("don't know how to handle slice"),
         Range { .. } => panic!("don't know how to handle range"),
         Quantifier { .. } => panic!("don't know how to handle quantifier"),
-        IfElse(VelosiAstIfElseExpr{cond, then, other, loc, ..}) =>
+        IfElse(VelosiAstIfElseExpr{cond: _, then: _, other: _, loc: _, ..}) =>
             panic!("don't know how to handle if/else"),
         // {
         //     let mut b = C::Block::new();
@@ -410,7 +410,7 @@ fn add_method(c: &mut C::Class, tm: &VelosiAstMethod) {
     }
 }
 
-pub fn generate_unit_header(name: &str, unit: &VelosiAstUnit, outdir: &Path) -> Result<(), HWGenError> {
+pub fn generate_unit_header(name: &str, unit: &VelosiAstUnit, outdir: &Path) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
     // document header
@@ -508,7 +508,7 @@ pub fn generate_unit_header(name: &str, unit: &VelosiAstUnit, outdir: &Path) -> 
     Ok(())
 }
 
-pub fn generate_unit_impl(name: &str, unit: &VelosiAstUnit, outdir: &Path) -> Result<(), HWGenError> {
+pub fn generate_unit_impl(name: &str, unit: &VelosiAstUnit, outdir: &Path) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
     // add the header

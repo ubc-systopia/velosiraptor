@@ -38,7 +38,7 @@ use crustal as C;
 use velosiast::ast::VelosiAstState;
 use crate::fastmodels::add_header;
 use crate::fastmodels::fields::{state_fields_class_name, state_fields_header_file};
-use crate::HWGenError;
+use crate::VelosiHwGenError;
 
 /// generates the name of the state header file
 pub fn state_header_file(name: &str) -> String {
@@ -60,7 +60,7 @@ pub fn state_class_name(name: &str) -> String {
     format!("{}{}State", name[0..1].to_uppercase(), &name[1..])
 }
 
-pub fn generate_state_header(name: &str, state: &VelosiAstState, outdir: &Path) -> Result<(), HWGenError> {
+pub fn generate_state_header(name: &str, state: &VelosiAstState, outdir: &Path) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
     let scn = state_class_name(name);
@@ -146,7 +146,7 @@ pub fn generate_state_header(name: &str, state: &VelosiAstState, outdir: &Path) 
     Ok(())
 }
 
-pub fn generate_state_impl(name: &str, state: &VelosiAstState, outdir: &Path) -> Result<(), HWGenError> {
+pub fn generate_state_impl(name: &str, state: &VelosiAstState, outdir: &Path) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
     let scn = state_class_name(name);
