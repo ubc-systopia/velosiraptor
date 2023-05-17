@@ -28,8 +28,6 @@ use std::path::Path;
 // the hardware backends
 mod fastmodels;
 
-// use velosiast::VelosiAst;
-
 const COPYRIGHT: &str =
     "2022 Systopia Lab, Computer Science, University of British Columbia.\nAll rights reserved.";
 
@@ -44,26 +42,8 @@ impl From<std::io::Error> for VelosiHwGenError {
     }
 }
 
-
-// the used library modules
-use velosiast::ast::VelosiAstRoot;
+use velosiast::VelosiAst;
 use crate::fastmodels::ArmFastModelsModule;
-
-// copy right notice for the generated files
-// const COPYRIGHT: &str =
-//     "Copyright (c) 2022 The University of British Columbia, Vancouver, BC, Canada";
-
-// custom error definitions for the hardware generation
-// custom_error! {#[derive(PartialEq, Eq)] pub VelosiHwGenError
-//     IOError           = "The input file could not be read.",
-//     FmtError          = "Could not format in buffer"
-// }
-
-// impl std::convert::From<std::io::Error> for VelosiHwGenError {
-//     fn from(_other: std::io::Error) -> VelosiHwGenError {
-//         VelosiHwGenError::IOError
-//     }
-// }
 
 /// the hardware generator context
 pub enum VelosiHwGen {
@@ -83,7 +63,7 @@ impl VelosiHwGen {
         }
     }
 
-    pub fn generate(&self, ast: &VelosiAstRoot) -> Result<(), VelosiHwGenError> {
+    pub fn generate(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
         match self {
             VelosiHwGen::FastModels(b) => {
                 b.generate_unit(ast)?;
@@ -105,13 +85,13 @@ pub trait VelosiHwGenBackend {
     fn prepare(&self) -> Result<(), VelosiHwGenError>;
 
     /// generates the unit
-    fn generate_unit(&self, ast: &VelosiAstRoot) -> Result<(), VelosiHwGenError>;
+    fn generate_unit(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
 
     /// generate the interface definitions
-    fn generate_interface(&self, ast: &VelosiAstRoot) -> Result<(), VelosiHwGenError>;
+    fn generate_interface(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
 
     /// generates the state representation
-    fn generate_state(&self, ast: &VelosiAstRoot) -> Result<(), VelosiHwGenError>;
+    fn generate_state(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
 
     /// finalizes the code generation part
     fn finalize(&self) -> Result<(), VelosiHwGenError>;
