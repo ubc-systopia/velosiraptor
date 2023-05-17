@@ -153,7 +153,6 @@ fn op_to_rust_expr(op: &VelosiOperation) -> String {
 }
 
 fn add_map_function(imp: &mut CG::Impl, unit: &VelosiAstUnitSegment) {
-
     imp.new_fn("map")
         .vis("pub")
         .doc(&format!("Creates a new {} unit", unit.ident()))
