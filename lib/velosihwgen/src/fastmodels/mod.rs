@@ -37,7 +37,7 @@ use std::path::{Path, PathBuf};
 use crustal as C;
 
 // the library
-use velosiast::VelosiAstRoot;
+use velosiast::VelosiAst;
 use crate::VelosiHwGenBackend;
 use crate::VelosiHwGenError;
 use crate::COPYRIGHT;
@@ -202,9 +202,9 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
     }
 
     /// generates the unit
-    fn generate_unit(&self, ast: &VelosiAstRoot) -> Result<(), VelosiHwGenError> {
+    fn generate_unit(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
         // should use ast.get_unit, but I don't know what the unit is called
-        let u = &ast.units.values().next();
+        let u = &ast.units().next();
         match u {
             None => panic!("no unit found"),
             Some(u) => {
@@ -218,8 +218,8 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
     }
 
     /// generate the interface definitions
-    fn generate_interface(&self, ast: &VelosiAstRoot) -> Result<(), VelosiHwGenError> {
-        for unit in ast.units.values() {
+    fn generate_interface(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
+        for unit in ast.units() {
             match &unit.interface() {
                 None => (),
                 Some(i) => {
@@ -238,7 +238,7 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
     }
 
     /// generates the state representation
-    fn generate_state(&self, ast: &VelosiAstRoot) -> Result<(), VelosiHwGenError> {
+    fn generate_state(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
         println!("GENERATING THE STATE!");
         for unit in ast.segments() {
             generate_field_header(&self.pkgname, &unit.state, &self.outdir)

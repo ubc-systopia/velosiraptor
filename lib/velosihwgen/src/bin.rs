@@ -1,4 +1,4 @@
-// VelosiHwGen -- The hardware generator for the Velosiraptor language
+// VelosiHwGen -- A hardware generator for the Velosiraptor language
 //
 //
 // MIT License
@@ -23,9 +23,41 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-
+use std::{env, path::Path};
+use velosiast::{VelosiAst, AstResult};
 use velosihwgen::VelosiHwGen;
 
 pub fn main() {
-    println!("Todo");
+    let args: Vec<String> = env::args().collect();
+
+    let ast = match args.len() {
+        2 => VelosiAst::from_file(&args[1]),
+        _ => {
+            println!("Usage: velosihwgen <file>");
+            return;
+        }
+    };
+
+    let ast = match ast {
+        AstResult::Ok(ast) => {
+            ast
+        }
+        AstResult::Issues(ast, err) => {
+            println!("{}", err);
+            ast
+        }
+        AstResult::Err(err) => {
+            println!("{}", err);
+            return;
+        }
+    };
+
+    let hwgen = VelosiHwGen::new_fastmodels(
+        Path::new("out"),
+        "myunit".to_string()
+    );
+
+    if let Err(e) = hwgen.generate(&ast) {
+        log::error!(target: "main", "code generation failed\n{:?}", e);
+    }
 }
