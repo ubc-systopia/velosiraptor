@@ -68,7 +68,7 @@ pub fn generate_interface(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
     // Step 2:  add the implementation
     let imp = scope.new_impl(&ifname);
 
-    let iftyperef = format!("&'static {}", ifname);
+    let iftyperef = "&'static Self";
     imp.new_fn("from_addr")
         .vis("pub")
         .arg("base", "u64")
@@ -78,7 +78,7 @@ pub fn generate_interface(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
         ))
         .ret(CG::Type::new(&iftyperef))
         .set_unsafe(true)
-        .line(format!("let ptr = base as *mut {};", iftyperef))
+        .line("let ptr = base as *mut Self;")
         .line("ptr.as_ref().unwrap()");
 
     for f in unit.interface.fields() {

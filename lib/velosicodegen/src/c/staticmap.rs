@@ -566,14 +566,14 @@ fn add_op_function(
 }
 
 fn add_op_functions(scope: &mut C::Scope, ast: &VelosiAst, unit: &VelosiAstUnitStaticMap) {
-    let op = unit.methods.get("map").expect("unmap method not found!");
+    let op = unit.methods.get("map").expect("map method not found!");
     add_op_function(scope, ast, unit, op);
     let op = unit.methods.get("unmap").expect("unmap method not found!");
     add_op_function(scope, ast, unit, op);
     let op = unit
         .methods
         .get("protect")
-        .expect("unmap method not found!");
+        .expect("protect method not found!");
     add_op_function(scope, ast, unit, op);
 }
 

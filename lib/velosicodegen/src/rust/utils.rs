@@ -34,7 +34,7 @@ use std::path::Path;
 use codegen_rs as CG;
 
 //
-use velosiast::ast::VelosiAstConst;
+use velosiast::ast::{VelosiAstConst, VelosiAstTypeInfo};
 
 use crate::VelosiCodeGenError;
 use crate::COPYRIGHT;
@@ -69,6 +69,21 @@ pub fn to_rust_type(l: u64) -> &'static str {
         33..=64 => "u64",
         65..=128 => "u128",
         _ => "unknown",
+    }
+}
+
+/// obtains the appropriate rust type for the type info
+pub fn ptype_to_rust_type(ptype: &VelosiAstTypeInfo, unit_ident: &str) -> CG::Type {
+    match ptype {
+        VelosiAstTypeInfo::Integer => CG::Type::new("u64"),
+        VelosiAstTypeInfo::Bool => CG::Type::new("u64"),
+        VelosiAstTypeInfo::GenAddr => CG::Type::new("u64"), // TODO: should address types be different?
+        VelosiAstTypeInfo::VirtAddr => CG::Type::new("u64"),
+        VelosiAstTypeInfo::PhysAddr => CG::Type::new("u64"),
+        VelosiAstTypeInfo::Size => CG::Type::new("u64"),
+        VelosiAstTypeInfo::Flags => CG::Type::new(&to_struct_name(unit_ident, Some("Flags"))),
+        VelosiAstTypeInfo::TypeRef(s) => CG::Type::new(&to_struct_name(s, None)),
+        _ => todo!(),
     }
 }
 

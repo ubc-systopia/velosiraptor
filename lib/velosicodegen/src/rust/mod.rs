@@ -35,10 +35,12 @@ use std::path::PathBuf;
 use codegen_rs as CG;
 
 use crate::VelosiCodeGenError;
-use velosiast::VelosiAst;
+use velosiast::{VelosiAst, VelosiAstUnit};
 
 mod field;
 mod interface;
+// mod segment;
+mod staticmap;
 mod unit;
 mod utils;
 
@@ -168,11 +170,27 @@ impl BackendRust {
 
         println!("##### rust generate_units");
 
-        for unit in ast.segments() {
+        for unit in ast.units() {
             srcdir.push(unit.ident().to_lowercase());
+            fs::create_dir_all(&srcdir)?;
 
             // generate the unit
-            unit::generate(unit, &srcdir)?;
+            // unit::generate(unit, &srcdir)?;
+            match unit {
+                VelosiAstUnit::Segment(segment) => {
+                    if segment.is_abstract {
+                        log::info!("Skipping abstract segment unit {}", segment.ident());
+                        continue;
+                    }
+                    // segment::generate(segment, &srcdir).expect("code generation failed\n");
+                }
+                VelosiAstUnit::StaticMap(staticmap) => {
+                    staticmap::generate(ast, staticmap, &srcdir).expect("code generation failed\n");
+                }
+                VelosiAstUnit::Enum(e) => {
+                    // enums::generate(ast, e, &srcdir).expect("code generation failed\n");
+                }
+            }
 
             // construct the scope
             let mut scope = CG::Scope::new();
@@ -185,11 +203,11 @@ impl BackendRust {
             // the unit
             scope.raw("mod unit;");
             // the unit
-            scope.raw("pub use unit :: *;");
+            scope.raw("pub use unit::*;");
 
             // the unit
-            scope.raw("mod interface;");
-            scope.raw("pub use interface :: *;");
+            scope.raw("mod interface;"); //TODO: don't add if no interface
+            scope.raw("pub use interface::*;");
 
             // save the scope
             save_scope(scope, &srcdir, "mod")?;
