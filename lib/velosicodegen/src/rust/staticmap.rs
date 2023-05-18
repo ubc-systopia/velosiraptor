@@ -77,6 +77,7 @@ fn add_op_fn_body_listcomp(
     ));
 
     // target_unit = from_addr((idx * 8) + self.base);
+    // TODO: if enum, need to decide which variant to make?
     op_fn.line(format!(
         "let target_unit = unsafe {{ {}::from_addr((idx * 0x8) + self.base) }};",
         utils::to_struct_name(dest_unit.ident(), None)
@@ -145,7 +146,6 @@ fn generate_unit_struct(scope: &mut CG::Scope, ast: &VelosiAst, unit: &VelosiAst
     let imp = scope.new_impl(&struct_name);
 
     // constructor
-    let struct_typeref = "&'static Self";
     imp.new_fn("from_addr")
         .vis("pub")
         .arg("base", "u64")
@@ -153,7 +153,7 @@ fn generate_unit_struct(scope: &mut CG::Scope, ast: &VelosiAst, unit: &VelosiAst
             "creates a new reference to a {} unit",
             unit.ident()
         ))
-        .ret(CG::Type::new(struct_typeref))
+        .ret(CG::Type::new("Self")) // TODO: is this the right type? update doc too
         .set_unsafe(true)
         .line("Self { base }");
 

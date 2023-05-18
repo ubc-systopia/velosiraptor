@@ -37,12 +37,13 @@ use codegen_rs as CG;
 use crate::VelosiCodeGenError;
 use velosiast::{VelosiAst, VelosiAstUnit};
 
+mod enums;
 mod field;
 mod interface;
-// mod segment;
 mod staticmap;
 mod unit;
 mod utils;
+// mod segment;
 
 use utils::{add_const_def, add_header, save_scope};
 
@@ -188,7 +189,7 @@ impl BackendRust {
                     staticmap::generate(ast, staticmap, &srcdir).expect("code generation failed\n");
                 }
                 VelosiAstUnit::Enum(e) => {
-                    // enums::generate(ast, e, &srcdir).expect("code generation failed\n");
+                    enums::generate(e, &srcdir).expect("code generation failed\n");
                 }
             }
 
