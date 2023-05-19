@@ -40,10 +40,9 @@ use velosiast::{VelosiAst, VelosiAstUnit};
 mod enums;
 mod field;
 mod interface;
+mod segment;
 mod staticmap;
-mod unit;
 mod utils;
-// mod segment;
 
 use utils::{add_const_def, add_header, save_scope};
 
@@ -202,7 +201,7 @@ impl BackendRust {
                         scope.raw("pub use interface::*;");
 
                         fs::create_dir_all(&srcdir)?;
-                        // segment::generate(segment, &srcdir).expect("code generation failed\n");
+                        segment::generate(segment, &srcdir).expect("code generation failed\n");
                     }
                 }
                 VelosiAstUnit::StaticMap(staticmap) => {

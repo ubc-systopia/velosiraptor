@@ -76,7 +76,7 @@ pub fn generate_interface(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
             "creates a new reference to a {} interface",
             unit.ident()
         ))
-        .ret(CG::Type::new(&iftyperef))
+        .ret(CG::Type::new(iftyperef))
         .set_unsafe(true)
         .line("let ptr = base as *mut Self;")
         .line("ptr.as_ref().unwrap()");

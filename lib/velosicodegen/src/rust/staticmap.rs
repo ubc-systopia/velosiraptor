@@ -106,8 +106,6 @@ fn add_op_function(
         );
     }
 
-    // TODO: add requires
-
     match &unit.map {
         VelosiAstStaticMap::Explicit(_) => {
             op_fn.line("// TODO: Explicit map");

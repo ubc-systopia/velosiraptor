@@ -33,6 +33,7 @@ use std::path::Path;
 // get the code generator
 use codegen_rs as CG;
 
+use velosiast::ast::{VelosiAstBinOp, VelosiAstExpr, VelosiAstUnOp, VelosiOpExpr, VelosiOperation};
 //
 use velosiast::ast::{VelosiAstConst, VelosiAstTypeInfo};
 
@@ -84,6 +85,182 @@ pub fn ptype_to_rust_type(ptype: &VelosiAstTypeInfo, unit_ident: &str) -> CG::Ty
         VelosiAstTypeInfo::Flags => CG::Type::new(&to_struct_name(unit_ident, Some("Flags"))),
         VelosiAstTypeInfo::TypeRef(s) => CG::Type::new(&to_struct_name(s, None)),
         _ => todo!(),
+    }
+}
+
+pub fn astexpr_to_rust(expr: &VelosiAstExpr) -> String {
+    match expr {
+        VelosiAstExpr::IdentLiteral(i) => i.ident().to_string(),
+        VelosiAstExpr::NumLiteral(i) => format!("{:#x}", i.val),
+        VelosiAstExpr::BoolLiteral(i) => {
+            if i.val {
+                "true".to_string()
+            } else {
+                "false".to_string()
+            }
+        }
+        VelosiAstExpr::BinOp(i) => match i.op {
+            VelosiAstBinOp::LShift => {
+                format!(
+                    "({} << {})",
+                    astexpr_to_rust(&i.lhs),
+                    astexpr_to_rust(&i.rhs)
+                )
+            }
+            VelosiAstBinOp::RShift => format!(
+                "({} >> {})",
+                astexpr_to_rust(&i.lhs),
+                astexpr_to_rust(&i.rhs)
+            ),
+            VelosiAstBinOp::And => format!(
+                "({} & {})",
+                astexpr_to_rust(&i.lhs),
+                astexpr_to_rust(&i.rhs)
+            ),
+            VelosiAstBinOp::Or => format!(
+                "({} | {})",
+                astexpr_to_rust(&i.lhs),
+                astexpr_to_rust(&i.rhs)
+            ),
+            VelosiAstBinOp::Xor => format!(
+                "({} ^ {})",
+                astexpr_to_rust(&i.lhs),
+                astexpr_to_rust(&i.rhs)
+            ),
+            VelosiAstBinOp::Plus => format!(
+                "({} + {})",
+                astexpr_to_rust(&i.lhs),
+                astexpr_to_rust(&i.rhs)
+            ),
+            VelosiAstBinOp::Minus => format!(
+                "({} - {})",
+                astexpr_to_rust(&i.lhs),
+                astexpr_to_rust(&i.rhs)
+            ),
+            VelosiAstBinOp::Multiply => format!(
+                "({} * {})",
+                astexpr_to_rust(&i.lhs),
+                astexpr_to_rust(&i.rhs)
+            ),
+            VelosiAstBinOp::Divide => format!(
+                "({} / {})",
+                astexpr_to_rust(&i.lhs),
+                astexpr_to_rust(&i.rhs)
+            ),
+            VelosiAstBinOp::Modulo => format!(
+                "({} % {})",
+                astexpr_to_rust(&i.lhs),
+                astexpr_to_rust(&i.rhs)
+            ),
+            VelosiAstBinOp::Eq => format!(
+                "({} == {})",
+                astexpr_to_rust(&i.lhs),
+                astexpr_to_rust(&i.rhs)
+            ),
+            VelosiAstBinOp::Ne => format!(
+                "({} != {})",
+                astexpr_to_rust(&i.lhs),
+                astexpr_to_rust(&i.rhs)
+            ),
+            VelosiAstBinOp::Lt => format!(
+                "({} < {})",
+                astexpr_to_rust(&i.lhs),
+                astexpr_to_rust(&i.rhs)
+            ),
+            VelosiAstBinOp::Gt => format!(
+                "({} > {})",
+                astexpr_to_rust(&i.lhs),
+                astexpr_to_rust(&i.rhs)
+            ),
+            VelosiAstBinOp::Le => format!(
+                "({} <= {})",
+                astexpr_to_rust(&i.lhs),
+                astexpr_to_rust(&i.rhs)
+            ),
+            VelosiAstBinOp::Ge => format!(
+                "({} >= {})",
+                astexpr_to_rust(&i.lhs),
+                astexpr_to_rust(&i.rhs)
+            ),
+            VelosiAstBinOp::Land => format!(
+                "({} && {})",
+                astexpr_to_rust(&i.lhs),
+                astexpr_to_rust(&i.rhs)
+            ),
+            VelosiAstBinOp::Lor => format!(
+                "({} || {})",
+                astexpr_to_rust(&i.lhs),
+                astexpr_to_rust(&i.rhs)
+            ),
+            VelosiAstBinOp::Implies => format!(
+                "(!{} || {})",
+                astexpr_to_rust(&i.lhs),
+                astexpr_to_rust(&i.rhs)
+            ),
+        },
+        VelosiAstExpr::UnOp(i) => match i.op {
+            VelosiAstUnOp::Not => format!("~{}", astexpr_to_rust(&i.expr)),
+            VelosiAstUnOp::LNot => format!("!{}", astexpr_to_rust(&i.expr)),
+        },
+        _ => todo!(),
+    }
+}
+
+pub fn op_to_rust_expr(op: &VelosiOperation) -> String {
+    match op {
+        VelosiOperation::InsertSlice(field, slice, arg) => {
+            format!("{field}.insert_{slice}({});", oparg_to_rust_expr(arg))
+        }
+        VelosiOperation::InsertField(field, arg) => {
+            format!("self.interface.write_{field}({});", oparg_to_rust_expr(arg))
+        }
+        VelosiOperation::ExtractSlice(field, slice) => {
+            format!("let {field}_{slice} = {field}.extract_{slice}();",)
+        }
+        VelosiOperation::WriteAction(field) => {
+            format!("self.interface.write_{field}({field});")
+        }
+        VelosiOperation::ReadAction(field) => {
+            format!("let {field} = self.interface.read_{field}();")
+        }
+        VelosiOperation::Return => String::new(),
+    }
+}
+
+fn oparg_to_rust_expr(op: &VelosiOpExpr) -> String {
+    match op {
+        VelosiOpExpr::None => String::new(),
+        VelosiOpExpr::Num(x) => format!("{:#x}", x),
+        VelosiOpExpr::Var(x) => x.clone(),
+        VelosiOpExpr::Shl(x, y) => {
+            format!("({} << {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+        }
+        VelosiOpExpr::Shr(x, y) => {
+            format!("({} >> {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+        }
+        VelosiOpExpr::And(x, y) => {
+            format!("({} & {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+        }
+        VelosiOpExpr::Or(x, y) => {
+            format!("({} | {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+        }
+        VelosiOpExpr::Add(x, y) => {
+            format!("({} + {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+        }
+        VelosiOpExpr::Sub(x, y) => {
+            format!("({} - {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+        }
+        VelosiOpExpr::Mul(x, y) => {
+            format!("({} * {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+        }
+        VelosiOpExpr::Div(x, y) => {
+            format!("({} / {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+        }
+        VelosiOpExpr::Mod(x, y) => {
+            format!("({} % {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+        }
+        VelosiOpExpr::Flags(v, f) => format!("{v}.{f}"),
+        VelosiOpExpr::Not(x) => format!("!{}", oparg_to_rust_expr(x)),
     }
 }
 
