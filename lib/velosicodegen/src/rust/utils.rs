@@ -76,11 +76,11 @@ pub fn to_rust_type(l: u64) -> &'static str {
 pub fn ptype_to_rust_type(ptype: &VelosiAstTypeInfo, unit_ident: &str) -> CG::Type {
     match ptype {
         VelosiAstTypeInfo::Integer => CG::Type::new("u64"),
-        VelosiAstTypeInfo::Bool => CG::Type::new("u64"),
-        VelosiAstTypeInfo::GenAddr => CG::Type::new("u64"), // TODO: should address types be different?
-        VelosiAstTypeInfo::VirtAddr => CG::Type::new("u64"),
-        VelosiAstTypeInfo::PhysAddr => CG::Type::new("u64"),
-        VelosiAstTypeInfo::Size => CG::Type::new("u64"),
+        VelosiAstTypeInfo::Bool => CG::Type::new("bool"),
+        VelosiAstTypeInfo::GenAddr => CG::Type::new("GenAddr"),
+        VelosiAstTypeInfo::VirtAddr => CG::Type::new("VirtAddr"),
+        VelosiAstTypeInfo::PhysAddr => CG::Type::new("PhysAddr"),
+        VelosiAstTypeInfo::Size => CG::Type::new("usize"),
         VelosiAstTypeInfo::Flags => CG::Type::new(&to_struct_name(unit_ident, Some("Flags"))),
         VelosiAstTypeInfo::TypeRef(s) => CG::Type::new(&to_struct_name(s, None)),
         _ => todo!(),
