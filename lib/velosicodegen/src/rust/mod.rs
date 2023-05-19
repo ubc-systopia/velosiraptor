@@ -181,8 +181,6 @@ impl BackendRust {
             let title = format!("{} translation unit module", unit.ident());
             add_header(&mut scope, &title);
 
-            // the fields
-            scope.raw("pub mod fields;");
             // the unit
             scope.raw("mod unit;");
             // the unit
@@ -196,7 +194,9 @@ impl BackendRust {
                         srcdir.pop();
                         continue;
                     } else {
-                        // the unit
+                        // the fields
+                        scope.raw("pub mod fields;");
+                        // the interface
                         scope.raw("mod interface;");
                         scope.raw("pub use interface::*;");
 
@@ -249,16 +249,16 @@ impl BackendRust {
         // import the units
         scope.new_comment("import the unit modules");
 
-        let units = ast.segments();
+        for unit in ast.units() {
+            if !unit.is_abstract() {
+                scope.raw(&format!("pub mod {};", unit.ident().to_lowercase()));
 
-        for unit in units {
-            scope.raw(&format!("pub mod {};", unit.ident().to_lowercase()));
-
-            scope.raw(&format!(
-                "pub use {}::{};",
-                unit.ident().to_lowercase(),
-                unit.ident()
-            ));
+                scope.raw(&format!(
+                    "pub use {}::{};",
+                    unit.ident().to_lowercase(),
+                    utils::to_struct_name(unit.ident(), None)
+                ));
+            }
         }
 
         // save the scope

@@ -81,7 +81,7 @@ fn add_segment_struct(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
 
     // it has a single field, called 'interface'
     let iface_name = utils::to_struct_name(&struct_name, Some("Interface"));
-    st.field("interface", &iface_name);
+    st.field("interface", &format!("&'static {iface_name}"));
 
     // struct impl
     let imp = scope.new_impl(&struct_name);

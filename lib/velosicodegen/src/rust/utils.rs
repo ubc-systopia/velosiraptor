@@ -221,7 +221,7 @@ pub fn op_to_rust_expr(op: &VelosiOperation) -> String {
             format!("self.interface.write_{field}({field});")
         }
         VelosiOperation::ReadAction(field) => {
-            format!("let {field} = self.interface.read_{field}();")
+            format!("let mut {field} = self.interface.read_{field}();")
         }
         VelosiOperation::Return => String::new(),
     }
