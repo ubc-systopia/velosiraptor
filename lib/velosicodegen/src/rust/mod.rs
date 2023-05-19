@@ -155,11 +155,13 @@ impl BackendRust {
         let mut srcdir = self.outdir.join("src");
 
         for unit in ast.segments() {
-            srcdir.push(unit.ident().to_lowercase());
-            // the root directory as supplied by backend
-            fs::create_dir_all(&srcdir)?;
-            interface::generate(unit, &srcdir)?;
-            srcdir.pop();
+            if !unit.is_abstract {
+                srcdir.push(unit.ident().to_lowercase());
+                // the root directory as supplied by backend
+                fs::create_dir_all(&srcdir)?;
+                interface::generate(unit, &srcdir)?;
+                srcdir.pop();
+            }
         }
         Ok(())
     }
@@ -173,27 +175,8 @@ impl BackendRust {
 
         for unit in ast.units() {
             srcdir.push(unit.ident().to_lowercase());
-            fs::create_dir_all(&srcdir)?;
 
-            // generate the unit
-            // unit::generate(unit, &srcdir)?;
-            match unit {
-                VelosiAstUnit::Segment(segment) => {
-                    if segment.is_abstract {
-                        log::info!("Skipping abstract segment unit {}", segment.ident());
-                        continue;
-                    }
-                    // segment::generate(segment, &srcdir).expect("code generation failed\n");
-                }
-                VelosiAstUnit::StaticMap(staticmap) => {
-                    staticmap::generate(ast, staticmap, &srcdir).expect("code generation failed\n");
-                }
-                VelosiAstUnit::Enum(e) => {
-                    enums::generate(e, &srcdir).expect("code generation failed\n");
-                }
-            }
-
-            // construct the scope
+            // construct the scope for the module file
             let mut scope = CG::Scope::new();
 
             let title = format!("{} translation unit module", unit.ident());
@@ -206,9 +189,31 @@ impl BackendRust {
             // the unit
             scope.raw("pub use unit::*;");
 
-            // the unit
-            scope.raw("mod interface;"); //TODO: don't add if no interface
-            scope.raw("pub use interface::*;");
+            // generate the unit
+            match unit {
+                VelosiAstUnit::Segment(segment) => {
+                    if segment.is_abstract {
+                        log::info!("Skipping abstract segment unit {}", segment.ident());
+                        srcdir.pop();
+                        continue;
+                    } else {
+                        // the unit
+                        scope.raw("mod interface;");
+                        scope.raw("pub use interface::*;");
+
+                        fs::create_dir_all(&srcdir)?;
+                        // segment::generate(segment, &srcdir).expect("code generation failed\n");
+                    }
+                }
+                VelosiAstUnit::StaticMap(staticmap) => {
+                    fs::create_dir_all(&srcdir)?;
+                    staticmap::generate(ast, staticmap, &srcdir).expect("code generation failed\n");
+                }
+                VelosiAstUnit::Enum(e) => {
+                    fs::create_dir_all(&srcdir)?;
+                    enums::generate(e, &srcdir).expect("code generation failed\n");
+                }
+            }
 
             // save the scope
             save_scope(scope, &srcdir, "mod")?;

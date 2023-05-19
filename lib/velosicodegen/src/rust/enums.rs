@@ -92,15 +92,15 @@ fn add_op_function(unit: &VelosiAstUnitEnum, op: &VelosiAstMethod, imp: &mut CG:
     // TODO: add requires
 
     // check variant and delegate accordingly
-    op_fn.line("match self {");
+    let mut block = CG::Block::new("match self");
     for (variant, _) in &unit.enums {
-        op_fn.line(format!(
-            "  Self::{}(inner) => inner.{}(va, sz, flgs, pa),",
+        block.line(format!(
+            "Self::{}(inner) => inner.{}(va, sz, flgs, pa),",
             utils::to_struct_name(variant.ident(), None),
             op.ident(),
         ));
     }
-    op_fn.line("}");
+    op_fn.push_block(block);
 }
 
 pub fn generate(unit: &VelosiAstUnitEnum, outdir: &Path) -> Result<(), VelosiCodeGenError> {
