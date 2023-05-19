@@ -89,8 +89,6 @@ fn add_op_function(unit: &VelosiAstUnitEnum, op: &VelosiAstMethod, imp: &mut CG:
         );
     }
 
-    // TODO: add requires
-
     // check variant and delegate accordingly
     let mut block = CG::Block::new("match self");
     for (variant, _) in &unit.enums {
