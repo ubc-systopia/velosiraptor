@@ -79,7 +79,7 @@ fn add_op_fn_body_listcomp(
     // target_unit = from_addr((idx * 8) + self.base);
     // TODO: if enum, need to decide which variant to make?
     op_fn.line(format!(
-        "let target_unit = unsafe {{ {}::from_addr((idx * 0x8) + self.base) }};",
+        "let mut target_unit = unsafe {{ {}::from_addr((idx * 0x8) + self.base) }};",
         utils::to_struct_name(dest_unit.ident(), None)
     ));
 
