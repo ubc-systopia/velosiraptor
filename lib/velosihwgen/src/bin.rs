@@ -53,11 +53,14 @@ pub fn main() {
     };
 
     let hwgen = VelosiHwGen::new_fastmodels(
-        Path::new("out"),
+        Path::new("./out"),
         "myunit".to_string()
     );
+
+    hwgen.prepare().expect("could not prepare the hwgen backend");
 
     if let Err(e) = hwgen.generate(&ast) {
         log::error!(target: "main", "code generation failed\n{:?}", e);
     }
+
 }
