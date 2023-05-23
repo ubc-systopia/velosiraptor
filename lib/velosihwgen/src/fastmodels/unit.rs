@@ -311,14 +311,14 @@ fn add_translate_remap(c: &mut C::Class, tm: &VelosiAstMethod) {
         &tm.params[0].ident.ident,
         C::Type::new_typedef("lvaddr_t")
     );
-    let mode_param = C::MethodParam::new(
-        &tm.params[1].ident.ident,
-        C::Type::new_typedef("access_mode_t")
-    );
+    // let mode_param = C::MethodParam::new(
+    //     &tm.params[1].ident.ident,
+    //     C::Type::new_typedef("access_mode_t")
+    // );
     let m = c
         .new_method("do_translate_remap", C::Type::new_typedef("lpaddr_t"))
-        .push_param(src_addr_param)
-        .push_param(mode_param);
+        .push_param(src_addr_param);
+        // .push_param(mode_param);
 
     if let Some(body) = &tm.body {
         let mut b = C::Block::new();
@@ -336,8 +336,8 @@ fn add_translate(c: &mut C::Class, tm: &VelosiAstMethod) {
     let src_addr_param = C::MethodParam::new(&tm.params[0].ident.ident, C::Type::new_typedef("lvaddr_t"));
     let src_var = C::Expr::from_method_param(&src_addr_param);
     let size_param = C::MethodParam::new("size", C::Type::new_size());
-    let mode_param = C::MethodParam::new(&tm.params[1].ident.ident, C::Type::new_typedef("access_mode_t"));
-    let mode_var = C::Expr::from_method_param(&mode_param);
+    // let mode_param = C::MethodParam::new(&tm.params[1].ident.ident, C::Type::new_typedef("access_mode_t"));
+    // let mode_var = C::Expr::from_method_param(&mode_param);
     let dst_addr_param = C::MethodParam::new(
         "dst_addr",
         C::Type::to_ptr(&C::Type::new_typedef("lpaddr_t")),
@@ -351,7 +351,7 @@ fn add_translate(c: &mut C::Class, tm: &VelosiAstMethod) {
 
         .push_param(src_addr_param)
         .push_param(size_param)
-        .push_param(mode_param)
+        // .push_param(mode_param)
         .push_param(dst_addr_param);
 
     m.body().raw(format!(
@@ -368,7 +368,7 @@ fn add_translate(c: &mut C::Class, tm: &VelosiAstMethod) {
         C::Expr::method_call(
             &C::Expr::this(),
             "do_translate_remap",
-            vec![src_var, mode_var],
+            vec![src_var],
         ),
     );
     m.body().return_expr(C::Expr::btrue());
