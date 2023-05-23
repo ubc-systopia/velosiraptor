@@ -375,12 +375,12 @@ fn add_translate(c: &mut C::Class, tm: &VelosiAstMethod) {
 }
 
 fn ast_type_to_c_type(t: &VelosiAstType) -> C::Type {
-    match t.typeinfo {
+    match &t.typeinfo {
         VelosiAstTypeInfo::Bool => C::Type::new_bool(),
         VelosiAstTypeInfo::Integer => C::Type::new_uint(64),
         VelosiAstTypeInfo::Size => C::Type::new_size(),
         VelosiAstTypeInfo::GenAddr => C::Type::new_typedef("genaddr_t"),
-        _ => panic!("unhandled!"),
+        x => panic!("unhandled VelosiAstTypeInfo: {:?}", x),
     }
 }
 
