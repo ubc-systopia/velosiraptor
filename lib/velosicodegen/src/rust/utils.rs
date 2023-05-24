@@ -88,6 +88,7 @@ pub fn ptype_to_rust_type(ptype: &VelosiAstTypeInfo, unit_ident: &str) -> CG::Ty
     }
 }
 
+/// converts a [VelosiAstExpr] into a string representing the corresponding rust expression
 pub fn astexpr_to_rust(expr: &VelosiAstExpr) -> String {
     match expr {
         VelosiAstExpr::IdentLiteral(i) => i.ident().to_string(),
@@ -206,13 +207,17 @@ pub fn astexpr_to_rust(expr: &VelosiAstExpr) -> String {
     }
 }
 
+/// converts a [VelosiOperation] into a string representing the corresponding rust expression
 pub fn op_to_rust_expr(op: &VelosiOperation) -> String {
     match op {
         VelosiOperation::InsertSlice(field, slice, arg) => {
-            format!("{field}.insert_{slice}({});", oparg_to_rust_expr(arg))
+            format!("{field}.insert_{slice}({});", opexpr_to_rust_expr(arg))
         }
         VelosiOperation::InsertField(field, arg) => {
-            format!("self.interface.write_{field}({});", oparg_to_rust_expr(arg))
+            format!(
+                "self.interface.write_{field}({});",
+                opexpr_to_rust_expr(arg)
+            )
         }
         VelosiOperation::ExtractSlice(field, slice) => {
             format!("let {field}_{slice} = {field}.extract_{slice}();",)
@@ -227,40 +232,41 @@ pub fn op_to_rust_expr(op: &VelosiOperation) -> String {
     }
 }
 
-fn oparg_to_rust_expr(op: &VelosiOpExpr) -> String {
+/// converts a [VelosiOpExpr] into a string representing the corresponding rust expression
+fn opexpr_to_rust_expr(op: &VelosiOpExpr) -> String {
     match op {
         VelosiOpExpr::None => String::new(),
         VelosiOpExpr::Num(x) => format!("{:#x}", x),
         VelosiOpExpr::Var(x) => x.clone(),
         VelosiOpExpr::Shl(x, y) => {
-            format!("({} << {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+            format!("({} << {})", opexpr_to_rust_expr(x), opexpr_to_rust_expr(y))
         }
         VelosiOpExpr::Shr(x, y) => {
-            format!("({} >> {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+            format!("({} >> {})", opexpr_to_rust_expr(x), opexpr_to_rust_expr(y))
         }
         VelosiOpExpr::And(x, y) => {
-            format!("({} & {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+            format!("({} & {})", opexpr_to_rust_expr(x), opexpr_to_rust_expr(y))
         }
         VelosiOpExpr::Or(x, y) => {
-            format!("({} | {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+            format!("({} | {})", opexpr_to_rust_expr(x), opexpr_to_rust_expr(y))
         }
         VelosiOpExpr::Add(x, y) => {
-            format!("({} + {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+            format!("({} + {})", opexpr_to_rust_expr(x), opexpr_to_rust_expr(y))
         }
         VelosiOpExpr::Sub(x, y) => {
-            format!("({} - {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+            format!("({} - {})", opexpr_to_rust_expr(x), opexpr_to_rust_expr(y))
         }
         VelosiOpExpr::Mul(x, y) => {
-            format!("({} * {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+            format!("({} * {})", opexpr_to_rust_expr(x), opexpr_to_rust_expr(y))
         }
         VelosiOpExpr::Div(x, y) => {
-            format!("({} / {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+            format!("({} / {})", opexpr_to_rust_expr(x), opexpr_to_rust_expr(y))
         }
         VelosiOpExpr::Mod(x, y) => {
-            format!("({} % {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
+            format!("({} % {})", opexpr_to_rust_expr(x), opexpr_to_rust_expr(y))
         }
         VelosiOpExpr::Flags(v, f) => format!("{v}.{f} as u8"),
-        VelosiOpExpr::Not(x) => format!("!{}", oparg_to_rust_expr(x)),
+        VelosiOpExpr::Not(x) => format!("!{}", opexpr_to_rust_expr(x)),
     }
 }
 

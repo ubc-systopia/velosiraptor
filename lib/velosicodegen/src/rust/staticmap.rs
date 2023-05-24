@@ -135,7 +135,7 @@ fn generate_unit_struct(scope: &mut CG::Scope, ast: &VelosiAst, unit: &VelosiAst
     for param in &unit.params {
         let doc = format!("Parameter '{}' in unit '{}'", param.ident(), unit.ident());
         let loc = format!("@loc: {}", param.loc.loc());
-        let mut f = CG::Field::new(param.ident(), "u64"); // TODO: what type, uintptr in c
+        let mut f = CG::Field::new(param.ident(), "u64");
         f.doc(vec![&doc, &loc]);
         st.push_field(f);
     }
@@ -151,7 +151,7 @@ fn generate_unit_struct(scope: &mut CG::Scope, ast: &VelosiAst, unit: &VelosiAst
             "creates a new reference to a {} unit",
             unit.ident()
         ))
-        .ret(CG::Type::new("Self")) // TODO: is this the right type? update doc too
+        .ret(CG::Type::new("Self"))
         .set_unsafe(true)
         .line("Self { base }");
 

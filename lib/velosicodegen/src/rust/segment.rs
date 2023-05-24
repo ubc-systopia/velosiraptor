@@ -94,7 +94,7 @@ fn add_segment_struct(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
             "creates a new reference to a {} unit",
             unit.ident()
         ))
-        .ret(CG::Type::new("Self")) // TODO: is this the right type? update doc too
+        .ret(CG::Type::new("Self"))
         .set_unsafe(true)
         .line(format!(
             "Self {{ interface: {}::from_addr(base) }}",
