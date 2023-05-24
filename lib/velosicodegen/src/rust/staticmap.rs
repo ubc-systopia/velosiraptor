@@ -187,8 +187,7 @@ pub fn generate(
     // find all the used other units in the static map
     scope.new_comment("include references to the used units");
     for u in unit.map.get_unit_names().iter() {
-        let path = format!("{}", u.to_lowercase());
-        scope.import(&path, "*");
+        scope.import("crate", &utils::to_struct_name(u, None));
     }
 
     // add the definitions

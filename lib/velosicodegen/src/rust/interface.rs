@@ -209,6 +209,7 @@ pub fn generate(unit: &VelosiAstUnitSegment, outdir: &Path) -> Result<(), Velosi
     let title = format!("`{}` Interface definition ", unit.ident());
     utils::add_header(&mut scope, &title);
 
+    // add imports to used fields
     for f in unit.interface.fields() {
         scope.import("super::fields", &field::field_type(f));
     }
