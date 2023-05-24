@@ -112,6 +112,11 @@ pub fn generate(unit: &VelosiAstUnitEnum, outdir: &Path) -> Result<(), VelosiCod
 
     // TODO: add system imports
 
+    scope.new_comment("include references to the used units");
+    for u in unit.get_unit_names() {
+        scope.import("crate", &utils::to_struct_name(u, None));
+    }
+
     // add the definitions
     generate_unit_struct(&mut scope, unit);
 

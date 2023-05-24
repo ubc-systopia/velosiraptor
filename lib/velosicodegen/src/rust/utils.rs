@@ -259,7 +259,7 @@ fn oparg_to_rust_expr(op: &VelosiOpExpr) -> String {
         VelosiOpExpr::Mod(x, y) => {
             format!("({} % {})", oparg_to_rust_expr(x), oparg_to_rust_expr(y))
         }
-        VelosiOpExpr::Flags(v, f) => format!("{v}.{f}"),
+        VelosiOpExpr::Flags(v, f) => format!("{v}.{f} as u8"),
         VelosiOpExpr::Not(x) => format!("!{}", oparg_to_rust_expr(x)),
     }
 }

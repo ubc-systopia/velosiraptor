@@ -161,6 +161,10 @@ pub fn generate(unit: &VelosiAstUnitSegment, outdir: &Path) -> Result<(), Velosi
     let title = format!("`{}` Unit definition ", unit.ident());
     utils::add_header(&mut scope, &title);
 
+    // add import for the interface
+    let iface_name = utils::to_struct_name(&unit.ident(), Some("Interface"));
+    scope.import("super", &iface_name);
+
     // add the definitions
     add_unit_constants(&mut scope, unit);
     add_unit_flags(&mut scope, unit);
