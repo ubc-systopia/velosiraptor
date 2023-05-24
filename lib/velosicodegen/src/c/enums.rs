@@ -379,7 +379,10 @@ fn add_protect_function(
     ast: &VelosiAst,
     unit: &VelosiAstUnitEnum,
 ) -> Result<(), VelosiCodeGenError> {
-    let op = unit.methods.get("unmap").expect("unmap method not found!");
+    let op = unit
+        .methods
+        .get("protect")
+        .expect("protect method not found!");
     add_op_function(scope, ast, unit, op)
 }
 
