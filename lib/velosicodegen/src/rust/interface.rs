@@ -30,12 +30,9 @@ use std::{fs, rc::Rc};
 
 use codegen_rs as CG;
 
-use super::utils::to_rust_type;
 use super::{field, utils};
 use crate::VelosiCodeGenError;
-use velosiast::{
-    VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField, VelosiAstUnitSegment,
-};
+use velosiast::{VelosiAstField, VelosiAstInterfaceField, VelosiAstUnitSegment};
 
 /// returns the string of the field type
 pub fn interface_type(unit: &VelosiAstUnitSegment) -> String {
@@ -84,11 +81,6 @@ pub fn generate_interface(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
     for f in unit.interface.fields() {
         generate_read_field(f, imp);
         generate_write_field(f, imp);
-
-        for slice in f.layout() {
-            generate_read_slice(f, slice, imp);
-            generate_write_slice(f, slice, imp);
-        }
     }
 }
 
@@ -103,25 +95,6 @@ fn generate_read_field(f: &Rc<VelosiAstInterfaceField>, imp: &mut CG::Impl) {
         .line(body);
 }
 
-fn generate_read_slice(
-    f: &Rc<VelosiAstInterfaceField>,
-    slice: &Rc<VelosiAstFieldSlice>,
-    imp: &mut CG::Impl,
-) {
-    let fname = format!("read_{}_{}", f.ident(), slice.ident());
-    let body = format!("self.{}.extract_{}()", f.ident(), slice.ident());
-    let ftype = to_rust_type(slice.nbits());
-    imp.new_fn(&fname)
-        .vis("pub")
-        .doc(&format!(
-            "reads value from interface slice '{}'",
-            slice.ident()
-        ))
-        .arg_mut_self()
-        .ret(CG::Type::new(ftype))
-        .line(body);
-}
-
 fn generate_write_field(f: &Rc<VelosiAstInterfaceField>, imp: &mut CG::Impl) {
     let fname = format!("write_{}", f.ident());
     let body = format!("self.{} = val;", f.ident());
@@ -133,25 +106,6 @@ fn generate_write_field(f: &Rc<VelosiAstInterfaceField>, imp: &mut CG::Impl) {
         ))
         .arg_mut_self()
         .arg("val", field::field_type(f))
-        .line(body);
-}
-
-fn generate_write_slice(
-    f: &Rc<VelosiAstInterfaceField>,
-    slice: &Rc<VelosiAstFieldSlice>,
-    imp: &mut CG::Impl,
-) {
-    let fname = format!("write_{}_{}", f.ident(), slice.ident());
-    let body = format!("self.{}.insert_{}(val);", f.ident(), slice.ident());
-    let ftype = to_rust_type(slice.nbits());
-    imp.new_fn(&fname)
-        .vis("pub")
-        .doc(&format!(
-            "writes value 'val' into interface slice '{}'",
-            slice.ident()
-        ))
-        .arg_mut_self()
-        .arg("val", ftype)
         .line(body);
 }
 
