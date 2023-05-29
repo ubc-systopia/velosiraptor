@@ -240,6 +240,9 @@ impl BackendRust {
         let title = format!("{} Library", self.pkgname);
         add_header(&mut scope, &title);
 
+        // use no_std
+        scope.raw("#![no_std]");
+
         // import the constants
         scope.new_comment("import constant definitions ");
 

@@ -92,7 +92,7 @@ fn add_insert_fn(imp: &mut CG::Impl, fname: &str, fbits: u64, sl: &VelosiAstFiel
 
     let body = if sl.start != 0 {
         format!(
-            "self.val = (self.val & {}) | (((val as {}) & {}) << {})",
+            "self.val = (self.val & {}) | (((val as {}) & {}) << {});",
             to_mask_str(!sl.mask(), fbits),
             valtype,
             to_mask_str(((1u128 << sl.nbits()) - 1) as u64, sl.nbits()),
@@ -100,7 +100,7 @@ fn add_insert_fn(imp: &mut CG::Impl, fname: &str, fbits: u64, sl: &VelosiAstFiel
         )
     } else {
         format!(
-            "self.val = (self.val & {}) | ((val as {}) & {})",
+            "self.val = (self.val & {}) | ((val as {}) & {});",
             to_mask_str(!sl.mask(), fbits),
             valtype,
             to_mask_str(((1u128 << sl.nbits()) - 1) as u64, sl.nbits())
@@ -112,7 +112,9 @@ fn add_insert_fn(imp: &mut CG::Impl, fname: &str, fbits: u64, sl: &VelosiAstFiel
         .arg_mut_self()
         .arg("val", CG::Type::new(ftype))
         .doc(&format!("inserts value {}.{} in field", fname, sl.ident()))
-        .line(body);
+        .ret("&mut Self")
+        .line(body)
+        .line("self");
 }
 
 fn add_extract_fn(imp: &mut CG::Impl, fname: &str, sl: &VelosiAstFieldSlice) {
