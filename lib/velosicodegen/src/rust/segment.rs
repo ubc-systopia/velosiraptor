@@ -29,7 +29,7 @@ use std::path::Path;
 
 use codegen_rs as CG;
 
-use velosiast::ast::{VelosiAstMethod, VelosiAstUnitSegment};
+use velosiast::ast::{VelosiAstMethod, VelosiAstUnitSegment, VelosiOperation};
 
 use super::utils;
 use crate::VelosiCodeGenError;
@@ -140,8 +140,14 @@ fn add_op_fn(unit: &VelosiAstUnitSegment, op: &VelosiAstMethod, imp: &mut CG::Im
 
     if !op.ops.is_empty() {
         op_fn.line("// configuration sequence");
-        for op in &op.ops {
-            op_fn.line(utils::op_to_rust_expr(op));
+        let mut iter = op.ops.iter().peekable();
+        while let Some(op) = iter.next() {
+            // if next op is a write action, end the method call chain
+            if matches!(iter.peek(), Some(VelosiOperation::WriteAction(_))) {
+                op_fn.line(utils::op_to_rust_expr(op) + ";");
+            } else {
+                op_fn.line(utils::op_to_rust_expr(op));
+            }
         }
         op_fn.line("true");
     } else {

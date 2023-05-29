@@ -210,8 +210,8 @@ pub fn astexpr_to_rust(expr: &VelosiAstExpr) -> String {
 /// converts a [VelosiOperation] into a string representing the corresponding rust expression
 pub fn op_to_rust_expr(op: &VelosiOperation) -> String {
     match op {
-        VelosiOperation::InsertSlice(field, slice, arg) => {
-            format!("{field}.insert_{slice}({});", opexpr_to_rust_expr(arg))
+        VelosiOperation::InsertSlice(_, slice, arg) => {
+            format!("    .insert_{slice}({})", opexpr_to_rust_expr(arg))
         }
         VelosiOperation::InsertField(field, arg) => {
             format!(
@@ -226,7 +226,7 @@ pub fn op_to_rust_expr(op: &VelosiOperation) -> String {
             format!("self.interface.write_{field}({field});")
         }
         VelosiOperation::ReadAction(field) => {
-            format!("let mut {field} = self.interface.read_{field}();")
+            format!("let {field} = self.interface.read_{field}()")
         }
         VelosiOperation::Return => String::new(),
     }
