@@ -9,11 +9,9 @@
 const PTABLE_ENTRIES : size =  512;
 const PTABLE_ENTRY_SIZE : size = 8;
 
-//
 const PTABLE_SIZE :size = (PTABLE_ENTRIES * PTABLE_ENTRY_SIZE);
 const PTABLE_ALIGNMENT : size = PTABLE_SIZE;
 
-// the page sizes
 const BASE_PAGE_BITS  : size = 12;
 const BASE_PAGE_SIZE  : size = (1 << BASE_PAGE_BITS); // 4 KiB
 
@@ -26,24 +24,12 @@ const HUGE_PAGE_SIZE  : size = (1 << HUGE_PAGE_BITS);  // 1 GiB
 const PML4_PAGE_BITS  : size = 39;
 const PML4_PAGE_SIZE  : size = (1 << PML4_PAGE_BITS); // 512 GiB
 
+const VSPACE_BITS : size = 48;
+const VSPACE_SIZE : size = (1 << VSPACE_BITS);
 
 const PHYS_ADDR_BITS : size = 48;
 const PHYS_ADDR_MAX  : size = (1 << PHYS_ADDR_BITS);
 
-
-// an entry in the table is invalid if it's present bit is set to 0. the remaining bits are ignored
-//segment Invalid {
-//    fn inv() {
-//        state.present == 0
-//    }
-//
-//    state = StateDef(base: addr) {
-//        mem entry [base, 0, 8] {
-//            0 .. 1  present,
-//            1 .. 64 ignored,
-//        }
-//    };
-//}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -88,29 +74,27 @@ abstract segment X86_64_PTableDescriptor(base: addr) {
 
     fn valid() -> bool {
         state.entry.present == 1
-          && state.entry.ps == 0
-          && state.entry.res0 == 0
-
     }
 
     fn matchflags(flgs : flags) -> bool
         requires valid()
     {
+        // TODO: make this one here a bit better
         (state.entry.rw == 1)      // always writable
          && (state.entry.us == 1)  // allow user access
          && (state.entry.pwt == 0) // don't do write back
          && (state.entry.pcd == 0) // don't disable cches
+         && (state.entry.res0 == 0) // must always be 0
     }
 
     fn translate(va: vaddr) -> paddr
-        requires valid()
+        requires state.entry.ps == 0
     {
         va + (state.entry.address << 12)
     }
 }
 
 abstract segment X86_64_PageDescriptor(base: addr) {
-    // it's a 64-bit machine with a 48 bit virtual address space
     outbitwidth = PHYS_ADDR_BITS;
 
     flags = {
@@ -131,7 +115,6 @@ abstract segment X86_64_PageDescriptor(base: addr) {
 
 segment X86_64_PageTableEntry(base: addr) : X86_64_PageDescriptor {
 
-    // there are there are 4 KiB pages
     inbitwidth = 12;
 
     state = StateDef(base: addr) {
@@ -145,10 +128,10 @@ segment X86_64_PageTableEntry(base: addr) : X86_64_PageDescriptor {
             6 ..  7 d,        // dirty
             7 ..  8 pat,      // page size
             8 ..  9 g,        // global
-            9 .. 12 ign0,  //
+            9 .. 12 ign0,     //
             12 .. 48 address, //
             48 .. 52 res0,    //
-            52 .. 59 ign1, // don't care
+            52 .. 59 ign1,    // don't care
             59 .. 63 pkey,    // protection keys
             63 .. 64 xd,      // execute disabled
         }
@@ -159,11 +142,10 @@ segment X86_64_PageTableEntry(base: addr) : X86_64_PageDescriptor {
     };
 
     fn valid() -> bool {
-        state.entry.present == 1 && state.entry.res0 == 0
+        state.entry.present == 1
     }
 
     fn matchflags(flgs : flags) -> bool
-        requires valid()
     {
         (state.entry.rw == flgs.writable)
          && if (flgs.devicemem == 1) {
@@ -173,12 +155,12 @@ segment X86_64_PageTableEntry(base: addr) : X86_64_PageDescriptor {
             }
          && (state.entry.us == flgs.usermode)
          && if flgs.executable == 1 {state.entry.xd == 0} else { state.entry.xd == 1}
+         && (state.entry.res0 == 0)
+         && (state.entry.pat == 0)
+         && (state.entry.g == 0)
     }
 
     fn translate(va: vaddr) -> paddr
-        requires state.entry.pat == 0
-        requires state.entry.g == 0
-        requires valid()
     {
         va + (state.entry.address << BASE_PAGE_BITS)
     }
@@ -192,7 +174,6 @@ segment X86_64_PageTableEntry(base: addr) : X86_64_PageDescriptor {
     synth fn unmap(va: vaddr, sz: size);
 }
 
-// represents an x86 page table entry
 staticmap X86_64_PageTable(base : addr) {
     // should be able to specify the alignment constraints here
     // mapdef = [ X86_64_PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..PTABLE_ENTRIES ];
@@ -205,7 +186,6 @@ staticmap X86_64_PageTable(base : addr) {
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
 segment X86_64_PDirEntryTable(base : addr) : X86_64_PTableDescriptor {
 
     inbitwidth = LARGE_PAGE_BITS;
@@ -213,18 +193,13 @@ segment X86_64_PDirEntryTable(base : addr) : X86_64_PTableDescriptor {
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : X86_64_PageTable)
         requires va == 0 && sz == LARGE_PAGE_SIZE
         requires (pa & (BASE_PAGE_SIZE - 1) == 0)
-        // requires va >= 0 && va < LARGE_PAGE_SIZE && 0 <= sz && sz <= LARGE_PAGE_SIZE
 
     synth fn protect(va: vaddr, sz: size, flgs: flags);
 
     synth fn unmap(va: vaddr, sz: size);
 }
 
-
 segment X86_64_PDirEntryPage(base :addr) : X86_64_PageDescriptor {
-
-
-    // there are there are 4 KiB pages
     inbitwidth = LARGE_PAGE_BITS;
 
     state = StateDef(base :addr) {
@@ -255,13 +230,9 @@ segment X86_64_PDirEntryPage(base :addr) : X86_64_PageDescriptor {
 
     fn valid() -> bool {
         state.entry.present == 1
-            && state.entry.res0_0 == 0
-            && state.entry.res0_1 == 0
-            && state.entry.ps == 1
     }
 
     fn matchflags(flgs : flags) -> bool
-        requires valid()
     {
         (state.entry.rw == flgs.writable)
          && if (flgs.devicemem == 1) {
@@ -273,13 +244,13 @@ segment X86_64_PDirEntryPage(base :addr) : X86_64_PageDescriptor {
          && if flgs.executable == 1 {state.entry.xd == 0} else { state.entry.xd == 1}
     }
 
-    fn translate(va: vaddr) -> paddr
-        requires state.entry.pat == 0
-        requires state.entry.g == 0
-        requires valid()
-    {
-        va + (state.entry.address << LARGE_PAGE_BITS)
-    }
+        fn translate(va: vaddr) -> paddr
+            requires state.entry.ps == 1
+            requires va < LARGE_PAGE_SIZE
+
+        {
+            va + (state.entry.address << LARGE_PAGE_BITS)
+        }
 
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
         requires va == 0 && sz == LARGE_PAGE_SIZE
@@ -291,25 +262,20 @@ segment X86_64_PDirEntryPage(base :addr) : X86_64_PageDescriptor {
         requires va == 0 && sz == LARGE_PAGE_SIZE
 }
 
-
-
 enum X86_64_PDirEntry(base: addr){
     X86_64_PDirEntryTable(base),
     X86_64_PDirEntryPage(base)
 }
 
 staticmap X86_64_PDir(base : addr) {
-    // should be able to specify the alignment constraints here
-    // mapdef = [ X86_64_PDirEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..PTABLE_ENTRIES ];
     mapdef = [ X86_64_PDirEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..512 ];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//
 // Page-Directory-Pointer-Table
-
+//
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
 
 segment X86_64_PDPTEntryTable(base : addr) : X86_64_PTableDescriptor {
 
@@ -324,10 +290,8 @@ segment X86_64_PDPTEntryTable(base : addr) : X86_64_PTableDescriptor {
     synth fn unmap(va: vaddr, sz: size);
 }
 
-
 segment X86_64_PDPTEntryPage(base: addr) : X86_64_PageDescriptor {
 
-    // there are there are 4 KiB pages
     inbitwidth = HUGE_PAGE_BITS;
 
     state = StateDef(base :addr) {
@@ -358,9 +322,6 @@ segment X86_64_PDPTEntryPage(base: addr) : X86_64_PageDescriptor {
 
     fn valid() -> bool {
         state.entry.present == 1
-            && state.entry.res0_0 == 0
-            && state.entry.res0_1 == 0
-            && state.entry.ps == 1
     }
 
     fn matchflags(flgs : flags) -> bool
@@ -374,12 +335,14 @@ segment X86_64_PDPTEntryPage(base: addr) : X86_64_PageDescriptor {
             }
          && (state.entry.us == flgs.usermode)
          && if flgs.executable == 1 {state.entry.xd == 0} else { state.entry.xd == 1}
+         && (state.entry.res0_0 == 0)
+         && (state.entry.res0_1 == 0)
+         && (state.entry.pat == 0)
+         && (state.entry.g == 0)
     }
 
     fn translate(va: vaddr) -> paddr
-        requires state.entry.pat == 0
-        requires state.entry.g == 0
-        requires valid()
+        requires state.entry.ps == 1
     {
         va + (state.entry.address << HUGE_PAGE_BITS)
     }
@@ -423,8 +386,75 @@ segment X86_64_PML4Entry(base : addr) : X86_64_PTableDescriptor {
     synth fn unmap(va: vaddr, sz: size);
 }
 
-
 staticmap X86_64_PML4(base : addr) {
-    // should be able to specify the alignment constraints here
     mapdef = [ X86_64_PML4Entry(base + i * PTABLE_ENTRY_SIZE) for i in 0..512 ];
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// CR3 Register
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+segment X86_MMU(base: addr) {
+
+    inbitwidth = VSPACE_BITS;
+
+    outbitwidth = PHYS_ADDR_BITS;
+
+
+    flags = {
+        writable,
+        readable,
+        executable,
+        devicemem,
+        usermode
+    };
+
+    state = StateDef(base: addr) {
+        reg cr3 [ 8 ] {
+            0 .. 12 pcid,
+            12 .. 64 address
+        },
+
+        reg cr4 [ 4 ] {
+            31 .. 32 enabled
+        }
+    };
+
+    // making these as an MMIO register so we can access them.
+    interface = InterfaceDef(base: addr) {
+        mmio cr3 [ base, 0, 8 ],
+        mmio cr4 [ base, 8, 4 ]
+    };
+
+    fn valid() -> bool {
+        true
+    }
+
+    fn matchflags(flgs:flags) -> bool {
+        true
+    }
+
+
+    fn translate(va: vaddr) -> paddr
+        requires va < VSPACE_SIZE
+    {
+        if state.cr4.enabled == 1 {
+            va + (state.cr3.address << 12)
+        } else {
+            va
+        }
+    }
+
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : X86_64_PML4)
+        requires va == 0 && sz == VSPACE_SIZE
+        requires (pa & (BASE_PAGE_SIZE - 1) == 0)
+
+    synth fn protect(va: vaddr, sz: size, flgs: flags);
+
+    synth fn unmap(va: vaddr, sz: size);
 }

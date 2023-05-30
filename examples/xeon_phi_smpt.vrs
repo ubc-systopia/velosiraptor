@@ -20,7 +20,7 @@ segment SMPTE(base: addr) {
     outbitwidth = 64;
 
     flags = {
-        snoot_disabled,
+        snoop_disabled,
     };
 
     state = StateDef() {
@@ -32,19 +32,7 @@ segment SMPTE(base: addr) {
     };
 
     interface = InterfaceDef(base: addr) {
-        mmio entry [ base, 0, 4 ] {
-            Layout {
-                0 ..  1  snoop_disabled,
-                1 ..  2  _,
-                2 .. 32  host_address,
-            },
-            ReadActions {
-                state.entry -> interface.entry;
-            },
-            WriteActions {
-                interface.entry -> state.entry;
-            }
-        }
+        mmio entry [ base, 0, 4 ]
     };
 
     fn matchflags(flgs : flags) -> bool
