@@ -37,7 +37,9 @@ use velosiparser::{
 };
 
 use crate::ast::{
-    method::{FN_SIG_MAP, FN_SIG_MATCHFLAGS, FN_SIG_PROTECT, FN_SIG_TRANSLATE, FN_SIG_UNMAP},
+    method::{
+        FN_SIG_MAP, FN_SIG_MATCHFLAGS, FN_SIG_PROTECT, FN_SIG_TRANSLATE, FN_SIG_UNMAP, FN_SIG_VALID,
+    },
     types::{VelosiAstType, VelosiAstTypeInfo},
     VelosiAstConst, VelosiAstInterface, VelosiAstMethod, VelosiAstNode, VelosiAstParam,
     VelosiAstStaticMap, VelosiOperation,
@@ -461,6 +463,19 @@ impl VelosiAstUnitSegment {
             issues.push(err);
 
             let m = Rc::new(VelosiAstMethod::default_protect());
+            methods.insert(m.ident_to_string(), m);
+        }
+
+        if !methods.contains_key("valid") && !pt.is_abstract {
+            let msg = "Segment unit has no `valid` method defined. Using default implementation";
+            let hint = format!("add method with signature `{FN_SIG_VALID}` to unit");
+            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                .add_hint(hint)
+                .add_location(pt.loc.from_self_with_subrange(0..1))
+                .build();
+            issues.push(err);
+
+            let m = Rc::new(VelosiAstMethod::default_valid());
             methods.insert(m.ident_to_string(), m);
         }
 
