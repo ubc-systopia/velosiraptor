@@ -41,11 +41,13 @@ use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
 
 /// the signature of the translate function
+pub const FN_SIG_VALID: &str = "fn valid() -> bool";
 pub const FN_SIG_TRANSLATE: &str = "fn translate(va: vaddr) -> addr";
 pub const FN_SIG_MATCHFLAGS: &str = "fn matchflags(flgs:flags) -> bool";
 pub const FN_SIG_MAP: &str = "fn map(va: vaddr, sz: size, flgs: flags, pa: paddr)";
 pub const FN_SIG_UNMAP: &str = "fn unmap(va: vaddr, sz: size)";
 pub const FN_SIG_PROTECT: &str = "fn protect(va: vaddr, sz: size, flgs: flags)";
+
 // const FN_SIG_INIT: &str = "fn init()";
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -247,6 +249,17 @@ impl VelosiAstMethod {
                 "flgs".to_string(),
                 VelosiAstTypeInfo::Flags,
             ))],
+            Vec::new(),                                    // no requires
+            Some(VelosiAstExpr::BoolLiteral(true.into())), // just true
+            VelosiTokenStream::default(),                  // no location
+        )
+    }
+
+    pub fn default_valid() -> Self {
+        Self::new(
+            VelosiAstIdentifier::with_name("valid".to_string()),
+            VelosiAstType::new_bool(),
+            Vec::new(),
             Vec::new(),                                    // no requires
             Some(VelosiAstExpr::BoolLiteral(true.into())), // just true
             VelosiTokenStream::default(),                  // no location
@@ -646,6 +659,11 @@ impl VelosiAstMethod {
 
     fn check_special_methods(&self, issues: &mut VelosiAstIssues) {
         match self.ident().as_str() {
+            "valid" => {
+                self.check_rettype(issues, FN_SIG_VALID, VelosiAstTypeInfo::Bool);
+                self.check_arguments_exact(issues, FN_SIG_VALID, &[]);
+                self.check_not_synth(issues);
+            }
             "translate" => {
                 self.check_rettype(issues, FN_SIG_TRANSLATE, VelosiAstTypeInfo::PhysAddr);
                 self.check_arguments_exact(
