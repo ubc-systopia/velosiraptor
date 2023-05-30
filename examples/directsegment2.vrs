@@ -14,96 +14,64 @@
  */
 
 // This defines an SMPT Entry
-unit DirectSegment2(base : addr) : Segment {
+segment DirectSegment(base : addr) {
 
     // let's assume the maximum size of the segment is 40 bits.
-    // size = 40;
+    inbitwidth= 48;
+
+    // let's assume the maximum output bit size is 48 bits
+    outbitwidth = 48;
+
+    flags = {
+        writable,
+        readable,
+        executable,
+    };
 
     // the state will be two registers:
-    state = Register {
-
-        base [8] {
-             0 63  address;
-        };
-
-        length [8] {
-            0 39 bytes;
-        };
+    state = StateDef(base: addr) {
+        reg address [ 8 ] {
+            0 .. 48 val,
+        },
+        reg length [ 8 ] {
+            0 ..  1 rw,
+            1 ..  2 exec,
+            2 ..  3 _res,
+            4 .. 48 bytes,
+        }
     };
 
-    // the interface is a register interface, assume there are two registers
-    // called `base` and `size`. They can be updated using load/store instructions
-    interface = MMIO(base : addr) {
-
-        base [base, 16, 8] {
-            Layout {
-               12 63  address;
-            };
-            ReadActions {
-                interface.base.address <- state.base.address >> 12;
-            };
-            WriteActions {
-                interface.base.address << 12 -> state.base.address;
-            };
-        };
-
-        length [base, 8, 8] {
-            Layout {
-                0 39 bytes;
-            };
-            ReadActions {
-                interface.length <- state.length;
-            };
-            WriteActions {
-                interface.length -> state.length;
-            };
-        };
+    // just expose the entire state as MMIO interface
+    interface = InterfaceDef(base: addr) {
+        mmio address [ base, 0, 8 ],
+        mmio length [ base, 8, 8 ],
     };
 
-    // unmapping an entry
-    fn unmap(va: addr, sz: size) -> bool
-        // need a way to express:
-        // forall a | va <= a < va + sz :: fail(translate(a, ANY))
-        ensures translate(va, 0) == 0;
-    ;
-
-    // mapping an entry
-    fn map(va: addr, sz: size, flags: int, pa : addr) -> bool
-        //requires (addr %  4096) == 0;
-        // need a way to express types:
-        // type(addr) == Memory || type(addr) == DevMemory;
-        // type(addr) == DevMemory ==> flags & CACHE_DISABLED
-        //
-        // the va should be 0 here
-        requires va == 0;
-
-        requires 1 <= sz;
-        requires sz < 0xff_ffff_ffff;
-
-        requires 0 <= pa;
-        requires pa & 0xfff == 0;
-        requires (pa >> 12) << 12 == pa;
-        requires pa <= 0xff_ffff_ffff;
-
-        ensures forall i : addr :: 0 <= i && i < sz && translate(va + i, flags) == pa + i;
-        ensures translate(va, flags) == pa;
-    ;
-
-
-    // protecting the entry, i.e., change its permission
-    fn protect(flags: int) -> bool
-    {
-        // update the entry
-        // ensures match_flags(flags) ==> translate(a) == translate(a)
-        return true;
+    // add the valid bit, we can't unmap here
+    fn valid() -> bool {
+        true
     }
 
-
-    // the translation semantics, adding an option type?
-    fn translate(va: addr, flags: int) -> addr
-        requires va < state.length.bytes;
+    // define the permission flags
+    fn matchflags(flgs : flags) -> bool
     {
-        return va + state.base.address;
+        flgs.writable == state.length.rw && flgs.executable == state.length.exec
     }
 
- };
+    // to calculate the new address, we just add the base address here, if within range
+    fn translate(va: vaddr) -> paddr
+        requires va < (state.length.bytes << 4);
+    {
+        va + state.address.val
+    }
+
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+        requires sz < (1 << 40)
+        requires sz > 0 && ((sz & 0xf) == 0)
+        requires va == 0
+        requires (pa & 0xf == 0)
+
+    synth fn protect(va: vaddr, sz: size, flgs: flags);
+
+    synth fn unmap(va: vaddr, sz: size);
+ }

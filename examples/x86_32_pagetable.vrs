@@ -89,34 +89,15 @@ segment X86_32_PageTableEntry(base : addr) {
     };
 
     interface = InterfaceDef(base : addr) {
-        mem pte [base, 0, 4] {
-            // this ones are in fact optional...
-            Layout {
-                // the following fields at starting bit, ending bit, name
-                    0 ..  1 present,
-                    1 ..  2 writable,
-                    2 ..  3 usermode,
-                    3 ..  4 writethrough,
-                    4 ..  5 nocache,
-                    5 ..  6 accessed,
-                    6 ..  7 dirty,
-                    7 ..  8 pat,
-                    8 ..  9 global,
-                    9 .. 12 ignored,
-                12 .. 32 base,
-            },
-            ReadActions {
-                interface.pte <- state.pte;
-            },
-            WriteActions {
-                interface.pte -> state.pte;
-            },
-        }
+        mem pte [base, 0, 4]
     };
+
+    fn valid() -> bool {
+        state.pte.present == 1
+    }
 
     // matches a translation flags,
     fn matchflags(flgs : flags) -> bool
-        requires (state.pte.present == 1);
     {
         (state.pte.writable == flgs.writable)
          && (state.pte.usermode != flgs.usermode)
@@ -133,8 +114,6 @@ segment X86_32_PageTableEntry(base : addr) {
     // the translation semantics, adding an option type?
     fn translate(va: vaddr) -> paddr
         requires va < BASE_PAGE_SIZE;
-        requires state.pte.present == 1;
-        requires state.pte.global == 0;
     {
         va + (state.pte.base << BASE_PAGE_BITS)
     }
