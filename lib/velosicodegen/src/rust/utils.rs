@@ -29,11 +29,15 @@
 
 use std::fs;
 use std::path::Path;
+use std::rc::Rc;
 
 // get the code generator
 use codegen_rs as CG;
 
-use velosiast::ast::{VelosiAstBinOp, VelosiAstExpr, VelosiAstUnOp, VelosiOpExpr, VelosiOperation};
+use velosiast::ast::{
+    VelosiAstBinOp, VelosiAstExpr, VelosiAstInterface, VelosiAstParam, VelosiAstUnOp, VelosiOpExpr,
+    VelosiOperation,
+};
 //
 use velosiast::ast::{VelosiAstConst, VelosiAstTypeInfo};
 
@@ -208,10 +212,16 @@ pub fn astexpr_to_rust(expr: &VelosiAstExpr) -> String {
 }
 
 /// converts a [VelosiOperation] into a string representing the corresponding rust expression
-pub fn op_to_rust_expr(op: &VelosiOperation) -> String {
+pub fn op_to_rust_expr(op: &VelosiOperation, interface: &VelosiAstInterface) -> String {
     match op {
-        VelosiOperation::InsertSlice(_, slice, arg) => {
-            format!("    .insert_{slice}({})", opexpr_to_rust_expr(arg))
+        VelosiOperation::InsertSlice(field_name, slice_name, arg) => {
+            let rust_expr = opexpr_to_rust_expr(arg);
+
+            let field = interface.field(field_name).unwrap();
+            let slice = field.slice(slice_name).unwrap();
+            let rust_type = to_rust_type(slice.nbits());
+
+            format!("    .insert_{slice_name}({} as {rust_type})", rust_expr)
         }
         VelosiOperation::InsertField(field, arg) => {
             format!(
@@ -223,7 +233,7 @@ pub fn op_to_rust_expr(op: &VelosiOperation) -> String {
             format!("let {field}_{slice} = {field}.extract_{slice}();",)
         }
         VelosiOperation::WriteAction(field) => {
-            format!("self.interface.write_{field}({field});")
+            format!("self.interface.write_{field}(*{field});")
         }
         VelosiOperation::ReadAction(field) => {
             format!("let {field} = self.interface.read_{field}()")
@@ -265,7 +275,7 @@ fn opexpr_to_rust_expr(op: &VelosiOpExpr) -> String {
         VelosiOpExpr::Mod(x, y) => {
             format!("({} % {})", opexpr_to_rust_expr(x), opexpr_to_rust_expr(y))
         }
-        VelosiOpExpr::Flags(v, f) => format!("{v}.{f} as u8"),
+        VelosiOpExpr::Flags(v, f) => format!("{v}.{f}"),
         VelosiOpExpr::Not(x) => format!("!{}", opexpr_to_rust_expr(x)),
     }
 }
@@ -279,6 +289,15 @@ pub fn to_mask_str(m: u64, len: u64) -> String {
         33..=64 => format!("0x{m:016x}"),
         _ => String::from("unknown"),
     }
+}
+
+// converts a list of parameters into a comma separated argument list with the same names
+pub fn params_to_args_list(params: &[Rc<VelosiAstParam>]) -> String {
+    params
+        .iter()
+        .map(|p| p.ident_to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// writes the scope to a file or to stdout

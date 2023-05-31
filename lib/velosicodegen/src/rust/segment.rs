@@ -144,9 +144,9 @@ fn add_op_fn(unit: &VelosiAstUnitSegment, op: &VelosiAstMethod, imp: &mut CG::Im
         while let Some(op) = iter.next() {
             // if next op is a write action, end the method call chain
             if matches!(iter.peek(), Some(VelosiOperation::WriteAction(_))) {
-                op_fn.line(utils::op_to_rust_expr(op) + ";");
+                op_fn.line(utils::op_to_rust_expr(op, &unit.interface) + ";");
             } else {
-                op_fn.line(utils::op_to_rust_expr(op));
+                op_fn.line(utils::op_to_rust_expr(op, &unit.interface));
             }
         }
         op_fn.line("true");
@@ -166,6 +166,9 @@ pub fn generate(unit: &VelosiAstUnitSegment, outdir: &Path) -> Result<(), Velosi
     // add the header comments
     let title = format!("`{}` Unit definition ", unit.ident());
     utils::add_header(&mut scope, &title);
+
+    // import utils
+    scope.import("crate::utils", "*");
 
     // add import for the interface
     let iface_name = utils::to_struct_name(&unit.ident(), Some("Interface"));

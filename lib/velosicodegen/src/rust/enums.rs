@@ -93,9 +93,10 @@ fn add_op_function(unit: &VelosiAstUnitEnum, op: &VelosiAstMethod, imp: &mut CG:
     let mut block = CG::Block::new("match self");
     for (variant, _) in &unit.enums {
         block.line(format!(
-            "Self::{}(inner) => inner.{}(va, sz, flgs, pa),",
+            "Self::{}(inner) => inner.{}({}),",
             utils::to_struct_name(variant.ident(), None),
             op.ident(),
+            utils::params_to_args_list(&op.params)
         ));
     }
     op_fn.push_block(block);
@@ -110,7 +111,8 @@ pub fn generate(unit: &VelosiAstUnitEnum, outdir: &Path) -> Result<(), VelosiCod
     let title = format!("Unit Definitions for `{}`", unit.ident());
     utils::add_header(&mut scope, &title);
 
-    // TODO: add system imports
+    // import utils
+    scope.import("crate::utils", "*");
 
     scope.new_comment("include references to the used units");
     for u in unit.get_unit_names() {

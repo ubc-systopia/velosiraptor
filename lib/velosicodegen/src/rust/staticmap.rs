@@ -66,13 +66,13 @@ fn add_op_fn_body_listcomp(
     // idx = va / element_size
     let dest_unit = ast.get_unit(map.elm.dst.ident().as_str()).unwrap();
     op_fn.line(format!(
-        "let idx = (va >> {:#x});",
+        "let idx = va >> {:#x};",
         dest_unit.input_bitwidth()
     ));
 
     // va = va & (element_size - 1)
     op_fn.line(format!(
-        "let va = (va & ((0x1 << {:#x}) - 0x1));",
+        "let va = va & ((0x1 << {:#x}) - 0x1);",
         dest_unit.input_bitwidth()
     ));
 
@@ -83,8 +83,12 @@ fn add_op_fn_body_listcomp(
         utils::to_struct_name(dest_unit.ident(), None)
     ));
 
-    // target_unit.op(va, sz, flgs, pa)
-    op_fn.line(format!("target_unit.{}(va, sz, flgs, pa)", op.ident()));
+    // target_unit.op(args)
+    op_fn.line(format!(
+        "target_unit.{}({})",
+        op.ident(),
+        utils::params_to_args_list(&op.params)
+    ));
 }
 
 fn add_op_function(
@@ -182,7 +186,8 @@ pub fn generate(
     let title = format!("Unit Definitions for `{}`", unit.ident());
     utils::add_header(&mut scope, &title);
 
-    // TODO: add system imports
+    // import utils
+    scope.import("crate::utils", "*");
 
     // find all the used other units in the static map
     scope.new_comment("include references to the used units");
