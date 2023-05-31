@@ -57,7 +57,7 @@ pub fn main() {
         "myunit".to_string()
     );
 
-    hwgen.prepare().expect("could not prepare the hwgen backend");
+    hwgen.prepare(&ast).expect("could not prepare the hwgen backend");
 
     if let Err(e) = hwgen.generate(&ast) {
         log::error!(target: "main", "code generation failed\n{:?}", e);
