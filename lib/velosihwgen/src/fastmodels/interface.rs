@@ -34,6 +34,7 @@ use std::path::Path;
 // other libraries
 use crustal as C;
 
+use velosiast::VelosiAstField;
 // the defined errors
 use velosiast::ast::VelosiAstInterface;
 use crate::fastmodels::add_header;
@@ -108,9 +109,8 @@ pub fn generate_interface_header(
     c.new_attribute("_state", state_ptr_type);
 
     for f in state.fields() {
-        let rcn = registers_class_name(&f.to_string());
-        // TODO: I think some indentation is making its way into f.to_string()
-        let fieldname = format!("_{}", &f.to_string());
+        let rcn = registers_class_name(&f.ident());
+        let fieldname = format!("_{}", &f.ident());
         let ty = C::Type::new_class(&rcn);
         c.new_attribute(&fieldname, ty);
     }
@@ -162,8 +162,8 @@ pub fn generate_interface_impl(
     cons.push_initializer("_state", pa.clone());
 
     for f in state.fields() {
-        let fieldname = format!("_{}", f.to_string());
-        let rcn = registers_class_name(&f.to_string());
+        let fieldname = format!("_{}", f.ident());
+        let rcn = registers_class_name(&f.ident());
         cons.push_initializer(fieldname.as_str(), C::Expr::fn_call(&rcn, vec![pa.clone()]));
 
         let this = C::Expr::this();
