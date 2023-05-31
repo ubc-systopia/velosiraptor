@@ -109,6 +109,7 @@ pub fn generate_interface_header(
 
     for f in state.fields() {
         let rcn = registers_class_name(&f.to_string());
+        // TODO: I think some indentation is making its way into f.to_string()
         let fieldname = format!("_{}", &f.to_string());
         let ty = C::Type::new_class(&rcn);
         c.new_attribute(&fieldname, ty);

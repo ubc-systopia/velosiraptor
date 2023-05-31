@@ -57,18 +57,18 @@ impl VelosiHwGen {
         VelosiHwGen::FastModels(ArmFastModelsModule::new(path.as_path(), pkg))
     }
 
-    pub fn prepare(&self) -> Result<(), VelosiHwGenError> {
+    pub fn prepare(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
         match self {
-            VelosiHwGen::FastModels(b) => b.prepare(),
+            VelosiHwGen::FastModels(b) => b.prepare(ast),
         }
     }
 
     pub fn generate(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
         match self {
             VelosiHwGen::FastModels(b) => {
-                b.generate_unit(ast)?;
-                b.generate_interface(ast)?;
-                b.generate_state(ast)
+                b.generate_interfaces(ast)?;
+                b.generate_states(ast)?;
+                b.generate_units(ast)
             }
         }
     }
@@ -82,16 +82,16 @@ impl VelosiHwGen {
 
 pub trait VelosiHwGenBackend {
     /// prepares the component generation, creating the directories etc
-    fn prepare(&self) -> Result<(), VelosiHwGenError>;
+    fn prepare(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
 
     /// generates the unit
-    fn generate_unit(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
+    fn generate_units(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
 
     /// generate the interface definitions
-    fn generate_interface(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
+    fn generate_interfaces(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
 
     /// generates the state representation
-    fn generate_state(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
+    fn generate_states(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
 
     /// finalizes the code generation part
     fn finalize(&self) -> Result<(), VelosiHwGenError>;

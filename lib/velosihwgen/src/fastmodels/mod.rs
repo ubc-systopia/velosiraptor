@@ -191,45 +191,42 @@ impl ArmFastModelsModule {
 }
 
 impl VelosiHwGenBackend for ArmFastModelsModule {
-    fn prepare(&self) -> Result<(), VelosiHwGenError> {
-        // outdir/hw/fastmodels/<pkgname>/include
-        let includedir = self.outdir.join("include");
-
-        // create the package path
-        fs::create_dir_all(includedir)?;
-
+    fn prepare(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
+        // outdir/hw/fastmodels/<pkgname>/<unitname>/include
+        for u in ast.units() {
+            let out_subdir = &self.outdir.join(u.ident_to_string());
+            fs::create_dir_all(out_subdir)?;
+            let includedir = out_subdir.join("include");
+            fs::create_dir_all(includedir)?;
+        }
         Ok(())
     }
 
-    /// generates the unit
-    fn generate_unit(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
-        // should use ast.get_unit, but I don't know what the unit is called
-        let u = &ast.units().next();
-        match u {
-            None => panic!("no unit found"),
-            Some(u) => {
-                generate_unit_header(&self.pkgname, u, &self.outdir)
-                    .expect("failed to generate the unit header");
-                generate_unit_impl(&self.pkgname, u, &self.outdir)
-                    .expect("failed to generate the unit implementation");
-                Ok(())
-            }
-        }
+    fn generate_units(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
+        for u in ast.units() {
+            let out_subdir = &self.outdir.join(u.ident_to_string());
+            generate_unit_header(&self.pkgname, u, out_subdir)
+                .expect("failed to generate the unit header");
+            generate_unit_impl(&self.pkgname, u, out_subdir)
+                .expect("failed to generate the unit implementation");
+        };
+        Ok(())
     }
 
     /// generate the interface definitions
-    fn generate_interface(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
-        for unit in ast.units() {
-            match &unit.interface() {
+    fn generate_interfaces(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
+        for u in ast.units() {
+            let out_subdir = &self.outdir.join(u.ident_to_string());
+            match &u.interface() {
                 None => (),
                 Some(i) => {
-                    generate_register_header(&self.pkgname, i, &self.outdir)
+                    generate_register_header(&self.pkgname, i, out_subdir)
                         .expect("failed to generate the interface header");
-                    generate_register_impl(&self.pkgname, i, &self.outdir)
+                    generate_register_impl(&self.pkgname, i, out_subdir)
                         .expect("failed to generate the interface header");
-                    generate_interface_header(&self.pkgname, i, &self.outdir)
+                    generate_interface_header(&self.pkgname, i, out_subdir)
                         .expect("failed to generate the interface header");
-                    generate_interface_impl(&self.pkgname, i, &self.outdir)
+                    generate_interface_impl(&self.pkgname, i, out_subdir)
                         .expect("failed to generate the interface implementation");
                 }
             }
@@ -238,16 +235,16 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
     }
 
     /// generates the state representation
-    fn generate_state(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
-        println!("GENERATING THE STATE!");
-        for unit in ast.segments() {
-            generate_field_header(&self.pkgname, &unit.state, &self.outdir)
+    fn generate_states(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
+        for u in ast.segments() {
+            let out_subdir = &self.outdir.join(u.ident_to_string());
+            generate_field_header(&self.pkgname, &u.state, out_subdir)
                 .expect("failed to generate the fields header");
-            generate_field_impl(&self.pkgname, &unit.state, &self.outdir)
+            generate_field_impl(&self.pkgname, &u.state, out_subdir)
                 .expect("failed to generate the fields implementation");
-            generate_state_header(&self.pkgname, &unit.state, &self.outdir)
+            generate_state_header(&self.pkgname, &u.state, out_subdir)
                 .expect("failed to generate the state header");
-            generate_state_impl(&self.pkgname, &unit.state, &self.outdir)
+            generate_state_impl(&self.pkgname, &u.state, out_subdir)
                 .expect("failed to generate the state implementation");
         }
 
