@@ -48,6 +48,8 @@ use utils::{add_const_def, add_header, save_scope};
 
 // the module name for the constants module
 const MOD_CONSTS: &str = "consts";
+// the module name for the utils module
+const MOD_UTILS: &str = "utils";
 
 /// The rust backend
 ///
@@ -121,7 +123,27 @@ impl BackendRust {
         let srcdir = self.outdir.join("src");
         fs::create_dir_all(srcdir)?;
 
+        // generate common utilities across units
+        self.generate_utils()?;
+
         Ok(())
+    }
+
+    pub fn generate_utils(&self) -> Result<(), VelosiCodeGenError> {
+        // get the source directory
+        let srcdir = self.outdir.join("src");
+
+        // the code generation scope
+        let mut scope = CG::Scope::new();
+
+        // constant definitions
+        let title = format!("Common Utilities for `{}` package", self.pkgname);
+        add_header(&mut scope, &title);
+
+        scope.raw("pub type VirtAddr = u64;");
+        scope.raw("pub type PhysAddr = u64;");
+
+        save_scope(scope, &srcdir, MOD_UTILS)
     }
 
     /// generates the global definitions.
@@ -242,6 +264,7 @@ impl BackendRust {
 
         // use no_std
         scope.raw("#![no_std]");
+        scope.raw(&format!("mod {MOD_UTILS};"));
 
         // import the constants
         scope.new_comment("import constant definitions ");
