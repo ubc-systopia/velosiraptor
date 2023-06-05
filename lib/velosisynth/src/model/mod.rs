@@ -60,7 +60,13 @@ pub fn create(unit: &VelosiAstUnitSegment, mem_model: bool) -> Smt2Context {
         wbuffer::add_wbuffer_def(&mut smt, &unit.interface);
     }
     velosimodel::add_model_def(&mut smt, unit, mem_model);
-    method::add_methods(&mut smt, Box::new(unit.methods()));
+
+    // valid needs to be defined first so that it can be used in the other method assumptions
+    method::add_methods(&mut smt, Box::new(unit.get_method("valid").into_iter()));
+    method::add_methods(
+        &mut smt,
+        Box::new(unit.methods().filter(|m| m.ident.as_str() != "valid")),
+    );
 
     smt
 }

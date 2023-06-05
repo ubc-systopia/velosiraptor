@@ -277,11 +277,18 @@ fn add_method_assms(smt: &mut Smt2Context, method: &VelosiAstMethod) {
 
     // get all expressions from the pre-condtion that do not have state references,
     // those should be pure assumptions
-    let expr = method
+    let mut expr = method
         .requires
         .iter()
         .filter(|p| !p.has_state_references())
         .fold(a, |e, p| Term::land(e, expr::expr_to_smt2(p, "st!0")));
+
+    if let "matchflags" | "translate" = method.ident.as_str() {
+        expr = Term::land(
+            expr,
+            Term::fn_apply("valid".to_string(), vec![Term::from("st!0")]),
+        )
+    }
 
     f.add_body(expr);
 
