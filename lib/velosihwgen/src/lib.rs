@@ -73,9 +73,9 @@ impl VelosiHwGen {
         }
     }
 
-    pub fn finalize(&self) -> Result<(), VelosiHwGenError> {
+    pub fn finalize(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
         match self {
-            VelosiHwGen::FastModels(b) => b.finalize(),
+            VelosiHwGen::FastModels(b) => b.finalize(ast),
         }
     }
 }
@@ -94,5 +94,5 @@ pub trait VelosiHwGenBackend {
     fn generate_states(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
 
     /// finalizes the code generation part
-    fn finalize(&self) -> Result<(), VelosiHwGenError>;
+    fn finalize(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
 }

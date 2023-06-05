@@ -94,8 +94,8 @@ impl ArmFastModelsModule {
         }
     }
 
-    fn generate_makefile(&self, name: &str) -> Result<(), VelosiHwGenError> {
-        let makefile = File::create(self.outdir.join("Makefile"))?;
+    fn generate_makefile(&self, name: &str, out: &PathBuf) -> Result<(), VelosiHwGenError> {
+        let makefile = File::create(out.join("Makefile"))?;
         let mut f = BufWriter::new(makefile);
 
         let lib = format!("lib{}.a", self.pkgname);
@@ -252,7 +252,12 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
     }
 
     /// finalizes the code generation part
-    fn finalize(&self) -> Result<(), VelosiHwGenError> {
-        self.generate_makefile(&self.pkgname)
+    fn finalize(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
+        for u in ast.segments() {
+            let out_subdir = &self.outdir.join(u.ident_to_string());
+            self.generate_makefile(&self.pkgname, out_subdir)
+                .expect("Could not generate makefile");
+        }
+        Ok(())
     }
 }
