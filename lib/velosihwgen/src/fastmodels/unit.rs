@@ -178,16 +178,21 @@ fn state_field_access(path: &Vec<&str>) -> C::Expr {
     let st = C::Expr::field_access(&C::Expr::this(), "_state");
 
     if path.len() == 1 {
-        let accname = format!("get_{}_val", &path[0]);
-        return C::Expr::method_call(&st, &accname, vec![]);
+        return st;
     }
 
     if path.len() == 2 {
-        let accname = format!("{}_field", &path[0]);
+        let accname = format!("get_{}_val", &path[1]);
+        return C::Expr::method_call(&st, &accname, vec![]);
+    }
+
+    if path.len() == 3 {
+        let accname = format!("{}_field", &path[1]);
         let mut fld = C::Expr::method_call(&st, &accname, vec![]);
         // we'll get back a pointer
         fld.set_ptr();
-        let accname = format!("get_{}_val", &path[1]);
+
+        let accname = format!("get_{}_val", &path[2]);
         return C::Expr::method_call(&fld, &accname, vec![]);
     }
 
@@ -236,17 +241,12 @@ fn expr_to_cpp(expr: &VelosiAstExpr) -> C::Expr {
         Slice { .. } => panic!("don't know how to handle slice"),
         Range { .. } => panic!("don't know how to handle range"),
         Quantifier { .. } => panic!("don't know how to handle quantifier"),
-        IfElse(VelosiAstIfElseExpr{cond: _, then: _, other: _, loc: _, ..}) =>
-            panic!("don't know how to handle if/else"),
-        // {
-        //     let mut b = C::Block::new();
-        //     let mut ifelse = C::IfElse::with_expr(expr_to_cpp(cond));
-        //     if let Some(other) = other.as_ref() {
-        //         ifelse.set_other(stmt_to_cpp(other));
-        //     }
-        //     ifelse.set_then(stmt_to_cpp(then));
-        //     b.ifelse(ifelse);
-        //     b
+        IfElse(VelosiAstIfElseExpr{cond, then, other, loc: _, ..}) => {
+            C::Expr::ternary(
+                expr_to_cpp(cond),
+                expr_to_cpp(then),
+                expr_to_cpp(other))
+        }
     }
 }
 
@@ -376,15 +376,24 @@ fn add_translate(c: &mut C::Class, tm: &VelosiAstMethod) {
 
 fn ast_type_to_c_type(t: &VelosiAstType) -> C::Type {
     match &t.typeinfo {
-        VelosiAstTypeInfo::Bool => C::Type::new_bool(),
         VelosiAstTypeInfo::Integer => C::Type::new_uint(64),
-        VelosiAstTypeInfo::Size => C::Type::new_size(),
+        VelosiAstTypeInfo::Bool => C::Type::new_bool(),
         VelosiAstTypeInfo::GenAddr => C::Type::new_typedef("genaddr_t"),
+        VelosiAstTypeInfo::VirtAddr => C::Type::new_uint(64),
+        VelosiAstTypeInfo::PhysAddr => C::Type::new_uint(64),
+        VelosiAstTypeInfo::Size => C::Type::new_size(),
+        VelosiAstTypeInfo::Flags => C::Type::new_uint(64),
+        VelosiAstTypeInfo::Range => C::Type::new_uint(64),
+        // VelosiAstTypeInfo::TypeRef(0) => C::Type::new_uint(64),
+        VelosiAstTypeInfo::State => C::Type::new_uint(64),
+        VelosiAstTypeInfo::Interface => C::Type::new_uint(64),
+        VelosiAstTypeInfo::Void => C::Type::new_uint(64),
         x => panic!("unhandled VelosiAstTypeInfo: {:?}", x),
     }
 }
 
 fn add_method(c: &mut C::Class, tm: &VelosiAstMethod) {
+    // println!("{:?}", tm.ident());
     match &tm.ident.ident[..] {
         "translate" => {
             add_translate(c, tm);
