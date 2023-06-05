@@ -37,8 +37,12 @@ use crate::{
     Program,
 };
 
-use super::queryhelper::{
-    MaybeResult, MultiDimProgramQueries, ProgramBuilder, ProgramQueries, QueryBuilder,
+use super::{
+    queryhelper::{
+        MaybeResult, MultiDimProgramQueries, ProgramBuilder, ProgramQueries, QueryBuilder,
+        SequentialProgramQueries,
+    },
+    utils::SynthOptions,
 };
 use crate::ProgramsIter;
 
@@ -56,6 +60,8 @@ where
     m_goal: Rc<VelosiAstMethod>,
     /// the entry in the pre-condition
     idx: Option<usize>,
+    /// whether or not to negate the body
+    negate: bool,
     /// whether the result should not change
     no_change: bool,
 }
@@ -69,6 +75,7 @@ where
         m_op: Rc<VelosiAstMethod>,
         m_goal: Rc<VelosiAstMethod>,
         idx: Option<usize>,
+        negate: bool,
         no_change: bool,
     ) -> Self {
         Self {
@@ -76,6 +83,7 @@ where
             m_op,
             m_goal,
             idx,
+            negate,
             no_change,
         }
     }
@@ -93,6 +101,7 @@ where
                 &self.m_goal,
                 self.idx,
                 prog,
+                self.negate,
                 self.no_change,
                 false,
             )),
@@ -104,10 +113,12 @@ where
 
 type SemanticFragmentQueries = ProgramQueries<SemanticQueryBuilder<ProgramsIter>>;
 type SemanticBlockQueries = MultiDimProgramQueries<SemanticFragmentQueries>;
+type SemanticBlockQueriesNegated = SequentialProgramQueries<SemanticFragmentQueries>;
 
 pub enum SemanticQueries {
     SingleQuery(SemanticQueryBuilder<ProgramsIter>),
     MultiQuery(SemanticQueryBuilder<SemanticBlockQueries>),
+    MultiQueryNegated(SemanticQueryBuilder<SemanticBlockQueriesNegated>),
 }
 
 impl QueryBuilder for SemanticQueries {
@@ -115,6 +126,7 @@ impl QueryBuilder for SemanticQueries {
         match self {
             Self::SingleQuery(q) => q.next(z3),
             Self::MultiQuery(q) => q.next(z3),
+            Self::MultiQueryNegated(q) => q.next(z3),
         }
     }
 }
@@ -124,6 +136,7 @@ pub fn semantic_query(
     m_op: Rc<VelosiAstMethod>,
     m_goal: Rc<VelosiAstMethod>,
     m_cond: &VelosiAstMethod,
+    negate: bool,
     no_change: bool,
     batch_size: usize,
 ) -> Option<ProgramQueries<SemanticQueries>> {
@@ -141,6 +154,7 @@ pub fn semantic_query(
                     m_op.clone(),
                     m_goal.clone(),
                     Some(idx),
+                    negate,
                     no_change,
                 );
                 let q = ProgramQueries::with_batchsize(b, batch_size, Z3TaskPriority::Low);
@@ -151,13 +165,35 @@ pub fn semantic_query(
             if program_queries.is_empty() {
                 None
             } else {
-                let programs = MultiDimProgramQueries::new(program_queries);
-
-                let b = SemanticQueryBuilder::new(programs, m_op, m_goal.clone(), None, no_change);
-                Some(ProgramQueries::new(
-                    SemanticQueries::MultiQuery(b),
-                    Z3TaskPriority::Medium,
-                ))
+                if negate {
+                    let programs = SequentialProgramQueries::new(program_queries);
+                    let b = SemanticQueryBuilder::new(
+                        programs,
+                        m_op,
+                        m_goal.clone(),
+                        None,
+                        negate,
+                        no_change,
+                    );
+                    Some(ProgramQueries::new(
+                        SemanticQueries::MultiQueryNegated(b),
+                        Z3TaskPriority::Medium,
+                    ))
+                } else {
+                    let programs = MultiDimProgramQueries::new(program_queries);
+                    let b = SemanticQueryBuilder::new(
+                        programs,
+                        m_op,
+                        m_goal.clone(),
+                        None,
+                        negate,
+                        no_change,
+                    );
+                    Some(ProgramQueries::new(
+                        SemanticQueries::MultiQuery(b),
+                        Z3TaskPriority::Medium,
+                    ))
+                }
             }
         } else {
             // case 1: we just have a single body element, so no need to split up.
@@ -188,7 +224,14 @@ pub fn semantic_query(
             if !programs.has_programs() {
                 None
             } else {
-                let b = SemanticQueryBuilder::new(programs, m_op, m_goal.clone(), None, no_change);
+                let b = SemanticQueryBuilder::new(
+                    programs,
+                    m_op,
+                    m_goal.clone(),
+                    None,
+                    negate,
+                    no_change,
+                );
 
                 Some(ProgramQueries::with_batchsize(
                     SemanticQueries::SingleQuery(b),
@@ -207,6 +250,7 @@ fn program_to_query(
     m_goal: &VelosiAstMethod,
     idx: Option<usize>,
     prog: Program,
+    negate: bool,
     no_change: bool,
     mem_model: bool,
 ) -> Box<Z3Query> {
@@ -242,10 +286,17 @@ fn program_to_query(
     );
 
     // get the goal as string
-    let goal = m_goal_call.to_string_compact();
+    let mut goal = m_goal_call.to_string_compact();
+    if negate {
+        goal = format!("!{}", goal)
+    }
     // println!("s goal: {}", goal);
 
-    let t = Term::forall(vars, pre.implies(m_goal_call));
+    let t = if negate {
+        Term::forall(vars, pre.implies(Term::lnot(m_goal_call)))
+    } else {
+        Term::forall(vars, pre.implies(m_goal_call))
+    };
 
     // assert and check sat
     smt.assert(t);
@@ -271,10 +322,17 @@ pub fn submit_program_query(
     m_goal: &VelosiAstMethod,
     idx: Option<usize>,
     prog: Program,
-    no_change: bool,
-    mem_model: bool,
+    options: SynthOptions,
 ) -> Z3Ticket {
-    let query = program_to_query(m_op, m_goal, idx, prog, no_change, mem_model);
+    let query = program_to_query(
+        m_op,
+        m_goal,
+        idx,
+        prog,
+        options.negate,
+        options.no_change,
+        options.mem_model,
+    );
     z3.submit_query(query, Z3TaskPriority::High)
         .expect("failed to submit query")
 }

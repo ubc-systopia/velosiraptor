@@ -30,12 +30,14 @@ use std::rc::Rc;
 
 use velosiast::ast::{VelosiAstMethod, VelosiAstUnitSegment};
 
+use crate::vmops::semantics;
+use crate::vmops::utils::SynthOptions;
 use crate::{programs::Program, z3::Z3WorkerPool, VelosiSynthIssues};
 
+use super::queryhelper::PartQueries;
 use super::{precond, utils};
 
-use crate::vmops::precond::PrecondQueries;
-use crate::vmops::queryhelper::MultiDimProgramQueries;
+use crate::vmops::queryhelper::SequentialProgramQueries;
 use crate::vmops::queryhelper::{MaybeResult, ProgramBuilder};
 use crate::DEFAULT_BATCH_SIZE;
 use crate::{ProgramsIter, Z3Ticket};
@@ -44,7 +46,7 @@ use std::time::Instant;
 
 pub enum UnmapProgramQueries {
     SingleQuery(ProgramsIter),
-    MultiQuery(MultiDimProgramQueries<PrecondQueries>),
+    MultiQuery(SequentialProgramQueries<PartQueries>),
 }
 
 impl ProgramBuilder for UnmapProgramQueries {
@@ -59,10 +61,11 @@ impl ProgramBuilder for UnmapProgramQueries {
 pub struct UnmapPrograms {
     programs: UnmapProgramQueries,
     programs_done: bool,
-    queries: LinkedList<(Program, [Option<Z3Ticket>; 2])>,
+    queries: LinkedList<(Program, [Option<Z3Ticket>; 1])>,
     candidates: Vec<Program>,
 
     m_fn: Rc<VelosiAstMethod>,
+    v_fn: Rc<VelosiAstMethod>,
     t_fn: Rc<VelosiAstMethod>,
     f_fn: Rc<VelosiAstMethod>,
 
@@ -73,6 +76,7 @@ impl UnmapPrograms {
     pub fn new(
         programs: UnmapProgramQueries,
         m_fn: Rc<VelosiAstMethod>,
+        v_fn: Rc<VelosiAstMethod>,
         t_fn: Rc<VelosiAstMethod>,
         f_fn: Rc<VelosiAstMethod>,
         mem_model: bool,
@@ -83,6 +87,7 @@ impl UnmapPrograms {
             queries: LinkedList::new(),
             candidates: Vec::new(),
             m_fn,
+            v_fn,
             t_fn,
             f_fn,
             mem_model,
@@ -114,6 +119,39 @@ impl ProgramBuilder for UnmapPrograms {
         const CONFIG_MAX_QUERIES: usize = 4;
         if self.queries.len() < CONFIG_MAX_QUERIES {
             if let Some(prog) = self.candidates.pop() {
+                // try to find one of !valid, !matchflags, !translate.pre
+                let valid_semantics = semantics::submit_program_query(
+                    z3,
+                    self.m_fn.as_ref(),
+                    self.v_fn.as_ref(),
+                    None,
+                    prog.clone(),
+                    SynthOptions {
+                        negate: true,
+                        no_change: false,
+                        mem_model: self.mem_model,
+                    },
+                );
+
+                self.queries
+                    .push_back((prog.clone(), [Some(valid_semantics)]));
+
+                let matchflags_semantics = semantics::submit_program_query(
+                    z3,
+                    self.m_fn.as_ref(),
+                    self.f_fn.as_ref(),
+                    None,
+                    prog.clone(),
+                    SynthOptions {
+                        negate: true,
+                        no_change: false,
+                        mem_model: self.mem_model,
+                    },
+                );
+
+                self.queries
+                    .push_back((prog.clone(), [Some(matchflags_semantics)]));
+
                 let translate_preconds = precond::submit_program_query(
                     z3,
                     self.m_fn.as_ref(),
@@ -124,18 +162,7 @@ impl ProgramBuilder for UnmapPrograms {
                     self.mem_model,
                 );
 
-                let matchflags_preconds = precond::submit_program_query(
-                    z3,
-                    self.m_fn.as_ref(),
-                    self.f_fn.as_ref(),
-                    None,
-                    true,
-                    prog.clone(),
-                    self.mem_model,
-                );
-
-                self.queries
-                    .push_back((prog, [Some(translate_preconds), Some(matchflags_preconds)]));
+                self.queries.push_back((prog, [Some(translate_preconds)]));
             }
         }
 
@@ -194,6 +221,7 @@ pub fn get_program_iter(
 
     // obtain the functions for the map operation
     let m_fn = unit.get_method("unmap").unwrap();
+    let v_fn = unit.get_method("valid").unwrap();
     let t_fn = unit.get_method("translate").unwrap();
     let f_fn = unit.get_method("matchflags").unwrap();
 
@@ -204,6 +232,7 @@ pub fn get_program_iter(
         UnmapPrograms::new(
             UnmapProgramQueries::SingleQuery(utils::make_program_iter_mem(prog)),
             m_fn.clone(),
+            v_fn.clone(),
             t_fn.clone(),
             f_fn.clone(),
             true,
@@ -216,20 +245,41 @@ pub fn get_program_iter(
         let _t_start = Instant::now();
 
         let mut unmap_queries = Vec::new();
-        if let Some(p) = precond::precond_query(unit, m_fn.clone(), f_fn.clone(), true, batch_size)
-        {
-            unmap_queries.push(p);
+
+        if let Some(p) = semantics::semantic_query(
+            unit,
+            m_fn.clone(),
+            v_fn.clone(),
+            v_fn,
+            true,
+            false,
+            batch_size,
+        ) {
+            unmap_queries.push(PartQueries::Semantic(p));
+        }
+
+        if let Some(p) = semantics::semantic_query(
+            unit,
+            m_fn.clone(),
+            f_fn.clone(),
+            f_fn,
+            true,
+            false,
+            batch_size,
+        ) {
+            unmap_queries.push(PartQueries::Semantic(p));
         }
 
         if let Some(p) = precond::precond_query(unit, m_fn.clone(), t_fn.clone(), true, batch_size)
         {
-            unmap_queries.push(p);
+            unmap_queries.push(PartQueries::Precond(p));
         }
 
-        let programs = MultiDimProgramQueries::new(unmap_queries);
+        let programs = SequentialProgramQueries::new(unmap_queries);
         UnmapPrograms::new(
             UnmapProgramQueries::MultiQuery(programs),
             m_fn.clone(),
+            v_fn.clone(),
             t_fn.clone(),
             f_fn.clone(),
             false,

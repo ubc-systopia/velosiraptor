@@ -41,6 +41,12 @@ use smt2::Term;
 
 use super::resultparser;
 
+pub struct SynthOptions {
+    pub negate: bool,
+    pub no_change: bool,
+    pub mem_model: bool,
+}
+
 pub fn make_program_builder_no_params(
     unit: &VelosiAstUnitSegment,
     pre: &VelosiAstExpr,

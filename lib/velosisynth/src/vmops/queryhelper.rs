@@ -28,6 +28,9 @@
 use std::collections::VecDeque;
 
 use super::utils;
+use crate::vmops::precond::PrecondQueries;
+use crate::vmops::semantics::SemanticQueries;
+use crate::vmops::semprecond::SemPrecondQueries;
 use crate::{Program, ProgramsIter};
 use crate::{Z3Query, Z3TaskPriority, Z3Ticket, Z3WorkerPool};
 
@@ -51,6 +54,22 @@ pub trait QueryBuilder {
 pub trait ProgramBuilder {
     /// returns the next query to be submitted, or None if all have been submitted
     fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program>;
+}
+
+pub enum PartQueries {
+    Precond(PrecondQueries),
+    Semantic(ProgramQueries<SemanticQueries>),
+    SemPrecond(SemPrecondQueries),
+}
+
+impl ProgramBuilder for PartQueries {
+    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
+        match self {
+            Self::Precond(q) => q.next(z3),
+            Self::Semantic(q) => q.next(z3),
+            Self::SemPrecond(q) => q.next(z3),
+        }
+    }
 }
 
 /// keeps track of queries
@@ -165,6 +184,43 @@ where
             MaybeResult::None
         } else {
             MaybeResult::Pending
+        }
+    }
+}
+
+pub struct SequentialProgramQueries<T>
+where
+    T: ProgramBuilder,
+{
+    queries: Vec<T>,
+    idx: usize,
+}
+
+impl<T> SequentialProgramQueries<T>
+where
+    T: ProgramBuilder,
+{
+    pub fn new(queries: Vec<T>) -> Self {
+        Self { queries, idx: 0 }
+    }
+}
+
+impl<T> ProgramBuilder for SequentialProgramQueries<T>
+where
+    T: ProgramBuilder,
+{
+    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
+        // no more work to do
+        if self.idx >= self.queries.len() {
+            return MaybeResult::None;
+        }
+
+        match self.queries[self.idx].next(z3) {
+            MaybeResult::None => {
+                self.idx += 1;
+                self.next(z3)
+            }
+            res => res,
         }
     }
 }

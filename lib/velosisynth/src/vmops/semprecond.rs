@@ -36,8 +36,11 @@ use crate::{
     Program,
 };
 
-use super::queryhelper::{
-    MaybeResult, MultiDimProgramQueries, ProgramBuilder, ProgramQueries, QueryBuilder,
+use super::{
+    queryhelper::{
+        MaybeResult, MultiDimProgramQueries, ProgramBuilder, ProgramQueries, QueryBuilder,
+    },
+    utils::SynthOptions,
 };
 use crate::ProgramsIter;
 
@@ -250,12 +253,6 @@ fn program_to_query(
     };
     query.set_program(prog).set_goal(goal);
     Box::new(query)
-}
-
-pub struct SynthOptions {
-    pub negate: bool,
-    pub no_change: bool,
-    pub mem_model: bool,
 }
 
 pub fn submit_program_query(
