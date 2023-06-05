@@ -63,4 +63,6 @@ pub fn main() {
         log::error!(target: "main", "code generation failed\n{:?}", e);
     }
 
+    hwgen.finalize(&ast).expect("could not finalize");
+
 }
