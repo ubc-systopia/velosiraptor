@@ -39,6 +39,30 @@ use velosiast::ast::{VelosiAstBinOp, VelosiAstExpr, VelosiAstMethod, VelosiAstPa
 // Function Names
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub fn valid_map_result_name(idx: Option<usize>) -> String {
+    if let Some(i) = idx {
+        format!("valid.map.result.{i}")
+    } else {
+        "valid.map.result".to_string()
+    }
+}
+
+pub fn valid_unmap_result_name(idx: Option<usize>) -> String {
+    if let Some(i) = idx {
+        format!("valid.unmap.result.{i}")
+    } else {
+        "valid.unmap.result".to_string()
+    }
+}
+
+pub fn valid_protect_result_name(idx: Option<usize>) -> String {
+    if let Some(i) = idx {
+        format!("valid.protect.result.{i}")
+    } else {
+        "valid.protect.result".to_string()
+    }
+}
+
 pub fn translate_range_name(idx: Option<usize>) -> String {
     if let Some(i) = idx {
         format!("translate.range.{i}")
@@ -71,6 +95,14 @@ pub fn matchflags_map_result_name(idx: Option<usize>) -> String {
     }
 }
 
+pub fn matchflags_unmap_result_name(idx: Option<usize>) -> String {
+    if let Some(i) = idx {
+        format!("matchflags.unmap.result.{i}")
+    } else {
+        "matchflags.unmap.result".to_string()
+    }
+}
+
 pub fn matchflags_protect_result_name(idx: Option<usize>) -> String {
     if let Some(i) = idx {
         format!("matchflags.protect.result.{i}")
@@ -96,10 +128,10 @@ pub fn method_assms_name(mname: &str) -> String {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Matchflags Parts
+// Boolean Method Parts
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn add_matchflags_parts(smt: &mut Smt2Context, method: &VelosiAstMethod) -> usize {
+fn add_bool_method_parts(smt: &mut Smt2Context, method: &VelosiAstMethod) -> usize {
     let parts = method.body.as_ref().unwrap().clone().split_cnf();
     for (i, pre) in parts
         .iter()
@@ -282,10 +314,15 @@ pub fn add_methods(
             smt.function(f);
 
             match m.path().as_str() {
+                "valid" => {
+                    assert!(m.rtype.is_boolean());
+                    let nparts = add_bool_method_parts(smt, m);
+                    add_valid_result_checks(smt, nparts);
+                }
                 "matchflags" => {
                     // if we have match flags we create one for reach element of the
                     assert!(m.rtype.is_boolean());
-                    let nparts = add_matchflags_parts(smt, m);
+                    let nparts = add_bool_method_parts(smt, m);
                     add_matchflags_result_checks(smt, nparts);
                 }
                 "translate" => {
@@ -305,6 +342,100 @@ pub fn add_methods(
         add_method_preconditions(smt, m.as_ref());
         add_method_assms(smt, m.as_ref());
     }
+}
+
+pub fn add_valid_result_checks(smt: &mut Smt2Context, nparts: usize) {
+    // ---------------------------------------------------------------------------------------------
+    // Result when mapping
+    // ---------------------------------------------------------------------------------------------
+
+    let map = |smt: &mut Smt2Context, idx| {
+        let mut f = Function::new(valid_map_result_name(idx), types::boolean());
+        f.add_comment("Checking the valid function result".to_string());
+
+        f.add_arg(String::from("st!0"), types::model());
+        f.add_arg(String::from("va"), types::vaddr());
+        f.add_arg(String::from("sz"), types::size());
+        f.add_arg(String::from("flgs"), types::flags());
+        f.add_arg(String::from("pa"), types::paddr());
+
+        let name = if let Some(i) = idx {
+            method_part_i_name("valid", i)
+        } else {
+            "valid".to_string()
+        };
+
+        let body = Term::fn_apply(name, vec![Term::from("st!0")]);
+        f.add_body(body);
+        smt.function(f);
+    };
+
+    for i in 0..nparts {
+        map(smt, Some(i));
+    }
+    map(smt, None);
+
+    // ---------------------------------------------------------------------------------------------
+    // Result when unmapping
+    // ---------------------------------------------------------------------------------------------
+
+    let unmap = |smt: &mut Smt2Context, idx| {
+        let mut f = Function::new(valid_unmap_result_name(idx), types::boolean());
+        f.add_comment("Checking the valid function result".to_string());
+
+        f.add_arg(String::from("st!0"), types::model());
+        f.add_arg(String::from("va"), types::vaddr());
+        f.add_arg(String::from("sz"), types::size());
+
+        let name = if let Some(i) = idx {
+            method_part_i_name("valid", i)
+        } else {
+            "valid".to_string()
+        };
+
+        let body = Term::fn_apply(name, vec![Term::from("st!0")]);
+        f.add_body(body);
+        smt.function(f);
+    };
+
+    for i in 0..nparts {
+        unmap(smt, Some(i));
+    }
+    unmap(smt, None);
+
+    // ---------------------------------------------------------------------------------------------
+    // Result when protecting
+    // ---------------------------------------------------------------------------------------------
+
+    let protect = |smt: &mut Smt2Context, idx| {
+        let mut f = Function::new(valid_protect_result_name(idx), types::boolean());
+        f.add_comment("Checking the valid function result".to_string());
+
+        f.add_arg(String::from("st!0"), types::model());
+        f.add_arg(String::from("st!1"), types::model());
+        f.add_arg(String::from("va"), types::vaddr());
+        f.add_arg(String::from("sz"), types::size());
+        f.add_arg(String::from("flgs"), types::flags());
+
+        let name = if let Some(i) = idx {
+            method_part_i_name("valid", i)
+        } else {
+            "valid".to_string()
+        };
+
+        let body = Term::eq(
+            Term::fn_apply(name.clone(), vec![Term::from("st!0")]),
+            Term::fn_apply(name, vec![Term::from("st!1")]),
+        );
+
+        f.add_body(body);
+        smt.function(f);
+    };
+
+    for i in 0..nparts {
+        protect(smt, Some(i));
+    }
+    protect(smt, None);
 }
 
 // the range checks are only for the translate function, it checks whether the
@@ -603,6 +734,35 @@ pub fn add_matchflags_result_checks(smt: &mut Smt2Context, nparts: usize) {
     map(smt, None);
 
     // ---------------------------------------------------------------------------------------------
+    // Result when unmapping
+    // ---------------------------------------------------------------------------------------------
+
+    let unmap = |smt: &mut Smt2Context, idx| {
+        let mut f = Function::new(matchflags_unmap_result_name(idx), types::boolean());
+        f.add_comment("Checking the matchflags function result".to_string());
+
+        f.add_arg(String::from("st!0"), types::model());
+        f.add_arg(String::from("va"), types::vaddr());
+        f.add_arg(String::from("sz"), types::size());
+        f.add_arg(String::from("flgs"), types::flags());
+
+        let name = if let Some(i) = idx {
+            method_part_i_name("matchflags", i)
+        } else {
+            "matchflags".to_string()
+        };
+
+        let body = Term::fn_apply(name, vec![Term::from("st!0"), Term::from("flgs")]);
+        f.add_body(body);
+        smt.function(f);
+    };
+
+    for i in 0..nparts {
+        unmap(smt, Some(i));
+    }
+    unmap(smt, None);
+
+    // ---------------------------------------------------------------------------------------------
     // Result when protecting
     // ---------------------------------------------------------------------------------------------
 
@@ -695,9 +855,13 @@ pub fn call_method_result_check_part(
     args: Vec<Term>,
 ) -> Term {
     let name = match (m.ident().as_str(), g.ident().as_str()) {
+        ("map", "valid") => valid_map_result_name(idx),
+        ("unmap", "valid") => valid_unmap_result_name(idx),
+        ("protect", "valid") => valid_protect_result_name(idx),
         ("map", "translate") => translate_map_result_name(idx),
         ("protect", "translate") => translate_protect_result_name(idx),
         ("map", "matchflags") => matchflags_map_result_name(idx),
+        ("unmap", "matchflags") => matchflags_unmap_result_name(idx),
         ("protect", "matchflags") => matchflags_protect_result_name(idx),
         (a, b) => unreachable!("case: {} {}", a, b),
     };
@@ -706,6 +870,12 @@ pub fn call_method_result_check_part(
     for a in m.params.iter() {
         check_args.push(Term::ident(a.ident_to_string()));
     }
+
+    // matchflags need access to the flags but are not provided in unmap
+    if (m.ident().as_str(), g.ident().as_str()) == ("unmap", "matchflags") {
+        check_args.push(Term::ident("flgs".to_string()));
+    }
+
     Term::fn_apply(name, check_args)
 }
 

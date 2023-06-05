@@ -35,30 +35,12 @@ use crate::{programs::Program, z3::Z3WorkerPool, VelosiSynthIssues};
 
 use super::{precond, semantics, semprecond, utils};
 
-use crate::vmops::precond::PrecondQueries;
+use super::queryhelper::PartQueries;
 use crate::vmops::queryhelper::MultiDimProgramQueries;
-use crate::vmops::queryhelper::ProgramQueries;
 use crate::vmops::queryhelper::{MaybeResult, ProgramBuilder};
-use crate::vmops::semantics::SemanticQueries;
-use crate::vmops::semprecond::{SemPrecondQueries, SynthOptions};
+use crate::vmops::utils::SynthOptions;
 use crate::Z3Ticket;
 use crate::DEFAULT_BATCH_SIZE;
-
-pub enum PartQueries {
-    Precond(PrecondQueries),
-    Semantic(ProgramQueries<SemanticQueries>),
-    SemPrecond(SemPrecondQueries),
-}
-
-impl ProgramBuilder for PartQueries {
-    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
-        match self {
-            Self::Precond(q) => q.next(z3),
-            Self::Semantic(q) => q.next(z3),
-            Self::SemPrecond(q) => q.next(z3),
-        }
-    }
-}
 
 pub enum MapProgramQueries {
     SingleQuery(ProgramsIter),
@@ -77,10 +59,11 @@ impl ProgramBuilder for MapProgramQueries {
 pub struct MapPrograms {
     programs: MapProgramQueries,
     programs_done: bool,
-    queries: LinkedList<(Program, [Option<Z3Ticket>; 5])>,
+    queries: LinkedList<(Program, [Option<Z3Ticket>; 6])>,
     candidates: Vec<Program>,
 
     m_fn: Rc<VelosiAstMethod>,
+    v_fn: Rc<VelosiAstMethod>,
     t_fn: Rc<VelosiAstMethod>,
     f_fn: Rc<VelosiAstMethod>,
 
@@ -91,6 +74,7 @@ impl MapPrograms {
     pub fn new(
         programs: MapProgramQueries,
         m_fn: Rc<VelosiAstMethod>,
+        v_fn: Rc<VelosiAstMethod>,
         t_fn: Rc<VelosiAstMethod>,
         f_fn: Rc<VelosiAstMethod>,
         mem_model: bool,
@@ -101,6 +85,7 @@ impl MapPrograms {
             queries: LinkedList::new(),
             candidates: Vec::new(),
             m_fn,
+            v_fn,
             t_fn,
             f_fn,
             mem_model,
@@ -132,6 +117,19 @@ impl ProgramBuilder for MapPrograms {
         const CONFIG_MAX_QUERIES: usize = 4;
         if self.queries.len() < CONFIG_MAX_QUERIES {
             if let Some(prog) = self.candidates.pop() {
+                let valid_semantics = semantics::submit_program_query(
+                    z3,
+                    self.m_fn.as_ref(),
+                    self.v_fn.as_ref(),
+                    None,
+                    prog.clone(),
+                    SynthOptions {
+                        negate: false,
+                        no_change: false,
+                        mem_model: self.mem_model,
+                    },
+                );
+
                 let translate_preconds = precond::submit_program_query(
                     z3,
                     self.m_fn.as_ref(),
@@ -147,8 +145,11 @@ impl ProgramBuilder for MapPrograms {
                     self.t_fn.as_ref(),
                     None,
                     prog.clone(),
-                    false,
-                    self.mem_model,
+                    SynthOptions {
+                        negate: false,
+                        no_change: false,
+                        mem_model: self.mem_model,
+                    },
                 );
 
                 let matchflags_preconds = precond::submit_program_query(
@@ -166,8 +167,11 @@ impl ProgramBuilder for MapPrograms {
                     self.f_fn.as_ref(),
                     None,
                     prog.clone(),
-                    false,
-                    self.mem_model,
+                    SynthOptions {
+                        negate: false,
+                        no_change: false,
+                        mem_model: self.mem_model,
+                    },
                 );
 
                 let semprodoncs = semprecond::submit_program_query(
@@ -187,6 +191,7 @@ impl ProgramBuilder for MapPrograms {
                     prog,
                     [
                         Some(semprodoncs),
+                        Some(valid_semantics),
                         Some(translate_semantics),
                         Some(matchflags_semantics),
                         Some(translate_preconds),
@@ -253,6 +258,7 @@ pub fn get_program_iter(
     let m_fn = unit
         .get_method("map")
         .unwrap_or_else(|| panic!("no method 'map' in unit {}", unit.ident()));
+    let v_fn = unit.get_method("valid").unwrap();
     let t_fn = unit.get_method("translate").unwrap();
     let f_fn = unit.get_method("matchflags").unwrap();
 
@@ -263,6 +269,7 @@ pub fn get_program_iter(
         MapPrograms::new(
             MapProgramQueries::SingleQuery(utils::make_program_iter_mem(prog)),
             m_fn.clone(),
+            v_fn.clone(),
             t_fn.clone(),
             f_fn.clone(),
             true,
@@ -289,15 +296,39 @@ pub fn get_program_iter(
             map_queries.push(PartQueries::SemPrecond(p));
         }
 
-        if let Some(p) =
-            semantics::semantic_query(unit, m_fn.clone(), t_fn.clone(), t_fn, false, batch_size)
-        {
+        if let Some(p) = semantics::semantic_query(
+            unit,
+            m_fn.clone(),
+            v_fn.clone(),
+            v_fn,
+            false,
+            false,
+            batch_size,
+        ) {
             map_queries.push(PartQueries::Semantic(p));
         }
 
-        if let Some(p) =
-            semantics::semantic_query(unit, m_fn.clone(), f_fn.clone(), f_fn, false, batch_size)
-        {
+        if let Some(p) = semantics::semantic_query(
+            unit,
+            m_fn.clone(),
+            t_fn.clone(),
+            t_fn,
+            false,
+            false,
+            batch_size,
+        ) {
+            map_queries.push(PartQueries::Semantic(p));
+        }
+
+        if let Some(p) = semantics::semantic_query(
+            unit,
+            m_fn.clone(),
+            f_fn.clone(),
+            f_fn,
+            false,
+            false,
+            batch_size,
+        ) {
             map_queries.push(PartQueries::Semantic(p));
         }
 
@@ -306,6 +337,7 @@ pub fn get_program_iter(
         MapPrograms::new(
             MapProgramQueries::MultiQuery(programs),
             m_fn.clone(),
+            v_fn.clone(),
             t_fn.clone(),
             f_fn.clone(),
             false,
