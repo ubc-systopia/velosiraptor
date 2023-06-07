@@ -49,7 +49,7 @@ pub fn interface_header_file(name: &str) -> String {
 
 /// generates the path of the headefile
 pub fn interface_header_file_path(name: &str) -> String {
-    format!("include/{}", interface_header_file(name))
+    format!("{}", interface_header_file(name))
 }
 
 /// generates the name of the state field header file

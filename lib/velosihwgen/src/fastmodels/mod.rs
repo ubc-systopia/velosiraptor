@@ -111,7 +111,7 @@ impl ArmFastModelsModule {
         // flags for the compiler
         writeln!(f, "# compiler flags")?;
         writeln!(f, "CC      := g++")?;
-        writeln!(f, "CCFLAGS := -Wall -O3 -Werror -std=c++20 -fPIC")?;
+        writeln!(f, "CCFLAGS := -Wall -O3 -Werror -std=c++2a -fPIC")?;
         writeln!(f, "CCFLAGS += -I include")?;
         writeln!(f, "CCFLAGS += -I $(FRAMEWORK_DIR)/include")?;
         writeln!(f, "CCFLAGS += -I $(PVLIB_HOME)/include")?;
@@ -196,8 +196,10 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
         for u in ast.units() {
             let out_subdir = &self.outdir.join(u.ident_to_string());
             fs::create_dir_all(out_subdir)?;
-            let includedir = out_subdir.join("include");
-            fs::create_dir_all(includedir)?;
+
+            // not putting hpp files in /include for now
+            // let includedir = out_subdir.join("include");
+            // fs::create_dir_all(includedir)?;
         }
         Ok(())
     }
