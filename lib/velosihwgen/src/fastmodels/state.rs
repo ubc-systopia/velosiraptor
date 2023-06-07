@@ -47,7 +47,7 @@ pub fn state_header_file(name: &str) -> String {
 
 /// generates the path of the state header file
 pub fn state_header_file_path(name: &str) -> String {
-    format!("include/{}", state_header_file(name))
+    format!("{}", state_header_file(name))
 }
 
 /// generates the name of the state header file
