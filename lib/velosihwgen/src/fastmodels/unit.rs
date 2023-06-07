@@ -35,7 +35,7 @@ use std::path::Path;
 use crustal as C;
 
 // the defined errors
-use velosiast::ast::{VelosiAstExpr, VelosiAstMethod, VelosiAstUnit, VelosiAstNumLiteralExpr, VelosiAstBoolLiteralExpr, VelosiAstBinOpExpr, VelosiAstUnOpExpr, VelosiAstFnCallExpr, VelosiAstIdentLiteralExpr, VelosiAstIfElseExpr, VelosiAstTypeInfo, VelosiAstType};
+use velosiast::ast::{VelosiAstExpr, VelosiAstMethod, VelosiAstUnit, VelosiAstNumLiteralExpr, VelosiAstBoolLiteralExpr, VelosiAstBinOpExpr, VelosiAstUnOpExpr, VelosiAstFnCallExpr, VelosiAstIdentLiteralExpr, VelosiAstIfElseExpr, VelosiAstTypeInfo, VelosiAstType, VelosiAstBinOp};
 
 use crate::fastmodels::add_header;
 use crate::fastmodels::interface::{interface_class_name, interface_header_file};
@@ -214,13 +214,16 @@ fn expr_to_cpp(expr: &VelosiAstExpr) -> C::Expr {
             }
         }
         NumLiteral(VelosiAstNumLiteralExpr{val, ..}) => C::Expr::new_num(*val),
-        BoolLiteral(VelosiAstBoolLiteralExpr{val: true, ..}) => C::Expr::btrue(),
-        BoolLiteral(VelosiAstBoolLiteralExpr{val: false, ..}) => C::Expr::bfalse(),
+        BoolLiteral(VelosiAstBoolLiteralExpr{val: b, ..}) =>
+            if *b { C::Expr::btrue() } else { C::Expr::bfalse() },
         BinOp(VelosiAstBinOpExpr{op, lhs, rhs, ..}) => {
-            let o = format!("{}", op);
             let e = expr_to_cpp(lhs);
             let e2 = expr_to_cpp(rhs);
-            C::Expr::binop(e, &o, e2)
+            // implies "==>" needs a special case, others should be fine in cpp
+            match op {
+                VelosiAstBinOp::Implies => C::Expr::binop(C::Expr::not(e), "||", e2),
+                _ => C::Expr::binop(e, &format!("{}", op), e2),
+            }
         }
         UnOp(VelosiAstUnOpExpr{op, expr, ..}) => {
             let o = format!("{}", op);
