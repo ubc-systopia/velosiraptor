@@ -61,18 +61,32 @@ use fields::{generate_field_header, generate_field_impl, state_fields_impl_file}
 ///
 /// ## Generated File Structure
 ///
-///  - outdir/hw/fastmodels/<pkgname>
-///  - outdir/hw/fastmodels/<pkgname>/include
-///  - outdir/hw/fastmodels/<pkgname>/include/registers.hpp
-///  - outdir/hw/fastmodels/<pkgname>/include/interface.hpp
-///  - outdir/hw/fastmodels/<pkgname>/include/state.hpp
-///  - outdir/hw/fastmodels/<pkgname>/include/unit.hpp
-///  - outdir/hw/fastmodels/<pkgname>/registers.cpp
-///  - outdir/hw/fastmodels/<pkgname>/unit.cpp
-///  - outdir/hw/fastmodels/<pkgname>/interface.cpp
-///  - outdir/hw/fastmodels/<pkgname>/state.cpp
-
+/// todo: unsure about the final positions of these, may use binaries
+///       currently putting them adjacent to the units for testing
+///  - outdir/hw/fastmodels/framework/
+///  - outdir/hw/fastmodels/framework/accessmode.hpp
+///  - outdir/hw/fastmodels/framework/interface_base.hpp
+///  - outdir/hw/fastmodels/framework/logging.hpp
+///  - outdir/hw/fastmodels/framework/register_base.hpp
+///  - outdir/hw/fastmodels/framework/state_base.hpp
+///  - outdir/hw/fastmodels/framework/state_field_base.hpp
+///  - outdir/hw/fastmodels/framework/translation_unit_base.hpp
+///  - outdir/hw/fastmodels/framework/types.hpp
 ///
+/// for pkgname in vrs:
+///  - outdir/hw/fastmodels/<pkgname>/
+///  - outdir/hw/fastmodels/<pkgname>/interface.hpp
+///  - outdir/hw/fastmodels/<pkgname>/interface.cpp
+///  - outdir/hw/fastmodels/<pkgname>/registers.hpp
+///  - outdir/hw/fastmodels/<pkgname>/registers.cpp
+///  - outdir/hw/fastmodels/<pkgname>/state.hpp
+///  - outdir/hw/fastmodels/<pkgname>/state.cpp
+///  - outdir/hw/fastmodels/<pkgname>/state_fields.hpp
+///  - outdir/hw/fastmodels/<pkgname>/state_fields.cpp
+///  - outdir/hw/fastmodels/<pkgname>/unit.hpp
+///  - outdir/hw/fastmodels/<pkgname>/unit.cpp
+
+
 pub struct ArmFastModelsModule {
     outdir: PathBuf,
     pkgname: String,
