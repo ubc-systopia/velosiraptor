@@ -268,47 +268,6 @@ fn handle_requires_assert(method: &mut C::Method, expr: &VelosiAstExpr) {
     method.body().ifelse(assert_to_cpp(expr));
 }
 
-// fn stmt_to_cpp(s: &Stmt) -> C::Block {
-//     use Stmt::*;
-//     match s {
-//         Block { stmts, .. } => stmts.iter().fold(C::Block::new(), |mut acc, x| {
-//             acc.merge(stmt_to_cpp(x));
-//             acc
-//         }),
-//         Return { expr, .. } => {
-//             let mut b = C::Block::new();
-//             b.return_expr(expr_to_cpp(expr));
-//             b
-//         }
-//         Let {
-//             typeinfo: _,
-//             lhs: _,
-//             rhs: _,
-//             pos: _,
-//         } => panic!("not handled yet!"),
-//         Assert { expr, pos: _ } => {
-//             let mut b = C::Block::new();
-//             b.ifelse(assert_to_cpp(expr));
-//             b
-//         }
-//         IfElse {
-//             cond,
-//             then,
-//             other,
-//             pos: _,
-//         } => {
-//             let mut b = C::Block::new();
-//             let mut ifelse = C::IfElse::with_expr(expr_to_cpp(cond));
-//             if let Some(other) = other.as_ref() {
-//                 ifelse.set_other(stmt_to_cpp(other));
-//             }
-//             ifelse.set_then(stmt_to_cpp(then));
-//             b.ifelse(ifelse);
-//             b
-//         }
-//     }
-// }
-
 fn add_translate_remap(c: &mut C::Class, tm: &VelosiAstMethod) {
     let src_addr_param = C::MethodParam::new(
         &tm.params[0].ident.ident,
@@ -443,14 +402,14 @@ pub fn generate_unit_header(name: &str, unit: &VelosiAstUnit, outdir: &Path) -> 
     s.new_include("assert.h", true);
 
     s.new_comment("framework includes");
-    s.new_include("framework/types.hpp", true);
-    s.new_include("framework/translation_unit_base.hpp", true);
+    s.new_include("../framework/types.hpp", false);
+    s.new_include("../framework/translation_unit_base.hpp", false);
 
     s.new_comment("translation unit specific includes");
     let statehdr = state_header_file(name);
-    s.new_include(&statehdr, true);
+    s.new_include(&statehdr, false);
     let ifhdr = interface_header_file(name);
-    s.new_include(&ifhdr, true);
+    s.new_include(&ifhdr, false);
 
     // create a new class in the scope
     let c = s.new_class(&ucn);
@@ -531,8 +490,8 @@ pub fn generate_unit_impl(name: &str, unit: &VelosiAstUnit, outdir: &Path) -> Re
     scope.new_include("assert.h", true);
 
     scope.new_comment("framework includes");
-    scope.new_include("framework/types.hpp", true);
-    scope.new_include("framework/logging.hpp", true);
+    scope.new_include("../framework/types.hpp", false);
+    scope.new_include("../framework/logging.hpp", false);
 
     scope.new_comment("translation unit specific includes");
     let unithdr = unit_header_file(name);

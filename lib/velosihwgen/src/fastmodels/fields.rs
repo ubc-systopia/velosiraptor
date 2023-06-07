@@ -83,8 +83,8 @@ pub fn generate_field_header(name: &str, state: &VelosiAstState, outdir: &Path) 
 
     // adding the includes
     s.new_comment("framework includes");
-    s.new_include("framework/types.hpp", true);
-    s.new_include("framework/state_field_base.hpp", true);
+    s.new_include("../framework/types.hpp", false);
+    s.new_include("../framework/state_field_base.hpp", false);
 
     // generate a new class for each field
     for f in state.fields() {
@@ -149,7 +149,7 @@ pub fn generate_field_impl(name: &str, state: &VelosiAstState, outdir: &Path) ->
 
     // adding includes
     scope.new_comment("framework includes");
-    scope.new_include("framework/types.hpp", true);
+    scope.new_include("../framework/types.hpp", false);
     scope.new_comment("translation unit generic includes");
     let hdrfile = state_fields_header_file(name);
     scope.new_include(&hdrfile, true);
