@@ -35,6 +35,7 @@ mod semantics;
 mod semprecond;
 pub mod unmap;
 mod utils;
+mod cnf;
 
 pub use queryhelper::{MaybeResult, ProgramBuilder};
 

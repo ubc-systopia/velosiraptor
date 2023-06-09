@@ -225,6 +225,8 @@ where
     }
 }
 
+
+///
 pub struct MultiDimProgramQueries<T>
 where
     T: ProgramBuilder,
@@ -254,16 +256,6 @@ where
             all_done: false,
         }
     }
-
-    // /// returns the current program count
-    // pub fn idx(&self) -> usize {
-    //     self.idx
-    // }
-
-    // /// returns the dimension of the iterator
-    // pub fn dim(&self) -> usize {
-    //     self.queries.len()
-    // }
 }
 
 impl<T> ProgramBuilder for MultiDimProgramQueries<T>
@@ -368,6 +360,11 @@ where
     }
 }
 
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Program Builder for the ProgramsIter
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl ProgramBuilder for ProgramsIter {
     fn next(&mut self, _z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
         match self.next_program() {
@@ -376,3 +373,9 @@ impl ProgramBuilder for ProgramsIter {
         }
     }
 }
+
+
+
+
+
+
