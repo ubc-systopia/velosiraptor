@@ -250,25 +250,20 @@ impl From<VelosiParseTreeBinOp> for VelosiAstBinOp {
 /// Represents a binary operation `expr <op> expr`
 #[derive(Eq, Clone, Debug)]
 pub struct VelosiAstBinOpExpr {
-    pub lhs: Box<VelosiAstExpr>,
+    pub lhs: Rc<VelosiAstExpr>,
     pub op: VelosiAstBinOp,
-    pub rhs: Box<VelosiAstExpr>,
+    pub rhs: Rc<VelosiAstExpr>,
     pub loc: VelosiTokenStream,
 }
 
 impl VelosiAstBinOpExpr {
     pub fn new(
-        lhs: VelosiAstExpr,
+        lhs: Rc<VelosiAstExpr>,
         op: VelosiAstBinOp,
-        rhs: VelosiAstExpr,
+        rhs: Rc<VelosiAstExpr>,
         loc: VelosiTokenStream,
     ) -> VelosiAstBinOpExpr {
-        VelosiAstBinOpExpr {
-            lhs: Box::new(lhs),
-            op,
-            rhs: Box::new(rhs),
-            loc,
-        }
+        VelosiAstBinOpExpr { lhs, op, rhs, loc }
     }
 
     pub fn from_parse_tree(
@@ -299,7 +294,7 @@ impl VelosiAstBinOpExpr {
         }
 
         // evaluate the expression, see if we can fold the constants
-        let res = VelosiAstBinOpExpr::new(lhs, op, rhs, pt.loc)
+        let res = VelosiAstBinOpExpr::new(Rc::new(lhs), op, Rc::new(rhs), pt.loc)
             .canonicalize()
             .eval();
 
@@ -390,7 +385,7 @@ impl VelosiAstBinOpExpr {
 
         // we no know that the constants are moved to the right.
         let (lhs, op, rhs) = if rhs.is_const_expr() {
-            if let VelosiAstExpr::BinOp(lhs_expr) = *lhs {
+            if let VelosiAstExpr::BinOp(lhs_expr) = lhs.as_ref() {
                 if lhs_expr.rhs.is_const_expr() {
                     use VelosiAstBinOp::*;
                     match (lhs_expr.op, op) {
@@ -403,70 +398,87 @@ impl VelosiAstBinOpExpr {
                         | (Land, Land)
                         | (Lor, Lor) => {
                             // we can fold the constants
-                            let lhs = lhs_expr.lhs;
-                            let rhs = VelosiAstBinOpExpr::new(*lhs_expr.rhs, op, *rhs, loc.clone())
-                                .eval();
-                            (lhs, op, Box::new(rhs))
+                            let lhs = &lhs_expr.lhs;
+                            let rhs =
+                                VelosiAstBinOpExpr::new(lhs_expr.rhs.clone(), op, rhs, loc.clone())
+                                    .eval();
+                            (lhs.clone(), op, Rc::new(rhs))
                         }
                         (Minus, Minus) => {
                             // (a - b) - c => a - (b + c)
-                            let lhs = lhs_expr.lhs;
-                            let rhs =
-                                VelosiAstBinOpExpr::new(*lhs_expr.rhs, Plus, *rhs, loc.clone())
-                                    .eval();
-                            (lhs, op, Box::new(rhs))
+                            let lhs = &lhs_expr.lhs;
+                            let rhs = VelosiAstBinOpExpr::new(
+                                lhs_expr.rhs.clone(),
+                                Plus,
+                                rhs,
+                                loc.clone(),
+                            )
+                            .eval();
+                            (lhs.clone(), op, Rc::new(rhs))
                         }
                         (Divide, Divide) => {
                             // (a / b) / c => a / (b * c)
-                            let lhs = lhs_expr.lhs;
-                            let rhs =
-                                VelosiAstBinOpExpr::new(*lhs_expr.rhs, Multiply, *rhs, loc.clone())
-                                    .eval();
-                            (lhs, op, Box::new(rhs))
+                            let lhs = &lhs_expr.lhs;
+                            let rhs = VelosiAstBinOpExpr::new(
+                                lhs_expr.rhs.clone(),
+                                Multiply,
+                                rhs,
+                                loc.clone(),
+                            )
+                            .eval();
+                            (lhs.clone(), op, Rc::new(rhs))
                         }
                         (LShift, LShift) => {
                             // (a << b) << c => a << (b + c)
-                            let lhs = lhs_expr.lhs;
-                            let rhs =
-                                VelosiAstBinOpExpr::new(*lhs_expr.rhs, Plus, *rhs, loc.clone())
-                                    .eval();
-                            (lhs, op, Box::new(rhs))
+                            let lhs = &lhs_expr.lhs;
+                            let rhs = VelosiAstBinOpExpr::new(
+                                lhs_expr.rhs.clone(),
+                                Plus,
+                                rhs,
+                                loc.clone(),
+                            )
+                            .eval();
+                            (lhs.clone(), op, Rc::new(rhs))
                         }
                         (RShift, RShift) => {
                             // (a >> b) >> c => a >> (b + c)
-                            let lhs = lhs_expr.lhs;
-                            let rhs =
-                                VelosiAstBinOpExpr::new(*lhs_expr.rhs, Plus, *rhs, loc.clone())
-                                    .eval();
-                            (lhs, op, Box::new(rhs))
+                            let lhs = &lhs_expr.lhs;
+                            let rhs = VelosiAstBinOpExpr::new(
+                                lhs_expr.rhs.clone(),
+                                Plus,
+                                rhs,
+                                loc.clone(),
+                            )
+                            .eval();
+                            (lhs.clone(), op, Rc::new(rhs))
                         }
                         (LShift, RShift) => {
                             if lhs_expr.rhs.const_expr_result_num().unwrap()
                                 >= rhs.const_expr_result_num().unwrap()
                             {
                                 // (a << b) >> c => a << (b - c)
-                                let lhs = lhs_expr.lhs;
+                                let lhs = &lhs_expr.lhs;
                                 let rhs = VelosiAstBinOpExpr::new(
-                                    *lhs_expr.rhs,
+                                    lhs_expr.rhs.clone(),
                                     Minus,
-                                    *rhs,
+                                    rhs,
                                     loc.clone(),
                                 )
                                 .eval();
                                 let op = LShift;
-                                (lhs, op, Box::new(rhs))
+                                (lhs.clone(), op, Rc::new(rhs))
                             } else {
                                 // (a << b) >> c => a >> (c - b)
-                                let lhs = lhs_expr.lhs;
+                                let lhs = &lhs_expr.lhs;
                                 let rhs = VelosiAstBinOpExpr::new(
-                                    *rhs,
+                                    rhs,
                                     Minus,
-                                    *lhs_expr.rhs,
+                                    lhs_expr.rhs.clone(),
                                     loc.clone(),
                                 )
                                 .eval();
                                 let op = RShift;
-                                (lhs, op, Box::new(rhs))
+                                (lhs.clone(), op, Rc::new(rhs))
                             }
                         }
                         (RShift, LShift) => {
@@ -474,34 +486,34 @@ impl VelosiAstBinOpExpr {
                                 >= rhs.const_expr_result_num().unwrap()
                             {
                                 // (a >> b) << c => a >> (b - c)
-                                let lhs = lhs_expr.lhs;
+                                let lhs = &lhs_expr.lhs;
                                 let rhs = VelosiAstBinOpExpr::new(
-                                    *lhs_expr.rhs,
+                                    lhs_expr.rhs.clone(),
                                     Minus,
-                                    *rhs,
+                                    rhs,
                                     loc.clone(),
                                 )
                                 .eval();
                                 let op = LShift;
-                                (lhs, op, Box::new(rhs))
+                                (lhs.clone(), op, Rc::new(rhs))
                             } else {
                                 // (a >> b) << c => a << (c - b)
-                                let lhs = lhs_expr.lhs;
+                                let lhs = &lhs_expr.lhs;
                                 let rhs = VelosiAstBinOpExpr::new(
-                                    *rhs,
+                                    rhs,
                                     Minus,
-                                    *lhs_expr.rhs,
+                                    lhs_expr.rhs.clone(),
                                     loc.clone(),
                                 )
                                 .eval();
                                 let op = RShift;
-                                (lhs, op, Box::new(rhs))
+                                (lhs.clone(), op, Rc::new(rhs))
                             }
                         }
-                        _ => (Box::new(VelosiAstExpr::BinOp(lhs_expr)), op, rhs),
+                        _ => (Rc::new(VelosiAstExpr::BinOp(lhs_expr.clone())), op, rhs),
                     }
                 } else {
-                    (Box::new(VelosiAstExpr::BinOp(lhs_expr)), op, rhs)
+                    (Rc::new(VelosiAstExpr::BinOp(lhs_expr.clone())), op, rhs)
                 }
             } else {
                 (lhs, op, rhs)
@@ -606,8 +618,8 @@ impl VelosiAstBinOpExpr {
         // here we could even be a bit smarter and try to further fold constants etc. using
         // further AST rewriting etc.
 
-        let lhs = self.lhs.flatten(st, mapping);
-        let rhs = self.rhs.flatten(st, mapping);
+        let lhs = Rc::new(self.lhs.as_ref().clone().flatten(st, mapping));
+        let rhs = Rc::new(self.rhs.as_ref().clone().flatten(st, mapping));
 
         VelosiAstBinOpExpr::new(lhs, self.op, rhs, self.loc).eval()
     }
@@ -748,21 +760,17 @@ impl From<VelosiParseTreeUnOp> for VelosiAstUnOp {
 #[derive(Eq, Clone, Debug)]
 pub struct VelosiAstUnOpExpr {
     pub op: VelosiAstUnOp,
-    pub expr: Box<VelosiAstExpr>,
+    pub expr: Rc<VelosiAstExpr>,
     pub loc: VelosiTokenStream,
 }
 
 impl VelosiAstUnOpExpr {
     pub fn new(
         op: VelosiAstUnOp,
-        expr: VelosiAstExpr,
+        expr: Rc<VelosiAstExpr>,
         loc: VelosiTokenStream,
     ) -> VelosiAstUnOpExpr {
-        VelosiAstUnOpExpr {
-            op,
-            expr: Box::new(expr),
-            loc,
-        }
+        VelosiAstUnOpExpr { op, expr, loc }
     }
 
     pub fn from_parse_tree(
@@ -791,7 +799,7 @@ impl VelosiAstUnOpExpr {
         }
 
         // evaluate the expression, see if we can fold the constants
-        let res = VelosiAstUnOpExpr::new(op, expr, pt.loc).eval();
+        let res = VelosiAstUnOpExpr::new(op, Rc::new(expr), pt.loc).eval();
 
         if issues.is_ok() {
             AstResult::Ok(res)
@@ -817,18 +825,19 @@ impl VelosiAstUnOpExpr {
         st: &mut SymbolTable,
         mapping: &HashMap<Rc<String>, &VelosiAstExpr>,
     ) -> VelosiAstExpr {
-        match self.expr.flatten(st, mapping) {
+        match self.expr.as_ref().clone().flatten(st, mapping) {
             // the other expression is also an unary operation
             VelosiAstExpr::UnOp(e) => {
                 // if the two unary opearations are the same, we can apply the double rule
                 if self.op == e.op {
-                    *e.expr
+                    e.expr.as_ref().clone()
                 } else {
-                    VelosiAstUnOpExpr::new(self.op, VelosiAstExpr::UnOp(e), self.loc).eval()
+                    VelosiAstUnOpExpr::new(self.op, Rc::new(VelosiAstExpr::UnOp(e)), self.loc)
+                        .eval()
                 }
             }
             // the other expression is not unary, evaluate and return
-            e => VelosiAstUnOpExpr::new(self.op, e, self.loc).eval(),
+            e => VelosiAstUnOpExpr::new(self.op, Rc::new(e), self.loc).eval(),
         }
     }
 
@@ -922,7 +931,7 @@ impl Display for VelosiAstQuantifier {
 pub struct VelosiAstQuantifierExpr {
     pub quant: VelosiAstQuantifier,
     pub params: Vec<Rc<VelosiAstParam>>,
-    pub expr: Box<VelosiAstExpr>,
+    pub expr: Rc<VelosiAstExpr>,
     pub loc: VelosiTokenStream,
 }
 
@@ -930,7 +939,7 @@ impl VelosiAstQuantifierExpr {
     pub fn new(
         quant: VelosiAstQuantifier,
         params: Vec<Rc<VelosiAstParam>>,
-        expr: Box<VelosiAstExpr>,
+        expr: Rc<VelosiAstExpr>,
         loc: VelosiTokenStream,
     ) -> VelosiAstQuantifierExpr {
         VelosiAstQuantifierExpr {
@@ -970,7 +979,7 @@ impl VelosiAstQuantifierExpr {
 
         st.drop_context();
 
-        let e = VelosiAstQuantifierExpr::new(quant, params, Box::new(expr), pt.loc);
+        let e = VelosiAstQuantifierExpr::new(quant, params, Rc::new(expr), pt.loc);
         ast_result_return!(VelosiAstExpr::Quantifier(e), issues)
     }
 
@@ -1575,7 +1584,7 @@ impl VelosiAstFnCallExpr {
                     for (i, p) in m.params.iter().enumerate() {
                         mapping.insert(p.ident().clone(), &res.args[i]);
                     }
-                    body.clone().flatten(st, &mapping)
+                    body.as_ref().clone().flatten(st, &mapping)
                 } else {
                     VelosiAstExpr::FnCall(res)
                 }
@@ -1670,25 +1679,25 @@ impl Display for VelosiAstFnCallExpr {
 /// Represents an boolean literal expression
 #[derive(Eq, Clone, Debug)]
 pub struct VelosiAstIfElseExpr {
-    pub cond: Box<VelosiAstExpr>,
-    pub then: Box<VelosiAstExpr>,
-    pub other: Box<VelosiAstExpr>,
+    pub cond: Rc<VelosiAstExpr>,
+    pub then: Rc<VelosiAstExpr>,
+    pub other: Rc<VelosiAstExpr>,
     pub etype: VelosiAstTypeInfo,
     pub loc: VelosiTokenStream,
 }
 
 impl VelosiAstIfElseExpr {
     pub fn new(
-        cond: VelosiAstExpr,
-        then: VelosiAstExpr,
-        other: VelosiAstExpr,
+        cond: Rc<VelosiAstExpr>,
+        then: Rc<VelosiAstExpr>,
+        other: Rc<VelosiAstExpr>,
         etype: VelosiAstTypeInfo,
         loc: VelosiTokenStream,
     ) -> Self {
         VelosiAstIfElseExpr {
-            cond: Box::new(cond),
-            then: Box::new(then),
-            other: Box::new(other),
+            cond,
+            then,
+            other,
             etype,
             loc,
         }
@@ -1730,8 +1739,14 @@ impl VelosiAstIfElseExpr {
         }
 
         let mapping = HashMap::new();
-        let e =
-            VelosiAstIfElseExpr::new(cond, then, other, then_type, pt.loc).flatten(st, &mapping);
+        let e = VelosiAstIfElseExpr::new(
+            Rc::new(cond),
+            Rc::new(then),
+            Rc::new(other),
+            then_type,
+            pt.loc,
+        )
+        .flatten(st, &mapping);
         if issues.is_ok() {
             AstResult::Ok(e)
         } else {
@@ -1744,15 +1759,15 @@ impl VelosiAstIfElseExpr {
         st: &mut SymbolTable,
         mapping: &HashMap<Rc<String>, &VelosiAstExpr>,
     ) -> VelosiAstExpr {
-        let then = self.then.flatten(st, mapping);
-        let other = self.other.flatten(st, mapping);
-        let cond = self.cond.flatten(st, mapping);
+        let then = Rc::new(self.then.as_ref().clone().flatten(st, mapping));
+        let other = Rc::new(self.other.as_ref().clone().flatten(st, mapping));
+        let cond = Rc::new(self.cond.as_ref().clone().flatten(st, mapping));
 
-        if let VelosiAstExpr::BoolLiteral(b) = &cond {
+        if let VelosiAstExpr::BoolLiteral(b) = cond.as_ref() {
             if b.val {
-                then
+                Rc::<VelosiAstExpr>::into_inner(then).unwrap()
             } else {
-                other
+                Rc::<VelosiAstExpr>::into_inner(other).unwrap()
             }
         } else if then.result_type().is_boolean() {
             let then_expr = VelosiAstBinOpExpr::new(
@@ -1763,16 +1778,16 @@ impl VelosiAstIfElseExpr {
             );
             let cond_neg = VelosiAstUnOpExpr::new(VelosiAstUnOp::LNot, cond, self.loc.clone());
             let other_expr = VelosiAstBinOpExpr::new(
-                VelosiAstExpr::UnOp(cond_neg),
+                Rc::new(VelosiAstExpr::UnOp(cond_neg)),
                 VelosiAstBinOp::Implies,
                 other,
                 self.loc.clone(),
             );
             let e = VelosiAstBinOpExpr::new(
-                VelosiAstExpr::BinOp(then_expr),
+                Rc::new(VelosiAstExpr::BinOp(then_expr)),
                 VelosiAstBinOp::Land,
-                VelosiAstExpr::BinOp(other_expr),
-                self.loc.clone(),
+                Rc::new(VelosiAstExpr::BinOp(other_expr)),
+                self.loc,
             );
             VelosiAstExpr::BinOp(e)
         } else {
@@ -2325,21 +2340,26 @@ impl VelosiAstExpr {
             if let BinOp(inner) = outer.rhs.as_ref() {
                 if outer.op == Lor && inner.op == Land {
                     let lhs = VelosiAstBinOpExpr::new(
-                        *outer.lhs.clone(),
+                        outer.lhs.clone(),
                         Lor,
-                        *inner.lhs.clone(),
+                        inner.lhs.clone(),
                         outer.loc.clone(),
                     )
                     .flatten(st, &mapping);
                     let rhs = VelosiAstBinOpExpr::new(
-                        *outer.lhs.clone(),
+                        outer.lhs.clone(),
                         Lor,
-                        *inner.rhs.clone(),
+                        inner.rhs.clone(),
                         outer.loc.clone(),
                     )
                     .flatten(st, &mapping);
-                    let res = VelosiAstBinOpExpr::new(lhs, Land, rhs, outer.loc.clone())
-                        .flatten(st, &mapping);
+                    let res = VelosiAstBinOpExpr::new(
+                        Rc::new(lhs),
+                        Land,
+                        Rc::new(rhs),
+                        outer.loc.clone(),
+                    )
+                    .flatten(st, &mapping);
                     // println!("into_cnf | rewrite: applying distributive law");
                     // println!("  {} -> {}", self, res);
                     return res;
@@ -2351,21 +2371,26 @@ impl VelosiAstExpr {
                 if outer.op == Lor && inner.op == Land {
                     // println!("into_cnf | rewrite: applying distributive law");
                     let lhs = VelosiAstBinOpExpr::new(
-                        *outer.rhs.clone(),
+                        outer.rhs.clone(),
                         Lor,
-                        *inner.lhs.clone(),
+                        inner.lhs.clone(),
                         outer.loc.clone(),
                     )
                     .flatten(st, &mapping);
                     let rhs = VelosiAstBinOpExpr::new(
-                        *outer.rhs.clone(),
+                        outer.rhs.clone(),
                         Lor,
-                        *inner.rhs.clone(),
+                        inner.rhs.clone(),
                         outer.loc.clone(),
                     )
                     .flatten(st, &mapping);
-                    let res = VelosiAstBinOpExpr::new(lhs, Land, rhs, outer.loc.clone())
-                        .flatten(st, &mapping);
+                    let res = VelosiAstBinOpExpr::new(
+                        Rc::new(lhs),
+                        Land,
+                        Rc::new(rhs),
+                        outer.loc.clone(),
+                    )
+                    .flatten(st, &mapping);
                     // println!("into_cnf | rewrite: applying distributive law");
                     // println!("  {} -> {}", self, res);
                     return res;
@@ -2376,12 +2401,13 @@ impl VelosiAstExpr {
                 // demorgan's law
                 // !(p or q) == !p and !q
                 if ue.op == LNot && be.op == Lor {
-                    let lhs = VelosiAstUnOpExpr::new(LNot, *be.lhs.clone(), be.loc.clone())
+                    let lhs = VelosiAstUnOpExpr::new(LNot, be.lhs.clone(), be.loc.clone())
                         .flatten(st, &mapping);
-                    let rhs = VelosiAstUnOpExpr::new(LNot, *be.rhs.clone(), be.loc.clone())
+                    let rhs = VelosiAstUnOpExpr::new(LNot, be.rhs.clone(), be.loc.clone())
                         .flatten(st, &mapping);
-                    let res = VelosiAstBinOpExpr::new(lhs, Land, rhs, ue.loc.clone())
-                        .flatten(st, &mapping);
+                    let res =
+                        VelosiAstBinOpExpr::new(Rc::new(lhs), Land, Rc::new(rhs), ue.loc.clone())
+                            .flatten(st, &mapping);
                     // println!("into_cnf | rewrite: applying demorgan's law");
                     // println!("  {} -> {}", self, res);
                     return res;
@@ -2392,7 +2418,7 @@ impl VelosiAstExpr {
     }
 
     /// splits a boolean expression into is conjuncts
-    pub fn split_cnf(self) -> Vec<Self> {
+    pub fn split_cnf(&self) -> Vec<Rc<Self>> {
         use VelosiAstExpr::*;
         match self {
             BinOp(e) => {
@@ -2401,10 +2427,10 @@ impl VelosiAstExpr {
                     v.extend(e.rhs.split_cnf());
                     v
                 } else {
-                    vec![BinOp(e)]
+                    vec![BinOp(e.clone()).into()]
                 }
             }
-            e => vec![e],
+            e => vec![e.clone().into()],
         }
     }
 
