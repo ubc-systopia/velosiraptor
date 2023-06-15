@@ -65,9 +65,9 @@ pub struct VelosiAstMethod {
     /// a map from parameter name to the parameter
     pub params_map: HashMap<String, Rc<VelosiAstParam>>,
     /// preconditions
-    pub requires: Vec<VelosiAstExpr>,
+    pub requires: Vec<Rc<VelosiAstExpr>>,
     /// method body
-    pub body: Option<VelosiAstExpr>,
+    pub body: Option<Rc<VelosiAstExpr>>,
     /// synthesized operations
     pub ops: Vec<VelosiOperation>,
     /// the location of the import clause
@@ -79,8 +79,8 @@ impl VelosiAstMethod {
         ident: VelosiAstIdentifier,
         rtype: VelosiAstType,
         params: Vec<Rc<VelosiAstParam>>,
-        requires: Vec<VelosiAstExpr>,
-        body: Option<VelosiAstExpr>,
+        requires: Vec<Rc<VelosiAstExpr>>,
+        body: Option<Rc<VelosiAstExpr>>,
         loc: VelosiTokenStream,
     ) -> Self {
         let mut params_map = HashMap::new();
@@ -105,8 +105,8 @@ impl VelosiAstMethod {
         ident: VelosiAstIdentifier,
         rtype: VelosiAstType,
         params: Vec<Rc<VelosiAstParam>>,
-        requires: Vec<VelosiAstExpr>,
-        body: Option<VelosiAstExpr>,
+        requires: Vec<Rc<VelosiAstExpr>>,
+        body: Option<Rc<VelosiAstExpr>>,
         loc: VelosiTokenStream,
     ) -> Self {
         let mut params_map = HashMap::new();
@@ -131,8 +131,8 @@ impl VelosiAstMethod {
         ident: VelosiAstIdentifier,
         rtype: VelosiAstType,
         params: Vec<Rc<VelosiAstParam>>,
-        requires: Vec<VelosiAstExpr>,
-        body: Option<VelosiAstExpr>,
+        requires: Vec<Rc<VelosiAstExpr>>,
+        body: Option<Rc<VelosiAstExpr>>,
         loc: VelosiTokenStream,
     ) -> Self {
         let mut params_map = HashMap::new();
@@ -234,9 +234,9 @@ impl VelosiAstMethod {
                 VelosiAstTypeInfo::VirtAddr,
             ))],
             Vec::new(), // no requires
-            Some(VelosiAstExpr::IdentLiteral(
+            Some(Rc::new(VelosiAstExpr::IdentLiteral(
                 VelosiAstIdentLiteralExpr::with_name("va".to_string(), VelosiAstTypeInfo::VirtAddr),
-            )), // just true
+            ))), // just true
             VelosiTokenStream::default(), // no location
         )
     }
@@ -249,9 +249,9 @@ impl VelosiAstMethod {
                 "flgs".to_string(),
                 VelosiAstTypeInfo::Flags,
             ))],
-            Vec::new(),                                    // no requires
-            Some(VelosiAstExpr::BoolLiteral(true.into())), // just true
-            VelosiTokenStream::default(),                  // no location
+            Vec::new(),                                             // no requires
+            Some(Rc::new(VelosiAstExpr::BoolLiteral(true.into()))), // just true
+            VelosiTokenStream::default(),                           // no location
         )
     }
 
@@ -260,9 +260,9 @@ impl VelosiAstMethod {
             VelosiAstIdentifier::with_name("valid".to_string()),
             VelosiAstType::new_bool(),
             Vec::new(),
-            Vec::new(),                                    // no requires
-            Some(VelosiAstExpr::BoolLiteral(true.into())), // just true
-            VelosiTokenStream::default(),                  // no location
+            Vec::new(),                                             // no requires
+            Some(Rc::new(VelosiAstExpr::BoolLiteral(true.into()))), // just true
+            VelosiTokenStream::default(),                           // no location
         )
     }
 
@@ -445,7 +445,7 @@ impl VelosiAstMethod {
                 issues.push(err);
             }
 
-            Some(body.into_cnf(st))
+            Some(Rc::new(body.into_cnf(st)))
         } else {
             None
         };
@@ -624,7 +624,7 @@ impl VelosiAstMethod {
             }
 
             let mut format_mismatch = true;
-            if let VelosiAstExpr::BinOp(pre) = pre {
+            if let VelosiAstExpr::BinOp(pre) = pre.as_ref() {
                 let mut found = false;
                 if let VelosiAstExpr::IdentLiteral(i) = pre.lhs.as_ref() {
                     found |= params.contains(i.ident().as_str());
