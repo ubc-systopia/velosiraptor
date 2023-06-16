@@ -25,6 +25,7 @@
 
 //! Synthesis of Virtual Memory Operations
 
+mod cnf;
 pub mod map;
 mod precond;
 pub mod protect;
@@ -35,7 +36,6 @@ mod semantics;
 mod semprecond;
 pub mod unmap;
 mod utils;
-mod cnf;
 
 pub use queryhelper::{MaybeResult, ProgramBuilder};
 
