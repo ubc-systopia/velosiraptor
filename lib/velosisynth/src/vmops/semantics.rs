@@ -164,36 +164,34 @@ pub fn semantic_query(
 
             if program_queries.is_empty() {
                 None
+            } else if negate {
+                let programs = SequentialProgramQueries::new(program_queries);
+                let b = SemanticQueryBuilder::new(
+                    programs,
+                    m_op,
+                    m_goal.clone(),
+                    None,
+                    negate,
+                    no_change,
+                );
+                Some(ProgramQueries::new(
+                    SemanticQueries::MultiQueryNegated(b),
+                    Z3TaskPriority::Medium,
+                ))
             } else {
-                if negate {
-                    let programs = SequentialProgramQueries::new(program_queries);
-                    let b = SemanticQueryBuilder::new(
-                        programs,
-                        m_op,
-                        m_goal.clone(),
-                        None,
-                        negate,
-                        no_change,
-                    );
-                    Some(ProgramQueries::new(
-                        SemanticQueries::MultiQueryNegated(b),
-                        Z3TaskPriority::Medium,
-                    ))
-                } else {
-                    let programs = MultiDimProgramQueries::new(program_queries);
-                    let b = SemanticQueryBuilder::new(
-                        programs,
-                        m_op,
-                        m_goal.clone(),
-                        None,
-                        negate,
-                        no_change,
-                    );
-                    Some(ProgramQueries::new(
-                        SemanticQueries::MultiQuery(b),
-                        Z3TaskPriority::Medium,
-                    ))
-                }
+                let programs = MultiDimProgramQueries::new(program_queries);
+                let b = SemanticQueryBuilder::new(
+                    programs,
+                    m_op,
+                    m_goal.clone(),
+                    None,
+                    negate,
+                    no_change,
+                );
+                Some(ProgramQueries::new(
+                    SemanticQueries::MultiQuery(b),
+                    Z3TaskPriority::Medium,
+                ))
             }
         } else {
             // case 1: we just have a single body element, so no need to split up.
