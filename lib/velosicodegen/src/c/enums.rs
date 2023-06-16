@@ -129,6 +129,19 @@ fn add_is_function(
         // TODO:
         // here we actually need a way to access the relevant part of the state...
         // in theory reading the interface may cause some state transition.
+        // for now, only read if it doesn't cause a state transition
+        if let Some(interface) = variant_unit.interface() {
+            if interface
+                .fields()
+                .iter()
+                .flat_map(|f| f.read_actions_as_ref().iter())
+                .any(|action| action.dst.has_state_references())
+            {
+                // TODO: should return error instead of panic
+                panic!("cannot check enum variant due to state transition on read action")
+            }
+        }
+
         let args = variant_unit
             .params_as_slice()
             .iter()
