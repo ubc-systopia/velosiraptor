@@ -608,20 +608,25 @@ impl<'a> CNFQueryBuilder<'a> {
 
         // no partial programs, simply take the expressions and build the query
         let mut candidate_programs = Vec::with_capacity(self.exprs.len());
+        let mut exprs = Vec::new();
         match self.partial_programs {
             PartialPrograms::All(pb) => {
                 let batch_size = self.batchsize;
                 let priority = self.priority;
                 candidate_programs = pb
                     .into_iter()
-                    .map(|p| ProgramVerifier::with_batchsize(p, batch_size, priority).into())
+                    .map(|p| {
+                        exprs.push(p.goal_expr());
+                        ProgramVerifier::with_batchsize(p, batch_size, priority).into()
+                    })
                     .collect();
             }
             PartialPrograms::Verified(pb) => {
+                exprs = pb.iter().map(|p| p.goal_expr()).collect();
                 candidate_programs = pb;
             }
             PartialPrograms::None => {
-                for expr in self.exprs.iter() {
+                for expr in self.exprs.into_iter() {
                     let bool_expr_query =
                         BoolExprQueryBuilder::new(self.unit, self.m_op.clone(), expr.clone())
                             .assms(assms.clone())
@@ -637,6 +642,7 @@ impl<'a> CNFQueryBuilder<'a> {
                             .into(),
                         );
                     }
+                    exprs.push(expr);
                 }
             }
         }
@@ -644,12 +650,12 @@ impl<'a> CNFQueryBuilder<'a> {
         let done = candidate_programs.iter().map(|_| false).collect();
 
         if self.negate {
-            let partial_programs = self.exprs.iter().map(|_| LinkedList::new()).collect();
+            let partial_programs = exprs.iter().map(|_| LinkedList::new()).collect();
 
             // this is !(A && B && C), we convert this to !A || !B || !C
             let compound_query = CompoundQueryAny {
                 m_op: self.m_op,
-                exprs: self.exprs,
+                exprs,
                 assms,
                 candidate_programs,
                 done,
@@ -666,7 +672,7 @@ impl<'a> CNFQueryBuilder<'a> {
             // this is A && B && C, keep it that way
             let compound_query = CompoundQueryAll {
                 m_op: self.m_op,
-                exprs: self.exprs,
+                exprs,
                 assms,
                 candidate_programs,
                 partial_programs,
@@ -686,20 +692,25 @@ impl<'a> CNFQueryBuilder<'a> {
 
         // no partial programs, simply take the expressions and build the query
         let mut candidate_programs = Vec::with_capacity(self.exprs.len());
+        let mut exprs = Vec::new();
         match self.partial_programs {
             PartialPrograms::All(pb) => {
                 let batch_size = self.batchsize;
                 let priority = self.priority;
                 candidate_programs = pb
                     .into_iter()
-                    .map(|p| ProgramVerifier::with_batchsize(p, batch_size, priority).into())
+                    .map(|p| {
+                        exprs.push(p.goal_expr());
+                        ProgramVerifier::with_batchsize(p, batch_size, priority).into()
+                    })
                     .collect();
             }
             PartialPrograms::Verified(pb) => {
+                exprs = pb.iter().map(|p| p.goal_expr()).collect();
                 candidate_programs = pb;
             }
             PartialPrograms::None => {
-                for expr in self.exprs.iter() {
+                for expr in self.exprs.into_iter() {
                     let bool_expr_query =
                         BoolExprQueryBuilder::new(self.unit, self.m_op.clone(), expr.clone())
                             .assms(assms.clone())
@@ -715,6 +726,7 @@ impl<'a> CNFQueryBuilder<'a> {
                             .into(),
                         );
                     }
+                    exprs.push(expr);
                 }
             }
         }
@@ -729,7 +741,7 @@ impl<'a> CNFQueryBuilder<'a> {
 
             let compound_query = CompoundQueryAll {
                 m_op: self.m_op,
-                exprs: self.exprs,
+                exprs,
                 assms,
                 candidate_programs,
                 partial_programs,
@@ -743,12 +755,12 @@ impl<'a> CNFQueryBuilder<'a> {
         } else {
             // this is A || B || C, keep it that way
 
-            let partial_programs = self.exprs.iter().map(|_| LinkedList::new()).collect();
+            let partial_programs = exprs.iter().map(|_| LinkedList::new()).collect();
 
             // this is !(A && B && C), we convert this to !A || !B || !C
             let compound_query = CompoundQueryAny {
                 m_op: self.m_op,
-                exprs: self.exprs,
+                exprs,
                 assms,
                 candidate_programs,
                 done,
