@@ -132,30 +132,34 @@ pub fn method_assms_name(mname: &str) -> String {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn add_bool_method_parts(smt: &mut Smt2Context, method: &VelosiAstMethod) -> usize {
-    let parts = method.body.as_ref().unwrap().clone().split_cnf();
-    for (i, pre) in parts
-        .iter()
-        .filter(|p| p.has_state_references())
-        .enumerate()
-    {
-        let name = method_part_i_name(method.ident(), i);
-        let mut f = Function::new(name, types::boolean());
-        f.add_comment(format!(
-            "Function Body part {}: {}, {}",
-            i,
-            method.ident(),
-            method.loc.loc()
-        ));
+    if let Some(body) = &method.body {
+        let parts = body.split_cnf();
+        for (i, pre) in parts
+            .iter()
+            .filter(|p| p.has_state_references())
+            .enumerate()
+        {
+            let name = method_part_i_name(method.ident(), i);
+            let mut f = Function::new(name, types::boolean());
+            f.add_comment(format!(
+                "Function Body part {}: {}, {}",
+                i,
+                method.ident(),
+                method.loc.loc()
+            ));
 
-        f.add_arg(String::from("st!0"), types::model());
-        for a in method.params.iter() {
-            f.add_arg(a.ident_to_string(), types::type_to_smt2(&a.ptype));
+            f.add_arg(String::from("st!0"), types::model());
+            for a in method.params.iter() {
+                f.add_arg(a.ident_to_string(), types::type_to_smt2(&a.ptype));
+            }
+
+            f.add_body(expr::expr_to_smt2(pre, "st!0"));
+            smt.function(f);
         }
-
-        f.add_body(expr::expr_to_smt2(pre, "st!0"));
-        smt.function(f);
+        parts.len()
+    } else {
+        0
     }
-    parts.len()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -465,7 +469,7 @@ pub fn add_translate_range_checks(smt: &mut Smt2Context, method: &VelosiAstMetho
 
         // we do have a mixed pre-condition here, get the binop out
 
-        let binop = if let VelosiAstExpr::BinOp(pre) = pre {
+        let binop = if let VelosiAstExpr::BinOp(pre) = pre.as_ref() {
             pre
         } else {
             panic!("expected a binary operation");
