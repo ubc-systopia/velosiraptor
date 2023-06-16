@@ -109,11 +109,27 @@ impl VelosiAstUnitSegment {
 
         // convert all the unit parameters
         let mut params = Vec::new();
+        let mut address_param: Option<VelosiTokenStream> = None;
         for p in pt.params.into_iter() {
             let param = Rc::new(ast_result_unwrap!(
                 VelosiAstParam::from_parse_tree(p, false, st),
                 issues
             ));
+
+            if param.ptype.is_addr() {
+                if let Some(loc) = &address_param {
+                    let msg = "Unit has multiple address parameters defined.";
+                    let hint = "Remove this parameter, or change its type";
+                    let loc_msg = "This is the previous address parameter";
+                    let e = VelosiAstErrBuilder::err(msg.to_string())
+                        .add_hint(hint.to_string())
+                        .add_related_location(loc_msg.to_string(), loc.clone())
+                        .build();
+                    issues.push(e);
+                } else {
+                    address_param = Some(param.loc.clone());
+                }
+            }
 
             // add the param to the symbol table, if it doesn't exist already
             if let Err(e) = st.insert(param.clone().into()) {
@@ -768,11 +784,27 @@ impl VelosiAstUnitStaticMap {
 
         // convert all the unit parameters
         let mut params = Vec::new();
+        let mut address_param: Option<VelosiTokenStream> = None;
         for p in pt.params.into_iter() {
             let param = Rc::new(ast_result_unwrap!(
                 VelosiAstParam::from_parse_tree(p, false, st),
                 issues
             ));
+
+            if param.ptype.is_addr() {
+                if let Some(loc) = &address_param {
+                    let msg = "Unit has multiple address parameters defined.";
+                    let hint = "Remove this parameter, or change its type";
+                    let loc_msg = "This is the previous address parameter";
+                    let e = VelosiAstErrBuilder::err(msg.to_string())
+                        .add_hint(hint.to_string())
+                        .add_related_location(loc_msg.to_string(), loc.clone())
+                        .build();
+                    issues.push(e);
+                } else {
+                    address_param = Some(param.loc.clone());
+                }
+            }
 
             // add the param to the symbol table, if it doesn't exist already
             if let Err(e) = st.insert(param.clone().into()) {
@@ -1147,12 +1179,29 @@ impl VelosiAstUnitEnum {
         st.create_context("unit".to_string());
 
         // convert all the unit parameters
+
         let mut params = Vec::new();
+        let mut address_param: Option<VelosiTokenStream> = None;
         for p in pt.params.into_iter() {
             let param = Rc::new(ast_result_unwrap!(
                 VelosiAstParam::from_parse_tree(p, false, st),
                 issues
             ));
+
+            if param.ptype.is_addr() {
+                if let Some(loc) = &address_param {
+                    let msg = "Unit has multiple address parameters defined.";
+                    let hint = "Remove this parameter, or change its type";
+                    let loc_msg = "This is the previous address parameter";
+                    let e = VelosiAstErrBuilder::err(msg.to_string())
+                        .add_hint(hint.to_string())
+                        .add_related_location(loc_msg.to_string(), loc.clone())
+                        .build();
+                    issues.push(e);
+                } else {
+                    address_param = Some(param.loc.clone());
+                }
+            }
 
             // add the param to the symbol table, if it doesn't exist already
             if let Err(e) = st.insert(param.clone().into()) {
