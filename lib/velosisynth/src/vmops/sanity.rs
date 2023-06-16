@@ -23,6 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+use std::rc::Rc;
+
 use smt2::{Smt2Context, Term, VarDecl};
 
 use velosiast::ast::{VelosiAstExpr, VelosiAstMethod, VelosiAstUnitSegment};
@@ -178,7 +180,7 @@ fn check_satisfy_fn_results(
                     panic!("unknown conflict: {}", t);
                 }
             })
-            .collect::<Vec<&VelosiAstExpr>>();
+            .collect::<Vec<&Rc<VelosiAstExpr>>>();
 
         if toks.len() == 2 {
             let msg = "unable to satify constraints";
