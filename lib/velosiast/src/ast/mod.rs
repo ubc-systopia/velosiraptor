@@ -381,6 +381,16 @@ impl VelosiAstRoot {
             })
             .collect()
     }
+
+    pub fn get_state_registers(&self) -> Vec<Rc<VelosiAstStateField>> {
+        let mut regs = Vec::new();
+        for u in self.units.values() {
+            if let VelosiAstUnit::Segment(s) = u {
+                regs.extend(s.get_state_registers())
+            }
+        }
+        regs
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstRoot]
