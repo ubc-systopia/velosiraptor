@@ -29,8 +29,12 @@ use std::collections::LinkedList;
 use std::rc::Rc;
 
 use smt2::{Smt2Context, SortedVar, Term, VarBinding};
-use velosiast::ast::{
-    VelosiAstExpr, VelosiAstMethod, VelosiAstUnOp, VelosiAstUnOpExpr, VelosiAstUnitSegment,
+use velosiast::{
+    ast::{
+        VelosiAstBinOp, VelosiAstBinOpExpr, VelosiAstBoolLiteralExpr, VelosiAstExpr,
+        VelosiAstMethod, VelosiAstUnOp, VelosiAstUnOpExpr, VelosiAstUnitSegment,
+    },
+    VelosiAst, VelosiTokenStream,
 };
 
 use crate::{
@@ -856,7 +860,42 @@ impl ProgramBuilder for CompoundQueryAny {
     }
 
     fn goal_expr(&self) -> Rc<VelosiAstExpr> {
-        panic!("called expr on compound query")
+        match self.exprs.len() {
+            0 => {
+                // just taking true as the goal expression
+                log::warn!("encountered empty compound query (ANY)");
+                Rc::new(VelosiAstExpr::BoolLiteral(VelosiAstBoolLiteralExpr::btrue()))
+            }
+            1 => {
+                // simply take the only expression we have
+                self.exprs[0].clone()
+            }
+            _ => {
+                let mut expr = self.exprs[0].clone();
+                for e in self.exprs.iter().skip(1) {
+                    if let VelosiAstExpr::BoolLiteral(be) = e.as_ref() {
+                        if be.val {
+                            log::warn!(
+                                "encountered always true expression in compound query (ANY)"
+                            );
+                            // this one was true, which means the entire expression is always true
+                            return e.clone();
+                        } else {
+                            // just skip the false one
+                        }
+                    } else {
+                        expr = Rc::new(VelosiAstExpr::BinOp(VelosiAstBinOpExpr {
+                            op: VelosiAstBinOp::Or,
+                            lhs: expr,
+                            rhs: e.clone(),
+                            loc: VelosiTokenStream::default(),
+                        }));
+                    }
+                }
+
+                expr
+            }
+        }
     }
 
     fn m_op(&self) -> &VelosiAstMethod {
@@ -884,7 +923,6 @@ pub struct CompoundQueryAll {
     /// flag indicating whether we're all done
     all_done: bool,
 }
-
 impl CompoundQueryAll {}
 
 impl ProgramBuilder for CompoundQueryAll {
@@ -994,8 +1032,41 @@ impl ProgramBuilder for CompoundQueryAll {
     }
 
     fn goal_expr(&self) -> Rc<VelosiAstExpr> {
-        //
+        match self.exprs.len() {
+            0 => {
+                // just taking true as the goal expression
+                log::warn!("encountered empty compound query (ALL)");
+                Rc::new(VelosiAstExpr::BoolLiteral(VelosiAstBoolLiteralExpr::btrue()))
+            }
+            1 => {
+                // simply take the only expression we have
+                self.exprs[0].clone()
+            }
+            _ => {
+                let mut expr = self.exprs[0].clone();
+                for e in self.exprs.iter().skip(1) {
+                    if let VelosiAstExpr::BoolLiteral(be) = e.as_ref() {
+                        if !be.val {
+                            log::warn!(
+                                "encountered always false expression in compound query (ALL)"
+                            );
+                            // this one was true, which means the entire expression is always true
+                            return e.clone();
+                        } else {
+                            // just skip the true one
+                        }
+                    } else {
+                        expr = Rc::new(VelosiAstExpr::BinOp(VelosiAstBinOpExpr {
+                            op: VelosiAstBinOp::Or,
+                            lhs: expr,
+                            rhs: e.clone(),
+                            loc: VelosiTokenStream::default(),
+                        }));
+                    }
+                }
 
-        panic!("called expr on compound query")
+                expr
+            }
+        }
     }
 }
