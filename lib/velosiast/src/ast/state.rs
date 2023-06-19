@@ -213,7 +213,7 @@ impl VelosiAstField for VelosiAstStateMemoryField {
 // State Register Fields
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstStateRegisterField {
     /// the name of the unit
     pub ident: VelosiAstIdentifier,
@@ -223,6 +223,8 @@ pub struct VelosiAstStateRegisterField {
     pub layout: Vec<Rc<VelosiAstFieldSlice>>,
     /// hashmap of the layout from slice name to slice
     pub layout_map: HashMap<String, Rc<VelosiAstFieldSlice>>,
+    /// whether the field is private
+    pub private: bool,
     /// the location of the type clause
     pub loc: VelosiTokenStream,
 }
@@ -244,6 +246,7 @@ impl VelosiAstStateRegisterField {
             size,
             layout,
             layout_map,
+            private: false, // let's just mark it as non-private for now.
             loc,
         }
     }
@@ -283,6 +286,12 @@ impl VelosiAstStateRegisterField {
 
     fn compare(&self, other: &Self) -> bool {
         self.ident == other.ident && self.size == other.size
+    }
+}
+
+impl PartialEq for VelosiAstStateRegisterField {
+    fn eq(&self, other: &Self) -> bool {
+        self.ident == other.ident && self.size == other.size && self.layout == other.layout
     }
 }
 
@@ -379,6 +388,9 @@ fn handle_layout(
             layout.push(slice);
         }
     }
+
+    // sort the slices by the start value
+    layout.sort();
 
     // overlap check
     utils::slice_overlap_check(&mut issues, size * 8, layout.as_slice());
@@ -599,9 +611,45 @@ impl VelosiAstStateDef {
                 issues
             ));
 
-            st.insert(field.clone().into())
-                .map_err(|e| issues.push(*e))
-                .ok();
+            let sym: Symbol = field.clone().into();
+            // for register fields we need to check whether they are
+            if let VelosiAstStateField::Register(reg) = field.as_ref() {
+                if reg.private {
+                    // this is a private register
+                } else {
+                    // this is a shared register, if it's not in the symbol table, add it to the
+                    // root.
+                    match st.lookup(&sym.name) {
+                        Some(sym) => {
+                            // we found it in the root context, now we can check the type
+                            if let VelosiAstNode::StateField(sf) = &sym.ast_node {
+                                if field.size() != sf.size() {
+                                    // the size must be the same
+                                }
+
+                                if field.layout_as_slice() != sf.layout_as_slice() {
+                                    // the layout must be the same
+                                }
+                            } else {
+                                // error here
+                            }
+                        }
+                        None => {
+                            // nothing found in the symbol table, we can adde the symbol to the root
+                            // context of the symbol table so it stays there in the compilation unit
+                            st.insert_root(sym.clone()).ok();
+                        }
+                    }
+
+                    // insert it to the current scope, in case there was a different layout, so
+                    // other checks won't fail
+                    st.insert_current(sym).map_err(|e| issues.push(*e)).ok();
+                }
+            } else {
+                // this is a memory field, simply insert it into the symbol table.
+                st.insert(sym).map_err(|e| issues.push(*e)).ok();
+            }
+
             fields.push(field);
         }
 

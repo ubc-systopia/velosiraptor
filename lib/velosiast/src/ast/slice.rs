@@ -29,6 +29,7 @@
 //!
 
 // used standard library functionality
+use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
@@ -38,7 +39,7 @@ use crate::ast::{VelosiAstIdentifier, VelosiAstNode, VelosiAstType};
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
 use crate::{ast_result_return, utils, AstResult, Symbol, VelosiTokenStream};
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstFieldSlice {
     /// the name of the unit
     pub ident: VelosiAstIdentifier,
@@ -137,6 +138,45 @@ impl VelosiAstFieldSlice {
 
     pub fn nbits(&self) -> u64 {
         self.end - self.start
+    }
+}
+
+impl PartialOrd for VelosiAstFieldSlice {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for VelosiAstFieldSlice {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // if the start is smaller, then we're smaller
+        if self.start < other.start {
+            return Ordering::Less;
+        }
+
+        if self.start > other.start {
+            return Ordering::Greater;
+        }
+
+        // if the end is smaller, then we're smaller
+
+        if self.end < other.end {
+            return Ordering::Less;
+        }
+
+        if self.end > other.end {
+            return Ordering::Greater;
+        }
+
+        // finally just consider the identifier
+
+        self.ident.cmp(&other.ident)
+    }
+}
+
+impl PartialEq for VelosiAstFieldSlice {
+    fn eq(&self, other: &Self) -> bool {
+        self.start == other.start && self.end == other.end && self.ident == other.ident
     }
 }
 
