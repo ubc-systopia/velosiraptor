@@ -1355,6 +1355,14 @@ pub struct VelosiAstBoolLiteralExpr {
 }
 
 impl VelosiAstBoolLiteralExpr {
+    pub fn btrue() -> Self {
+        Self::new(true, VelosiTokenStream::default())
+    }
+
+    pub fn bfalse() -> Self {
+        Self::new(false, VelosiTokenStream::default())
+    }
+
     pub fn new(val: bool, loc: VelosiTokenStream) -> Self {
         VelosiAstBoolLiteralExpr { val, loc }
     }
