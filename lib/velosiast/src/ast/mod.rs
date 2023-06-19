@@ -29,6 +29,7 @@
 
 // used standard library functionality
 use core::str::Split;
+use std::cmp::Ordering;
 use std::collections::hash_map::{Keys, Values, ValuesMut};
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
@@ -131,6 +132,18 @@ pub struct VelosiAstIdentifier {
 impl PartialEq for VelosiAstIdentifier {
     fn eq(&self, other: &Self) -> bool {
         self.path == other.path && self.ident == other.ident
+    }
+}
+
+impl PartialOrd for VelosiAstIdentifier {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for VelosiAstIdentifier {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.ident.as_ref().cmp(other.ident.as_ref())
     }
 }
 
