@@ -61,7 +61,7 @@ use super::expr::VelosiAstIdentLiteralExpr;
 ///
 /// Currently an action is basically an assignment that assigns the destination the value of the
 /// source. If the destination is a StateRef, then this src => dst
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstInterfaceAction {
     /// the source operand of the action
     pub src: VelosiAstExpr,
@@ -233,6 +233,13 @@ impl VelosiAstInterfaceAction {
                 panic!("unsupported state access: {} -> {}", self.src, self.dst);
             }
         }
+    }
+}
+
+/// Implementation of [PartialEq] for [VelosiAstInterfaceAction]
+impl PartialEq for VelosiAstInterfaceAction {
+    fn eq(&self, other: &Self) -> bool {
+        self.src == other.src && self.dst == other.dst
     }
 }
 
@@ -546,7 +553,7 @@ fn handle_nodes(
 // Interface Memory Fields
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstInterfaceMemoryField {
     /// the name of the unit
     pub ident: VelosiAstIdentifier,
@@ -707,6 +714,20 @@ impl VelosiAstField for VelosiAstInterfaceMemoryField {
     }
 }
 
+/// Implementation of [PartialEq] for [VelosiAstInterfaceMmioField]
+impl PartialEq for VelosiAstInterfaceMemoryField {
+    fn eq(&self, other: &Self) -> bool {
+        self.ident == other.ident
+        && self.size == other.size
+        && self.base == other.base
+        && self.offset == other.offset
+        && self.layout == other.layout
+        // layout map is basically the same as layout
+        && self.readactions == other.readactions
+        && self.writeactions == other.writeactions
+    }
+}
+
 /// Implementation of [Display] for [VelosiAstInterfaceMemoryField]
 impl Display for VelosiAstInterfaceMemoryField {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
@@ -764,7 +785,7 @@ impl Display for VelosiAstInterfaceMemoryField {
 // Interface MMIO Fields
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstInterfaceMmioField {
     /// the name of the unit
     pub ident: VelosiAstIdentifier,
@@ -945,6 +966,20 @@ impl VelosiAstField for VelosiAstInterfaceMmioField {
     }
 }
 
+/// Implementation of [PartialEq] for [VelosiAstInterfaceMmioField]
+impl PartialEq for VelosiAstInterfaceMmioField {
+    fn eq(&self, other: &Self) -> bool {
+        self.ident == other.ident
+        && self.size == other.size
+        && self.base == other.base
+        && self.offset == other.offset
+        && self.layout == other.layout
+        // layout map is basically the same as layout
+        && self.readactions == other.readactions
+        && self.writeactions == other.writeactions
+    }
+}
+
 /// Implementation of [Display] for [VelosiAstInterfaceRegisterField]
 impl Display for VelosiAstInterfaceMmioField {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
@@ -1002,7 +1037,7 @@ impl Display for VelosiAstInterfaceMmioField {
 // Interface Register Fields
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstInterfaceRegisterField {
     /// the name of the unit
     pub ident: VelosiAstIdentifier,
@@ -1162,6 +1197,18 @@ impl VelosiAstField for VelosiAstInterfaceRegisterField {
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+}
+
+/// Implementation of [PartialEq] for [VelosiAstInterfaceRegisterField]
+impl PartialEq for VelosiAstInterfaceRegisterField {
+    fn eq(&self, other: &Self) -> bool {
+        self.ident == other.ident
+        && self.size == other.size
+        && self.layout == other.layout
+        // layout map is basically the same as layout
+        && self.readactions == other.readactions
+        && self.writeactions == other.writeactions
     }
 }
 
@@ -1432,7 +1479,7 @@ impl From<Rc<VelosiAstInterfaceField>> for Symbol {
 // Interface Definition
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstInterfaceDef {
     /// the parameters of the memory Interface
     pub params: Vec<Rc<VelosiAstParam>>,
@@ -1622,6 +1669,16 @@ impl VelosiAstInterfaceDef {
         }
 
         true
+    }
+}
+
+/// Implementation of [PartialEq] for [VelosiAstInterfaceDef]
+impl PartialEq for VelosiAstInterfaceDef {
+    fn eq(&self, other: &Self) -> bool {
+        self.params == other.params
+        // the params map is basically the same as the params
+        && self.fields == other.fields
+        // the fields_map is basically the same as the fields
     }
 }
 

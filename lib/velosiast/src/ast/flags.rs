@@ -49,12 +49,6 @@ pub struct VelosiAstFlags {
     pub loc: VelosiTokenStream,
 }
 
-impl PartialEq for VelosiAstFlags {
-    fn eq(&self, other: &Self) -> bool {
-        self.flags == other.flags
-    }
-}
-
 impl VelosiAstFlags {
     pub fn new(flags: Vec<Rc<VelosiAstIdentifier>>, loc: VelosiTokenStream) -> VelosiAstFlags {
         VelosiAstFlags { flags, loc }
@@ -107,6 +101,13 @@ impl VelosiAstFlags {
             st.insert(sym)
                 .expect("conflict while building the symbol table");
         }
+    }
+}
+
+/// Implementation of [PartialEq] for [VelosiAstFlags]
+impl PartialEq for VelosiAstFlags {
+    fn eq(&self, other: &Self) -> bool {
+        self.flags == other.flags
     }
 }
 

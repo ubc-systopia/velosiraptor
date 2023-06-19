@@ -110,7 +110,7 @@ impl Default for VelosiAstStaticMap {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstStaticMapListComp {
     pub inputsize: u64,
     pub elm: VelosiAstStaticMapElement,
@@ -224,6 +224,16 @@ impl VelosiAstStaticMapListComp {
     }
 }
 
+/// Implementation of [PartialEq] for [VelosiAstStaticMapListComp]
+impl PartialEq for VelosiAstStaticMapListComp {
+    fn eq(&self, other: &Self) -> bool {
+        self.inputsize == other.inputsize
+            && self.elm == other.elm
+            && self.var == other.var
+            && self.range == other.range
+    }
+}
+
 /// Implementation of [Display] for [VelosiAstStaticMapListComp]
 impl Display for VelosiAstStaticMapListComp {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
@@ -234,7 +244,7 @@ impl Display for VelosiAstStaticMapListComp {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstStaticMapExplicit {
     pub inputsize: u64,
     pub entries: Vec<VelosiAstStaticMapElement>,
@@ -277,6 +287,13 @@ impl VelosiAstStaticMapExplicit {
     }
 }
 
+/// Implementation of [PartialEq] for [VelosiAstStaticMapListComp]
+impl PartialEq for VelosiAstStaticMapExplicit {
+    fn eq(&self, other: &Self) -> bool {
+        self.inputsize == other.inputsize && self.entries == other.entries
+    }
+}
+
 /// Implementation of [Display] for [VelosiAstStaticMapExplicit]
 impl Display for VelosiAstStaticMapExplicit {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
@@ -284,7 +301,7 @@ impl Display for VelosiAstStaticMapExplicit {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstStaticMapElement {
     pub src: Option<VelosiAstRangeExpr>,
     pub dst: VelosiAstFnCallExpr,
@@ -370,6 +387,16 @@ impl VelosiAstStaticMapElement {
         };
 
         ast_result_return!(Self::new(src, dest, bitwidth, offset, pt.loc), issues)
+    }
+}
+
+/// Implementation of [PartialEq] for [VelosiAstStaticMapElement]
+impl PartialEq for VelosiAstStaticMapElement {
+    fn eq(&self, other: &Self) -> bool {
+        self.src == other.src
+            && self.dst == other.dst
+            && self.dst_bitwidth == other.dst_bitwidth
+            && self.offset == other.offset
     }
 }
 

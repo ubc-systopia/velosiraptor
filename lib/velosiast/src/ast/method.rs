@@ -50,7 +50,7 @@ pub const FN_SIG_PROTECT: &str = "fn protect(va: vaddr, sz: size, flgs: flags)";
 
 // const FN_SIG_INIT: &str = "fn init()";
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstMethod {
     /// the name of the constant
     pub ident: VelosiAstIdentifier,
@@ -800,6 +800,21 @@ impl From<Rc<VelosiAstMethod>> for Symbol {
     fn from(c: Rc<VelosiAstMethod>) -> Self {
         let n = VelosiAstNode::Method(c.clone());
         Symbol::new(c.path().clone(), c.rtype.clone(), n)
+    }
+}
+
+/// Implementation of [PartialEq] for [VelosiAstStaticMapElement]
+impl PartialEq for VelosiAstMethod {
+    fn eq(&self, other: &Self) -> bool {
+        self.ident == other.ident
+        && self.is_abstract == other.is_abstract
+        && self.is_synth == other.is_synth
+        && self.rtype == other.rtype
+        && self.params == other.params
+        // params map is the same as params
+        && self.requires == other.requires
+        && self.body == other.body
+        && self.ops == other.ops
     }
 }
 
