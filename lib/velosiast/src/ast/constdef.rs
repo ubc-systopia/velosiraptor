@@ -36,7 +36,7 @@ use crate::ast::{expr::VelosiAstExpr, types::VelosiAstType, VelosiAstIdentifier,
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstConst {
     /// the name of the constant
     pub ident: VelosiAstIdentifier,
@@ -44,7 +44,7 @@ pub struct VelosiAstConst {
     pub ctype: VelosiAstType,
     /// expression representing the value of the constnat
     pub value: VelosiAstExpr,
-    /// the location of the import clause
+    /// the location of the constant definition.
     pub loc: VelosiTokenStream,
 }
 
@@ -159,6 +159,13 @@ impl VelosiAstConst {
 
         let res = Self::new(name, ctype, value, pt.loc);
         ast_result_return!(res, issues)
+    }
+}
+
+/// Implementation of [PartialEq] for [VelosiAstConst]
+impl PartialEq for VelosiAstConst {
+    fn eq(&self, other: &Self) -> bool {
+        self.ident == other.ident && self.ctype == other.ctype && self.value == other.value
     }
 }
 
