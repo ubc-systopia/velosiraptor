@@ -50,7 +50,7 @@ use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, Symb
 // State Memory Fields
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstStateMemoryField {
     /// the name of the unit
     pub ident: VelosiAstIdentifier,
@@ -148,6 +148,18 @@ impl VelosiAstStateMemoryField {
             && self.size == other.size
             && self.base == other.base
             && self.offset == other.offset
+    }
+}
+
+/// Implementation of [PartialEq] for [VelosiAstStateMemoryField]
+impl PartialEq for VelosiAstStateMemoryField {
+    fn eq(&self, other: &Self) -> bool {
+        self.ident == other.ident
+            && self.size == other.size
+            && self.base == other.base
+            && self.offset == other.offset
+            && self.layout == other.layout
+        // layout map same as layout
     }
 }
 
@@ -292,6 +304,7 @@ impl VelosiAstStateRegisterField {
 impl PartialEq for VelosiAstStateRegisterField {
     fn eq(&self, other: &Self) -> bool {
         self.ident == other.ident && self.size == other.size && self.layout == other.layout
+        // we don't include the private elemenet
     }
 }
 
@@ -521,7 +534,7 @@ impl From<Rc<VelosiAstStateField>> for Symbol {
 // State Definition
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Eq, Clone, Debug)]
 pub struct VelosiAstStateDef {
     /// the parameters of the memory state
     pub params: Vec<Rc<VelosiAstParam>>,
@@ -625,11 +638,22 @@ impl VelosiAstStateDef {
                             if let VelosiAstNode::StateField(sf) = &sym.ast_node {
                                 if field.size() != sf.size() {
                                     // the size must be the same
+                                    let msg = "Field size mismatch. Shared registes fields must have the same size.";
+                                    let hint = format!("Make the field size  `{}`", sf.size());
+                                    let related = "This is the previous definition of the field";
+                                    let err = VelosiAstErrBuilder::err(msg.to_string())
+                                        .add_hint(hint)
+                                        .add_location(field.loc().clone())
+                                        .add_related_location(related.to_string(), sf.loc().clone())
+                                        .build();
+                                    issues.push(err);
                                 }
 
-                                if field.layout_as_slice() != sf.layout_as_slice() {
-                                    // the layout must be the same
-                                }
+                                utils::check_layout_qauality(
+                                    &mut issues,
+                                    sf.layout_as_slice(),
+                                    field.layout_as_slice(),
+                                );
                             } else {
                                 // error here
                             }
@@ -741,6 +765,13 @@ impl VelosiAstStateDef {
         }
 
         true
+    }
+}
+
+impl PartialEq for VelosiAstStateDef {
+    fn eq(&self, other: &Self) -> bool {
+        self.params == other.params && self.fields == other.fields
+        // params_map and fields_map the same as params and fields
     }
 }
 

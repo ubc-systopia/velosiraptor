@@ -350,6 +350,113 @@ pub fn check_fn_call_args(
     }
 }
 
+pub fn check_layout_qauality(
+    issues: &mut VelosiAstIssues,
+    global: &[Rc<VelosiAstFieldSlice>],
+    current: &[Rc<VelosiAstFieldSlice>],
+) {
+    let global_num_elements = global.len();
+    let current_num_elements = current.len();
+
+    if global_num_elements != current_num_elements && current_num_elements != 0 {
+        let (hint, loc) = if global_num_elements < current_num_elements {
+            // too many slices
+            let hint = format!(
+                "remove the {} unexpected argument{}",
+                current_num_elements - global_num_elements,
+                if current_num_elements - global_num_elements == 1 {
+                    ""
+                } else {
+                    "s"
+                }
+            );
+
+            let mut loc = current[global_num_elements].loc.clone();
+            loc.expand_until_end(&current[current_num_elements - 1].loc);
+            (hint, loc)
+        } else {
+            // to few slices
+            let hint = format!(
+                "add the {} missing slices{}",
+                global_num_elements - current_num_elements,
+                if global_num_elements - current_num_elements == 1 {
+                    ""
+                } else {
+                    "s"
+                }
+            );
+
+            let loc = current[current_num_elements - 1].loc.clone();
+
+            (hint, loc)
+        };
+        let msg = "number of slices does not match";
+        let err = VelosiAstErrBuilder::err(msg.to_string())
+            .add_hint(hint)
+            .add_location(loc)
+            //.add_related_location("parameters defined here".to_string(), m.loc.clone())
+            .build();
+        issues.push(err);
+    }
+
+    for i in 0..std::cmp::max(global_num_elements, current_num_elements) {
+        let msg = "field layout mismatch";
+        let mut err = VelosiAstErrBuilder::err(msg.to_string());
+
+        if i >= global_num_elements {
+            // too many slices in the current
+            let hint = "remove this slice from the field layout.";
+            let loc = current[i].loc.clone();
+
+            err.add_hint(hint.to_string()).add_location(loc);
+            issues.push(err.build());
+            continue;
+        }
+
+        if i >= current_num_elements {
+            // missing slices in the current
+            let mut loc = current[0].loc.clone();
+            loc.expand_until_end(&current[current_num_elements - 1].loc);
+
+            let related = "add this slice to the layout";
+            err.add_location(loc)
+                .add_related_location(related.to_string(), global[i].loc.clone());
+            issues.push(err.build());
+            continue;
+        }
+
+        let mut err = VelosiAstErrBuilder::err(String::new());
+
+        // same amount of slices in the current
+        if global[i].ident() != current[i].ident() {
+            err.add_message("field slice identifier mismatch.".to_string());
+            err.add_hint(format!("expected slice with name {}", global[i].ident()));
+            err.add_location(current[i].loc.clone());
+            if global[i].ident().as_str() != "_val" {
+                err.add_related_location("this is the definition".to_string(), global[i].loc.clone());
+            }
+        } else if global[i].start != current[i].start {
+            err.add_message("start bit offset mismatch.".to_string());
+            err.add_location(current[i].loc.clone());
+            if global[i].ident().as_str() != "_val" {
+                err.add_hint(format!("expected start bit {}", global[i].start));
+                err.add_related_location("this is the definition".to_string(), global[i].loc.clone());
+            }
+        } else if global[i].end != current[i].end {
+            err.add_message("end bit offset mismatch.".to_string());
+            err.add_location(current[i].loc.clone());
+            if global[i].ident().as_str() != "_val" {
+                err.add_hint(format!("change this bit {}", global[i].end));
+                err.add_related_location("this is the definition".to_string(), global[i].loc.clone());
+            }
+        } else {
+            continue;
+        };
+
+        issues.push(err.build());
+    }
+}
+
 pub fn check_element_ranges(
     issues: &mut VelosiAstIssues,
     st: &SymbolTable,

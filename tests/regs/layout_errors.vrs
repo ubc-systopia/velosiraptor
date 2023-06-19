@@ -1,0 +1,180 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Registers Tests: OK
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// represents an x86 page table entry
+segment Seg(base : addr) {
+    inbitwidth = 12;
+    outbitwidth = 12;
+
+    flags = { dummy };
+
+    // the state
+    state = StateDef(base: addr) {
+        reg pte [ 4 ] {
+            0..8 foo,
+            16..32 bar
+        }
+    };
+
+    interface = InterfaceDef(base : addr) {
+        mmio pte [base, 0, 4]
+    };
+
+    fn valid() -> bool { true }
+
+    // matches a translation flags,
+    fn matchflags(flgs : flags) -> bool { true }
+
+    // the translation semantics, adding an option type?
+    fn translate(va: vaddr) -> paddr
+    {
+        va
+    }
+
+    synth fn unmap(va: vaddr, sz: size)
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+    synth fn protect(va: vaddr, sz: size, flgs: flags)
+}
+
+// represents an x86 page table entry
+segment Seg2(base : addr) {
+    inbitwidth = 12;
+    outbitwidth = 12;
+
+    flags = { dummy };
+
+    // the state
+    state = StateDef(base: addr) {
+        reg pte [ 4 ] {
+            0..9 foo,
+            17..32 bar
+        }
+    };
+
+    interface = InterfaceDef(base : addr) {
+        mmio pte [base, 0, 4]
+    };
+
+    fn valid() -> bool { true }
+
+    // matches a translation flags,
+    fn matchflags(flgs : flags) -> bool { true }
+
+    // the translation semantics, adding an option type?
+    fn translate(va: vaddr) -> paddr
+    {
+        va
+    }
+
+    synth fn unmap(va: vaddr, sz: size)
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+    synth fn protect(va: vaddr, sz: size, flgs: flags)
+}
+
+// represents an x86 page table entry
+segment Seg3(base : addr) {
+    inbitwidth = 12;
+    outbitwidth = 12;
+
+    flags = { dummy };
+
+    // the state
+    state = StateDef(base: addr) {
+        reg pte [ 4 ] {
+            0..8 bar,
+            16..32 baz
+        }
+    };
+
+    interface = InterfaceDef(base : addr) {
+        mmio pte [base, 0, 4]
+    };
+
+    fn valid() -> bool { true }
+
+    // matches a translation flags,
+    fn matchflags(flgs : flags) -> bool { true }
+
+    // the translation semantics, adding an option type?
+    fn translate(va: vaddr) -> paddr
+    {
+        va
+    }
+
+    synth fn unmap(va: vaddr, sz: size)
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+    synth fn protect(va: vaddr, sz: size, flgs: flags)
+}
+
+// represents an x86 page table entry
+segment Seg4(base : addr) {
+    inbitwidth = 12;
+    outbitwidth = 12;
+
+    flags = { dummy };
+
+    // the state
+    state = StateDef(base: addr) {
+        reg pte [ 4 ] {
+            0..8 foo,
+        }
+    };
+
+    interface = InterfaceDef(base : addr) {
+        mmio pte [base, 0, 4]
+    };
+
+    fn valid() -> bool { true }
+
+    // matches a translation flags,
+    fn matchflags(flgs : flags) -> bool { true }
+
+    // the translation semantics, adding an option type?
+    fn translate(va: vaddr) -> paddr
+    {
+        va
+    }
+
+    synth fn unmap(va: vaddr, sz: size)
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+    synth fn protect(va: vaddr, sz: size, flgs: flags)
+}
+
+// represents an x86 page table entry
+segment Seg5(base : addr) {
+    inbitwidth = 12;
+    outbitwidth = 12;
+
+    flags = { dummy };
+
+    // the state
+    state = StateDef(base: addr) {
+        reg pte [ 4 ] {
+            0..8 foo,
+            8..9 baz,
+            16..32 bar
+        }
+    };
+
+    interface = InterfaceDef(base : addr) {
+        mmio pte [base, 0, 4]
+    };
+
+    fn valid() -> bool { true }
+
+    // matches a translation flags,
+    fn matchflags(flgs : flags) -> bool { true }
+
+    // the translation semantics, adding an option type?
+    fn translate(va: vaddr) -> paddr
+    {
+        va
+    }
+
+    synth fn unmap(va: vaddr, sz: size)
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+    synth fn protect(va: vaddr, sz: size, flgs: flags)
+}
