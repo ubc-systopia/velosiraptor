@@ -42,7 +42,7 @@ use crate::ast::{
     },
     types::{VelosiAstType, VelosiAstTypeInfo},
     VelosiAstConst, VelosiAstInterface, VelosiAstMethod, VelosiAstNode, VelosiAstParam,
-    VelosiAstStaticMap, VelosiOperation,
+    VelosiAstStateField, VelosiAstStaticMap, VelosiOperation,
 };
 use crate::error::{
     VelosiAstErrBuilder, VelosiAstErrDoubleDef, VelosiAstErrUndef, VelosiAstIssues,
@@ -680,6 +680,10 @@ impl VelosiAstUnitSegment {
         } else {
             unreachable!("method {} not found", method);
         }
+    }
+
+    pub fn get_state_registers(&self) -> Vec<Rc<VelosiAstStateField>> {
+        self.state.get_registers()
     }
 }
 

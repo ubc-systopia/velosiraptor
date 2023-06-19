@@ -739,6 +739,19 @@ impl VelosiAstStateDef {
         hs
     }
 
+    pub fn get_registers(&self) -> Vec<Rc<VelosiAstStateField>> {
+        self.fields
+            .iter()
+            .filter_map(|f| {
+                if let VelosiAstStateField::Register(_r) = f.as_ref() {
+                    Some(f.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     pub fn compare(&self, other: &Self) -> bool {
         if self.params.len() != other.params.len() {
             return false;
@@ -888,6 +901,13 @@ impl VelosiAstState {
             (VelosiAstState::StateDef(s), VelosiAstState::StateDef(o)) => s.compare(o),
             (VelosiAstState::NoneState(_), VelosiAstState::NoneState(_)) => true,
             _ => false,
+        }
+    }
+
+    pub fn get_registers(&self) -> Vec<Rc<VelosiAstStateField>> {
+        match self {
+            VelosiAstState::StateDef(s) => s.get_registers(),
+            VelosiAstState::NoneState(_) => vec![],
         }
     }
 }

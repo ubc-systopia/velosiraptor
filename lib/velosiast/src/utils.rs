@@ -433,21 +433,30 @@ pub fn check_layout_qauality(
             err.add_hint(format!("expected slice with name {}", global[i].ident()));
             err.add_location(current[i].loc.clone());
             if global[i].ident().as_str() != "_val" {
-                err.add_related_location("this is the definition".to_string(), global[i].loc.clone());
+                err.add_related_location(
+                    "this is the definition".to_string(),
+                    global[i].loc.clone(),
+                );
             }
         } else if global[i].start != current[i].start {
             err.add_message("start bit offset mismatch.".to_string());
             err.add_location(current[i].loc.clone());
             if global[i].ident().as_str() != "_val" {
                 err.add_hint(format!("expected start bit {}", global[i].start));
-                err.add_related_location("this is the definition".to_string(), global[i].loc.clone());
+                err.add_related_location(
+                    "this is the definition".to_string(),
+                    global[i].loc.clone(),
+                );
             }
         } else if global[i].end != current[i].end {
             err.add_message("end bit offset mismatch.".to_string());
             err.add_location(current[i].loc.clone());
             if global[i].ident().as_str() != "_val" {
                 err.add_hint(format!("change this bit {}", global[i].end));
-                err.add_related_location("this is the definition".to_string(), global[i].loc.clone());
+                err.add_related_location(
+                    "this is the definition".to_string(),
+                    global[i].loc.clone(),
+                );
             }
         } else {
             continue;
