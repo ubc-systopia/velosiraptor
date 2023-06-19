@@ -624,6 +624,8 @@ impl VelosiAstStateDef {
                 issues
             ));
 
+            // TODO: move this logic to the RegisterField struct?
+
             let sym: Symbol = field.clone().into();
             // for register fields we need to check whether they are
             if let VelosiAstStateField::Register(reg) = field.as_ref() {
