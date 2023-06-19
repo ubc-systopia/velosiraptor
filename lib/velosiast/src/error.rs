@@ -155,6 +155,11 @@ impl VelosiAstErrBuilder {
         }
     }
 
+    pub fn add_message(&mut self, message: String) -> &mut Self {
+        self.message.push_str(message.as_str());
+        self
+    }
+
     /// Adds a hint to the error message
     pub fn add_hint(&mut self, hint: String) -> &mut Self {
         self.hint = Some(hint);

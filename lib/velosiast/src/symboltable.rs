@@ -230,6 +230,36 @@ impl SymbolTable {
         }
     }
 
+    pub fn insert_current(&mut self, sym: Symbol) -> Result<(), Box<VelosiAstErr>> {
+        let ctxt = self.syms.last_mut().unwrap();
+        match ctxt.lookup(&sym.name) {
+            None => ctxt.insert(sym),
+            Some(x) => Err(Box::new(
+                VelosiAstErrDoubleDef::new(
+                    sym.name.clone(),
+                    x.ast_node.loc().clone(),
+                    sym.ast_node.loc().clone(),
+                )
+                .into(),
+            )),
+        }
+    }
+
+    pub fn insert_root(&mut self, sym: Symbol) -> Result<(), Box<VelosiAstErr>> {
+        let ctxt = self.syms.first_mut().unwrap();
+        match ctxt.lookup(&sym.name) {
+            None => ctxt.insert(sym),
+            Some(x) => Err(Box::new(
+                VelosiAstErrDoubleDef::new(
+                    sym.name.clone(),
+                    x.ast_node.loc().clone(),
+                    sym.ast_node.loc().clone(),
+                )
+                .into(),
+            )),
+        }
+    }
+
     pub fn update(&mut self, sym: Symbol) -> Result<Option<Symbol>, Box<VelosiAstErr>> {
         {
             let ctxt = self.syms.last_mut().unwrap();
