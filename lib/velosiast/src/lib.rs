@@ -50,9 +50,9 @@ use velosiparser::VelosiParseTree;
 pub use crate::ast::{
     VelosiAstConst, VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField,
     VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField, VelosiAstInterfaceRegisterField,
-    VelosiAstMethod, VelosiAstRoot, VelosiAstStaticMap, VelosiAstStaticMapElement,
-    VelosiAstStaticMapExplicit, VelosiAstStaticMapListComp, VelosiAstUnit, VelosiAstUnitEnum,
-    VelosiAstUnitSegment, VelosiAstUnitStaticMap,
+    VelosiAstMethod, VelosiAstRoot, VelosiAstStateField, VelosiAstStaticMap,
+    VelosiAstStaticMapElement, VelosiAstStaticMapExplicit, VelosiAstStaticMapListComp,
+    VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment, VelosiAstUnitStaticMap,
 };
 
 // custom error definitions
@@ -197,6 +197,10 @@ impl VelosiAst {
 
     pub fn enums(&self) -> Vec<&VelosiAstUnitEnum> {
         self.root.enums()
+    }
+
+    pub fn get_state_registers(&self) -> Vec<Rc<VelosiAstStateField>> {
+        self.root.get_state_registers()
     }
 }
 
