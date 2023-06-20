@@ -1,3 +1,4 @@
+
 // VelosiHwGen -- A hardware generator for the Velosiraptor language
 //
 //
@@ -39,9 +40,7 @@ pub fn main() {
     };
 
     let ast = match ast {
-        AstResult::Ok(ast) => {
-            ast
-        }
+        AstResult::Ok(ast) => ast,
         AstResult::Issues(ast, err) => {
             println!("{}", err);
             ast
@@ -52,9 +51,15 @@ pub fn main() {
         }
     };
 
+    let vrs_file = Path::new(&args[1]).file_stem();
+    let unit_name = match vrs_file {
+        Some(p) => p.to_string_lossy().into_owned(),
+        None => "unknown_vrs".to_owned()
+    };
+
     let hwgen = VelosiHwGen::new_fastmodels(
         Path::new("./out"),
-        "myunit".to_string()
+        unit_name
     );
 
     hwgen.prepare(&ast).expect("could not prepare the hwgen backend");

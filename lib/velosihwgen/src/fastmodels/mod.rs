@@ -204,6 +204,8 @@ impl ArmFastModelsModule {
     }
 }
 
+
+
 impl VelosiHwGenBackend for ArmFastModelsModule {
     fn prepare(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
         // outdir/hw/fastmodels/<pkgname>/<unitname>/include
@@ -229,11 +231,11 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
         Ok(())
     }
 
-    /// generate the interface definitions
     fn generate_interfaces(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
         for u in ast.units() {
             let out_subdir = &self.outdir.join(u.ident_to_string());
             match &u.interface() {
+                // TODO some units dont have an interface
                 None => (),
                 Some(i) => {
                     generate_register_header(&self.pkgname, i, out_subdir)
@@ -250,7 +252,8 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
         Ok(())
     }
 
-    /// generates the state representation
+
+    // TODO: I think the units in question have no segments
     fn generate_states(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
         for u in ast.segments() {
             let out_subdir = &self.outdir.join(u.ident_to_string());
@@ -267,7 +270,6 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
         Ok(())
     }
 
-    /// finalizes the code generation part
     fn finalize(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
         for u in ast.segments() {
             let out_subdir = &self.outdir.join(u.ident_to_string());
