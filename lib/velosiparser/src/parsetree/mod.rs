@@ -118,6 +118,7 @@ pub enum VelosiParseTreeContextNode {
     Const(VelosiParseTreeConstDef),
     Import(VelosiParseTreeImport),
     Unit(VelosiParseTreeUnit),
+    Flags(VelosiParseTreeFlags),
 }
 
 /// Implement [Display] for [VelosiParseTree]
@@ -125,9 +126,10 @@ impl Display for VelosiParseTreeContextNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         use VelosiParseTreeContextNode::*;
         match self {
-            Const(c) => Display::fmt(&c, f),
-            Import(i) => Display::fmt(&i, f),
-            Unit(u) => Display::fmt(&u, f),
+            Const(s) => Display::fmt(&s, f),
+            Import(s) => Display::fmt(&s, f),
+            Unit(s) => Display::fmt(&s, f),
+            Flags(s) => Display::fmt(&s, f),
         }
     }
 }

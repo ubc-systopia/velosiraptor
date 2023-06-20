@@ -37,6 +37,7 @@ use nom::{
 
 // the used library-internal functionaltity
 use crate::error::IResult;
+use crate::parser::flags;
 use crate::parser::{
     constdef,
     expr::expr,
@@ -46,7 +47,7 @@ use crate::parser::{
     param::parameter,
     state::state,
     terminals::{
-        assign, colon, comma, ident, kw_abstract, kw_enum, kw_flags, kw_inbitwidth, kw_outbitwidth,
+        assign, colon, comma, ident, kw_abstract, kw_enum, kw_inbitwidth, kw_outbitwidth,
         kw_segment, kw_staticmap, lbrace, lparen, rbrace, rparen, semicolon,
     },
 };
@@ -199,27 +200,6 @@ fn outbitwidth_clause(
     Ok((i2, VelosiParseTreeUnitNode::OutBitWidth(e, pos)))
 }
 
-////
-fn flags_clause(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
-    let mut pos = input.clone();
-    // parse the `const` keyword, return otherwise
-    let (i1, _) = kw_flags(input)?;
-
-    let flagsblock = delimited(
-        lbrace,
-        separated_list0(comma, ident),
-        tuple((opt(comma), rbrace)),
-    );
-
-    let (i2, flags) = cut(delimited(assign, flagsblock, semicolon))(i1)?;
-    pos.span_until_start(&i2);
-
-    Ok((
-        i2,
-        VelosiParseTreeUnitNode::Flags(VelosiParseTreeFlags::new(flags, pos)),
-    ))
-}
-
 /// parses the unit body
 ///
 /// # Arguments
@@ -238,7 +218,9 @@ fn unit_body(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vec<VelosiP
         method,
         state,
         interface,
-        flags_clause,
+        map(flags::flags_unit, |s: VelosiParseTreeFlags| {
+            VelosiParseTreeUnitNode::Flags(s)
+        }),
         staticmap,
         map(constdef::constdef, |s: VelosiParseTreeConstDef| {
             VelosiParseTreeUnitNode::Const(s)
