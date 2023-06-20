@@ -27,7 +27,7 @@ members = [
 
 [dependencies]
 # argument parsing
-clap = { version = "4.0.24", features = [ "derive" ] }
+clap = { version = "4.3.5", features = [ "derive" ] }
 
 # for colorful output
 colored = "2"
@@ -38,7 +38,7 @@ velosisynth = { path = "lib/velosisynth" }
 velosicodegen = { path = "lib/velosicodegen" }
 
 # logging and errors
-log = { version = "0.4.17", features = ["max_level_trace", "release_max_level_warn"] }
+log = { version = "0.4.19", features = ["max_level_trace", "release_max_level_warn"] }
 simplelog = { version = "^0.12.0", features = ["paris"] }
 
 
