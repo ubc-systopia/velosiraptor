@@ -344,15 +344,18 @@ impl VelosiAstUnitSegment {
                                 // we have some flags that are defined
                                 if f.as_ref() != flgs.as_ref() {
                                     // they are not the same, this is an error!
-                                    let err = VelosiAstErrDoubleDef::new(
-                                        Rc::new(String::from("flags")),
-                                        f.loc.clone(),
-                                        flgs.loc.clone(),
-                                    );
-                                    issues.push(err.into());
-
-                                    // let's just overwrite it with the flags here
-                                    flags = Some(f.clone());
+                                    let msg = "Flags definition mismatch";
+                                    let err = VelosiAstErrBuilder::err(msg.to_string())
+                                        .add_hint(
+                                            "ensure flags definitions are identical".to_string(),
+                                        )
+                                        .add_location(flgs.loc.clone())
+                                        .add_related_location(
+                                            "this is the previous definition".to_string(),
+                                            f.loc.clone(),
+                                        )
+                                        .build();
+                                    issues.push(err);
                                 } else {
                                     // they are the same, so leave let's just take the globally defined
                                     flags = Some(f.clone());
