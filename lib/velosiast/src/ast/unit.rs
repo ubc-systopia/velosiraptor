@@ -222,8 +222,7 @@ impl VelosiAstUnitSegment {
         });
 
         if let Some(f) = &flags {
-            st.insert(f.clone().into())
-                .expect("could not insert into symbol table")
+            st.insert(f.clone().into()).ok();
         }
 
         if let Some(i) = &interface {
@@ -314,6 +313,15 @@ impl VelosiAstUnitSegment {
                 VelosiParseTreeUnitNode::Flags(f) => {
                     let mut flgs = ast_result_unwrap!(VelosiAstFlags::from_parse_tree(f), issues);
 
+                    // add a deprecation warning
+                    let msg = "defining flags in unit context is deprecated.";
+                    let err = VelosiAstErrBuilder::warn(msg.to_string())
+                        .add_hint("define flags globally instead.".to_string())
+                        .add_location(flgs.loc.clone())
+                        .build();
+                    issues.push(err);
+
+                    // check for double definition
                     if flags.is_some() && derived_flags.is_none() {
                         let f = flags.as_ref().unwrap();
                         let err = VelosiAstErrDoubleDef::new(
@@ -327,9 +335,41 @@ impl VelosiAstUnitSegment {
                             flgs.derive_from(&d);
                         }
                         let flgs = Rc::new(flgs);
-                        st.update(flgs.clone().into())
-                            .expect("flags already exist n symbol table?");
                         flags = Some(flgs);
+                    }
+
+                    match (&flags, st.lookup("flags")) {
+                        (Some(flgs), Some(sym)) => {
+                            if let VelosiAstNode::Flags(f) = &sym.ast_node {
+                                // we have some flags that are defined
+                                if f.as_ref() != flgs.as_ref() {
+                                    // they are not the same, this is an error!
+                                    let err = VelosiAstErrDoubleDef::new(
+                                        Rc::new(String::from("flags")),
+                                        f.loc.clone(),
+                                        flgs.loc.clone(),
+                                    );
+                                    issues.push(err.into());
+
+                                    // let's just overwrite it with the flags here
+                                    flags = Some(f.clone());
+                                } else {
+                                    // they are the same, so leave let's just take the globally defined
+                                    flags = Some(f.clone());
+                                }
+                            }
+                        }
+                        (Some(flgs), _) => {
+                            let msg = "using unit flags as the new global flags!";
+                            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                                .add_location(flgs.loc.clone())
+                                .build();
+                            issues.push(err);
+
+                            st.insert_root(flgs.clone().into())
+                                .expect("could not insert flags into symbol table");
+                        }
+                        _ => {}
                     }
                 }
                 VelosiParseTreeUnitNode::State(pst) => {
