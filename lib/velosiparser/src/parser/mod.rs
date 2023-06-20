@@ -31,7 +31,8 @@ use nom::{branch::alt, combinator::map, multi::many0, Err};
 // the used library-internal functionality
 use crate::error::{IResult, VelosiParserErrBuilder};
 use crate::parsetree::{
-    VelosiParseTree, VelosiParseTreeConstDef, VelosiParseTreeContextNode, VelosiParseTreeUnit,
+    VelosiParseTree, VelosiParseTreeConstDef, VelosiParseTreeContextNode, VelosiParseTreeFlags,
+    VelosiParseTreeUnit,
 };
 use crate::VelosiTokenStream;
 
@@ -40,7 +41,7 @@ use crate::VelosiTokenStream;
 mod constdef;
 mod expr;
 // mod field;
-// mod flags;
+mod flags;
 mod import;
 mod interface;
 mod map;
@@ -97,6 +98,9 @@ pub fn parse(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParse
         map(unit::unit, |s: VelosiParseTreeUnit| {
             VelosiParseTreeContextNode::Unit(s)
         }),
+        map(flags::flags, |s: VelosiParseTreeFlags| {
+            VelosiParseTreeContextNode::Flags(s)
+        }),
     )))(input)?;
 
     // we expect everything to be parsed, of not this will trigger an error
@@ -110,4 +114,14 @@ pub fn parse(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParse
     }
 
     Ok((rem, VelosiParseTree::new(nodes)))
+}
+
+#[cfg(test)]
+use crate::VelosiLexer;
+
+#[test]
+fn test_ok() {
+    let content = "flags { FOO, BAR, }";
+    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
+    assert!(parse(ts).is_ok());
 }
