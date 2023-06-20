@@ -242,6 +242,7 @@ impl Display for VelosiAstIdentifier {
 pub struct VelosiAstRoot {
     pub consts: HashMap<String, Rc<VelosiAstConst>>,
     pub units: HashMap<String, VelosiAstUnit>,
+    pub flags: Option<Rc<VelosiAstFlags>>,
     pub context: String,
 }
 
@@ -251,6 +252,7 @@ impl VelosiAstRoot {
             consts: HashMap::new(),
             units: HashMap::new(),
             context,
+            flags: None,
         }
     }
 
@@ -282,6 +284,18 @@ impl VelosiAstRoot {
                         issues.push(*e);
                     } else {
                         root.units.insert(c.ident_to_string(), c);
+                    }
+                }
+                VelosiParseTreeContextNode::Flags(f) => {
+                    let c = Rc::new(ast_result_unwrap!(
+                        VelosiAstFlags::from_parse_tree(f),
+                        issues
+                    ));
+                    if let Err(e) = st.insert(c.clone().into()) {
+                        debug_assert!(root.flags.is_some());
+                        issues.push(*e);
+                    } else {
+                        root.flags = Some(c);
                     }
                 }
                 VelosiParseTreeContextNode::Import(_i) => {
