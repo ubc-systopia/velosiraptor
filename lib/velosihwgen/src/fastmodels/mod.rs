@@ -61,30 +61,35 @@ use fields::{generate_field_header, generate_field_impl, state_fields_impl_file}
 ///
 /// ## Generated File Structure
 ///
-/// todo: unsure about the final positions of these, may use binaries
-///       currently putting them adjacent to the units for testing
-///  - outdir/hw/fastmodels/framework/
-///  - outdir/hw/fastmodels/framework/accessmode.hpp
-///  - outdir/hw/fastmodels/framework/interface_base.hpp
-///  - outdir/hw/fastmodels/framework/logging.hpp
-///  - outdir/hw/fastmodels/framework/register_base.hpp
-///  - outdir/hw/fastmodels/framework/state_base.hpp
-///  - outdir/hw/fastmodels/framework/state_field_base.hpp
-///  - outdir/hw/fastmodels/framework/translation_unit_base.hpp
-///  - outdir/hw/fastmodels/framework/types.hpp
+/// main makefile will call all unit makefiles
+///  - outdir/hw/fastmodels/Makefile
 ///
-/// for pkgname in vrs:
-///  - outdir/hw/fastmodels/<pkgname>/
-///  - outdir/hw/fastmodels/<pkgname>/interface.hpp
-///  - outdir/hw/fastmodels/<pkgname>/interface.cpp
-///  - outdir/hw/fastmodels/<pkgname>/registers.hpp
-///  - outdir/hw/fastmodels/<pkgname>/registers.cpp
-///  - outdir/hw/fastmodels/<pkgname>/state.hpp
-///  - outdir/hw/fastmodels/<pkgname>/state.cpp
-///  - outdir/hw/fastmodels/<pkgname>/state_fields.hpp
-///  - outdir/hw/fastmodels/<pkgname>/state_fields.cpp
-///  - outdir/hw/fastmodels/<pkgname>/unit.hpp
-///  - outdir/hw/fastmodels/<pkgname>/unit.cpp
+/// for unit in vrs:
+///  - outdir/hw/fastmodels/<unit>/
+///  - outdir/hw/fastmodels/<unit>/Makefile
+///  - outdir/hw/fastmodels/<unit>/interface.hpp
+///  - outdir/hw/fastmodels/<unit>/interface.cpp
+///  - outdir/hw/fastmodels/<unit>/registers.hpp
+///  - outdir/hw/fastmodels/<unit>/registers.cpp
+///  - outdir/hw/fastmodels/<unit>/state.hpp
+///  - outdir/hw/fastmodels/<unit>/state.cpp
+///  - outdir/hw/fastmodels/<unit>/state_fields.hpp
+///  - outdir/hw/fastmodels/<unit>/state_fields.cpp
+///  - outdir/hw/fastmodels/<unit>/unit.hpp
+///  - outdir/hw/fastmodels/<unit>/unit.cpp
+///
+///  Fastmodels framework lib is adjacent to units
+///  note no unit can share the name of the framework folder
+///  - outdir/hw/fastmodels/fm-translation-framework/
+///  - outdir/hw/fastmodels/fm-translation-framework/accessmode.hpp
+///  - outdir/hw/fastmodels/fm-translation-framework/interface_base.hpp
+///  - outdir/hw/fastmodels/fm-translation-framework/logging.hpp
+///  - outdir/hw/fastmodels/fm-translation-framework/register_base.hpp
+///  - outdir/hw/fastmodels/fm-translation-framework/state_base.hpp
+///  - outdir/hw/fastmodels/fm-translation-framework/state_field_base.hpp
+///  - outdir/hw/fastmodels/fm-translation-framework/translation_unit_base.hpp
+///  - outdir/hw/fastmodels/fm-translation-framework/types.hpp
+
 
 
 pub struct ArmFastModelsModule {
@@ -108,7 +113,42 @@ impl ArmFastModelsModule {
         }
     }
 
-    fn generate_makefile(&self, name: &str, out: &PathBuf) -> Result<(), VelosiHwGenError> {
+    fn generate_top_makefile(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
+        let makefile = File::create(&self.outdir.join("Makefile"))?;
+        let mut f = BufWriter::new(makefile);
+        let frameworkdir = "framework";
+
+        writeln!(f, "# This file is auto-generated\n")?;
+
+        writeln!(f, "FRAMEWORK_URL=https://github.com/achreto/fm-translation-framework")?;
+        writeln!(f, "FRAMEWORK_COMMIT=040cdba09025d5c9cd9da9d2c9731a2f6677051b")?;
+        writeln!(f, "FRAMEWORK_DIR=framework")?;
+
+
+        writeln!(f, "\nall: deps_framework")?;
+        writeln!(f, "\tmake -C {}", frameworkdir)?;
+        for u in ast.units() {
+            writeln!(f, "\tmake -C {} -I framework/build/include", u.ident())?;
+        }
+
+        // todo archive all outputs
+
+        writeln!(f, "deps_framework:")?;
+        writeln!(f, "\t!(test -s $(FRAMEWORK_DIR)/.git) &&\\")?;
+        writeln!(f, "\tgit clone $(FRAMEWORK_URL) $(FRAMEWORK_DIR);\\")?;
+        writeln!(f, "\tgit -C $(FRAMEWORK_DIR) fetch;\\")?;
+        writeln!(f, "\tgit -C $(FRAMEWORK_DIR) checkout $(FRAMEWORK_COMMIT)")?;
+
+        writeln!(f, "\nclean:")?;
+        writeln!(f, "\trm -rf {}", frameworkdir)?;
+
+        f.flush()?;
+
+        Ok(())
+
+    }
+
+    fn generate_unit_makefile(&self, name: &str, out: &PathBuf) -> Result<(), VelosiHwGenError> {
         let makefile = File::create(out.join("Makefile"))?;
         let mut f = BufWriter::new(makefile);
 
@@ -120,14 +160,14 @@ impl ArmFastModelsModule {
         writeln!(f, "\n# Set the build directory")?;
         writeln!(f, "BUILD_DIR := $(CURDIR)/build")?;
         writeln!(f, "SOURCE_DIR := $(CURDIR)")?;
-        writeln!(f, "FRAMEWORK_DIR ?= $(CURDIR)/framework")?;
+        writeln!(f, "FRAMEWORK_DIR ?= $(CURDIR)/../fm-translation-framework")?;
 
-        // flags for the compiler
         writeln!(f, "# compiler flags")?;
+        writeln!(f, "# PVLIB_HOME should be set by the fast models setup script")?;
         writeln!(f, "CC      := g++")?;
         writeln!(f, "CCFLAGS := -Wall -O3 -Werror -std=c++2a -fPIC")?;
-        writeln!(f, "CCFLAGS += -I include")?;
-        writeln!(f, "CCFLAGS += -I $(FRAMEWORK_DIR)/include")?;
+        // writeln!(f, "CCFLAGS += -I include")?;
+        writeln!(f, "CCFLAGS += -I $(FRAMEWORK_DIR)/src/include")?;
         writeln!(f, "CCFLAGS += -I $(PVLIB_HOME)/include")?;
         writeln!(f, "CCFLAGS += -I $(PVLIB_HOME)/include/fmruntime")?;
         writeln!(f, "CCFLAGS += -MMD -MP")?;
@@ -271,11 +311,12 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
     }
 
     fn finalize(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
-        for u in ast.segments() {
+        for u in ast.units() {
             let out_subdir = &self.outdir.join(u.ident_to_string());
-            self.generate_makefile(&self.pkgname, out_subdir)
+            self.generate_unit_makefile(&self.pkgname, out_subdir)
                 .expect("Could not generate makefile");
         }
+        self.generate_top_makefile(ast).expect("Could not generate makefile");
         Ok(())
     }
 }
