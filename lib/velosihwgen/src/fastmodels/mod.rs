@@ -94,6 +94,7 @@ use fields::{generate_field_header, generate_field_impl, state_fields_impl_file}
 
 pub struct ArmFastModelsModule {
     outdir: PathBuf,
+    fdir: String, // relative to outdir
     pkgname: String,
 }
 
@@ -104,31 +105,30 @@ pub fn add_header(scope: &mut C::Scope, unit: &str, comp: &str) {
 }
 
 impl ArmFastModelsModule {
-    pub fn new(outdir: &Path, pkg: String) -> ArmFastModelsModule {
-        // set the outpath to: outdir/fastmodels/<pkgname>
-        let path = outdir.join("fastmodels");
+    pub fn new(hwdir: &Path, pkgname: String) -> ArmFastModelsModule {
         ArmFastModelsModule {
-            outdir: path,
-            pkgname: pkg,
+            outdir: hwdir.join("fastmodels"),
+            fdir: "fm_translation_framework".to_string(),
+            pkgname,
         }
     }
 
     fn generate_top_makefile(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
         let makefile = File::create(&self.outdir.join("Makefile"))?;
         let mut f = BufWriter::new(makefile);
-        let frameworkdir = "framework";
 
         writeln!(f, "# This file is auto-generated\n")?;
 
         writeln!(f, "FRAMEWORK_URL=https://github.com/achreto/fm-translation-framework")?;
         writeln!(f, "FRAMEWORK_COMMIT=040cdba09025d5c9cd9da9d2c9731a2f6677051b")?;
-        writeln!(f, "FRAMEWORK_DIR=framework")?;
+        writeln!(f, "FRAMEWORK_DIR={}", self.fdir)?;
 
 
         writeln!(f, "\nall: deps_framework")?;
-        writeln!(f, "\tmake -C {}", frameworkdir)?;
+        writeln!(f, "\tmake -C {}", self.fdir)?;
         for u in ast.units() {
-            writeln!(f, "\tmake -C {} -I framework/build/include", u.ident())?;
+            // writeln!(f, "\tmake -d -I framework/build/include -C {}", u.ident())?;
+            writeln!(f, "\tmake -C {}", u.ident())?;
         }
 
         // todo archive all outputs
@@ -140,7 +140,7 @@ impl ArmFastModelsModule {
         writeln!(f, "\tgit -C $(FRAMEWORK_DIR) checkout $(FRAMEWORK_COMMIT)")?;
 
         writeln!(f, "\nclean:")?;
-        writeln!(f, "\trm -rf {}", frameworkdir)?;
+        writeln!(f, "\trm -rf {}", self.fdir)?;
 
         f.flush()?;
 
@@ -160,7 +160,7 @@ impl ArmFastModelsModule {
         writeln!(f, "\n# Set the build directory")?;
         writeln!(f, "BUILD_DIR := $(CURDIR)/build")?;
         writeln!(f, "SOURCE_DIR := $(CURDIR)")?;
-        writeln!(f, "FRAMEWORK_DIR ?= $(CURDIR)/../fm-translation-framework")?;
+        writeln!(f, "FRAMEWORK_DIR ?= $(CURDIR)/../{}", self.fdir)?;
 
         writeln!(f, "# compiler flags")?;
         writeln!(f, "# PVLIB_HOME should be set by the fast models setup script")?;

@@ -78,8 +78,8 @@ pub fn generate_state_header(name: &str, state: &VelosiAstState, outdir: &Path) 
     s.new_include("assert.h", true);
 
     s.new_comment("framework includes");
-    s.new_include("../framework/types.hpp", false);
-    s.new_include("../framework/state_base.hpp", false);
+    s.new_include("framework/types.hpp", false);
+    s.new_include("framework/state_base.hpp", false);
 
     s.new_comment("translation unit specific includes");
     let fieldshdr = state_fields_header_file(name);
@@ -159,12 +159,12 @@ pub fn generate_state_impl(name: &str, state: &VelosiAstState, outdir: &Path) ->
     scope.new_include("pv/RemapRequest.h", true);
 
     scope.new_comment("framework includes");
-    scope.new_include("../framework/logging.hpp", false);
-    scope.new_include("../framework/state_field_base.hpp", false);
+    scope.new_include("framework/logging.hpp", false);
+    scope.new_include("framework/state_field_base.hpp", false);
 
     scope.new_comment("unit includes");
     let statehdr = state_header_file(name);
-    scope.new_include(&statehdr, true);
+    scope.new_include(&statehdr, false);
 
     let c = scope.new_class(scn.as_str());
     let cons = c.new_constructor();

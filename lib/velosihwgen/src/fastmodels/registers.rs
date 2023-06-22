@@ -79,8 +79,8 @@ pub fn generate_register_header(
 
     // adding the includes
     s.new_comment("framework includes");
-    s.new_include("../framework/types.hpp", false);
-    s.new_include("../framework/register_base.hpp", false);
+    s.new_include("framework/types.hpp", false);
+    s.new_include("framework/register_base.hpp", false);
 
     s.new_comment("translation register specific includes");
     let statehdr = state_header_file(name);
@@ -142,11 +142,11 @@ pub fn generate_register_impl(
 
     // adding the includes
     scope.new_comment("framework includes");
-    scope.new_include("../framework/types.hpp", false);
-    scope.new_include("../framework/logging.hpp", false);
+    scope.new_include("framework/types.hpp", false);
+    scope.new_include("framework/logging.hpp", false);
     scope.new_comment("translation register specific includes");
     let reghdr = registers_header_file(name);
-    scope.new_include(&reghdr, true);
+    scope.new_include(&reghdr, false);
 
     for f in interface.fields() {
         // if it's not a register file, we skip
