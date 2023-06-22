@@ -402,8 +402,8 @@ pub fn generate_unit_header(name: &str, unit: &VelosiAstUnit, outdir: &Path) -> 
     s.new_include("assert.h", true);
 
     s.new_comment("framework includes");
-    s.new_include("../framework/types.hpp", false);
-    s.new_include("../framework/translation_unit_base.hpp", false);
+    s.new_include("framework/types.hpp", false);
+    s.new_include("framework/translation_unit_base.hpp", false);
 
     s.new_comment("translation unit specific includes");
     let statehdr = state_header_file(name);
@@ -490,12 +490,12 @@ pub fn generate_unit_impl(name: &str, unit: &VelosiAstUnit, outdir: &Path) -> Re
     scope.new_include("assert.h", true);
 
     scope.new_comment("framework includes");
-    scope.new_include("../framework/types.hpp", false);
-    scope.new_include("../framework/logging.hpp", false);
+    scope.new_include("framework/types.hpp", false);
+    scope.new_include("framework/logging.hpp", false);
 
     scope.new_comment("translation unit specific includes");
     let unithdr = unit_header_file(name);
-    scope.new_include(&unithdr, true);
+    scope.new_include(&unithdr, false);
 
     // create a new class in the scope
     let ucn = unit_class_name(name);

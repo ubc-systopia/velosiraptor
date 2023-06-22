@@ -83,8 +83,8 @@ pub fn generate_interface_header(
     s.new_include("assert.h", true);
 
     s.new_comment("framework includes");
-    s.new_include("../framework/types.hpp", false);
-    s.new_include("../framework/interface_base.hpp", false);
+    s.new_include("framework/types.hpp", false);
+    s.new_include("framework/interface_base.hpp", false);
 
     s.new_comment("translation unit specific includes");
     let statehdr = state_header_file(name);
@@ -138,13 +138,13 @@ pub fn generate_interface_impl(
     scope.new_include("pv/RemapRequest.h", true);
 
     scope.new_comment("framework includes");
-    scope.new_include("../framework/logging.hpp", false);
+    scope.new_include("framework/logging.hpp", false);
 
     scope.new_comment("unit includes");
     let reghdr = registers_header_file(name);
-    scope.new_include(&reghdr, true);
+    scope.new_include(&reghdr, false);
     let ifhdr = interface_header_file(name);
-    scope.new_include(&ifhdr, true);
+    scope.new_include(&ifhdr, false);
 
     let icn = interface_class_name(name);
     let c = scope.new_class(icn.as_str());
