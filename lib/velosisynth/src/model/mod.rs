@@ -34,6 +34,7 @@ pub mod interface;
 pub mod method;
 pub mod state;
 pub mod types;
+mod utils;
 pub mod velosimodel;
 pub mod wbuffer;
 
@@ -44,7 +45,7 @@ pub fn create(unit: &VelosiAstUnitSegment, mem_model: bool) -> Smt2Context {
     smt.set_option(Smt2Option::ProduceUnsatCores(true));
 
     // adding general type definitions
-    types::add_type_defs(&mut smt, unit.inbitwidth, unit.outbitwidth);
+    types::add_type_defs(&mut smt, unit.ident(), unit.inbitwidth, unit.outbitwidth);
 
     // TODO: adding global constants
 
@@ -54,17 +55,61 @@ pub fn create(unit: &VelosiAstUnitSegment, mem_model: bool) -> Smt2Context {
         flags::add_flags(&mut smt, unit.ident(), flags);
     }
 
-    state::add_state_def(&mut smt, &unit.state);
-    interface::add_interface_def(&mut smt, &unit.interface);
+    state::add_state_def(&mut smt, unit.ident(), &unit.state);
+    interface::add_interface_def(&mut smt, unit.ident(), &unit.interface);
     if mem_model {
-        wbuffer::add_wbuffer_def(&mut smt, &unit.interface);
+        wbuffer::add_wbuffer_def(&mut smt, unit.ident(), &unit.interface); // TODO: add prefix to write buffer
     }
     velosimodel::add_model_def(&mut smt, unit, mem_model);
 
     // valid needs to be defined first so that it can be used in the other method assumptions
-    method::add_methods(&mut smt, Box::new(unit.get_method("valid").into_iter()));
     method::add_methods(
         &mut smt,
+        unit.ident(),
+        Box::new(unit.get_method("valid").into_iter()),
+    );
+    method::add_methods(
+        &mut smt,
+        unit.ident(),
+        Box::new(unit.methods().filter(|m| m.ident.as_str() != "valid")),
+    );
+
+    smt
+}
+
+// TODO: duplicated
+pub fn create_with_context(
+    mut smt: Smt2Context,
+    unit: &VelosiAstUnitSegment,
+    mem_model: bool,
+) -> Smt2Context {
+    // adding general type definitions
+    types::add_type_defs(&mut smt, unit.ident(), unit.inbitwidth, unit.outbitwidth);
+
+    // TODO: adding global constants
+
+    // adding the model
+    consts::add_consts(&mut smt, unit.ident(), Box::new(unit.consts()));
+    if let Some(flags) = &unit.flags {
+        flags::add_flags(&mut smt, unit.ident(), flags);
+    }
+
+    state::add_state_def(&mut smt, unit.ident(), &unit.state);
+    interface::add_interface_def(&mut smt, unit.ident(), &unit.interface);
+    if mem_model {
+        wbuffer::add_wbuffer_def(&mut smt, unit.ident(), &unit.interface);
+    }
+    velosimodel::add_model_def(&mut smt, unit, mem_model);
+
+    // valid needs to be defined first so that it can be used in the other method assumptions
+    method::add_methods(
+        &mut smt,
+        unit.ident(),
+        Box::new(unit.get_method("valid").into_iter()),
+    );
+    method::add_methods(
+        &mut smt,
+        unit.ident(),
         Box::new(unit.methods().filter(|m| m.ident.as_str() != "valid")),
     );
 

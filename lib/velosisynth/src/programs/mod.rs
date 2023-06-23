@@ -96,14 +96,15 @@ impl Literal {
     }
 
     /// Converts the [Literal] into a [Term] for smt query
-    pub fn to_smt2_term(&self, symvars: &mut SymbolicVars) -> Term {
+    pub fn to_smt2_term(&self, symvars: &mut SymbolicVars, prefix: &str) -> Term {
         match self {
             Literal::Num => Term::ident(symvars.get()),
             Literal::Var(v) => Term::ident(v.to_string()),
             Literal::Val(v) => Term::num(*v),
-            Literal::Flag(v, f) => {
-                Term::fn_apply(format!("Flags.{f}.get!"), vec![Term::ident(v.to_string())])
-            }
+            Literal::Flag(v, f) => Term::fn_apply(
+                format!("{prefix}.Flags.{f}.get!"),
+                vec![Term::ident(v.to_string())],
+            ),
         }
     }
 }
@@ -248,58 +249,58 @@ impl Expression {
     }
 
     /// Converts the [Expression] into a [Term] for smt query
-    pub fn to_smt2_term(&self, symvars: &mut SymbolicVars) -> Term {
+    pub fn to_smt2_term(&self, symvars: &mut SymbolicVars, prefix: &str) -> Term {
         use Expression::*;
         match self {
-            Lit(x) => x.to_smt2_term(symvars),
+            Lit(x) => x.to_smt2_term(symvars, prefix),
             // RShift(x, y) => {
             //     let x = x.to_smt2_term(symvars);
             //     let y = y.to_smt2_term(symvars);
             //     Term::bvshr(x, y)
             // }
             LShift(x, y) => {
-                let x = x.to_smt2_term(symvars);
-                let y = y.to_smt2_term(symvars);
+                let x = x.to_smt2_term(symvars, prefix);
+                let y = y.to_smt2_term(symvars, prefix);
                 Term::bvshl(x, y)
             }
             Div(x, y) => {
-                let x = x.to_smt2_term(symvars);
-                let y = y.to_smt2_term(symvars);
+                let x = x.to_smt2_term(symvars, prefix);
+                let y = y.to_smt2_term(symvars, prefix);
                 Term::bvdiv(x, y)
             }
             Mul(x, y) => {
-                let x = x.to_smt2_term(symvars);
-                let y = y.to_smt2_term(symvars);
+                let x = x.to_smt2_term(symvars, prefix);
+                let y = y.to_smt2_term(symvars, prefix);
                 Term::bvmul(x, y)
             }
             Add(x, y) => {
-                let x = x.to_smt2_term(symvars);
-                let y = y.to_smt2_term(symvars);
+                let x = x.to_smt2_term(symvars, prefix);
+                let y = y.to_smt2_term(symvars, prefix);
                 Term::bvadd(x, y)
             }
             Sub(x, y) => {
-                let x = x.to_smt2_term(symvars);
-                let y = y.to_smt2_term(symvars);
+                let x = x.to_smt2_term(symvars, prefix);
+                let y = y.to_smt2_term(symvars, prefix);
                 Term::bvsub(x, y)
             }
             And(x, y) => {
-                let x = x.to_smt2_term(symvars);
-                let y = y.to_smt2_term(symvars);
+                let x = x.to_smt2_term(symvars, prefix);
+                let y = y.to_smt2_term(symvars, prefix);
                 Term::bvand(x, y)
             }
             Or(x, y) => {
-                let x = x.to_smt2_term(symvars);
-                let y = y.to_smt2_term(symvars);
+                let x = x.to_smt2_term(symvars, prefix);
+                let y = y.to_smt2_term(symvars, prefix);
                 Term::bvor(x, y)
             }
             ShiftMask(x, y, z) => {
-                let x = x.to_smt2_term(symvars);
-                let y = y.to_smt2_term(symvars);
-                let z = z.to_smt2_term(symvars);
+                let x = x.to_smt2_term(symvars, prefix);
+                let y = y.to_smt2_term(symvars, prefix);
+                let z = z.to_smt2_term(symvars, prefix);
                 Term::bvand(Term::bvshr(x, y), z)
             }
             Not(x) => {
-                let x = x.to_smt2_term(symvars);
+                let x = x.to_smt2_term(symvars, prefix);
                 Term::bvnot(x)
             }
         }
@@ -395,18 +396,19 @@ impl FieldSliceOp {
         fieldname: &str,
         smtops: &mut Vec<(String, Option<Term>)>,
         symvars: &mut SymbolicVars,
+        prefix: &str,
         mem_model: bool,
     ) {
-        let arg = self.1.to_smt2_term(symvars);
+        let arg = self.1.to_smt2_term(symvars, prefix);
 
         let fname = if mem_model {
             format!(
-                "{MODEL_PREFIX}.{LOCAL_VARS_PREFIX}.{}.{}.set!",
+                "{prefix}.{MODEL_PREFIX}.{LOCAL_VARS_PREFIX}.{}.{}.set!",
                 fieldname, self.0
             )
         } else {
             format!(
-                "{MODEL_PREFIX}.{IFACE_PREFIX}.{}.{}.set!",
+                "{prefix}.{MODEL_PREFIX}.{IFACE_PREFIX}.{}.{}.set!",
                 fieldname, self.0
             )
         };
@@ -476,6 +478,7 @@ impl FieldOp {
     /// Converts the [Expression] into a [Term] for smt query
     pub fn to_smt2_term(
         &self,
+        prefix: &str,
         fieldname: &str,
         smtops: &mut Vec<(String, Option<Term>)>,
         symvars: &mut SymbolicVars,
@@ -483,22 +486,23 @@ impl FieldOp {
     ) {
         match self {
             FieldOp::InsertField(arg) => {
-                let arg = arg.to_smt2_term(symvars);
+                let arg = arg.to_smt2_term(symvars, prefix);
 
                 let fname = if mem_model {
-                    format!("{MODEL_PREFIX}.{LOCAL_VARS_PREFIX}.{fieldname}.set!")
+                    format!("{prefix}.{MODEL_PREFIX}.{LOCAL_VARS_PREFIX}.{fieldname}.set!")
                 } else {
-                    format!("{MODEL_PREFIX}.{IFACE_PREFIX}.{fieldname}.set!")
+                    format!("{prefix}.{MODEL_PREFIX}.{IFACE_PREFIX}.{fieldname}.set!")
                 };
                 smtops.push((fname, Some(arg)));
             }
             FieldOp::InsertFieldSlices(sliceops) => {
                 sliceops
                     .iter()
-                    .for_each(|f| f.to_smt2_term(fieldname, smtops, symvars, mem_model));
+                    .for_each(|f| f.to_smt2_term(fieldname, smtops, symvars, prefix, mem_model));
             }
             FieldOp::ReadAction => {
-                let fname = format!("{MODEL_PREFIX}.{IFACE_PREFIX}.{fieldname}.readaction! ");
+                let fname =
+                    format!("{prefix}.{MODEL_PREFIX}.{IFACE_PREFIX}.{fieldname}.readaction! ");
                 smtops.push((fname, None));
             } // FieldOp::WriteAction => {
               //     let fname = format!("{MODEL_PREFIX}.IFace.{}.writeaction! ", fieldname);
@@ -566,16 +570,17 @@ impl ProgramActions {
         &self,
         smtops: &mut Vec<(String, Option<Term>)>,
         symvars: &mut SymbolicVars,
+        prefix: &str,
         mem_model: bool,
     ) {
         match self {
             ProgramActions::GlobalBarrier => {
                 if mem_model {
-                    let fname = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.flushaction!");
+                    let fname = format!("{prefix}.{MODEL_PREFIX}.{WBUFFER_PREFIX}.flushaction!");
                     smtops.push((fname, None));
                 }
             }
-            ProgramActions::FieldActions(f) => f.to_smt2_term(smtops, symvars, mem_model),
+            ProgramActions::FieldActions(f) => f.to_smt2_term(smtops, symvars, prefix, mem_model),
         }
     }
 }
@@ -622,18 +627,25 @@ impl FieldActions {
         &self,
         smtops: &mut Vec<(String, Option<Term>)>,
         symvars: &mut SymbolicVars,
+        prefix: &str,
         mem_model: bool,
     ) {
         self.1
             .iter()
-            .for_each(|f| f.to_smt2_term(self.0.as_str(), smtops, symvars, mem_model));
+            .for_each(|f| f.to_smt2_term(prefix, self.0.as_str(), smtops, symvars, mem_model));
 
         let fname = if mem_model {
             // field actions always end with a store action
-            format!("{MODEL_PREFIX}.{LOCAL_VARS_PREFIX}.{}.storeaction!", self.0)
+            format!(
+                "{prefix}.{MODEL_PREFIX}.{LOCAL_VARS_PREFIX}.{}.storeaction!",
+                self.0
+            )
         } else {
             // field actions always end with a write action
-            format!("{MODEL_PREFIX}.{IFACE_PREFIX}.{}.writeaction! ", self.0)
+            format!(
+                "{prefix}.{MODEL_PREFIX}.{IFACE_PREFIX}.{}.writeaction! ",
+                self.0
+            )
         };
         smtops.push((fname, None));
     }
@@ -736,6 +748,7 @@ impl Program {
     /// function to do the state transitions in the model.
     pub fn to_smt2_term(
         &self,
+        prefix: &str,
         fnname: &str,
         args: &[Rc<VelosiAstParam>],
         mem_model: bool,
@@ -747,7 +760,7 @@ impl Program {
         let mut smtops = Vec::new();
         self.0
             .iter()
-            .for_each(|f| f.to_smt2_term(&mut smtops, &mut symvar, mem_model));
+            .for_each(|f| f.to_smt2_term(&mut smtops, &mut symvar, prefix, mem_model));
 
         // the state variable of the current state
         let mut stvar = StateVars::new();
@@ -759,12 +772,12 @@ impl Program {
         //   let st1 = op1(st)
         //   let st2 = op2(st1)
         //   st2
-        let mut f = Function::new(fnname.to_string(), model::types::model());
-        f.add_arg(stvar.current(), model::types::model());
+        let mut f = Function::new(fnname.to_string(), model::types::model(prefix));
+        f.add_arg(stvar.current(), model::types::model(prefix));
         for arg in args.iter() {
             f.add_arg(
                 arg.ident_to_string(),
-                model::types::type_to_smt2(&arg.ptype),
+                model::types::type_to_smt2(prefix, &arg.ptype),
             );
         }
 
@@ -797,7 +810,7 @@ impl Program {
 
         // create a new Smt2Context with the symbolic variables and the function
         let mut smt = Smt2Context::new();
-        symvar.add_to_context(&mut smt);
+        symvar.add_to_context(&mut smt, prefix);
         smt.function(f);
 
         (smt, symvar)

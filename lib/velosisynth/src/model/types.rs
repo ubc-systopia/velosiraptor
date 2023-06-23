@@ -29,20 +29,23 @@ use velosiast::ast::{VelosiAstType, VelosiAstTypeInfo};
 
 use smt2::{Function, Smt2Context, Sort, Term};
 
-use super::velosimodel::{IFACE_PREFIX, STATE_PREFIX};
+use super::{
+    utils,
+    velosimodel::{IFACE_PREFIX, STATE_PREFIX},
+};
 
 pub const DEFAULT_BIT_WIDTH: u64 = 64;
 
-pub fn model() -> String {
-    String::from("Model_t")
+pub fn model(prefix: &str) -> String {
+    utils::with_prefix(prefix, "Model_t")
 }
 
-pub fn iface() -> String {
-    "IFace_t".to_string()
+pub fn iface(prefix: &str) -> String {
+    utils::with_prefix(prefix, "IFace_t")
 }
 
-pub fn state() -> String {
-    "State_t".to_string()
+pub fn state(prefix: &str) -> String {
+    utils::with_prefix(prefix, "State_t")
 }
 
 pub fn wbuffer() -> String {
@@ -63,46 +66,47 @@ pub fn field_tag_enum(fieldname: &str) -> String {
     enum_name
 }
 
-pub fn ctxt(c: &str) -> String {
-    format!("{c}_t")
+pub fn ctxt(prefix: &str, c: &str) -> String {
+    utils::with_prefix(prefix, &format!("{c}_t"))
 }
 
-pub fn num() -> String {
-    String::from("Num")
+pub fn num(prefix: &str) -> String {
+    utils::with_prefix(prefix, &String::from("Num"))
 }
 
 pub fn boolean() -> String {
     String::from("Bool")
 }
 
-pub fn addr() -> String {
-    "Addr_t".to_string()
+pub fn addr(prefix: &str) -> String {
+    utils::with_prefix(prefix, &"Addr_t".to_string())
 }
 
-pub fn vaddr() -> String {
-    "VAddr_t".to_string()
+pub fn vaddr(prefix: &str) -> String {
+    utils::with_prefix(prefix, &"VAddr_t".to_string())
 }
 
-pub fn paddr() -> String {
-    "PAddr_t".to_string()
+pub fn paddr(prefix: &str) -> String {
+    utils::with_prefix(prefix, &"PAddr_t".to_string())
 }
 
-pub fn size() -> String {
-    "Size_t".to_string()
+pub fn size(prefix: &str) -> String {
+    utils::with_prefix(prefix, &"Size_t".to_string())
 }
 
-pub fn flags() -> String {
-    "Flags_t".to_string()
+pub fn flags(prefix: &str) -> String {
+    utils::with_prefix(prefix, &"Flags_t".to_string())
 }
 
-pub fn field_type(ctxt: &str, name: &str) -> String {
+pub fn field_type(prefix: &str, ctxt: &str, name: &str) -> String {
     let mut i = name.split('.');
-    match (i.next(), i.next()) {
+    let ty = match (i.next(), i.next()) {
         (Some("state"), Some(name)) => format!("{STATE_PREFIX}Field.{name}_t"),
         (Some("interface"), Some(name)) => format!("{IFACE_PREFIX}Field.{name}_t"),
         (Some(name), None) => format!("{ctxt}Field.{name}_t"),
         _ => panic!("{} {}", ctxt, name),
-    }
+    };
+    utils::with_prefix(prefix, &ty)
 }
 
 pub fn add_type_def(smt: &mut Smt2Context, name: String, sort: String) {
@@ -110,7 +114,7 @@ pub fn add_type_def(smt: &mut Smt2Context, name: String, sort: String) {
     smt.sort(sort);
 }
 
-pub fn add_type_constraints(smt: &mut Smt2Context, name: String, maxbits: u64) {
+pub fn add_type_constraints(smt: &mut Smt2Context, prefix: &str, name: String, maxbits: u64) {
     let fnname = format!("{name}.assms");
     let mut f = Function::new(fnname, boolean());
     f.add_comment(format!("Type constraints {name}"));
@@ -130,7 +134,7 @@ pub fn add_type_constraints(smt: &mut Smt2Context, name: String, maxbits: u64) {
     smt.function(f);
 }
 
-fn add_type_constraints_size(smt: &mut Smt2Context, name: String, maxbits: u64) {
+fn add_type_constraints_size(smt: &mut Smt2Context, prefix: &str, name: String, maxbits: u64) {
     let fnname = format!("{name}.assms");
     let mut f = Function::new(fnname, boolean());
     f.add_comment(format!("Type constraints {name}"));
@@ -150,49 +154,49 @@ fn add_type_constraints_size(smt: &mut Smt2Context, name: String, maxbits: u64) 
     smt.function(f);
 }
 
-pub fn add_type_defs(smt: &mut Smt2Context, inaddr: u64, outaddr: u64) {
+pub fn add_type_defs(smt: &mut Smt2Context, prefix: &str, inaddr: u64, outaddr: u64) {
     smt.section(String::from("Type Definitions"));
 
     let default_sort = format!("(_ BitVec {DEFAULT_BIT_WIDTH})");
-    add_type_def(smt, num(), default_sort.clone());
-    add_type_def(smt, addr(), default_sort.clone());
-    add_type_def(smt, vaddr(), default_sort.clone());
-    add_type_def(smt, paddr(), default_sort.clone());
-    add_type_def(smt, size(), default_sort.clone());
-    add_type_def(smt, flags(), default_sort);
+    add_type_def(smt, num(prefix), default_sort.clone());
+    add_type_def(smt, addr(prefix), default_sort.clone());
+    add_type_def(smt, vaddr(prefix), default_sort.clone());
+    add_type_def(smt, paddr(prefix), default_sort.clone());
+    add_type_def(smt, size(prefix), default_sort.clone());
+    add_type_def(smt, flags(prefix), default_sort);
 
-    add_type_constraints(smt, addr(), DEFAULT_BIT_WIDTH);
-    add_type_constraints(smt, vaddr(), inaddr);
-    add_type_constraints(smt, paddr(), outaddr);
-    add_type_constraints(smt, flags(), DEFAULT_BIT_WIDTH);
+    add_type_constraints(smt, prefix, addr(prefix), DEFAULT_BIT_WIDTH);
+    add_type_constraints(smt, prefix, vaddr(prefix), inaddr);
+    add_type_constraints(smt, prefix, paddr(prefix), outaddr);
+    add_type_constraints(smt, prefix, flags(prefix), DEFAULT_BIT_WIDTH);
 
-    add_type_constraints_size(smt, size(), std::cmp::min(inaddr, outaddr));
+    add_type_constraints_size(smt, prefix, size(prefix), std::cmp::min(inaddr, outaddr));
 }
 
 /// Obtains the type information of the
-pub fn typeinfo_to_smt2(ty: &VelosiAstTypeInfo) -> String {
+pub fn typeinfo_to_smt2(prefix: &str, ty: &VelosiAstTypeInfo) -> String {
     use VelosiAstTypeInfo::*;
     match ty {
         // built-in integer type
-        Integer => num(),
+        Integer => num(prefix),
         // built-in boolean type
         Bool => boolean(),
         // built-in generic address type
-        GenAddr => addr(),
+        GenAddr => addr(prefix),
         // built-in virtual address type
-        VirtAddr => vaddr(),
+        VirtAddr => vaddr(prefix),
         // built-in physical address type
-        PhysAddr => paddr(),
+        PhysAddr => paddr(prefix),
         // built-in size type
-        Size => size(),
+        Size => size(prefix),
         // built-in flags type
-        Flags => flags(),
+        Flags => flags(prefix),
         // built in range type
         Range => unimplemented!("don't know how to handle ranges yet"),
         // type referece to user-define type
         TypeRef(_s) => {
             // here we just return the paddr instead.
-            paddr()
+            paddr(prefix)
             //unimplemented!("don't know how to handle typerefs yet ({s})"),
         }
         // Reference to the state
@@ -204,15 +208,15 @@ pub fn typeinfo_to_smt2(ty: &VelosiAstTypeInfo) -> String {
     }
 }
 
-pub fn type_to_smt2(ty: &VelosiAstType) -> String {
-    typeinfo_to_smt2(&ty.typeinfo)
+pub fn type_to_smt2(prefix: &str, ty: &VelosiAstType) -> String {
+    typeinfo_to_smt2(prefix, &ty.typeinfo)
 }
 
-pub fn type_to_assms_fn_name(ty: &VelosiAstType) -> String {
-    format!("{}.assms", type_to_smt2(ty))
+pub fn type_to_assms_fn_name(prefix: &str, ty: &VelosiAstType) -> String {
+    format!("{}.assms", type_to_smt2(prefix, ty))
 }
 
-pub fn type_to_assms_fn(ty: &VelosiAstType, var: String) -> Term {
-    let fname = type_to_assms_fn_name(ty);
+pub fn type_to_assms_fn(prefix: &str, ty: &VelosiAstType, var: String) -> Term {
+    let fname = type_to_assms_fn_name(prefix, ty);
     Term::fn_apply(fname, vec![Term::ident(var)])
 }

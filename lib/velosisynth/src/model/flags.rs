@@ -31,24 +31,24 @@ use smt2::{Attribute, Function, Smt2Context, SortedVar, Term};
 use velosiast::ast::VelosiAstFlags;
 
 // crate imports
-use super::types;
+use super::{types, utils};
 
-pub fn flags_get_fn_name(flag: &str) -> String {
-    format!("Flags.{flag}.get!")
+pub fn flags_get_fn_name(prefix: &str, flag: &str) -> String {
+    utils::with_prefix(prefix, &format!("Flags.{flag}.get!"))
 }
 
 pub fn add_flags(smt: &mut Smt2Context, ctxt: &str, flags: &VelosiAstFlags) {
-    smt.comment(format!("flags for unit {} ({:?}", ctxt, flags.loc.loc()));
+    smt.section(format!("flags for unit {} ({:?}", ctxt, flags.loc.loc()));
 
     for (i, flag) in flags.flags.iter().enumerate() {
         // the get() function extracting the bit fields
-        let f_get_fn_name = flags_get_fn_name(flag.as_str());
+        let f_get_fn_name = flags_get_fn_name(ctxt, flag.as_str());
 
         //
         // Define the Function
         //
-        let mut f = Function::new(f_get_fn_name.clone(), types::num());
-        f.add_arg("flgs".to_string(), "Flags_t".to_string());
+        let mut f = Function::new(f_get_fn_name.clone(), types::num(ctxt));
+        f.add_arg("flgs".to_string(), types::flags(ctxt));
         smt.function(f);
 
         //
@@ -72,7 +72,7 @@ pub fn add_flags(smt: &mut Smt2Context, ctxt: &str, flags: &VelosiAstFlags) {
 
         let e = Term::attributed(e, attrs);
         smt.assert(Term::forall(
-            vec![SortedVar::new("flgs@".to_string(), "Flags_t".to_string())],
+            vec![SortedVar::new("flgs@".to_string(), types::flags(ctxt))],
             e,
         ));
     }

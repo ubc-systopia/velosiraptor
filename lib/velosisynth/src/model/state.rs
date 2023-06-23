@@ -29,27 +29,30 @@ use smt2::{DataType, Smt2Context};
 use velosiast::ast::VelosiAstState;
 
 use super::field::{add_state_field, add_state_field_accessors};
-use super::types;
 use super::velosimodel::STATE_PREFIX;
+use super::{types, utils};
 
 // adds the state to the context
-pub fn add_state_def(smt: &mut Smt2Context, state: &VelosiAstState) {
+pub fn add_state_def(smt: &mut Smt2Context, prefix: &str, state: &VelosiAstState) {
     smt.section(String::from("State Fields"));
 
     // define a type for each state field
     for field in state.fields() {
-        add_state_field(smt, field);
+        add_state_field(smt, prefix, field);
     }
 
     smt.section(String::from("State"));
 
     // define the data type for the state
-    let mut dt = DataType::new(String::from(STATE_PREFIX), 0);
+    let mut dt = DataType::new(utils::with_prefix(prefix, STATE_PREFIX), 0);
     dt.add_comment(format!("State Definition, {}", state.loc().loc()));
     for field in state.fields() {
         dt.add_field(
-            format!("State.{}", field.ident().split('.').last().unwrap()),
-            types::field_type(STATE_PREFIX, field.ident()),
+            utils::with_prefix(
+                prefix,
+                &format!("State.{}", field.ident().split('.').last().unwrap()),
+            ),
+            types::field_type(prefix, STATE_PREFIX, field.ident()),
         );
     }
 
@@ -61,6 +64,6 @@ pub fn add_state_def(smt: &mut Smt2Context, state: &VelosiAstState) {
 
     // add accessors for each type
     for field in state.fields() {
-        add_state_field_accessors(smt, field);
+        add_state_field_accessors(smt, prefix, field);
     }
 }

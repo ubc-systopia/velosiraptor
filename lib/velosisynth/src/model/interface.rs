@@ -31,27 +31,31 @@ use velosiast::ast::VelosiAstInterface;
 
 use super::field::{add_iface_field, add_iface_field_accessors};
 use super::types;
+use super::utils;
 use super::velosimodel::IFACE_PREFIX;
 
 /// adds the interface definitions to the model
 ///
 /// Note: this doesn't include the interface actions
-pub fn add_interface_def(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
+pub fn add_interface_def(smt: &mut Smt2Context, prefix: &str, iface: &VelosiAstInterface) {
     // add a type for each interface field
     smt.section(String::from("Interface Fields"));
     for field in iface.fields() {
-        add_iface_field(smt, field);
+        add_iface_field(smt, prefix, field);
     }
 
     smt.section(String::from("Interface"));
 
     // add a datatype for the interface
-    let mut dt = DataType::new(String::from(IFACE_PREFIX), 0);
+    let mut dt = DataType::new(utils::with_prefix(prefix, IFACE_PREFIX), 0);
     dt.add_comment(format!("Interface Definition, {}", iface.loc().loc()));
     for field in iface.fields() {
         dt.add_field(
-            format!("IFace.{}", field.ident().split('.').last().unwrap()),
-            types::field_type(IFACE_PREFIX, field.ident()),
+            utils::with_prefix(
+                prefix,
+                &format!("IFace.{}", field.ident().split('.').last().unwrap()),
+            ),
+            types::field_type(prefix, IFACE_PREFIX, field.ident()),
         );
     }
 
@@ -62,6 +66,6 @@ pub fn add_interface_def(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
 
     // add the field accessors
     for field in iface.fields() {
-        add_iface_field_accessors(smt, field);
+        add_iface_field_accessors(smt, prefix, field);
     }
 }

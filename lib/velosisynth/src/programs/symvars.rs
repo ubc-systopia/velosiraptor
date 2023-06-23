@@ -44,11 +44,11 @@ impl SymbolicVars {
         name
     }
 
-    pub fn add_to_context(&self, smt: &mut Smt2Context) {
+    pub fn add_to_context(&self, smt: &mut Smt2Context, prefix: &str) {
         smt.comment("Variable Definitions".to_string());
         for i in 0..self.counter {
             let name = format!("symvar!{i}");
-            smt.variable(VarDecl::new(name, model::types::num()));
+            smt.variable(VarDecl::new(name, model::types::num(prefix)));
         }
     }
 
