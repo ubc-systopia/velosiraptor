@@ -280,7 +280,7 @@ fn add_translate_remap(c: &mut C::Class, tm: &VelosiAstMethod) {
     let m = c
         .new_method("do_translate_remap", C::Type::new_typedef("lpaddr_t"))
         .push_param(src_addr_param);
-        // .push_param(mode_param);
+    // .push_param(mode_param);
 
     if let Some(body) = &tm.body {
         let mut b = C::Block::new();
@@ -428,15 +428,15 @@ pub fn generate_unit_header(name: &str, unit: &VelosiAstUnit, outdir: &Path) -> 
         "get_interface",
         C::Type::to_ptr(&C::Type::new_class("InterfaceBase")),
     )
-    .set_public()
-    .set_virtual()
-    .set_inside_def()
-    .set_override()
-    .body()
-    .return_expr(C::Expr::addr_of(&C::Expr::field_access(
-        &C::Expr::this(),
-        "_interface",
-    )));
+        .set_public()
+        .set_virtual()
+        .set_inside_def()
+        .set_override()
+        .body()
+        .return_expr(C::Expr::addr_of(&C::Expr::field_access(
+            &C::Expr::this(),
+            "_interface",
+        )));
 
     //
     // virtual StateBase *get_state(void) set_overridee
@@ -447,15 +447,15 @@ pub fn generate_unit_header(name: &str, unit: &VelosiAstUnit, outdir: &Path) -> 
         "get_state",
         C::Type::to_ptr(&C::Type::new_class("StateBase")),
     )
-    .set_public()
-    .set_virtual()
-    .set_override()
-    .set_inside_def()
-    .body()
-    .return_expr(C::Expr::addr_of(&C::Expr::field_access(
-        &C::Expr::this(),
-        "_state",
-    )));
+        .set_public()
+        .set_virtual()
+        .set_override()
+        .set_inside_def()
+        .body()
+        .return_expr(C::Expr::addr_of(&C::Expr::field_access(
+            &C::Expr::this(),
+            "_state",
+        )));
 
     // attributes
 
@@ -507,7 +507,10 @@ pub fn generate_unit_impl(name: &str, unit: &VelosiAstUnit, outdir: &Path) -> Re
     let scn = state_class_name(name);
 
     add_constructor(c, &ifn, &scn);
-    add_create(c, &ucn);
+
+    // if !unit.is_abstract() {
+        add_create(c, &ucn);
+    // }
 
     /*
      * -------------------------------------------------------------------------------------------
