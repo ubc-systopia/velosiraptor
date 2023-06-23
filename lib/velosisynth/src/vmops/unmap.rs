@@ -164,9 +164,12 @@ impl ProgramBuilder for UnmapPrograms {
                     self.m_fn.as_ref(),
                     self.t_fn.as_ref(),
                     None,
-                    true,
                     prog.clone(),
-                    self.mem_model,
+                    SynthOptions {
+                        negate: true,
+                        no_change: false,
+                        mem_model: self.mem_model,
+                    },
                 );
 
                 self.queries.push_back((prog, [Some(translate_preconds)]));

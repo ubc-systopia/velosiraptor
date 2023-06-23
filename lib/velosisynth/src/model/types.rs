@@ -79,23 +79,23 @@ pub fn boolean() -> String {
 }
 
 pub fn addr(prefix: &str) -> String {
-    utils::with_prefix(prefix, &"Addr_t".to_string())
+    utils::with_prefix(prefix, "Addr_t")
 }
 
 pub fn vaddr(prefix: &str) -> String {
-    utils::with_prefix(prefix, &"VAddr_t".to_string())
+    utils::with_prefix(prefix, "VAddr_t")
 }
 
 pub fn paddr(prefix: &str) -> String {
-    utils::with_prefix(prefix, &"PAddr_t".to_string())
+    utils::with_prefix(prefix, "PAddr_t")
 }
 
 pub fn size(prefix: &str) -> String {
-    utils::with_prefix(prefix, &"Size_t".to_string())
+    utils::with_prefix(prefix, "Size_t")
 }
 
 pub fn flags(prefix: &str) -> String {
-    utils::with_prefix(prefix, &"Flags_t".to_string())
+    utils::with_prefix(prefix, "Flags_t")
 }
 
 pub fn field_type(prefix: &str, ctxt: &str, name: &str) -> String {
@@ -114,7 +114,7 @@ pub fn add_type_def(smt: &mut Smt2Context, name: String, sort: String) {
     smt.sort(sort);
 }
 
-pub fn add_type_constraints(smt: &mut Smt2Context, prefix: &str, name: String, maxbits: u64) {
+pub fn add_type_constraints(smt: &mut Smt2Context, name: String, maxbits: u64) {
     let fnname = format!("{name}.assms");
     let mut f = Function::new(fnname, boolean());
     f.add_comment(format!("Type constraints {name}"));
@@ -134,7 +134,7 @@ pub fn add_type_constraints(smt: &mut Smt2Context, prefix: &str, name: String, m
     smt.function(f);
 }
 
-fn add_type_constraints_size(smt: &mut Smt2Context, prefix: &str, name: String, maxbits: u64) {
+fn add_type_constraints_size(smt: &mut Smt2Context, name: String, maxbits: u64) {
     let fnname = format!("{name}.assms");
     let mut f = Function::new(fnname, boolean());
     f.add_comment(format!("Type constraints {name}"));
@@ -165,12 +165,12 @@ pub fn add_type_defs(smt: &mut Smt2Context, prefix: &str, inaddr: u64, outaddr: 
     add_type_def(smt, size(prefix), default_sort.clone());
     add_type_def(smt, flags(prefix), default_sort);
 
-    add_type_constraints(smt, prefix, addr(prefix), DEFAULT_BIT_WIDTH);
-    add_type_constraints(smt, prefix, vaddr(prefix), inaddr);
-    add_type_constraints(smt, prefix, paddr(prefix), outaddr);
-    add_type_constraints(smt, prefix, flags(prefix), DEFAULT_BIT_WIDTH);
+    add_type_constraints(smt, addr(prefix), DEFAULT_BIT_WIDTH);
+    add_type_constraints(smt, vaddr(prefix), inaddr);
+    add_type_constraints(smt, paddr(prefix), outaddr);
+    add_type_constraints(smt, flags(prefix), DEFAULT_BIT_WIDTH);
 
-    add_type_constraints_size(smt, prefix, size(prefix), std::cmp::min(inaddr, outaddr));
+    add_type_constraints_size(smt, size(prefix), std::cmp::min(inaddr, outaddr));
 }
 
 /// Obtains the type information of the

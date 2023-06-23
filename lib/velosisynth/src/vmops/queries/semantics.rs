@@ -106,9 +106,11 @@ impl<T> QueryBuilder for SemanticQueryBuilder<T>
                 &self.m_goal,
                 self.idx,
                 prog,
-                self.negate,
-                self.no_change,
-                false,
+                SynthOptions {
+                    negate: self.negate,
+                    no_change: self.no_change,
+                    mem_model: false,
+                },
             )),
             MaybeResult::Pending => MaybeResult::Pending,
             MaybeResult::None => MaybeResult::None,
@@ -258,19 +260,21 @@ fn program_to_query(
     m_goal: &VelosiAstMethod,
     idx: Option<usize>,
     prog: Program,
-    negate: bool,
-    no_change: bool,
-    mem_model: bool,
+    options: SynthOptions,
 ) -> Box<Z3Query> {
     // convert the program to a smt2 term
-    let (mut smt, symvars) =
-        prog.to_smt2_term(prefix, m_op.ident(), m_op.params.as_slice(), mem_model);
+    let (mut smt, symvars) = prog.to_smt2_term(
+        prefix,
+        m_op.ident(),
+        m_op.params.as_slice(),
+        options.mem_model,
+    );
 
     // build up the pre-conditions
     let pre1 = call_method_assms(m_op, "st!0");
     let pre2 = call_method_assms(m_goal, "st!0");
     let mut pre = Term::land(pre1, pre2);
-    if mem_model {
+    if options.mem_model {
         pre = utils::add_empty_wbuffer_precond(prefix, pre);
     }
 
@@ -278,7 +282,7 @@ fn program_to_query(
 
     let m_op_call = call_method(m_op, vec![Term::from("st!0")]);
 
-    let args = if no_change {
+    let args = if options.no_change {
         vec![Term::from("st!0"), m_op_call]
     } else {
         vec![m_op_call]
@@ -297,12 +301,12 @@ fn program_to_query(
 
     // get the goal as string
     let mut goal = m_goal_call.to_string_compact();
-    if negate {
+    if options.negate {
         goal = format!("!{}", goal)
     }
     // println!("s goal: {}", goal);
 
-    let t = if negate {
+    let t = if options.negate {
         Term::forall(vars, pre.implies(Term::lnot(m_goal_call)))
     } else {
         Term::forall(vars, pre.implies(m_goal_call))
@@ -335,16 +339,7 @@ pub fn submit_program_query(
     prog: Program,
     options: SynthOptions,
 ) -> Z3Ticket {
-    let query = program_to_query(
-        prefix,
-        m_op,
-        m_goal,
-        idx,
-        prog,
-        options.negate,
-        options.no_change,
-        options.mem_model,
-    );
+    let query = program_to_query(prefix, m_op, m_goal, idx, prog, options);
     z3.submit_query(query, Z3TaskPriority::High)
         .expect("failed to submit query")
 }

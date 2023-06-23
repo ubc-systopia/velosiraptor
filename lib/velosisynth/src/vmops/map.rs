@@ -141,9 +141,12 @@ impl ProgramBuilder for MapPrograms {
                     self.m_fn.as_ref(),
                     self.t_fn.as_ref(),
                     None,
-                    false,
                     prog.clone(),
-                    self.mem_model,
+                    SynthOptions {
+                        negate: false,
+                        no_change: false,
+                        mem_model: self.mem_model,
+                    },
                 );
                 let translate_semantics = semantics::submit_program_query(
                     z3,
@@ -165,9 +168,12 @@ impl ProgramBuilder for MapPrograms {
                     self.m_fn.as_ref(),
                     self.f_fn.as_ref(),
                     None,
-                    false,
                     prog.clone(),
-                    self.mem_model,
+                    SynthOptions {
+                        negate: false,
+                        no_change: false,
+                        mem_model: self.mem_model,
+                    },
                 );
                 let matchflags_semantics = semantics::submit_program_query(
                     z3,
