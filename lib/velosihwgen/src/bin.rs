@@ -1,4 +1,3 @@
-
 // VelosiHwGen -- A hardware generator for the Velosiraptor language
 //
 //
@@ -25,7 +24,7 @@
 // SOFTWARE.
 
 use std::{env, path::Path};
-use velosiast::{VelosiAst, AstResult};
+use velosiast::{AstResult, VelosiAst};
 use velosihwgen::VelosiHwGen;
 
 pub fn main() {
@@ -54,20 +53,18 @@ pub fn main() {
     let vrs_file = Path::new(&args[1]).file_stem();
     let unit_name = match vrs_file {
         Some(p) => p.to_string_lossy().into_owned(),
-        None => "unknown_vrs".to_owned()
+        None => "unknown_vrs".to_owned(),
     };
 
-    let hwgen = VelosiHwGen::new_fastmodels(
-        Path::new("./out"),
-        unit_name
-    );
+    let hwgen = VelosiHwGen::new_fastmodels(Path::new("./out"), unit_name);
 
-    hwgen.prepare(&ast).expect("could not prepare the hwgen backend");
+    hwgen
+        .prepare(&ast)
+        .expect("could not prepare the hwgen backend");
 
     if let Err(e) = hwgen.generate(&ast) {
         log::error!(target: "main", "code generation failed\n{:?}", e);
     }
 
     hwgen.finalize(&ast).expect("could not finalize");
-
 }

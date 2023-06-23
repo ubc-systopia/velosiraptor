@@ -42,8 +42,8 @@ impl From<std::io::Error> for VelosiHwGenError {
     }
 }
 
-use velosiast::VelosiAst;
 use crate::fastmodels::ArmFastModelsModule;
+use velosiast::VelosiAst;
 
 /// the hardware generator context
 pub enum VelosiHwGen {

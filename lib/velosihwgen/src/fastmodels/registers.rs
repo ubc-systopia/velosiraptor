@@ -36,10 +36,10 @@ use crustal as C;
 
 use velosiast::{VelosiAstField, VelosiAstInterfaceField};
 // the defined errors
-use velosiast::ast::VelosiAstInterface;
 use crate::fastmodels::add_header;
 use crate::fastmodels::state::{state_class_name, state_header_file};
 use crate::VelosiHwGenError;
+use velosiast::ast::VelosiAstInterface;
 
 /// generates the name of the state field header file
 pub fn registers_header_file(name: &str) -> String {
@@ -94,7 +94,6 @@ pub fn generate_register_header(
 
     // for each field in the scope create a register class
     for f in interface.fields() {
-
         if !matches!(**f, VelosiAstInterfaceField::Register(_)) {
             // scope.to_file(outdir, true)?;
             continue;
@@ -118,7 +117,6 @@ pub fn generate_register_header(
             .set_override()
             .set_public()
             .new_param("data", C::Type::new_uint(64));
-
     }
 
     // done, save the scope
