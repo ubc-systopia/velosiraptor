@@ -35,7 +35,11 @@ use std::path::Path;
 use crustal as C;
 
 // the defined errors
-use velosiast::ast::{VelosiAstExpr, VelosiAstMethod, VelosiAstUnit, VelosiAstNumLiteralExpr, VelosiAstBoolLiteralExpr, VelosiAstBinOpExpr, VelosiAstUnOpExpr, VelosiAstFnCallExpr, VelosiAstIdentLiteralExpr, VelosiAstIfElseExpr, VelosiAstTypeInfo, VelosiAstType, VelosiAstBinOp};
+use velosiast::ast::{
+    VelosiAstBinOp, VelosiAstBinOpExpr, VelosiAstBoolLiteralExpr, VelosiAstExpr,
+    VelosiAstFnCallExpr, VelosiAstIdentLiteralExpr, VelosiAstIfElseExpr, VelosiAstMethod,
+    VelosiAstNumLiteralExpr, VelosiAstType, VelosiAstTypeInfo, VelosiAstUnOpExpr, VelosiAstUnit,
+};
 
 use crate::fastmodels::add_header;
 use crate::fastmodels::interface::{interface_class_name, interface_header_file};
@@ -202,7 +206,7 @@ fn state_field_access(path: &Vec<&str>) -> C::Expr {
 fn expr_to_cpp(expr: &VelosiAstExpr) -> C::Expr {
     use VelosiAstExpr::*;
     match expr {
-        IdentLiteral(VelosiAstIdentLiteralExpr{ident, ..}) => {
+        IdentLiteral(VelosiAstIdentLiteralExpr { ident, .. }) => {
             let p: Vec<&str> = ident.path_split().collect();
             match p[0] {
                 "state" => {
@@ -213,10 +217,15 @@ fn expr_to_cpp(expr: &VelosiAstExpr) -> C::Expr {
                 x => C::Expr::new_var(x, C::Type::new_int(64)),
             }
         }
-        NumLiteral(VelosiAstNumLiteralExpr{val, ..}) => C::Expr::new_num(*val),
-        BoolLiteral(VelosiAstBoolLiteralExpr{val: b, ..}) =>
-            if *b { C::Expr::btrue() } else { C::Expr::bfalse() },
-        BinOp(VelosiAstBinOpExpr{op, lhs, rhs, ..}) => {
+        NumLiteral(VelosiAstNumLiteralExpr { val, .. }) => C::Expr::new_num(*val),
+        BoolLiteral(VelosiAstBoolLiteralExpr { val: b, .. }) => {
+            if *b {
+                C::Expr::btrue()
+            } else {
+                C::Expr::bfalse()
+            }
+        }
+        BinOp(VelosiAstBinOpExpr { op, lhs, rhs, .. }) => {
             let e = expr_to_cpp(lhs);
             let e2 = expr_to_cpp(rhs);
             // implies "==>" needs a special case, others should be fine in cpp
@@ -225,12 +234,12 @@ fn expr_to_cpp(expr: &VelosiAstExpr) -> C::Expr {
                 _ => C::Expr::binop(e, &format!("{}", op), e2),
             }
         }
-        UnOp(VelosiAstUnOpExpr{op, expr, ..}) => {
+        UnOp(VelosiAstUnOpExpr { op, expr, .. }) => {
             let o = format!("{}", op);
             let e = expr_to_cpp(expr);
             C::Expr::uop(&o, e)
         }
-        FnCall(VelosiAstFnCallExpr{ident, args, ..}) => {
+        FnCall(VelosiAstFnCallExpr { ident, args, .. }) => {
             let p: Vec<&str> = ident.path_split().collect();
             if p.len() != 1 {
                 panic!("TODO: handle multiple path components");
@@ -244,12 +253,13 @@ fn expr_to_cpp(expr: &VelosiAstExpr) -> C::Expr {
         Slice { .. } => panic!("don't know how to handle slice"),
         Range { .. } => panic!("don't know how to handle range"),
         Quantifier { .. } => panic!("don't know how to handle quantifier"),
-        IfElse(VelosiAstIfElseExpr{cond, then, other, loc: _, ..}) => {
-            C::Expr::ternary(
-                expr_to_cpp(cond),
-                expr_to_cpp(then),
-                expr_to_cpp(other))
-        }
+        IfElse(VelosiAstIfElseExpr {
+            cond,
+            then,
+            other,
+            loc: _,
+            ..
+        }) => C::Expr::ternary(expr_to_cpp(cond), expr_to_cpp(then), expr_to_cpp(other)),
     }
 }
 
@@ -269,10 +279,8 @@ fn handle_requires_assert(method: &mut C::Method, expr: &VelosiAstExpr) {
 }
 
 fn add_translate_remap(c: &mut C::Class, tm: &VelosiAstMethod) {
-    let src_addr_param = C::MethodParam::new(
-        &tm.params[0].ident.ident,
-        C::Type::new_typedef("lvaddr_t")
-    );
+    let src_addr_param =
+        C::MethodParam::new(&tm.params[0].ident.ident, C::Type::new_typedef("lvaddr_t"));
     // let mode_param = C::MethodParam::new(
     //     &tm.params[1].ident.ident,
     //     C::Type::new_typedef("access_mode_t")
@@ -295,7 +303,8 @@ fn add_translate(c: &mut C::Class, tm: &VelosiAstMethod) {
     // virtual bool do_translate(lvaddr_t src_addr, size_t size, access_mode_t mode,
     // lpaddr_t *dst_addr) set_overridee;
 
-    let src_addr_param = C::MethodParam::new(&tm.params[0].ident.ident, C::Type::new_typedef("lvaddr_t"));
+    let src_addr_param =
+        C::MethodParam::new(&tm.params[0].ident.ident, C::Type::new_typedef("lvaddr_t"));
     let src_var = C::Expr::from_method_param(&src_addr_param);
     let size_param = C::MethodParam::new("size", C::Type::new_size());
     // let mode_param = C::MethodParam::new(&tm.params[1].ident.ident, C::Type::new_typedef("access_mode_t"));
@@ -310,7 +319,6 @@ fn add_translate(c: &mut C::Class, tm: &VelosiAstMethod) {
         .new_method("do_translate", C::Type::new_bool())
         .set_public()
         .set_virtual()
-
         .push_param(src_addr_param)
         .push_param(size_param)
         // .push_param(mode_param)
@@ -327,11 +335,7 @@ fn add_translate(c: &mut C::Class, tm: &VelosiAstMethod) {
 
     m.body().assign(
         C::Expr::deref(&dst_addr),
-        C::Expr::method_call(
-            &C::Expr::this(),
-            "do_translate_remap",
-            vec![src_var],
-        ),
+        C::Expr::method_call(&C::Expr::this(), "do_translate_remap", vec![src_var]),
     );
     m.body().return_expr(C::Expr::btrue());
 }
@@ -369,7 +373,10 @@ fn add_method(c: &mut C::Class, tm: &VelosiAstMethod) {
 
     let m = c.new_method(&tm.ident.ident, ast_type_to_c_type(&tm.rtype));
     for p in &tm.params {
-        m.push_param(C::MethodParam::new(&p.ident.ident, ast_type_to_c_type(&p.ptype)));
+        m.push_param(C::MethodParam::new(
+            &p.ident.ident,
+            ast_type_to_c_type(&p.ptype),
+        ));
     }
 
     for e in &tm.requires {
@@ -381,7 +388,11 @@ fn add_method(c: &mut C::Class, tm: &VelosiAstMethod) {
     }
 }
 
-pub fn generate_unit_header(name: &str, unit: &VelosiAstUnit, outdir: &Path) -> Result<(), VelosiHwGenError> {
+pub fn generate_unit_header(
+    name: &str,
+    unit: &VelosiAstUnit,
+    outdir: &Path,
+) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
     // document header
@@ -428,15 +439,15 @@ pub fn generate_unit_header(name: &str, unit: &VelosiAstUnit, outdir: &Path) -> 
         "get_interface",
         C::Type::to_ptr(&C::Type::new_class("InterfaceBase")),
     )
-        .set_public()
-        .set_virtual()
-        .set_inside_def()
-        .set_override()
-        .body()
-        .return_expr(C::Expr::addr_of(&C::Expr::field_access(
-            &C::Expr::this(),
-            "_interface",
-        )));
+    .set_public()
+    .set_virtual()
+    .set_inside_def()
+    .set_override()
+    .body()
+    .return_expr(C::Expr::addr_of(&C::Expr::field_access(
+        &C::Expr::this(),
+        "_interface",
+    )));
 
     //
     // virtual StateBase *get_state(void) set_overridee
@@ -447,15 +458,15 @@ pub fn generate_unit_header(name: &str, unit: &VelosiAstUnit, outdir: &Path) -> 
         "get_state",
         C::Type::to_ptr(&C::Type::new_class("StateBase")),
     )
-        .set_public()
-        .set_virtual()
-        .set_override()
-        .set_inside_def()
-        .body()
-        .return_expr(C::Expr::addr_of(&C::Expr::field_access(
-            &C::Expr::this(),
-            "_state",
-        )));
+    .set_public()
+    .set_virtual()
+    .set_override()
+    .set_inside_def()
+    .body()
+    .return_expr(C::Expr::addr_of(&C::Expr::field_access(
+        &C::Expr::this(),
+        "_state",
+    )));
 
     // attributes
 
@@ -479,7 +490,11 @@ pub fn generate_unit_header(name: &str, unit: &VelosiAstUnit, outdir: &Path) -> 
     Ok(())
 }
 
-pub fn generate_unit_impl(name: &str, unit: &VelosiAstUnit, outdir: &Path) -> Result<(), VelosiHwGenError> {
+pub fn generate_unit_impl(
+    name: &str,
+    unit: &VelosiAstUnit,
+    outdir: &Path,
+) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
     // add the header
@@ -509,7 +524,7 @@ pub fn generate_unit_impl(name: &str, unit: &VelosiAstUnit, outdir: &Path) -> Re
     add_constructor(c, &ifn, &scn);
 
     // if !unit.is_abstract() {
-        add_create(c, &ucn);
+    add_create(c, &ucn);
     // }
 
     /*

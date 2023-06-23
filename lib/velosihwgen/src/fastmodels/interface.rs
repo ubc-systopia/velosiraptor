@@ -36,11 +36,11 @@ use crustal as C;
 
 use velosiast::VelosiAstField;
 // the defined errors
-use velosiast::ast::VelosiAstInterface;
 use crate::fastmodels::add_header;
 use crate::fastmodels::registers::{registers_class_name, registers_header_file};
 use crate::fastmodels::state::{state_class_name, state_header_file};
 use crate::VelosiHwGenError;
+use velosiast::ast::VelosiAstInterface;
 
 /// generates the name of the state field header file
 pub fn interface_header_file(name: &str) -> String {

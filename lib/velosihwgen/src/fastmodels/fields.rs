@@ -35,9 +35,9 @@ use std::path::Path;
 use crustal as C;
 
 // the defined errors
-use velosiast::ast::VelosiAstState;
 use crate::fastmodels::add_header;
 use crate::VelosiHwGenError;
+use velosiast::ast::VelosiAstState;
 
 /// generates the name of the state field header file
 pub fn state_fields_header_file(name: &str) -> String {
@@ -70,7 +70,11 @@ pub fn state_fields_slice_setter_name(name: &str) -> String {
 }
 
 /// generates the header file for the  state fields
-pub fn generate_field_header(name: &str, state: &VelosiAstState, outdir: &Path) -> Result<(), VelosiHwGenError> {
+pub fn generate_field_header(
+    name: &str,
+    state: &VelosiAstState,
+    outdir: &Path,
+) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
     // document header
@@ -141,7 +145,11 @@ pub fn generate_field_header(name: &str, state: &VelosiAstState, outdir: &Path) 
 }
 
 /// generates the implementation file for the state fields
-pub fn generate_field_impl(name: &str, state: &VelosiAstState, outdir: &Path) -> Result<(), VelosiHwGenError> {
+pub fn generate_field_impl(
+    name: &str,
+    state: &VelosiAstState,
+    outdir: &Path,
+) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
     // document header

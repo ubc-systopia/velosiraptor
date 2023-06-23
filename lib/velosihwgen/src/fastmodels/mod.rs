@@ -37,10 +37,10 @@ use std::path::{Path, PathBuf};
 use crustal as C;
 
 // the library
-use velosiast::VelosiAst;
 use crate::VelosiHwGenBackend;
 use crate::VelosiHwGenError;
 use crate::COPYRIGHT;
+use velosiast::VelosiAst;
 
 // the generators
 mod state;
@@ -90,8 +90,6 @@ use fields::{generate_field_header, generate_field_impl, state_fields_impl_file}
 ///  - outdir/hw/fastmodels/fm-translation-framework/translation_unit_base.hpp
 ///  - outdir/hw/fastmodels/fm-translation-framework/types.hpp
 
-
-
 pub struct ArmFastModelsModule {
     outdir: PathBuf,
     fdir: String, // relative to outdir
@@ -119,10 +117,15 @@ impl ArmFastModelsModule {
 
         writeln!(f, "# This file is auto-generated\n")?;
 
-        writeln!(f, "FRAMEWORK_URL=https://github.com/achreto/fm-translation-framework")?;
-        writeln!(f, "FRAMEWORK_COMMIT=040cdba09025d5c9cd9da9d2c9731a2f6677051b")?;
+        writeln!(
+            f,
+            "FRAMEWORK_URL=https://github.com/achreto/fm-translation-framework"
+        )?;
+        writeln!(
+            f,
+            "FRAMEWORK_COMMIT=040cdba09025d5c9cd9da9d2c9731a2f6677051b"
+        )?;
         writeln!(f, "FRAMEWORK_DIR={}", self.fdir)?;
-
 
         writeln!(f, "\nall: deps_framework")?;
         writeln!(f, "\tmake -C {}", self.fdir)?;
@@ -145,7 +148,6 @@ impl ArmFastModelsModule {
         f.flush()?;
 
         Ok(())
-
     }
 
     fn generate_unit_makefile(&self, name: &str, out: &PathBuf) -> Result<(), VelosiHwGenError> {
@@ -163,7 +165,10 @@ impl ArmFastModelsModule {
         writeln!(f, "FRAMEWORK_DIR ?= $(CURDIR)/../{}", self.fdir)?;
 
         writeln!(f, "# compiler flags")?;
-        writeln!(f, "# PVLIB_HOME should be set by the fast models setup script")?;
+        writeln!(
+            f,
+            "# PVLIB_HOME should be set by the fast models setup script"
+        )?;
         writeln!(f, "CC      := g++")?;
         writeln!(f, "CCFLAGS := -Wall -O3 -Werror -std=c++2a -fPIC")?;
         // writeln!(f, "CCFLAGS += -I include")?;
@@ -244,8 +249,6 @@ impl ArmFastModelsModule {
     }
 }
 
-
-
 impl VelosiHwGenBackend for ArmFastModelsModule {
     fn prepare(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
         // outdir/hw/fastmodels/<pkgname>/<unitname>/include
@@ -267,7 +270,7 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
                 .expect("failed to generate the unit header");
             generate_unit_impl(&u.ident_to_string(), u, out_subdir)
                 .expect("failed to generate the unit implementation");
-        };
+        }
         Ok(())
     }
 
@@ -291,7 +294,6 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
         }
         Ok(())
     }
-
 
     fn generate_states(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
         for u in ast.segments() {
@@ -317,7 +319,8 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
             self.generate_unit_makefile(&u.ident_to_string(), out_subdir)
                 .expect("Could not generate makefile");
         }
-        self.generate_top_makefile(ast).expect("Could not generate makefile");
+        self.generate_top_makefile(ast)
+            .expect("Could not generate makefile");
         Ok(())
     }
 }
