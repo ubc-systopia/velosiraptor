@@ -50,6 +50,8 @@ pub struct PrecondQueryBuilder<T>
 where
     T: ProgramBuilder,
 {
+    /// the prefix to use for identifiers
+    prefix: String,
     /// the programs
     programs: T,
     /// the operation method
@@ -67,6 +69,7 @@ where
     T: ProgramBuilder,
 {
     pub fn new(
+        prefix: String,
         programs: T,
         m_op: Rc<VelosiAstMethod>,
         m_goal: Rc<VelosiAstMethod>,
@@ -74,6 +77,7 @@ where
         negate: bool,
     ) -> Self {
         Self {
+            prefix,
             programs,
             m_op,
             m_goal,
@@ -91,6 +95,7 @@ where
     fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Box<Z3Query>> {
         match self.programs.next(z3) {
             MaybeResult::Some(prog) => MaybeResult::Some(program_to_query(
+                &self.prefix,
                 &self.m_op,
                 &self.m_goal,
                 self.idx,
@@ -135,7 +140,14 @@ pub fn precond_query(
         if !programs.has_programs() {
             continue;
         }
-        let b = PrecondQueryBuilder::new(programs, m_op.clone(), m_goal.clone(), Some(i), negate);
+        let b = PrecondQueryBuilder::new(
+            unit.ident_to_string(),
+            programs,
+            m_op.clone(),
+            m_goal.clone(),
+            Some(i),
+            negate,
+        );
         let q = ProgramQueries::with_batchsize(b, batch_size, Z3TaskPriority::Low);
         program_queries.push(q);
     }
@@ -145,12 +157,14 @@ pub fn precond_query(
     } else {
         let programs = MultiDimProgramQueries::new(program_queries);
 
-        let b = PrecondQueryBuilder::new(programs, m_op, m_goal, None, negate);
+        let b =
+            PrecondQueryBuilder::new(unit.ident_to_string(), programs, m_op, m_goal, None, negate);
         Some(ProgramQueries::new(b, Z3TaskPriority::Medium))
     }
 }
 
 fn program_to_query(
+    prefix: &str,
     m_op: &VelosiAstMethod,
     m_goal: &VelosiAstMethod,
     idx: Option<usize>,
@@ -159,14 +173,15 @@ fn program_to_query(
     mem_model: bool,
 ) -> Box<Z3Query> {
     // convert the program to a smt2 term
-    let (mut smt, symvars) = prog.to_smt2_term(m_op.ident(), m_op.params.as_slice(), mem_model);
+    let (mut smt, symvars) =
+        prog.to_smt2_term(prefix, m_op.ident(), m_op.params.as_slice(), mem_model);
 
     // build up the pre-conditions
     let pre1 = call_method_assms(m_op, "st!0");
     let pre2 = call_method_assms(m_goal, "st!0");
     let mut pre = Term::land(pre1, pre2);
     if mem_model {
-        pre = utils::add_empty_wbuffer_precond(pre);
+        pre = utils::add_empty_wbuffer_precond(prefix, pre);
     }
 
     // construct the predicate call
@@ -174,8 +189,9 @@ fn program_to_query(
     let m_goal_call = call_method_pre(m_goal, idx, vec![m_op_call]);
 
     // obtain the forall params
-    let stvar = SortedVar::new("st!0".to_string(), types::model());
+    let stvar = SortedVar::new("st!0".to_string(), types::model(prefix));
     let vars = combine_method_params(
+        prefix,
         vec![stvar],
         m_op.params.as_slice(),
         m_goal.params.as_slice(),
@@ -236,6 +252,7 @@ fn program_to_query(
 
 pub fn submit_program_query(
     z3: &mut Z3WorkerPool,
+    prefix: &str,
     m_op: &VelosiAstMethod,
     m_goal: &VelosiAstMethod,
     idx: Option<usize>,
@@ -243,7 +260,7 @@ pub fn submit_program_query(
     prog: Program,
     mem_model: bool,
 ) -> Z3Ticket {
-    let query = program_to_query(m_op, m_goal, idx, negate, prog, mem_model);
+    let query = program_to_query(prefix, m_op, m_goal, idx, negate, prog, mem_model);
     z3.submit_query(query, crate::Z3TaskPriority::High)
         .expect("failed to submit query")
 }

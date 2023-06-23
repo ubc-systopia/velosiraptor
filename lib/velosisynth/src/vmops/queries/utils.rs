@@ -199,12 +199,12 @@ pub fn check_result(output: &str, program: &mut Program) -> QueryResult {
     }
 }
 
-pub fn add_empty_wbuffer_precond(pre: Term) -> Term {
+pub fn add_empty_wbuffer_precond(prefix: &str, pre: Term) -> Term {
     Term::land(
         Term::eq(
             smt2::seq::empty(types::wbuffer()),
             Term::fn_apply(
-                model_get_fn_name(WBUFFER_PREFIX),
+                model_get_fn_name(prefix, WBUFFER_PREFIX),
                 vec![Term::ident("st!0".to_string())],
             ),
         ),

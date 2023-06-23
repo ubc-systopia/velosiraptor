@@ -131,7 +131,7 @@ pub fn method_assms_name(mname: &str) -> String {
 // Boolean Method Parts
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn add_bool_method_parts(smt: &mut Smt2Context, method: &VelosiAstMethod) -> usize {
+fn add_bool_method_parts(smt: &mut Smt2Context, prefix: &str, method: &VelosiAstMethod) -> usize {
     if let Some(body) = &method.body {
         let parts = body.split_cnf();
         for (i, pre) in parts
@@ -148,12 +148,12 @@ fn add_bool_method_parts(smt: &mut Smt2Context, method: &VelosiAstMethod) -> usi
                 method.loc.loc()
             ));
 
-            f.add_arg(String::from("st!0"), types::model());
+            f.add_arg(String::from("st!0"), types::model(prefix));
             for a in method.params.iter() {
                 f.add_arg(a.ident_to_string(), types::type_to_smt2(&a.ptype));
             }
 
-            f.add_body(expr::expr_to_smt2(pre, "st!0"));
+            f.add_body(expr::expr_to_smt2(prefix, pre, "st!0"));
             smt.function(f);
         }
         parts.len()
@@ -174,7 +174,7 @@ fn add_bool_method_parts(smt: &mut Smt2Context, method: &VelosiAstMethod) -> usi
 //   - mixed arg/state ref: va < (state.length.bytes << 4);
 //        -> gets extracted into separate method to be checked.
 
-fn add_method_preconditions(smt: &mut Smt2Context, method: &VelosiAstMethod) {
+fn add_method_preconditions(smt: &mut Smt2Context, prefix: &str, method: &VelosiAstMethod) {
     // ---------------------------------------------------------------------------------------------
     // Adding Individual Function Pre-Conditions
     // ---------------------------------------------------------------------------------------------
@@ -189,9 +189,9 @@ fn add_method_preconditions(smt: &mut Smt2Context, method: &VelosiAstMethod) {
         let name = method_precond_i_name(method.ident(), i);
         let mut f = Function::new(name, types::boolean());
 
-        f.add_arg(String::from("st!0"), types::model());
+        f.add_arg(String::from("st!0"), types::model(prefix));
         for a in method.params.iter() {
-            f.add_arg(a.ident_to_string(), types::type_to_smt2(&a.ptype));
+            f.add_arg(a.ident_to_string(), types::type_to_smt2(prefix, &a.ptype));
         }
 
         let body = if !pre.has_state_references() {
@@ -222,7 +222,7 @@ fn add_method_preconditions(smt: &mut Smt2Context, method: &VelosiAstMethod) {
                 method.ident(),
                 method.loc.loc()
             ));
-            expr::expr_to_smt2(pre, "st!0")
+            expr::expr_to_smt2(prefix, pre, "st!0")
         };
 
         f.add_body(body);
@@ -241,9 +241,9 @@ fn add_method_preconditions(smt: &mut Smt2Context, method: &VelosiAstMethod) {
         method.loc.loc()
     ));
 
-    f.add_arg(String::from("st!0"), types::model());
+    f.add_arg(String::from("st!0"), types::model(prefix));
     for a in method.params.iter() {
-        f.add_arg(a.ident_to_string(), types::type_to_smt2(&a.ptype));
+        f.add_arg(a.ident_to_string(), types::type_to_smt2(prefix, &a.ptype));
     }
 
     // construct the body of the comined function with pure state references
@@ -252,13 +252,15 @@ fn add_method_preconditions(smt: &mut Smt2Context, method: &VelosiAstMethod) {
         .requires
         .iter()
         .filter(|p| p.has_state_references() && !p.has_var_references(&params))
-        .fold(expr, |e, p| Term::land(e, expr::expr_to_smt2(p, "st!0")));
+        .fold(expr, |e, p| {
+            Term::land(e, expr::expr_to_smt2(prefix, p, "st!0"))
+        });
 
     f.add_body(expr);
     smt.function(f);
 }
 
-fn add_method_assms(smt: &mut Smt2Context, method: &VelosiAstMethod) {
+fn add_method_assms(smt: &mut Smt2Context, prefix: &str, method: &VelosiAstMethod) {
     // add the assumptions on the function parameters
     // this includes only pre-conditions that do not have state references
     let name = method_assms_name(method.ident());
@@ -269,14 +271,17 @@ fn add_method_assms(smt: &mut Smt2Context, method: &VelosiAstMethod) {
         method.loc.loc()
     ));
 
-    f.add_arg(String::from("st!0"), types::model());
+    f.add_arg(String::from("st!0"), types::model(prefix));
     for a in method.params.iter() {
-        f.add_arg(a.ident_to_string(), types::type_to_smt2(&a.ptype));
+        f.add_arg(a.ident_to_string(), types::type_to_smt2(prefix, &a.ptype));
     }
 
     // add the type constraints on the function parameters
     let a = method.params.iter().fold(Term::Binary(true), |e, a| {
-        Term::land(e, types::type_to_assms_fn(&a.ptype, a.ident_to_string()))
+        Term::land(
+            e,
+            types::type_to_assms_fn(prefix, &a.ptype, a.ident_to_string()),
+        )
     });
 
     // get all expressions from the pre-condtion that do not have state references,
@@ -285,7 +290,9 @@ fn add_method_assms(smt: &mut Smt2Context, method: &VelosiAstMethod) {
         .requires
         .iter()
         .filter(|p| !p.has_state_references())
-        .fold(a, |e, p| Term::land(e, expr::expr_to_smt2(p, "st!0")));
+        .fold(a, |e, p| {
+            Term::land(e, expr::expr_to_smt2(prefix, p, "st!0"))
+        });
 
     if let "matchflags" | "translate" = method.ident.as_str() {
         expr = Term::land(
@@ -302,7 +309,8 @@ fn add_method_assms(smt: &mut Smt2Context, method: &VelosiAstMethod) {
 /// adds methods defined in the unit to the current context
 pub fn add_methods(
     smt: &mut Smt2Context,
-    methods: Box<dyn Iterator<Item = &Rc<VelosiAstMethod>> + '_>,
+    prefix: &str,
+    methods: Box<dyn Iterator<Item=&Rc<VelosiAstMethod>> + '_>,
 ) {
     smt.section(String::from("Methods"));
 
@@ -313,32 +321,32 @@ pub fn add_methods(
 
         if let Some(body) = &m.body {
             // TODO: should we add an assert here with pattern?
-            let mut f = Function::new(m.ident_to_string(), types::type_to_smt2(&m.rtype));
+            let mut f = Function::new(m.ident_to_string(), types::type_to_smt2(prefix, &m.rtype));
             f.add_comment(format!("Function: {}, {}", m.ident(), m.loc.loc()));
 
-            f.add_arg(String::from("st"), types::model());
+            f.add_arg(String::from("st"), types::model(prefix));
             for a in m.params.iter() {
-                f.add_arg(a.ident_to_string(), types::type_to_smt2(&a.ptype));
+                f.add_arg(a.ident_to_string(), types::type_to_smt2(prefix, &a.ptype));
             }
 
-            f.add_body(expr::expr_to_smt2(body, "st"));
+            f.add_body(expr::expr_to_smt2(prefix, body, "st"));
             smt.function(f);
 
             match m.path().as_str() {
                 "valid" => {
                     assert!(m.rtype.is_boolean());
-                    let nparts = add_bool_method_parts(smt, m);
-                    add_valid_result_checks(smt, nparts);
+                    let nparts = add_bool_method_parts(smt, prefix, m);
+                    add_valid_result_checks(smt, prefix, nparts);
                 }
                 "matchflags" => {
                     // if we have match flags we create one for reach element of the
                     assert!(m.rtype.is_boolean());
-                    let nparts = add_bool_method_parts(smt, m);
-                    add_matchflags_result_checks(smt, nparts);
+                    let nparts = add_bool_method_parts(smt, prefix, m);
+                    add_matchflags_result_checks(smt, prefix, nparts);
                 }
                 "translate" => {
-                    add_translate_result_checks(smt);
-                    add_translate_range_checks(smt, m.as_ref());
+                    add_translate_result_checks(smt, prefix);
+                    add_translate_range_checks(smt, prefix, m.as_ref());
                 }
                 _ => (),
             }
@@ -350,12 +358,12 @@ pub fn add_methods(
         // Adding Function Pre-conditions on the state, and assumptions on the methods
         // -----------------------------------------------------------------------------------------
 
-        add_method_preconditions(smt, m.as_ref());
-        add_method_assms(smt, m.as_ref());
+        add_method_preconditions(smt, prefix, m.as_ref());
+        add_method_assms(smt, prefix, m.as_ref());
     }
 }
 
-pub fn add_valid_result_checks(smt: &mut Smt2Context, nparts: usize) {
+pub fn add_valid_result_checks(smt: &mut Smt2Context, prefix: &str, nparts: usize) {
     // ---------------------------------------------------------------------------------------------
     // Result when mapping
     // ---------------------------------------------------------------------------------------------
@@ -364,11 +372,11 @@ pub fn add_valid_result_checks(smt: &mut Smt2Context, nparts: usize) {
         let mut f = Function::new(valid_map_result_name(idx), types::boolean());
         f.add_comment("Checking the valid function result".to_string());
 
-        f.add_arg(String::from("st!0"), types::model());
-        f.add_arg(String::from("va"), types::vaddr());
-        f.add_arg(String::from("sz"), types::size());
-        f.add_arg(String::from("flgs"), types::flags());
-        f.add_arg(String::from("pa"), types::paddr());
+        f.add_arg(String::from("st!0"), types::model(prefix));
+        f.add_arg(String::from("va"), types::vaddr(prefix));
+        f.add_arg(String::from("sz"), types::size(prefix));
+        f.add_arg(String::from("flgs"), types::flags(prefix));
+        f.add_arg(String::from("pa"), types::paddr(prefix));
 
         let name = if let Some(i) = idx {
             method_part_i_name("valid", i)
@@ -394,9 +402,9 @@ pub fn add_valid_result_checks(smt: &mut Smt2Context, nparts: usize) {
         let mut f = Function::new(valid_unmap_result_name(idx), types::boolean());
         f.add_comment("Checking the valid function result".to_string());
 
-        f.add_arg(String::from("st!0"), types::model());
-        f.add_arg(String::from("va"), types::vaddr());
-        f.add_arg(String::from("sz"), types::size());
+        f.add_arg(String::from("st!0"), types::model(prefix));
+        f.add_arg(String::from("va"), types::vaddr(prefix));
+        f.add_arg(String::from("sz"), types::size(prefix));
 
         let name = if let Some(i) = idx {
             method_part_i_name("valid", i)
@@ -422,11 +430,11 @@ pub fn add_valid_result_checks(smt: &mut Smt2Context, nparts: usize) {
         let mut f = Function::new(valid_protect_result_name(idx), types::boolean());
         f.add_comment("Checking the valid function result".to_string());
 
-        f.add_arg(String::from("st!0"), types::model());
-        f.add_arg(String::from("st!1"), types::model());
-        f.add_arg(String::from("va"), types::vaddr());
-        f.add_arg(String::from("sz"), types::size());
-        f.add_arg(String::from("flgs"), types::flags());
+        f.add_arg(String::from("st!0"), types::model(prefix));
+        f.add_arg(String::from("st!1"), types::model(prefix));
+        f.add_arg(String::from("va"), types::vaddr(prefix));
+        f.add_arg(String::from("sz"), types::size(prefix));
+        f.add_arg(String::from("flgs"), types::flags(prefix));
 
         let name = if let Some(i) = idx {
             method_part_i_name("valid", i)
@@ -451,7 +459,7 @@ pub fn add_valid_result_checks(smt: &mut Smt2Context, nparts: usize) {
 
 // the range checks are only for the translate function, it checks whether the
 // given virtual address would translate
-pub fn add_translate_range_checks(smt: &mut Smt2Context, method: &VelosiAstMethod) {
+pub fn add_translate_range_checks(smt: &mut Smt2Context, prefix: &str, method: &VelosiAstMethod) {
     // basically: forall i : vaddr_t ::
     //  &&  i < va ==> !does_translate(st, i)
     //  &&  va <= i < va + size ==> translate_result(st, va)
@@ -505,7 +513,7 @@ pub fn add_translate_range_checks(smt: &mut Smt2Context, method: &VelosiAstMetho
 
             (
                 Term::bvge(Term::ident(varstr.clone()), Term::ident("va!".to_string()))
-                    .eq(expr::expr_to_smt2(pre, "st!0")),
+                    .eq(expr::expr_to_smt2(prefix, pre, "st!0")),
                 "forall i. pri == (va <= i)",
             )
         } else {
@@ -520,7 +528,7 @@ pub fn add_translate_range_checks(smt: &mut Smt2Context, method: &VelosiAstMetho
                         Term::ident("sz".to_string()),
                     ),
                 )
-                .eq(expr::expr_to_smt2(pre, "st!0")),
+                    .eq(expr::expr_to_smt2(prefix, pre, "st!0")),
                 "forall i. pri == (i < va + size)",
             )
         };
@@ -529,12 +537,12 @@ pub fn add_translate_range_checks(smt: &mut Smt2Context, method: &VelosiAstMetho
         f.add_comment("Checking the translate range".to_string());
         f.add_comment(comment.to_string());
 
-        f.add_arg(String::from("st!0"), types::model());
-        f.add_arg(String::from("va"), types::vaddr());
-        f.add_arg(String::from("va!"), types::vaddr());
-        f.add_arg(String::from("sz"), types::size());
-        f.add_arg(String::from("flgs"), types::flags());
-        f.add_arg(String::from("pa!"), types::paddr());
+        f.add_arg(String::from("st!0"), types::model(prefix));
+        f.add_arg(String::from("va"), types::vaddr(prefix));
+        f.add_arg(String::from("va!"), types::vaddr(prefix));
+        f.add_arg(String::from("sz"), types::size(prefix));
+        f.add_arg(String::from("flgs"), types::flags(prefix));
+        f.add_arg(String::from("pa!"), types::paddr(prefix));
 
         // let forallvars = vec![SortedVar::new(varstr.clone(), types::vaddr())];
 
@@ -564,12 +572,12 @@ pub fn add_translate_range_checks(smt: &mut Smt2Context, method: &VelosiAstMetho
         method.loc.loc()
     ));
 
-    f.add_arg(String::from("st!0"), types::model());
-    f.add_arg(String::from("va"), types::vaddr());
-    f.add_arg(String::from("va!"), types::vaddr());
-    f.add_arg(String::from("sz"), types::size());
-    f.add_arg(String::from("flgs"), types::flags());
-    f.add_arg(String::from("pa!"), types::paddr());
+    f.add_arg(String::from("st!0"), types::model(prefix));
+    f.add_arg(String::from("va"), types::vaddr(prefix));
+    f.add_arg(String::from("va!"), types::vaddr(prefix));
+    f.add_arg(String::from("sz"), types::size(prefix));
+    f.add_arg(String::from("flgs"), types::flags(prefix));
+    f.add_arg(String::from("pa!"), types::paddr(prefix));
 
     let expr = Term::Binary(true);
 
@@ -577,12 +585,14 @@ pub fn add_translate_range_checks(smt: &mut Smt2Context, method: &VelosiAstMetho
         .requires
         .iter()
         .filter(|p| p.has_state_references() && p.has_var_references(&vars))
-        .fold(expr, |e, p| Term::land(e, expr::expr_to_smt2(p, "st!0")));
+        .fold(expr, |e, p| {
+            Term::land(e, expr::expr_to_smt2(prefix, p, "st!0"))
+        });
 
     // the var string for the forall variable, we use va here otherwise we need to rewrite the
     // precondition expression
     let varstr = "va".to_string();
-    let forallvars = vec![SortedVar::new(varstr.clone(), types::vaddr())];
+    let forallvars = vec![SortedVar::new(varstr.clone(), types::vaddr(prefix))];
 
     let body = Term::land(
         Term::land(
@@ -597,7 +607,7 @@ pub fn add_translate_range_checks(smt: &mut Smt2Context, method: &VelosiAstMetho
                     Term::ident("sz".to_string()),
                 ),
             )
-            .implies(Term::lnot(expr.clone())),
+                .implies(Term::lnot(expr.clone())),
         ),
         Term::land(
             Term::bvge(
@@ -615,14 +625,14 @@ pub fn add_translate_range_checks(smt: &mut Smt2Context, method: &VelosiAstMetho
                 ),
             ),
         )
-        .implies(expr),
+            .implies(expr),
     );
 
     f.add_body(Term::forall(forallvars, body));
     smt.function(f);
 }
 
-pub fn add_translate_result_checks(smt: &mut Smt2Context) {
+pub fn add_translate_result_checks(smt: &mut Smt2Context, prefix: &str) {
     // basically: forall i : vaddr_t ::
     //  &&  i < va ==> !does_translate(st, i)
     //  &&  va <= i < va + size ==> translate_result(st, va)
@@ -635,14 +645,14 @@ pub fn add_translate_result_checks(smt: &mut Smt2Context) {
     let mut f = Function::new(translate_map_result_name(None), types::boolean());
     f.add_comment("Checking the translate function result".to_string());
 
-    f.add_arg(String::from("st!0"), types::model());
-    f.add_arg(String::from("va"), types::vaddr());
-    f.add_arg(String::from("sz"), types::size());
-    f.add_arg(String::from("flgs"), types::flags());
-    f.add_arg(String::from("pa"), types::paddr());
+    f.add_arg(String::from("st!0"), types::model(prefix));
+    f.add_arg(String::from("va"), types::vaddr(prefix));
+    f.add_arg(String::from("sz"), types::size(prefix));
+    f.add_arg(String::from("flgs"), types::flags(prefix));
+    f.add_arg(String::from("pa"), types::paddr(prefix));
 
     let varstr = "i!0".to_string();
-    let forallvars = vec![SortedVar::new(varstr.clone(), types::size())];
+    let forallvars = vec![SortedVar::new(varstr.clone(), types::size(prefix))];
 
     // forall i | 0 <= i < size :: translate (st!0, va + i) == pa + i
     // forall i :: 0 <= i < size ==> translate (st!0, va + i) == pa + i
@@ -674,14 +684,14 @@ pub fn add_translate_result_checks(smt: &mut Smt2Context) {
     let mut f = Function::new(translate_protect_result_name(None), types::boolean());
     f.add_comment("Checking the translate function result".to_string());
 
-    f.add_arg(String::from("st!0"), types::model());
-    f.add_arg(String::from("st!1"), types::model());
-    f.add_arg(String::from("va"), types::vaddr());
-    f.add_arg(String::from("sz"), types::size());
-    f.add_arg(String::from("flgs"), types::flags());
+    f.add_arg(String::from("st!0"), types::model(prefix));
+    f.add_arg(String::from("st!1"), types::model(prefix));
+    f.add_arg(String::from("va"), types::vaddr(prefix));
+    f.add_arg(String::from("sz"), types::size(prefix));
+    f.add_arg(String::from("flgs"), types::flags(prefix));
 
     let varstr = "i!0".to_string();
-    let forallvars = vec![SortedVar::new(varstr.clone(), types::size())];
+    let forallvars = vec![SortedVar::new(varstr.clone(), types::size(prefix))];
 
     // forall i | 0 <= i < size :: translate (st!0, va + i) == translate (st!1, va + i)
     // forall i :: 0 <= i < size ==> translate (st!0, va + i) == translate (st!1, va + i)
@@ -713,7 +723,7 @@ pub fn add_translate_result_checks(smt: &mut Smt2Context) {
     smt.function(f);
 }
 
-pub fn add_matchflags_result_checks(smt: &mut Smt2Context, nparts: usize) {
+pub fn add_matchflags_result_checks(smt: &mut Smt2Context, prefix: &str, nparts: usize) {
     // ---------------------------------------------------------------------------------------------
     // Result when mapping
     // ---------------------------------------------------------------------------------------------
@@ -722,11 +732,11 @@ pub fn add_matchflags_result_checks(smt: &mut Smt2Context, nparts: usize) {
         let mut f = Function::new(matchflags_map_result_name(idx), types::boolean());
         f.add_comment("Checking the matchflags function result".to_string());
 
-        f.add_arg(String::from("st!0"), types::model());
-        f.add_arg(String::from("va"), types::vaddr());
-        f.add_arg(String::from("sz"), types::size());
-        f.add_arg(String::from("flgs"), types::flags());
-        f.add_arg(String::from("pa"), types::paddr());
+        f.add_arg(String::from("st!0"), types::model(prefix));
+        f.add_arg(String::from("va"), types::vaddr(prefix));
+        f.add_arg(String::from("sz"), types::size(prefix));
+        f.add_arg(String::from("flgs"), types::flags(prefix));
+        f.add_arg(String::from("pa"), types::paddr(prefix));
 
         let name = if let Some(i) = idx {
             method_part_i_name("matchflags", i)
@@ -752,10 +762,10 @@ pub fn add_matchflags_result_checks(smt: &mut Smt2Context, nparts: usize) {
         let mut f = Function::new(matchflags_unmap_result_name(idx), types::boolean());
         f.add_comment("Checking the matchflags function result".to_string());
 
-        f.add_arg(String::from("st!0"), types::model());
-        f.add_arg(String::from("va"), types::vaddr());
-        f.add_arg(String::from("sz"), types::size());
-        f.add_arg(String::from("flgs"), types::flags());
+        f.add_arg(String::from("st!0"), types::model(prefix));
+        f.add_arg(String::from("va"), types::vaddr(prefix));
+        f.add_arg(String::from("sz"), types::size(prefix));
+        f.add_arg(String::from("flgs"), types::flags(prefix));
 
         let name = if let Some(i) = idx {
             method_part_i_name("matchflags", i)
@@ -781,10 +791,10 @@ pub fn add_matchflags_result_checks(smt: &mut Smt2Context, nparts: usize) {
         let mut f = Function::new(matchflags_protect_result_name(idx), types::boolean());
         f.add_comment("Checking the matchflags function result".to_string());
 
-        f.add_arg(String::from("st!0"), types::model());
-        f.add_arg(String::from("va"), types::vaddr());
-        f.add_arg(String::from("sz"), types::size());
-        f.add_arg(String::from("flgs"), types::flags());
+        f.add_arg(String::from("st!0"), types::model(prefix));
+        f.add_arg(String::from("va"), types::vaddr(prefix));
+        f.add_arg(String::from("sz"), types::size(prefix));
+        f.add_arg(String::from("flgs"), types::flags(prefix));
         // f.add_arg(String::from("pa"), types::paddr());
 
         let name = if let Some(i) = idx {
@@ -891,6 +901,7 @@ pub fn call_method_result_check_part(
 }
 
 pub fn combine_method_params(
+    prefix: &str,
     pvars: Vec<SortedVar>,
     p1: &[Rc<VelosiAstParam>],
     p2: &[Rc<VelosiAstParam>],
@@ -905,7 +916,7 @@ pub fn combine_method_params(
         if vars.contains_key(p.ident().as_str()) {
             continue;
         }
-        let v = SortedVar::new(p.ident_to_string(), types::type_to_smt2(&p.ptype));
+        let v = SortedVar::new(p.ident_to_string(), types::type_to_smt2(prefix, &p.ptype));
         vars.insert(p.ident_to_string(), v);
     }
 
@@ -913,7 +924,7 @@ pub fn combine_method_params(
         if vars.contains_key(p.ident().as_str()) {
             continue;
         }
-        let v = SortedVar::new(p.ident_to_string(), types::type_to_smt2(&p.ptype));
+        let v = SortedVar::new(p.ident_to_string(), types::type_to_smt2(prefix, &p.ptype));
         vars.insert(p.ident_to_string(), v);
     }
 

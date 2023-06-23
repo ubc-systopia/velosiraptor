@@ -59,6 +59,8 @@ impl ProgramBuilder for UnmapProgramQueries {
 }
 
 pub struct UnmapPrograms {
+    prefix: String,
+
     programs: UnmapProgramQueries,
     programs_done: bool,
     queries: LinkedList<(Program, [Option<Z3Ticket>; 1])>,
@@ -74,6 +76,7 @@ pub struct UnmapPrograms {
 
 impl UnmapPrograms {
     pub fn new(
+        prefix: String,
         programs: UnmapProgramQueries,
         m_fn: Rc<VelosiAstMethod>,
         v_fn: Rc<VelosiAstMethod>,
@@ -82,6 +85,7 @@ impl UnmapPrograms {
         mem_model: bool,
     ) -> Self {
         Self {
+            prefix,
             programs,
             programs_done: false,
             queries: LinkedList::new(),
@@ -122,6 +126,7 @@ impl ProgramBuilder for UnmapPrograms {
                 // try to find one of !valid, !matchflags, !translate.pre
                 let valid_semantics = semantics::submit_program_query(
                     z3,
+                    &self.prefix,
                     self.m_fn.as_ref(),
                     self.v_fn.as_ref(),
                     None,
@@ -138,6 +143,7 @@ impl ProgramBuilder for UnmapPrograms {
 
                 let matchflags_semantics = semantics::submit_program_query(
                     z3,
+                    &self.prefix,
                     self.m_fn.as_ref(),
                     self.f_fn.as_ref(),
                     None,
@@ -154,6 +160,7 @@ impl ProgramBuilder for UnmapPrograms {
 
                 let translate_preconds = precond::submit_program_query(
                     z3,
+                    &self.prefix,
                     self.m_fn.as_ref(),
                     self.t_fn.as_ref(),
                     None,
@@ -230,6 +237,7 @@ pub fn get_program_iter(
         // Translate: Add a query for each possible barrier position
         // ---------------------------------------------------------------------------------------------
         UnmapPrograms::new(
+            unit.ident_to_string(),
             UnmapProgramQueries::SingleQuery(utils::make_program_iter_mem(prog)),
             m_fn.clone(),
             v_fn.clone(),
@@ -277,6 +285,7 @@ pub fn get_program_iter(
 
         let programs = SequentialProgramQueries::new(unmap_queries);
         UnmapPrograms::new(
+            unit.ident_to_string(),
             UnmapProgramQueries::MultiQuery(programs),
             m_fn.clone(),
             v_fn.clone(),

@@ -58,6 +58,8 @@ impl ProgramBuilder for ProtectProgramQueries {
 }
 
 pub struct ProtectPrograms {
+    prefix: String,
+
     programs: ProtectProgramQueries,
     programs_done: bool,
 
@@ -74,6 +76,7 @@ pub struct ProtectPrograms {
 
 impl ProtectPrograms {
     pub fn new(
+        prefix: String,
         programs: ProtectProgramQueries,
         m_fn: Rc<VelosiAstMethod>,
         v_fn: Rc<VelosiAstMethod>,
@@ -82,6 +85,7 @@ impl ProtectPrograms {
         mem_model: bool,
     ) -> Self {
         Self {
+            prefix,
             programs,
             programs_done: false,
             queries: LinkedList::new(),
@@ -121,6 +125,7 @@ impl ProgramBuilder for ProtectPrograms {
             if let Some(prog) = self.candidates.pop() {
                 let valid_semantics = semantics::submit_program_query(
                     z3,
+                    &self.prefix,
                     self.m_fn.as_ref(),
                     self.v_fn.as_ref(),
                     None,
@@ -134,6 +139,7 @@ impl ProgramBuilder for ProtectPrograms {
 
                 let translate_semantics = semantics::submit_program_query(
                     z3,
+                    &self.prefix,
                     self.m_fn.as_ref(),
                     self.t_fn.as_ref(),
                     None,
@@ -147,6 +153,7 @@ impl ProgramBuilder for ProtectPrograms {
 
                 let matchflags_semantics = semantics::submit_program_query(
                     z3,
+                    &self.prefix,
                     self.m_fn.as_ref(),
                     self.f_fn.as_ref(),
                     None,
@@ -245,6 +252,7 @@ pub fn get_program_iter(
         // Translate: Add a query for each possible barrier position
         // ---------------------------------------------------------------------------------------------
         ProtectPrograms::new(
+            unit.ident_to_string(),
             ProtectProgramQueries::SingleQuery(utils::make_program_iter_mem(prog)),
             m_fn.clone(),
             v_fn.clone(),
@@ -274,6 +282,7 @@ pub fn get_program_iter(
         let programs = MultiDimProgramQueries::new(protec_queries);
 
         ProtectPrograms::new(
+            unit.ident_to_string(),
             ProtectProgramQueries::MultiQuery(programs),
             m_fn.clone(),
             v_fn.clone(),

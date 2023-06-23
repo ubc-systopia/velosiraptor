@@ -32,45 +32,45 @@ use velosiast::ast::{
     VelosiAstFieldSlice, VelosiAstIdentifier, VelosiAstInterfaceField, VelosiAstStateField,
 };
 
-use super::types;
 use super::velosimodel::{IFACE_PREFIX, STATE_PREFIX};
+use super::{types, utils};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Field Definitions
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn field_slice_extract_fn_name(ctxt: &str, field: &str, slice: &str) -> String {
+fn field_slice_extract_fn_name(prefix: &str, ctxt: &str, field: &str, slice: &str) -> String {
     let sname = slice.split('.').last().unwrap();
     let field = field.split('.').last().unwrap();
-    format!("{ctxt}Field.{field}.{sname}.get!")
+    utils::with_prefix(prefix, &format!("{ctxt}Field.{field}.{sname}.get!"))
 }
 
-fn field_slice_insert_fn_name(ctxt: &str, field: &str, slice: &str) -> String {
+fn field_slice_insert_fn_name(prefix: &str, ctxt: &str, field: &str, slice: &str) -> String {
     let sname = slice.split('.').last().unwrap();
     let field = field.split('.').last().unwrap();
-    format!("{ctxt}Field.{field}.{sname}.set!")
+    utils::with_prefix(prefix, &format!("{ctxt}Field.{field}.{sname}.set!"))
 }
 
-pub fn field_slice_get_fn_name(ctxt: &str, field: &str, slice: &str) -> String {
+pub fn field_slice_get_fn_name(prefix: &str, ctxt: &str, field: &str, slice: &str) -> String {
     let sname = slice.split('.').last().unwrap();
     let field = field.split('.').last().unwrap();
-    format!("{ctxt}.{field}.{sname}.get!")
+    utils::with_prefix(prefix, &format!("{ctxt}.{field}.{sname}.get!"))
 }
 
-pub fn field_slice_set_fn_name(ctxt: &str, field: &str, slice: &str) -> String {
+pub fn field_slice_set_fn_name(prefix: &str, ctxt: &str, field: &str, slice: &str) -> String {
     let sname = slice.split('.').last().unwrap();
     let field = field.split('.').last().unwrap();
-    format!("{ctxt}.{field}.{sname}.set!")
+    utils::with_prefix(prefix, &format!("{ctxt}.{field}.{sname}.set!"))
 }
 
-pub fn field_get_fn_name(ctxt: &str, field: &str) -> String {
+pub fn field_get_fn_name(prefix: &str, ctxt: &str, field: &str) -> String {
     let field = field.split('.').last().unwrap();
-    format!("{ctxt}.{field}.get!")
+    utils::with_prefix(prefix, &format!("{ctxt}.{field}.get!"))
 }
 
-pub fn field_set_fn_name(ctxt: &str, field: &str) -> String {
+pub fn field_set_fn_name(prefix: &str, ctxt: &str, field: &str) -> String {
     let field = field.split('.').last().unwrap();
-    format!("{ctxt}.{field}.set!")
+    utils::with_prefix(prefix, &format!("{ctxt}.{field}.set!"))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -80,6 +80,7 @@ pub fn field_set_fn_name(ctxt: &str, field: &str) -> String {
 /// adds the field type definition and adds accessors for the field type
 fn add_field_common(
     smt: &mut Smt2Context,
+    prefix: &str,
     ident: &VelosiAstIdentifier,
     layout: &[Rc<VelosiAstFieldSlice>],
 ) {
@@ -96,9 +97,9 @@ fn add_field_common(
     // TODO: currently this is using a 64-bit bitvector, but we should take the size
     //       from the field into account.
     //
-    let fieldtype = types::field_type(ctxt, fieldname);
+    let fieldtype = types::field_type(prefix, ctxt, fieldname);
     smt.comment(format!("Type for the {fieldtype}"));
-    smt.sort(Sort::new_def(fieldtype.clone(), types::num()));
+    smt.sort(Sort::new_def(fieldtype.clone(), types::num(prefix)));
 
     //
     // Step 2: for each slice in the layout, add an extract/insert function
@@ -114,8 +115,8 @@ fn add_field_common(
         //
         // Step 2.1.1: Add the accessor function definition (*.get!)
         //
-        let s_get_fn_name = field_slice_extract_fn_name(ctxt, fieldname, s.ident());
-        let mut f = Function::new(s_get_fn_name.clone(), types::num());
+        let s_get_fn_name = field_slice_extract_fn_name(prefix, ctxt, fieldname, s.ident());
+        let mut f = Function::new(s_get_fn_name.clone(), types::num(prefix));
         f.add_arg(fieldname.to_string(), fieldtype.clone());
         smt.function(f);
 
@@ -144,10 +145,10 @@ fn add_field_common(
         // Step 2.2: Add the Accessor function (*.get!)
         //
 
-        let s_set_fn_name = field_slice_insert_fn_name(ctxt, fieldname, s.ident());
+        let s_set_fn_name = field_slice_insert_fn_name(prefix, ctxt, fieldname, s.ident());
         let mut f = Function::new(s_set_fn_name.clone(), fieldtype.clone());
         f.add_arg(fieldname.to_string(), fieldtype.clone());
-        f.add_arg(fieldname.to_string(), types::num());
+        f.add_arg(fieldname.to_string(), types::num(prefix));
         smt.function(f);
 
         //
@@ -179,27 +180,27 @@ fn add_field_common(
         smt.assert(Term::forall(
             vec![
                 SortedVar::new("x@".to_string(), fieldtype.clone()),
-                SortedVar::new("v@".to_string(), types::num()),
+                SortedVar::new("v@".to_string(), types::num(prefix)),
             ],
             e,
         ));
     }
 }
 
-pub fn add_iface_field(smt: &mut Smt2Context, field: &VelosiAstInterfaceField) {
+pub fn add_iface_field(smt: &mut Smt2Context, prefix: &str, field: &VelosiAstInterfaceField) {
     use VelosiAstInterfaceField::*;
     match field {
-        Memory(f) => add_field_common(smt, &f.ident, f.layout.as_slice()),
-        Register(f) => add_field_common(smt, &f.ident, f.layout.as_slice()),
-        Mmio(f) => add_field_common(smt, &f.ident, f.layout.as_slice()),
+        Memory(f) => add_field_common(smt, prefix, &f.ident, f.layout.as_slice()),
+        Register(f) => add_field_common(smt, prefix, &f.ident, f.layout.as_slice()),
+        Mmio(f) => add_field_common(smt, prefix, &f.ident, f.layout.as_slice()),
     }
 }
 
-pub fn add_state_field(smt: &mut Smt2Context, field: &VelosiAstStateField) {
+pub fn add_state_field(smt: &mut Smt2Context, prefix: &str, field: &VelosiAstStateField) {
     use VelosiAstStateField::*;
     match field {
-        Memory(f) => add_field_common(smt, &f.ident, f.layout.as_slice()),
-        Register(f) => add_field_common(smt, &f.ident, f.layout.as_slice()),
+        Memory(f) => add_field_common(smt, prefix, &f.ident, f.layout.as_slice()),
+        Register(f) => add_field_common(smt, prefix, &f.ident, f.layout.as_slice()),
     }
 }
 
@@ -212,6 +213,7 @@ pub fn add_state_field(smt: &mut Smt2Context, field: &VelosiAstStateField) {
 /// This function adds direct accessors
 fn add_field_accessors_common(
     smt: &mut Smt2Context,
+    prefix: &str,
     ident: &VelosiAstIdentifier,
     layout: &[Rc<VelosiAstFieldSlice>],
 ) {
@@ -222,55 +224,62 @@ fn add_field_accessors_common(
         _ => panic!("Invalid field name: {}", ident),
     };
 
-    let ctxttype = types::ctxt(ctxt);
+    let ctxttype = types::ctxt(prefix, ctxt);
 
     for slice in layout {
-        let name = field_slice_get_fn_name(ctxt, fieldname, slice.ident());
+        let name = field_slice_get_fn_name(prefix, ctxt, fieldname, slice.ident());
 
-        let mut f = Function::new(name, types::num());
+        let mut f = Function::new(name, types::num(prefix));
         f.add_arg(String::from("st"), ctxttype.clone());
 
         let arg = Term::ident(String::from("st"));
-        let st = Term::fn_apply(field_get_fn_name(ctxt, fieldname), vec![arg]);
+        let st = Term::fn_apply(field_get_fn_name(prefix, ctxt, fieldname), vec![arg]);
         let e = Term::fn_apply(
-            field_slice_extract_fn_name(ctxt, fieldname, slice.ident()),
+            field_slice_extract_fn_name(prefix, ctxt, fieldname, slice.ident()),
             vec![st],
         );
         f.add_body(e);
         smt.function(f);
 
-        let name = field_slice_set_fn_name(ctxt, fieldname, slice.ident());
+        let name = field_slice_set_fn_name(prefix, ctxt, fieldname, slice.ident());
         let mut f = Function::new(name, ctxttype.clone());
         f.add_arg(String::from("st"), ctxttype.clone());
-        f.add_arg(String::from("val"), types::num());
+        f.add_arg(String::from("val"), types::num(prefix));
 
         let arg = Term::ident(String::from("st"));
         let arg2 = Term::ident(String::from("val"));
 
-        let fld = Term::fn_apply(field_get_fn_name(ctxt, fieldname), vec![arg.clone()]);
+        let fld = Term::fn_apply(
+            field_get_fn_name(prefix, ctxt, fieldname),
+            vec![arg.clone()],
+        );
         let st = Term::fn_apply(
-            field_slice_insert_fn_name(ctxt, fieldname, slice.ident()),
+            field_slice_insert_fn_name(prefix, ctxt, fieldname, slice.ident()),
             vec![fld, arg2],
         );
-        let e = Term::fn_apply(field_set_fn_name(ctxt, fieldname), vec![arg, st]);
+        let e = Term::fn_apply(field_set_fn_name(prefix, ctxt, fieldname), vec![arg, st]);
         f.add_body(e);
         smt.function(f);
     }
 }
 
-pub fn add_iface_field_accessors(smt: &mut Smt2Context, field: &VelosiAstInterfaceField) {
+pub fn add_iface_field_accessors(
+    smt: &mut Smt2Context,
+    prefix: &str,
+    field: &VelosiAstInterfaceField,
+) {
     use VelosiAstInterfaceField::*;
     match field {
-        Memory(f) => add_field_accessors_common(smt, &f.ident, f.layout.as_slice()),
-        Register(f) => add_field_accessors_common(smt, &f.ident, f.layout.as_slice()),
-        Mmio(f) => add_field_accessors_common(smt, &f.ident, f.layout.as_slice()),
+        Memory(f) => add_field_accessors_common(smt, prefix, &f.ident, f.layout.as_slice()),
+        Register(f) => add_field_accessors_common(smt, prefix, &f.ident, f.layout.as_slice()),
+        Mmio(f) => add_field_accessors_common(smt, prefix, &f.ident, f.layout.as_slice()),
     }
 }
 
-pub fn add_state_field_accessors(smt: &mut Smt2Context, field: &VelosiAstStateField) {
+pub fn add_state_field_accessors(smt: &mut Smt2Context, prefix: &str, field: &VelosiAstStateField) {
     use VelosiAstStateField::*;
     match field {
-        Memory(f) => add_field_accessors_common(smt, &f.ident, f.layout.as_slice()),
-        Register(f) => add_field_accessors_common(smt, &f.ident, f.layout.as_slice()),
+        Memory(f) => add_field_accessors_common(smt, prefix, &f.ident, f.layout.as_slice()),
+        Register(f) => add_field_accessors_common(smt, prefix, &f.ident, f.layout.as_slice()),
     }
 }

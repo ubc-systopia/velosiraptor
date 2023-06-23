@@ -35,6 +35,8 @@ use velosiast::ast::VelosiAstConst;
 // crate imports
 use crate::model::types;
 
+use super::utils;
+
 /// adds constant definitions to the current context
 pub fn add_consts(
     smt: &mut Smt2Context,
@@ -47,12 +49,20 @@ pub fn add_consts(
             let val = c
                 .try_into_u64()
                 .expect("Expected numeric constant but could not convert.");
-            smt.constant(c.ident_to_string(), types::num(), Term::num(val));
+            smt.constant(
+                utils::with_prefix(context, &c.ident_to_string()),
+                types::num(context),
+                Term::num(val),
+            );
         } else if c.ctype.is_boolean() {
             let val = c
                 .try_into_bool()
                 .expect("Expected boolean constant but could not convert.");
-            smt.constant(c.ident_to_string(), types::num(), Term::Binary(val));
+            smt.constant(
+                utils::with_prefix(context, &c.ident_to_string()),
+                types::num(context),
+                Term::Binary(val),
+            );
         } else {
             unreachable!("constant with type `{}` unhandled\n", c.ctype);
         }

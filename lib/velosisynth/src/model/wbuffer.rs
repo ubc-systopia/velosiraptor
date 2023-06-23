@@ -33,7 +33,7 @@ use super::{types, velosimodel::WBUFFER_ENTRY_PREFIX};
 /// adds the write buffer definitions to the model
 ///
 /// Note: this doesn't include the write buffer actions
-pub fn add_wbuffer_def(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
+pub fn add_wbuffer_def(smt: &mut Smt2Context, prefix: &str, iface: &VelosiAstInterface) {
     smt.section(String::from("Write Buffer"));
 
     // create an enum of the different fields, used for tagging
@@ -50,7 +50,7 @@ pub fn add_wbuffer_def(smt: &mut Smt2Context, iface: &VelosiAstInterface) {
 
     let mut dt = DataType::new(String::from(WBUFFER_ENTRY_PREFIX), 0);
     dt.add_field(format!("{WBUFFER_ENTRY_PREFIX}.tag"), types::field_tag());
-    dt.add_field(format!("{WBUFFER_ENTRY_PREFIX}.val"), types::num());
+    dt.add_field(format!("{WBUFFER_ENTRY_PREFIX}.val"), types::num(prefix));
 
     let accessors = dt.to_field_accessor();
     smt.datatype(dt);
