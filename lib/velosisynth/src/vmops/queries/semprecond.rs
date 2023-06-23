@@ -102,9 +102,11 @@ where
                     &self.m_goal,
                     self.idx,
                     prog,
-                    self.negate,
-                    false,
-                    false,
+                    SynthOptions {
+                        negate: self.negate,
+                        no_change: false,
+                        mem_model: false,
+                    },
                 ))
             }
             MaybeResult::Pending => MaybeResult::Pending,
@@ -189,19 +191,21 @@ fn program_to_query(
     m_goal: &VelosiAstMethod,
     idx: Option<usize>,
     prog: Program,
-    negate: bool,
-    no_change: bool,
-    mem_model: bool,
+    options: SynthOptions,
 ) -> Box<Z3Query> {
     // convert the program to a smt2 term
-    let (mut smt, symvars) =
-        prog.to_smt2_term(prefix, m_op.ident(), m_op.params.as_slice(), mem_model);
+    let (mut smt, symvars) = prog.to_smt2_term(
+        prefix,
+        m_op.ident(),
+        m_op.params.as_slice(),
+        options.mem_model,
+    );
 
     // build up the pre-conditions
     let pre1 = call_method_assms(m_op, "st!0");
     let pre2 = call_method_assms(m_goal, "st!0");
     let mut pre = Term::land(pre1, pre2);
-    if mem_model {
+    if options.mem_model {
         pre = utils::add_empty_wbuffer_precond(prefix, pre);
     }
 
@@ -220,7 +224,7 @@ fn program_to_query(
     );
 
     // build up the term
-    let t = if negate {
+    let t = if options.negate {
         Term::forall(vars, pre.implies(Term::lnot(m_goal_call)))
     } else {
         Term::forall(vars, pre.implies(m_goal_call))
@@ -240,7 +244,7 @@ fn program_to_query(
 
     // get the goal as string
     let goal = if let Some(i) = idx {
-        if negate {
+        if options.negate {
             format!("!{}", m_goal.requires[i])
         } else {
             m_goal.requires[i].to_string()
@@ -251,7 +255,7 @@ fn program_to_query(
             .iter()
             .filter_map(|p| {
                 if p.has_state_references() {
-                    if negate {
+                    if options.negate {
                         Some(format!("!{p}"))
                     } else {
                         Some(p.to_string())
@@ -267,7 +271,7 @@ fn program_to_query(
     // println!("goal: {}", goal);
 
     // create and submit query
-    let mut query = if no_change {
+    let mut query = if options.no_change {
         Z3Query::new()
     } else {
         Z3Query::from(smtctx)
@@ -285,16 +289,7 @@ pub fn submit_program_query(
     prog: Program,
     options: SynthOptions,
 ) -> Z3Ticket {
-    let query = program_to_query(
-        prefix,
-        m_op,
-        m_goal,
-        idx,
-        prog,
-        options.negate,
-        options.no_change,
-        options.mem_model,
-    );
+    let query = program_to_query(prefix, m_op, m_goal, idx, prog, options);
     z3.submit_query(query, Z3TaskPriority::High)
         .expect("failed to submit query")
 }

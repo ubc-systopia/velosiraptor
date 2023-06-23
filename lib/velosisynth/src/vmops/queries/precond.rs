@@ -38,8 +38,11 @@ use crate::{
     Program,
 };
 
-use super::queryhelper::{
-    MaybeResult, MultiDimProgramQueries, ProgramBuilder, ProgramQueries, QueryBuilder,
+use super::{
+    queryhelper::{
+        MaybeResult, MultiDimProgramQueries, ProgramBuilder, ProgramQueries, QueryBuilder,
+    },
+    utils::SynthOptions,
 };
 
 use crate::ProgramsIter;
@@ -256,11 +259,18 @@ pub fn submit_program_query(
     m_op: &VelosiAstMethod,
     m_goal: &VelosiAstMethod,
     idx: Option<usize>,
-    negate: bool,
     prog: Program,
-    mem_model: bool,
+    options: SynthOptions,
 ) -> Z3Ticket {
-    let query = program_to_query(prefix, m_op, m_goal, idx, negate, prog, mem_model);
+    let query = program_to_query(
+        prefix,
+        m_op,
+        m_goal,
+        idx,
+        options.negate,
+        prog,
+        options.mem_model,
+    );
     z3.submit_query(query, crate::Z3TaskPriority::High)
         .expect("failed to submit query")
 }

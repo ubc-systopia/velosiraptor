@@ -65,7 +65,7 @@ pub fn add_model_def(smt: &mut Smt2Context, unit: &VelosiAstUnitSegment, mem_mod
 
 fn add_model(smt: &mut Smt2Context, prefix: &str, mem_model: bool) {
     smt.section(String::from("Model"));
-    let mut dt = DataType::new(utils::with_prefix(prefix, &MODEL_PREFIX.to_string()), 0);
+    let mut dt = DataType::new(utils::with_prefix(prefix, MODEL_PREFIX), 0);
     dt.add_comment("Model Definition".to_string());
     dt.add_field(
         utils::with_prefix(prefix, &format!("{MODEL_PREFIX}.{STATE_PREFIX}")),

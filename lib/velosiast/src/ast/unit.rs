@@ -1719,7 +1719,7 @@ impl VelosiAstUnitEnum {
     }
 
     pub fn distinguishing_exprs(
-        enums: &Vec<(VelosiAstIdentifier, Vec<VelosiAstIdentifier>)>,
+        enums: &[(VelosiAstIdentifier, Vec<VelosiAstIdentifier>)],
         st: &SymbolTable,
     ) -> HashMap<VelosiAstIdentifier, VelosiAstExpr> {
         // assumptions here:
