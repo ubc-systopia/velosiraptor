@@ -53,7 +53,7 @@ pub fn unit_header_file(name: &str) -> String {
 
 /// generates the path of the state field header file
 pub fn unit_header_file_path(name: &str) -> String {
-    format!("{}", unit_header_file(name))
+    unit_header_file(name)
 }
 
 /// generates the name of the state field header file
@@ -246,7 +246,7 @@ fn expr_to_cpp(expr: &VelosiAstExpr) -> C::Expr {
             }
             C::Expr::method_call(
                 &C::Expr::this(),
-                &p[0],
+                p[0],
                 args.iter().map(expr_to_cpp).collect(),
             )
         }

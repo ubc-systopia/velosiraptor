@@ -48,7 +48,7 @@ pub fn registers_header_file(name: &str) -> String {
 
 /// generates the path of the state field header file
 pub fn registers_header_file_path(name: &str) -> String {
-    format!("{}", registers_header_file(name))
+    registers_header_file(name)
 }
 
 /// generates the name of the state field header file
@@ -99,7 +99,7 @@ pub fn generate_register_header(
             continue;
         };
 
-        let rcn = registers_class_name(&f.ident());
+        let rcn = registers_class_name(f.ident());
         // create a new class in the scope
         let c = s.new_class(rcn.as_str());
         c.set_base("RegisterBase", C::Visibility::Public);
@@ -153,7 +153,7 @@ pub fn generate_register_impl(
             continue;
         };
 
-        let rcn = registers_class_name(&f.ident());
+        let rcn = registers_class_name(f.ident());
         // create a new class in the scope
         let c = scope.new_class(rcn.as_str());
         c.set_base("RegisterBase", C::Visibility::Public);
@@ -170,7 +170,7 @@ pub fn generate_register_impl(
         cons.push_parent_initializer(C::Expr::fn_call(
             "RegisterBase",
             vec![
-                C::Expr::new_str(&f.ident()),
+                C::Expr::new_str(f.ident()),
                 // C::Expr::ConstNum(f.offset()), // TODO probably wrong
                 C::Expr::ConstNum(f.size()),
                 C::Expr::Raw(String::from("ACCESS_PERMISSION_ALL")),

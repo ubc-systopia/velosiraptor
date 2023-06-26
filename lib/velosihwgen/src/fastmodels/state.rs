@@ -47,7 +47,7 @@ pub fn state_header_file(name: &str) -> String {
 
 /// generates the path of the state header file
 pub fn state_header_file_path(name: &str) -> String {
-    format!("{}", state_header_file(name))
+    state_header_file(name)
 }
 
 /// generates the name of the state header file
@@ -99,7 +99,7 @@ pub fn generate_state_header(
 
     // adding field getters and setters
     for f in state.fields() {
-        let fcn = state_fields_class_name(&f.ident());
+        let fcn = state_fields_class_name(f.ident());
         let ty = C::Type::new_class(&fcn);
 
         let fieldname = format!("_{}", f.ident());
@@ -137,7 +137,7 @@ pub fn generate_state_header(
 
     // adding the state fields to the class
     for f in state.fields() {
-        let ty = C::BaseType::Class(state_fields_class_name(&f.ident()));
+        let ty = C::BaseType::Class(state_fields_class_name(f.ident()));
         let fieldname = format!("_{}", f.ident());
         c.new_attribute(&fieldname, C::Type::new(ty));
     }
@@ -181,7 +181,7 @@ pub fn generate_state_impl(
 
     for f in state.fields() {
         let fieldname = format!("_{}", f.ident());
-        let fieldclass = state_fields_class_name(&f.ident());
+        let fieldclass = state_fields_class_name(f.ident());
         cons.push_initializer(fieldname.as_str(), C::Expr::fn_call(&fieldclass, vec![]));
 
         let this = C::Expr::this();
