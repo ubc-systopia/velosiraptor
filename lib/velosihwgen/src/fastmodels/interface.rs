@@ -49,7 +49,7 @@ pub fn interface_header_file(name: &str) -> String {
 
 /// generates the path of the headefile
 pub fn interface_header_file_path(name: &str) -> String {
-    format!("{}", interface_header_file(name))
+    interface_header_file(name)
 }
 
 /// generates the name of the state field header file
@@ -109,7 +109,7 @@ pub fn generate_interface_header(
     c.new_attribute("_state", state_ptr_type);
 
     for f in state.fields() {
-        let rcn = registers_class_name(&f.ident());
+        let rcn = registers_class_name(f.ident());
         let fieldname = format!("_{}", &f.ident());
         let ty = C::Type::new_class(&rcn);
         c.new_attribute(&fieldname, ty);
@@ -163,7 +163,7 @@ pub fn generate_interface_impl(
 
     for f in state.fields() {
         let fieldname = format!("_{}", f.ident());
-        let rcn = registers_class_name(&f.ident());
+        let rcn = registers_class_name(f.ident());
         cons.push_initializer(fieldname.as_str(), C::Expr::fn_call(&rcn, vec![pa.clone()]));
 
         let this = C::Expr::this();

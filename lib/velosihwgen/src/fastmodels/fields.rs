@@ -46,7 +46,7 @@ pub fn state_fields_header_file(name: &str) -> String {
 
 /// generates the path of the header file
 pub fn state_fileds_header_file_path(name: &str) -> String {
-    format!("{}", state_fields_header_file(name))
+    state_fields_header_file(name)
 }
 
 /// generates the name of the state field header file
@@ -93,7 +93,7 @@ pub fn generate_field_header(
     // generate a new class for each field
     for f in state.fields() {
         // create a new class in the scope
-        let rcn = state_fields_class_name(&f.ident());
+        let rcn = state_fields_class_name(f.ident());
         let c = s.new_class(&rcn);
 
         // set the base class
@@ -106,7 +106,7 @@ pub fn generate_field_header(
         let var = C::Expr::new_var("data", C::Type::new_uint(64));
 
         for sl in &f.layout_as_slice().to_vec() {
-            let slname = state_fields_slice_getter_name(&sl.ident());
+            let slname = state_fields_slice_getter_name(sl.ident());
             let m = c
                 .new_method(&slname, C::Type::new_uint(64))
                 .set_public()
@@ -116,11 +116,11 @@ pub fn generate_field_header(
                 .method_call(
                     C::Expr::this(),
                     "get_slice_value",
-                    vec![C::Expr::new_str(&sl.ident()), C::Expr::addr_of(&var)],
+                    vec![C::Expr::new_str(sl.ident()), C::Expr::addr_of(&var)],
                 )
                 .return_expr(var.clone());
 
-            let slname = state_fields_slice_setter_name(&sl.ident());
+            let slname = state_fields_slice_setter_name(sl.ident());
             let m = c
                 .new_method(&slname, C::Type::new_void())
                 .set_public()
@@ -129,7 +129,7 @@ pub fn generate_field_header(
             m.body().method_call(
                 C::Expr::this(),
                 "set_slice_value",
-                vec![C::Expr::new_str(&sl.ident()), var.clone()],
+                vec![C::Expr::new_str(sl.ident()), var.clone()],
             );
         }
     }
@@ -163,7 +163,7 @@ pub fn generate_field_impl(
     scope.new_include(&hdrfile, true);
 
     for f in state.fields() {
-        let rcn = state_fields_class_name(&f.ident());
+        let rcn = state_fields_class_name(f.ident());
         // create a new class in the scope
         let c = scope.new_class(rcn.as_str());
         c.set_base("StateFieldBase", C::Visibility::Public);
@@ -172,7 +172,7 @@ pub fn generate_field_impl(
         cons.push_parent_initializer(C::Expr::fn_call(
             "StateFieldBase",
             vec![
-                C::Expr::new_str(&f.ident()),
+                C::Expr::new_str(f.ident()),
                 C::Expr::new_num(f.size()),
                 C::Expr::new_num(0),
             ],
@@ -183,7 +183,7 @@ pub fn generate_field_impl(
                 C::Expr::this(),
                 "add_slice",
                 vec![
-                    C::Expr::new_str(&sl.ident()),
+                    C::Expr::new_str(sl.ident()),
                     C::Expr::new_num(sl.start),
                     C::Expr::new_num(sl.end),
                 ],
