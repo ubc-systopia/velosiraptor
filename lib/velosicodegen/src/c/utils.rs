@@ -124,9 +124,25 @@ pub trait UnitUtils {
         match expr {
             IdentLiteral(i) => {
                 if let Some(e) = var_mappings.get(i.ident().as_str()) {
-                    e.clone()
-                } else {
-                    C::Expr::new_var(i.ident().as_str(), self.ptype_to_ctype(expr.result_type()))
+                    return e.clone();
+                }
+
+                let mut parts = i.ident().as_str().split('.');
+                match (parts.next(), parts.next(), parts.next()) {
+                    (Some("interface"), Some(field), Some(slice)) => {
+                        let fname = slice_rd_fn_name_str(self.my_ident(), field, slice);
+                        let param = var_mappings.get("$unit").unwrap();
+                        C::Expr::fn_call(&fname, vec![param.clone()])
+                    }
+                    (Some("interface"), Some(field), None) => {
+                        let fname = field_rd_fn_name_str(self.my_ident(), field);
+                        let param = var_mappings.get("$unit").unwrap();
+                        C::Expr::fn_call(&fname, vec![param.clone()])
+                    }
+                    _ => C::Expr::new_var(
+                        i.ident().as_str(),
+                        self.ptype_to_ctype(expr.result_type()),
+                    ),
                 }
             }
             NumLiteral(i) => C::Expr::new_num(i.val),
