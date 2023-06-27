@@ -30,6 +30,7 @@
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+use std::ops::Range;
 use std::rc::Rc;
 
 use velosiparser::{
@@ -39,12 +40,12 @@ use velosiparser::{
     VelosiParseTreeInterfaceFieldRegister, VelosiTokenStream,
 };
 
-use crate::ast::VelosiAstIdentifier;
 use crate::ast::{
     types::{VelosiAstType, VelosiAstTypeInfo},
-    VelosiAstExpr, VelosiAstField, VelosiAstFieldSlice, VelosiAstNode, VelosiAstParam,
-    VelosiAstStateField,
+    VelosiAstBinOp, VelosiAstExpr, VelosiAstField, VelosiAstFieldSlice, VelosiAstNode,
+    VelosiAstParam, VelosiAstStateField,
 };
+use crate::ast::{VelosiAstBinOpExpr, VelosiAstIdentifier, VelosiAstNumLiteralExpr};
 use crate::error::{VelosiAstErrBuilder, VelosiAstErrUndef, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
 
@@ -64,15 +65,15 @@ use super::expr::VelosiAstIdentLiteralExpr;
 #[derive(Eq, Clone, Debug)]
 pub struct VelosiAstInterfaceAction {
     /// the source operand of the action
-    pub src: VelosiAstExpr,
+    pub src: Rc<VelosiAstExpr>,
     /// the destination operand of the action (lvalue expression)
-    pub dst: VelosiAstExpr,
+    pub dst: Rc<VelosiAstExpr>,
     /// the location where the action was defined
     pub loc: VelosiTokenStream,
 }
 
 impl VelosiAstInterfaceAction {
-    pub fn new(src: VelosiAstExpr, dst: VelosiAstExpr, loc: VelosiTokenStream) -> Self {
+    pub fn new(src: Rc<VelosiAstExpr>, dst: Rc<VelosiAstExpr>, loc: VelosiTokenStream) -> Self {
         Self { src, dst, loc }
     }
 
@@ -82,8 +83,14 @@ impl VelosiAstInterfaceAction {
     ) -> AstResult<VelosiAstInterfaceAction, VelosiAstIssues> {
         let mut issues = VelosiAstIssues::new();
 
-        let src = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(pt.src, st), issues);
-        let dst = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(pt.dst, st), issues);
+        let src = Rc::new(ast_result_unwrap!(
+            VelosiAstExpr::from_parse_tree(pt.src, st),
+            issues
+        ));
+        let dst = Rc::new(ast_result_unwrap!(
+            VelosiAstExpr::from_parse_tree(pt.dst, st),
+            issues
+        ));
 
         // the destination must be an lvalue that can be assigned to.
         if !dst.is_lvalue() {
@@ -424,22 +431,22 @@ fn handle_nodes(
 
             let stident = VelosiAstIdentifier::new("", sf.path().to_string(), sf.loc.clone());
 
-            let stexpr = VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
+            let stexpr = Rc::new(VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
                 vec![stident],
                 VelosiAstTypeInfo::Integer,
                 VelosiTokenStream::default(),
-            ));
+            )));
 
             let sifdent = VelosiAstIdentifier::new(
                 "",
                 sf.path().replace("state", "interface"),
                 sf.loc.clone(),
             );
-            let ifexpr = VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
+            let ifexpr = Rc::new(VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
                 vec![sifdent],
                 VelosiAstTypeInfo::Integer,
                 VelosiTokenStream::default(),
-            ));
+            )));
 
             if nodes.writeactions.is_empty() {
                 nodes.writeactions = vec![VelosiAstInterfaceAction::new(
@@ -499,22 +506,22 @@ fn handle_nodes(
 
             let stident = VelosiAstIdentifier::new("", sf.path().to_string(), sf.loc.clone());
 
-            let stexpr = VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
+            let stexpr = Rc::new(VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
                 vec![stident],
                 VelosiAstTypeInfo::Integer,
                 VelosiTokenStream::default(),
-            ));
+            )));
 
             let sifdent = VelosiAstIdentifier::new(
                 "",
                 sf.path().replace("state", "interface"),
                 sf.loc.clone(),
             );
-            let ifexpr = VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
+            let ifexpr = Rc::new(VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
                 vec![sifdent],
                 VelosiAstTypeInfo::Integer,
                 VelosiTokenStream::default(),
-            ));
+            )));
 
             if nodes.writeactions.is_empty() {
                 nodes.writeactions = vec![VelosiAstInterfaceAction::new(
