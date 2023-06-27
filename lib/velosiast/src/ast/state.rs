@@ -30,6 +30,7 @@
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+use std::ops::Range;
 use std::rc::Rc;
 
 use velosiparser::{
@@ -741,6 +742,30 @@ impl VelosiAstStateDef {
         hs
     }
 
+    pub fn get_field_range(&self, stateref: &str) -> Range<u64> {
+        let mut parts = stateref.split('.');
+        match (parts.next(), parts.next(), parts.next()) {
+            (Some("state"), Some(field), Some(slice)) => {
+                if let Some(f) = self.fields_map.get(field) {
+                    for s in f.layout_as_slice() {
+                        if s.ident().as_str() == slice {
+                            return s.start..s.end;
+                        }
+                    }
+                }
+                0..0
+            }
+            (Some("state"), Some(field), None) => {
+                if let Some(f) = self.fields_map.get(field) {
+                    0..f.size()
+                } else {
+                    0..0
+                }
+            }
+            _ => 0..0,
+        }
+    }
+
     pub fn get_registers(&self) -> Vec<Rc<VelosiAstStateField>> {
         self.fields
             .iter()
@@ -895,6 +920,13 @@ impl VelosiAstState {
         match self {
             VelosiAstState::StateDef(s) => s.get_field_slice_refs(refs),
             VelosiAstState::NoneState(_s) => HashMap::new(),
+        }
+    }
+
+    pub fn get_field_range(&self, stateref: &str) -> Range<u64> {
+        match self {
+            VelosiAstState::StateDef(s) => s.get_field_range(stateref),
+            VelosiAstState::NoneState(_s) => 0..0,
         }
     }
 
