@@ -140,35 +140,54 @@ fn add_is_function(
             C::Expr::fn_call(&variant_unit.constructor_fn_name(), args),
         );
 
-        let _res_expr = body.new_variable("res", C::Type::new_bool()).to_expr();
+        body.new_comment("Extracting the state values\n");
 
-        let res_var = C::Expr::new_var("res", C::Type::new_bool());
-        let mut idx = 0;
+        let differentiators = unit.get_unit_differentiator(variant_unit.ident());
+
+        // obtain all the state references here.
+        let mut state_refs = HashSet::new();
+        for e in differentiators {
+            e.get_state_references(&mut state_refs);
+        }
+
+        let iface = variant_unit.interface().unwrap();
+
+        let mut vars = HashMap::new();
+        vars.insert("$unit", tunit.clone());
+
+        let state = variant_unit.state().unwrap();
+        for sref in &state_refs {
+            // TODO: find the slice here!
+            let val = iface
+                .read_state_expr(sref, state.get_field_range(sref))
+                .unwrap();
+
+            let sref_var_name = format!("{}_val", sref.replace('.', "_"));
+
+            // create a new variable
+            let sref_var = body
+                .new_variable(sref_var_name.as_str(), C::Type::new_uint64())
+                .to_expr();
+
+            // assing the value to the variable
+            body.assign(sref_var.clone(), variant_unit.expr_to_cpp(&vars, &val));
+
+            // store the variable for later
+            vars.insert(sref.as_str(), sref_var);
+        }
+
+        body.new_comment("Evaluate boolean expression on the state\n");
+
+        let res_var = body.new_variable("res", C::Type::new_bool()).to_expr();
 
         // obtain the differentiators
-        for e in unit.get_unit_differentiator(variant_unit.ident()) {
-            // obtain the state references
-            let mut state_refs = HashSet::new();
-            e.get_state_references(&mut state_refs);
-
-            // we create a variable as a place holder for the state and
-            // construct the expression to access the interface
-            let mut vars = HashMap::new();
-            for state_ref in &state_refs {
-                // TODO: here we need to back project the state onto the interface
-                // and create the expressions
-
-                vars.insert(state_ref.as_str(), C::Expr::btrue());
-            }
-
+        for (idx, e) in differentiators.iter().enumerate() {
             if idx == 0 {
                 body.assign(res_var.clone(), variant_unit.expr_to_cpp(&vars, e));
             } else {
                 let val = C::Expr::binop(res_var.clone(), "&&", variant_unit.expr_to_cpp(&vars, e));
                 body.assign(res_var.clone(), val);
             }
-
-            idx += 1;
         }
 
         body.return_expr(res_var);
