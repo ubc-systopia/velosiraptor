@@ -1677,6 +1677,114 @@ impl VelosiAstInterfaceDef {
 
         true
     }
+
+    pub fn read_state_expr(&self, state_ref: &str, bits: Range<u64>) -> Option<Rc<VelosiAstExpr>> {
+        let mut parts = state_ref.split('.');
+        let (fieldname, _slicename) = match (parts.next(), parts.next(), parts.next()) {
+            (Some("state"), Some(field), Some(slice)) => {
+                (field.to_string(), Some(slice.to_string()))
+            }
+            (Some("state"), Some(field), None) => (field.to_string(), None),
+            _ => return None,
+        };
+
+        let field_ref = format!("state.{}", fieldname);
+
+        let mut state_accessors = Vec::new();
+
+        // find the field that contains the state reference
+        for field in &self.fields {
+            for read_action in field.read_actions_as_ref() {
+                match read_action.src.as_ref() {
+                    VelosiAstExpr::IdentLiteral(ident) => {
+                        let src_ident = ident.ident().as_ref();
+                        if src_ident == state_ref || src_ident == &field_ref {
+                            state_accessors.push((
+                                read_action.src.clone(),
+                                read_action.dst.clone(),
+                                src_ident == state_ref,
+                            ));
+                        }
+                    }
+                    _ => panic!("TODO: source of read action not an ident literal"),
+                }
+            }
+        }
+
+        // ok now we have a list of (src, dst) tuples that contain (parts of) the state refrence
+        if state_accessors.is_empty() {
+            return None;
+        }
+
+        // obtain one state accessor, preferably one that is the full one
+        let mut state_accessor = state_accessors.pop().unwrap();
+        for acc in state_accessors.into_iter() {
+            if acc.2 {
+                state_accessor = acc
+            }
+        }
+
+        assert!(matches!(
+            state_accessor.1.as_ref(),
+            VelosiAstExpr::IdentLiteral(_)
+        ));
+
+        if state_accessor.2 {
+            // we have a precise match, then we can just return the dst
+            Some(state_accessor.1)
+        } else {
+            // no precise match, this is mostly due to the action having a field <- field action,
+            // here we need to find the the corresponding bit slice of the state and extract it
+            // from the interface field
+
+            let interface_field = match state_accessor.1.as_ref() {
+                VelosiAstExpr::IdentLiteral(i) => self.fields_map.get(i.path().as_str()).unwrap(),
+                _ => unreachable!(),
+            };
+
+            for slice in interface_field.layout_as_slice() {
+                if slice.start == bits.start && slice.end == bits.end {
+                    return Some(Rc::new(VelosiAstExpr::IdentLiteral(
+                        VelosiAstIdentLiteralExpr::with_name(
+                            slice.path_to_string(),
+                            VelosiAstTypeInfo::Integer,
+                        ),
+                    )));
+                }
+            }
+
+            // there was not an exact match of the bits, so we can construct something here
+            // ((interface_field) >> bits.start) & (2^(bits.end - bits.start) - 1)
+            debug_assert!(bits.end <= 64 && bits.start < bits.end);
+            let mask = if bits.end == 64 && bits.start == 0 {
+                0xffff_ffff_ffff_ffff
+            } else {
+                (1 << (bits.end - bits.start)) - 1
+            };
+
+            let shval = VelosiAstBinOpExpr::new(
+                state_accessor.1,
+                VelosiAstBinOp::RShift,
+                Rc::new(VelosiAstExpr::NumLiteral(VelosiAstNumLiteralExpr::new(
+                    bits.start,
+                    Default::default(),
+                ))),
+                Default::default(),
+            );
+
+            let accessor = VelosiAstBinOpExpr::new(
+                Rc::new(VelosiAstExpr::BinOp(shval)),
+                VelosiAstBinOp::And,
+                Rc::new(VelosiAstExpr::NumLiteral(VelosiAstNumLiteralExpr::new(
+                    mask,
+                    Default::default(),
+                ))),
+                Default::default(),
+            );
+
+            Some(Rc::new(VelosiAstExpr::BinOp(accessor)))
+        }
+    }
 }
 
 /// Implementation of [PartialEq] for [VelosiAstInterfaceDef]
@@ -1798,6 +1906,13 @@ impl VelosiAstInterface {
         match self {
             VelosiAstInterface::InterfaceDef(s) => s.fields_accessing_state(state_syms, state_bits),
             VelosiAstInterface::NoneInterface(_s) => HashSet::new(),
+        }
+    }
+
+    pub fn read_state_expr(&self, state_ref: &str, bits: Range<u64>) -> Option<Rc<VelosiAstExpr>> {
+        match self {
+            VelosiAstInterface::InterfaceDef(s) => s.read_state_expr(state_ref, bits),
+            VelosiAstInterface::NoneInterface(_) => None,
         }
     }
 
