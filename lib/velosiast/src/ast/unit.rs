@@ -1196,6 +1196,17 @@ impl Display for VelosiAstUnitStaticMap {
     }
 }
 
+/// holds the information about a specific variant
+#[derive(PartialEq, Eq, Clone, Debug)]
+struct VelosiAstUnitEnumVariant {
+    /// identifier of the unit
+    ident: VelosiAstIdentifier,
+    /// arguments for the initialization of the variant
+    args: Vec<VelosiAstIdentifier>,
+    /// vector of expressions forming the CNF of the differentiator expression for this variant
+    differentiator: Vec<Rc<VelosiAstExpr>>,
+}
+
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiAstUnitEnum {
     /// the name of the unit
@@ -1206,7 +1217,8 @@ pub struct VelosiAstUnitEnum {
     pub inbitwidth: u64,
     pub outbitwidth: u64,
 
-    pub enums: Vec<(VelosiAstIdentifier, Vec<VelosiAstIdentifier>)>,
+    // enumeration
+    enums: HashMap<Rc<String>, VelosiAstUnitEnumVariant>,
 
     pub methods: HashMap<String, Rc<VelosiAstMethod>>,
 
@@ -1260,7 +1272,7 @@ impl VelosiAstUnitEnum {
 
         // TODO: handle the drivation...
 
-        let mut enums: HashMap<VelosiAstIdentifier, Vec<VelosiAstIdentifier>> = HashMap::new();
+        let mut enums: HashMap<Rc<String>, VelosiAstUnitEnumVariant> = HashMap::new();
         let mut inbitwidth = 0;
         let outbitwidth = 0;
 
@@ -1270,10 +1282,10 @@ impl VelosiAstUnitEnum {
                     // covert the identifiers..
                     let ident = VelosiAstIdentifier::from(e.ident);
 
-                    if let Some((k, _v)) = enums.get_key_value(&ident) {
+                    if let Some(v) = enums.get(ident.ident()) {
                         let err = VelosiAstErrDoubleDef::new(
                             ident.ident.clone(),
-                            k.loc.clone(),
+                            v.ident.loc.clone(),
                             ident.loc.clone(),
                         );
                         issues.push(err.into());
@@ -1289,6 +1301,8 @@ impl VelosiAstUnitEnum {
                             id
                         })
                         .collect();
+
+                    let mut differentiator = Vec::new();
 
                     if let Some(sym) = st.lookup(ident.ident()) {
                         if let VelosiAstNode::Unit(u) = &sym.ast_node {
@@ -1337,6 +1351,32 @@ impl VelosiAstUnitEnum {
                             //     .build();
                             //     issues.push(err);
                             // }
+
+                            // populate the differentiator with the requires of the unit, this may
+                            // be reduced later on
+                            if let Some(m) = u.get_method("translate") {
+                                let pre = m.requires.iter().filter_map(|expr| {
+                                    if expr.has_state_references() {
+                                        Some(expr.clone())
+                                    } else {
+                                        None
+                                    }
+                                });
+
+                                differentiator.extend(pre);
+                            }
+
+                            if let Some(m) = u.get_method("matchflags") {
+                                let pre = m.requires.iter().filter_map(|expr| {
+                                    if expr.has_state_references() {
+                                        Some(expr.clone())
+                                    } else {
+                                        None
+                                    }
+                                });
+
+                                differentiator.extend(pre);
+                            }
 
                             // now we need to match
                             let nparam = u.params_as_slice().len();
@@ -1471,7 +1511,13 @@ impl VelosiAstUnitEnum {
                         issues.push(err.into());
                     }
 
-                    enums.insert(ident, args);
+                    let val = VelosiAstUnitEnumVariant {
+                        ident,
+                        args,
+                        differentiator,
+                    };
+
+                    enums.insert(val.ident.ident.clone(), val);
                 }
                 VelosiParseTreeUnitNode::Const(c) => {
                     ignored_node!(VelosiParseTreeUnitNode::Const, c, &mut issues, "Enum")
@@ -1496,16 +1542,13 @@ impl VelosiAstUnitEnum {
             }
         }
 
-        let enums: Vec<(VelosiAstIdentifier, Vec<VelosiAstIdentifier>)> =
-            enums.into_iter().collect();
-
-        for i in 0..enums.len() {
-            for j in i..enums.len() {
+        for (_, vi) in enums.iter() {
+            for (_, vj) in enums.iter() {
                 let unit1_sym = st
-                    .lookup(enums[i].0.ident())
+                    .lookup(vi.ident.ident())
                     .expect("BUG: no unit with that identifier");
                 let unit2_sym = st
-                    .lookup(enums[j].0.ident())
+                    .lookup(vj.ident.ident())
                     .expect("BUG: no unit with that identifier");
 
                 match (&unit1_sym.ast_node, &unit2_sym.ast_node) {
@@ -1517,8 +1560,8 @@ impl VelosiAstUnitEnum {
                             let msg2 = "This is the other unit with incompatible state";
                             let err = VelosiAstErrBuilder::err(msg.to_string())
                                 .add_hint(hint.to_string())
-                                .add_location(enums[i].0.loc.clone())
-                                .add_related_location(msg2.to_string(), enums[j].0.loc.clone())
+                                .add_location(vi.ident.loc.clone())
+                                .add_related_location(msg2.to_string(), vj.ident.loc.clone())
                                 .build();
                             issues.push(err);
                         }
@@ -1529,8 +1572,8 @@ impl VelosiAstUnitEnum {
                             let msg2 = "This is the other unit with incompatible interface";
                             let err = VelosiAstErrBuilder::err(msg.to_string())
                                 .add_hint(hint.to_string())
-                                .add_location(enums[i].0.loc.clone())
-                                .add_related_location(msg2.to_string(), enums[j].0.loc.clone())
+                                .add_location(vi.ident.loc.clone())
+                                .add_related_location(msg2.to_string(), vj.ident.loc.clone())
                                 .build();
                             issues.push(err);
                         }
@@ -1608,7 +1651,30 @@ impl VelosiAstUnitEnum {
     }
 
     pub fn get_unit_names(&self) -> Vec<&str> {
-        self.enums.iter().map(|(ident, _)| ident.as_str()).collect()
+        self.enums.keys().map(|ident| ident.as_str()).collect()
+    }
+
+    /// obtains the (unit, differentiators) for all units of the enum
+    ///
+    /// The differentiator expressions are returned as a slice of boolean expressions forming
+    /// a conjunctive normal form
+    pub fn get_unit_differentiators(&self) -> HashMap<Rc<String>, &[Rc<VelosiAstExpr>]> {
+        self.enums
+            .iter()
+            .map(|(k, v)| (k.clone(), v.differentiator.as_slice()))
+            .collect()
+    }
+
+    /// obtains the differentiator expression over the state for the supplied unit identifier
+    ///
+    /// The differentiator expressions are returned as a slice of boolean expressions forming
+    /// a conjunctive normal form
+    pub fn get_unit_differentiator(&self, unit: &Rc<String>) -> &[Rc<VelosiAstExpr>] {
+        if let Some(variant) = self.enums.get(unit) {
+            variant.differentiator.as_slice()
+        } else {
+            &[]
+        }
     }
 }
 
@@ -1630,7 +1696,7 @@ impl Display for VelosiAstUnitEnum {
 
         for (e, p) in &self.enums {
             write!(f, "  {e}(")?;
-            for (i, p) in p.iter().enumerate() {
+            for (i, p) in p.args.iter().enumerate() {
                 if i > 0 {
                     write!(f, ", ")?;
                 }
