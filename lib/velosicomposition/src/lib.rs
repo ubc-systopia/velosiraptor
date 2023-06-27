@@ -183,10 +183,7 @@ pub fn extract_composition(ast: &VelosiAst) {
             },
             Enum(u) => {
                 for next in &u.get_unit_names() {
-                    relations.insert(
-                        u.ident().clone(),
-                        ast.get_unit(next).unwrap().clone(),
-                    );
+                    relations.insert(u.ident().clone(), ast.get_unit(next).unwrap().clone());
                     referenced_units.insert(Rc::new(next.to_string()));
                 }
             }
@@ -204,7 +201,6 @@ pub fn extract_composition(ast: &VelosiAst) {
         relations.print_unit_hierarchy(ast.get_unit(root).unwrap());
     }
 }
-
 
 impl Default for Relations {
     fn default() -> Self {
