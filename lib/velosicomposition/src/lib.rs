@@ -147,7 +147,12 @@ pub fn extract_composition(ast: &VelosiAst) {
     let mut relations = Relations::new();
 
     for unit in units {
+        if unit.is_abstract() {
+            continue;
+        }
+
         all_units.insert(unit.ident().clone());
+
         use VelosiAstUnit::*;
         match unit {
             Segment(u) => {
@@ -177,12 +182,12 @@ pub fn extract_composition(ast: &VelosiAst) {
                 }
             },
             Enum(u) => {
-                for (next, _) in &u.enums {
+                for next in &u.get_unit_names() {
                     relations.insert(
                         u.ident().clone(),
-                        ast.get_unit(next.ident()).unwrap().clone(),
+                        ast.get_unit(next).unwrap().clone(),
                     );
-                    referenced_units.insert(next.ident().clone());
+                    referenced_units.insert(Rc::new(next.to_string()));
                 }
             }
         }
@@ -200,64 +205,9 @@ pub fn extract_composition(ast: &VelosiAst) {
     }
 }
 
-/*
 
-for each node:
-  minsize
-  maxsize
-  alignment
-
-
-
- */
-
-/*
-{
- "X86_64_PDPTEntry": {"X86_64_PDPT"},
- "Frame": {"X86_64_PDPTEntryPage", "X86_64_PageTableEntry", "X86_64_PDirEntryPage"},
- "X86_64_PDPTEntryPage": {"X86_64_PDPTEntry"},
- "X86_64_PDir": {"X86_64_PDPTEntryTable"},
- "X86_64_PDirEntryTable": {"X86_64_PDirEntry"},
- "X86_64_PDPT": {"X86_64_PML4Entry"},
- "X86_64_PDPTEntryTable": {"X86_64_PDPTEntry"},
- "X86_64_PML4Entry": {"X86_64_PML4"},
- "X86_64_PageTableEntry": {"X86_64_PageTable"},
- "X86_64_PDirEntryPage": {"X86_64_PDirEntry"},
- "X86_64_PageTable": {"X86_64_PDirEntryTable"},
- "X86_64_PDirEntry": {"X86_64_PDir"}})
-
-*/
-
-/*
-StaticMap: X86_64_PML4
- ->  X86_64_PML4Entry (ListComp)!
-Segment: X86_64_PML4Entry
- ->  X86_64_PDPT
-
-
-StaticMap: X86_64_PDPT
- ->  X86_64_PDPTEntry (ListComp)!
-Enum: X86_64_PDPTEntry
- ->  X86_64_PDPTEntryTable
- ->  X86_64_PDPTEntryPage
-Segment: X86_64_PDPTEntryPage
- ->  Frame!
-Segment: X86_64_PDPTEntryTable
- ->  X86_64_PDir
-
-StaticMap: X86_64_PDir
- ->  X86_64_PDirEntry (ListComp)!
-Enum: X86_64_PDirEntry
- ->  X86_64_PDirEntryTable
- ->  X86_64_PDirEntryPage
-Segment: X86_64_PDirEntryPage
- ->  Frame!
-Segment: X86_64_PDirEntryTable
- ->  X86_64_PageTable
-
-StaticMap: X86_64_PageTable
- ->  X86_64_PageTableEntry (ListComp)!
-Segment: X86_64_PageTableEntry
- ->  Frame!
-
- */
+impl Default for Relations {
+    fn default() -> Self {
+        Self::new()
+    }
+}
