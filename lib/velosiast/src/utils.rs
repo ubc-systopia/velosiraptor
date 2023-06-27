@@ -223,7 +223,7 @@ pub fn actions_conflict_check(issues: &mut VelosiAstIssues, actions: &[VelosiAst
     let mut dst: Vec<(&str, &VelosiTokenStream)> = Vec::new();
 
     for action in actions {
-        let ident = match &action.dst {
+        let ident = match action.dst.as_ref() {
             VelosiAstExpr::IdentLiteral(e) => e.ident(),
             VelosiAstExpr::Slice(e) => e.ident(),
             _ => "",
