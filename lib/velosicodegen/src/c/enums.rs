@@ -96,42 +96,9 @@ fn add_is_function(
     // 2) back project onto the interface to find out how to obtain the state
     // 3) read the interface such that the translation behavior doesn't change
 
-    let mut preconds_state_bits = HashMap::new();
-    for (_i, (variant, _params)) in unit.enums.iter().enumerate() {
-        let variant_unit = ast.get_unit(variant.as_str()).expect("unit not found!");
-        let variant_op = variant_unit
-            .get_method("translate")
-            .expect("map method not found!");
-
-        let mut state_refs = HashSet::new();
-        for (_j, e) in variant_op.requires.iter().enumerate() {
-            e.get_state_references(&mut state_refs);
-        }
-
-        let my_precond_state_bits = if let Some(state) = variant_unit.state() {
-            state.get_field_slice_refs(&state_refs)
-        } else {
-            HashMap::new()
-        };
-
-        // construct the intersection of all bits
-        for (k, v) in my_precond_state_bits.iter() {
-            if let Some(v2) = preconds_state_bits.get_mut(k) {
-                *v2 &= v;
-            } else {
-                preconds_state_bits.insert(k.clone(), *v);
-            }
-        }
-    }
-
-    for (variant, _params) in unit.enums.iter() {
+    for variant in unit.get_unit_names().into_iter() {
         // lookup the unit
-        let variant_unit = ast.get_unit(variant.as_str()).expect("unit not found!");
-        let variant_op = variant_unit
-            .get_method("translate")
-            .expect("map method not found!");
-
-        // here we probably want to generate something else
+        let variant_unit = ast.get_unit(variant).expect("unit not found!");
 
         // declare the function
 
@@ -177,36 +144,23 @@ fn add_is_function(
 
         let res_var = C::Expr::new_var("res", C::Type::new_bool());
         let mut idx = 0;
-        for e in variant_op.requires.iter() {
-            let state_refs = HashSet::new();
-            // let _state_bits = e.get_state_references(&mut state_refs);
 
-            let mut my_precond_state_bits = if let Some(state) = variant_unit.state() {
-                state.get_field_slice_refs(&state_refs)
-            } else {
-                HashMap::new()
-            };
+        // obtain the differentiators
+        for e in unit.get_unit_differentiator(variant_unit.ident()) {
+            // obtain the state references
+            let mut state_refs = HashSet::new();
+            e.get_state_references(&mut state_refs);
 
-            for (k, v) in my_precond_state_bits.iter_mut() {
-                let mask = preconds_state_bits.get(k).expect("state bit not found!");
-                *v &= *mask;
+            // we create a variable as a place holder for the state and
+            // construct the expression to access the interface
+            let mut vars = HashMap::new();
+            for state_ref in &state_refs {
+                // TODO: here we need to back project the state onto the interface
+                // and create the expressions
+
+                vars.insert(state_ref.as_str(), C::Expr::btrue());
             }
 
-            let st_access_fields = if let Some(interface) = variant_unit.interface() {
-                interface.fields_accessing_state(&state_refs, &my_precond_state_bits)
-            } else {
-                HashSet::new()
-            };
-
-            if st_access_fields.is_empty() {
-                continue;
-            }
-
-            // this is a part of the state that is present in both.
-
-            let vars = HashMap::new();
-            // TODO: need to to a back projection here, and select the right interface
-            // more over, do the intersection of all of them
             if idx == 0 {
                 body.assign(res_var.clone(), variant_unit.expr_to_cpp(&vars, e));
             } else {
@@ -235,10 +189,10 @@ fn add_map_function(
     //  -> create state struct
     //  -> call map()
 
-    for (variant, _params) in unit.enums.iter() {
+    for variant in unit.get_unit_names().into_iter() {
         // lookup the unit
 
-        let variant_unit = ast.get_unit(variant.as_str()).expect("unit not found!");
+        let variant_unit = ast.get_unit(variant).expect("unit not found!");
         let variant_op = variant_unit
             .get_method("map")
             .expect("map method not found!");
@@ -339,8 +293,8 @@ fn add_op_function(
     let mut block = C::Block::new();
     block.fn_call("assert", vec![C::Expr::bfalse()]);
 
-    for (_i, (variant, _params)) in unit.enums.iter().enumerate() {
-        let variant_unit = ast.get_unit(variant.as_str()).expect("unit not found!");
+    for variant in unit.get_unit_names().into_iter() {
+        let variant_unit = ast.get_unit(variant).expect("unit not found!");
         // let variant_op = variant_unit
         //     .get_method("translate")
         //     .expect("map method not found!");
