@@ -25,6 +25,8 @@
 
 //! Model Synthesis Module: Z3
 
+use std::rc::Rc;
+
 use super::expr::{expr_to_smt2, p2p};
 use super::types;
 
@@ -304,7 +306,7 @@ fn add_field_action(
     for (i, a) in actions.iter().enumerate() {
         let newvar = format!("st_{}", i + 1);
 
-        let dst = match &a.dst {
+        let dst = match a.dst.as_ref() {
             VelosiAstExpr::IdentLiteral(i) => {
                 let mut s = i.path_split();
                 match (s.next(), s.next(), s.next()) {
@@ -424,14 +426,14 @@ fn add_actions(smt: &mut Smt2Context, iface: &VelosiAstInterface, mem_model: boo
 
         if mem_model {
             let store_action = VelosiAstInterfaceAction::new(
-                VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
+                Rc::new(VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
                     format!("{LOCAL_VARS_PREFIX}.{fieldname}"),
                     VelosiAstTypeInfo::Integer,
-                )),
-                VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
+                ))),
+                Rc::new(VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
                     format!("{WBUFFER_PREFIX}.{fieldname}"),
                     VelosiAstTypeInfo::Integer,
-                )),
+                ))),
                 Default::default(),
             );
             add_field_action(
@@ -455,14 +457,14 @@ fn add_actions(smt: &mut Smt2Context, iface: &VelosiAstInterface, mem_model: boo
 
         if mem_model {
             let update_local_vars_action = VelosiAstInterfaceAction::new(
-                VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
+                Rc::new(VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
                     format!("{IFACE_PREFIX}.{fieldname}"),
                     VelosiAstTypeInfo::Integer,
-                )),
-                VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
+                ))),
+                Rc::new(VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::with_name(
                     format!("{LOCAL_VARS_PREFIX}.{fieldname}"),
                     VelosiAstTypeInfo::Integer,
-                )),
+                ))),
                 Default::default(),
             );
             add_field_action(
