@@ -42,6 +42,8 @@ use crate::VelosiTokenStream;
 pub struct VelosiParseTreeMethod {
     /// the name of the unit (identifier)
     pub name: VelosiParseTreeIdentifier,
+    /// properties of the method
+    pub properties: Vec<VelosiParseTreeIdentifier>,
     /// whether this is an abstract method
     pub is_abstract: bool,
     /// whether this is a method to be synthesized
@@ -67,6 +69,17 @@ impl VelosiParseTreeMethod {
 /// Implement the [Display] trait for the [VelosiParseTreeMethod] struct
 impl Display for VelosiParseTreeMethod {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        if !self.properties.is_empty() {
+            write!(f, "  #[")?;
+            for (i, prop) in self.properties.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                write!(f, "{}", prop.name)?;
+            }
+            writeln!(f, "]")?;
+        }
+
         write!(f, "  ")?;
         if self.is_abstract {
             write!(f, "abstract ")?;

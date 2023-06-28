@@ -116,6 +116,7 @@ terminalparser!(pub at, VelosiOpToken::At);
 terminalparser!(pub dotdot, VelosiOpToken::DotDot);
 terminalparser!(pub coloncolon, VelosiOpToken::ColonColon);
 // terminalparser!(pub questionmark, VelosiOpToken::QuestionMark);
+terminalparser!(pub hashtag, VelosiOpToken::HashTag);
 
 pub fn ident(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeIdentifier> {
     // we hit EOF, report the expected string
