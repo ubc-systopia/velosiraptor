@@ -29,24 +29,24 @@
 use nom::{
     branch::alt,
     combinator::{cut, opt},
-    multi::{many0, separated_list0},
+    multi::{many0, separated_list0, separated_list1},
     sequence::{delimited, preceded, terminated, tuple},
 };
 
 // library internal includes
-use crate::error::IResult;
 use crate::parser::{
     expr::{expr, quantifier_expr},
     param::parameter,
     terminals::{
-        comma, ident, kw_abstract, kw_fn, kw_requires, kw_synth, lbrace, lparen, rarrow, rbrace,
-        rparen, semicolon, typeinfo,
+        comma, hashtag, ident, kw_abstract, kw_fn, kw_requires, kw_synth, lbrace, lbrack, lparen,
+        rarrow, rbrace, rbrack, rparen, semicolon, typeinfo,
     },
 };
 use crate::parsetree::{
     VelosiParseTreeExpr, VelosiParseTreeMethod, VelosiParseTreeParam, VelosiParseTreeUnitNode,
 };
 use crate::VelosiTokenStream;
+use crate::{error::IResult, VelosiParseTreeIdentifier};
 
 /// Parses a require clause
 ///
@@ -146,6 +146,17 @@ fn param_list(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vec<Velosi
     separated_list0(comma, parameter)(input)
 }
 
+fn decorator(
+    input: VelosiTokenStream,
+) -> IResult<VelosiTokenStream, Vec<VelosiParseTreeIdentifier>> {
+    let (i1, _) = hashtag(input)?;
+
+    // [ ident ]
+    let (i2, decorators) = cut(delimited(lbrack, separated_list1(comma, ident), rbrack))(i1)?;
+
+    Ok((i2, decorators))
+}
+
 /// parses a method definition
 ///
 /// This function parses a full method definition.
@@ -184,8 +195,15 @@ fn param_list(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vec<Velosi
 pub fn method(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
     let mut pos = input.clone();
 
+    // parse the decorator #[foo]
+    let (i0, props) = opt(decorator)(input)?;
+
     // parse and consume fn keyword
-    let (i1, (abs, synth, _)) = tuple((opt(kw_abstract), opt(kw_synth), kw_fn))(input)?;
+    let (i1, (abs, synth, _)) = if props.is_some() {
+        cut(tuple((opt(kw_abstract), opt(kw_synth), kw_fn)))(i0)
+    } else {
+        tuple((opt(kw_abstract), opt(kw_synth), kw_fn))(i0)
+    }?;
 
     // get the method identifier, fail if there is not an identifier
     let (i2, name) = cut(ident)(i1)?;
@@ -214,6 +232,7 @@ pub fn method(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPars
 
     let method = VelosiParseTreeMethod {
         name,
+        properties: props.unwrap_or_default(),
         is_abstract: abs.is_some(),
         is_synth: synth.is_some(),
         params,
