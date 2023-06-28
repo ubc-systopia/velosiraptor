@@ -31,7 +31,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
-use velosiparser::{VelosiParseTreeMethod, VelosiTokenStream};
+use velosiparser::{VelosiParseTreeIdentifier, VelosiParseTreeMethod, VelosiTokenStream};
 
 use crate::ast::{
     VelosiAstBinOp, VelosiAstExpr, VelosiAstIdentLiteralExpr, VelosiAstIdentifier, VelosiAstNode,
@@ -50,10 +50,48 @@ pub const FN_SIG_PROTECT: &str = "fn protect(va: vaddr, sz: size, flgs: flags)";
 
 // const FN_SIG_INIT: &str = "fn init()";
 
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
+pub enum VelosiAstMethodProperty {
+    Invariant,
+    Predicate,
+}
+
+impl VelosiAstMethodProperty {
+    pub fn from_parse_tree(
+        pt: VelosiParseTreeIdentifier,
+        _st: &mut SymbolTable,
+    ) -> AstResult<Self, VelosiAstIssues> {
+        match pt.name.as_str() {
+            "invariant" => AstResult::Ok(Self::Invariant),
+            "predicate" => AstResult::Ok(Self::Predicate),
+            _ => {
+                let msg = "unknown method property";
+                let hint = "supported method properties are `invariant` and `predicate`";
+                let err = VelosiAstErrBuilder::err(msg.to_string())
+                    .add_hint(hint.to_string())
+                    .add_location(pt.loc)
+                    .build();
+                AstResult::Err(VelosiAstIssues::from(err))
+            }
+        }
+    }
+}
+
+impl Display for VelosiAstMethodProperty {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            Self::Invariant => write!(f, "invariant"),
+            Self::Predicate => write!(f, "predicate"),
+        }
+    }
+}
+
 #[derive(Eq, Clone, Debug)]
 pub struct VelosiAstMethod {
     /// the name of the constant
     pub ident: VelosiAstIdentifier,
+    /// properties of the method
+    pub properties: HashSet<VelosiAstMethodProperty>,
     /// whether this is an abstract method
     pub is_abstract: bool,
     /// wheather this is a method to be synthesized
@@ -89,6 +127,7 @@ impl VelosiAstMethod {
         });
         Self {
             ident,
+            properties: HashSet::new(),
             is_abstract: false,
             is_synth: false,
             rtype,
@@ -115,6 +154,7 @@ impl VelosiAstMethod {
         });
         Self {
             ident,
+            properties: HashSet::new(),
             is_abstract: true,
             is_synth: false,
             rtype,
@@ -141,6 +181,7 @@ impl VelosiAstMethod {
         });
         Self {
             ident,
+            properties: HashSet::new(),
             is_abstract: false,
             is_synth: true,
             rtype,
@@ -299,6 +340,26 @@ impl VelosiAstMethod {
         // check whether the name is in the right format
         let name = VelosiAstIdentifier::from(pt.name);
         utils::check_snake_case(&mut issues, &name);
+
+        // convert the properties
+        let mut properties: HashSet<VelosiAstMethodProperty> = HashSet::new();
+        for p in pt.properties.into_iter() {
+            let loc = p.loc.clone();
+            let prop = ast_result_unwrap!(VelosiAstMethodProperty::from_parse_tree(p, st), issues);
+
+            if properties.contains(&prop) {
+                let msg = "ignoring double defined property";
+                let hint = "remove the duplicate property";
+                let err = VelosiAstErrBuilder::warn(msg.to_string())
+                    .add_hint(hint.to_string())
+                    .add_location(loc)
+                    .build();
+
+                issues.push(err);
+            } else {
+                properties.insert(prop);
+            }
+        }
 
         // convert all the unit parameters
         let mut params = Vec::new();
@@ -492,13 +553,17 @@ impl VelosiAstMethod {
         // restore the symbol table context
         st.drop_context();
 
-        let res = if pt.is_abstract {
+        let mut res = if pt.is_abstract {
             Self::new_abstract(name, rtype, params, requires, body, pt.pos)
         } else if pt.is_synth {
             Self::new_synth(name, rtype, params, requires, body, pt.pos)
         } else {
             Self::new(name, rtype, params, requires, body, pt.pos)
         };
+
+        if !properties.is_empty() {
+            res.properties = properties;
+        }
 
         // perform additional checks for one of the special methods
         res.check_special_methods(&mut issues);
@@ -821,7 +886,25 @@ impl PartialEq for VelosiAstMethod {
 /// Implementation of [Display] for [VelosiAstMethod]
 impl Display for VelosiAstMethod {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "  fn {}(", self.ident())?;
+        if !self.properties.is_empty() {
+            write!(f, "  #[")?;
+            for (i, prop) in self.properties.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                write!(f, "{prop}")?;
+            }
+            writeln!(f, "]")?;
+        }
+
+        write!(f, "  ")?;
+        if self.is_abstract {
+            write!(f, "abstract ")?;
+        }
+        if self.is_synth {
+            write!(f, "synth ")?;
+        }
+        write!(f, "fn {}(", self.ident())?;
         for (i, p) in self.params.iter().enumerate() {
             if i > 0 {
                 write!(f, ", ")?;
