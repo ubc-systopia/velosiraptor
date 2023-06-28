@@ -115,6 +115,7 @@ namedtag!(at, VelosiOpToken::At);
 namedtag!(dotdot, VelosiOpToken::DotDot);
 namedtag!(coloncolon, VelosiOpToken::ColonColon);
 namedtag!(questionmark, VelosiOpToken::QuestionMark);
+namedtag!(hashtag, VelosiOpToken::HashTag);
 
 /// symbols with two character width
 fn punctuation2(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
@@ -172,6 +173,7 @@ fn punctuation1(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
         assign,
         questionmark,
         at,
+        hashtag,
     ))(input)
 }
 

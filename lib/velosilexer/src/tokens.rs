@@ -354,6 +354,7 @@ pub enum VelosiOpToken {
     DotDot,       // ..
     ColonColon,   // ::
     QuestionMark, // ?
+    HashTag,      // #
 }
 
 impl VelosiOpToken {
@@ -418,6 +419,7 @@ impl VelosiOpToken {
             DotDot => "..",
             ColonColon => "::",
             QuestionMark => "?",
+            HashTag => "#",
         }
     }
 }
@@ -494,6 +496,7 @@ impl TryFrom<&str> for VelosiOpToken {
             ".." => Ok(DotDot),
             "::" => Ok(ColonColon),
             "?" => Ok(QuestionMark),
+            "#" => Ok(HashTag),
 
             _ => Err(()),
         }
