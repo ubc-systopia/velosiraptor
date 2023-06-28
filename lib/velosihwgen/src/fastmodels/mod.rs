@@ -255,11 +255,39 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
         for u in ast.units() {
             let out_subdir = &self.outdir.join(u.ident_to_string());
             fs::create_dir_all(out_subdir)?;
-
-            // not putting hpp files in /include for now
-            // let includedir = out_subdir.join("include");
-            // fs::create_dir_all(includedir)?;
         }
+        Ok(())
+    }
+
+    fn generate(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
+        for u in ast.units() {
+            let unit_dir = &self.outdir.join(u.ident_to_string());
+            let name = &u.ident_to_string();
+
+            generate_unit_header(name, u, unit_dir)?;
+            generate_unit_impl(name, u, unit_dir)?;
+
+            match u {
+                velosiast::VelosiAstUnit::Segment(us) => {
+                    // todo: registers are not per unit
+                    generate_register_header(name, &us.interface, unit_dir)?;
+                    generate_register_impl(name, &us.interface, unit_dir)?;
+                    generate_interface_header(name, &us.interface, unit_dir)?;
+                    generate_interface_impl(name, &us.interface, unit_dir)?;
+                    generate_field_header(name, &us.state, unit_dir)?;
+                    generate_field_impl(name, &us.state, unit_dir)?;
+                    generate_state_header(name, &us.state, unit_dir)?;
+                    generate_state_impl(name, &us.state, unit_dir)?;
+                }
+                velosiast::VelosiAstUnit::StaticMap(_sm) => {
+                    println!("staticmap skipped for now: {}", u.ident_to_string());
+                }
+                velosiast::VelosiAstUnit::Enum(_en) => {
+                    println!("enum skipped for now: {}", u.ident_to_string());
+                }
+            }
+        }
+
         Ok(())
     }
 

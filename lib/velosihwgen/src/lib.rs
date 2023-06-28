@@ -65,11 +65,7 @@ impl VelosiHwGen {
 
     pub fn generate(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
         match self {
-            VelosiHwGen::FastModels(b) => {
-                b.generate_interfaces(ast)?;
-                b.generate_states(ast)?;
-                b.generate_units(ast)
-            }
+            VelosiHwGen::FastModels(b) => b.generate(ast),
         }
     }
 
@@ -84,13 +80,11 @@ pub trait VelosiHwGenBackend {
     /// prepares the component generation, creating the directories etc
     fn prepare(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
 
-    /// generates the unit
+    // simplifying the generation; this will replace the next three
+    fn generate(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
+
     fn generate_units(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
-
-    /// generate the interface definitions
     fn generate_interfaces(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
-
-    /// generates the state representation
     fn generate_states(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
 
     /// finalizes the code generation part
