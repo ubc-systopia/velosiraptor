@@ -147,8 +147,16 @@ pub fn generate_register_impl(
     scope.new_include(&reghdr, false);
 
     for f in interface.fields() {
-        // if it's not a register file, we skip
+        // println!("{}", f.ident_to_string());
+
+        // match **f {
+        //     VelosiAstInterfaceField::Register(_) => println!("1"),
+        //     VelosiAstInterfaceField::Memory(_) => println!("2"),
+        //     VelosiAstInterfaceField::Mmio(_) => println!("3"),
+        // }
+
         if !matches!(**f, VelosiAstInterfaceField::Register(_)) {
+            // println!("skipping");
             // scope.to_file(outdir, false)?;
             continue;
         };
