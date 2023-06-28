@@ -1,6 +1,11 @@
-# Velosiparser Library
+# Velosihwgen library
 
-This library implements the VelosiAst the AST for the Velosiraptor Specification Language source files (*.vrs).
+This library implements hardware generation from a [velosiast](../velosiast/).
+
+Supported targets:
+
+- ARM FastModels
+- more to come...
 
 ## License
 
@@ -26,15 +31,8 @@ To build the library
 $ cargo build
 ```
 
-## Documentation
+To run an example
 
 ```
-$ cargo doc --no-deps
-```
-
-
-## Testing
-
-```
-$ cargo test
+$ cargo ../../examples/x86_64_pagetable.vrs
 ```
