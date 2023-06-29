@@ -41,8 +41,8 @@ use crate::ast::{
         FN_SIG_MAP, FN_SIG_MATCHFLAGS, FN_SIG_PROTECT, FN_SIG_TRANSLATE, FN_SIG_UNMAP, FN_SIG_VALID,
     },
     types::{VelosiAstType, VelosiAstTypeInfo},
-    VelosiAstConst, VelosiAstInterface, VelosiAstMethod, VelosiAstNode, VelosiAstParam,
-    VelosiAstStateField, VelosiAstStaticMap, VelosiOperation,
+    VelosiAstConst, VelosiAstInterface, VelosiAstMethod, VelosiAstMethodProperty, VelosiAstNode,
+    VelosiAstParam, VelosiAstStateField, VelosiAstStaticMap, VelosiOperation,
 };
 use crate::error::{
     VelosiAstErrBuilder, VelosiAstErrDoubleDef, VelosiAstErrUndef, VelosiAstIssues,
@@ -1844,6 +1844,13 @@ impl VelosiAstUnit {
             Segment(segment) => Box::new(segment.methods()),
             Enum(_) => Box::new(std::iter::empty()),
         }
+    }
+
+    pub fn methods_with_property(&self, prop: VelosiAstMethodProperty) -> Vec<Rc<VelosiAstMethod>> {
+        self.methods()
+            .filter(|m| m.properties.contains(&prop))
+            .cloned()
+            .collect()
     }
 
     pub fn get_method(&self, name: &str) -> Option<&Rc<VelosiAstMethod>> {
