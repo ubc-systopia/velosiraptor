@@ -551,16 +551,14 @@ impl VelosiAstMethod {
         }
 
         // check a few things regarding the properties
-        if !properties.is_empty() {
-            if !rtype.is_boolean() {
-                let msg = "methods with properties must have a boolean return type.";
-                let hint = "change this to `fn -> bool`";
-                let err = VelosiAstErrBuilder::warn(msg.to_string())
-                    .add_hint(hint.to_string())
-                    .add_location(rtype.loc.clone())
-                    .build();
-                issues.push(err);
-            }
+        if !properties.is_empty() && !rtype.is_boolean() {
+            let msg = "methods with properties must have a boolean return type.";
+            let hint = "change this to `fn -> bool`";
+            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                .add_hint(hint.to_string())
+                .add_location(rtype.loc.clone())
+                .build();
+            issues.push(err);
         }
 
         // restore the symbol table context
