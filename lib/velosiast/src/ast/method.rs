@@ -31,7 +31,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
-use velosiparser::{VelosiParseTreeIdentifier, VelosiParseTreeMethod, VelosiTokenStream};
+use velosiparser::{VelosiParseTreeMethod, VelosiParseTreeMethodProperty, VelosiTokenStream};
 
 use crate::ast::{
     VelosiAstBinOp, VelosiAstExpr, VelosiAstIdentLiteralExpr, VelosiAstIdentifier, VelosiAstNode,
@@ -58,10 +58,10 @@ pub enum VelosiAstMethodProperty {
 
 impl VelosiAstMethodProperty {
     pub fn from_parse_tree(
-        pt: VelosiParseTreeIdentifier,
+        pt: VelosiParseTreeMethodProperty,
         _st: &mut SymbolTable,
     ) -> AstResult<Self, VelosiAstIssues> {
-        match pt.name.as_str() {
+        match pt.0.name.as_str() {
             "invariant" => AstResult::Ok(Self::Invariant),
             "predicate" => AstResult::Ok(Self::Predicate),
             _ => {
@@ -69,7 +69,7 @@ impl VelosiAstMethodProperty {
                 let hint = "supported method properties are `invariant` and `predicate`";
                 let err = VelosiAstErrBuilder::err(msg.to_string())
                     .add_hint(hint.to_string())
-                    .add_location(pt.loc)
+                    .add_location(pt.0.loc)
                     .build();
                 AstResult::Err(VelosiAstIssues::from(err))
             }
@@ -344,7 +344,7 @@ impl VelosiAstMethod {
         // convert the properties
         let mut properties: HashSet<VelosiAstMethodProperty> = HashSet::new();
         for p in pt.properties.into_iter() {
-            let loc = p.loc.clone();
+            let loc = p.0.loc.clone();
             let prop = ast_result_unwrap!(VelosiAstMethodProperty::from_parse_tree(p, st), issues);
 
             if properties.contains(&prop) {
