@@ -34,6 +34,7 @@ use nom::{
 };
 
 // library internal includes
+use crate::error::IResult;
 use crate::parser::{
     expr::{expr, quantifier_expr},
     param::parameter,
@@ -43,10 +44,10 @@ use crate::parser::{
     },
 };
 use crate::parsetree::{
-    VelosiParseTreeExpr, VelosiParseTreeMethod, VelosiParseTreeParam, VelosiParseTreeUnitNode,
+    VelosiParseTreeExpr, VelosiParseTreeMethod, VelosiParseTreeMethodProperty,
+    VelosiParseTreeParam, VelosiParseTreeUnitNode,
 };
 use crate::VelosiTokenStream;
-use crate::{error::IResult, VelosiParseTreeIdentifier};
 
 /// Parses a require clause
 ///
@@ -146,13 +147,50 @@ fn param_list(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vec<Velosi
     separated_list0(comma, parameter)(input)
 }
 
-fn decorator(
+/// parses a decorator/property element
+///
+/// # Grammar
+///
+/// DECORATOR_ELEMENT := IDENT (LPAREN IDENT RPAREN)?
+///
+/// # Results
+///
+///  * OK:      the parser could successfully recognize the decorator/property
+///  * Error:   the parser could not recognize the decorator/property
+///  * Failure: the parser recognized the decorator keyword, but failed to parse
+///
+fn decorator_element(
     input: VelosiTokenStream,
-) -> IResult<VelosiTokenStream, Vec<VelosiParseTreeIdentifier>> {
+) -> IResult<VelosiTokenStream, VelosiParseTreeMethodProperty> {
+    let (i1, name) = ident(input)?;
+    let (i2, arg) = opt(delimited(lparen, cut(ident), cut(rparen)))(i1)?;
+    Ok((i2, (name, arg)))
+}
+
+/// parses a decorator
+///
+/// This function parses a function decorator/property
+///
+/// # Grammar
+///
+/// DECORATOR := KW_HASHTAG RBRAK DECORATOR_ELEMENT RBRAK
+///
+/// # Results
+///
+///  * OK:      the parser could successfully recognize the decorator/property
+///  * Error:   the parser could not recognize the decorator/property
+///  * Failure: the parser recognized the decorator keyword, but failed to parse
+fn decorator_list(
+    input: VelosiTokenStream,
+) -> IResult<VelosiTokenStream, Vec<VelosiParseTreeMethodProperty>> {
     let (i1, _) = hashtag(input)?;
 
     // [ ident ]
-    let (i2, decorators) = cut(delimited(lbrack, separated_list1(comma, ident), rbrack))(i1)?;
+    let (i2, decorators) = cut(delimited(
+        lbrack,
+        separated_list1(comma, decorator_element),
+        rbrack,
+    ))(i1)?;
 
     Ok((i2, decorators))
 }
@@ -196,7 +234,7 @@ pub fn method(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPars
     let mut pos = input.clone();
 
     // parse the decorator #[foo]
-    let (i0, props) = opt(decorator)(input)?;
+    let (i0, props) = opt(decorator_list)(input)?;
 
     // parse and consume fn keyword
     let (i1, (abs, synth, _)) = if props.is_some() {

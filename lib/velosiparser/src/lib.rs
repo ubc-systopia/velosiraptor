@@ -56,12 +56,13 @@ pub use parsetree::{
     VelosiParseTreeInterfaceFieldMemory, VelosiParseTreeInterfaceFieldMmio,
     VelosiParseTreeInterfaceFieldNode, VelosiParseTreeInterfaceFieldRegister, VelosiParseTreeMap,
     VelosiParseTreeMapElement, VelosiParseTreeMapExplicit, VelosiParseTreeMapListComp,
-    VelosiParseTreeMethod, VelosiParseTreeNumLiteral, VelosiParseTreeParam,
-    VelosiParseTreeQuantifier, VelosiParseTreeQuantifierExpr, VelosiParseTreeRangeExpr,
-    VelosiParseTreeSliceExpr, VelosiParseTreeState, VelosiParseTreeStateDef,
-    VelosiParseTreeStateField, VelosiParseTreeStateFieldMemory, VelosiParseTreeStateFieldRegister,
-    VelosiParseTreeType, VelosiParseTreeTypeInfo, VelosiParseTreeUnOp, VelosiParseTreeUnOpExpr,
-    VelosiParseTreeUnit, VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,
+    VelosiParseTreeMethod, VelosiParseTreeMethodProperty, VelosiParseTreeNumLiteral,
+    VelosiParseTreeParam, VelosiParseTreeQuantifier, VelosiParseTreeQuantifierExpr,
+    VelosiParseTreeRangeExpr, VelosiParseTreeSliceExpr, VelosiParseTreeState,
+    VelosiParseTreeStateDef, VelosiParseTreeStateField, VelosiParseTreeStateFieldMemory,
+    VelosiParseTreeStateFieldRegister, VelosiParseTreeType, VelosiParseTreeTypeInfo,
+    VelosiParseTreeUnOp, VelosiParseTreeUnOpExpr, VelosiParseTreeUnit, VelosiParseTreeUnitDef,
+    VelosiParseTreeUnitNode,
 };
 
 use error::IResult;

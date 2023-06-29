@@ -38,12 +38,15 @@ use crate::parsetree::{
 };
 use crate::VelosiTokenStream;
 
+pub type VelosiParseTreeMethodProperty =
+    (VelosiParseTreeIdentifier, Option<VelosiParseTreeIdentifier>);
+
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct VelosiParseTreeMethod {
     /// the name of the unit (identifier)
     pub name: VelosiParseTreeIdentifier,
     /// properties of the method
-    pub properties: Vec<VelosiParseTreeIdentifier>,
+    pub properties: Vec<VelosiParseTreeMethodProperty>,
     /// whether this is an abstract method
     pub is_abstract: bool,
     /// whether this is a method to be synthesized
@@ -75,7 +78,11 @@ impl Display for VelosiParseTreeMethod {
                 if i > 0 {
                     write!(f, ", ")?;
                 }
-                write!(f, "{}", prop.name)?;
+
+                write!(f, "{}", prop.0.name)?;
+                if let Some(param) = &prop.1 {
+                    write!(f, "({})", param.name)?;
+                }
             }
             writeln!(f, "]")?;
         }
