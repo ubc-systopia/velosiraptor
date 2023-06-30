@@ -3,7 +3,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2022 Systopia Lab, Computer Science, University of British Columbia
+// Copyright (c) 2023 Systopia Lab, Computer Science, University of British Columbia
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -25,23 +25,11 @@
 
 //! Synthesis of Virtual Memory Operations
 
-pub mod map;
-pub mod protect;
-mod queries;
-pub mod unmap;
-
-pub use queries::queryhelper::{MaybeResult, ProgramBuilder};
-
-// re-export the sanity checks
-pub use queries::cnf;
-pub use queries::precond;
-pub use queries::queryhelper;
-pub use queries::resultparser;
-pub use queries::sanitychecks;
-pub use queries::semantics;
-pub use queries::semprecond;
-pub use queries::utils;
-
-pub use map::MapPrograms;
-pub use protect::ProtectPrograms;
-pub use unmap::UnmapPrograms;
+pub mod cnf;
+pub mod precond;
+pub mod queryhelper;
+pub mod resultparser;
+pub mod sanitychecks;
+pub mod semantics;
+pub mod semprecond;
+pub mod utils;
