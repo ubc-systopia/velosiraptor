@@ -24,6 +24,7 @@
 // SOFTWARE.
 
 use std::rc::Rc;
+use std::collections::HashMap;
 
 use smt2::{Smt2Context, Term, VarDecl};
 
@@ -31,9 +32,23 @@ use velosiast::ast::{VelosiAstExpr, VelosiAstMethod, VelosiAstUnitSegment};
 
 use crate::error::{VelosiSynthErrorBuilder, VelosiSynthErrorUnsatDef, VelosiSynthIssues};
 use crate::model::{expr, types};
-use crate::z3::{Z3Query, Z3TaskPriority, Z3Ticket, Z3WorkerPool};
+use crate::z3::{Z3Query, Z3Result, Z3TaskPriority, Z3Ticket, Z3WorkerPool};
 
-fn check_precondition_pair(
+/// checks whether two expressions can be satisfied at the same time
+///
+/// # Arguments
+///
+/// * `z3` - the Z3 worker pool
+/// * `p1` - the first expression
+/// * `i1` - the index of the first expression
+/// * `p2` - the second expression
+/// * `i2` - the index of the second expression
+///
+/// # Returns
+///
+/// The function returns a Z3Ticket of the submitted query
+///
+fn expr_pair_sat_query(
     z3: &mut Z3WorkerPool,
     p1: &VelosiAstExpr,
     i1: usize,
@@ -43,9 +58,6 @@ fn check_precondition_pair(
     // construct a new SMT2 context
     let mut smt = Smt2Context::new();
 
-    // declare a variable for each
-    smt.variable(VarDecl::new(String::from("st"), types::model()));
-
     // ---------------------------------------------------------------------------------------------
     // Variable Declarations
     // ---------------------------------------------------------------------------------------------
@@ -54,19 +66,23 @@ fn check_precondition_pair(
     // leverage this. In particluar the values:
     //   va: vaddr, sz: size, flgs: flags, pa : paddr
     // So fore ach of them we declare a variable and add it to the context.
-    //
-    // TODO: handle the case where the destination is a unit!
+    // in addition we add the state avariable
 
+    smt.variable(VarDecl::new(String::from("st"), types::model()));
     smt.variable(VarDecl::new("va".to_string(), types::vaddr()));
     smt.variable(VarDecl::new("sz".to_string(), types::size()));
     smt.variable(VarDecl::new("flgs".to_string(), types::flags()));
     smt.variable(VarDecl::new("pa".to_string(), types::paddr()));
 
-    // smt.comment(format!("{}: {}", fn_1.ident(), p1));
+    // ---------------------------------------------------------------------------------------------
+    // Assert expressions
+    // ---------------------------------------------------------------------------------------------
+    //
+    // We assert the two expressions. There should be an assignment for each of them.
+
     let name1 = format!("fn_1-{i1}");
     smt.assert(Term::named(expr::expr_to_smt2(p1, "st"), name1));
 
-    // smt.comment(format!("{}: {}", fn_2.ident(), p2));
     let name2 = format!("fn_2-{i2}");
     smt.assert(Term::named(expr::expr_to_smt2(p2, "st"), name2));
 
@@ -93,6 +109,164 @@ fn check_precondition_pair(
         .expect("failed to submit query")
 }
 
+/// checks whether a single expressions can be satisfied
+///
+/// # Arguments
+///
+/// * `z3` - the Z3 worker pool
+/// * `p1` - the first expression
+/// * `i1` - the index of the first expression
+///
+/// # Returns
+///
+/// The function returns a Z3Ticket of the submitted query
+///
+fn expr_sat_query(z3: &mut Z3WorkerPool, p1: &VelosiAstExpr, i1: usize) -> Z3Ticket {
+    // construct a new SMT2 context
+    let mut smt = Smt2Context::new();
+
+    // ---------------------------------------------------------------------------------------------
+    // Variable Declarations
+    // ---------------------------------------------------------------------------------------------
+    //
+    // We know that the function signatures have a well-defined arguments, so we can
+    // leverage this. In particluar the values:
+    //   va: vaddr, sz: size, flgs: flags, pa : paddr
+    // So fore ach of them we declare a variable and add it to the context.
+    // in addition we add the state avariable
+
+    smt.variable(VarDecl::new(String::from("st"), types::model()));
+    smt.variable(VarDecl::new("va".to_string(), types::vaddr()));
+    smt.variable(VarDecl::new("sz".to_string(), types::size()));
+    smt.variable(VarDecl::new("flgs".to_string(), types::flags()));
+    smt.variable(VarDecl::new("pa".to_string(), types::paddr()));
+
+    // ---------------------------------------------------------------------------------------------
+    // Assert expressions
+    // ---------------------------------------------------------------------------------------------
+    //
+    // We assert the two expressions. There should be an assignment for each of them.
+
+    let name1 = format!("fn_1-{i1}");
+    smt.assert(Term::named(expr::expr_to_smt2(p1, "st"), name1));
+
+    // ---------------------------------------------------------------------------------------------
+    // Checking Satisfiability
+    // ---------------------------------------------------------------------------------------------
+    //
+    // Invoke the `checkast` function and obtain the unsat core
+
+    smt.check_sat();
+    smt.get_unsat_core();
+
+    // ---------------------------------------------------------------------------------------------
+    // Create and Submit query
+    // ---------------------------------------------------------------------------------------------
+    //
+    // Here we push the context to the Z3 and then submit the query to the pool
+
+    let mut smtctx = Smt2Context::new();
+    smtctx.level(smt);
+
+    let q = Box::new(Z3Query::from(smtctx));
+    z3.submit_query(q, Z3TaskPriority::Medium)
+        .expect("failed to submit query")
+}
+
+
+/// checks whether the the preconditions of a function can be satisfied
+fn method_precond_sat_query(z3: &mut Z3WorkerPool, m: &VelosiAstMethod) -> Z3Ticket
+{
+    // construct a new SMT2 context
+    let mut smt = Smt2Context::new();
+
+    // ---------------------------------------------------------------------------------------------
+    // Variable Declarations
+    // ---------------------------------------------------------------------------------------------
+
+    smt.variable(VarDecl::new(String::from("st"), types::model()));
+    for param in m.params.iter() {
+        smt.variable(VarDecl::new(param.ident_to_string(),types::type_to_smt2(&param.ptype)));
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Adding Asserts for the pre-conditions and the body, if it's boolean
+    // ---------------------------------------------------------------------------------------------
+
+    for (i, e) in m.requires.iter().enumerate() {
+        smt.assert(Term::named(expr::expr_to_smt2(e, "st"), format!("pre-{i}")));
+    }
+
+    match (&m.body, m.rtype.is_boolean()) {
+        (Some(e), true) => {
+            smt.assert(Term::named(expr::expr_to_smt2(e.as_ref(), "st"), format!("body")));
+        }
+        _ => ()
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Checking Satisfiability
+    // ---------------------------------------------------------------------------------------------
+
+    smt.check_sat();
+    smt.get_unsat_core();
+
+    // ---------------------------------------------------------------------------------------------
+    // Create the query context and submit it
+    // ---------------------------------------------------------------------------------------------
+
+    let mut smtctx = Smt2Context::new();
+    smtctx.level(smt);
+
+    let q = Box::new(Z3Query::from(smtctx));
+    z3.submit_query(q, Z3TaskPriority::Medium)
+        .expect("failed to submit query")
+}
+
+fn method_precond_sat_results(z3: &mut Z3WorkerPool, m: &VelosiAstMethod, result: &Z3Result) -> VelosiSynthIssues
+{
+    let mut issues = VelosiSynthIssues::new();
+
+    issues
+}
+
+/// checks the methods for
+pub fn check_methods(z3: &mut Z3WorkerPool, unit: &VelosiAstUnitSegment) -> VelosiSynthIssues {
+    let mut issues = VelosiSynthIssues::new();
+    let mut tickets = HashMap::new();
+    for m in unit.methods() {
+        // skip methods that would not result in queries
+        if m.requires.is_empty() && m.body.is_none() && m.rtype.is_boolean() {
+            continue;
+        }
+
+        tickets.insert(m.ident().as_str(), (m, method_precond_sat_query(z3, m)));
+    }
+
+    let mut results = Vec::with_capacity(tickets.len());
+    while !tickets.is_empty() {
+        tickets.retain(|_k, (m, ticket)| {
+            if let Some(res) = z3.get_result(*ticket) {
+                results.push((*m, res));
+                false
+            } else {
+                true
+            }
+        });
+
+        for (m, result) in results.drain(..) {
+            issues.merge(method_precond_sat_results(z3, m, &result));
+        }
+    }
+
+    for (m, result) in results.drain(..) {
+        issues.merge(method_precond_sat_results(z3, m, &result));
+    }
+
+    issues
+}
+
+
 fn check_satisfy_fn_pair(
     z3: &mut Z3WorkerPool,
     fn_1: &VelosiAstMethod,
@@ -111,7 +285,7 @@ fn check_satisfy_fn_pair(
             if same && i2 < i1 {
                 continue;
             }
-            let ticket = check_precondition_pair(z3, p1, i1, p2, i2);
+            let ticket = expr_pair_sat_query(z3, p1, i1, p2, i2);
             tickets.push(ticket);
         }
     }
@@ -126,7 +300,7 @@ fn check_satisfy_fn(z3: &mut Z3WorkerPool, fn_1: &VelosiAstMethod) -> Vec<Z3Tick
 
     for (i1, p1) in fn_1.requires.iter().enumerate() {
         for (i2, p2) in fn_1.requires.iter().enumerate().skip(i1) {
-            let ticket = check_precondition_pair(z3, p1, i1, p2, i2);
+            let ticket = expr_pair_sat_query(z3, p1, i1, p2, i2);
             tickets.push(ticket);
         }
     }

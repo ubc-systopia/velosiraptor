@@ -178,20 +178,23 @@ impl<'a> Z3Synth<'a> {
         self.create_model();
         let t_start = Instant::now();
 
-        log::info!(target: "[Z3Synth]", "running sanity checks on the model.");
+        log::warn!(target: "[Z3Synth]", "running sanity checks on the model.");
         let mut issues = VelosiSynthIssues::new();
 
-        issues.merge_result(vmops::sanity::check_precondition_satisfiability(
+
+
+
+        issues.merge_result(vmops::sanitychecks::check_precondition_satisfiability(
             &mut self.z3,
             self.unit,
             "map",
         ));
-        issues.merge_result(vmops::sanity::check_precondition_satisfiability(
+        issues.merge_result(vmops::sanitychecks::check_precondition_satisfiability(
             &mut self.z3,
             self.unit,
             "unmap",
         ));
-        issues.merge_result(vmops::sanity::check_precondition_satisfiability(
+        issues.merge_result(vmops::sanitychecks::check_precondition_satisfiability(
             &mut self.z3,
             self.unit,
             "protect",
