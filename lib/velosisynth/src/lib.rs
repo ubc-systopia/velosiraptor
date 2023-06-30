@@ -43,6 +43,7 @@ use std::time::{Duration, Instant};
 mod error;
 mod model;
 mod programs;
+mod sanitycheck;
 mod vmops;
 mod z3;
 
@@ -181,8 +182,11 @@ impl<'a> Z3Synth<'a> {
         log::warn!(target: "[Z3Synth]", "running sanity checks on the model.");
         let mut issues = VelosiSynthIssues::new();
 
+        let issues = sanitycheck::check_methods(&mut self.z3, self.unit);
 
+        println!("sanity check:\n {}", issues);
 
+        panic!("stop!");
 
         issues.merge_result(vmops::sanitychecks::check_precondition_satisfiability(
             &mut self.z3,

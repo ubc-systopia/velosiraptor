@@ -345,15 +345,12 @@ pub fn get_program_iter(
     }
 }
 
-
 // pub fn get_program_iter_new(    unit: &VelosiAstUnitSegment,
 //     batch_size: usize,
 //     starting_prog: Option<Program>) -> MapPrograms
 // {
 
 // }
-
-
 
 pub fn synthesize(
     z3: &mut Z3WorkerPool,

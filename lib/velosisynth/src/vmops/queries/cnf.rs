@@ -34,7 +34,7 @@ use velosiast::{
         VelosiAstBinOp, VelosiAstBinOpExpr, VelosiAstBoolLiteralExpr, VelosiAstExpr,
         VelosiAstMethod, VelosiAstUnOp, VelosiAstUnOpExpr, VelosiAstUnitSegment,
     },
-    VelosiAst, VelosiTokenStream,
+    VelosiTokenStream,
 };
 
 use crate::{
