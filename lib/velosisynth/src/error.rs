@@ -154,10 +154,10 @@ impl VelosiSynthErrorBuilder {
     }
 
     /// Adds a hint to the error message
-    // pub fn add_hint(&mut self, hint: String) -> &mut Self {
-    //     self.hint = Some(hint);
-    //     self
-    // }
+    pub fn add_hint(&mut self, hint: String) -> &mut Self {
+        self.hint = Some(hint);
+        self
+    }
 
     /// Adds a location to the error information
     pub fn add_location(&mut self, tokstream: VelosiTokenStream) -> &mut Self {
