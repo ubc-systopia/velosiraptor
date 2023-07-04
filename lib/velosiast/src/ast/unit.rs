@@ -28,7 +28,7 @@
 //! This module defines the Constant AST nodes of the langauge
 
 use std::collections::hash_map::{Values, ValuesMut};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
@@ -50,9 +50,7 @@ use crate::error::{
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
 
 use super::flags::VelosiAstFlags;
-use super::{
-    VelosiAstBinOp, VelosiAstBinOpExpr, VelosiAstExpr, VelosiAstIdentifier, VelosiAstState,
-};
+use super::{VelosiAstExpr, VelosiAstIdentifier, VelosiAstState};
 
 macro_rules! ignored_node (
     ($node:path, $pst:expr, $issues:expr, $kind:expr) => {
