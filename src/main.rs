@@ -308,7 +308,7 @@ fn main() {
                 }
 
                 let seg = seg.unwrap();
-                let mut synth = synthfactory.create(seg);
+                let mut synth = synthfactory.create_segment(seg);
 
                 synth.create_model();
 

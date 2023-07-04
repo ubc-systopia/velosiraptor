@@ -123,6 +123,17 @@ pub fn main() {
     let mut synthfactory = Z3SynthFactory::new();
     synthfactory.num_workers(ncores).default_log_dir();
 
+    // HACK: how do we have access to the methods and give a mutable reference at the same time?
+    {
+        let initial_ast = ast.clone();
+        for unit in ast.units_mut() {
+            if let VelosiAstUnit::Enum(e) = unit {
+                let mut synth = synthfactory.create_enum(e);
+                synth.distinguish(&initial_ast);
+            }
+        }
+    }
+
     let mut t_synth = Vec::new();
     for unit in ast.units_mut() {
         use std::rc::Rc;
@@ -152,7 +163,7 @@ pub fn main() {
 
                 t_synth_segment.push(("start", Instant::now()));
 
-                let mut synth = synthfactory.create(seg);
+                let mut synth = synthfactory.create_segment(seg);
 
                 t_synth_segment.push(("init", Instant::now()));
 

@@ -1612,25 +1612,25 @@ impl VelosiAstUnitEnum {
 
             let mut values = distinguishing_exprs.values();
             let first_value = values.next();
-            if distinguishing_exprs.is_empty() {
-                let msg = "Unable to distinguish enum variants";
-                let hint = "Add preconditions to the variant translate functions that describe the differentiating state";
-                issues.push(
-                    VelosiAstErrBuilder::err(msg.to_string())
-                        .add_hint(hint.to_string())
-                        .add_location(pt.loc.clone())
-                        .build(),
-                )
-            } else if values.all(|e| e == first_value.unwrap()) {
-                let msg = "Unable to distinguish enum variants";
-                let hint = "All variants have the same translate preconditions";
-                issues.push(
-                    VelosiAstErrBuilder::err(msg.to_string())
-                        .add_hint(hint.to_string())
-                        .add_location(pt.loc.clone())
-                        .build(),
-                )
-            }
+            // if distinguishing_exprs.is_empty() {
+            //     let msg = "Unable to distinguish enum variants";
+            //     let hint = "Add preconditions to the variant translate functions that describe the differentiating state";
+            //     issues.push(
+            //         VelosiAstErrBuilder::err(msg.to_string())
+            //             .add_hint(hint.to_string())
+            //             .add_location(pt.loc.clone())
+            //             .build(),
+            //     )
+            // } else if values.all(|e| e == first_value.unwrap()) {
+            //     let msg = "Unable to distinguish enum variants";
+            //     let hint = "All variants have the same translate preconditions";
+            //     issues.push(
+            //         VelosiAstErrBuilder::err(msg.to_string())
+            //             .add_hint(hint.to_string())
+            //             .add_location(pt.loc.clone())
+            //             .build(),
+            //     )
+            // }
 
             distinguishing_exprs
         };
