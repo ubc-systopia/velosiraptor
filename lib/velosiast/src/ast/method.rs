@@ -53,7 +53,7 @@ pub const FN_SIG_PROTECT: &str = "fn protect(va: vaddr, sz: size, flgs: flags)";
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
 pub enum VelosiAstMethodProperty {
     Invariant,
-    Predicate,
+    Remap,
 }
 
 impl VelosiAstMethodProperty {
@@ -63,10 +63,10 @@ impl VelosiAstMethodProperty {
     ) -> AstResult<Self, VelosiAstIssues> {
         match pt.0.name.as_str() {
             "invariant" => AstResult::Ok(Self::Invariant),
-            "predicate" => AstResult::Ok(Self::Predicate),
+            "remap" => AstResult::Ok(Self::Remap),
             _ => {
                 let msg = "unknown method property";
-                let hint = "supported method properties are `invariant` and `predicate`";
+                let hint = "supported method properties are `invariant` and `remap`";
                 let err = VelosiAstErrBuilder::err(msg.to_string())
                     .add_hint(hint.to_string())
                     .add_location(pt.0.loc)
@@ -81,7 +81,7 @@ impl Display for VelosiAstMethodProperty {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
             Self::Invariant => write!(f, "invariant"),
-            Self::Predicate => write!(f, "predicate"),
+            Self::Remap => write!(f, "remap"),
         }
     }
 }
