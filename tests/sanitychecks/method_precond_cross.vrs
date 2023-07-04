@@ -1,0 +1,57 @@
+segment MySegment(base : addr) {
+    inbitwidth= 48;
+    outbitwidth = 48;
+
+    flags = {
+        writable,
+        readable,
+        executable,
+    };
+
+    // the state will be two registers:
+    state = StateDef(base: addr) {
+        reg address [ 8 ] {
+            0 .. 48 val,
+        },
+        reg length [ 8 ] {
+            0 ..  1 present,
+            1 ..  2 rw,
+            2 ..  3 exec,
+            4 .. 48 bytes,
+        }
+    };
+
+    // just expose the entire state as MMIO interface
+    interface = InterfaceDef(base: addr) {
+        mmio address [ base, 0, 8 ],
+        mmio length [ base, 8, 8 ],
+    };
+
+    // add the valid bit
+    #[remap]
+    fn valid() -> bool
+        requires state.length.present == 1       // XXX: this should be caught by the sanity checker
+    {
+        state.length.present == 1                // XXX: this should be caught by the sanity checker
+    }
+
+    #[remap]
+    fn matchflags(flgs : flags) -> bool
+        requires state.length.present == 0       // XXX: this should be caught by the sanity checker
+    {
+        true
+    }
+
+    fn translate(va: vaddr) -> paddr
+        requires va == 0                         // XXX: this should be caught by the sanity checker
+    {
+        va + state.address.val
+    }
+
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+        requires va > 0                          // XXX: this should be caught by the sanity checker
+
+    synth fn protect(va: vaddr, sz: size, flgs: flags);
+
+    synth fn unmap(va: vaddr, sz: size)
+ }
