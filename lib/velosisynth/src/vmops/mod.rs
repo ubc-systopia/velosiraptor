@@ -25,6 +25,7 @@
 
 //! Synthesis of Virtual Memory Operations
 
+pub mod enums;
 pub mod map;
 pub mod protect;
 mod queries;

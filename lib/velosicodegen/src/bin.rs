@@ -169,7 +169,7 @@ pub fn main() {
 
                     t_synth_segment.push(("start", Instant::now()));
 
-                    let mut synth = synthfactory.create(seg);
+                    let mut synth = synthfactory.create_segment(seg);
 
                     synth.create_model();
 

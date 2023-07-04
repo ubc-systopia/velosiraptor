@@ -33,6 +33,7 @@
 use std::env;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -46,9 +47,12 @@ mod sanitycheck;
 mod vmops;
 mod z3;
 
-use velosiast::ast::VelosiAstUnitSegment;
+use velosiast::VelosiAst;
+use velosiast::{ast::VelosiAstUnitSegment, VelosiAstUnitEnum};
 
-use crate::vmops::{MapPrograms, MaybeResult, ProgramBuilder, ProtectPrograms, UnmapPrograms};
+use crate::vmops::{
+    enums, MapPrograms, MaybeResult, ProgramBuilder, ProtectPrograms, UnmapPrograms,
+};
 pub use error::{VelosiSynthError, VelosiSynthIssues};
 pub use programs::{Program, ProgramsBuilder, ProgramsIter};
 pub use z3::{Z3Query, Z3TaskPriority, Z3Ticket, Z3Worker, Z3WorkerPool, Z3WorkerPoolStats};
@@ -91,7 +95,7 @@ impl Display for SynthResult {
     }
 }
 
-pub struct Z3Synth<'a> {
+pub struct Z3SynthSegment<'a> {
     z3: Z3WorkerPool,
     // unit: Option<Rc<VelosiAstUnitSegment>>,
     unit: &'a mut VelosiAstUnitSegment,
@@ -121,7 +125,7 @@ pub struct Z3Synth<'a> {
     t_synth_start: Option<Instant>,
 }
 
-impl<'a> Z3Synth<'a> {
+impl<'a> Z3SynthSegment<'a> {
     /// creates a new synthesis handle with the given worker poopl and the unit
     pub(crate) fn new(z3: Z3WorkerPool, unit: &'a mut VelosiAstUnitSegment) -> Self {
         let batch_size = std::cmp::max(DEFAULT_BATCH_SIZE, z3.num_workers());
@@ -405,7 +409,7 @@ impl<'a> Z3Synth<'a> {
     }
 }
 
-impl<'a> Display for Z3Synth<'a> {
+impl<'a> Display for Z3SynthSegment<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         if self.is_done() {
             if let Some(prog) = &self.map_program {
@@ -428,6 +432,21 @@ impl<'a> Display for Z3Synth<'a> {
         } else {
             write!(f, "Synthesis not done yet.")
         }
+    }
+}
+
+pub struct Z3SynthEnum<'a> {
+    z3: Z3WorkerPool,
+    unit: &'a mut Rc<VelosiAstUnitEnum>,
+}
+
+impl<'a> Z3SynthEnum<'a> {
+    pub fn new(z3: Z3WorkerPool, unit: &'a mut Rc<VelosiAstUnitEnum>) -> Self {
+        Self { z3, unit }
+    }
+
+    pub fn distinguish(&mut self, ast: &VelosiAst) {
+        enums::distinguish(&mut self.z3, ast, self.unit)
     }
 }
 
@@ -483,7 +502,7 @@ impl Z3SynthFactory {
         self
     }
 
-    pub fn create<'a>(&self, unit: &'a mut VelosiAstUnitSegment) -> Z3Synth<'a> {
+    pub fn create_segment<'a>(&self, unit: &'a mut VelosiAstUnitSegment) -> Z3SynthSegment<'a> {
         if unit.is_abstract {
             panic!("Cannot synthesize abstract units");
         }
@@ -499,7 +518,22 @@ impl Z3SynthFactory {
         };
 
         let z3 = Z3WorkerPool::with_num_workers(self.num_workers, logpath);
-        Z3Synth::new(z3, unit)
+        Z3SynthSegment::new(z3, unit)
+    }
+
+    pub fn create_enum<'a>(&self, unit: &'a mut Rc<VelosiAstUnitEnum>) -> Z3SynthEnum<'a> {
+        let logpath = if let Some(logdir) = &self.logdir {
+            if self.logging {
+                Some(Arc::new(logdir.join(unit.ident().as_str())))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let z3 = Z3WorkerPool::with_num_workers(self.num_workers, logpath);
+        Z3SynthEnum::new(z3, unit)
     }
 }
 
