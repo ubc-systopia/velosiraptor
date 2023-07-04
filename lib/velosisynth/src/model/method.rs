@@ -150,7 +150,7 @@ fn add_bool_method_parts(smt: &mut Smt2Context, prefix: &str, method: &VelosiAst
 
             f.add_arg(String::from("st!0"), types::model(prefix));
             for a in method.params.iter() {
-                f.add_arg(a.ident_to_string(), types::type_to_smt2(&a.ptype));
+                f.add_arg(a.ident_to_string(), types::type_to_smt2(prefix, &a.ptype));
             }
 
             f.add_body(expr::expr_to_smt2(prefix, pre, "st!0"));
@@ -310,7 +310,7 @@ fn add_method_assms(smt: &mut Smt2Context, prefix: &str, method: &VelosiAstMetho
 pub fn add_methods(
     smt: &mut Smt2Context,
     prefix: &str,
-    methods: Box<dyn Iterator<Item=&Rc<VelosiAstMethod>> + '_>,
+    methods: Box<dyn Iterator<Item = &Rc<VelosiAstMethod>> + '_>,
 ) {
     smt.section(String::from("Methods"));
 
@@ -528,7 +528,7 @@ pub fn add_translate_range_checks(smt: &mut Smt2Context, prefix: &str, method: &
                         Term::ident("sz".to_string()),
                     ),
                 )
-                    .eq(expr::expr_to_smt2(prefix, pre, "st!0")),
+                .eq(expr::expr_to_smt2(prefix, pre, "st!0")),
                 "forall i. pri == (i < va + size)",
             )
         };
@@ -607,7 +607,7 @@ pub fn add_translate_range_checks(smt: &mut Smt2Context, prefix: &str, method: &
                     Term::ident("sz".to_string()),
                 ),
             )
-                .implies(Term::lnot(expr.clone())),
+            .implies(Term::lnot(expr.clone())),
         ),
         Term::land(
             Term::bvge(
@@ -625,7 +625,7 @@ pub fn add_translate_range_checks(smt: &mut Smt2Context, prefix: &str, method: &
                 ),
             ),
         )
-            .implies(expr),
+        .implies(expr),
     );
 
     f.add_body(Term::forall(forallvars, body));

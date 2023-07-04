@@ -24,21 +24,21 @@ use velosiast::{
 };
 
 #[derive(Debug, Clone)]
-struct Node(VelosiAstIdentifier, Vec<VelosiAstExpr>);
+struct Node(String, Vec<Rc<VelosiAstExpr>>);
 
 impl Display for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "Node({}, {:?})",
-            self.0.ident(),
+            self.0,
             self.1.iter().map(|e| format!("{e}")).collect::<Vec<_>>()
         )
     }
 }
 
 #[derive(Debug, Clone)]
-struct Edge(VelosiAstExpr, VelosiAstExpr, Vec<Rc<String>>);
+struct Edge(Rc<VelosiAstExpr>, Rc<VelosiAstExpr>, Vec<Rc<String>>);
 
 impl Display for Edge {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -52,10 +52,10 @@ pub fn distinguish(z3: &mut Z3WorkerPool, ast: &VelosiAst, e: &VelosiAstUnitEnum
     // set the options
     smt.set_option(Smt2Option::ProduceUnsatCores(true));
 
-    for (variant, _) in e.enums.iter() {
+    for variant in e.get_unit_names().iter() {
         smt = model::create_with_context(
             smt,
-            if let VelosiAstUnit::Segment(s) = ast.get_unit(variant.as_str()).unwrap() {
+            if let VelosiAstUnit::Segment(s) = ast.get_unit(variant).unwrap() {
                 s
             } else {
                 panic!("not a segment")
@@ -68,13 +68,13 @@ pub fn distinguish(z3: &mut Z3WorkerPool, ast: &VelosiAst, e: &VelosiAstUnitEnum
     // create the graph
     let mut graph = StableUnGraph::<Node, Edge>::default();
 
-    for (variant, _) in e.enums.iter() {
-        let variant_unit = ast.get_unit(variant.as_str()).expect("unit not found!");
+    for variant in e.get_unit_names().iter() {
+        let variant_unit = ast.get_unit(variant).expect("unit not found!");
         let variant_op = variant_unit
             .get_method("translate")
             .expect("map method not found!");
         graph.add_node(Node(
-            variant.clone(),
+            variant.to_string(),
             variant_op
                 .requires
                 .iter()
@@ -100,7 +100,6 @@ pub fn distinguish(z3: &mut Z3WorkerPool, ast: &VelosiAst, e: &VelosiAstUnitEnum
 
                         let refs = refs1.intersection(&refs2).cloned().collect::<Vec<_>>();
                         if !refs.is_empty() {
-                            // TODO: probably shouldn't clone
                             edges.push((idx1, idx2, Edge(e1.clone(), e2.clone(), refs)));
                         }
                     }

@@ -49,8 +49,8 @@ use crate::ProgramsIter;
 use super::utils;
 
 pub struct SemanticQueryBuilder<T>
-    where
-        T: ProgramBuilder,
+where
+    T: ProgramBuilder,
 {
     /// the prefix to use for identifiers
     prefix: String,
@@ -69,8 +69,8 @@ pub struct SemanticQueryBuilder<T>
 }
 
 impl<T> SemanticQueryBuilder<T>
-    where
-        T: ProgramBuilder,
+where
+    T: ProgramBuilder,
 {
     pub fn new(
         prefix: String,
@@ -94,8 +94,8 @@ impl<T> SemanticQueryBuilder<T>
 }
 
 impl<T> QueryBuilder for SemanticQueryBuilder<T>
-    where
-        T: ProgramBuilder,
+where
+    T: ProgramBuilder,
 {
     /// returns the next query to be submitted, or None if all have been submitted
     fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Box<Z3Query>> {
