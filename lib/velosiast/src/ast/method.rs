@@ -869,6 +869,15 @@ impl VelosiAstMethod {
         }
         params
     }
+
+    // indicate whether we should run a sanity check or not.
+    pub fn recommends_sanity_check(&self) -> bool {
+        self.is_synth
+            || self
+                .properties
+                .contains(&VelosiAstMethodProperty::Invariant)
+            || self.properties.contains(&VelosiAstMethodProperty::Remap)
+    }
 }
 
 /// Implementation fo the [From] trait for [Symbol]
