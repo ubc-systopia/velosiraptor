@@ -873,6 +873,7 @@ impl VelosiAstMethod {
     // indicate whether we should run a sanity check or not.
     pub fn recommends_sanity_check(&self) -> bool {
         self.is_synth
+            || self.ident().as_str() == "translate"
             || self
                 .properties
                 .contains(&VelosiAstMethodProperty::Invariant)
