@@ -358,12 +358,12 @@ impl VelosiAstBinOpExpr {
                 }
             }
             (lhs, VelosiAstBinOp::Gt, rhs) => {
-                // lhs > rhs => rhs <= lhs
-                (rhs, VelosiAstBinOp::Le, lhs)
+                // lhs > rhs => rhs < lhs
+                (rhs, VelosiAstBinOp::Lt, lhs)
             }
             (lhs, VelosiAstBinOp::Ge, rhs) => {
-                // lhs >= rhs => rhs < lhs
-                (rhs, VelosiAstBinOp::Lt, lhs)
+                // lhs >= rhs => rhs <= lhs
+                (rhs, VelosiAstBinOp::Le, lhs)
             }
             (lhs, VelosiAstBinOp::Land, rhs) => {
                 if lhs <= rhs {
