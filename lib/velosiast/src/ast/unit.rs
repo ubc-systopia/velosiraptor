@@ -1226,8 +1226,6 @@ pub struct VelosiAstUnitEnum {
 
     /// the location of the type clause
     pub loc: VelosiTokenStream,
-
-    pub distinguishing_exprs: HashMap<VelosiAstIdentifier, VelosiAstExpr>,
 }
 
 impl VelosiAstUnitEnum {
@@ -1546,17 +1544,13 @@ impl VelosiAstUnitEnum {
             }
         }
 
-        let enums: Vec<(VelosiAstIdentifier, Vec<VelosiAstIdentifier>)> =
-            enums.into_iter().collect();
         for (_, vi) in enums.iter() {
             for (_, vj) in enums.iter() {
-                let unit1_sym = match st
-                    .lookup(vi.ident.ident()) {
+                let unit1_sym = match st.lookup(vi.ident.ident()) {
                     Some(unit1) => unit1,
                     None => continue,
                 };
-                let unit2_sym = match st
-                    .lookup(vj.ident.ident()) {
+                let unit2_sym = match st.lookup(vj.ident.ident()) {
                     Some(unit2) => unit2,
                     None => continue,
                 };
@@ -1604,36 +1598,6 @@ impl VelosiAstUnitEnum {
             Rc::new(VelosiAstMethod::default_protect()),
         );
 
-        // verify that the enums are distinguishable
-        let distinguishing_exprs = if issues.has_errors() {
-            HashMap::new()
-        } else {
-            let distinguishing_exprs = Self::distinguishing_exprs(&enums, st);
-
-            let mut values = distinguishing_exprs.values();
-            let first_value = values.next();
-            // if distinguishing_exprs.is_empty() {
-            //     let msg = "Unable to distinguish enum variants";
-            //     let hint = "Add preconditions to the variant translate functions that describe the differentiating state";
-            //     issues.push(
-            //         VelosiAstErrBuilder::err(msg.to_string())
-            //             .add_hint(hint.to_string())
-            //             .add_location(pt.loc.clone())
-            //             .build(),
-            //     )
-            // } else if values.all(|e| e == first_value.unwrap()) {
-            //     let msg = "Unable to distinguish enum variants";
-            //     let hint = "All variants have the same translate preconditions";
-            //     issues.push(
-            //         VelosiAstErrBuilder::err(msg.to_string())
-            //             .add_hint(hint.to_string())
-            //             .add_location(pt.loc.clone())
-            //             .build(),
-            //     )
-            // }
-
-            distinguishing_exprs
-        };
         let res = Self {
             ident: VelosiAstIdentifier::from(pt.name),
             params,
@@ -1642,7 +1606,6 @@ impl VelosiAstUnitEnum {
             enums,
             methods,
             loc: pt.loc,
-            distinguishing_exprs,
         };
 
         // and restore the context again.
@@ -1716,136 +1679,6 @@ impl VelosiAstUnitEnum {
         } else {
             &[]
         }
-    }
-
-    pub fn distinguishing_exprs(
-        enums: &[(VelosiAstIdentifier, Vec<VelosiAstIdentifier>)],
-        st: &SymbolTable,
-    ) -> HashMap<VelosiAstIdentifier, VelosiAstExpr> {
-        // assumptions here:
-        //  - all variants have the same parameters, the same state and interface layout!
-
-        // now,  the generic problem of finding which one of the two it is, is a bit involved:
-        // 1) find the state that defines this
-        // 2) back project onto the interface to find out how to obtain the state
-        // 3) read the interface such that the translation behavior doesn't change
-
-        let mut preconds_state_bits = HashMap::new();
-        for (variant, _params) in enums.iter() {
-            let variant_unit = if let VelosiAstNode::Unit(u) = &st
-                .lookup(variant.as_str())
-                .expect("unit not found!")
-                .ast_node
-            {
-                u
-            } else {
-                panic!("not type unit!")
-            };
-            let variant_op = variant_unit
-                .get_method("translate")
-                .expect("translate method not found!");
-
-            let mut state_refs = HashSet::new();
-            for e in variant_op.requires.iter() {
-                e.get_state_references(&mut state_refs);
-            }
-
-            let my_precond_state_bits = if let Some(state) = variant_unit.state() {
-                state.get_field_slice_refs(&state_refs)
-            } else {
-                HashMap::new()
-            };
-
-            // construct the intersection of all bits
-            for (k, v) in my_precond_state_bits.iter() {
-                if let Some(v2) = preconds_state_bits.get_mut(k) {
-                    *v2 &= v;
-                } else {
-                    preconds_state_bits.insert(k.clone(), *v);
-                }
-            }
-        }
-
-        let mut distinguishing_exprs = HashMap::new();
-        for (variant, _params) in enums.iter() {
-            // lookup the unit
-            let variant_unit = if let VelosiAstNode::Unit(u) = &st
-                .lookup(variant.as_str())
-                .expect("unit not found!")
-                .ast_node
-            {
-                u
-            } else {
-                panic!("not type unit!")
-            };
-            let variant_op = variant_unit
-                .get_method("translate")
-                .expect("map method not found!");
-
-            for e in variant_op.requires.iter() {
-                let mut state_refs = HashSet::new();
-                e.get_state_references(&mut state_refs);
-
-                let mut my_precond_state_bits = if let Some(state) = variant_unit.state() {
-                    state.get_field_slice_refs(&state_refs)
-                } else {
-                    HashMap::new()
-                };
-
-                for (k, v) in my_precond_state_bits.iter_mut() {
-                    let mask = preconds_state_bits.get(k).expect("state bit not found!");
-                    *v &= *mask;
-                }
-
-                let st_access_field = variant_unit.interface().and_then(|interface| {
-                    interface
-                        .fields_accessing_state(&state_refs, &my_precond_state_bits)
-                        .into_iter()
-                        .min_by(|field1, field2| {
-                            let complexity1 = Self::field_complexity(&interface, field1);
-                            let complexity2 = Self::field_complexity(&interface, field2);
-                            complexity1.cmp(&complexity2)
-                        })
-                });
-
-                if let Some(field) = st_access_field {
-                    // TODO: need to to a back projection here, and select the right interface
-                    // more over, do the intersection of all of them
-                    let interface_expr = e.clone();
-                    let new_expr = match distinguishing_exprs.remove(variant) {
-                        Some(expr) => VelosiAstExpr::BinOp(VelosiAstBinOpExpr::new(
-                            expr,
-                            VelosiAstBinOp::Land,
-                            interface_expr,
-                            Default::default(),
-                        )),
-                        None => interface_expr,
-                    };
-                    distinguishing_exprs.insert(variant.clone(), new_expr);
-                }
-            }
-        }
-
-        distinguishing_exprs
-    }
-
-    fn field_complexity(interface: &VelosiAstInterface, fieldname: &str) -> usize {
-        // interface
-        //     .field(fieldname)
-        //     .unwrap()
-        //     .read_actions_as_ref()
-        //     .into_iter()
-        //     .map(|action| {
-        //         if action.dst.contains("state") {
-        //             // TODO: not sure if should panic here
-        //             panic!("cannot ")
-        //         } else {
-        //             action.complexity()
-        //         }
-        //     })
-        //     .min()
-        //     .unwrap()
-        0
     }
 }
 
@@ -2008,7 +1841,7 @@ impl VelosiAstUnit {
         }
     }
 
-    pub fn methods(&self) -> Box<dyn Iterator<Item=&Rc<VelosiAstMethod>> + '_> {
+    pub fn methods(&self) -> Box<dyn Iterator<Item = &Rc<VelosiAstMethod>> + '_> {
         use VelosiAstUnit::*;
         match self {
             StaticMap(staticmap) => Box::new(staticmap.methods()),
@@ -2033,7 +1866,7 @@ impl VelosiAstUnit {
         }
     }
 
-    pub fn consts(&self) -> Box<dyn Iterator<Item=&Rc<VelosiAstConst>> + '_> {
+    pub fn consts(&self) -> Box<dyn Iterator<Item = &Rc<VelosiAstConst>> + '_> {
         use VelosiAstUnit::*;
         match self {
             StaticMap(staticmap) => Box::new(staticmap.consts()),

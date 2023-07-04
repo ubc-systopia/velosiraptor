@@ -275,6 +275,8 @@ impl ProgramBuilder for BoolExprQuery {
 const DEFAULT_BATCH_SIZE: usize = 5;
 
 pub struct ProgramVerifier {
+    /// prefix for smt namespacing
+    prefix: String,
     /// sequence of queries to be submitted
     programs: Box<dyn ProgramBuilder>,
     /// the priority of the task
@@ -291,18 +293,20 @@ pub struct ProgramVerifier {
 
 impl ProgramVerifier {
     /// creates a new query verifier for the queries with the given priority
-    pub fn new(queries: Box<dyn ProgramBuilder>, priority: Z3TaskPriority) -> Self {
-        Self::with_batchsize(queries, 5, priority)
+    pub fn new(prefix: String, queries: Box<dyn ProgramBuilder>, priority: Z3TaskPriority) -> Self {
+        Self::with_batchsize(prefix, queries, 5, priority)
     }
 
     /// creates a new query verifier for the queries with the given priority and batch size
     pub fn with_batchsize(
+        prefix: String,
         programs: Box<dyn ProgramBuilder>,
         batch_size: usize,
         priority: Z3TaskPriority,
     ) -> Self {
         let batch_size = std::cmp::max(batch_size, 1);
         ProgramVerifier {
+            prefix,
             programs,
             priority,
             submitted: LinkedList::new(),
@@ -317,13 +321,15 @@ impl ProgramVerifier {
         let assms = self.programs.assms();
         let goal_expr = self.programs.goal_expr();
         let mem_model = false;
+        let prefix = &self.prefix;
 
         // convert the program to a smt2 term
-        let (mut smt, symvars) = prog.to_smt2_term(m_op.ident(), m_op.params.as_slice(), mem_model);
+        let (mut smt, symvars) =
+            prog.to_smt2_term(prefix, m_op.ident(), m_op.params.as_slice(), mem_model);
 
         // obtain the forall params
-        let stvar = SortedVar::new("st!0".to_string(), types::model());
-        let vars = combine_method_params(vec![stvar], m_op.params.as_slice(), &[]);
+        let stvar = SortedVar::new("st!0".to_string(), types::model(prefix));
+        let vars = combine_method_params(prefix, vec![stvar], m_op.params.as_slice(), &[]);
 
         // build up the pre-conditions (lhs of the implication)
         let pre1 = call_method_assms(m_op, "st!0");
@@ -331,7 +337,7 @@ impl ProgramVerifier {
             .iter()
             .fold(pre1, |acc, assm| Term::land(acc, assm.clone()));
         if mem_model {
-            pre = utils::add_empty_wbuffer_precond(pre);
+            pre = utils::add_empty_wbuffer_precond(prefix, pre);
         }
 
         // call the program method
@@ -348,7 +354,7 @@ impl ProgramVerifier {
         // form the implication `let st = OP() in pre => goal`
         let impl_term = Term::Let(
             vec![VarBinding::new("st".to_string(), m_op_call)],
-            Box::new(pre.implies(expr_to_smt2(&goal_expr, "st"))),
+            Box::new(pre.implies(expr_to_smt2(prefix, &goal_expr, "st"))),
         );
 
         // build the forall term for the query
@@ -609,6 +615,7 @@ impl<'a> CNFQueryBuilder<'a> {
     /// sets the base query to be all (i.e., A && B && C)
     pub fn all(self) -> CompoundBoolExprQuery {
         let assms = Rc::new(self.assms);
+        let prefix = self.unit.ident();
 
         // no partial programs, simply take the expressions and build the query
         let mut candidate_programs = Vec::with_capacity(self.exprs.len());
@@ -621,7 +628,8 @@ impl<'a> CNFQueryBuilder<'a> {
                     .into_iter()
                     .map(|p| {
                         exprs.push(p.goal_expr());
-                        ProgramVerifier::with_batchsize(p, batch_size, priority).into()
+                        ProgramVerifier::with_batchsize(prefix.to_string(), p, batch_size, priority)
+                            .into()
                     })
                     .collect();
             }
@@ -639,6 +647,7 @@ impl<'a> CNFQueryBuilder<'a> {
                     if let Some(bool_expr_query) = bool_expr_query {
                         candidate_programs.push(
                             ProgramVerifier::with_batchsize(
+                                prefix.to_string(),
                                 Box::new(bool_expr_query),
                                 self.batchsize,
                                 self.priority,
@@ -693,6 +702,7 @@ impl<'a> CNFQueryBuilder<'a> {
     /// sets the base query to be any (i.e., A || B || C)
     pub fn any(self) -> CompoundBoolExprQuery {
         let assms = Rc::new(self.assms);
+        let prefix = self.unit.ident();
 
         // no partial programs, simply take the expressions and build the query
         let mut candidate_programs = Vec::with_capacity(self.exprs.len());
@@ -705,7 +715,8 @@ impl<'a> CNFQueryBuilder<'a> {
                     .into_iter()
                     .map(|p| {
                         exprs.push(p.goal_expr());
-                        ProgramVerifier::with_batchsize(p, batch_size, priority).into()
+                        ProgramVerifier::with_batchsize(prefix.to_string(), p, batch_size, priority)
+                            .into()
                     })
                     .collect();
             }
@@ -723,6 +734,7 @@ impl<'a> CNFQueryBuilder<'a> {
                     if let Some(bool_expr_query) = bool_expr_query {
                         candidate_programs.push(
                             ProgramVerifier::with_batchsize(
+                                prefix.to_string(),
                                 Box::new(bool_expr_query),
                                 self.batchsize,
                                 self.priority,
