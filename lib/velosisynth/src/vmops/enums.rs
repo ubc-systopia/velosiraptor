@@ -3,8 +3,6 @@ use std::fmt::Display;
 use std::rc::Rc;
 
 use itertools::Itertools;
-use petgraph::dot::Dot;
-use petgraph::graph::{Graph, UnGraph};
 use petgraph::stable_graph::{EdgeIndex, NodeIndex, StableUnGraph};
 use petgraph::visit::IntoNodeReferences;
 use petgraph::visit::{EdgeRef, IntoEdgeReferences};
@@ -16,12 +14,9 @@ use crate::model::{
     types,
 };
 use crate::z3::Z3Result;
-use crate::{Z3Query, Z3SynthSegment, Z3TaskPriority, Z3WorkerPool};
+use crate::{Z3Query, Z3TaskPriority, Z3WorkerPool};
 use smt2::{Smt2Context, Smt2Option, Term};
-use velosiast::{
-    ast::{VelosiAstExpr, VelosiAstIdentifier},
-    VelosiAst, VelosiAstUnit, VelosiAstUnitEnum,
-};
+use velosiast::{ast::VelosiAstExpr, VelosiAst, VelosiAstUnit, VelosiAstUnitEnum};
 
 #[derive(Debug, Clone)]
 struct Node(String, Vec<Rc<VelosiAstExpr>>);
@@ -60,7 +55,7 @@ pub fn distinguish(z3: &mut Z3WorkerPool, ast: &VelosiAst, e: &VelosiAstUnitEnum
             } else {
                 panic!("not a segment")
             },
-            false,
+            false, // TODO: add mem model?
         );
     }
     z3.reset_with_context(Z3Query::from(smt));
@@ -131,9 +126,7 @@ pub fn distinguish(z3: &mut Z3WorkerPool, ast: &VelosiAst, e: &VelosiAstUnitEnum
             e.weight().1.get_state_references(&mut source_refs);
         });
         if !edge.2.iter().any(|sref| source_refs.contains(sref)) {
-            (&mut graph[source_id])
-                .1
-                .retain(|e| e != &edge.0 && e != &edge.1);
+            graph[source_id].1.retain(|e| e != &edge.0 && e != &edge.1);
         }
 
         let mut target_refs = HashSet::new();
@@ -142,16 +135,16 @@ pub fn distinguish(z3: &mut Z3WorkerPool, ast: &VelosiAst, e: &VelosiAstUnitEnum
             e.weight().1.get_state_references(&mut target_refs);
         });
         if !edge.2.iter().any(|sref| target_refs.contains(sref)) {
-            (&mut graph[target_id])
-                .1
-                .retain(|e| e != &edge.0 && e != &edge.1);
+            graph[target_id].1.retain(|e| e != &edge.0 && e != &edge.1);
         }
     }
 
     if fully_connected(graph) {
         // TODO: update ast
+        println!("distinguishable");
     } else {
         // TODO: emit warning
+        println!("not distinguishable");
     }
 }
 
@@ -284,7 +277,6 @@ fn fully_connected(graph: StableUnGraph<Node, Edge>) -> bool {
         let mut reachable = graph
             .edges(node_id)
             .map(|edge| edge.target())
-            .into_iter()
             .chain([node_id])
             .collect::<Vec<_>>();
 
