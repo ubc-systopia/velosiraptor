@@ -1650,8 +1650,8 @@ impl VelosiAstUnitEnum {
         }
     }
 
-    pub fn get_unit_names(&self) -> Vec<&str> {
-        self.enums.keys().map(|ident| ident.as_str()).collect()
+    pub fn get_unit_names(&self) -> Vec<&Rc<String>> {
+        self.enums.keys().collect()
     }
 
     /// obtains the (unit, differentiators) for all units of the enum
@@ -1675,6 +1675,18 @@ impl VelosiAstUnitEnum {
         } else {
             &[]
         }
+    }
+
+    /// sets the differentiator expression over the state for the supplied unit identifier
+    pub fn set_unit_differentiator(
+        &mut self,
+        unit: &Rc<String>,
+        differentiator: Vec<Rc<VelosiAstExpr>>,
+    ) {
+        self.enums
+            .get_mut(unit)
+            .expect("unit to be found")
+            .differentiator = differentiator;
     }
 }
 

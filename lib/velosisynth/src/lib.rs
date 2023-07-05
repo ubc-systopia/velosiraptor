@@ -30,6 +30,7 @@
 
 // used standard library functionality
 
+use std::collections::HashMap;
 use std::env;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::path::PathBuf;
@@ -41,13 +42,13 @@ use std::time::{Duration, Instant};
 
 // crate modules
 mod error;
-mod model;
+pub mod model;
 mod programs;
 mod sanitycheck;
 mod vmops;
 mod z3;
 
-use velosiast::VelosiAst;
+use smt2::Smt2Context;
 use velosiast::{ast::VelosiAstUnitSegment, VelosiAstUnitEnum};
 
 use crate::vmops::{
@@ -437,16 +438,16 @@ impl<'a> Display for Z3SynthSegment<'a> {
 
 pub struct Z3SynthEnum<'a> {
     z3: Z3WorkerPool,
-    unit: &'a mut Rc<VelosiAstUnitEnum>,
+    unit: &'a mut VelosiAstUnitEnum,
 }
 
 impl<'a> Z3SynthEnum<'a> {
-    pub fn new(z3: Z3WorkerPool, unit: &'a mut Rc<VelosiAstUnitEnum>) -> Self {
+    pub fn new(z3: Z3WorkerPool, unit: &'a mut VelosiAstUnitEnum) -> Self {
         Self { z3, unit }
     }
 
-    pub fn distinguish(&mut self, ast: &VelosiAst) {
-        enums::distinguish(&mut self.z3, ast, self.unit)
+    pub fn distinguish(&mut self, models: &HashMap<Rc<String>, Smt2Context>) {
+        enums::distinguish(&mut self.z3, models, self.unit)
     }
 }
 
@@ -521,7 +522,7 @@ impl Z3SynthFactory {
         Z3SynthSegment::new(z3, unit)
     }
 
-    pub fn create_enum<'a>(&self, unit: &'a mut Rc<VelosiAstUnitEnum>) -> Z3SynthEnum<'a> {
+    pub fn create_enum<'a>(&self, unit: &'a mut VelosiAstUnitEnum) -> Z3SynthEnum<'a> {
         let logpath = if let Some(logdir) = &self.logdir {
             if self.logging {
                 Some(Arc::new(logdir.join(unit.ident().as_str())))

@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::rc::Rc;
 
@@ -9,17 +9,16 @@ use petgraph::visit::{EdgeRef, IntoEdgeReferences};
 use petgraph::Undirected;
 
 use crate::model::{
-    self,
     expr::{self, model_slice_accessor_read_fn, p2p},
     types,
 };
 use crate::z3::Z3Result;
 use crate::{Z3Query, Z3TaskPriority, Z3WorkerPool};
 use smt2::{Smt2Context, Smt2Option, Term};
-use velosiast::{ast::VelosiAstExpr, VelosiAst, VelosiAstUnit, VelosiAstUnitEnum};
+use velosiast::{ast::VelosiAstExpr, VelosiAstUnitEnum};
 
 #[derive(Debug, Clone)]
-struct Node(String, Vec<Rc<VelosiAstExpr>>);
+struct Node(Rc<String>, Vec<Rc<VelosiAstExpr>>);
 
 impl Display for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -41,42 +40,26 @@ impl Display for Edge {
     }
 }
 
-pub fn distinguish(z3: &mut Z3WorkerPool, ast: &VelosiAst, e: &VelosiAstUnitEnum) {
+pub fn distinguish(
+    z3: &mut Z3WorkerPool,
+    models: &HashMap<Rc<String>, Smt2Context>,
+    e: &mut VelosiAstUnitEnum,
+) {
     // create model
     let mut smt = Smt2Context::new();
     // set the options
     smt.set_option(Smt2Option::ProduceUnsatCores(true));
 
     for variant in e.get_unit_names().iter() {
-        smt = model::create_with_context(
-            smt,
-            if let VelosiAstUnit::Segment(s) = ast.get_unit(variant).unwrap() {
-                s
-            } else {
-                panic!("not a segment")
-            },
-            false, // TODO: add mem model?
-        );
+        smt.merge(models[*variant].clone());
     }
     z3.reset_with_context(Z3Query::from(smt));
 
     // create the graph
     let mut graph = StableUnGraph::<Node, Edge>::default();
 
-    for variant in e.get_unit_names().iter() {
-        let variant_unit = ast.get_unit(variant).expect("unit not found!");
-        let variant_op = variant_unit
-            .get_method("translate")
-            .expect("map method not found!");
-        graph.add_node(Node(
-            variant.to_string(),
-            variant_op
-                .requires
-                .iter()
-                .filter(|p| p.has_state_references())
-                .cloned()
-                .collect(),
-        ));
+    for (variant, differentiators) in e.get_unit_differentiators().iter() {
+        graph.add_node(Node(variant.clone(), differentiators.to_vec()));
     }
 
     let mut edges = Vec::new();
@@ -102,14 +85,13 @@ pub fn distinguish(z3: &mut Z3WorkerPool, ast: &VelosiAst, e: &VelosiAstUnitEnum
             }
         });
 
-    // TODO: can this be done in loop?
     for (idx1, idx2, e) in edges {
         graph.add_edge(idx1, idx2, e);
     }
 
     let mut edges_to_remove = Vec::new();
     for edge in graph.edge_references() {
-        let (result, to_remove) = submit_edge_query(edge, &graph, ast, z3);
+        let (result, to_remove) = submit_edge_query(edge, &graph, z3);
 
         // we got a result, check if it's sat
         if !result.unwrap().result().starts_with("sat") {
@@ -139,9 +121,13 @@ pub fn distinguish(z3: &mut Z3WorkerPool, ast: &VelosiAst, e: &VelosiAstUnitEnum
         }
     }
 
-    if fully_connected(graph) {
-        // TODO: update ast
+    if fully_connected(&graph) {
         println!("distinguishable");
+        let indices = graph.node_indices().collect::<Vec<_>>();
+        for idx in indices {
+            let node = graph.remove_node(idx).unwrap();
+            e.set_unit_differentiator(&node.0, node.1)
+        }
     } else {
         // TODO: emit warning
         println!("not distinguishable");
@@ -151,7 +137,6 @@ pub fn distinguish(z3: &mut Z3WorkerPool, ast: &VelosiAst, e: &VelosiAstUnitEnum
 fn submit_edge_query(
     edge: petgraph::stable_graph::EdgeReference<'_, Edge>,
     graph: &petgraph::stable_graph::StableGraph<Node, Edge, Undirected>,
-    ast: &VelosiAst,
     z3: &mut Z3WorkerPool,
 ) -> (Option<Z3Result>, (EdgeIndex, NodeIndex, NodeIndex)) {
     // check distinguishable, remove if not
@@ -184,16 +169,8 @@ fn submit_edge_query(
                         .enumerate()
                         .map(|(i, variant)| {
                             let param = format!("st!{i}");
-                            let variant_unit =
-                                ast.get_unit(variant.as_str()).expect("unit not found!");
 
-                            model_slice_accessor_read_fn(
-                                variant_unit.ident(),
-                                &param,
-                                part,
-                                field,
-                                slice,
-                            )
+                            model_slice_accessor_read_fn(variant, &param, part, field, slice)
                         })
                         .collect(),
                 )
@@ -203,29 +180,21 @@ fn submit_edge_query(
 
     let mut vars = Vec::new();
     let mut exprs = Vec::new();
-    for (i, variant) in [&source_node.0, &target_node.0].iter().enumerate() {
+    for (i, node) in [&source_node, &target_node].iter().enumerate() {
+        let (variant, preconds) = (&node.0, &node.1);
         let param = format!("st!{i}");
-        let variant_unit = ast.get_unit(variant.as_str()).expect("unit not found!");
-        vars.push(smt2::SortedVar::new(
-            param.clone(),
-            types::model(variant_unit.ident()),
-        ));
-
-        let variant_op = variant_unit
-            .get_method("translate")
-            .expect("map method not found!");
+        vars.push(smt2::SortedVar::new(param.clone(), types::model(variant)));
 
         let expr = Term::fn_apply(
             "and".to_string(),
-            variant_op
-                .requires
+            preconds
                 .iter()
                 .filter(|p| {
                     let mut refs = HashSet::new();
                     p.get_state_references(&mut refs);
-                    p.has_state_references() && refs.iter().all(|x| state_refs.contains(x))
+                    refs.iter().all(|x| state_refs.contains(x))
                 })
-                .map(|p| expr::expr_to_smt2(variant_unit.ident(), p, &param))
+                .map(|p| expr::expr_to_smt2(variant, p, &param))
                 .collect(),
         );
         exprs.push(expr);
@@ -267,8 +236,7 @@ fn submit_edge_query(
 }
 
 // TODO: sequential for now
-
-fn fully_connected(graph: StableUnGraph<Node, Edge>) -> bool {
+fn fully_connected(graph: &StableUnGraph<Node, Edge>) -> bool {
     let node_ids = graph
         .node_references()
         .map(|(id, _)| id)
