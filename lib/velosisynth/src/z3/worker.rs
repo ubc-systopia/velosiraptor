@@ -39,7 +39,7 @@ use std::sync::{
 use std::thread;
 
 // own create imports
-use super::query::{Z3Query, Z3Result, Z3Ticket};
+use super::query::{Z3Query, Z3Result, Z3Ticket, Z3TimeStamp};
 use super::{TaskQ, Z3Instance, Z3TaskPriority};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -53,6 +53,7 @@ enum Z3Context {
 }
 
 /// represents a Z3 worker thread
+#[repr(align(128))]
 pub struct Z3Worker {
     /// the worker identifier
     id: usize,
@@ -140,6 +141,9 @@ impl Z3Worker {
                         }
                         drop(context);
 
+                        // t_query_ms_clone.store(z3., Ordering::Relaxed);
+                        // t_prepare_ms_clone
+
                         reset_clone.store(false, Ordering::Relaxed);
                         continue;
                     }
@@ -158,26 +162,12 @@ impl Z3Worker {
                         continue;
                     }
 
-                    // see if we have a shared query
-                    // match z3.exec_shared(query.deref()) {
-                    //     Ok(result) => Z3ResultMsg::Result(id, result),
-                    //     Err(_) => Z3ResultMsg::Error(id, None),
-                    // }
-
-                    // get a task
-
-                    // let mut task_q = tasks.lock().unwrap();
-                    // let task = task_q.pop_front();
-                    // drop(task_q); // drop the lock again
-
                     if let Some((ticket, mut query)) = tasks.pop() {
                         num_queries += 1;
 
-                       // println!("worker {} got task {:?}", wid, ticket);
                         // run the query
-                        query.timestamp("request");
+                        query.timestamp(Z3TimeStamp::Dispatch);
                         let result = z3.exec(ticket, &mut query);
-                        query.timestamp("smt");
 
                         match result {
                             Ok(mut result) => {
@@ -296,17 +286,17 @@ impl Drop for Z3Worker {
 
 /// Represents a pool of Z3 worker threads
 pub struct Z3WorkerPool {
-    ///
+    /// the workers of the worker pool
     workers: Vec<Z3Worker>,
-
-    /// the number of queries executed (statistics)
-    stats_num_queries: usize,
-    ///
-    stats_cached: usize,
-    ///
+    /// identifier for the next query
+    next_query_id: usize,
+    /// statistics about the queries executed on the worker pool
+    stats: Z3WorkerPoolStats,
+    /// a query cache for avoiding running the same query twice
     query_cache: HashMap<Z3Query, Result<Z3Result, Vec<Z3Ticket>>>,
     /// tasks that haven't been dispatched to the client
     taskq: TaskQ,
+    /// the result queue
     resultq: Receiver<(Z3Ticket, Z3Result)>,
     /// stored results that haven't been collected by the client
     results: HashMap<Z3Ticket, Z3Result>,
@@ -388,12 +378,12 @@ impl Z3WorkerPool {
 
         Self {
             workers,
+            next_query_id: 0,
             resultq,
             taskq,
             results,
             query_cache,
-            stats_cached: 0,
-            stats_num_queries: 0,
+            stats: Z3WorkerPoolStats::new(),
         }
     }
 
@@ -404,19 +394,19 @@ impl Z3WorkerPool {
     ) -> Result<Z3Ticket, Box<Z3Query>> {
         log::trace!(target : "[Z3WorkerPool]", " submitting query");
         // take the timestamp
-        task.timestamp("submit");
+        task.timestamp(Z3TimeStamp::Submit);
 
         // get the ticket
-        self.stats_num_queries += 1;
-        let id = Z3Ticket(self.stats_num_queries);
+        self.next_query_id += 1;
+        let id = Z3Ticket(self.next_query_id);
 
         // see if we can the cached result
         match self.query_cache.get_mut(&task) {
             Some(Ok(r)) => {
                 // we've already computed this query and it's results are ready
                 log::debug!(target : "[Z3WorkerPool]", "not sending task, cached result for {}", id);
+                self.stats.add_cached(&task);
                 self.results.insert(id, r.clone_with_query(task));
-                self.stats_cached += 1;
             }
             Some(Err(v)) => {
                 // we've submited but it's pending, push it back and continue
@@ -429,9 +419,6 @@ impl Z3WorkerPool {
                 self.query_cache
                     .insert(task.clone_without_timestamps(), Err(vec![id]));
                 self.taskq.push(priority, id, task);
-                // let mut taskq = self.taskq.lock().unwrap();
-                // taskq.push_back((id, task));
-                // drop(taskq);
             }
         }
 
@@ -449,10 +436,17 @@ impl Z3WorkerPool {
         // XXX: that one here just makes sure there are no new tasks...
         loop {
             match self.resultq.try_recv() {
-                Ok((_id, result)) => {
+                Ok((_id, mut result)) => {
                     // nothing
+                    {
+                        let query = result.query_mut();
+                        query.timestamp(Z3TimeStamp::Done);
+                    }
                     let query = result.query();
                     let smtresult = result.result().to_string();
+
+                    // TODO: update stats!
+                    self.stats.add_query(query);
 
                     match self.query_cache.get_mut(query) {
                         Some(Ok(_r)) => {
@@ -546,11 +540,119 @@ impl Z3WorkerPool {
         self.workers.len()
     }
 
-    pub fn num_queries(&self) -> usize {
-        self.stats_num_queries
+    /// obtain the stats fo the worker pool
+    pub fn stats(&self) -> &Z3WorkerPoolStats {
+        &self.stats
     }
 
-    pub fn num_cached_queries(&self) -> usize {
-        self.stats_cached
+    /// reset the stats of the worker pool
+    pub fn stats_reset(&mut self) {
+        self.stats.reset();
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Z3 Worker Pool Stats
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone)]
+pub struct Z3WorkerPoolStats {
+    /// total number of queries run
+    pub n_queries: u64,
+    /// the number of cached queries
+    pub n_cached: u64,
+    /// total query creation time
+    pub t_create_ms: u64,
+    /// total queuing time
+    pub t_queued_ms: u64,
+    /// total time for formatting smtlib2
+    pub t_prepare_ms: u64,
+    /// total SMT time
+    pub t_solver_ms: u64,
+}
+
+impl Z3WorkerPoolStats {
+    pub fn new() -> Self {
+        Self {
+            n_queries: 0,
+            n_cached: 0,
+            t_create_ms: 0,
+            t_queued_ms: 0,
+            t_prepare_ms: 0,
+            t_solver_ms: 0,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.n_queries = 0;
+        self.n_cached = 0;
+        self.t_create_ms = 0;
+        self.t_queued_ms = 0;
+        self.t_prepare_ms = 0;
+        self.t_solver_ms = 0;
+    }
+
+    fn update_times(&mut self, query: &Z3Query) {
+        let mut timestamps = query.timestamps().iter();
+
+        let t_start = if let Some((Z3TimeStamp::Create, t_start)) = timestamps.next() {
+            t_start
+        } else {
+            return;
+        };
+
+        let t_submit = if let Some((Z3TimeStamp::Submit, t_submit)) = timestamps.next() {
+            t_submit
+        } else {
+            return;
+        };
+
+        self.t_create_ms += t_submit.duration_since(*t_start).as_millis() as u64;
+
+        let t_dispatch = if let Some((Z3TimeStamp::Dispatch, t_dispatch)) = timestamps.next() {
+            t_dispatch
+        } else {
+            return;
+        };
+
+        self.t_queued_ms += t_dispatch.duration_since(*t_submit).as_millis() as u64;
+
+        let _t_prepare = if let Some((Z3TimeStamp::FmtSmt, t_prepare)) = timestamps.next() {
+            t_prepare
+        } else {
+            return;
+        };
+
+        let t_prepare = if let Some((Z3TimeStamp::SendCmd, t_prepare)) = timestamps.next() {
+            t_prepare
+        } else {
+            return;
+        };
+
+        self.t_prepare_ms += t_prepare.duration_since(*t_dispatch).as_millis() as u64;
+        let t_solver = if let Some((Z3TimeStamp::SolverDone, t_solver)) = timestamps.next() {
+            t_solver
+        } else {
+            return;
+        };
+
+        self.t_solver_ms += t_solver.duration_since(*t_prepare).as_millis() as u64;
+    }
+
+    pub fn add_query(&mut self, query: &Z3Query) {
+        self.n_queries += 1;
+        self.update_times(query);
+    }
+
+    pub fn add_cached(&mut self, query: &Z3Query) {
+        self.n_queries += 1;
+        self.n_cached += 1;
+        self.update_times(query);
+    }
+}
+
+impl Default for Z3WorkerPoolStats {
+    fn default() -> Self {
+        Self::new()
     }
 }

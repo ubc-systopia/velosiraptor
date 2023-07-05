@@ -51,6 +51,58 @@ impl Display for Z3Ticket {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+// Timestamps
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Z3TimeStamp {
+    /// time of the creation of the Z3Query
+    Create,
+    /// the query has been submitted to the worker pool
+    Submit,
+    /// a worker dispatched the query
+    Dispatch,
+    /// smtlib2 formatting completed
+    FmtSmt,
+    /// command sent to the solver
+    SendCmd,
+    /// solver execution completed
+    SolverDone,
+    ///
+    Done,
+}
+
+// implementation of [Display] for [Z3TimeStamp]]
+impl Display for Z3TimeStamp {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        use Z3TimeStamp::*;
+        match self {
+            Create => {
+                write!(f, "foo")
+            }
+            Submit => {
+                write!(f, "foo")
+            }
+            Dispatch => {
+                write!(f, "foo")
+            }
+            FmtSmt => {
+                write!(f, "foo")
+            }
+            SendCmd => {
+                write!(f, "foo")
+            }
+            SolverDone => {
+                write!(f, "foo")
+            }
+            Done => {
+                write!(f, "foo")
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // Z3Query
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -59,15 +111,12 @@ impl Display for Z3Ticket {
 pub struct Z3Query {
     /// the operations of this query for bookkeeping purposes
     prog: Option<Program>,
-
     /// the goal of the program
     goal: Option<String>,
-
     /// the statements to be executed
     smt: Arc<Smt2Context>,
-
-    /// the timestamps fo tracing
-    timestamps: Vec<(&'static str, Instant)>,
+    /// time durations for tracing
+    timestamps: Vec<(Z3TimeStamp, Instant)>,
 }
 
 impl Z3Query {
@@ -78,29 +127,35 @@ impl Z3Query {
 
     /// Creates a new Z3 Query with the given SMT context
     pub fn with_context(smt: Smt2Context) -> Self {
+        let mut timestamps = Vec::with_capacity(10);
+        timestamps.push((Z3TimeStamp::Create, Instant::now()));
         Self {
             prog: None,
             goal: None,
             smt: Arc::new(smt),
-            timestamps: Vec::with_capacity(10),
+            timestamps,
         }
     }
 
     pub fn clone_without_program(&self) -> Self {
+        let mut timestamps = Vec::with_capacity(10);
+        timestamps.push((Z3TimeStamp::Create, Instant::now()));
         Self {
             prog: None,
             goal: None,
             smt: self.smt.clone(),
-            timestamps: Vec::with_capacity(0),
+            timestamps,
         }
     }
 
     pub fn clone_without_timestamps(&self) -> Self {
+        let mut timestamps = Vec::with_capacity(10);
+        timestamps.push((Z3TimeStamp::Create, Instant::now()));
         Self {
             prog: self.prog.clone(),
             goal: self.goal.clone(),
             smt: self.smt.clone(),
-            timestamps: Vec::with_capacity(0),
+            timestamps,
         }
     }
 
@@ -149,29 +204,14 @@ impl Z3Query {
     }
 
     /// records a timestamp for tracing
-    pub fn timestamp(&mut self, name: &'static str) {
-        self.timestamps.push((name, Instant::now()));
+    pub fn timestamp(&mut self, id: Z3TimeStamp) -> Instant {
+        let inst = Instant::now();
+        self.timestamps.push((id, inst));
+        inst
     }
 
-    /// prints the timestamp values
-    pub fn print_timestamps(&self) {
-        if self.timestamps.is_empty() {
-            println!("stats: no timestamps");
-            return;
-        }
-
-        let (_, t_start) = self.timestamps[0];
-        let mut t_last = t_start;
-        for (i, (name, now)) in self.timestamps.iter().enumerate() {
-            let diff = now.saturating_duration_since(t_last);
-            t_last = *now;
-            if i == 0 {
-                continue;
-            }
-            print!("{}, {:7}, us,  ", name, diff.as_micros());
-        }
-        let diff = t_last.saturating_duration_since(t_start);
-        println!("elapsed, {:7}, us  ", diff.as_micros());
+    pub fn timestamps(&self) -> &[(Z3TimeStamp, Instant)] {
+        &self.timestamps
     }
 
     /// checks whether the query is empty or not
@@ -271,11 +311,11 @@ impl Z3Result {
         }
     }
 
-    pub fn print_timestamps(&self) {
-        if let Some(query) = &self.query {
-            query.print_timestamps();
-        }
-    }
+    // pub fn print_timestamps(&self) {
+    //     if let Some(query) = &self.query {
+    //         query.print_timestamps();
+    //     }
+    // }
 
     /// sets the query with the result
     pub fn set_query(&mut self, query: Box<Z3Query>) {

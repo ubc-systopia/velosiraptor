@@ -48,7 +48,7 @@ pub use instance_standalone::Z3Instance;
 pub use query::{Z3Query, Z3Result, Z3Ticket};
 use taskq::TaskQ;
 pub use taskq::Z3TaskPriority;
-pub use worker::{Z3Worker, Z3WorkerPool};
+pub use worker::{Z3Worker, Z3WorkerPool, Z3WorkerPoolStats};
 
 /// Errors reported by Z3
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
