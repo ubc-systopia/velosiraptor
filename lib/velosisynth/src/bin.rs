@@ -27,6 +27,7 @@
 //!
 //! This example program
 
+use std::collections::HashMap;
 use std::env;
 use std::io;
 use std::io::Read;
@@ -36,6 +37,7 @@ use clap::{arg, command};
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, LevelPadding, TermLogger, TerminalMode};
 
 use velosiast::{AstResult, VelosiAst, VelosiAstUnit};
+use velosisynth::model;
 use velosisynth::Z3SynthFactory;
 
 pub fn main() {
@@ -123,16 +125,12 @@ pub fn main() {
     let mut synthfactory = Z3SynthFactory::new();
     synthfactory.num_workers(ncores).default_log_dir();
 
-    // HACK: how do we have access to the methods and give a mutable reference at the same time?
-    {
-        let initial_ast = ast.clone();
-        for unit in ast.units_mut() {
-            if let VelosiAstUnit::Enum(e) = unit {
-                let mut synth = synthfactory.create_enum(e);
-                synth.distinguish(&initial_ast);
-            }
-        }
-    }
+    // TODO: might be able to put this in the ast and reuse it?
+    let models = ast
+        .segments()
+        .iter()
+        .map(|u| (u.ident().clone(), model::create(u, false)))
+        .collect::<HashMap<_, _>>();
 
     let mut t_synth = Vec::new();
     for unit in ast.units_mut() {
@@ -252,8 +250,18 @@ pub fn main() {
             VelosiAstUnit::StaticMap(_s) => {
                 // nothing to synthesize here
             }
-            VelosiAstUnit::Enum(_e) => {
-                // nothing to synthesize here
+            VelosiAstUnit::Enum(e) => {
+                // try to differentiate enum variants
+                let e = Rc::get_mut(e);
+
+                if e.is_none() {
+                    println!("could not obtain mutable reference to enum unit\n");
+                    continue;
+                }
+                let e = e.unwrap();
+
+                let mut synth = synthfactory.create_enum(e);
+                synth.distinguish(&models);
             }
         }
     }
