@@ -649,6 +649,12 @@ impl VelosiAstBinOpExpr {
     pub fn result_type(&self) -> &VelosiAstTypeInfo {
         self.op.result_type()
     }
+
+    pub fn get_var_references(&self) -> HashSet<&VelosiAstIdentLiteralExpr> {
+        let mut vars = self.lhs.get_var_references();
+        vars.extend(self.rhs.get_var_references());
+        vars
+    }
 }
 
 /// Implementation of [PartialEq] for [VelosiAstBinOpExpr]
@@ -864,6 +870,10 @@ impl VelosiAstUnOpExpr {
     pub fn result_type(&self) -> &VelosiAstTypeInfo {
         self.op.result_type()
     }
+
+    pub fn get_var_references(&self) -> HashSet<&VelosiAstIdentLiteralExpr> {
+        self.expr.get_var_references()
+    }
 }
 
 /// Implementation of [PartialEq] for [VelosiAstUnOpExpr]
@@ -1010,6 +1020,10 @@ impl VelosiAstQuantifierExpr {
 
     pub fn has_interface_references(&self) -> bool {
         self.expr.has_interface_references()
+    }
+
+    pub fn get_var_references(&self) -> HashSet<&VelosiAstIdentLiteralExpr> {
+        unimplemented!();
     }
 }
 
@@ -1242,6 +1256,14 @@ impl VelosiAstIdentLiteralExpr {
             }
         }
     }
+
+    pub fn get_var_references(&self) -> HashSet<&VelosiAstIdentLiteralExpr> {
+        let mut vars = HashSet::new();
+        if !(self.has_state_references() || self.has_interface_references()) {
+            vars.insert(self);
+        }
+        vars
+    }
 }
 
 /// Implementation of [PartialEq] for [VelosiAstIdentLiteralExpr]
@@ -1311,6 +1333,10 @@ impl VelosiAstNumLiteralExpr {
 
     pub fn has_var_references(&self, _vars: &HashSet<&str>) -> bool {
         false
+    }
+
+    pub fn get_var_references(&self) -> HashSet<&VelosiAstIdentLiteralExpr> {
+        HashSet::new()
     }
 }
 
@@ -1394,6 +1420,10 @@ impl VelosiAstBoolLiteralExpr {
 
     pub fn has_var_references(&self, _vars: &HashSet<&str>) -> bool {
         false
+    }
+
+    pub fn get_var_references(&self) -> HashSet<&VelosiAstIdentLiteralExpr> {
+        HashSet::new()
     }
 }
 
@@ -1642,6 +1672,10 @@ impl VelosiAstFnCallExpr {
     pub fn result_type(&self) -> &VelosiAstTypeInfo {
         &self.etype
     }
+
+    pub fn get_var_references(&self) -> HashSet<&VelosiAstIdentLiteralExpr> {
+        unimplemented!();
+    }
 }
 
 /// Implementation of [PartialEq] for [VelosiAstFnCallExpr]
@@ -1838,6 +1872,13 @@ impl VelosiAstIfElseExpr {
     pub fn result_type(&self) -> &VelosiAstTypeInfo {
         &self.etype
     }
+
+    pub fn get_var_references(&self) -> HashSet<&VelosiAstIdentLiteralExpr> {
+        let mut vars = self.cond.get_var_references();
+        vars.extend(self.then.get_var_references());
+        vars.extend(self.other.get_var_references());
+        vars
+    }
 }
 
 /// Implementation of [PartialEq] for [VelosiAstIfElseExpr]
@@ -1979,6 +2020,10 @@ impl VelosiAstRangeExpr {
     pub fn has_interface_references(&self) -> bool {
         false
     }
+
+    pub fn get_var_references(&self) -> HashSet<&VelosiAstIdentLiteralExpr> {
+        HashSet::new()
+    }
 }
 
 /// Implementation of [PartialEq] for [VelosiAstRangeExpr]
@@ -2110,6 +2155,10 @@ impl VelosiAstSliceExpr {
 
     pub fn has_interface_references(&self) -> bool {
         self.ident.has_interface_references() || self.range.has_interface_references()
+    }
+
+    pub fn get_var_references(&self) -> HashSet<&VelosiAstIdentLiteralExpr> {
+        self.ident.get_var_references()
     }
 }
 
@@ -2298,6 +2347,22 @@ impl VelosiAstExpr {
             IfElse(i) => i.has_var_references(vars),
             Slice(i) => i.has_var_references(vars),
             Range(i) => i.has_var_references(vars),
+        }
+    }
+
+    pub fn get_var_references(&self) -> HashSet<&VelosiAstIdentLiteralExpr> {
+        use VelosiAstExpr::*;
+        match self {
+            IdentLiteral(i) => i.get_var_references(),
+            NumLiteral(i) => i.get_var_references(),
+            BoolLiteral(i) => i.get_var_references(),
+            BinOp(i) => i.get_var_references(),
+            UnOp(i) => i.get_var_references(),
+            Quantifier(i) => i.get_var_references(),
+            FnCall(i) => i.get_var_references(),
+            IfElse(i) => i.get_var_references(),
+            Slice(i) => i.get_var_references(),
+            Range(i) => i.get_var_references(),
         }
     }
 
