@@ -44,8 +44,9 @@ pub fn main() {
         .arg(arg!(
             -v --verbose ... "Turn debugging verbosity on"
         ))
-        .arg(arg!(-c --cores <VALUE>).default_value("1"))
+        .arg(arg!(-c --cores <VALUE>).default_value("num_cpu - 1"))
         .arg(arg!(-s --synth <VALUE>).default_value("all"))
+        .arg(arg!(-u --unit <VALUE>).default_value("all"))
         .arg(arg!(
             -m --"mem-model" "Synthesize using the abstract memory model"
         ))
@@ -73,7 +74,11 @@ pub fn main() {
         .get_one::<String>("cores")
         .unwrap()
         .parse::<usize>()
-        .unwrap();
+        .unwrap_or_else(|_| {
+            std::thread::available_parallelism()
+                .map(|i| i.into())
+                .unwrap_or(1)
+        });
 
     TermLogger::init(
         filter_level,
@@ -127,6 +132,13 @@ pub fn main() {
                     // don't handle abstract units
                     continue;
                 }
+
+                if let Some(unit_filter) = matches.get_one::<String>("unit").map(|s| s.as_str()) {
+                    if !(unit_filter == "all" || unit_filter == u.ident().as_str()) {
+                        continue;
+                    }
+                }
+
                 let seg = Rc::get_mut(u);
 
                 if seg.is_none() {
@@ -155,13 +167,15 @@ pub fn main() {
                 if let Err(e) = sanity_check {
                     println!("{}", e);
                     log::error!(target: "main", "skipped synthesizing due to errors");
+                    let stats = Some(synth.worker_pool_stats().clone());
+                    t_synth.push((seg.ident_to_string(), t_synth_segment, Vec::new(), stats));
                     continue;
                 }
 
                 let mut synth_breakdown = Vec::new();
                 let mem_model = matches.get_flag("mem-model");
 
-                match matches.get_one::<String>("synth").map(|s| s.as_str()) {
+                let stats = match matches.get_one::<String>("synth").map(|s| s.as_str()) {
                     Some("all") => {
                         println!("Synthesizing ALL for unit {}", synth.unit_ident());
                         synth.synthesize(mem_model);
@@ -170,10 +184,14 @@ pub fn main() {
                             ("protect", synth.t_protect_synthesis),
                             ("unmap", synth.t_unmap_synthesis),
                         ];
+
+                        let stats = synth.worker_pool_stats().clone();
+
                         match synth.finalize() {
                             Ok(p) => log::warn!(target: "main", "synthesis completed: {}", p),
                             Err(e) => log::error!(target: "main", "synthesis failed\n{}", e),
                         }
+                        Some(stats)
                     }
 
                     Some("map") => {
@@ -182,6 +200,7 @@ pub fn main() {
                             Ok(p) => log::warn!(target: "main", "Program: {}", p),
                             Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
                         }
+                        None
                     }
 
                     Some("unmap") => {
@@ -190,6 +209,7 @@ pub fn main() {
                             Ok(p) => log::warn!(target: "main", "Program: {}", p),
                             Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
                         }
+                        None
                     }
 
                     Some("protect") => {
@@ -198,6 +218,7 @@ pub fn main() {
                             Ok(p) => log::warn!(target: "main", "Program: {}", p),
                             Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
                         }
+                        None
                     }
                     Some(x) => {
                         log::error!(target: "main", "unknown synth model '{}'", x);
@@ -207,11 +228,15 @@ pub fn main() {
                         log::error!(target: "main", "synth mode not set");
                         return;
                     }
-                }
+                };
 
                 t_synth_segment.push(("Synthesis", Instant::now()));
-
-                t_synth.push((seg.ident_to_string(), t_synth_segment, synth_breakdown));
+                t_synth.push((
+                    seg.ident_to_string(),
+                    t_synth_segment,
+                    synth_breakdown,
+                    stats,
+                ));
             }
             VelosiAstUnit::StaticMap(_s) => {
                 // nothing to synthesize here
@@ -235,37 +260,50 @@ pub fn main() {
         t_parsing.duration_since(t_start).as_millis()
     );
 
-    let t_synth_start = t_synth.first().unwrap().1.first().unwrap().1;
-    let t_synth_end = t_synth.last().unwrap().1.last().unwrap().1;
-    println!(
-        "  Synthesis time         {:6} ms",
-        t_synth_end.duration_since(t_synth_start).as_millis()
-    );
-    for (unit, t, breakdown) in t_synth {
+    if !t_synth.is_empty() {
+        let t_synth_start = t_synth.first().unwrap().1.first().unwrap().1;
+        let t_synth_end = t_synth.last().unwrap().1.last().unwrap().1;
         println!(
-            "---------------------------------------------------------------------------------"
+            "  Synthesis time         {:6} ms",
+            t_synth_end.duration_since(t_synth_start).as_millis()
         );
-        let mut t_prev = t.first().unwrap().1;
-        let t_last = t.last().unwrap().1;
-
-        println!(
-            "  {:20.20}   {:6} ms",
-            unit,
-            t_last.duration_since(t_prev).as_millis()
-        );
-        for (name, t) in t.iter().skip(1) {
+        for (unit, t, breakdown, stats) in t_synth {
             println!(
-                "   - {:17.17}   {:6} ms",
-                name,
-                t.duration_since(t_prev).as_millis()
+                "---------------------------------------------------------------------------------"
             );
-            t_prev = *t;
-            if *name == "Synthesis" {
-                for (name, t) in breakdown.iter() {
-                    println!("     - {:15.15}   {:6} ms", name, t.as_millis());
+            let mut t_prev = t.first().unwrap().1;
+            let t_last = t.last().unwrap().1;
+
+            println!(
+                "  {:20.20}   {:6} ms",
+                unit,
+                t_last.duration_since(t_prev).as_millis()
+            );
+            for (name, t) in t.iter().skip(1) {
+                println!(
+                    "   * {:17.17}   {:6} ms",
+                    name,
+                    t.duration_since(t_prev).as_millis()
+                );
+                t_prev = *t;
+                if *name == "Synthesis" {
+                    for (name, t) in breakdown.iter() {
+                        println!("     - {:15.15}   {:6} ms", name, t.as_millis());
+                    }
                 }
             }
+            if let Some(stats) = stats {
+                println!("   - Synthesis Breakdown");
+                println!("     - {:15.15}   {:6}", "num queries", stats.n_queries);
+                println!("       {:15.15}   {:6}", " - cached", stats.n_cached);
+                println!("     - {:15.15}   {:6} ms", "create", stats.t_create_ms);
+                println!("     - {:15.15}   {:6} ms", "queued", stats.t_queued_ms);
+                println!("     - {:15.15}   {:6} ms", "prepare", stats.t_prepare_ms);
+                println!("     - {:15.15}   {:6} ms", "solver", stats.t_solver_ms);
+            }
         }
+    } else {
+        println!("  Synthesis time         {:6} ms (not run due to error)", 0);
     }
     println!("=================================================================================\n");
 }

@@ -31,10 +31,9 @@
 // used standard library functionality
 
 use std::env;
+use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::path::PathBuf;
 use std::sync::Arc;
-
-use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::time::{Duration, Instant};
 
 // public re-exports
@@ -52,7 +51,7 @@ use velosiast::ast::VelosiAstUnitSegment;
 use crate::vmops::{MapPrograms, MaybeResult, ProgramBuilder, ProtectPrograms, UnmapPrograms};
 pub use error::{VelosiSynthError, VelosiSynthIssues};
 pub use programs::{Program, ProgramsBuilder, ProgramsIter};
-pub use z3::{Z3Query, Z3TaskPriority, Z3Ticket, Z3Worker, Z3WorkerPool};
+pub use z3::{Z3Query, Z3TaskPriority, Z3Ticket, Z3Worker, Z3WorkerPool, Z3WorkerPoolStats};
 
 const DEFAULT_BATCH_SIZE: usize = 32;
 
@@ -180,32 +179,18 @@ impl<'a> Z3Synth<'a> {
         let t_start = Instant::now();
 
         log::warn!(target: "[Z3Synth]", "running sanity checks on the model.");
-        let mut issues = VelosiSynthIssues::new();
+        let _issues = VelosiSynthIssues::new();
 
+        // first make sure the methods themselves are sane
         let issues = sanitycheck::check_methods(&mut self.z3, self.unit);
+        if !issues.is_ok() {
+            self.t_sanity_check = Instant::now() - t_start;
+            return synth_result_return!((), issues);
+        }
 
-        println!("sanity check:\n {}", issues);
-
-        panic!("stop!");
-
-        issues.merge_result(vmops::sanitychecks::check_precondition_satisfiability(
-            &mut self.z3,
-            self.unit,
-            "map",
-        ));
-        issues.merge_result(vmops::sanitychecks::check_precondition_satisfiability(
-            &mut self.z3,
-            self.unit,
-            "unmap",
-        ));
-        issues.merge_result(vmops::sanitychecks::check_precondition_satisfiability(
-            &mut self.z3,
-            self.unit,
-            "protect",
-        ));
-
-        let t_end = Instant::now();
-        self.t_sanity_check = t_end - t_start;
+        // now make sure the unit is sane
+        let issues = sanitycheck::check_unit(&mut self.z3, self.unit);
+        self.t_sanity_check = Instant::now() - t_start;
 
         synth_result_return!((), issues)
     }
@@ -414,6 +399,10 @@ impl<'a> Z3Synth<'a> {
     pub fn terminate(&mut self) {
         self.z3.terminate();
     }
+
+    pub fn worker_pool_stats(&self) -> &Z3WorkerPoolStats {
+        self.z3.stats()
+    }
 }
 
 impl<'a> Display for Z3Synth<'a> {
@@ -458,7 +447,13 @@ impl Z3SynthFactory {
         Self {
             logdir: None,
             logging: cfg!(debug_assertions),
-            num_workers: 1,
+            num_workers: std::cmp::max(
+                1usize,
+                std::thread::available_parallelism()
+                    .map(|i| i.into())
+                    .unwrap_or(1)
+                    - 1,
+            ),
         }
     }
 
