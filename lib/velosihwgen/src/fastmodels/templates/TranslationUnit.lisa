@@ -1,0 +1,258 @@
+// TranslationUnit Component for ArmFastModels
+//
+// SPDX-License-Identifier: MIT
+//
+// This defines some translation hardware with two memory regions, similar to the
+// PCI Express setup:
+//
+//    1) The configuration space of the translation hardware
+//    2) The memory region that is translated by the unit
+//
+component TranslationUnit
+{
+    // --------------------------------------------------------------------------------------------
+    // C++ Header Includes
+    // --------------------------------------------------------------------------------------------
+
+    // include directives of the C++ headers used by this component.
+    includes
+    {
+        #include<framework/logging.hpp>
+        #include<unit.hpp>
+    }
+
+
+    // --------------------------------------------------------------------------------------------
+    // Top level ports.
+    // --------------------------------------------------------------------------------------------
+
+    //! This port is the upstream port of the processor, addresses on the port are in core-local
+    //! physical addresses (VA/IPA as seen from the unit)
+    slave port<PVBus>       pvbus_s;
+
+    //! This downstream port is where the translated accesses from pvbus_s come out.
+    //! This port should be connected to RAMDevice or similar
+    master port<PVBus>      pvbus_m;
+
+    //! This downstream port is where page table walk accesses come from
+    //! (currently not used)
+    master port<PVBus>      pvbus_ptw_m;
+
+    //! Control ports to address the register file
+    slave port<PVBus>       control;
+
+    //! The reset pin.
+    slave port<Signal> reset_in
+    {
+        behaviour setValue(sg::Signal::State t_)
+        {
+            unit->set_reset(t_ == sg::Signal::Set );
+        }
+    }
+
+
+    // --------------------------------------------------------------------------------------------
+    // Components used to implement device.
+    // --------------------------------------------------------------------------------------------
+
+    composition {
+        /// The basis of remapping the translated stream
+        mapper               : PVBusMapper("handling_of_dvm_messages_from_upstream"="terminate",
+                                           "handling_of_dvm_messages_from_downstream"=(ptw_has_separate_port ? "terminate" : "handle"),
+                                           "handling_of_upstream_snoop_requests"="terminate");
+
+        /// In order to receive DVM messages on pvbus_ptw_m then we
+        /// need to attach a PVBusMapper to it.
+        ptw_dvm_receiver     : PVBusMapper("handling_of_dvm_messages_from_upstream"="terminate",
+                                           "handling_of_dvm_messages_from_downstream"="handle",
+                                           "handling_of_upstream_snoop_requests"="terminate");
+
+        /// The register file port
+        control_slv          : PVBusSlave();
+
+        /// A PVBusMaster that we use to get a transaction generator to perform
+        /// page walks on if configured to use the separate port.
+        ptw_master           : PVBusMaster();
+
+        /// If pvbus_ptw_m is not configured to be used then this will be the
+        /// transaction generator configured to be used instead.
+        pvbus_master         : PVBusMaster();
+    }
+
+
+    // --------------------------------------------------------------------------------------------
+    // Deal with handing of translation requests to the unit
+    // --------------------------------------------------------------------------------------------
+
+    internal slave port<PVBusMapperControl>  mapper_control
+    {
+        slave behavior remap(pv::RemapRequest& req) : unsigned
+        {
+            unsigned unpredictableness = 0;
+            unsigned const ret = unit->handle_remap(req, &unpredictableness);
+
+            req.getModifiableTransactionAttributes()->setUserFlags(unpredictableness);
+
+            return ret;
+        }
+
+        slave behaviour handleUpstreamDVMMessageFromDownstream(
+            unsigned             /*downstream_port_index_*/,
+            void*                /*arc_within_port_*/,
+            DVM::Message*        message_
+            ) : DVM::error_response_t
+        {
+            return unit->handle_dvm_msg(message_, false);
+        }
+    }
+
+
+    // --------------------------------------------------------------------------------------------
+    // Connect the register file requests to the model
+    // --------------------------------------------------------------------------------------------
+
+    internal slave port<PVDevice> control_slv_port
+    {
+        slave behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return unit->control_read(tx);
+        }
+        slave behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return unit->control_write(tx);
+        }
+        slave behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return unit->control_debug_read(tx);
+        }
+        slave behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return unit->control_debug_write(tx);
+        }
+    }
+
+
+    // --------------------------------------------------------------------------------------------
+    /// Transaction generators so we can emit table walk requests
+    // --------------------------------------------------------------------------------------------
+
+    internal master port<PVTransactionMaster> ptw_master_control;
+    internal master port<PVTransactionMaster> pvbus_master_control;
+
+
+    // --------------------------------------------------------------------------------------------
+    // Deal with receiving DVM messages on the ptw port
+    // --------------------------------------------------------------------------------------------
+
+    internal slave port<PVBusMapperControl>  ptw_dvm_receiver_control
+    {
+        // This will be called if we do page walking through the pvbus_ptw_m
+        // port as we sit between the PVBusMaster that is generating the
+        // transaction and pvbus_ptw_m.  We are here only for the DVM message
+        // handling and nothing else.
+        slave behavior remap( pv::RemapRequest& ) : unsigned { return 0; }
+
+        slave behaviour handleUpstreamDVMMessageFromDownstream(
+            unsigned             /*downstream_port_index_*/,
+            void*                /*arc_within_port_*/,
+            DVM::Message*        message_
+            ) : DVM::error_response_t
+        {
+            return unit->handle_dvm_msg(message_, true);
+        }
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Setting the connections
+    // --------------------------------------------------------------------------------------------
+
+    connection {
+        // The translated stream
+        self.pvbus_s      => mapper.pvbus_s;
+        mapper.pvbus_m[0] => self.pvbus_m;
+        mapper.control    => self.mapper_control;
+
+        // The register ports
+        self.control                 => control_slv.pvbus_s;
+        control_slv.device           => self.control_slv_port;
+
+        // Connect our control port to the ptw_master so that we can ask it
+        // for a transaction generator to do page walks on.  And then connect
+        // up the PVBusMaster to the outside world via a PVBusMapper that we
+        // use to capture DVM messages sent to the PTW port.
+        self.ptw_master_control     => ptw_master.control;
+        ptw_master.pvbus_m          => ptw_dvm_receiver.pvbus_s;
+        ptw_dvm_receiver.pvbus_m[0] => self.pvbus_ptw_m;
+        ptw_dvm_receiver.control    => self.ptw_dvm_receiver_control;
+
+        self.pvbus_master_control   => pvbus_master.control;
+        pvbus_master.pvbus_m        => self.pvbus_m;
+    }
+
+
+    resources
+    {
+        PARAMETER {
+            type(string),
+            default("INFO"),
+            description("Set the logging Level")
+        } log_level;
+
+        PARAMETER {
+            type(bool),
+            default(true),
+            description( "Page Table Walks use pvbus_ptw_m" )
+        } ptw_has_separate_port;
+
+        pv::TransactionGenerator *tx_generator;
+        protocol_PVBus *cpu_bus;
+
+        // the translatio nunit
+        TranslationUnit* unit;
+    }
+
+
+
+    // initialization function (constructor)
+    behavior init()
+    {
+        composition.init();
+
+        // setup logging level
+        LogLevel level;
+        if (log_level == "NONE") {
+            level = LOG_LEVEL_NONE;
+        } else if (log_level == "ERROR") {
+            level = LOG_LEVEL_ERROR;
+        } else if (log_level == "INFO") {
+            level = LOG_LEVEL_INFO;
+        } else if (log_level == "DEBUG") {
+            level = LOG_LEVEL_DEBUG;
+        } else {
+            cout << "Unknown logging level: " << log_level << endl;
+            exit(1);
+        }
+
+        // TODO: register the interrupt stuff
+        Logging::init(level);
+
+        // create the translation unit object
+        unit = TranslationUnit::create(this, getHierarchicalName(), cadi__,
+                                       ptw_master_control.createRandomContextTransactionGenerator());
+    }
+
+    // reset the unit
+    behaviour reset(int reset_level_)
+    {
+        composition.reset(reset_level_);
+        unit->reset();
+    }
+
+
+    // termination function (destructor)
+    behavior terminate()
+    {
+        delete unit;
+        composition.terminate();
+    }
+}
