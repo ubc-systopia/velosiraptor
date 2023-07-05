@@ -29,7 +29,7 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::time::Instant;
 
-use super::query::{Z3Query, Z3Result, Z3Ticket};
+use super::query::{Z3Query, Z3Result, Z3Ticket, Z3TimeStamp};
 use super::Z3Error;
 
 /// flag whether we want to use a full restart when resetting z3
@@ -47,11 +47,8 @@ pub struct Z3Instance {
     z3_proc: Child,
     /// the path to where the logfiles are stored
     logfile: Option<File>,
-
-    t_prepare: u64,
-    t_query: u64,
-    t_longest_query: u64,
-    num_queries: u64,
+    /// some statistics of the instance
+    stats: Z3InstanceStats,
 }
 
 impl Z3Instance {
@@ -63,10 +60,7 @@ impl Z3Instance {
             id,
             z3_proc: Self::spawn_z3(),
             logfile: None,
-            t_prepare: 0,
-            t_query: 0,
-            t_longest_query: 0,
-            num_queries: 0,
+            stats: Z3InstanceStats::new(),
         }
     }
 
@@ -91,10 +85,7 @@ impl Z3Instance {
             id,
             z3_proc: Self::spawn_z3(),
             logfile,
-            t_prepare: 0,
-            t_query: 0,
-            t_longest_query: 0,
-            num_queries: 0,
+            stats: Z3InstanceStats::new(),
         }
     }
 
@@ -121,12 +112,14 @@ impl Z3Instance {
 
     /// restarts the z3 instance, terminate it and restart it
     pub fn restart(&mut self) {
+        self.stats.reset();
         self.terminate();
         self.z3_proc = Self::spawn_z3();
     }
 
     /// resets the z3 instance, by sending a `(reset)` command
     pub fn reset(&mut self) -> Result<(), Z3Error> {
+        self.stats.reset();
         if CONFIG_RESET_IS_RESTART {
             self.restart();
             Ok(())
@@ -153,29 +146,29 @@ impl Z3Instance {
 
             // construt the smt2 context from the query
             let smt = query.smt_context().to_code(!cfg!(debug_assertions));
-            // query.timestamp("fmtsmt");
-
             let id = format!(";; Z3Ticket({})\n", ticket);
 
-            // send to the z3 process
-            z3_stdin.write_all(id.as_bytes()).unwrap();
+            // record the time to create the smt context
+            query.timestamp(Z3TimeStamp::FmtSmt);
 
-            // send to the z3 process
+            // send it to z3
+            z3_stdin.write_all(id.as_bytes()).unwrap();
             z3_stdin.write_all(smt.as_bytes()).unwrap();
+
+            // record the time to execute the query
+            query.timestamp(Z3TimeStamp::SendCmd);
 
             // adding an `(echo)` to have at least some output
             z3_stdin
                 .write_all("\n(echo \"!remove\")\n".as_bytes())
                 .unwrap();
 
-            // query.timestamp("writesmt");
             if let Some(f) = &mut self.logfile {
                 f.write_all(id.as_bytes())
                     .expect("writing the smt query failed.");
                 f.write_all(smt.as_bytes())
                     .expect("writing the smt query failed.");
             }
-            // query.timestamp("logging");
         } else {
             return Err(Z3Error::QueryExecution);
         }
@@ -207,13 +200,12 @@ impl Z3Instance {
             String::new()
         };
 
-        let t_query = Instant::now();
-        let t_query = t_query.duration_since(t_prepare).as_millis() as u64;
-        self.t_prepare += t_prepare.duration_since(t_start).as_millis() as u64;
-        self.t_query += t_query;
+        let t_query = query.timestamp(Z3TimeStamp::SolverDone);
 
-        self.t_longest_query = std::cmp::max(self.t_longest_query, t_query);
-        self.num_queries += 1;
+        let t_query = t_query.duration_since(t_prepare).as_millis() as u64;
+        let t_prepare = t_prepare.duration_since(t_start).as_millis() as u64;
+
+        self.stats.add(ticket.0, t_prepare, t_query);
 
         log::trace!(target : "[Z3Instance]", "{} query result is '{}'", self.id, result);
         Ok(Z3Result::new(result))
@@ -274,11 +266,8 @@ impl Z3Instance {
 
         let t_query = Instant::now();
         let t_query = t_query.duration_since(t_prepare).as_millis() as u64;
-        self.t_prepare += t_prepare.duration_since(t_start).as_millis() as u64;
-        self.t_query += t_query;
-
-        self.t_longest_query = std::cmp::max(self.t_longest_query, t_query);
-        self.num_queries += 1;
+        let t_prepare = t_prepare.duration_since(t_start).as_millis() as u64;
+        self.stats.add(0, t_prepare, t_query);
 
         Ok(Z3Result::new(result))
     }
@@ -290,5 +279,52 @@ impl Drop for Z3Instance {
         //     "[Z3StandaloneInstance] #{} prepare time: {}ms, query time: {}ms, longest query: {}ms, num queries: {}",            self.id, self.t_prepare, self.t_query, self.t_longest_query, self.num_queries
         // );
         self.terminate();
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Z3 Instance Stats
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct Z3InstanceStats {
+    /// cumulative time for preparing queries
+    pub t_prepare: u64,
+    /// cummulative time for executing queries
+    pub t_query: u64,
+    /// longest running query time
+    pub t_longest_query: u64,
+    /// id of the longest running query
+    pub id_longest_query: usize,
+    /// number of queries executed
+    pub num_queries: u64,
+}
+
+impl Z3InstanceStats {
+    pub fn new() -> Self {
+        Self {
+            t_prepare: 0,
+            t_query: 0,
+            t_longest_query: 0,
+            id_longest_query: 0,
+            num_queries: 0,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.t_prepare = 0;
+        self.t_query = 0;
+        self.t_longest_query = 0;
+        self.id_longest_query = 0;
+        self.num_queries = 0;
+    }
+
+    pub fn add(&mut self, id: usize, t_prepare: u64, t_query: u64) {
+        self.t_prepare += t_prepare;
+        self.t_query += t_query;
+        if t_query > self.t_longest_query {
+            self.t_longest_query = t_query;
+            self.id_longest_query = id;
+        }
+        self.num_queries += 1;
     }
 }
