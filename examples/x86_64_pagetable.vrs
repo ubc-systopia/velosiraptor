@@ -37,6 +37,15 @@ const PHYS_ADDR_MAX  : size = (1 << PHYS_ADDR_BITS);
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+flags {
+    writable,
+    readable,
+    executable,
+    devicemem,
+    usermode,
+    bar
+}
+
 
 abstract segment X86_64_PTableDescriptor(base: addr) {
 
@@ -47,7 +56,8 @@ abstract segment X86_64_PTableDescriptor(base: addr) {
         readable,
         executable,
         devicemem,
-        usermode
+        usermode,
+        bar
     };
 
     state = StateDef(base: addr) {
@@ -72,10 +82,12 @@ abstract segment X86_64_PTableDescriptor(base: addr) {
         mem entry [ base, 0, 8 ]
     };
 
+    #[remap]
     fn valid() -> bool {
         state.entry.present == 1
     }
 
+    #[remap]
     fn matchflags(flgs : flags) -> bool
         requires valid()
     {
@@ -102,7 +114,8 @@ abstract segment X86_64_PageDescriptor(base: addr) {
         readable,
         executable,
         devicemem,
-        usermode
+        usermode,
+        bar
     };
 }
 
@@ -141,10 +154,12 @@ segment X86_64_PageTableEntry(base: addr) : X86_64_PageDescriptor {
         mem entry [ base, 0, 8 ]
     };
 
+    #[remap]
     fn valid() -> bool {
         state.entry.present == 1
     }
 
+    #[remap]
     fn matchflags(flgs : flags) -> bool
     {
         (state.entry.rw == flgs.writable)
@@ -228,10 +243,12 @@ segment X86_64_PDirEntryPage(base :addr) : X86_64_PageDescriptor {
         mem entry [ base, 0, 8 ]
     };
 
+    #[remap]
     fn valid() -> bool {
         state.entry.present == 1
     }
 
+    #[remap]
     fn matchflags(flgs : flags) -> bool
     {
         (state.entry.rw == flgs.writable)
@@ -320,10 +337,12 @@ segment X86_64_PDPTEntryPage(base: addr) : X86_64_PageDescriptor {
         mem entry [ base, 0, 8 ]
     };
 
+    #[remap]
     fn valid() -> bool {
         state.entry.present == 1
     }
 
+    #[remap]
     fn matchflags(flgs : flags) -> bool
         requires valid()
     {
@@ -335,10 +354,10 @@ segment X86_64_PDPTEntryPage(base: addr) : X86_64_PageDescriptor {
             }
          && (state.entry.us == flgs.usermode)
          && if flgs.executable == 1 {state.entry.xd == 0} else { state.entry.xd == 1}
-         && (state.entry.res0_0 == 0)
-         && (state.entry.res0_1 == 0)
-         && (state.entry.pat == 0)
-         && (state.entry.g == 0)
+         //&& (state.entry.res0_0 == 0)
+         //&& (state.entry.res0_1 == 0)
+         //&& (state.entry.pat == 0)
+         //&& (state.entry.g == 0)
     }
 
     fn translate(va: vaddr) -> paddr
@@ -411,7 +430,8 @@ segment X86_MMU(base: addr) {
         readable,
         executable,
         devicemem,
-        usermode
+        usermode,
+        bar
     };
 
     state = StateDef(base: addr) {
@@ -431,10 +451,12 @@ segment X86_MMU(base: addr) {
         mmio cr4 [ base, 8, 4 ]
     };
 
+    #[remap]
     fn valid() -> bool {
         true
     }
 
+    #[remap]
     fn matchflags(flgs:flags) -> bool {
         true
     }

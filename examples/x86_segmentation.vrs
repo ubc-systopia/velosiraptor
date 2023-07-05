@@ -56,6 +56,7 @@ abstract segment SegmentDescriptorBase(base: addr) {
         mem entry_hi [ base, 4, 4 ],
     };
 
+    #[remap]
     abstract fn matchflags(flgs : flags) -> bool;
 
     fn limit() -> size {
@@ -116,6 +117,7 @@ segment SegmentDescriptorData(base: addr) : SegmentDescriptorBase {
         write,
     };
 
+    #[remap]
     fn matchflags(flgs : flags) -> bool
         requires state.entry_hi.p == 1;
         requires state.entry_hi.s == 0;
