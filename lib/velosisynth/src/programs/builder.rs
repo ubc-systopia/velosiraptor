@@ -192,7 +192,7 @@ impl ProgramsBuilder {
         let exprs = self.construct_expressions();
 
         log::info!(
-            target : "[ProgramsBuilder]", "build programs: {} fields, {} slices, {} vars, {} flags, {} expr",
+            target : "[ProgramsBuilder]", "Build programs: {} fields, {} slices, {} vars, {} flags, {} expr",
             self.fields.len(),
             self.fields.iter().map(|a| a.1.len()).sum::<usize>(),
             self.vars.len(),
@@ -200,13 +200,13 @@ impl ProgramsBuilder {
             exprs.len()
         );
 
-        log::info!(target : "[ProgramsBuilder]", "Vars: {:?}", self.vars);
-        log::info!(target : "[ProgramsBuilder]", "Flags: {:?}", self.flags);
-        log::info!(target : "[ProgramsBuilder]", "Fields: {:?}", self.fields);
+        log::info!(target : "[ProgramsBuilder]", " * Vars: {:?}", self.vars);
+        log::info!(target : "[ProgramsBuilder]", " * Flags: {:?}", self.flags);
+        log::info!(target : "[ProgramsBuilder]", " * Fields: {:?}", self.fields);
 
-        log::debug!(target : "[ProgramsBuilder]", "Expressions:");
+        log::debug!(target : "[ProgramsBuilder]", " * Expressions:");
         for (i, e) in exprs.iter().enumerate() {
-            log::debug!(target : "[ProgramsBuilder]", "  - e{}: {:?}", i, e);
+            log::debug!(target : "[ProgramsBuilder]", "    - e{}: {:?}", i, e);
         }
 
         let mut fieldprograms = Vec::new();
