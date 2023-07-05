@@ -35,6 +35,7 @@ segment SMPTE(base: addr) {
         mmio entry [ base, 0, 4 ]
     };
 
+    #[remap]
     fn matchflags(flgs : flags) -> bool
     {
         true
