@@ -29,7 +29,6 @@ pub mod cnf;
 pub mod precond;
 pub mod queryhelper;
 pub mod resultparser;
-pub mod sanitychecks;
 pub mod semantics;
 pub mod semprecond;
 pub mod utils;

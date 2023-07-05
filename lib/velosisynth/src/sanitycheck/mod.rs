@@ -25,6 +25,8 @@
 
 mod exprs;
 mod methods;
+mod unit;
 
-pub use exprs::check_all_expr_pairwise;
+pub use exprs::{check_all_expr, check_all_expr_pairwise};
 pub use methods::check_methods;
+pub use unit::check_unit;
