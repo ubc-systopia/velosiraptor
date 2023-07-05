@@ -1,0 +1,65 @@
+// Example Platform Component for ArmFastModels
+//
+// SPDX-License-Identifier: MIT
+//
+// This defines some sample platform that uses the
+//
+// TODO: add the translation unit component when things compile
+//
+component ExamplePlatform
+{
+    // the system composition
+    composition
+    {
+        // PL011 UART and Terminal
+        telnetterminal : TelnetTerminal("start_telnet"=0);
+        pl011_uart : PL011_Uart("out_file"="-");
+
+        // Memory Devices
+        Memory0 : RAMDevice();
+        DRAM0 : RAMDevice();
+        DRAM1 : RAMDevice();
+
+        // Processors
+        armcortexa57x1ct : ARMCortexA53x1CT(CLUSTER_ID = 0, "GICDISABLE"=false);
+
+        // Clock source
+        Clock100MHz : ClockDivider(mul=100000000);
+        Clock1Hz : MasterClock();
+
+        // Busdecoders
+        BusDecoder0 : PVBusDecoder();
+
+        // Translation Unit
+        TranslationUnit : TranslationUnit();
+    }
+
+    connection
+    {
+        // Processor connections
+        armcortexa57x1ct.pvbus_m0 => BusDecoder0.pvbus_s;
+
+        // main system bus
+        BusDecoder0.pvbus_m_range[0x00000000..0x0fffffff] => Memory0.pvbus;
+        BusDecoder0.pvbus_m_range[0x1C090000..0x1C090fff] => pl011_uart.pvbus;
+        BusDecoder0.pvbus_m_range[0x1D000000..0x1dffffff] => TranslationUnit.control;
+        BusDecoder0.pvbus_m_range[0x80000000..0xbfffffff] => DRAM0.pvbus;
+
+        BusDecoder0.pvbus_m_range[0xC0000000..0xffffffff] => TranslationUnit.pvbus_s;
+        TranslationUnit.pvbus_m => DRAM1.pvbus;
+        TranslationUnit.pvbus_ptw_m => DRAM1.pvbus;
+
+        // UART to terminal
+        pl011_uart.serial_out => telnetterminal.serial;
+
+        // clocks
+        Clock1Hz.clk_out => Clock100MHz.clk_in;
+        Clock100MHz.clk_out => armcortexa57x1ct.clk_in;
+        Clock100MHz.clk_out => pl011_uart.clk_in_ref;
+    }
+
+    properties
+    {
+        component_type = "System";
+    }
+}
