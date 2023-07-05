@@ -261,6 +261,7 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
 
     fn generate(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
         for u in ast.units() {
+
             let unit_dir = &self.outdir.join(u.ident_to_string());
             let name = &u.ident_to_string();
 
@@ -269,9 +270,11 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
 
             match u {
                 velosiast::VelosiAstUnit::Segment(us) => {
-                    // todo: registers are not per unit
+
                     generate_register_header(name, &us.interface, unit_dir)?;
                     generate_register_impl(name, &us.interface, unit_dir)?;
+
+
                     generate_interface_header(name, &us.interface, unit_dir)?;
                     generate_interface_impl(name, &us.interface, unit_dir)?;
                     generate_field_header(name, &us.state, unit_dir)?;

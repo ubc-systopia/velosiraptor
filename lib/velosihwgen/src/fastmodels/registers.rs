@@ -23,45 +23,31 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! # The FastModels Platform Generator: State
-//!
-//! This module generates the register description of the Arm FastModels implementation
-//! of the translation register.
-
-// the path buffer
+use std::ops::Deref;
 use std::path::Path;
-
-// other libraries
 use crustal as C;
-
 use velosiast::{VelosiAstField, VelosiAstInterfaceField};
-// the defined errors
 use crate::fastmodels::add_header;
 use crate::fastmodels::state::{state_class_name, state_header_file};
 use crate::VelosiHwGenError;
 use velosiast::ast::VelosiAstInterface;
 
-/// generates the name of the state field header file
 pub fn registers_header_file(name: &str) -> String {
     format!("{}_registers.hpp", name)
 }
 
-/// generates the path of the state field header file
 pub fn registers_header_file_path(name: &str) -> String {
     registers_header_file(name)
 }
 
-/// generates the name of the state field header file
 pub fn registers_impl_file(name: &str) -> String {
     format!("{}_registers.cpp", name)
 }
 
-/// generates the class name for the registers file
 pub fn registers_class_name(name: &str) -> String {
     format!("{}{}Register", name[0..1].to_uppercase(), &name[1..])
 }
 
-/// generate the header file for the interface registers
 pub fn generate_register_header(
     name: &str,
     interface: &VelosiAstInterface,
@@ -94,10 +80,10 @@ pub fn generate_register_header(
 
     // for each field in the scope create a register class
     for f in interface.fields() {
-        if !matches!(**f, VelosiAstInterfaceField::Register(_)) {
-            // scope.to_file(outdir, true)?;
-            continue;
-        };
+        // if !matches!(**f, VelosiAstInterfaceField::Register(_)) {
+        //     // scope.to_file(outdir, true)?;
+        //     continue;
+        // };
 
         let rcn = registers_class_name(f.ident());
         // create a new class in the scope
@@ -127,7 +113,6 @@ pub fn generate_register_header(
     Ok(())
 }
 
-/// generate the implementation file for the interface registers
 pub fn generate_register_impl(
     name: &str,
     interface: &VelosiAstInterface,
@@ -147,85 +132,77 @@ pub fn generate_register_impl(
     scope.new_include(&reghdr, false);
 
     for f in interface.fields() {
-        // println!("{}", f.ident_to_string());
 
-        // match **f {
-        //     VelosiAstInterfaceField::Register(_) => println!("1"),
-        //     VelosiAstInterfaceField::Memory(_) => println!("2"),
-        //     VelosiAstInterfaceField::Mmio(_) => println!("3"),
-        // }
+        match f.deref() {
+            VelosiAstInterfaceField::Memory(_) => (),
+            VelosiAstInterfaceField::Register(_) => (),
+            VelosiAstInterfaceField::Mmio(f_mmio) => {
+                let rcn = registers_class_name(f.ident());
+                let c = scope.new_class(rcn.as_str());
+                c.set_base("RegisterBase", C::Visibility::Public);
 
-        if !matches!(**f, VelosiAstInterfaceField::Register(_)) {
-            // println!("skipping");
-            // scope.to_file(outdir, false)?;
-            continue;
-        };
+                let scn = state_class_name(name);
+                let sctype = C::Type::new_class(&scn);
+                let state_ptr_type = C::Type::to_ptr(&sctype);
 
-        let rcn = registers_class_name(f.ident());
-        // create a new class in the scope
-        let c = scope.new_class(rcn.as_str());
-        c.set_base("RegisterBase", C::Visibility::Public);
+                let stvar = C::Expr::new_var("st", state_ptr_type.clone());
 
-        let scn = state_class_name(name);
-        let sctype = C::Type::new_class(&scn);
-        let state_ptr_type = C::Type::to_ptr(&sctype);
+                let cons = c.new_constructor();
 
-        let stvar = C::Expr::new_var("st", state_ptr_type.clone());
+                let cparam = C::MethodParam::new("state", state_ptr_type);
 
-        let cons = c.new_constructor();
+                cons.push_parent_initializer(C::Expr::fn_call(
+                    "RegisterBase",
+                    vec![
+                        C::Expr::new_str(f.ident()),
+                        C::Expr::ConstNum(f_mmio.clone().offset),
+                        C::Expr::ConstNum(f.size()),
+                        C::Expr::Raw(String::from("ACCESS_PERMISSION_ALL")),
+                        C::Expr::ConstNum(0),
+                        C::Expr::from_method_param(&cparam),
+                    ],
+                )).push_param(cparam);
 
-        let cparam = C::MethodParam::new("state", state_ptr_type);
-        cons.push_parent_initializer(C::Expr::fn_call(
-            "RegisterBase",
-            vec![
-                C::Expr::new_str(f.ident()),
-                // C::Expr::ConstNum(f.offset()), // TODO probably wrong
-                C::Expr::ConstNum(f.size()),
-                C::Expr::Raw(String::from("ACCESS_PERMISSION_ALL")),
-                C::Expr::ConstNum(0),
-                C::Expr::from_method_param(&cparam),
-            ],
-        ))
-        .push_param(cparam);
+                let mut field_access_expr =
+                    C::Expr::method_call(&stvar, &format!("{}_field", f.ident()), vec![]);
+                field_access_expr.set_ptr();
 
-        let mut field_access_expr =
-            C::Expr::method_call(&stvar, &format!("{}_field", f.ident()), vec![]);
-        field_access_expr.set_ptr();
+                let m = c
+                    .new_method("do_read", C::Type::new_uint(64))
+                    .set_override();
+                m.body()
+                    .fn_call(
+                        "Logging::debug",
+                        vec![C::Expr::new_str("Register::do_read()")],
+                    )
+                    .raw(format!(
+                        "auto st = static_cast<{} *>(this->get_state())",
+                        scn
+                    ))
+                    .return_expr(C::Expr::method_call(
+                        &field_access_expr,
+                        "get_value",
+                        vec![],
+                    ));
 
-        let m = c
-            .new_method("do_read", C::Type::new_uint(64))
-            .set_override();
-        m.body()
-            .fn_call(
-                "Logging::debug",
-                vec![C::Expr::new_str("Register::do_read()")],
-            )
-            .raw(format!(
-                "auto st = static_cast<{} *>(this->get_state())",
-                scn
-            ))
-            .return_expr(C::Expr::method_call(
-                &field_access_expr,
-                "get_value",
-                vec![],
-            ));
-
-        let m = c.new_method("do_write", C::Type::new_void()).set_override();
-        m.new_param("data", C::Type::new_uint(64));
-        m.body()
-            .fn_call(
-                "Logging::debug",
-                vec![C::Expr::new_str("Register::do_write()")],
-            )
-            .raw(format!(
-                "auto st = static_cast<{} *>(this->get_state())",
-                scn
-            ))
-            .method_call(
-                field_access_expr,
-                "set_value",
-                vec![C::Expr::new_var("data", C::Type::new_uint(64))],
-            );
+                let m = c.new_method("do_write", C::Type::new_void()).set_override();
+                m.new_param("data", C::Type::new_uint(64));
+                m.body()
+                    .fn_call(
+                        "Logging::debug",
+                        vec![C::Expr::new_str("Register::do_write()")],
+                    )
+                    .raw(format!(
+                        "auto st = static_cast<{} *>(this->get_state())",
+                        scn
+                    ))
+                    .method_call(
+                        field_access_expr,
+                        "set_value",
+                        vec![C::Expr::new_var("data", C::Type::new_uint(64))],
+                    );
+            },
+        }
     }
 
     // set the outfile name
