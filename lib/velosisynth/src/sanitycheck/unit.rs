@@ -3,7 +3,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2022 Systopia Lab, Computer Science, University of British Columbia
+// Copyright (c) 2023 Systopia Lab, Computer Science, University of British Columbia
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,24 +23,37 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Synthesis of Virtual Memory Operations
+use velosiast::ast::{VelosiAstExpr, VelosiAstUnitSegment};
 
-pub mod map;
-pub mod protect;
-mod queries;
-pub mod unmap;
+use crate::error::VelosiSynthIssues;
 
-pub use queries::queryhelper::{MaybeResult, ProgramBuilder};
+use crate::z3::Z3WorkerPool;
 
-// re-export the sanity checks
-pub use queries::cnf;
-pub use queries::precond;
-pub use queries::queryhelper;
-pub use queries::resultparser;
-pub use queries::semantics;
-pub use queries::semprecond;
-pub use queries::utils;
+/// checks the methods for
+pub fn check_unit(z3: &mut Z3WorkerPool, unit: &VelosiAstUnitSegment) -> VelosiSynthIssues {
+    let _issues = VelosiSynthIssues::new();
 
-pub use map::MapPrograms;
-pub use protect::ProtectPrograms;
-pub use unmap::UnmapPrograms;
+    // collect all the expressions
+    let mut exprs: Vec<&VelosiAstExpr> = Vec::new();
+    for m in unit.methods() {
+        exprs.extend(m.requires.iter().map(|e| e.as_ref()));
+        if let Some(body) = m.body.as_ref() {
+            if m.rtype.is_boolean() {
+                exprs.push(body);
+            }
+        }
+    }
+
+    // now we have all the expressions in an array
+    let issues = super::check_all_expr(z3, exprs.as_slice());
+    if issues.is_ok() {
+        return issues;
+    }
+
+    let issues_new = super::check_all_expr_pairwise(z3, exprs.as_slice());
+
+    if issues_new.is_ok() {
+        return issues;
+    }
+    issues_new
+}

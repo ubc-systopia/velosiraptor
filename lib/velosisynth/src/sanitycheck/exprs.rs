@@ -24,7 +24,6 @@
 // SOFTWARE.
 
 use std::collections::HashMap;
-use std::rc::Rc;
 
 use smt2::{Smt2Context, Term, VarDecl};
 
@@ -103,7 +102,7 @@ fn expr_query(z3: &mut Z3WorkerPool, e: &VelosiAstExpr, i1: usize) -> Z3Ticket {
 }
 
 /// checks whether a single expressions can be satisfied
-///
+#[allow(dead_code)] // temporarily disable warning here
 pub fn check_expr(z3: &mut Z3WorkerPool, e: &VelosiAstExpr) -> VelosiSynthIssues {
     let mut issues = VelosiSynthIssues::new();
 
@@ -205,6 +204,8 @@ fn expr_pair_query(
         .expect("failed to submit query")
 }
 
+/// checks whether two expressions can be satisfied at the same time
+#[allow(dead_code)] // temporarily disable warning here
 pub fn check_expr_pair(
     z3: &mut Z3WorkerPool,
     e1: &VelosiAstExpr,
@@ -217,7 +218,7 @@ pub fn check_expr_pair(
 
     let mut res = result.result().lines();
     if Some("sat") == res.next() {
-        log::debug!(target: "[Z3Synth]", "exprs {e1} and {e1} are satisfiable");
+        log::debug!(target: "[Z3Synth::Sanitycheck]", "exprs {e1} and {e1} are satisfiable");
     } else {
         // obtain the unsatcore with the conflicts.
         let conflicts = res.next().expect("expected unsatcore on next line");
@@ -226,20 +227,20 @@ pub fn check_expr_pair(
             .collect::<Vec<&str>>();
 
         if toks.len() == 2 {
-            let msg = "unable to satify constraints";
-            let err =
-                VelosiSynthErrorUnsatDef::new(msg.to_string(), e1.loc().clone(), e2.loc().clone());
+            let msg = "unable to satify expression";
+            let e = VelosiSynthErrorUnsatDef::new(
+                msg.to_string(),
+                vec![e1.loc().clone(), e2.loc().clone()],
+            );
+            issues.push(e.into())
         } else {
             // just one! figure out which one
             let i = toks[0][5..].parse::<usize>().unwrap();
             let exp = if i == 1 { e1 } else { e2 };
 
             let msg = "unable to satify expression";
-            let e = VelosiSynthErrorBuilder::err(msg.to_string())
-                .add_location(exp.loc().clone())
-                .add_hint("this is the expression that can't be satisfied".to_string())
-                .build();
-            issues.push(e)
+            let e = VelosiSynthErrorUnsatDef::new(msg.to_string(), vec![exp.loc().clone()]);
+            issues.push(e.into())
         }
     }
 
@@ -306,7 +307,7 @@ fn all_expr_query(z3: &mut Z3WorkerPool, exprs: &[&VelosiAstExpr]) -> Z3Ticket {
 }
 
 fn all_expr_check_result(
-    z3: &mut Z3WorkerPool,
+    _z3: &mut Z3WorkerPool,
     exprs: &[&VelosiAstExpr],
     result: &Z3Result,
 ) -> VelosiSynthIssues {
@@ -345,17 +346,10 @@ fn all_expr_check_result(
         })
         .collect::<Vec<&VelosiAstExpr>>();
 
-    if toks.len() == 2 {
-        let msg = "unable to satify constraints";
-        let err = VelosiSynthErrorUnsatDef::new(
-            msg.to_string(),
-            toks.first().unwrap().loc().clone(),
-            toks.last().unwrap().loc().clone(),
-        );
-        issues.push(err.into());
-    } else {
-        panic!("should not happen?");
-    }
+    let locs = toks.iter().map(|e| e.loc().clone()).collect::<Vec<_>>();
+    let msg = "unable to satify constraints";
+    let err = VelosiSynthErrorUnsatDef::new(msg.to_string(), locs);
+    issues.push(err.into());
 
     issues
 }
@@ -374,15 +368,38 @@ pub fn check_all_expr_pairwise(
 ) -> VelosiSynthIssues {
     let mut issues = VelosiSynthIssues::new();
 
+    if exprs.is_empty() {
+        return issues;
+    }
+
     let mut tickets = HashMap::new();
     for i in 0..exprs.len() {
-        for j in i + 1..exprs.len() {
-            if exprs[i] != exprs[j] {
-                let ticket = expr_pair_query(z3, exprs[i], i, exprs[j], j);
-                tickets.insert((i, j), ticket);
+        // let's filter out the trivial true / false
+        if let VelosiAstExpr::BoolLiteral(b) = exprs[i] {
+            if !b.val {
+                let msg = "unable to satify expression (const `false`).";
+                let err = VelosiSynthErrorBuilder::err(msg.to_string())
+                    .add_location(exprs[i].loc().clone())
+                    .add_hint("this is the expression that can't be satisfied".to_string())
+                    .build();
+                issues.push(err)
             }
+
+            // if there is anything true, we don't need to run this
+            continue;
+        }
+
+        let ticket = expr_query(z3, exprs[i], i);
+        tickets.insert((i, i), ticket);
+        for j in i + 1..exprs.len() {
+            if let VelosiAstExpr::BoolLiteral(_) = exprs[j] {
+                continue; // will be handled by the case above
+            }
+            let ticket = expr_pair_query(z3, exprs[i], i, exprs[j], j);
+            tickets.insert((i, j), ticket);
         }
     }
+
     // collect and process the results
     let mut results = Vec::with_capacity(tickets.len());
     while !tickets.is_empty() {
@@ -400,30 +417,21 @@ pub fn check_all_expr_pairwise(
             if Some("sat") == res.next() {
                 log::debug!(target: "[Z3Synth]", "exprs {} and {} are satisfiable", exprs[i], exprs[j]);
             } else {
+                log::debug!(target: "[Z3Synth]", "exprs {} and {} are NOT satisfiable", exprs[i], exprs[j]);
                 // obtain the unsatcore with the conflicts.
                 let conflicts = res.next().expect("expected unsatcore on next line");
                 let toks = conflicts[1..conflicts.len() - 1]
                     .split(' ')
-                    .collect::<Vec<&str>>();
+                    .map(|s| {
+                        let i = s[5..].parse::<usize>().unwrap();
+                        exprs[i]
+                    })
+                    .collect::<Vec<_>>();
 
-                if toks.len() == 2 {
-                    let msg = "unable to satify constraints";
-                    let err = VelosiSynthErrorUnsatDef::new(
-                        msg.to_string(),
-                        exprs[i].loc().clone(),
-                        exprs[j].loc().clone(),
-                    );
-                    issues.push(err.into())
-                } else {
-                    // just one! figure out which one
-                    let i = toks[0][5..].parse::<usize>().unwrap();
-                    let msg = "unable to satify expression";
-                    let err = VelosiSynthErrorBuilder::err(msg.to_string())
-                        .add_location(exprs[i].loc().clone())
-                        .add_hint("this is the expression that can't be satisfied".to_string())
-                        .build();
-                    issues.push(err)
-                }
+                let locs = toks.iter().map(|e| e.loc().clone()).collect::<Vec<_>>();
+                let msg = "unable to satify constraints";
+                let err = VelosiSynthErrorUnsatDef::new(msg.to_string(), locs);
+                issues.push(err.into());
             }
         }
     }

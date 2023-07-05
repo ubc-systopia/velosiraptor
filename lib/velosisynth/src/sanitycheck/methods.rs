@@ -24,7 +24,6 @@
 // SOFTWARE.
 
 use std::collections::HashMap;
-use std::rc::Rc;
 
 use smt2::{Smt2Context, Term, VarDecl};
 
@@ -48,7 +47,7 @@ fn method_precond_sat_query(z3: &mut Z3WorkerPool, m: &VelosiAstMethod) -> Z3Tic
     // construct a new SMT2 context
     let mut smt = Smt2Context::new();
 
-    smt.comment(format!("Method: {}", m.ident_to_string()));
+    smt.comment(format!("SANITYCHECK:  {}()", m.ident_to_string()));
 
     // ---------------------------------------------------------------------------------------------
     // Variable Declarations
@@ -67,10 +66,12 @@ fn method_precond_sat_query(z3: &mut Z3WorkerPool, m: &VelosiAstMethod) -> Z3Tic
     // ---------------------------------------------------------------------------------------------
 
     for (i, e) in m.requires.iter().enumerate() {
+        smt.comment(format!("pre-{}: {}", i, e));
         smt.assert(Term::named(expr::expr_to_smt2(e, "st"), format!("pre-{i}")));
     }
 
     if let (Some(body), true) = (&m.body, m.rtype.is_boolean()) {
+        smt.comment(format!("body: {}", body));
         for (i, e) in body.split_cnf().iter().enumerate() {
             smt.assert(Term::named(
                 expr::expr_to_smt2(e.as_ref(), "st"),
@@ -108,11 +109,11 @@ fn method_precond_sat_results(
     // obtain the output lines, if we get `sat` we're done
     let mut res = result.result().lines();
     if Some("sat") == res.next() {
-        log::debug!(target: "[Z3Synth]", "method {} is satisfiable", m.ident());
+        log::info!(target: "[Z3Synth]", "method {} is satisfiable", m.ident());
         return issues;
     }
 
-    log::debug!(target: "[Z3Synth]", "method {} is unsatisfiable", m.ident());
+    log::info!(target: "[Z3Synth]", "method {} is unsatisfiable", m.ident());
 
     if result.has_errors() {
         for l in result.collect_errors() {
@@ -125,7 +126,7 @@ fn method_precond_sat_results(
 
     // there has been issues, so we re-run the individual queries now
 
-    log::debug!(target: "[Z3Synth]", "rerunning individual queries for method {}", m.ident());
+    log::info!(target: "[Z3Synth]", "rerunning individual queries for method {}", m.ident());
 
     let body_exprs = match (&m.body, m.rtype.is_boolean()) {
         (Some(body), true) => body.split_cnf(),
@@ -133,11 +134,29 @@ fn method_precond_sat_results(
     };
 
     let mut exprs: Vec<&VelosiAstExpr> = body_exprs.iter().map(|e| e.as_ref()).collect();
-
     exprs.extend(m.requires.iter().map(|e| e.as_ref()));
-    issues.merge(super::check_all_expr_pairwise(z3, exprs.as_slice()));
 
-    issues
+    let conflicts = res.next().expect("expected unsatcore on next line");
+    let toks = conflicts[1..conflicts.len() - 1]
+        .split(' ')
+        .map(|s| {
+            let i = s[5..].parse::<usize>().unwrap();
+            exprs[i]
+        })
+        .collect::<Vec<_>>();
+
+    let locs = toks.iter().map(|e| e.loc().clone()).collect::<Vec<_>>();
+    let msg = "unable to satify constraints";
+    let err = VelosiSynthErrorUnsatDef::new(msg.to_string(), locs);
+    issues.push(err.into());
+
+    let issues_new = super::check_all_expr_pairwise(z3, exprs.as_slice());
+
+    if issues_new.is_ok() {
+        issues
+    } else {
+        issues_new
+    }
 }
 
 /// checks the methods for
@@ -147,11 +166,16 @@ pub fn check_methods(z3: &mut Z3WorkerPool, unit: &VelosiAstUnitSegment) -> Velo
     // issue the queries for checking the methods for satisfiability
     let mut tickets = HashMap::new();
     for m in unit.methods() {
-        // skip methods that would not result in queries
-        if m.requires.is_empty() && m.body.is_none() {
+        if !m.recommends_sanity_check() {
+            log::warn!(target: "[Z3Synth::Sanitycheck]",  "skipping method {} (!recommmends_sanity_check)", m.ident());
             continue;
         }
 
+        // skip methods that would not result in queries
+        if m.requires.is_empty() && m.body.is_none() {
+            log::warn!(target: "[Z3Synth::Sanitycheck]",  "skipping method {} (requires/body)", m.ident());
+            continue;
+        }
         tickets.insert(m.ident().as_str(), (m, method_precond_sat_query(z3, m)));
     }
 

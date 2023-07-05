@@ -279,18 +279,17 @@ pub struct VelosiSynthErrorUnsatDef {
     /// message of the unsat error
     message: String,
     /// the location of the first definition
-    first: VelosiTokenStream,
-    /// the location of the second definition
-    second: VelosiTokenStream,
+    locs: Vec<VelosiTokenStream>,
 }
 
 impl VelosiSynthErrorUnsatDef {
-    pub fn new(message: String, first: VelosiTokenStream, second: VelosiTokenStream) -> Self {
-        Self {
-            message,
-            first,
-            second,
-        }
+    pub fn new(message: String, locs: Vec<VelosiTokenStream>) -> Self {
+        Self { message, locs }
+    }
+
+    pub fn push_loc(&mut self, loc: VelosiTokenStream) -> &mut Self {
+        self.locs.push(loc);
+        self
     }
 }
 
@@ -317,16 +316,58 @@ impl Display for VelosiSynthErrorUnsatDef {
 
         let pipe = blue("|");
 
-        // location information
-        writeln!(f, "     {} {}", blue("-->"), self.second.loc())?;
-        writeln!(f, "      {pipe}")?;
+        match self.locs.len() {
+            0 => {}
+            1 => {
+                // location information
+                writeln!(f, "     {} {}", blue("-->"), self.locs[0].loc())?;
+                writeln!(f, "      {pipe}")?;
+                print_location_context(f, false, &self.locs[0])?;
+                writeln!(f, " {}", red("this expression cannot be satisfied"))?;
+            }
+            2 => {
+                // location information
+                writeln!(f, "     {} {}", blue("-->"), self.locs[0].loc())?;
+                writeln!(f, "      {pipe}")?;
+                print_location_context(f, false, &self.locs[0])?;
+                writeln!(
+                    f,
+                    " {}",
+                    red("this expression conflicts with another expression")
+                )?;
 
-        print_location_context(f, false, &self.first)?;
-        writeln!(f, " {}", red("this constraint"))?;
-        writeln!(f, "   {}", blue("..."))?;
-        writeln!(f, "      {pipe}")?;
-        print_location_context(f, false, &self.second)?;
-        writeln!(f, " {}", red("conflicts with this constraint"))
+                writeln!(f, "   {}", blue("..."))?;
+                writeln!(f, "      {pipe}")?;
+
+                print_location_context(f, false, &self.locs[1])?;
+                writeln!(f, " {}", red("this is the conflicting expression"))?;
+            }
+            _l => {
+                writeln!(f, "     {} {}", blue("-->"), self.locs[0].loc())?;
+                writeln!(
+                    f,
+                    "      {}",
+                    blue("---------- begin expression group -----------")
+                )?;
+                writeln!(f, "      {pipe}")?;
+
+                for (i, loc) in self.locs.iter().enumerate() {
+                    print_location_context(f, false, loc)?;
+                    let msg = format!(
+                        "this is conflicting expression #{}/{}",
+                        i + 1,
+                        self.locs.len()
+                    );
+                    writeln!(f, " {}", red(&msg))?;
+                }
+                writeln!(
+                    f,
+                    "      {}",
+                    blue("----------- end expression group ------------")
+                )?;
+            }
+        }
+        Ok(())
     }
 }
 
