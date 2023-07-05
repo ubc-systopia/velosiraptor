@@ -95,14 +95,33 @@ pub fn make_program_builder(
 ) -> ProgramsBuilder {
     let mut builder = make_program_builder_no_params(unit, pre);
 
+    let mut vars = HashSet::new();
+    for id in pre.get_var_references().iter() {
+        let mut parts = id.ident().as_str().split('.');
+        if let Some(part) = parts.next() {
+            vars.insert(part);
+        }
+        vars.insert(id.ident().as_str());
+    }
+
     // add the variables that the function talks about
     for v in m_goal.params.iter() {
         // flags show up differently
         if v.ptype.is_flags() {
             if let Some(flags) = &unit.flags {
                 let var = Arc::new(v.ident_to_string());
+
+                let mut buf = String::with_capacity(30);
                 for f in flags.flags.iter() {
-                    builder.add_flags(var.clone(), f.to_string());
+                    buf.push_str(var.as_str());
+                    buf.push('.');
+                    buf.push_str(f.as_str());
+
+                    if vars.contains(buf.as_str()) {
+                        builder.add_flags(var.clone(), f.to_string());
+                    }
+
+                    buf.clear();
                 }
             } else {
                 unreachable!("shoudl have defined flags!");
