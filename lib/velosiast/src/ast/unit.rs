@@ -1544,14 +1544,12 @@ impl VelosiAstUnitEnum {
 
         for (_, vi) in enums.iter() {
             for (_, vj) in enums.iter() {
-                let unit1_sym = match st.lookup(vi.ident.ident()) {
-                    Some(unit1) => unit1,
-                    None => continue,
-                };
-                let unit2_sym = match st.lookup(vj.ident.ident()) {
-                    Some(unit2) => unit2,
-                    None => continue,
-                };
+                let unit1_sym = st
+                    .lookup(vi.ident.ident())
+                    .expect("BUG: no unit with that identifier");
+                let unit2_sym = st
+                    .lookup(vj.ident.ident())
+                    .expect("BUG: no unit with that identifier");
 
                 match (&unit1_sym.ast_node, &unit2_sym.ast_node) {
                     (VelosiAstNode::Unit(unit1), VelosiAstNode::Unit(unit2)) => {
