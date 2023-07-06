@@ -389,21 +389,20 @@ fn add_method(c: &mut C::Class, tm: &VelosiAstMethod) {
 }
 
 pub fn generate_unit_header(
-    name: &str,
     unit: &VelosiAstUnit,
     outdir: &Path,
 ) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
     // document header
-    add_header(&mut scope, name, "unit");
+    add_header(&mut scope, unit.ident(), "unit");
 
-    let ifn = interface_class_name(name);
-    let scn = state_class_name(name);
-    let ucn = unit_class_name(name);
+    let ifn = interface_class_name(unit.ident());
+    let scn = state_class_name(unit.ident());
+    let ucn = unit_class_name(unit.ident());
 
     // set the header guard, and create
-    let hdrguard = format!("{}_UNIT_HPP_", name.to_uppercase());
+    let hdrguard = format!("{}_UNIT_HPP_", unit.ident().to_uppercase());
     let guard = scope.new_ifdef(&hdrguard);
     let s = guard.guard().then_scope();
 
@@ -417,10 +416,8 @@ pub fn generate_unit_header(
     s.new_include("framework/translation_unit_base.hpp", false);
 
     s.new_comment("translation unit specific includes");
-    let statehdr = state_header_file(name);
-    s.new_include(&statehdr, false);
-    let ifhdr = interface_header_file(name);
-    s.new_include(&ifhdr, false);
+    s.new_include(&state_header_file(unit.ident()), false);
+    s.new_include(&interface_header_file(unit.ident()), false);
 
     // create a new class in the scope
     let c = s.new_class(&ucn);
@@ -483,7 +480,7 @@ pub fn generate_unit_header(
     }
 
     // save the scope
-    let filename = unit_header_file_path(name);
+    let filename = unit_header_file_path(unit.ident());
     scope.set_filename(&filename);
     scope.to_file(outdir, true)?;
 
@@ -491,14 +488,13 @@ pub fn generate_unit_header(
 }
 
 pub fn generate_unit_impl(
-    name: &str,
     unit: &VelosiAstUnit,
     outdir: &Path,
 ) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
     // add the header
-    add_header(&mut scope, name, "unit");
+    add_header(&mut scope, unit.ident(), "unit");
 
     scope.new_comment("system includes");
     scope.new_include("string.h", true);
@@ -509,17 +505,16 @@ pub fn generate_unit_impl(
     scope.new_include("framework/logging.hpp", false);
 
     scope.new_comment("translation unit specific includes");
-    let unithdr = unit_header_file(name);
-    scope.new_include(&unithdr, false);
+    scope.new_include(&unit_header_file(unit.ident()), false);
 
     // create a new class in the scope
-    let ucn = unit_class_name(name);
+    let ucn = unit_class_name(unit.ident());
     let c = scope.new_class(ucn.as_str());
 
     c.set_base("TranslationUnitBase", C::Visibility::Public);
 
-    let ifn = interface_class_name(name);
-    let scn = state_class_name(name);
+    let ifn = interface_class_name(unit.ident());
+    let scn = state_class_name(unit.ident());
 
     add_constructor(c, &ifn, &scn);
 
@@ -538,7 +533,7 @@ pub fn generate_unit_impl(
         add_method(c, m)
     }
 
-    let filename = unit_impl_file(name);
+    let filename = unit_impl_file(unit.ident());
     scope.set_filename(&filename);
 
     scope.to_file(outdir, false)?;

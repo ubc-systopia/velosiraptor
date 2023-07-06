@@ -265,26 +265,15 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
             let unit_dir = &self.outdir.join(u.ident_to_string());
             let name = &u.ident_to_string();
 
-            generate_unit_header(name, u, unit_dir)?;
-            generate_unit_impl(name, u, unit_dir)?;
+            generate_unit_header(u, unit_dir)?;
+            generate_unit_impl(u, unit_dir)?;
             generate_interface_header(&self.pkgname, &u, unit_dir)?;
             generate_interface_impl(&self.pkgname, &u, unit_dir)?;
+            generate_field_header(name, &u, unit_dir)?;
+            generate_field_impl(name, &u, unit_dir)?;
+            generate_state_header(name, &u, unit_dir)?;
+            generate_state_impl(name, &u, unit_dir)?;
 
-
-            match u {
-                velosiast::VelosiAstUnit::Segment(us) => {
-                    generate_field_header(name, &us.state, unit_dir)?;
-                    generate_field_impl(name, &us.state, unit_dir)?;
-                    generate_state_header(name, &us.state, unit_dir)?;
-                    generate_state_impl(name, &us.state, unit_dir)?;
-                }
-                velosiast::VelosiAstUnit::StaticMap(_sm) => {
-                    println!("staticmap skipped for now: {}", u.ident_to_string());
-                }
-                velosiast::VelosiAstUnit::Enum(_en) => {
-                    println!("enum skipped for now: {}", u.ident_to_string());
-                }
-            }
         }
 
         Ok(())
