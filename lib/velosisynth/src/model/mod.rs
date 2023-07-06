@@ -41,9 +41,6 @@ pub mod wbuffer;
 pub fn create(unit: &VelosiAstUnitSegment, mem_model: bool) -> Smt2Context {
     let mut smt = Smt2Context::new();
 
-    // set the options
-    smt.set_option(Smt2Option::ProduceUnsatCores(true));
-
     // adding general type definitions
     types::add_type_defs(&mut smt, unit.ident(), unit.inbitwidth, unit.outbitwidth);
 
@@ -77,41 +74,12 @@ pub fn create(unit: &VelosiAstUnitSegment, mem_model: bool) -> Smt2Context {
     smt
 }
 
-// TODO: duplicated
-pub fn create_with_context(
-    mut smt: Smt2Context,
-    unit: &VelosiAstUnitSegment,
-    mem_model: bool,
-) -> Smt2Context {
-    // adding general type definitions
-    types::add_type_defs(&mut smt, unit.ident(), unit.inbitwidth, unit.outbitwidth);
+/// creates the common options and definitions used across all unit models
+pub fn prelude() -> Smt2Context {
+    let mut smt = Smt2Context::new();
 
-    // TODO: adding global constants
-
-    // adding the model
-    consts::add_consts(&mut smt, unit.ident(), Box::new(unit.consts()));
-    if let Some(flags) = &unit.flags {
-        flags::add_flags(&mut smt, unit.ident(), flags);
-    }
-
-    state::add_state_def(&mut smt, unit.ident(), &unit.state);
-    interface::add_interface_def(&mut smt, unit.ident(), &unit.interface);
-    if mem_model {
-        wbuffer::add_wbuffer_def(&mut smt, unit.ident(), &unit.interface);
-    }
-    velosimodel::add_model_def(&mut smt, unit, mem_model);
-
-    // valid needs to be defined first so that it can be used in the other method assumptions
-    method::add_methods(
-        &mut smt,
-        unit.ident(),
-        Box::new(unit.get_method("valid").into_iter()),
-    );
-    method::add_methods(
-        &mut smt,
-        unit.ident(),
-        Box::new(unit.methods().filter(|m| m.ident.as_str() != "valid")),
-    );
+    // set the options
+    smt.set_option(Smt2Option::ProduceUnsatCores(true));
 
     smt
 }

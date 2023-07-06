@@ -136,7 +136,7 @@ impl<'a> Z3SynthSegment<'a> {
         let unmap_queries = vmops::unmap::get_program_iter(unit, batch_size, None);
         let protect_queries = vmops::protect::get_program_iter(unit, batch_size, None);
 
-        z3.reset_with_context(Z3Query::with_contexts(vec![model]));
+        z3.reset_with_context(Z3Query::with_model_contexts(vec![model]));
 
         Self {
             z3,
@@ -422,16 +422,13 @@ impl<'a> Z3SynthEnum<'a> {
     }
 
     pub fn distinguish(&mut self, models: &HashMap<Rc<String>, Arc<Smt2Context>>) {
-        let mut prelude = Smt2Context::new();
-        prelude.set_option(Smt2Option::ProduceUnsatCores(true));
-
-        let mut contexts = vec![Arc::new(prelude)];
-        models
-            .iter()
-            .filter(|(ident, _)| self.unit.get_unit_names().contains(ident))
-            .for_each(|(_, ctx)| contexts.push(ctx.clone()));
-
-        self.z3.reset_with_context(Z3Query::with_contexts(contexts));
+        self.z3.reset_with_context(Z3Query::with_model_contexts(
+            models
+                .iter()
+                .filter(|(ident, _)| self.unit.get_unit_names().contains(ident))
+                .map(|(_, ctx)| ctx.clone())
+                .collect(),
+        ));
         enums::distinguish(&mut self.z3, self.unit)
     }
 }
