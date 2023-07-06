@@ -45,7 +45,7 @@ pub fn state_fields_header_file(name: &str) -> String {
 }
 
 /// generates the path of the header file
-pub fn state_fileds_header_file_path(name: &str) -> String {
+pub fn state_fields_header_path(name: &str) -> String {
     state_fields_header_file(name)
 }
 
@@ -71,17 +71,16 @@ pub fn state_fields_slice_setter_name(name: &str) -> String {
 
 /// generates the header file for the  state fields
 pub fn generate_field_header(
-    name: &str,
     unit: &VelosiAstUnit,
     outdir: &Path,
 ) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
     // document header
-    add_header(&mut scope, name, "state fields");
+    add_header(&mut scope, unit.ident(), "state fields");
 
     // set the header guard
-    let hdrguard = format!("{}_FIELDS_HPP_", name.to_uppercase());
+    let hdrguard = format!("{}_FIELDS_HPP_", unit.ident().to_uppercase());
     let guard = scope.new_ifdef(&hdrguard);
     let s = guard.guard().then_scope();
 
@@ -145,7 +144,7 @@ pub fn generate_field_header(
         },
     }
     // set the filename for this scope
-    let filename = state_fileds_header_file_path(name);
+    let filename = state_fields_header_path(unit.ident());
     scope.set_filename(&filename);
 
     // save the scope
@@ -156,20 +155,19 @@ pub fn generate_field_header(
 
 /// generates the implementation file for the state fields
 pub fn generate_field_impl(
-    name: &str,
     unit: &VelosiAstUnit,
     outdir: &Path,
 ) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
     // document header
-    add_header(&mut scope, name, "state fields");
+    add_header(&mut scope, unit.ident(), "state fields");
 
     // adding includes
     scope.new_comment("framework includes");
     scope.new_include("framework/types.hpp", false);
     scope.new_comment("translation unit generic includes");
-    let hdrfile = state_fields_header_file(name);
+    let hdrfile = state_fields_header_file(unit.ident());
     scope.new_include(&hdrfile, false);
 
     match unit.state() {
@@ -208,7 +206,7 @@ pub fn generate_field_impl(
 
 
     // set the filename for this scope
-    let filename = state_fields_impl_file(name);
+    let filename = state_fields_impl_file(unit.ident());
     scope.set_filename(&filename);
 
     // save the scope
