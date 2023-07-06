@@ -33,36 +33,32 @@ use std::path::Path;
 
 // other libraries
 use crustal as C;
+use velosiast::VelosiAstUnit;
 
 // the defined errors
 use crate::fastmodels::add_header;
 use crate::fastmodels::fields::{state_fields_class_name, state_fields_header_file};
 use crate::VelosiHwGenError;
-use velosiast::ast::VelosiAstState;
 
-/// generates the name of the state header file
 pub fn state_header_file(name: &str) -> String {
     format!("{}_state.hpp", name)
 }
 
-/// generates the path of the state header file
 pub fn state_header_file_path(name: &str) -> String {
     state_header_file(name)
 }
 
-/// generates the name of the state header file
 pub fn state_impl_file(name: &str) -> String {
     format!("{}_state.cpp", name)
 }
 
-/// generates the state class name
 pub fn state_class_name(name: &str) -> String {
     format!("{}{}State", name[0..1].to_uppercase(), &name[1..])
 }
 
 pub fn generate_state_header(
     name: &str,
-    state: &VelosiAstState,
+    unit: &VelosiAstUnit,
     outdir: &Path,
 ) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
@@ -71,10 +67,8 @@ pub fn generate_state_header(
 
     add_header(&mut scope, name, "state");
 
-    // set the header guard
     let guard = scope.new_ifdef(format!("{}_STATE_HPP_", name.to_uppercase()).as_str());
 
-    // create the scope guard
     let s = guard.guard().then_scope();
 
     s.new_comment("system includes");
@@ -89,57 +83,67 @@ pub fn generate_state_header(
     let fieldshdr = state_fields_header_file(name);
     s.new_include(&fieldshdr, false);
 
-    // create a new class in the scope
-    let c = s.new_class(scn.as_str());
+    match unit.state() {
+        None => {
+            scope.new_comment("This unit does not have a state");
+            scope.new_comment(&format!("Abstract:  {}", unit.is_abstract()));
+            scope.new_comment(&format!("Enum:      {}", unit.is_enum()));
+            scope.new_comment(&format!("Staticmap: {}", unit.is_staticmap()));
+        },
+        Some(state) => {
+            // create a new class in the scope
+            let c = s.new_class(scn.as_str());
 
-    c.push_doc_str("Represents the State of the Translation Unit.");
-    c.set_base("StateBase", C::Visibility::Public);
+            c.push_doc_str("Represents the State of the Translation Unit.");
+            c.set_base("StateBase", C::Visibility::Public);
 
-    c.new_constructor();
+            c.new_constructor();
 
-    // adding field getters and setters
-    for f in state.fields() {
-        let fcn = state_fields_class_name(f.ident());
-        let ty = C::Type::new_class(&fcn);
+            // adding field getters and setters
+            for f in state.fields() {
+                let fcn = state_fields_class_name(f.ident());
+                let ty = C::Type::new_class(&fcn);
 
-        let fieldname = format!("_{}", f.ident());
+                let fieldname = format!("_{}", f.ident());
 
-        // the field access expression: this->_field
-        let e_field_acc = C::Expr::field_access(&C::Expr::this(), &fieldname);
+                // the field access expression: this->_field
+                let e_field_acc = C::Expr::field_access(&C::Expr::this(), &fieldname);
 
-        // get/set the field
-        let methodname = format!("{}_field", f.ident());
-        let m = c.new_method(&methodname, C::Type::to_ptr(&ty));
+                // get/set the field
+                let methodname = format!("{}_field", f.ident());
+                let m = c.new_method(&methodname, C::Type::to_ptr(&ty));
 
-        m.set_public()
-            .set_inside_def()
-            .body()
-            .return_expr(C::Expr::addr_of(&e_field_acc));
+                m.set_public()
+                    .set_inside_def()
+                    .body()
+                    .return_expr(C::Expr::addr_of(&e_field_acc));
 
-        // get/set the field values
-        let methodname = format!("get_{}_val", f.ident());
-        let m = c.new_method(&methodname, C::Type::new(C::BaseType::new_int(f.size())));
-        m.set_public()
-            .set_inside_def()
-            .body()
-            .return_expr(C::Expr::method_call(&e_field_acc, "get_value", vec![]));
+                // get/set the field values
+                let methodname = format!("get_{}_val", f.ident());
+                let m = c.new_method(&methodname, C::Type::new(C::BaseType::new_int(f.size())));
+                m.set_public()
+                    .set_inside_def()
+                    .body()
+                    .return_expr(C::Expr::method_call(&e_field_acc, "get_value", vec![]));
 
-        let methodname = format!("set_{}_val", f.ident());
-        let arg = C::MethodParam::new("val", C::Type::new(C::BaseType::new_int(f.size())));
-        let argexpr = C::Expr::from_method_param(&arg);
-        let m = c.new_method(&methodname, C::Type::new_void());
-        m.set_public()
-            .set_inside_def()
-            .push_param(arg)
-            .body()
-            .method_call(e_field_acc, "set_value", vec![argexpr]);
-    }
+                let methodname = format!("set_{}_val", f.ident());
+                let arg = C::MethodParam::new("val", C::Type::new(C::BaseType::new_int(f.size())));
+                let argexpr = C::Expr::from_method_param(&arg);
+                let m = c.new_method(&methodname, C::Type::new_void());
+                m.set_public()
+                    .set_inside_def()
+                    .push_param(arg)
+                    .body()
+                    .method_call(e_field_acc, "set_value", vec![argexpr]);
+            }
 
-    // adding the state fields to the class
-    for f in state.fields() {
-        let ty = C::BaseType::Class(state_fields_class_name(f.ident()));
-        let fieldname = format!("_{}", f.ident());
-        c.new_attribute(&fieldname, C::Type::new(ty));
+            // adding the state fields to the class
+            for f in state.fields() {
+                let ty = C::BaseType::Class(state_fields_class_name(f.ident()));
+                let fieldname = format!("_{}", f.ident());
+                c.new_attribute(&fieldname, C::Type::new(ty));
+            };
+            },
     }
 
     // save the scope
@@ -152,7 +156,7 @@ pub fn generate_state_header(
 
 pub fn generate_state_impl(
     name: &str,
-    state: &VelosiAstState,
+    unit: &VelosiAstUnit,
     outdir: &Path,
 ) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
@@ -170,24 +174,29 @@ pub fn generate_state_impl(
     scope.new_include("framework/logging.hpp", false);
     scope.new_include("framework/state_field_base.hpp", false);
 
-    scope.new_comment("unit includes");
+        scope.new_comment("unit includes");
     let statehdr = state_header_file(name);
     scope.new_include(&statehdr, false);
 
-    let c = scope.new_class(scn.as_str());
-    let cons = c.new_constructor();
+    match unit.state() {
+        None => (),
+        Some(state) => {
+            let c = scope.new_class(scn.as_str());
+            let cons = c.new_constructor();
 
-    cons.push_parent_initializer(C::Expr::fn_call("StateBase", vec![]));
+            cons.push_parent_initializer(C::Expr::fn_call("StateBase", vec![]));
 
-    for f in state.fields() {
-        let fieldname = format!("_{}", f.ident());
-        let fieldclass = state_fields_class_name(f.ident());
-        cons.push_initializer(fieldname.as_str(), C::Expr::fn_call(&fieldclass, vec![]));
+            for f in state.fields() {
+                let fieldname = format!("_{}", f.ident());
+                let fieldclass = state_fields_class_name(f.ident());
+                cons.push_initializer(fieldname.as_str(), C::Expr::fn_call(&fieldclass, vec![]));
 
-        let this = C::Expr::this();
-        let field = C::Expr::field_access(&this, &fieldname);
-        cons.body()
-            .method_call(C::Expr::this(), "add_field", vec![C::Expr::addr_of(&field)]);
+                let this = C::Expr::this();
+                let field = C::Expr::field_access(&this, &fieldname);
+                cons.body()
+                    .method_call(C::Expr::this(), "add_field", vec![C::Expr::addr_of(&field)]);
+            }
+        },
     }
 
     let filename = state_impl_file(name);
