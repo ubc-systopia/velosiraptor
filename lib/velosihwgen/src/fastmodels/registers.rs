@@ -66,14 +66,14 @@ pub fn register_map<T>(
 }
 
 pub fn generate_register_header(
-    name: &str,
+    pkgname: &str,
     ast: &VelosiAst,
     outdir: &Path,
 ) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
-    add_header(&mut scope, name, "interface registers");
+    add_header(&mut scope, pkgname, "interface registers");
 
-    let hdrguard = format!("{}_REGISTERS_HPP_", name.to_uppercase());
+    let hdrguard = format!("{}_REGISTERS_HPP_", pkgname.to_uppercase());
     let guard = scope.new_ifdef(&hdrguard);
     let s = guard.guard().then_scope();
 
@@ -82,7 +82,7 @@ pub fn generate_register_header(
     s.new_include("framework/register_base.hpp", false);
 
     s.new_comment("translation register specific includes");
-    let statehdr = state_header_file(name);
+    let statehdr = state_header_file(pkgname);
     s.new_include(&statehdr, false);
 
     for u in ast.units() {
@@ -91,7 +91,7 @@ pub fn generate_register_header(
             let c = s.new_class(rcn.as_str());
             c.set_base("RegisterBase", C::Visibility::Public);
 
-            let scn = state_class_name(name);
+            let scn = state_class_name(pkgname);
             let sctype = C::Type::new_class(&scn);
             let state_ptr_type = C::Type::to_ptr(&sctype);
 
@@ -109,7 +109,7 @@ pub fn generate_register_header(
     }
 
     // done, save the scope
-    let filename = registers_header_file_path(name);
+    let filename = registers_header_file_path(pkgname);
     scope.set_filename(&filename);
     scope.to_file(outdir, true)?;
 
@@ -121,6 +121,7 @@ pub fn generate_register_impl(
     ast: &VelosiAst,
     outdir: &Path,
 ) -> Result<(), VelosiHwGenError> {
+
     let mut scope = C::Scope::new();
 
     // document header
