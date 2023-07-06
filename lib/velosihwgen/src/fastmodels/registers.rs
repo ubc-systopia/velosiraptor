@@ -85,16 +85,20 @@ pub fn generate_register_header(
     s.new_include("framework/register_base.hpp", false);
 
     s.new_comment("translation register specific includes");
-    let statehdr = state_header_file(pkgname);
-    s.new_include(&statehdr, false);
 
     for u in ast.units() {
-        let rcns = register_map(|r| r.ident().clone(), u);
-        for rcn in rcns {
-            let c = s.new_class(rcn.as_str());
+        let rs = register_map(|r| r.clone(), u);
+
+        if !rs.is_empty() {
+            let state_h = u.ident_to_string() + "/" + &state_header_file(u.ident());
+            s.new_include(&state_h, false);
+        }
+
+        for r in rs {
+            let c = s.new_class(r.ident().as_str());
             c.set_base("RegisterBase", C::Visibility::Public);
 
-            let scn = state_class_name(pkgname);
+            let scn = state_class_name(u.ident());
             let sctype = C::Type::new_class(&scn);
             let state_ptr_type = C::Type::to_ptr(&sctype);
 
@@ -119,21 +123,21 @@ pub fn generate_register_header(
 }
 
 pub fn generate_register_impl(
-    name: &str,
+    pkgname: &str,
     ast: &VelosiAst,
     outdir: &Path,
 ) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
     // document header
-    add_header(&mut scope, name, "interface registers");
+    add_header(&mut scope, pkgname, "interface registers");
 
     // adding the includes
     scope.new_comment("framework includes");
     scope.new_include("framework/types.hpp", false);
     scope.new_include("framework/logging.hpp", false);
     scope.new_comment("translation register specific includes");
-    let reghdr = registers_header_file(name);
+    let reghdr = registers_header_file(pkgname);
     scope.new_include(&reghdr, false);
 
     for u in ast.units() {
@@ -144,7 +148,7 @@ pub fn generate_register_impl(
             let c = scope.new_class(rcn.as_str());
             c.set_base("RegisterBase", C::Visibility::Public);
 
-            let scn = state_class_name(name);
+            let scn = state_class_name(u.ident());
             let sctype = C::Type::new_class(&scn);
             let state_ptr_type = C::Type::to_ptr(&sctype);
 
@@ -215,7 +219,7 @@ pub fn generate_register_impl(
     }
 
     // set the outfile name
-    let filename = registers_impl_file(name);
+    let filename = registers_impl_file(pkgname);
     scope.set_filename(&filename);
 
     scope.to_file(outdir, false)?;
