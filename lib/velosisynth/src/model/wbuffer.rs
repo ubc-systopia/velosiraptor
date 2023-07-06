@@ -28,7 +28,7 @@
 use smt2::{DataType, Smt2Context, Sort};
 use velosiast::ast::{VelosiAstField, VelosiAstInterface};
 
-use super::{types, velosimodel::WBUFFER_ENTRY_PREFIX};
+use super::{types, utils, velosimodel::WBUFFER_ENTRY_PREFIX};
 
 /// adds the write buffer definitions to the model
 ///
@@ -39,7 +39,7 @@ pub fn add_wbuffer_def(smt: &mut Smt2Context, prefix: &str, iface: &VelosiAstInt
     // create an enum of the different fields, used for tagging
     smt.raw(format!(
         "(declare-datatypes () (({} {})))",
-        types::field_tag(),
+        types::field_tag(prefix),
         iface
             .fields()
             .iter()
@@ -48,16 +48,22 @@ pub fn add_wbuffer_def(smt: &mut Smt2Context, prefix: &str, iface: &VelosiAstInt
             .join(" ")
     ));
 
-    let mut dt = DataType::new(String::from(WBUFFER_ENTRY_PREFIX), 0);
-    dt.add_field(format!("{WBUFFER_ENTRY_PREFIX}.tag"), types::field_tag());
-    dt.add_field(format!("{WBUFFER_ENTRY_PREFIX}.val"), types::num(prefix));
+    let mut dt = DataType::new(utils::with_prefix(prefix, WBUFFER_ENTRY_PREFIX), 0);
+    dt.add_field(
+        utils::with_prefix(prefix, &format!("{WBUFFER_ENTRY_PREFIX}.tag")),
+        types::field_tag(prefix),
+    );
+    dt.add_field(
+        utils::with_prefix(prefix, &format!("{WBUFFER_ENTRY_PREFIX}.val")),
+        types::num(prefix),
+    );
 
     let accessors = dt.to_field_accessor();
     smt.datatype(dt);
     smt.merge(accessors);
 
     smt.sort(Sort::new_def(
-        types::wbuffer(),
-        format!("(Seq {})", types::wbuffer_entry()),
+        types::wbuffer(prefix),
+        format!("(Seq {})", types::wbuffer_entry(prefix)),
     ));
 }

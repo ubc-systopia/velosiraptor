@@ -48,16 +48,16 @@ pub fn state(prefix: &str) -> String {
     utils::with_prefix(prefix, "State_t")
 }
 
-pub fn wbuffer() -> String {
-    "WBuffer_t".to_string()
+pub fn wbuffer(prefix: &str) -> String {
+    utils::with_prefix(prefix, "WBuffer_t")
 }
 
-pub fn wbuffer_entry() -> String {
-    "WBufferEntry_t".to_string()
+pub fn wbuffer_entry(prefix: &str) -> String {
+    utils::with_prefix(prefix, "WBufferEntry_t")
 }
 
-pub fn field_tag() -> String {
-    "FieldTag_t".to_string()
+pub fn field_tag(prefix: &str) -> String {
+    utils::with_prefix(prefix, "FieldTag_t")
 }
 
 pub fn field_tag_enum(fieldname: &str) -> String {

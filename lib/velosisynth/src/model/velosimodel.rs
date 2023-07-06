@@ -79,7 +79,7 @@ fn add_model(smt: &mut Smt2Context, prefix: &str, mem_model: bool) {
     if mem_model {
         dt.add_field(
             utils::with_prefix(prefix, &format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}")),
-            types::wbuffer(),
+            types::wbuffer(prefix),
         );
         dt.add_field(
             utils::with_prefix(prefix, &format!("{MODEL_PREFIX}.{LOCAL_VARS_PREFIX}")),
@@ -248,7 +248,7 @@ fn add_model_wbuffer_field_set(smt: &mut Smt2Context, prefix: &str, fieldname: &
 
     let st = Term::fn_apply(model_get_fn_name(prefix, WBUFFER_PREFIX), vec![arg.clone()]);
     let wbuffer_entry = Term::fn_apply(
-        WBUFFER_ENTRY_PREFIX.to_string(),
+        utils::with_prefix(prefix, WBUFFER_ENTRY_PREFIX),
         vec![Term::ident(types::field_tag_enum(fieldname)), arg2],
     );
 
@@ -385,10 +385,10 @@ fn add_field_action(
 }
 
 fn add_apply_entry_action(smt: &mut Smt2Context, prefix: &str, iface: &VelosiAstInterface) {
-    let name = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.applyentryaction!");
+    let name = format!("{prefix}.{MODEL_PREFIX}.{WBUFFER_PREFIX}.applyentryaction!");
     let mut f = Function::new(name, types::model(prefix));
     f.add_arg(String::from("st"), types::model(prefix));
-    f.add_arg(String::from("entry"), types::wbuffer_entry());
+    f.add_arg(String::from("entry"), types::wbuffer_entry(prefix));
     f.add_comment("applies the given write buffer entry to the model, writing the value and applying the write action on the right field".to_string());
 
     let st = Term::ident(String::from("st"));
@@ -406,7 +406,7 @@ fn add_apply_entry_action(smt: &mut Smt2Context, prefix: &str, iface: &VelosiAst
                 MatchCase::new(
                     Pattern::new(vec![types::field_tag_enum(fieldname)]),
                     Term::fn_apply(
-                        format!("{MODEL_PREFIX}.{IFACE_PREFIX}.{fieldname}.writeaction!"),
+                        format!("{prefix}.{MODEL_PREFIX}.{IFACE_PREFIX}.{fieldname}.writeaction!"),
                         vec![Term::fn_apply(
                             model_field_set_fn_name(prefix, IFACE_PREFIX, fieldname),
                             vec![
@@ -428,7 +428,7 @@ fn add_apply_entry_action(smt: &mut Smt2Context, prefix: &str, iface: &VelosiAst
 }
 
 fn add_flush_action(smt: &mut Smt2Context, prefix: &str) {
-    let name = format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.flushaction!");
+    let name = format!("{prefix}.{MODEL_PREFIX}.{WBUFFER_PREFIX}.flushaction!");
     let mut f = Function::new(name, types::model(prefix));
     f.add_arg(String::from("st"), types::model(prefix));
     f.add_comment("flushes the write buffer, writing values back to the interface and applying their write actions".to_string());
@@ -440,16 +440,19 @@ fn add_flush_action(smt: &mut Smt2Context, prefix: &str) {
                 "wb".to_string(),
                 Term::fn_apply(model_get_fn_name(prefix, WBUFFER_PREFIX), vec![st.clone()]),
             ),
-            VarBinding::new("new_wb".to_string(), smt2::seq::empty(types::wbuffer())),
+            VarBinding::new(
+                "new_wb".to_string(),
+                smt2::seq::empty(types::wbuffer(prefix)),
+            ),
         ],
         smt2::seq::foldl(
             Term::lambda(
                 vec![
                     SortedVar::new("model".to_string(), types::model(prefix)),
-                    SortedVar::new("entry".to_string(), types::wbuffer_entry()),
+                    SortedVar::new("entry".to_string(), types::wbuffer_entry(prefix)),
                 ],
                 Term::fn_apply(
-                    format!("{MODEL_PREFIX}.{WBUFFER_PREFIX}.applyentryaction!"),
+                    format!("{prefix}.{MODEL_PREFIX}.{WBUFFER_PREFIX}.applyentryaction!"),
                     vec![
                         Term::ident("model".to_string()),
                         Term::ident("entry".to_string()),
