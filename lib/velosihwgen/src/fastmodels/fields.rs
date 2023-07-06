@@ -70,10 +70,7 @@ pub fn state_fields_slice_setter_name(name: &str) -> String {
 }
 
 /// generates the header file for the  state fields
-pub fn generate_field_header(
-    unit: &VelosiAstUnit,
-    outdir: &Path,
-) -> Result<(), VelosiHwGenError> {
+pub fn generate_field_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
     // document header
@@ -95,9 +92,8 @@ pub fn generate_field_header(
             scope.new_comment(&format!("Abstract:  {}", unit.is_abstract()));
             scope.new_comment(&format!("Enum:      {}", unit.is_enum()));
             scope.new_comment(&format!("Staticmap: {}", unit.is_staticmap()));
-        },
+        }
         Some(state) => {
-
             // generate a new class for each field
             for f in state.fields() {
                 // create a new class in the scope
@@ -141,7 +137,7 @@ pub fn generate_field_header(
                     );
                 }
             }
-        },
+        }
     }
     // set the filename for this scope
     let filename = state_fields_header_path(unit.ident());
@@ -154,10 +150,7 @@ pub fn generate_field_header(
 }
 
 /// generates the implementation file for the state fields
-pub fn generate_field_impl(
-    unit: &VelosiAstUnit,
-    outdir: &Path,
-) -> Result<(), VelosiHwGenError> {
+pub fn generate_field_impl(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
     // document header
@@ -201,9 +194,8 @@ pub fn generate_field_impl(
                     );
                 }
             }
-        },
+        }
     }
-
 
     // set the filename for this scope
     let filename = state_fields_impl_file(unit.ident());

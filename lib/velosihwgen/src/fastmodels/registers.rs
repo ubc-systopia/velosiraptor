@@ -23,13 +23,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use std::ops::Deref;
-use std::path::Path;
-use crustal as C;
-use velosiast::{VelosiAstField, VelosiAstInterfaceField, VelosiAst, VelosiAstUnit};
 use crate::fastmodels::add_header;
 use crate::fastmodels::state::{state_class_name, state_header_file};
 use crate::VelosiHwGenError;
+use crustal as C;
+use std::ops::Deref;
+use std::path::Path;
+use velosiast::{VelosiAst, VelosiAstField, VelosiAstInterfaceField, VelosiAstUnit};
 
 pub fn registers_header_file(name: &str) -> String {
     format!("{}_registers.hpp", name)
@@ -50,19 +50,22 @@ pub fn registers_class_name(name: &str) -> String {
 // defines what interface fields we care about. Currently mmio only.
 pub fn register_map<T>(
     func: impl Fn(&VelosiAstInterfaceField) -> T,
-    unit: &VelosiAstUnit
+    unit: &VelosiAstUnit,
 ) -> Vec<T> {
     if unit.interface().is_none() {
-        return vec!();
+        return vec![];
     }
-    return unit.interface().unwrap().fields()
-        .iter().filter_map(
-            |f| match f.deref() {
-                VelosiAstInterfaceField::Memory(_) => None,
-                VelosiAstInterfaceField::Register(_) => None,
-                VelosiAstInterfaceField::Mmio(_) => Some(func(f.deref())),
-            }).collect()
-
+    return unit
+        .interface()
+        .unwrap()
+        .fields()
+        .iter()
+        .filter_map(|f| match f.deref() {
+            VelosiAstInterfaceField::Memory(_) => None,
+            VelosiAstInterfaceField::Register(_) => None,
+            VelosiAstInterfaceField::Mmio(_) => Some(func(f.deref())),
+        })
+        .collect();
 }
 
 pub fn generate_register_header(
@@ -105,7 +108,6 @@ pub fn generate_register_header(
                 .set_public()
                 .new_param("data", C::Type::new_uint(64));
         }
-
     }
 
     // done, save the scope
@@ -121,7 +123,6 @@ pub fn generate_register_impl(
     ast: &VelosiAst,
     outdir: &Path,
 ) -> Result<(), VelosiHwGenError> {
-
     let mut scope = C::Scope::new();
 
     // document header
@@ -169,7 +170,8 @@ pub fn generate_register_impl(
                     C::Expr::ConstNum(0),
                     C::Expr::from_method_param(&cparam),
                 ],
-            )).push_param(cparam);
+            ))
+            .push_param(cparam);
 
             let mut field_access_expr =
                 C::Expr::method_call(&stvar, &format!("{}_field", r.ident()), vec![]);

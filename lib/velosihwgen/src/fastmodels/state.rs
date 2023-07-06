@@ -56,10 +56,7 @@ pub fn state_class_name(name: &str) -> String {
     format!("{}{}State", name[0..1].to_uppercase(), &name[1..])
 }
 
-pub fn generate_state_header(
-    unit: &VelosiAstUnit,
-    outdir: &Path,
-) -> Result<(), VelosiHwGenError> {
+pub fn generate_state_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
     let scn = state_class_name(unit.ident());
@@ -88,7 +85,7 @@ pub fn generate_state_header(
             scope.new_comment(&format!("Abstract:  {}", unit.is_abstract()));
             scope.new_comment(&format!("Enum:      {}", unit.is_enum()));
             scope.new_comment(&format!("Staticmap: {}", unit.is_staticmap()));
-        },
+        }
         Some(state) => {
             // create a new class in the scope
             let c = s.new_class(scn.as_str());
@@ -141,8 +138,8 @@ pub fn generate_state_header(
                 let ty = C::BaseType::Class(state_fields_class_name(f.ident()));
                 let fieldname = format!("_{}", f.ident());
                 c.new_attribute(&fieldname, C::Type::new(ty));
-            };
-            },
+            }
+        }
     }
 
     // save the scope
@@ -153,10 +150,7 @@ pub fn generate_state_header(
     Ok(())
 }
 
-pub fn generate_state_impl(
-    unit: &VelosiAstUnit,
-    outdir: &Path,
-) -> Result<(), VelosiHwGenError> {
+pub fn generate_state_impl(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
     let scn = state_class_name(unit.ident());
@@ -172,7 +166,7 @@ pub fn generate_state_impl(
     scope.new_include("framework/logging.hpp", false);
     scope.new_include("framework/state_field_base.hpp", false);
 
-        scope.new_comment("unit includes");
+    scope.new_comment("unit includes");
     let statehdr = state_header_file(unit.ident());
     scope.new_include(&statehdr, false);
 
@@ -191,10 +185,13 @@ pub fn generate_state_impl(
 
                 let this = C::Expr::this();
                 let field = C::Expr::field_access(&this, &fieldname);
-                cons.body()
-                    .method_call(C::Expr::this(), "add_field", vec![C::Expr::addr_of(&field)]);
+                cons.body().method_call(
+                    C::Expr::this(),
+                    "add_field",
+                    vec![C::Expr::addr_of(&field)],
+                );
             }
-        },
+        }
     }
 
     let filename = state_impl_file(unit.ident());

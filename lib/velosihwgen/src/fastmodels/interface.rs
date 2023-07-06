@@ -25,14 +25,14 @@
 
 //! # The FastModels Platform Generator: Interface
 
-use std::path::Path;
-use crustal as C;
-use velosiast::{VelosiAstField, VelosiAstUnit};
 use crate::fastmodels::add_header;
 use crate::fastmodels::registers::{registers_class_name, registers_header_file};
 use crate::fastmodels::state::{state_class_name, state_header_file};
 use crate::VelosiHwGenError;
-use velosiast::ast::VelosiAstInterface;
+use crustal as C;
+use std::path::Path;
+
+use velosiast::{VelosiAstField, VelosiAstUnit};
 
 /// generates the name of the state field header file
 pub fn interface_header_file(name: &str) -> String {
@@ -87,7 +87,7 @@ pub fn generate_interface_header(
             scope.new_comment(&format!("Abstract:  {}", unit.is_abstract()));
             scope.new_comment(&format!("Enum:      {}", unit.is_enum()));
             scope.new_comment(&format!("Staticmap: {}", unit.is_staticmap()));
-        },
+        }
         Some(i) => {
             let interface_class = interface_class_name(unit.ident());
             let c = s.new_class(interface_class.as_str());
@@ -107,7 +107,7 @@ pub fn generate_interface_header(
                 let ty = C::Type::new_class(&rcn);
                 c.new_attribute(&fieldname, ty);
             }
-        },
+        }
     }
 
     // save the scope
@@ -119,7 +119,7 @@ pub fn generate_interface_header(
 }
 
 pub fn generate_interface_impl(
-    pkgname: &str,
+    _pkgname: &str,
     unit: &VelosiAstUnit,
     outdir: &Path,
 ) -> Result<(), VelosiHwGenError> {
@@ -171,7 +171,7 @@ pub fn generate_interface_impl(
                     vec![C::Expr::addr_of(&field)],
                 );
             }
-        },
+        }
     }
 
     let filename = interface_impl_file(unit.ident());

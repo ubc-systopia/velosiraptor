@@ -388,10 +388,7 @@ fn add_method(c: &mut C::Class, tm: &VelosiAstMethod) {
     }
 }
 
-pub fn generate_unit_header(
-    unit: &VelosiAstUnit,
-    outdir: &Path,
-) -> Result<(), VelosiHwGenError> {
+pub fn generate_unit_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
     // document header
@@ -487,10 +484,7 @@ pub fn generate_unit_header(
     Ok(())
 }
 
-pub fn generate_unit_impl(
-    unit: &VelosiAstUnit,
-    outdir: &Path,
-) -> Result<(), VelosiHwGenError> {
+pub fn generate_unit_impl(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
     // add the header
