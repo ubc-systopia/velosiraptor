@@ -50,7 +50,7 @@ use interface::{generate_interface_header, generate_interface_impl, interface_im
 mod unit;
 use unit::{generate_unit_header, generate_unit_impl, unit_impl_file};
 mod registers;
-use registers::{generate_register_header, generate_register_impl, registers_impl_file};
+use registers::{generate_register_header, generate_register_impl};
 mod fields;
 use fields::{generate_field_header, generate_field_impl, state_fields_impl_file};
 
@@ -255,21 +255,20 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
     }
 
     fn generate(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
-
         // check all units for registers and put them in the main directory
-        generate_register_header(&self.pkgname, &ast, &self.outdir)?;
-        generate_register_impl(&self.pkgname, &ast, &self.outdir)?;
+        generate_register_header(&self.pkgname, ast, &self.outdir)?;
+        generate_register_impl(&self.pkgname, ast, &self.outdir)?;
 
         for u in ast.units() {
             let unit_dir = &self.outdir.join(u.ident_to_string());
             generate_unit_header(u, unit_dir)?;
             generate_unit_impl(u, unit_dir)?;
-            generate_interface_header(&self.pkgname, &u, unit_dir)?;
-            generate_interface_impl(&self.pkgname, &u, unit_dir)?;
-            generate_field_header(&u, unit_dir)?;
-            generate_field_impl(&u, unit_dir)?;
-            generate_state_header(&u, unit_dir)?;
-            generate_state_impl(&u, unit_dir)?;
+            generate_interface_header(&self.pkgname, u, unit_dir)?;
+            generate_interface_impl(&self.pkgname, u, unit_dir)?;
+            generate_field_header(u, unit_dir)?;
+            generate_field_impl(u, unit_dir)?;
+            generate_state_header(u, unit_dir)?;
+            generate_state_impl(u, unit_dir)?;
         }
         Ok(())
     }
