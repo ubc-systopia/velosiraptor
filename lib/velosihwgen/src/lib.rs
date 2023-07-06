@@ -79,14 +79,6 @@ impl VelosiHwGen {
 pub trait VelosiHwGenBackend {
     /// prepares the component generation, creating the directories etc
     fn prepare(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
-
-    // simplifying the generation; this will replace the next three
     fn generate(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
-
-    fn generate_units(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
-    fn generate_interfaces(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
-    fn generate_states(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
-
-    /// finalizes the code generation part
     fn finalize(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
 }

@@ -289,55 +289,6 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
         Ok(())
     }
 
-    fn generate_units(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
-        for u in ast.units() {
-            let out_subdir = &self.outdir.join(u.ident_to_string());
-            generate_unit_header(&u.ident_to_string(), u, out_subdir)
-                .expect("failed to generate the unit header");
-            generate_unit_impl(&u.ident_to_string(), u, out_subdir)
-                .expect("failed to generate the unit implementation");
-        }
-        Ok(())
-    }
-
-    fn generate_interfaces(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
-        for u in ast.units() {
-            let out_subdir = &self.outdir.join(u.ident_to_string());
-
-            match &u.interface() {
-                None => println!("No interface for {}", u.ident_to_string()),
-                Some(i) => {
-                    // generate_register_header(&u.ident_to_string(), i, out_subdir)
-                    //     .expect("failed to generate the interface header");
-                    // generate_register_impl(&u.ident_to_string(), i, out_subdir)
-                    //     .expect("failed to generate the interface header");
-                    generate_interface_header(&u.ident_to_string(), i, out_subdir)
-                        .expect("failed to generate the interface header");
-                    generate_interface_impl(&u.ident_to_string(), i, out_subdir)
-                        .expect("failed to generate the interface implementation");
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn generate_states(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
-        for u in ast.segments() {
-            let out_subdir = &self.outdir.join(u.ident_to_string());
-            println!("\t segment {}", u.ident_to_string());
-
-            generate_field_header(&u.ident_to_string(), &u.state, out_subdir)
-                .expect("failed to generate the fields header");
-            generate_field_impl(&u.ident_to_string(), &u.state, out_subdir)
-                .expect("failed to generate the fields implementation");
-            generate_state_header(&u.ident_to_string(), &u.state, out_subdir)
-                .expect("failed to generate the state header");
-            generate_state_impl(&u.ident_to_string(), &u.state, out_subdir)
-                .expect("failed to generate the state implementation");
-        }
-        Ok(())
-    }
-
     fn finalize(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
         for u in ast.units() {
             let out_subdir = &self.outdir.join(u.ident_to_string());
