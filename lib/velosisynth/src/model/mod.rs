@@ -55,7 +55,7 @@ pub fn create(unit: &VelosiAstUnitSegment, mem_model: bool) -> Smt2Context {
     state::add_state_def(&mut smt, unit.ident(), &unit.state);
     interface::add_interface_def(&mut smt, unit.ident(), &unit.interface);
     if mem_model {
-        wbuffer::add_wbuffer_def(&mut smt, unit.ident(), &unit.interface); // TODO: add prefix to write buffer
+        wbuffer::add_wbuffer_def(&mut smt, unit.ident(), &unit.interface);
     }
     velosimodel::add_model_def(&mut smt, unit, mem_model);
 
