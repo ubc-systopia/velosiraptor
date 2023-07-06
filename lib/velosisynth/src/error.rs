@@ -133,15 +133,15 @@ pub(crate) struct VelosiSynthErrorBuilder {
 }
 
 impl VelosiSynthErrorBuilder {
-    // pub fn warn(message: String) -> Self {
-    //     Self {
-    //         warn: true,
-    //         message,
-    //         hint: None,
-    //         tokstream: None,
-    //         related: Vec::new(),
-    //     }
-    // }
+    pub fn warn(message: String) -> Self {
+        Self {
+            warn: true,
+            message,
+            hint: None,
+            tokstream: None,
+            related: Vec::new(),
+        }
+    }
 
     pub fn err(message: String) -> Self {
         Self {

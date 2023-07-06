@@ -48,7 +48,7 @@ mod sanitycheck;
 mod vmops;
 mod z3;
 
-use smt2::{Smt2Context, Smt2Option};
+use smt2::Smt2Context;
 use velosiast::VelosiAst;
 use velosiast::{ast::VelosiAstUnitSegment, VelosiAstUnitEnum};
 
@@ -421,7 +421,10 @@ impl<'a> Z3SynthEnum<'a> {
         Self { z3, unit }
     }
 
-    pub fn distinguish(&mut self, models: &HashMap<Rc<String>, Arc<Smt2Context>>) {
+    pub fn distinguish(
+        &mut self,
+        models: &HashMap<Rc<String>, Arc<Smt2Context>>,
+    ) -> Result<(), VelosiSynthIssues> {
         self.z3.reset_with_context(Z3Query::with_model_contexts(
             models
                 .iter()
