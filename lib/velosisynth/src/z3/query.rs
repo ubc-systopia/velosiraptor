@@ -114,7 +114,7 @@ pub struct Z3Query {
     /// the goal of the program
     goal: Option<String>,
     /// the statements to be executed
-    smt: Arc<Smt2Context>,
+    smt: Vec<Arc<Smt2Context>>,
     /// time durations for tracing
     timestamps: Vec<(Z3TimeStamp, Instant)>,
 }
@@ -132,8 +132,18 @@ impl Z3Query {
         Self {
             prog: None,
             goal: None,
-            smt: Arc::new(smt),
+            smt: vec![Arc::new(smt)],
             timestamps,
+        }
+    }
+
+    /// Creates a new Z3 Query with multiple SMT contexts
+    pub fn with_contexts(smt: Vec<Arc<Smt2Context>>) -> Self {
+        Self {
+            prog: None,
+            goal: None,
+            smt,
+            timestamps: Vec::with_capacity(10),
         }
     }
 
@@ -181,12 +191,12 @@ impl Z3Query {
 
     /// sets the SMT context of the query
     pub fn set_smt(&mut self, smt: Smt2Context) -> &mut Self {
-        self.smt = Arc::new(smt);
+        self.smt = vec![Arc::new(smt)];
         self
     }
 
     /// obtains a reference to this context
-    pub fn smt_context(&self) -> &Smt2Context {
+    pub fn smt_contexts(&self) -> &[Arc<Smt2Context>] {
         &self.smt
     }
 
@@ -216,7 +226,7 @@ impl Z3Query {
 
     /// checks whether the query is empty or not
     pub fn is_empty(&self) -> bool {
-        self.smt.is_empty()
+        self.smt.len() == 1 && self.smt[0].is_empty()
     }
 }
 
@@ -240,13 +250,21 @@ impl From<Smt2Context> for Z3Query {
 
 impl Display for Z3Query {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "Query: {}", self.smt)
+        write!(
+            f,
+            "Query: {:?}",
+            self.smt.iter().map(|s| s.to_string()).collect::<Vec<_>>()
+        )
     }
 }
 
 impl Debug for Z3Query {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "Query: {}", self.smt)
+        write!(
+            f,
+            "Query: {:?}",
+            self.smt.iter().map(|s| s.to_string()).collect::<Vec<_>>()
+        )
     }
 }
 
