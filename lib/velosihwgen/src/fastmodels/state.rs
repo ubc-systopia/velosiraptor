@@ -57,17 +57,16 @@ pub fn state_class_name(name: &str) -> String {
 }
 
 pub fn generate_state_header(
-    name: &str,
     unit: &VelosiAstUnit,
     outdir: &Path,
 ) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
-    let scn = state_class_name(name);
+    let scn = state_class_name(unit.ident());
 
-    add_header(&mut scope, name, "state");
+    add_header(&mut scope, unit.ident(), "state");
 
-    let guard = scope.new_ifdef(format!("{}_STATE_HPP_", name.to_uppercase()).as_str());
+    let guard = scope.new_ifdef(format!("{}_STATE_HPP_", unit.ident().to_uppercase()).as_str());
 
     let s = guard.guard().then_scope();
 
@@ -80,7 +79,7 @@ pub fn generate_state_header(
     s.new_include("framework/state_base.hpp", false);
 
     s.new_comment("translation unit specific includes");
-    let fieldshdr = state_fields_header_file(name);
+    let fieldshdr = state_fields_header_file(unit.ident());
     s.new_include(&fieldshdr, false);
 
     match unit.state() {
@@ -147,7 +146,7 @@ pub fn generate_state_header(
     }
 
     // save the scope
-    let filename = state_header_file_path(name);
+    let filename = state_header_file_path(unit.ident());
     scope.set_filename(&filename);
     scope.to_file(outdir, true)?;
 
@@ -155,15 +154,14 @@ pub fn generate_state_header(
 }
 
 pub fn generate_state_impl(
-    name: &str,
     unit: &VelosiAstUnit,
     outdir: &Path,
 ) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
-    let scn = state_class_name(name);
+    let scn = state_class_name(unit.ident());
 
-    add_header(&mut scope, name, "state");
+    add_header(&mut scope, unit.ident(), "state");
 
     // #include "pv/RemapRequest.h"
 
@@ -175,7 +173,7 @@ pub fn generate_state_impl(
     scope.new_include("framework/state_field_base.hpp", false);
 
         scope.new_comment("unit includes");
-    let statehdr = state_header_file(name);
+    let statehdr = state_header_file(unit.ident());
     scope.new_include(&statehdr, false);
 
     match unit.state() {
@@ -199,7 +197,7 @@ pub fn generate_state_impl(
         },
     }
 
-    let filename = state_impl_file(name);
+    let filename = state_impl_file(unit.ident());
     scope.set_filename(&filename);
     scope.to_file(outdir, false)?;
 

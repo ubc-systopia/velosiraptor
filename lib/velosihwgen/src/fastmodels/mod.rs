@@ -261,21 +261,16 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
         generate_register_impl(&self.pkgname, &ast, &self.outdir)?;
 
         for u in ast.units() {
-
             let unit_dir = &self.outdir.join(u.ident_to_string());
-            let name = &u.ident_to_string();
-
             generate_unit_header(u, unit_dir)?;
             generate_unit_impl(u, unit_dir)?;
             generate_interface_header(&self.pkgname, &u, unit_dir)?;
             generate_interface_impl(&self.pkgname, &u, unit_dir)?;
-            generate_field_header(name, &u, unit_dir)?;
-            generate_field_impl(name, &u, unit_dir)?;
-            generate_state_header(name, &u, unit_dir)?;
-            generate_state_impl(name, &u, unit_dir)?;
-
+            generate_field_header(&u, unit_dir)?;
+            generate_field_impl(&u, unit_dir)?;
+            generate_state_header(&u, unit_dir)?;
+            generate_state_impl(&u, unit_dir)?;
         }
-
         Ok(())
     }
 
