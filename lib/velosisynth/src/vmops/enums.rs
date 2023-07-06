@@ -108,7 +108,6 @@ pub fn distinguish(z3: &mut Z3WorkerPool, e: &mut VelosiAstUnitEnum) {
     }
 
     if fully_connected(&graph) {
-        println!("distinguishable");
         let indices = graph.node_indices().collect::<Vec<_>>();
         for idx in indices {
             let node = graph.remove_node(idx).unwrap();
@@ -116,7 +115,6 @@ pub fn distinguish(z3: &mut Z3WorkerPool, e: &mut VelosiAstUnitEnum) {
         }
     } else {
         // TODO: emit warning
-        println!("not distinguishable");
     }
 }
 

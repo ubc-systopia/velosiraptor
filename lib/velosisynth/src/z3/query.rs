@@ -33,7 +33,7 @@ use std::time::Instant;
 use smt2::Smt2Context;
 
 // own crate imports
-use crate::Program;
+use crate::{model, Program};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Z3Tickets: a identifies the Z3 query
@@ -137,8 +137,10 @@ impl Z3Query {
         }
     }
 
-    /// Creates a new Z3 Query with multiple SMT contexts
-    pub fn with_contexts(smt: Vec<Arc<Smt2Context>>) -> Self {
+    /// Creates a new Z3 Query with multiple SMT contexts and adds the model prelude
+    pub fn with_model_contexts(mut smt: Vec<Arc<Smt2Context>>) -> Self {
+        smt.insert(0, Arc::new(model::prelude()));
+
         Self {
             prog: None,
             goal: None,

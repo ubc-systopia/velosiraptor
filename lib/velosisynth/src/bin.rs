@@ -285,7 +285,7 @@ pub fn main() {
     );
     println!(
         "  Model Creation         {:6} ms",
-        t_model_start.duration_since(t_model_end).as_millis()
+        t_model_end.duration_since(t_model_start).as_millis()
     );
 
     if !t_synth.is_empty() {
