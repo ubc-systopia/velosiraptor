@@ -262,7 +262,12 @@ pub fn main() {
 
                 t_synth_enum.push(("init", Instant::now()));
 
-                synth.distinguish(&models);
+                match synth.distinguish(&models) {
+                    Ok(()) => {
+                        log::info!(target: "main", "the variants of {} are distinguishable", e.ident())
+                    }
+                    Err(e) => log::error!(target: "main", "Distinguishing failed:\n{}", e),
+                }
 
                 t_synth_enum.push(("Distinguish", Instant::now()));
 

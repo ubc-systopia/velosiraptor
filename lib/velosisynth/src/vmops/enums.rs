@@ -8,12 +8,13 @@ use petgraph::visit::IntoNodeReferences;
 use petgraph::visit::{EdgeRef, IntoEdgeReferences};
 use petgraph::Undirected;
 
+use crate::error::VelosiSynthErrorBuilder;
 use crate::model::{
     expr::{self, model_slice_accessor_read_fn, p2p},
     types,
 };
 use crate::z3::Z3Result;
-use crate::{Z3Query, Z3TaskPriority, Z3WorkerPool};
+use crate::{VelosiSynthIssues, Z3Query, Z3TaskPriority, Z3WorkerPool};
 use smt2::{Smt2Context, Term};
 use velosiast::{ast::VelosiAstExpr, VelosiAstUnitEnum};
 
@@ -40,7 +41,10 @@ impl Display for Edge {
     }
 }
 
-pub fn distinguish(z3: &mut Z3WorkerPool, e: &mut VelosiAstUnitEnum) {
+pub fn distinguish(
+    z3: &mut Z3WorkerPool,
+    e: &mut VelosiAstUnitEnum,
+) -> Result<(), VelosiSynthIssues> {
     // create the graph
     let mut graph = StableUnGraph::<Node, Edge>::default();
 
@@ -107,14 +111,19 @@ pub fn distinguish(z3: &mut Z3WorkerPool, e: &mut VelosiAstUnitEnum) {
         }
     }
 
-    if fully_connected(&graph) {
+    let (fully_connected, issues) = fully_connected(&graph);
+    if fully_connected {
         let indices = graph.node_indices().collect::<Vec<_>>();
         for idx in indices {
             let node = graph.remove_node(idx).unwrap();
             e.set_unit_differentiator(&node.0, node.1)
         }
+    }
+
+    if issues.is_ok() {
+        Ok(())
     } else {
-        // TODO: emit warning
+        Err(issues)
     }
 }
 
@@ -219,8 +228,10 @@ fn submit_edge_query(
     (result, (id, source_id, target_id))
 }
 
-// TODO: sequential for now
-fn fully_connected(graph: &StableUnGraph<Node, Edge>) -> bool {
+fn fully_connected(graph: &StableUnGraph<Node, Edge>) -> (bool, VelosiSynthIssues) {
+    let mut fully_connected = true;
+    let mut issues = VelosiSynthIssues::new();
+
     let node_ids = graph
         .node_references()
         .map(|(id, _)| id)
@@ -234,15 +245,51 @@ fn fully_connected(graph: &StableUnGraph<Node, Edge>) -> bool {
 
         for n_id in &node_ids {
             match reachable.iter().position(|r_id| r_id == n_id) {
-                Some(idx) => reachable.remove(idx),
-                None => return false,
+                Some(idx) => {
+                    reachable.remove(idx);
+                }
+                None => {
+                    fully_connected = false;
+
+                    let msg = format!(
+                        "unable to distinguish {} from {}",
+                        graph[node_id].0, graph[*n_id].0
+                    );
+                    let hint = "check the translate preconditions of each variant to make sure they can be distinguished";
+                    let err = VelosiSynthErrorBuilder::err(msg)
+                        .add_hint(hint.to_string())
+                        .build();
+                    issues.push(err);
+                }
             };
         }
 
         if !reachable.is_empty() {
-            // TODO: emit warning
+            let counts = graph.edges(node_id).counts_by(|edge| edge.target());
+            let overspec = counts
+                .into_iter()
+                .filter(|(_, count)| *count > 1)
+                .map(|(n_id, _)| n_id);
+
+            for n_id in overspec {
+                let msg = format!(
+                    "multiple ways to distinguish {} from {}",
+                    graph[node_id].0, graph[n_id].0
+                );
+                let hint = format!(
+                    "any of the following distinguish the two:\n{}",
+                    graph
+                        .edges_connecting(node_id, n_id)
+                        .map(|e| format!(" - {} and {}\n", e.weight().0, e.weight().1))
+                        .join("")
+                );
+                let warn = VelosiSynthErrorBuilder::warn(msg)
+                    .add_hint(hint.to_string())
+                    .build();
+                issues.push(warn);
+            }
         }
     }
 
-    true
+    (fully_connected, issues)
 }
