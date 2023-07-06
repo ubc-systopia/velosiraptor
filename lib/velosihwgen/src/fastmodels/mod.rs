@@ -69,14 +69,14 @@ use fields::{generate_field_header, generate_field_impl, state_fields_impl_file}
 ///  - outdir/hw/fastmodels/<unit>/Makefile
 ///  - outdir/hw/fastmodels/<unit>/interface.hpp
 ///  - outdir/hw/fastmodels/<unit>/interface.cpp
-///  - outdir/hw/fastmodels/<unit>/registers.hpp
-///  - outdir/hw/fastmodels/<unit>/registers.cpp
 ///  - outdir/hw/fastmodels/<unit>/state.hpp
 ///  - outdir/hw/fastmodels/<unit>/state.cpp
 ///  - outdir/hw/fastmodels/<unit>/state_fields.hpp
 ///  - outdir/hw/fastmodels/<unit>/state_fields.cpp
 ///  - outdir/hw/fastmodels/<unit>/unit.hpp
 ///  - outdir/hw/fastmodels/<unit>/unit.cpp
+///  - outdir/hw/fastmodels/<vrs>_registers.cpp
+///  - outdir/hw/fastmodels/<vrs>_registers.hpp
 ///
 ///  Fastmodels framework lib is adjacent to units
 ///  note no unit can share the name of the framework folder
@@ -205,11 +205,6 @@ impl ArmFastModelsModule {
         writeln!(
             f,
             "TRANSLATION_UNIT_SRCS += $(SOURCE_DIR)/{}",
-            registers_impl_file(name)
-        )?;
-        writeln!(
-            f,
-            "TRANSLATION_UNIT_SRCS += $(SOURCE_DIR)/{}",
             state_fields_impl_file(name)
         )?;
 
@@ -260,6 +255,11 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
     }
 
     fn generate(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
+
+        // check all units for registers and put them in the main directory
+        generate_register_header(&self.pkgname, &ast, &self.outdir)?;
+        generate_register_impl(&self.pkgname, &ast, &self.outdir)?;
+
         for u in ast.units() {
 
             let unit_dir = &self.outdir.join(u.ident_to_string());
@@ -270,11 +270,6 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
 
             match u {
                 velosiast::VelosiAstUnit::Segment(us) => {
-
-                    generate_register_header(name, &us.interface, unit_dir)?;
-                    generate_register_impl(name, &us.interface, unit_dir)?;
-
-
                     generate_interface_header(name, &us.interface, unit_dir)?;
                     generate_interface_impl(name, &us.interface, unit_dir)?;
                     generate_field_header(name, &us.state, unit_dir)?;
@@ -312,10 +307,10 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
             match &u.interface() {
                 None => println!("No interface for {}", u.ident_to_string()),
                 Some(i) => {
-                    generate_register_header(&u.ident_to_string(), i, out_subdir)
-                        .expect("failed to generate the interface header");
-                    generate_register_impl(&u.ident_to_string(), i, out_subdir)
-                        .expect("failed to generate the interface header");
+                    // generate_register_header(&u.ident_to_string(), i, out_subdir)
+                    //     .expect("failed to generate the interface header");
+                    // generate_register_impl(&u.ident_to_string(), i, out_subdir)
+                    //     .expect("failed to generate the interface header");
                     generate_interface_header(&u.ident_to_string(), i, out_subdir)
                         .expect("failed to generate the interface header");
                     generate_interface_impl(&u.ident_to_string(), i, out_subdir)

@@ -160,7 +160,7 @@ pub fn generate_field_impl(
     scope.new_include("framework/types.hpp", false);
     scope.new_comment("translation unit generic includes");
     let hdrfile = state_fields_header_file(name);
-    scope.new_include(&hdrfile, true);
+    scope.new_include(&hdrfile, false);
 
     for f in state.fields() {
         let rcn = state_fields_class_name(f.ident());
