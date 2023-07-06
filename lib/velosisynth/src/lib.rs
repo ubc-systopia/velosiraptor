@@ -42,13 +42,14 @@ use std::time::{Duration, Instant};
 
 // crate modules
 mod error;
-pub mod model;
+mod model;
 mod programs;
 mod sanitycheck;
 mod vmops;
 mod z3;
 
-use smt2::Smt2Context;
+use smt2::{Smt2Context, Smt2Option};
+use velosiast::VelosiAst;
 use velosiast::{ast::VelosiAstUnitSegment, VelosiAstUnitEnum};
 
 use crate::vmops::{
@@ -107,13 +108,8 @@ pub struct Z3SynthSegment<'a> {
     protect_queries: ProtectPrograms,
     protect_program: Option<Program>,
     done: bool,
-    model_created: bool,
 
     // stats
-    /// the time to create the smtlib2 context of the model
-    pub t_create_model: Duration,
-    /// the time to populate Z3 with the model
-    pub t_reset_model: Duration,
     /// runtime for the sanity check
     pub t_sanity_check: Duration,
     /// the time to synthesize the map program
@@ -128,13 +124,19 @@ pub struct Z3SynthSegment<'a> {
 
 impl<'a> Z3SynthSegment<'a> {
     /// creates a new synthesis handle with the given worker poopl and the unit
-    pub(crate) fn new(z3: Z3WorkerPool, unit: &'a mut VelosiAstUnitSegment) -> Self {
+    pub(crate) fn new(
+        mut z3: Z3WorkerPool,
+        unit: &'a mut VelosiAstUnitSegment,
+        model: Arc<Smt2Context>,
+    ) -> Self {
         let batch_size = std::cmp::max(DEFAULT_BATCH_SIZE, z3.num_workers());
 
         // XXX: move this to the the syntheisze() step.
         let map_queries = vmops::map::get_program_iter(unit, batch_size, None);
         let unmap_queries = vmops::unmap::get_program_iter(unit, batch_size, None);
         let protect_queries = vmops::protect::get_program_iter(unit, batch_size, None);
+
+        z3.reset_with_context(Z3Query::with_contexts(vec![model]));
 
         Self {
             z3,
@@ -146,9 +148,6 @@ impl<'a> Z3SynthSegment<'a> {
             protect_queries,
             protect_program: None,
             done: false,
-            model_created: false,
-            t_create_model: Duration::from_secs(0),
-            t_reset_model: Duration::from_secs(0),
             t_sanity_check: Duration::from_secs(0),
             t_map_synthesis: Duration::from_secs(0),
             t_unmap_synthesis: Duration::from_secs(0),
@@ -165,22 +164,7 @@ impl<'a> Z3SynthSegment<'a> {
         self.unit.ident()
     }
 
-    /// creates the model for the synthesis for this handle
-    pub fn create_model(&mut self) {
-        if !self.model_created {
-            let t_start = Instant::now();
-            self.model_created = true;
-            let ctx = model::create(self.unit, false);
-            let t_reset = Instant::now();
-            self.z3.reset_with_context(Z3Query::from(ctx));
-            let t_end = Instant::now();
-            self.t_create_model = t_reset - t_start;
-            self.t_reset_model = t_end - t_reset;
-        }
-    }
-
     pub fn sanity_check(&mut self) -> Result<(), VelosiSynthIssues> {
-        self.create_model();
         let t_start = Instant::now();
 
         log::warn!(target: "[Z3Synth]", "running sanity checks on the model.");
@@ -260,9 +244,6 @@ impl<'a> Z3SynthSegment<'a> {
         }
 
         let t_synth_start = self.t_synth_start.unwrap();
-
-        // create the model of not done yet
-        self.create_model();
 
         let mut all_done = true;
 
@@ -353,8 +334,6 @@ impl<'a> Z3SynthSegment<'a> {
     }
 
     pub fn synthesize_map(&mut self, mem_model: bool) -> Result<Program, VelosiSynthIssues> {
-        // have this more conditional
-        self.create_model();
         self.done = true;
 
         let prog = vmops::map::synthesize(&mut self.z3, self.unit, None)?;
@@ -369,8 +348,6 @@ impl<'a> Z3SynthSegment<'a> {
     }
 
     pub fn synthesize_unmap(&mut self, mem_model: bool) -> Result<Program, VelosiSynthIssues> {
-        // have this more conditional
-        self.create_model();
         self.done = true;
 
         let prog = vmops::unmap::synthesize(&mut self.z3, self.unit, None)?;
@@ -385,8 +362,6 @@ impl<'a> Z3SynthSegment<'a> {
     }
 
     pub fn synthesize_protect(&mut self, mem_model: bool) -> Result<Program, VelosiSynthIssues> {
-        // have this more conditional
-        self.create_model();
         self.done = true;
 
         let prog = vmops::protect::synthesize(&mut self.z3, self.unit, None)?;
@@ -446,8 +421,18 @@ impl<'a> Z3SynthEnum<'a> {
         Self { z3, unit }
     }
 
-    pub fn distinguish(&mut self, models: &HashMap<Rc<String>, Smt2Context>) {
-        enums::distinguish(&mut self.z3, models, self.unit)
+    pub fn distinguish(&mut self, models: &HashMap<Rc<String>, Arc<Smt2Context>>) {
+        let mut prelude = Smt2Context::new();
+        prelude.set_option(Smt2Option::ProduceUnsatCores(true));
+
+        let mut contexts = vec![Arc::new(prelude)];
+        models
+            .iter()
+            .filter(|(ident, _)| self.unit.get_unit_names().contains(ident))
+            .for_each(|(_, ctx)| contexts.push(ctx.clone()));
+
+        self.z3.reset_with_context(Z3Query::with_contexts(contexts));
+        enums::distinguish(&mut self.z3, self.unit)
     }
 }
 
@@ -503,7 +488,11 @@ impl Z3SynthFactory {
         self
     }
 
-    pub fn create_segment<'a>(&self, unit: &'a mut VelosiAstUnitSegment) -> Z3SynthSegment<'a> {
+    pub fn create_segment<'a>(
+        &self,
+        unit: &'a mut VelosiAstUnitSegment,
+        model: Arc<Smt2Context>,
+    ) -> Z3SynthSegment<'a> {
         if unit.is_abstract {
             panic!("Cannot synthesize abstract units");
         }
@@ -519,7 +508,7 @@ impl Z3SynthFactory {
         };
 
         let z3 = Z3WorkerPool::with_num_workers(self.num_workers, logpath);
-        Z3SynthSegment::new(z3, unit)
+        Z3SynthSegment::new(z3, unit, model)
     }
 
     pub fn create_enum<'a>(&self, unit: &'a mut VelosiAstUnitEnum) -> Z3SynthEnum<'a> {
@@ -542,4 +531,11 @@ impl Default for Z3SynthFactory {
     fn default() -> Self {
         Self::new()
     }
+}
+
+pub fn create_models(ast: &VelosiAst) -> HashMap<Rc<String>, Arc<Smt2Context>> {
+    ast.segments()
+        .iter()
+        .map(|u| (u.ident().clone(), Arc::new(model::create(u, false))))
+        .collect()
 }

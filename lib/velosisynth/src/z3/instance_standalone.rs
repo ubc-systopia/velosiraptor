@@ -145,7 +145,8 @@ impl Z3Instance {
             // can we format/write this directly into the stdin?
 
             // construt the smt2 context from the query
-            let smt = query.smt_context().to_code(!cfg!(debug_assertions));
+            let contexts = query.smt_contexts();
+
             let id = format!(";; Z3Ticket({})\n", ticket);
 
             // record the time to create the smt context
@@ -153,7 +154,11 @@ impl Z3Instance {
 
             // send it to z3
             z3_stdin.write_all(id.as_bytes()).unwrap();
-            z3_stdin.write_all(smt.as_bytes()).unwrap();
+            for smt in contexts {
+                z3_stdin
+                    .write_all(smt.to_code(!cfg!(debug_assertions)).as_bytes())
+                    .unwrap();
+            }
 
             // record the time to execute the query
             query.timestamp(Z3TimeStamp::SendCmd);
@@ -166,8 +171,10 @@ impl Z3Instance {
             if let Some(f) = &mut self.logfile {
                 f.write_all(id.as_bytes())
                     .expect("writing the smt query failed.");
-                f.write_all(smt.as_bytes())
-                    .expect("writing the smt query failed.");
+                for smt in contexts {
+                    f.write_all(smt.to_code(!cfg!(debug_assertions)).as_bytes())
+                        .expect("writing the smt query failed.");
+                }
             }
         } else {
             return Err(Z3Error::QueryExecution);
@@ -222,18 +229,24 @@ impl Z3Instance {
             // can we format/write this directly into the stdin?
 
             // construt the smt2 context from the query
-            let smt = query.smt_context().to_code(!cfg!(debug_assertions));
+            let contexts = query.smt_contexts();
 
             // send to the z3 process
-            z3_stdin.write_all(smt.as_bytes()).unwrap();
+            for smt in contexts {
+                z3_stdin
+                    .write_all(smt.to_code(!cfg!(debug_assertions)).as_bytes())
+                    .unwrap();
+            }
             // adding an `(echo)` to have at least some output
             z3_stdin
                 .write_all("\n(echo \"!remove\")\n".as_bytes())
                 .unwrap();
 
             if let Some(f) = &mut self.logfile {
-                f.write_all(smt.as_bytes())
-                    .expect("writing the smt query failed.");
+                for smt in contexts {
+                    f.write_all(smt.to_code(!cfg!(debug_assertions)).as_bytes())
+                        .expect("writing the smt query failed.");
+                }
             }
         } else {
             return Err(Z3Error::QueryExecution);

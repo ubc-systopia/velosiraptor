@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fmt::Display;
 use std::rc::Rc;
 
@@ -14,7 +14,7 @@ use crate::model::{
 };
 use crate::z3::Z3Result;
 use crate::{Z3Query, Z3TaskPriority, Z3WorkerPool};
-use smt2::{Smt2Context, Smt2Option, Term};
+use smt2::{Smt2Context, Term};
 use velosiast::{ast::VelosiAstExpr, VelosiAstUnitEnum};
 
 #[derive(Debug, Clone)]
@@ -40,21 +40,7 @@ impl Display for Edge {
     }
 }
 
-pub fn distinguish(
-    z3: &mut Z3WorkerPool,
-    models: &HashMap<Rc<String>, Smt2Context>,
-    e: &mut VelosiAstUnitEnum,
-) {
-    // create model
-    let mut smt = Smt2Context::new();
-    // set the options
-    smt.set_option(Smt2Option::ProduceUnsatCores(true));
-
-    for variant in e.get_unit_names().iter() {
-        smt.merge(models[*variant].clone());
-    }
-    z3.reset_with_context(Z3Query::from(smt));
-
+pub fn distinguish(z3: &mut Z3WorkerPool, e: &mut VelosiAstUnitEnum) {
     // create the graph
     let mut graph = StableUnGraph::<Node, Edge>::default();
 

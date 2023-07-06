@@ -27,7 +27,6 @@
 //!
 //! This example program
 
-use std::collections::HashMap;
 use std::env;
 use std::io;
 use std::io::Read;
@@ -37,7 +36,7 @@ use clap::{arg, command};
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, LevelPadding, TermLogger, TerminalMode};
 
 use velosiast::{AstResult, VelosiAst, VelosiAstUnit};
-use velosisynth::model;
+use velosisynth::create_models;
 use velosisynth::Z3SynthFactory;
 
 pub fn main() {
@@ -125,12 +124,9 @@ pub fn main() {
     let mut synthfactory = Z3SynthFactory::new();
     synthfactory.num_workers(ncores).default_log_dir();
 
-    // TODO: might be able to put this in the ast and reuse it?
-    let models = ast
-        .segments()
-        .iter()
-        .map(|u| (u.ident().clone(), model::create(u, false)))
-        .collect::<HashMap<_, _>>();
+    let t_model_start = Instant::now();
+    let models = create_models(&ast);
+    let t_model_end = Instant::now();
 
     let mut t_synth = Vec::new();
     for unit in ast.units_mut() {
@@ -161,13 +157,9 @@ pub fn main() {
 
                 t_synth_segment.push(("start", Instant::now()));
 
-                let mut synth = synthfactory.create_segment(seg);
+                let mut synth = synthfactory.create_segment(seg, models[seg.ident()].clone());
 
                 t_synth_segment.push(("init", Instant::now()));
-
-                synth.create_model();
-
-                t_synth_segment.push(("Model Creation", Instant::now()));
 
                 let sanity_check = synth.sanity_check();
 
@@ -252,6 +244,8 @@ pub fn main() {
             }
             VelosiAstUnit::Enum(e) => {
                 // try to differentiate enum variants
+                println!("Checking distinguishability for enum {}", e.ident());
+
                 let e = Rc::get_mut(e);
 
                 if e.is_none() {
@@ -260,8 +254,19 @@ pub fn main() {
                 }
                 let e = e.unwrap();
 
+                let mut t_synth_enum = Vec::new();
+
+                t_synth_enum.push(("start", Instant::now()));
+
                 let mut synth = synthfactory.create_enum(e);
+
+                t_synth_enum.push(("init", Instant::now()));
+
                 synth.distinguish(&models);
+
+                t_synth_enum.push(("Distinguish", Instant::now()));
+
+                t_synth.push((e.ident_to_string(), t_synth_enum, Vec::new()));
             }
         }
     }
@@ -277,6 +282,10 @@ pub fn main() {
     println!(
         "  Parsing time           {:6} ms",
         t_parsing.duration_since(t_start).as_millis()
+    );
+    println!(
+        "  Model Creation         {:6} ms",
+        t_model_start.duration_since(t_model_end).as_millis()
     );
 
     if !t_synth.is_empty() {
