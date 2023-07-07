@@ -38,7 +38,7 @@ use std::process::exit;
 // get the parser module
 use velosiast::{AstResult, VelosiAst, VelosiAstUnit};
 use velosicodegen::VelosiCodeGen;
-use velosisynth::Z3SynthFactory;
+use velosisynth::{create_models, Z3SynthFactory};
 
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
@@ -289,6 +289,7 @@ fn main() {
         .logging(cli.logsmt)
         .num_workers(cli.parallelism);
 
+    let models = create_models(&ast);
     for unit in ast.units_mut() {
         match unit {
             VelosiAstUnit::Segment(u) => {
@@ -308,9 +309,7 @@ fn main() {
                 }
 
                 let seg = seg.unwrap();
-                let mut synth = synthfactory.create_segment(seg);
-
-                synth.create_model();
+                let mut synth = synthfactory.create_segment(seg, models[seg.ident()].clone());
 
                 if let Err(_e) = synth.sanity_check() {
                     eprintln!(
@@ -339,8 +338,24 @@ fn main() {
             VelosiAstUnit::StaticMap(_s) => {
                 // nothing to synthesize here
             }
-            VelosiAstUnit::Enum(_e) => {
-                // nothing to synthesize here
+            VelosiAstUnit::Enum(e) => {
+                // try to differentiate enum variants
+                println!("Checking distinguishability for enum {}", e.ident());
+                let e = Rc::get_mut(e);
+
+                if e.is_none() {
+                    println!("could not obtain mutable reference to enum unit\n");
+                    continue;
+                }
+                let e = e.unwrap();
+
+                let mut synth = synthfactory.create_enum(e);
+                match synth.distinguish(&models) {
+                    Ok(()) => {
+                        log::info!(target: "main", "the variants of {} are distinguishable", e.ident())
+                    }
+                    Err(e) => log::error!(target: "main", "Distinguishing failed:\n{}", e),
+                }
             }
         }
     }
