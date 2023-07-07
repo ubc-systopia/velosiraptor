@@ -244,7 +244,8 @@ pub fn main() {
             }
             VelosiAstUnit::Enum(e) => {
                 // try to differentiate enum variants
-                println!("Checking distinguishability for enum {}", e.ident());
+                let enum_name = e.ident().clone();
+                println!("Checking distinguishability for enum {}", enum_name);
 
                 let e = Rc::get_mut(e);
 
@@ -264,14 +265,15 @@ pub fn main() {
 
                 match synth.distinguish(&models) {
                     Ok(()) => {
-                        log::info!(target: "main", "the variants of {} are distinguishable", e.ident())
+                        log::info!(target: "main", "the variants of {} are distinguishable", enum_name)
                     }
                     Err(e) => log::error!(target: "main", "Distinguishing failed:\n{}", e),
                 }
 
                 t_synth_enum.push(("Distinguish", Instant::now()));
 
-                t_synth.push((e.ident_to_string(), t_synth_enum, Vec::new()));
+                let stats = Some(synth.worker_pool_stats().clone());
+                t_synth.push((e.ident_to_string(), t_synth_enum, Vec::new(), stats));
             }
         }
     }
