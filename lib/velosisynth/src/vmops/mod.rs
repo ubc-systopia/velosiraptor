@@ -27,14 +27,13 @@
 
 pub mod enums;
 pub mod map;
+pub mod map_new;
 pub mod protect;
 mod queries;
 pub mod unmap;
-
-pub use queries::queryhelper::{MaybeResult, ProgramBuilder};
+pub use queries::MaybeResult;
 
 // re-export the sanity checks
-pub use queries::cnf;
 pub use queries::precond;
 pub use queries::queryhelper;
 pub use queries::resultparser;
