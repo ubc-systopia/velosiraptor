@@ -3,7 +3,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2022 Systopia Lab, Computer Science, University of British Columbia
+// Copyright (c) 2022,2023 Systopia Lab, Computer Science, University of British Columbia
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -25,56 +25,36 @@
 
 //! Handles Conjunctive Normal Form
 
+// std imports
 use std::collections::LinkedList;
+use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
-use smt2::{Smt2Context, SortedVar, Term, VarBinding};
+use smt2::Term;
 use velosiast::{
     ast::{
         VelosiAstBinOp, VelosiAstBinOpExpr, VelosiAstBoolLiteralExpr, VelosiAstExpr,
-        VelosiAstMethod, VelosiAstUnOp, VelosiAstUnOpExpr, VelosiAstUnitSegment,
+        VelosiAstMethod, VelosiAstUnOpExpr, VelosiAstUnitSegment,
     },
     VelosiTokenStream,
 };
 
 use crate::{
-    model::expr::expr_to_smt2,
-    model::method::{call_method, call_method_assms, combine_method_params},
-    model::types,
-    z3::{Z3Query, Z3TaskPriority, Z3Ticket, Z3WorkerPool},
+    z3::{Z3TaskPriority, Z3WorkerPool},
     Program,
 };
 
 //use super::queryhelper::{MaybeResult, ProgramBuilder, QueryBuilder};
-use super::queryhelper::MaybeResult;
+use super::MaybeResult;
+use super::{BoolExprQueryBuilder, ProgramVerifier, DEFAULT_BATCH_SIZE};
+
+use super::ProgramBuilder;
 
 // use crate::ProgramsIter;
-
-use super::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Single Boolean Expression Queries
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// produces a new program
-pub trait ProgramBuilder {
-    /// returns the next query to be submitted, or None if all have been submitted
-    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program>;
-
-    /// obtains the reference to the method/program
-    fn m_op(&self) -> &VelosiAstMethod;
-
-    /// additional assumptions for the program
-    fn assms(&self) -> Rc<Vec<Term>>;
-
-    /// the expression that the program needs to establish
-    fn goal_expr(&self) -> Rc<VelosiAstExpr>;
-
-    /// returns whether or not we use the mem model
-    fn mem_model(&self) -> bool {
-        false
-    }
-}
 
 // Some dummy implementatin for now...
 use crate::ProgramsIter;
@@ -96,425 +76,25 @@ impl ProgramBuilder for ProgramsIter {
     fn goal_expr(&self) -> Rc<VelosiAstExpr> {
         panic!("foo")
     }
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Single Boolean Expression Queries
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct BoolExprQueryBuilder<'a> {
-    /// the unit context for this query
-    unit: &'a VelosiAstUnitSegment,
-    /// the programs that this query builder handles
-    goal_expr: Rc<VelosiAstExpr>,
-    /// the operation method
-    m_op: Rc<VelosiAstMethod>,
-    /// assumptions for the boolean expressions
-    assms: Rc<Vec<Term>>,
-    /// whether or not to negate the expression
-    negate: bool,
-    /// whether to specialize the program for memory model
-    mem_model: Option<Program>,
-    /// whether or not to allow variable references
-    variable_references: bool,
-    /// the size of the batch
-    batchsize: usize,
-    /// programs generator
-    programs: Option<Box<dyn ProgramBuilder>>,
-}
-
-impl<'a> BoolExprQueryBuilder<'a> {
-    /// creates a builder for boolean expression queries
-    pub fn new(
-        unit: &'a VelosiAstUnitSegment,
-        m_op: Rc<VelosiAstMethod>,
-        goal_expr: Rc<VelosiAstExpr>,
-    ) -> Self {
-        Self {
-            unit,
-            goal_expr,
-            m_op,
-            assms: Rc::new(Vec::new()),
-            negate: false,
-            mem_model: None,
-            variable_references: false,
-            batchsize: 1,
-            programs: None,
-        }
-    }
-
-    /// sets the assumptions for the supplied vector
-    pub fn assms(mut self, assms: Rc<Vec<Term>>) -> Self {
-        self.assms = assms;
-        self
-    }
-
-    /// whether or not to negate the expression
-    pub fn negate(mut self, toggle: bool) -> Self {
-        self.negate = toggle;
-        self
-    }
-
-    /// sets the memory model to be used
-    pub fn mem_model(mut self, prog: Program) -> Self {
-        self.mem_model = Some(prog);
-        self
-    }
-
-    /// whether we want to allow variable references in the pre-conditions
-    pub fn variable_references(mut self) -> Self {
-        self.variable_references = true;
-        self
-    }
-
-    /// the batch size to be used when submitting queries
-    pub fn batchsize(mut self, batchsize: usize) -> Self {
-        self.batchsize = batchsize;
-        self
-    }
-
-    pub fn programs(mut self, programs: Box<dyn ProgramBuilder>) -> Self {
-        self.programs = Some(programs);
-        self
-    }
-
-    /// builds the bool expr query or returns None if there are no queries to be run
-    pub fn build(self) -> Option<BoolExprQuery> {
-        // if the expression doesn't have state references, then nothing to be done.
-        if !self.goal_expr.has_state_references() {
-            return None;
-        }
-
-        // check if the expression has variable references and we want variable referenes
-        let params = self.m_op.get_param_names();
-        if self.goal_expr.has_var_references(&params) == self.variable_references {
-            return None;
-        }
-
-        let mem_model = self.mem_model.is_some();
-
-        // We either spec
-        let programs = if let Some(programs) = self.programs {
-            programs
-        } else if let Some(prog) = self.mem_model {
-            Box::new(utils::make_program_iter_mem(prog))
-        } else {
-            let programs =
-                utils::make_program_builder(self.unit, self.m_op.as_ref(), &self.goal_expr)
-                    .into_iter();
-            if !programs.has_programs() {
-                return None;
-            }
-            Box::new(programs)
-        };
-
-        // convert the goal expression if needed
-        let expr = if self.negate {
-            let loc = self.goal_expr.loc().clone();
-            Rc::new(VelosiAstExpr::UnOp(VelosiAstUnOpExpr::new(
-                VelosiAstUnOp::LNot,
-                self.goal_expr,
-                loc,
-            )))
-        } else {
-            self.goal_expr
-        };
-
-        Some(BoolExprQuery {
-            programs,
-            m_op: self.m_op,
-            assms: self.assms,
-            expr,
-            mem_model,
-        })
+    fn do_fmt(&self, f: &mut Formatter<'_>, indent: usize, debug: bool) -> FmtResult {
+        let i = " ".repeat(indent);
+        writeln!(f, "{i}  + ProgramsIter (num: {})", self.programs.len())
     }
 }
 
-pub struct BoolExprQuery {
-    /// the programs that this query builder handles
-    programs: Box<dyn ProgramBuilder>,
-    /// the operation method
-    m_op: Rc<VelosiAstMethod>,
-    /// assumptions for the term
-    assms: Rc<Vec<Term>>,
-    /// the boolean expression to be evaluated
-    expr: Rc<VelosiAstExpr>,
-    /// whether to use the memory model
-    mem_model: bool,
-}
-
-impl ProgramBuilder for BoolExprQuery {
-    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
-        self.programs.next(z3)
-    }
-
-    fn m_op(&self) -> &VelosiAstMethod {
-        self.m_op.as_ref()
-    }
-
-    /// the assumptions for the program
-    fn assms(&self) -> Rc<Vec<Term>> {
-        self.assms.clone()
-    }
-
-    /// the expression that the program needs to establish
-    fn goal_expr(&self) -> Rc<VelosiAstExpr> {
-        self.expr.clone()
-    }
-
-    fn mem_model(&self) -> bool {
-        self.mem_model
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// ProgramQueries
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// the default batch size
-const DEFAULT_BATCH_SIZE: usize = 5;
-
-pub struct ProgramVerifier {
-    /// prefix for smt namespacing
-    prefix: String,
-    /// sequence of queries to be submitted
-    programs: Box<dyn ProgramBuilder>,
-    /// the priority of the task
-    priority: Z3TaskPriority,
-    /// the submitted/in-flight queries
-    submitted: LinkedList<Z3Ticket>,
-    /// programs that had SAT results
-    completed: LinkedList<Program>,
-    /// the batch size for submiting queries
-    batch_size: usize,
-    /// whether we're done processing
-    queries_done: bool,
-}
-
-impl ProgramVerifier {
-    /// creates a new query verifier for the queries with the given priority
-    pub fn new(prefix: String, queries: Box<dyn ProgramBuilder>, priority: Z3TaskPriority) -> Self {
-        Self::with_batchsize(prefix, queries, 5, priority)
-    }
-
-    /// creates a new query verifier for the queries with the given priority and batch size
-    pub fn with_batchsize(
-        prefix: String,
-        programs: Box<dyn ProgramBuilder>,
-        batch_size: usize,
-        priority: Z3TaskPriority,
-    ) -> Self {
-        let batch_size = std::cmp::max(batch_size, 1);
-        ProgramVerifier {
-            prefix,
-            programs,
-            priority,
-            submitted: LinkedList::new(),
-            completed: LinkedList::new(),
-            batch_size,
-            queries_done: false,
-        }
-    }
-
-    fn to_smt_query(&self, prog: Program) -> Box<Z3Query> {
-        let m_op = self.programs.m_op();
-        let assms = self.programs.assms();
-        let goal_expr = self.programs.goal_expr();
-        let mem_model = false;
-        let prefix = &self.prefix;
-
-        // convert the program to a smt2 term
-        let (mut smt, symvars) =
-            prog.to_smt2_term(prefix, m_op.ident(), m_op.params.as_slice(), mem_model);
-
-        // obtain the forall params
-        let stvar = SortedVar::new("st!0".to_string(), types::model(prefix));
-        let vars = combine_method_params(prefix, vec![stvar], m_op.params.as_slice(), &[]);
-
-        // build up the pre-conditions (lhs of the implication)
-        let pre1 = call_method_assms(m_op, "st!0");
-        let mut pre = assms
-            .iter()
-            .fold(pre1, |acc, assm| Term::land(acc, assm.clone()));
-        if mem_model {
-            pre = utils::add_empty_wbuffer_precond(prefix, pre);
-        }
-
-        // call the program method
-
-        let args = m_op
-            .params
-            .iter()
-            .fold(vec![Term::from("st!0")], |mut acc, param| {
-                acc.push(Term::from(param.ident().as_str()));
-                acc
-            });
-        let m_op_call = call_method(m_op, args);
-
-        // form the implication `let st = OP() in pre => goal`
-        let impl_term = Term::Let(
-            vec![VarBinding::new("st".to_string(), m_op_call)],
-            Box::new(pre.implies(expr_to_smt2(prefix, &goal_expr, "st"))),
-        );
-
-        // build the forall term for the query
-        let t_assert = Term::forall(vars, impl_term);
-
-        // get the goal string for the query
-        let goal_str = t_assert.to_string();
-
-        // assert and check sat
-        smt.assert(t_assert);
-        smt.check_sat();
-
-        // add the printing of the symvars
-        symvars.add_get_values(&mut smt);
-
-        // now form a new context with the smt context in a new level
-        let mut smtctx = Smt2Context::new();
-        smtctx.subsection(String::from("Verification"));
-        smtctx.level(smt);
-
-        // create and submit query
-        let mut query = Z3Query::from(smtctx);
-        query.set_program(prog).set_goal(goal_str);
-
-        Box::new(query)
-    }
-
-    /// submits one query to the z3 worker pool
-    pub fn submit_one(&mut self, z3: &mut Z3WorkerPool) -> bool {
-        self.do_submit(z3, Some(1))
-    }
-
-    /// submits all queries to the z3 worker pool
-    pub fn submit_all(&mut self, z3: &mut Z3WorkerPool) -> bool {
-        self.do_submit(z3, None)
-    }
-
-    /// submits the supplied number of elements from the queue
-    pub fn submit_n(&mut self, z3: &mut Z3WorkerPool, num: usize) -> bool {
-        self.do_submit(z3, Some(num))
-    }
-
-    /// submits `num` queries to the Z3 worker pool
-    pub fn submit(&mut self, z3: &mut Z3WorkerPool) -> bool {
-        self.do_submit(z3, Some(self.batch_size))
-    }
-
-    /// processes the results of the submitted queries
-    pub fn process_results(&mut self, z3: &mut Z3WorkerPool) -> bool {
-        self.do_check_submitted(z3);
-        !self.completed.is_empty()
-    }
-
-    /// handles submitting up `num` queries to the verifier, if None all ready queries are submitted
-    fn do_submit(&mut self, z3: &mut Z3WorkerPool, num: Option<usize>) -> bool {
-        let mut has_submitted = false;
-        loop {
-            // check the supplied limit
-            if let Some(num) = num {
-                if self.submitted.len() >= 2 * num {
-                    // we've reached the limit of queries to be submitted, let's return
-                    // true if we have submitted anything or we know that we're not done
-                    return has_submitted || !self.queries_done;
-                }
-            }
-
-            // try to submit equeries to the verifier
-            match self.programs.next(z3) {
-                MaybeResult::Some(prog) => {
-                    // we got a new query to submit, try submitting it to the solver and
-                    // record that we've submitted a query
-                    has_submitted = true;
-
-                    let query = self.to_smt_query(prog);
-                    match z3.submit_query(query, self.priority) {
-                        Ok(ticket) => self.submitted.push_back(ticket),
-                        Err(e) => panic!("Error submitting query: {}", e),
-                    }
-                }
-                MaybeResult::Pending => {
-                    // we can submit more queries, but the queries are not ready yet
-                    // returning true indicating there is some more work to be done
-                    return true;
-                }
-                MaybeResult::None => {
-                    // we've exhausted the queries, set the queries done flag and return
-                    // whether we've submitted any new queries
-                    self.queries_done = true;
-                    return has_submitted;
-                }
-            }
-        }
-    }
-
-    /// checks the submitted queries for results
-    fn do_check_submitted(&mut self, z3: &mut Z3WorkerPool) {
-        if self.submitted.is_empty() {
-            return;
-        }
-
-        let mut submitted = LinkedList::new();
-        while let Some(ticket) = self.submitted.pop_front() {
-            if let Some(mut result) = z3.get_result(ticket) {
-                let mut program = result.query_mut().take_program().unwrap();
-                let output = result.result();
-                if utils::check_result(output, &mut program) == utils::QueryResult::Sat {
-                    self.completed.push_back(program);
-                }
-            } else {
-                submitted.push_back(ticket);
-            }
-        }
-
-        // update the submitted list
-        self.submitted = submitted;
-    }
-}
-
-impl ProgramBuilder for ProgramVerifier {
-    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
-        self.do_check_submitted(z3);
-        let pending = self.do_submit(z3, Some(self.batch_size));
-
-        if let Some(p) = self.completed.pop_front() {
-            MaybeResult::Some(p)
-        } else if self.submitted.is_empty() && !pending {
-            assert!(self.programs.next(z3) == MaybeResult::None);
-            MaybeResult::None
-        } else {
-            MaybeResult::Pending
-        }
-    }
-
-    fn m_op(&self) -> &VelosiAstMethod {
-        self.programs.m_op()
-    }
-
-    fn assms(&self) -> Rc<Vec<Term>> {
-        self.programs.assms()
-    }
-
-    fn goal_expr(&self) -> Rc<VelosiAstExpr> {
-        self.programs.goal_expr()
-    }
-}
-
-impl From<ProgramVerifier> for Box<dyn ProgramBuilder> {
-    fn from(q: ProgramVerifier) -> Self {
+/// Implement `From` for `ProgramsIter`
+///
+/// To allow conversions from ProgramsIter -> Box<dyn ProgramBuilder>
+impl From<ProgramsIter> for Box<dyn ProgramBuilder> {
+    fn from(q: ProgramsIter) -> Self {
         Box::new(q)
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// CNF Queries
+// Compound Query Builder
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub enum CompoundBoolExprQuery {
-    Any(CompoundQueryAny),
-    All(CompoundQueryAll),
-}
 
 enum PartialPrograms {
     None,
@@ -522,7 +102,7 @@ enum PartialPrograms {
     All(Vec<Box<dyn ProgramBuilder>>),
 }
 
-pub struct CNFQueryBuilder<'a> {
+pub struct CompoundBoolExprQueryBuilder<'a> {
     /// the unit context for this query
     unit: &'a VelosiAstUnitSegment,
     /// the operation we want to synthesize (map/protect/unmap)
@@ -543,7 +123,7 @@ pub struct CNFQueryBuilder<'a> {
     priority: Z3TaskPriority,
 }
 
-impl<'a> CNFQueryBuilder<'a> {
+impl<'a> CompoundBoolExprQueryBuilder<'a> {
     pub fn new(unit: &'a VelosiAstUnitSegment, m_op: Rc<VelosiAstMethod>) -> Self {
         Self {
             unit,
@@ -570,7 +150,7 @@ impl<'a> CNFQueryBuilder<'a> {
         programs: Vec<Box<dyn ProgramBuilder>>,
         verify: bool,
     ) -> Self {
-        self.partial_programs = if verify {
+        self.partial_programs = if !verify {
             PartialPrograms::Verified(programs)
         } else {
             PartialPrograms::All(programs)
@@ -613,7 +193,7 @@ impl<'a> CNFQueryBuilder<'a> {
     }
 
     /// sets the base query to be all (i.e., A && B && C)
-    pub fn all(self) -> CompoundBoolExprQuery {
+    pub fn all(self) -> Option<CompoundBoolExprQuery> {
         let assms = Rc::new(self.assms);
         let prefix = self.unit.ident();
 
@@ -638,7 +218,7 @@ impl<'a> CNFQueryBuilder<'a> {
                 candidate_programs = pb;
             }
             PartialPrograms::None => {
-                for expr in self.exprs.into_iter() {
+                for expr in self.exprs.iter() {
                     let bool_expr_query =
                         BoolExprQueryBuilder::new(self.unit, self.m_op.clone(), expr.clone())
                             .assms(assms.clone())
@@ -655,17 +235,26 @@ impl<'a> CNFQueryBuilder<'a> {
                             .into(),
                         );
                     }
-                    exprs.push(expr);
+                    exprs.push(expr.clone());
                 }
             }
         }
 
-        let done = candidate_programs.iter().map(|_| false).collect();
+        if candidate_programs.is_empty() {
+            return None;
+        }
 
         if self.negate {
-            let partial_programs = exprs.iter().map(|_| LinkedList::new()).collect();
-
             // this is !(A && B && C), we convert this to !A || !B || !C
+            let partial_programs = exprs.iter().map(|_| LinkedList::new()).collect();
+            let done = candidate_programs.iter().map(|_| false).collect();
+
+            // negate the the expressions
+            let exprs = exprs
+                .into_iter()
+                .map(|e| Rc::new(VelosiAstUnOpExpr::new_neg(e)))
+                .collect();
+
             let compound_query = CompoundQueryAny {
                 m_op: self.m_op,
                 exprs,
@@ -677,16 +266,47 @@ impl<'a> CNFQueryBuilder<'a> {
                 partial_programs,
             };
 
-            CompoundBoolExprQuery::Any(compound_query)
+            Some(CompoundBoolExprQuery::Any(compound_query))
         } else {
+            // this is A && B && C, keep it that way
+
+            const DEFAULT_CHUNK_SIZE: usize = 2;
+            let mut queries = Vec::with_capacity(exprs.len() / DEFAULT_CHUNK_SIZE + 1);
+
+            while candidate_programs.len() > DEFAULT_CHUNK_SIZE + (DEFAULT_CHUNK_SIZE / 2) {
+                let cp = candidate_programs.split_off(DEFAULT_CHUNK_SIZE);
+                let exp = exprs.split_off(DEFAULT_CHUNK_SIZE);
+
+                let done = candidate_programs.iter().map(|_| false).collect();
+                let partial_program_idx = candidate_programs.iter().map(|_| 0).collect();
+                let partial_programs = candidate_programs.iter().map(|_| Vec::new()).collect();
+
+                let compound_query = CompoundQueryAll {
+                    m_op: self.m_op.clone(),
+                    exprs,
+                    assms: assms.clone(),
+                    candidate_programs,
+                    partial_programs,
+                    partial_program_idx,
+                    done,
+                    partial_program_counter: 0,
+                    all_done: false,
+                };
+
+                queries.push(CompoundBoolExprQuery::All(compound_query));
+
+                candidate_programs = cp;
+                exprs = exp;
+            }
+
+            let done = candidate_programs.iter().map(|_| false).collect();
             let partial_program_idx = candidate_programs.iter().map(|_| 0).collect();
             let partial_programs = candidate_programs.iter().map(|_| Vec::new()).collect();
 
-            // this is A && B && C, keep it that way
             let compound_query = CompoundQueryAll {
-                m_op: self.m_op,
+                m_op: self.m_op.clone(),
                 exprs,
-                assms,
+                assms: assms.clone(),
                 candidate_programs,
                 partial_programs,
                 partial_program_idx,
@@ -695,7 +315,98 @@ impl<'a> CNFQueryBuilder<'a> {
                 all_done: false,
             };
 
-            CompoundBoolExprQuery::All(compound_query)
+            queries.push(CompoundBoolExprQuery::All(compound_query));
+
+            let batch_size = self.batchsize;
+
+            loop {
+                let mut queries_new = Vec::with_capacity(queries.len() / DEFAULT_CHUNK_SIZE + 1);
+                if queries.len() == 1 {
+                    break;
+                }
+
+                assert!(!queries.is_empty());
+
+                while queries.len() > DEFAULT_CHUNK_SIZE + (DEFAULT_CHUNK_SIZE / 2) {
+                    let cp = queries.split_off(DEFAULT_CHUNK_SIZE);
+
+                    let done = queries.iter().map(|_| false).collect();
+                    let partial_program_idx = queries.iter().map(|_| 0).collect();
+                    let partial_programs = queries.iter().map(|_| Vec::new()).collect();
+                    let exprs = queries.iter().map(|e| e.goal_expr()).collect();
+
+                    let batch_size = self.batchsize;
+                    let priority = self.priority;
+
+                    let candidate_programs = queries
+                        .into_iter()
+                        .map(|p| {
+                            ProgramVerifier::with_batchsize(Box::new(p), batch_size, priority)
+                                .into()
+                        })
+                        .collect();
+
+                    let compound_query = CompoundQueryAll {
+                        m_op: self.m_op.clone(),
+                        exprs,
+                        assms: assms.clone(),
+                        candidate_programs,
+                        partial_programs,
+                        partial_program_idx,
+                        done,
+                        partial_program_counter: 0,
+                        all_done: false,
+                    };
+
+                    queries_new.push(CompoundBoolExprQuery::All(compound_query));
+                    queries = cp;
+                }
+
+                let done = queries.iter().map(|_| false).collect();
+                let partial_program_idx = queries.iter().map(|_| 0).collect();
+                let partial_programs = queries.iter().map(|_| Vec::new()).collect();
+                let exprs = queries.iter().map(|e| e.goal_expr()).collect();
+
+                let batch_size = self.batchsize;
+                let priority = self.priority;
+
+                let candidate_programs = queries
+                    .into_iter()
+                    .map(|p| {
+                        ProgramVerifier::with_batchsize(Box::new(p), batch_size, priority).into()
+                    })
+                    .collect();
+
+                let compound_query = CompoundQueryAll {
+                    m_op: self.m_op.clone(),
+                    exprs,
+                    assms: assms.clone(),
+                    candidate_programs,
+                    partial_programs,
+                    partial_program_idx,
+                    done,
+                    partial_program_counter: 0,
+                    all_done: false,
+                };
+
+                queries_new.push(CompoundBoolExprQuery::All(compound_query));
+
+                queries = queries_new;
+            }
+
+            // let compound_query = CompoundQueryAll {
+            //     m_op: self.m_op,
+            //     exprs,
+            //     assms,
+            //     candidate_programs,
+            //     partial_programs,
+            //     partial_program_idx,
+            //     done,
+            //     partial_program_counter: 0,
+            //     all_done: false,
+            // };
+            debug_assert_eq!(queries.len(), 1);
+            queries.pop()
         }
     }
 
@@ -788,6 +499,83 @@ impl<'a> CNFQueryBuilder<'a> {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// CNF Queries
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub enum CompoundBoolExprQuery {
+    Any(CompoundQueryAny),
+    All(CompoundQueryAll),
+}
+
+impl ProgramBuilder for CompoundBoolExprQuery {
+    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
+        match self {
+            Self::Any(q) => q.next(z3),
+            Self::All(q) => q.next(z3),
+        }
+    }
+    fn assms(&self) -> Rc<Vec<Term>> {
+        match self {
+            Self::Any(q) => q.assms(),
+            Self::All(q) => q.assms(),
+        }
+    }
+
+    fn goal_expr(&self) -> Rc<VelosiAstExpr> {
+        match self {
+            Self::Any(q) => q.goal_expr(),
+            Self::All(q) => q.goal_expr(),
+        }
+    }
+
+    fn m_op(&self) -> &VelosiAstMethod {
+        match self {
+            Self::Any(q) => q.m_op(),
+            Self::All(q) => q.m_op(),
+        }
+    }
+
+    fn mem_model(&self) -> bool {
+        match self {
+            Self::Any(q) => q.mem_model(),
+            Self::All(q) => q.mem_model(),
+        }
+    }
+
+    fn do_fmt(&self, f: &mut Formatter<'_>, indent: usize, debug: bool) -> FmtResult {
+        match self {
+            Self::Any(q) => q.do_fmt(f, indent, debug),
+            Self::All(q) => q.do_fmt(f, indent, debug),
+        }
+    }
+}
+
+/// Implement `From` for `CompoundBoolExprQuery`
+///
+/// To allow conversions from CompoundBoolExprQuery -> Box<dyn ProgramBuilder>
+impl From<CompoundBoolExprQuery> for Box<dyn ProgramBuilder> {
+    fn from(q: CompoundBoolExprQuery) -> Self {
+        Box::new(q)
+    }
+}
+
+impl Display for CompoundBoolExprQuery {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
+        self.do_fmt(f, 0, false)
+    }
+}
+
+impl Debug for CompoundBoolExprQuery {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
+        self.do_fmt(f, 0, true)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+/// Disjunctive Normal Form
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct CompoundQueryAny {
     /// the operation we want to synthesize (map/protect/unmap)
@@ -913,7 +701,45 @@ impl ProgramBuilder for CompoundQueryAny {
     fn m_op(&self) -> &VelosiAstMethod {
         self.m_op.as_ref()
     }
+
+    fn do_fmt(&self, f: &mut Formatter<'_>, indent: usize, debug: bool) -> FmtResult {
+        let i = " ".repeat(indent);
+        writeln!(f, "{i} # CompoundQueryAny( assms )")?;
+        if self.candidate_programs.is_empty() {
+            writeln!(f, "{i}   - true")
+        } else {
+            for p in self.candidate_programs.iter() {
+                p.do_fmt(f, indent + 4, debug)?;
+            }
+            Ok(())
+        }
+    }
 }
+
+/// Implement `From` for `CompoundQueryAny`
+///
+/// To allow conversions from CompoundQueryAny -> Box<dyn ProgramBuilder>
+impl From<CompoundQueryAny> for Box<dyn ProgramBuilder> {
+    fn from(q: CompoundQueryAny) -> Self {
+        Box::new(q)
+    }
+}
+
+impl Display for CompoundQueryAny {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
+        self.do_fmt(f, 0, false)
+    }
+}
+
+impl Debug for CompoundQueryAny {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
+        self.do_fmt(f, 0, true)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+/// Conjunctive Normal Form
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct CompoundQueryAll {
     /// the operation we want to synthesize (map/protect/unmap)
@@ -1080,5 +906,39 @@ impl ProgramBuilder for CompoundQueryAll {
                 expr
             }
         }
+    }
+
+    fn do_fmt(&self, f: &mut Formatter<'_>, indent: usize, debug: bool) -> FmtResult {
+        let i = " ".repeat(indent);
+        writeln!(f, "{i} # CompoundQueryAll( assms )")?;
+        if self.candidate_programs.is_empty() {
+            writeln!(f, "{i}   - true")
+        } else {
+            for p in self.candidate_programs.iter() {
+                p.do_fmt(f, indent + 4, debug)?;
+            }
+            Ok(())
+        }
+    }
+}
+
+/// Implement `From` for `CompoundQueryAll`
+///
+/// To allow conversions from CompoundQueryAll -> Box<dyn ProgramBuilder>
+impl From<CompoundQueryAll> for Box<dyn ProgramBuilder> {
+    fn from(q: CompoundQueryAll) -> Self {
+        Box::new(q)
+    }
+}
+
+impl Display for CompoundQueryAll {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
+        self.do_fmt(f, 0, false)
+    }
+}
+
+impl Debug for CompoundQueryAll {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
+        self.do_fmt(f, 0, true)
     }
 }

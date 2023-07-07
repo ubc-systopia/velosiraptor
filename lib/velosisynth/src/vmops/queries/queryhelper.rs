@@ -34,15 +34,7 @@ use crate::vmops::semprecond::SemPrecondQueries;
 use crate::{Program, ProgramsIter};
 use crate::{Z3Query, Z3TaskPriority, Z3Ticket, Z3WorkerPool};
 
-#[derive(Clone, PartialEq, Eq)]
-pub enum MaybeResult<T> {
-    /// we have a result
-    Some(T),
-    /// the result is not yet available
-    Pending,
-    /// There are no results here, no programs that are being built
-    None,
-}
+use super::MaybeResult;
 
 /// query builder trait that provides a squence of queries to be submitted to Z3
 pub trait QueryBuilder {

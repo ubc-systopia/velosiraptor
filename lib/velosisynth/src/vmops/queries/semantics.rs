@@ -39,10 +39,11 @@ use crate::{
 
 use super::{
     queryhelper::{
-        MaybeResult, MultiDimProgramQueries, ProgramBuilder, ProgramQueries, QueryBuilder,
+        MultiDimProgramQueries, ProgramBuilder, ProgramQueries, QueryBuilder,
         SequentialProgramQueries,
     },
     utils::SynthOptions,
+    MaybeResult,
 };
 use crate::ProgramsIter;
 
