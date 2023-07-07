@@ -270,7 +270,7 @@ pub fn check_fn_call_args(
     issues: &mut VelosiAstIssues,
     _st: &SymbolTable,
     params: &[Rc<VelosiAstParam>],
-    args: &[VelosiAstExpr],
+    args: &[Rc<VelosiAstExpr>],
     callsite: &VelosiTokenStream,
 ) {
     let nparam = params.len();
