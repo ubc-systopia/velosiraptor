@@ -434,6 +434,10 @@ impl<'a> Z3SynthEnum<'a> {
         ));
         enums::distinguish(&mut self.z3, self.unit)
     }
+
+    pub fn worker_pool_stats(&self) -> &Z3WorkerPoolStats {
+        self.z3.stats()
+    }
 }
 
 /// Represents a
