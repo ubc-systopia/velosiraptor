@@ -143,6 +143,7 @@ pub fn precond_query(
         if !programs.has_programs() {
             continue;
         }
+
         let b = PrecondQueryBuilder::new(
             unit.ident_to_string(),
             programs,
@@ -151,6 +152,7 @@ pub fn precond_query(
             Some(i),
             negate,
         );
+
         let q = ProgramQueries::with_batchsize(b, batch_size, Z3TaskPriority::Low);
         program_queries.push(q);
     }

@@ -37,10 +37,9 @@ use crate::{
 };
 
 use super::{
-    queryhelper::{
-        MaybeResult, MultiDimProgramQueries, ProgramBuilder, ProgramQueries, QueryBuilder,
-    },
+    queryhelper::{MultiDimProgramQueries, ProgramBuilder, ProgramQueries, QueryBuilder},
     utils::SynthOptions,
+    MaybeResult,
 };
 use crate::ProgramsIter;
 
