@@ -280,7 +280,7 @@ fn fully_connected(graph: &StableUnGraph<Node, Edge>) -> (bool, VelosiSynthIssue
                     "any of the following distinguish the two:\n{}",
                     graph
                         .edges_connecting(node_id, n_id)
-                        .map(|e| format!(" - {} and {}\n", e.weight().0, e.weight().1))
+                        .map(|e| format!("  - {} and {}\n", e.weight().0, e.weight().1))
                         .join("")
                 );
                 let warn = VelosiSynthErrorBuilder::warn(msg)

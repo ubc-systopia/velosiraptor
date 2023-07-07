@@ -1,0 +1,275 @@
+/**
+ * Intel 64 and IA-32 Architectures Software Developer's Manual
+ * =====================================================
+ *
+ * Volume 3 - Chapter 4: Paging
+ * 4.5 4-LEVEL PAGING AND 5-LEVEL PAGING
+ */
+
+const PTABLE_ENTRIES : size =  512;
+const PTABLE_ENTRY_SIZE : size = 8;
+
+const PTABLE_SIZE :size = (PTABLE_ENTRIES * PTABLE_ENTRY_SIZE);
+const PTABLE_ALIGNMENT : size = PTABLE_SIZE;
+
+const BASE_PAGE_BITS  : size = 12;
+const BASE_PAGE_SIZE  : size = (1 << BASE_PAGE_BITS); // 4 KiB
+
+const LARGE_PAGE_BITS : size = 21;
+const LARGE_PAGE_SIZE : size = (1 << LARGE_PAGE_BITS); // 2 MiB
+
+const HUGE_PAGE_BITS  : size = 30;
+const HUGE_PAGE_SIZE  : size = (1 << HUGE_PAGE_BITS);  // 1 GiB
+
+const PML4_PAGE_BITS  : size = 39;
+const PML4_PAGE_SIZE  : size = (1 << PML4_PAGE_BITS); // 512 GiB
+
+const VSPACE_BITS : size = 48;
+const VSPACE_SIZE : size = (1 << VSPACE_BITS);
+
+const PHYS_ADDR_BITS : size = 48;
+const PHYS_ADDR_MAX  : size = (1 << PHYS_ADDR_BITS);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// x86_64 Table Descriptor (PDIR / PDPT / PML4)
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+flags {
+    writable,
+    readable,
+    executable,
+    devicemem,
+    usermode,
+    bar
+}
+
+
+abstract segment X86_64_PTableDescriptor(base: addr) {
+
+    outbitwidth = PHYS_ADDR_BITS;
+
+    flags = {
+        writable,
+        readable,
+        executable,
+        devicemem,
+        usermode,
+        bar
+    };
+
+    state = StateDef(base: addr) {
+        mem entry [ base, 0, 8 ] {
+            0 ..  1 present,  // whether this entry is valid
+            1 ..  2 rw,       // Read/write; if 0, writes may not be allowed to the 512-GByte region controlled by this entry
+            2 ..  3 us,       // if 0, user-mode accesses are not allowed to the 512-GByte region controlled by this entry
+            3 ..  4 pwt,      // Page-level write-through;
+            4 ..  5 pcd,      // Page-level cache disable
+            5 ..  6 a,        // Accessed;
+            6 ..  7 ignored0,
+            7 ..  8 ps,
+            8 .. 12 ignored1,
+            12 .. 48 address,
+            48 .. 52 res0,
+            52 .. 63 ignored3,
+            63 .. 64 xd, // execute disabled
+        }
+    };
+
+    interface = InterfaceDef(base: addr) {
+        mem entry [ base, 0, 8 ]
+    };
+
+    #[remap]
+    fn valid() -> bool {
+        state.entry.present == 1
+    }
+
+    #[remap]
+    fn matchflags(flgs : flags) -> bool
+        requires valid()
+    {
+        // TODO: make this one here a bit better
+        (state.entry.rw == 1)      // always writable
+         && (state.entry.us == 1)  // allow user access
+         && (state.entry.pwt == 0) // don't do write back
+         && (state.entry.pcd == 0) // don't disable cches
+         && (state.entry.res0 == 0) // must always be 0
+    }
+
+    fn translate(va: vaddr) -> paddr
+        requires state.entry.ps == 0
+    {
+        va + (state.entry.address << 12)
+    }
+}
+
+abstract segment X86_64_PageDescriptor(base: addr) {
+    outbitwidth = PHYS_ADDR_BITS;
+
+    flags = {
+        writable,
+        readable,
+        executable,
+        devicemem,
+        usermode,
+        bar
+    };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// X86_64__64 Page Directory
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+segment X86_64_PDirEntryTable(base : addr) : X86_64_PTableDescriptor {
+    inbitwidth = LARGE_PAGE_BITS;
+
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+        requires va == 0 && sz == LARGE_PAGE_SIZE
+        requires (pa & (BASE_PAGE_SIZE - 1) == 0)
+
+    synth fn protect(va: vaddr, sz: size, flgs: flags);
+
+    synth fn unmap(va: vaddr, sz: size);
+}
+
+segment X86_64_PDirEntryPage(base :addr) : X86_64_PageDescriptor {
+    inbitwidth = LARGE_PAGE_BITS;
+
+    state = StateDef(base :addr) {
+        mem entry [ base, 0, 8] {
+            0 ..  1 present,
+            1 ..  2 rw,  // Read/write; if 0, writes may not be allowed to the page
+            2 ..  3 us,  // if 0, user-mode accesses are not allowed to the page
+            3 ..  4 pwt, // Page-level write-through;
+            4 ..  5 pcd, // Page-level cache disable
+            5 ..  6 a,   // Accessed;
+            6 ..  7 d,   // dirty
+            7 ..  8 ps,  // page size
+            8 ..  9 g,   // global
+            9 .. 12 ign_0,
+            12 .. 13 pat,
+            13 .. 21 res0_0,
+            21 .. 48 address,
+            48 .. 52 res0_1,
+            52 .. 59 ign_1,
+            59 .. 63 pkey, // protection keys
+            63 .. 64 xd, // execute disabled
+        }
+    };
+
+    interface = InterfaceDef(base: addr) {
+        mem entry [ base, 0, 8 ]
+    };
+
+    #[remap]
+    fn valid() -> bool {
+        state.entry.present == 1
+    }
+
+    #[remap]
+    fn matchflags(flgs : flags) -> bool
+    {
+        (state.entry.rw == flgs.writable)
+         && if (flgs.devicemem == 1) {
+                (state.entry.pcd == 1 && state.entry.pwt == 1)
+            } else {
+                (state.entry.pcd == 0 && state.entry.pwt == 0)
+            }
+         && (state.entry.us == flgs.usermode)
+         && if flgs.executable == 1 {state.entry.xd == 0} else { state.entry.xd == 1}
+    }
+
+        fn translate(va: vaddr) -> paddr
+            requires state.entry.ps == 1
+            requires state.entry.xd == 1
+            requires va < LARGE_PAGE_SIZE
+
+        {
+            va + (state.entry.address << LARGE_PAGE_BITS)
+        }
+
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+        requires va == 0 && sz == LARGE_PAGE_SIZE
+        requires (pa & (LARGE_PAGE_SIZE - 1) == 0)
+
+    synth fn protect(va: vaddr, sz: size, flgs: flags);
+
+    synth fn unmap(va: vaddr, sz: size)
+        requires va == 0 && sz == LARGE_PAGE_SIZE
+}
+
+segment X86_64_PDirEntryTest(base :addr) : X86_64_PageDescriptor {
+    inbitwidth = LARGE_PAGE_BITS;
+
+    state = StateDef(base :addr) {
+        mem entry [ base, 0, 8] {
+            0 ..  1 present,
+            1 ..  2 rw,  // Read/write; if 0, writes may not be allowed to the page
+            2 ..  3 us,  // if 0, user-mode accesses are not allowed to the page
+            3 ..  4 pwt, // Page-level write-through;
+            4 ..  5 pcd, // Page-level cache disable
+            5 ..  6 a,   // Accessed;
+            6 ..  7 d,   // dirty
+            7 ..  8 ps,  // page size
+            8 ..  9 g,   // global
+            9 .. 12 ign_0,
+            12 .. 13 pat,
+            13 .. 21 res0_0,
+            21 .. 48 address,
+            48 .. 52 res0_1,
+            52 .. 59 ign_1,
+            59 .. 63 pkey, // protection keys
+            63 .. 64 xd, // execute disabled
+        }
+    };
+
+    interface = InterfaceDef(base: addr) {
+        mem entry [ base, 0, 8 ]
+    };
+
+    #[remap]
+    fn valid() -> bool {
+        state.entry.present == 1
+    }
+
+    #[remap]
+    fn matchflags(flgs : flags) -> bool
+    {
+        (state.entry.rw == flgs.writable)
+         && if (flgs.devicemem == 1) {
+                (state.entry.pcd == 1 && state.entry.pwt == 1)
+            } else {
+                (state.entry.pcd == 0 && state.entry.pwt == 0)
+            }
+         && (state.entry.us == flgs.usermode)
+         && if flgs.executable == 1 {state.entry.xd == 0} else { state.entry.xd == 1}
+    }
+
+        fn translate(va: vaddr) -> paddr
+            requires state.entry.ps == 1
+            requires state.entry.xd == 1
+            requires va < LARGE_PAGE_SIZE
+
+        {
+            va + (state.entry.address << LARGE_PAGE_BITS)
+        }
+
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+        requires va == 0 && sz == LARGE_PAGE_SIZE
+        requires (pa & (LARGE_PAGE_SIZE - 1) == 0)
+
+    synth fn protect(va: vaddr, sz: size, flgs: flags);
+
+    synth fn unmap(va: vaddr, sz: size)
+        requires va == 0 && sz == LARGE_PAGE_SIZE
+}
+
+enum X86_64_PDirEntry(base: addr){
+    X86_64_PDirEntryTable(base),
+    X86_64_PDirEntryPage(base),
+    X86_64_PDirEntryTest(base)
+}
