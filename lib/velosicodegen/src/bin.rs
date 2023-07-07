@@ -38,6 +38,7 @@ use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, LevelPadding, TermLogge
 
 use velosiast::{AstResult, VelosiAst, VelosiAstUnit};
 use velosicodegen::VelosiCodeGen;
+use velosisynth::create_models;
 use velosisynth::Z3SynthFactory;
 
 pub fn main() {
@@ -146,6 +147,7 @@ pub fn main() {
     if !no_synth {
         let mut synthfactory = Z3SynthFactory::new();
         synthfactory.num_workers(ncores).default_log_dir();
+        let models = create_models(&ast);
 
         for unit in ast.units_mut() {
             use std::rc::Rc;
@@ -169,11 +171,7 @@ pub fn main() {
 
                     t_synth_segment.push(("start", Instant::now()));
 
-                    let mut synth = synthfactory.create_segment(seg);
-
-                    synth.create_model();
-
-                    t_synth_segment.push(("Model Creation", Instant::now()));
+                    let mut synth = synthfactory.create_segment(seg, models[seg.ident()].clone());
 
                     let sanity_check = synth.sanity_check();
 
@@ -195,8 +193,24 @@ pub fn main() {
                 VelosiAstUnit::StaticMap(_s) => {
                     // nothing to synthesize here
                 }
-                VelosiAstUnit::Enum(_e) => {
-                    // nothing to synthesize here
+                VelosiAstUnit::Enum(e) => {
+                    // try to differentiate enum variants
+                    println!("Checking distinguishability for enum {}", e.ident());
+                    let e = Rc::get_mut(e);
+
+                    if e.is_none() {
+                        println!("could not obtain mutable reference to enum unit\n");
+                        continue;
+                    }
+                    let e = e.unwrap();
+
+                    let mut synth = synthfactory.create_enum(e);
+                    match synth.distinguish(&models) {
+                        Ok(()) => {
+                            log::info!(target: "main", "the variants of {} are distinguishable", e.ident())
+                        }
+                        Err(e) => log::error!(target: "main", "Distinguishing failed:\n{}", e),
+                    }
                 }
             }
         }
