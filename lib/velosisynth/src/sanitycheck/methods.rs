@@ -43,7 +43,7 @@ use crate::z3::{Z3Query, Z3Result, Z3TaskPriority, Z3Ticket, Z3WorkerPool};
 ///
 /// * z3 - the Z3 worker pool
 /// * m - the method
-fn method_precond_sat_query(z3: &mut Z3WorkerPool, m: &VelosiAstMethod) -> Z3Ticket {
+fn method_precond_sat_query(z3: &mut Z3WorkerPool, prefix: &str, m: &VelosiAstMethod) -> Z3Ticket {
     // construct a new SMT2 context
     let mut smt = Smt2Context::new();
 
@@ -53,11 +53,11 @@ fn method_precond_sat_query(z3: &mut Z3WorkerPool, m: &VelosiAstMethod) -> Z3Tic
     // Variable Declarations
     // ---------------------------------------------------------------------------------------------
 
-    smt.variable(VarDecl::new(String::from("st"), types::model()));
+    smt.variable(VarDecl::new(String::from("st"), types::model(prefix)));
     for param in m.params.iter() {
         smt.variable(VarDecl::new(
             param.ident_to_string(),
-            types::type_to_smt2(&param.ptype),
+            types::type_to_smt2(prefix, &param.ptype),
         ));
     }
 
@@ -67,14 +67,17 @@ fn method_precond_sat_query(z3: &mut Z3WorkerPool, m: &VelosiAstMethod) -> Z3Tic
 
     for (i, e) in m.requires.iter().enumerate() {
         smt.comment(format!("pre-{}: {}", i, e));
-        smt.assert(Term::named(expr::expr_to_smt2(e, "st"), format!("pre-{i}")));
+        smt.assert(Term::named(
+            expr::expr_to_smt2(prefix, e, "st"),
+            format!("pre-{i}"),
+        ));
     }
 
     if let (Some(body), true) = (&m.body, m.rtype.is_boolean()) {
         smt.comment(format!("body: {}", body));
         for (i, e) in body.split_cnf().iter().enumerate() {
             smt.assert(Term::named(
-                expr::expr_to_smt2(e.as_ref(), "st"),
+                expr::expr_to_smt2(prefix, e.as_ref(), "st"),
                 format!("body-{i}"),
             ));
         }
@@ -101,6 +104,7 @@ fn method_precond_sat_query(z3: &mut Z3WorkerPool, m: &VelosiAstMethod) -> Z3Tic
 
 fn method_precond_sat_results(
     z3: &mut Z3WorkerPool,
+    prefix: &str,
     m: &VelosiAstMethod,
     result: &Z3Result,
 ) -> VelosiSynthIssues {
@@ -150,7 +154,7 @@ fn method_precond_sat_results(
     let err = VelosiSynthErrorUnsatDef::new(msg.to_string(), locs);
     issues.push(err.into());
 
-    let issues_new = super::check_all_expr_pairwise(z3, exprs.as_slice());
+    let issues_new = super::check_all_expr_pairwise(z3, prefix, exprs.as_slice());
 
     if issues_new.is_ok() {
         issues
@@ -176,7 +180,10 @@ pub fn check_methods(z3: &mut Z3WorkerPool, unit: &VelosiAstUnitSegment) -> Velo
             log::warn!(target: "[Z3Synth::Sanitycheck]",  "skipping method {} (requires/body)", m.ident());
             continue;
         }
-        tickets.insert(m.ident().as_str(), (m, method_precond_sat_query(z3, m)));
+        tickets.insert(
+            m.ident().as_str(),
+            (m, method_precond_sat_query(z3, unit.ident(), m)),
+        );
     }
 
     // collect and process the results
@@ -192,7 +199,7 @@ pub fn check_methods(z3: &mut Z3WorkerPool, unit: &VelosiAstUnitSegment) -> Velo
         });
 
         for (m, result) in results.drain(..) {
-            issues.merge(method_precond_sat_results(z3, m, &result))
+            issues.merge(method_precond_sat_results(z3, unit.ident(), m, &result))
         }
     }
 

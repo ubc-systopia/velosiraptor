@@ -45,12 +45,12 @@ pub fn check_unit(z3: &mut Z3WorkerPool, unit: &VelosiAstUnitSegment) -> VelosiS
     }
 
     // now we have all the expressions in an array
-    let issues = super::check_all_expr(z3, exprs.as_slice());
+    let issues = super::check_all_expr(z3, unit.ident(), exprs.as_slice());
     if issues.is_ok() {
         return issues;
     }
 
-    let issues_new = super::check_all_expr_pairwise(z3, exprs.as_slice());
+    let issues_new = super::check_all_expr_pairwise(z3, unit.ident(), exprs.as_slice());
 
     if issues_new.is_ok() {
         return issues;

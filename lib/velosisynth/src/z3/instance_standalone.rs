@@ -144,9 +144,6 @@ impl Z3Instance {
         if let Some(z3_stdin) = self.z3_proc.stdin.as_mut() {
             // can we format/write this directly into the stdin?
 
-            // construt the smt2 context from the query
-            let contexts = query.smt_contexts();
-
             let id = format!(";; Z3Ticket({})\n", ticket);
 
             // record the time to create the smt context
@@ -154,7 +151,7 @@ impl Z3Instance {
 
             // send it to z3
             z3_stdin.write_all(id.as_bytes()).unwrap();
-            for smt in contexts {
+            for smt in query.smt_contexts() {
                 z3_stdin
                     .write_all(smt.to_code(!cfg!(debug_assertions)).as_bytes())
                     .unwrap();
@@ -171,7 +168,7 @@ impl Z3Instance {
             if let Some(f) = &mut self.logfile {
                 f.write_all(id.as_bytes())
                     .expect("writing the smt query failed.");
-                for smt in contexts {
+                for smt in query.smt_contexts() {
                     f.write_all(smt.to_code(!cfg!(debug_assertions)).as_bytes())
                         .expect("writing the smt query failed.");
                 }
