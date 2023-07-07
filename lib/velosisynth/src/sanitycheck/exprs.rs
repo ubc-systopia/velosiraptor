@@ -49,7 +49,7 @@ use crate::z3::{Z3Query, Z3Result, Z3TaskPriority, Z3Ticket, Z3WorkerPool};
 ///
 /// The function returns a Z3Ticket of the submitted query
 ///
-fn expr_query(z3: &mut Z3WorkerPool, e: &VelosiAstExpr, i1: usize) -> Z3Ticket {
+fn expr_query(z3: &mut Z3WorkerPool, prefix: &str, e: &VelosiAstExpr, i1: usize) -> Z3Ticket {
     // construct a new SMT2 context
     let mut smt = Smt2Context::new();
 
@@ -63,11 +63,11 @@ fn expr_query(z3: &mut Z3WorkerPool, e: &VelosiAstExpr, i1: usize) -> Z3Ticket {
     // So fore ach of them we declare a variable and add it to the context.
     // in addition we add the state avariable
 
-    smt.variable(VarDecl::new(String::from("st"), types::model()));
-    smt.variable(VarDecl::new("va".to_string(), types::vaddr()));
-    smt.variable(VarDecl::new("sz".to_string(), types::size()));
-    smt.variable(VarDecl::new("flgs".to_string(), types::flags()));
-    smt.variable(VarDecl::new("pa".to_string(), types::paddr()));
+    smt.variable(VarDecl::new(String::from("st"), types::model(prefix)));
+    smt.variable(VarDecl::new("va".to_string(), types::vaddr(prefix)));
+    smt.variable(VarDecl::new("sz".to_string(), types::size(prefix)));
+    smt.variable(VarDecl::new("flgs".to_string(), types::flags(prefix)));
+    smt.variable(VarDecl::new("pa".to_string(), types::paddr(prefix)));
 
     // ---------------------------------------------------------------------------------------------
     // Assert expressions
@@ -76,7 +76,7 @@ fn expr_query(z3: &mut Z3WorkerPool, e: &VelosiAstExpr, i1: usize) -> Z3Ticket {
     // We assert the two expressions. There should be an assignment for each of them.
 
     let name1 = format!("expr-{i1}");
-    smt.assert(Term::named(expr::expr_to_smt2(e, "st"), name1));
+    smt.assert(Term::named(expr::expr_to_smt2(prefix, e, "st"), name1));
 
     // ---------------------------------------------------------------------------------------------
     // Checking Satisfiability
@@ -103,10 +103,10 @@ fn expr_query(z3: &mut Z3WorkerPool, e: &VelosiAstExpr, i1: usize) -> Z3Ticket {
 
 /// checks whether a single expressions can be satisfied
 #[allow(dead_code)] // temporarily disable warning here
-pub fn check_expr(z3: &mut Z3WorkerPool, e: &VelosiAstExpr) -> VelosiSynthIssues {
+pub fn check_expr(z3: &mut Z3WorkerPool, prefix: &str, e: &VelosiAstExpr) -> VelosiSynthIssues {
     let mut issues = VelosiSynthIssues::new();
 
-    let ticket = expr_query(z3, e, 1);
+    let ticket = expr_query(z3, prefix, e, 1);
     let result = z3.wait_for_result(ticket);
 
     let mut res = result.result().lines();
@@ -145,6 +145,7 @@ pub fn check_expr(z3: &mut Z3WorkerPool, e: &VelosiAstExpr) -> VelosiSynthIssues
 ///
 fn expr_pair_query(
     z3: &mut Z3WorkerPool,
+    prefix: &str,
     e1: &VelosiAstExpr,
     i1: usize,
     e2: &VelosiAstExpr,
@@ -163,11 +164,11 @@ fn expr_pair_query(
     // So fore ach of them we declare a variable and add it to the context.
     // in addition we add the state avariable
 
-    smt.variable(VarDecl::new(String::from("st"), types::model()));
-    smt.variable(VarDecl::new("va".to_string(), types::vaddr()));
-    smt.variable(VarDecl::new("sz".to_string(), types::size()));
-    smt.variable(VarDecl::new("flgs".to_string(), types::flags()));
-    smt.variable(VarDecl::new("pa".to_string(), types::paddr()));
+    smt.variable(VarDecl::new(String::from("st"), types::model(prefix)));
+    smt.variable(VarDecl::new("va".to_string(), types::vaddr(prefix)));
+    smt.variable(VarDecl::new("sz".to_string(), types::size(prefix)));
+    smt.variable(VarDecl::new("flgs".to_string(), types::flags(prefix)));
+    smt.variable(VarDecl::new("pa".to_string(), types::paddr(prefix)));
 
     // ---------------------------------------------------------------------------------------------
     // Assert expressions
@@ -176,10 +177,10 @@ fn expr_pair_query(
     // We assert the two expressions. There should be an assignment for each of them.
 
     let name1 = format!("expr-{i1}");
-    smt.assert(Term::named(expr::expr_to_smt2(e1, "st"), name1));
+    smt.assert(Term::named(expr::expr_to_smt2(prefix, e1, "st"), name1));
 
     let name2 = format!("expr-{i2}");
-    smt.assert(Term::named(expr::expr_to_smt2(e2, "st"), name2));
+    smt.assert(Term::named(expr::expr_to_smt2(prefix, e2, "st"), name2));
 
     // ---------------------------------------------------------------------------------------------
     // Checking Satisfiability
@@ -208,12 +209,13 @@ fn expr_pair_query(
 #[allow(dead_code)] // temporarily disable warning here
 pub fn check_expr_pair(
     z3: &mut Z3WorkerPool,
+    prefix: &str,
     e1: &VelosiAstExpr,
     e2: &VelosiAstExpr,
 ) -> VelosiSynthIssues {
     let mut issues = VelosiSynthIssues::new();
 
-    let ticket = expr_pair_query(z3, e1, 1, e2, 2);
+    let ticket = expr_pair_query(z3, prefix, e1, 1, e2, 2);
     let result = z3.wait_for_result(ticket);
 
     let mut res = result.result().lines();
@@ -252,7 +254,7 @@ pub fn check_expr_pair(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// checks all expressions in one go
-fn all_expr_query(z3: &mut Z3WorkerPool, exprs: &[&VelosiAstExpr]) -> Z3Ticket {
+fn all_expr_query(z3: &mut Z3WorkerPool, prefix: &str, exprs: &[&VelosiAstExpr]) -> Z3Ticket {
     // construct a new SMT2 context
     let mut smt = Smt2Context::new();
 
@@ -266,11 +268,11 @@ fn all_expr_query(z3: &mut Z3WorkerPool, exprs: &[&VelosiAstExpr]) -> Z3Ticket {
     // So fore ach of them we declare a variable and add it to the context.
     // in addition we add the state avariable
 
-    smt.variable(VarDecl::new(String::from("st"), types::model()));
-    smt.variable(VarDecl::new("va".to_string(), types::vaddr()));
-    smt.variable(VarDecl::new("sz".to_string(), types::size()));
-    smt.variable(VarDecl::new("flgs".to_string(), types::flags()));
-    smt.variable(VarDecl::new("pa".to_string(), types::paddr()));
+    smt.variable(VarDecl::new(String::from("st"), types::model(prefix)));
+    smt.variable(VarDecl::new("va".to_string(), types::vaddr(prefix)));
+    smt.variable(VarDecl::new("sz".to_string(), types::size(prefix)));
+    smt.variable(VarDecl::new("flgs".to_string(), types::flags(prefix)));
+    smt.variable(VarDecl::new("pa".to_string(), types::paddr(prefix)));
 
     // ---------------------------------------------------------------------------------------------
     // Assert expressions
@@ -280,7 +282,7 @@ fn all_expr_query(z3: &mut Z3WorkerPool, exprs: &[&VelosiAstExpr]) -> Z3Ticket {
 
     for (i, e) in exprs.iter().enumerate() {
         let name1 = format!("expr-{i}");
-        smt.assert(Term::named(expr::expr_to_smt2(e, "st"), name1));
+        smt.assert(Term::named(expr::expr_to_smt2(prefix, e, "st"), name1));
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -355,8 +357,12 @@ fn all_expr_check_result(
 }
 
 /// checks all expressions in one go
-pub fn check_all_expr(z3: &mut Z3WorkerPool, exprs: &[&VelosiAstExpr]) -> VelosiSynthIssues {
-    let ticket = all_expr_query(z3, exprs);
+pub fn check_all_expr(
+    z3: &mut Z3WorkerPool,
+    prefix: &str,
+    exprs: &[&VelosiAstExpr],
+) -> VelosiSynthIssues {
+    let ticket = all_expr_query(z3, prefix, exprs);
     let result = z3.wait_for_result(ticket);
     all_expr_check_result(z3, exprs, &result)
 }
@@ -364,6 +370,7 @@ pub fn check_all_expr(z3: &mut Z3WorkerPool, exprs: &[&VelosiAstExpr]) -> Velosi
 /// checks all expressions pairwise individually
 pub fn check_all_expr_pairwise(
     z3: &mut Z3WorkerPool,
+    prefix: &str,
     exprs: &[&VelosiAstExpr],
 ) -> VelosiSynthIssues {
     let mut issues = VelosiSynthIssues::new();
@@ -389,13 +396,13 @@ pub fn check_all_expr_pairwise(
             continue;
         }
 
-        let ticket = expr_query(z3, exprs[i], i);
+        let ticket = expr_query(z3, prefix, exprs[i], i);
         tickets.insert((i, i), ticket);
         for j in i + 1..exprs.len() {
             if let VelosiAstExpr::BoolLiteral(_) = exprs[j] {
                 continue; // will be handled by the case above
             }
-            let ticket = expr_pair_query(z3, exprs[i], i, exprs[j], j);
+            let ticket = expr_pair_query(z3, prefix, exprs[i], i, exprs[j], j);
             tickets.insert((i, j), ticket);
         }
     }
