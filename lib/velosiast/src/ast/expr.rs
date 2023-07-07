@@ -1477,7 +1477,7 @@ impl Display for VelosiAstBoolLiteralExpr {
 #[derive(Eq, Clone, Debug)]
 pub struct VelosiAstFnCallExpr {
     pub ident: VelosiAstIdentifier,
-    pub args: Vec<VelosiAstExpr>,
+    pub args: Vec<Rc<VelosiAstExpr>>,
     pub etype: VelosiAstTypeInfo,
     pub loc: VelosiTokenStream,
 }
@@ -1485,16 +1485,28 @@ pub struct VelosiAstFnCallExpr {
 impl VelosiAstFnCallExpr {
     pub fn new(
         ident: VelosiAstIdentifier,
-        args: Vec<VelosiAstExpr>,
         etype: VelosiAstTypeInfo,
-        loc: VelosiTokenStream,
     ) -> Self {
+        Self::with_loc(ident, etype, VelosiTokenStream::default())
+    }
+
+    pub fn with_loc(ident: VelosiAstIdentifier, etype: VelosiAstTypeInfo,loc: VelosiTokenStream) -> Self {
         VelosiAstFnCallExpr {
             ident,
-            args,
+            args: Vec::new(),
             etype,
             loc,
         }
+    }
+
+    pub fn push_arg(&mut self, arg: Rc<VelosiAstExpr>) -> &mut Self{
+        self.args.push(arg);
+        self
+    }
+
+    pub fn add_args(&mut self, args: Vec<Rc<VelosiAstExpr>>) -> &mut Self{
+        self.args.extend(args);
+        self
     }
 
     pub fn from_parse_tree(
@@ -1517,16 +1529,16 @@ impl VelosiAstFnCallExpr {
         let mut args = Vec::with_capacity(pt.args.len());
         for a in pt.args.into_iter() {
             let arg = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(a, st), issues);
-            args.push(arg);
+            args.push(Rc::new(arg));
         }
 
         // construct the default function call expression node
-        let mut res = VelosiAstFnCallExpr::new(
-            VelosiAstIdentifier::from(pt.name),
+        let mut res = VelosiAstFnCallExpr {
+            ident: VelosiAstIdentifier::from(pt.name),
             args,
-            VelosiAstTypeInfo::Integer,
-            pt.loc,
-        );
+            etype: VelosiAstTypeInfo::Integer,
+            loc: pt.loc
+        };
 
         let fn_sym = st.lookup(res.path());
         if fn_sym.is_none() {
@@ -1614,7 +1626,7 @@ impl VelosiAstFnCallExpr {
         res.args = res
             .args
             .into_iter()
-            .map(|a| a.flatten(st, mapping))
+            .map(|a| Rc::new(a.as_ref().clone().flatten(st, mapping)))
             .collect();
 
         let fn_sym = st.lookup(res.path());
@@ -1629,7 +1641,7 @@ impl VelosiAstFnCallExpr {
                     // we have a body we can rewrite, gather all the arguments
                     let mut mapping = HashMap::new();
                     for (i, p) in m.params.iter().enumerate() {
-                        mapping.insert(p.ident().clone(), &res.args[i]);
+                        mapping.insert(p.ident().clone(), res.args[i].as_ref());
                     }
                     body.as_ref().clone().flatten(st, &mapping)
                 } else {
@@ -1649,7 +1661,7 @@ impl VelosiAstFnCallExpr {
         res.args = res
             .args
             .into_iter()
-            .map(|a| a.flatten(st, mapping))
+            .map(|a| Rc::new(a.as_ref().clone().flatten(st, mapping)))
             .collect();
         res
     }
