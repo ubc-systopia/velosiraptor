@@ -779,6 +779,15 @@ impl VelosiAstUnOpExpr {
         VelosiAstUnOpExpr { op, expr, loc }
     }
 
+    pub fn new_neg(expr: Rc<VelosiAstExpr>) -> VelosiAstExpr {
+        let loc = expr.loc().clone();
+        VelosiAstExpr::UnOp(VelosiAstUnOpExpr::new(
+            VelosiAstUnOp::Not,
+            expr,
+            loc,
+        ))
+    }
+
     pub fn from_parse_tree(
         pt: VelosiParseTreeUnOpExpr,
         st: &mut SymbolTable,
