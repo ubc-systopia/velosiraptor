@@ -37,9 +37,9 @@ use crate::{programs::Program, z3::Z3WorkerPool, VelosiSynthIssues};
 use super::{semantics, utils};
 
 use crate::vmops::queryhelper::MultiDimProgramQueries;
-use crate::vmops::queryhelper::ProgramQueries;
-use crate::vmops::queryhelper::{MaybeResult, ProgramBuilder};
+use crate::vmops::queryhelper::{ProgramBuilder, ProgramQueries};
 use crate::vmops::semantics::SemanticQueries;
+use crate::vmops::MaybeResult;
 use crate::DEFAULT_BATCH_SIZE;
 use crate::{ProgramsIter, Z3Ticket};
 

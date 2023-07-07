@@ -37,8 +37,9 @@ use super::{precond, semantics, semprecond, utils};
 
 use super::queryhelper::PartQueries;
 use crate::vmops::queryhelper::MultiDimProgramQueries;
-use crate::vmops::queryhelper::{MaybeResult, ProgramBuilder};
+use crate::vmops::queryhelper::ProgramBuilder;
 use crate::vmops::utils::SynthOptions;
+use crate::vmops::MaybeResult;
 use crate::Z3Ticket;
 use crate::DEFAULT_BATCH_SIZE;
 
@@ -362,13 +363,6 @@ pub fn get_program_iter(
         )
     }
 }
-
-// pub fn get_program_iter_new(    unit: &VelosiAstUnitSegment,
-//     batch_size: usize,
-//     starting_prog: Option<Program>) -> MapPrograms
-// {
-
-// }
 
 pub fn synthesize(
     z3: &mut Z3WorkerPool,
