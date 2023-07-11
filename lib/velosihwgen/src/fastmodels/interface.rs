@@ -26,7 +26,7 @@
 //! # The FastModels Platform Generator: Interface
 
 use crate::fastmodels::add_header;
-use crate::fastmodels::registers::{registers_class_name, registers_header_file};
+use crate::fastmodels::registers::{registers_header_file};
 use crate::fastmodels::state::{state_class_name, state_header_file};
 use crate::VelosiHwGenError;
 use crustal as C;
@@ -81,34 +81,35 @@ pub fn generate_interface_header(
     let regfile = "../".to_owned() + &registers_header_file(pkgname);
     s.new_include(&regfile, false);
 
-    match unit.interface() {
-        None => {
-            scope.new_comment("This unit does not have an interface");
-            scope.new_comment(&format!("Abstract:  {}", unit.is_abstract()));
-            scope.new_comment(&format!("Enum:      {}", unit.is_enum()));
-            scope.new_comment(&format!("Staticmap: {}", unit.is_staticmap()));
-        }
-        Some(i) => {
-            let interface_class = interface_class_name(unit.ident());
-            let c = s.new_class(interface_class.as_str());
-            c.set_base("InterfaceBase", C::Visibility::Public);
+    let interface_class = interface_class_name(unit.ident());
+    let c = s.new_class(interface_class.as_str());
+    c.set_base("InterfaceBase", C::Visibility::Public);
 
-            let scn = state_class_name(unit.ident());
-            let state_ptr_type = C::Type::to_ptr(&C::Type::new_class(&scn));
+    let scn = state_class_name(unit.ident());
+    let state_ptr_type = C::Type::to_ptr(&C::Type::new_class(&scn));
 
-            let cons = c.new_constructor();
-            cons.new_param("state", state_ptr_type.clone());
+    let cons = c.new_constructor();
+    cons.new_param("state", state_ptr_type.clone());
 
-            // add the state attribute
-            c.new_attribute("_state", state_ptr_type);
-            for f in i.fields() {
-                let rcn = registers_class_name(f.ident());
-                let fieldname = format!("_{}", &f.ident());
-                let ty = C::Type::new_class(&rcn);
-                c.new_attribute(&fieldname, ty);
-            }
-        }
-    }
+    // add the state attribute
+    c.new_attribute("_state", state_ptr_type);
+
+    // match unit.interface() {
+    //     None => {
+    //         scope.new_comment("This unit does not have an interface");
+    //         scope.new_comment(&format!("Abstract:  {}", unit.is_abstract()));
+    //         scope.new_comment(&format!("Enum:      {}", unit.is_enum()));
+    //         scope.new_comment(&format!("Staticmap: {}", unit.is_staticmap()));
+    //     }
+    //     Some(i) => {
+    //         for f in i.fields() {
+    //             let rcn = registers_class_name(f.ident());
+    //             let fieldname = format!("_{}", &f.ident());
+    //             let ty = C::Type::new_class(&rcn);
+    //             c.new_attribute(&fieldname, ty);
+    //         }
+    //     }
+    // }
 
     // save the scope
     let filename = interface_header_file_path(unit.ident());
@@ -140,39 +141,41 @@ pub fn generate_interface_impl(
     // let regfile = "../".to_owned() + &registers_header_file(pkgname);
     // scope.new_include(&regfile, false);
 
-    match unit.interface() {
-        None => (),
-        Some(i) => {
-            let icn = interface_class_name(unit.ident());
-            let c = scope.new_class(icn.as_str());
+    let icn = interface_class_name(unit.ident());
+    let c = scope.new_class(icn.as_str());
 
-            let scn = state_class_name(unit.ident());
-            let state_ptr_type = C::Type::to_ptr(&C::Type::new_class(&scn));
+    let scn = state_class_name(unit.ident());
+    let state_ptr_type = C::Type::to_ptr(&C::Type::new_class(&scn));
 
-            let cons = c.new_constructor();
+    let cons = c.new_constructor();
 
-            let m = cons.new_param("state", state_ptr_type);
+    let m = cons.new_param("state", state_ptr_type);
 
-            let pa = C::Expr::from_method_param(m);
+    let pa = C::Expr::from_method_param(m);
 
-            cons.push_parent_initializer(C::Expr::fn_call("InterfaceBase", vec![pa.clone()]));
-            cons.push_initializer("_state", pa.clone());
+    cons.push_parent_initializer(C::Expr::fn_call("InterfaceBase", vec![pa.clone()]));
+    cons.push_initializer("_state", pa);
 
-            for f in i.fields() {
-                let fieldname = format!("_{}", f.ident());
-                let rcn = registers_class_name(f.ident());
-                cons.push_initializer(fieldname.as_str(), C::Expr::fn_call(&rcn, vec![pa.clone()]));
+    // registers are no longer relevant in unit context
 
-                let this = C::Expr::this();
-                let field = C::Expr::field_access(&this, &fieldname);
-                cons.body().method_call(
-                    C::Expr::this(),
-                    "add_register",
-                    vec![C::Expr::addr_of(&field)],
-                );
-            }
-        }
-    }
+    // match unit.interface() {
+    //     None => (),
+    //     Some(i) => {
+    //         for f in i.fields() {
+    //             let fieldname = format!("_{}", f.ident());
+    //             let rcn = registers_class_name(f.ident());
+    //             cons.push_initializer(fieldname.as_str(), C::Expr::fn_call(&rcn, vec![pa.clone()]));
+    //
+    //             let this = C::Expr::this();
+    //             let field = C::Expr::field_access(&this, &fieldname);
+    //             cons.body().method_call(
+    //                 C::Expr::this(),
+    //                 "add_register",
+    //                 vec![C::Expr::addr_of(&field)],
+    //             );
+    //         }
+    //     }
+    // }
 
     let filename = interface_impl_file(unit.ident());
     scope.set_filename(&filename);
