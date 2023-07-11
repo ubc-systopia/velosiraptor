@@ -28,13 +28,8 @@
 //! This module generates the unit description of the Arm FastModels implementation
 //! of the translation unit.
 
-// the path buffer
-use std::path::Path;
-
-// other libraries
 use crustal as C;
-
-// the defined errors
+use std::path::Path;
 use velosiast::ast::{
     VelosiAstBinOp, VelosiAstBinOpExpr, VelosiAstBoolLiteralExpr, VelosiAstExpr,
     VelosiAstFnCallExpr, VelosiAstIdentLiteralExpr, VelosiAstIfElseExpr, VelosiAstMethod,
@@ -318,10 +313,16 @@ fn add_translate(c: &mut C::Class, tm: &VelosiAstMethod) {
     let m = c
         .new_method("do_translate", C::Type::new_bool())
         .set_public()
-        .set_virtual()
+        .set_override()
+        // .set_virtual()
         .push_param(src_addr_param)
         .push_param(size_param)
-        // .push_param(mode_param)
+        // Since the signatures of the .vrs don't line up with the framework, this is a dummy param.
+        // I think it makes most sense to make the framework part of this project, or ditch it and take parts.
+        .push_param(C::MethodParam::new(
+            "temp_param",
+            C::Type::new_typedef("access_mode_t"),
+        ))
         .push_param(dst_addr_param);
 
     m.body().raw(format!(
@@ -428,13 +429,13 @@ pub fn generate_unit_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), V
     // virtual UnitBase *get_interface(void) set_overridee
     // {
     //     return &this->_interface;
-    // }
+    //
     c.new_method(
         "get_interface",
         C::Type::to_ptr(&C::Type::new_class("InterfaceBase")),
     )
     .set_public()
-    .set_virtual()
+    // .set_virtual()
     .set_inside_def()
     .set_override()
     .body()
@@ -453,7 +454,7 @@ pub fn generate_unit_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), V
         C::Type::to_ptr(&C::Type::new_class("StateBase")),
     )
     .set_public()
-    .set_virtual()
+    // .set_virtual()
     .set_override()
     .set_inside_def()
     .body()

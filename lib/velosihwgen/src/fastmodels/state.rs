@@ -79,6 +79,13 @@ pub fn generate_state_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), 
     let fieldshdr = state_fields_header_file(unit.ident());
     s.new_include(&fieldshdr, false);
 
+    let c = s.new_class(scn.as_str());
+
+    c.push_doc_str("Represents the State of the Translation Unit.");
+    c.set_base("StateBase", C::Visibility::Public);
+
+    c.new_constructor();
+
     match unit.state() {
         None => {
             scope.new_comment("This unit does not have a state");
@@ -88,12 +95,6 @@ pub fn generate_state_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), 
         }
         Some(state) => {
             // create a new class in the scope
-            let c = s.new_class(scn.as_str());
-
-            c.push_doc_str("Represents the State of the Translation Unit.");
-            c.set_base("StateBase", C::Visibility::Public);
-
-            c.new_constructor();
 
             // adding field getters and setters
             for f in state.fields() {
@@ -170,14 +171,14 @@ pub fn generate_state_impl(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), Ve
     let statehdr = state_header_file(unit.ident());
     scope.new_include(&statehdr, false);
 
+    let c = scope.new_class(scn.as_str());
+    let cons = c.new_constructor();
+
+    cons.push_parent_initializer(C::Expr::fn_call("StateBase", vec![]));
+
     match unit.state() {
         None => (),
         Some(state) => {
-            let c = scope.new_class(scn.as_str());
-            let cons = c.new_constructor();
-
-            cons.push_parent_initializer(C::Expr::fn_call("StateBase", vec![]));
-
             for f in state.fields() {
                 let fieldname = format!("_{}", f.ident());
                 let fieldclass = state_fields_class_name(f.ident());
