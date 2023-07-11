@@ -246,8 +246,11 @@ impl ArmFastModelsModule {
 
 impl VelosiHwGenBackend for ArmFastModelsModule {
     fn prepare(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
-        // outdir/hw/fastmodels/<pkgname>/<unitname>/include
+        // outdir/hw/fastmodels/<pkgname>/<unitname>
         for u in ast.units() {
+            if u.is_abstract() {
+                continue;
+            }
             let out_subdir = &self.outdir.join(u.ident_to_string());
             fs::create_dir_all(out_subdir)?;
         }
@@ -260,6 +263,9 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
         generate_register_impl(&self.pkgname, ast, &self.outdir)?;
 
         for u in ast.units() {
+            if u.is_abstract() {
+                continue;
+            }
             let unit_dir = &self.outdir.join(u.ident_to_string());
             generate_unit_header(u, unit_dir)?;
             generate_unit_impl(u, unit_dir)?;
@@ -275,6 +281,10 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
 
     fn finalize(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
         for u in ast.units() {
+            if u.is_abstract() {
+                continue;
+            }
+
             let out_subdir = &self.outdir.join(u.ident_to_string());
 
             self.generate_unit_makefile(&u.ident_to_string(), out_subdir)
