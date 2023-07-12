@@ -32,7 +32,9 @@ use codegen_rs as CG;
 
 use super::{field, utils};
 use crate::VelosiCodeGenError;
-use velosiast::{VelosiAstField, VelosiAstInterfaceField, VelosiAstUnitSegment};
+use velosiast::{
+    VelosiAstField, VelosiAstInterfaceField, VelosiAstInterfaceMemoryField, VelosiAstUnitSegment,
+};
 
 /// returns the string of the field type
 pub fn interface_type(unit: &VelosiAstUnitSegment) -> String {
@@ -54,10 +56,13 @@ pub fn generate_interface(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
     // c representation
     st.repr("C");
 
-    for f in unit.interface.fields() {
-        let doc = format!("Field '{}' in unit '{}'", f.ident(), unit.ident());
-        let loc = format!("@loc: {}", f.loc().loc());
-        let mut f = CG::Field::new(f.ident(), field::field_type(f));
+    for p in &unit.params {
+        let doc = format!("Parameter '{}' in unit '{}'", p.ident(), unit.ident());
+        let loc = format!("@loc: {}", p.loc.loc());
+        let mut f = CG::Field::new(
+            p.ident(),
+            utils::ptype_to_rust_type(&p.ptype.typeinfo, &ifname),
+        );
         f.doc(vec![&doc, &loc]);
         st.push_field(f);
     }
@@ -65,18 +70,25 @@ pub fn generate_interface(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
     // Step 2:  add the implementation
     let imp = scope.new_impl(&ifname);
 
-    let iftyperef = "&'static Self";
-    imp.new_fn("from_addr")
+    let constructor = imp
+        .new_fn("new")
         .vis("pub")
-        .arg("base", "u64")
         .doc(&format!(
-            "creates a new reference to a {} interface",
-            unit.ident()
+            "Creates a new {}.\n\n# Safety\nPossibly unsafe due to being given arbitrary addresses and using them to do casts to raw pointers.",
+            ifname,
         ))
-        .ret(CG::Type::new(iftyperef))
-        .set_unsafe(true)
-        .line("let ptr = base as *mut Self;")
-        .line("ptr.as_ref().unwrap()");
+        .ret("Self")
+        .set_unsafe(true);
+    for p in &unit.params {
+        constructor.arg(
+            p.ident(),
+            utils::ptype_to_rust_type(&p.ptype.typeinfo, &ifname),
+        );
+    }
+    constructor.line(format!(
+        "Self {{ {} }}",
+        utils::params_to_args_list(&unit.params),
+    ));
 
     for f in unit.interface.fields() {
         generate_read_field(f, imp);
@@ -86,27 +98,49 @@ pub fn generate_interface(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
 
 fn generate_read_field(f: &Rc<VelosiAstInterfaceField>, imp: &mut CG::Impl) {
     let fname = format!("read_{}", f.ident());
-    let body = format!("self.{}", f.ident());
-    imp.new_fn(&fname)
-        .vis("pub")
-        .doc(&format!("reads value from interface field '{}'", f.ident()))
-        .arg_mut_self()
-        .ret(CG::Type::new(&field::field_type(f)))
-        .line(body);
+    let field_type = field::field_type(f);
+
+    // TODO: what about for other types
+    if let VelosiAstInterfaceField::Memory(VelosiAstInterfaceMemoryField { base, offset, .. }) =
+        f.as_ref()
+    {
+        imp.new_fn(&fname)
+            .vis("pub")
+            .doc(&format!("reads value from interface field '{}'", f.ident()))
+            .arg_ref_self()
+            .ret(&field_type)
+            .line(format!(
+                "let ptr = (self.{} + {}) as *mut {field_type};",
+                base.ident(),
+                offset
+            ))
+            .line("unsafe { *ptr }");
+    }
 }
 
 fn generate_write_field(f: &Rc<VelosiAstInterfaceField>, imp: &mut CG::Impl) {
     let fname = format!("write_{}", f.ident());
-    let body = format!("self.{} = val;", f.ident());
-    imp.new_fn(&fname)
-        .vis("pub")
-        .doc(&format!(
-            "writes value 'val' into interface field '{}'",
-            f.ident()
-        ))
-        .arg_mut_self()
-        .arg("val", field::field_type(f))
-        .line(body);
+    let field_type = field::field_type(f);
+
+    // TODO: what about for other types
+    if let VelosiAstInterfaceField::Memory(VelosiAstInterfaceMemoryField { base, offset, .. }) =
+        f.as_ref()
+    {
+        imp.new_fn(&fname)
+            .vis("pub")
+            .doc(&format!(
+                "writes value 'val' into interface field '{}'",
+                f.ident()
+            ))
+            .arg_ref_self()
+            .arg("val", &field_type)
+            .line(format!(
+                "let ptr = (self.{} + {}) as *mut {field_type};",
+                base.ident(),
+                offset
+            ))
+            .line("unsafe { *ptr = val }");
+    }
 }
 
 /// generates the field types for the interface
@@ -162,6 +196,8 @@ pub fn generate(unit: &VelosiAstUnitSegment, outdir: &Path) -> Result<(), Velosi
     // add the header comments
     let title = format!("`{}` Interface definition ", unit.ident());
     utils::add_header(&mut scope, &title);
+
+    scope.import("crate::utils", "*");
 
     // add imports to used fields
     for f in unit.interface.fields() {
