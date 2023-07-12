@@ -30,8 +30,7 @@ use std::path::Path;
 use codegen_rs as CG;
 
 use velosiast::{
-    VelosiAst, VelosiAstMethod, VelosiAstStaticMap, VelosiAstStaticMapListComp,
-    VelosiAstUnitStaticMap,
+    VelosiAst, VelosiAstMethod, VelosiAstStaticMap, VelosiAstUnit, VelosiAstUnitStaticMap,
 };
 
 use super::utils;
@@ -57,14 +56,11 @@ fn add_unit_flags(_scope: &mut CG::Scope, _unit: &VelosiAstUnitStaticMap) {
 
 fn add_op_fn_body_listcomp(
     op_fn: &mut CG::Function,
-    ast: &VelosiAst,
-    map: &VelosiAstStaticMapListComp,
+    dest_unit: &VelosiAstUnit,
     op: &VelosiAstMethod,
+    suffix: Option<&str>,
 ) {
-    op_fn.line(format!("// {}", map.to_string().as_str()));
-
     // idx = va / element_size
-    let dest_unit = ast.get_unit(map.elm.dst.ident().as_str()).unwrap();
     op_fn.line(format!(
         "let idx = va >> {:#x};",
         dest_unit.input_bitwidth()
@@ -76,17 +72,23 @@ fn add_op_fn_body_listcomp(
         dest_unit.input_bitwidth()
     ));
 
-    // target_unit = from_addr((idx * 8) + self.base);
+    // target_unit = new((idx * 8) + self.base);
     // TODO: if enum, need to decide which variant to make?
+    // TODO: base and idx * 0x8 are hardcoded
     op_fn.line(format!(
-        "let mut target_unit = unsafe {{ {}::from_addr((idx * 0x8) + self.base) }};",
+        "let target_unit = unsafe {{ {}::new((idx * 0x8) + self.base) }};",
         utils::to_struct_name(dest_unit.ident(), None)
     ));
 
     // target_unit.op(args)
+    let op_name = match suffix {
+        Some(suffix) => format!("{}_{}", op.ident(), suffix),
+        None => op.ident_to_string(),
+    };
+
     op_fn.line(format!(
         "target_unit.{}({})",
-        op.ident(),
+        op_name,
         utils::params_to_args_list(&op.params)
     ));
 }
@@ -94,31 +96,67 @@ fn add_op_fn_body_listcomp(
 fn add_op_function(
     ast: &VelosiAst,
     unit: &VelosiAstUnitStaticMap,
-    op: &VelosiAstMethod,
+    op_name: &str,
     imp: &mut CG::Impl,
 ) {
-    let op_fn = imp
-        .new_fn(op.ident())
-        .vis("pub")
-        .arg_mut_self()
-        .ret(CG::Type::from("bool"));
-
-    for f in op.params.iter() {
-        op_fn.arg(
-            f.ident(),
-            utils::ptype_to_rust_type(&f.ptype.typeinfo, unit.ident()),
-        );
-    }
-
     match &unit.map {
         VelosiAstStaticMap::Explicit(_) => {
-            op_fn.line("// TODO: Explicit map");
+            // TODO: Explicit map
         }
         VelosiAstStaticMap::ListComp(map) => {
-            add_op_fn_body_listcomp(op_fn, ast, map, op);
+            let dest_unit = ast.get_unit(map.elm.dst.ident().as_str()).unwrap();
+            match dest_unit {
+                VelosiAstUnit::Enum(e) if op_name == "map" || op_name == "protect" => {
+                    for variant in e.get_unit_names() {
+                        let variant_unit = ast.get_unit(variant).unwrap();
+                        let op = variant_unit.get_method(op_name).unwrap();
+                        let op_fn = imp
+                            .new_fn(&format!(
+                                "{}_{}",
+                                op.ident(),
+                                variant_unit.ident().to_lowercase()
+                            ))
+                            .vis("pub")
+                            .arg_ref_self()
+                            .ret(CG::Type::from("bool"));
+
+                        for f in op.params.iter() {
+                            op_fn.arg(
+                                f.ident(),
+                                utils::ptype_to_rust_type(&f.ptype.typeinfo, variant_unit.ident()),
+                            );
+                        }
+                        op_fn.line(format!("// {}", map));
+                        add_op_fn_body_listcomp(
+                            op_fn,
+                            dest_unit,
+                            op,
+                            Some(&variant_unit.ident().to_lowercase()),
+                        );
+                    }
+                }
+                _ => {
+                    let op = unit.get_method(op_name).unwrap();
+                    let op_fn = imp
+                        .new_fn(op.ident())
+                        .vis("pub")
+                        .arg_ref_self()
+                        .ret(CG::Type::from("bool"));
+
+                    for f in op.params.iter() {
+                        op_fn.arg(
+                            f.ident(),
+                            utils::ptype_to_rust_type(&f.ptype.typeinfo, dest_unit.ident()),
+                        );
+                    }
+
+                    op_fn.line(format!("// {}", map));
+                    add_op_fn_body_listcomp(op_fn, dest_unit, op, None);
+                }
+            }
         }
         VelosiAstStaticMap::None(_) => {
-            op_fn.line("// No map defined for this unit");
+            // No map defined for this unit
         }
     }
 }
@@ -139,7 +177,10 @@ fn generate_unit_struct(scope: &mut CG::Scope, ast: &VelosiAst, unit: &VelosiAst
     for param in &unit.params {
         let doc = format!("Parameter '{}' in unit '{}'", param.ident(), unit.ident());
         let loc = format!("@loc: {}", param.loc.loc());
-        let mut f = CG::Field::new(param.ident(), "u64");
+        let mut f = CG::Field::new(
+            param.ident(),
+            utils::ptype_to_rust_type(&param.ptype.typeinfo, &struct_name),
+        );
         f.doc(vec![&doc, &loc]);
         st.push_field(f);
     }
@@ -148,27 +189,30 @@ fn generate_unit_struct(scope: &mut CG::Scope, ast: &VelosiAst, unit: &VelosiAst
     let imp = scope.new_impl(&struct_name);
 
     // constructor
-    imp.new_fn("from_addr")
+    let constructor = imp
+        .new_fn("new")
         .vis("pub")
-        .arg("base", "u64")
         .doc(&format!(
-            "creates a new reference to a {} unit",
+            "Creates a new {}.\n\n# Safety\nPossibly unsafe due to being given arbitrary addresses and using them to do casts to raw pointers.",
             unit.ident()
         ))
         .ret(CG::Type::new("Self"))
-        .set_unsafe(true)
-        .line("Self { base }");
+        .set_unsafe(true);
+    for p in &unit.params {
+        constructor.arg(
+            p.ident(),
+            utils::ptype_to_rust_type(&p.ptype.typeinfo, &struct_name),
+        );
+    }
+    constructor.line(format!(
+        "Self {{ {} }}",
+        utils::params_to_args_list(&unit.params)
+    ));
 
     // op functions
-    let op = unit.methods.get("map").expect("map method not found!");
-    add_op_function(ast, unit, op, imp);
-    let op = unit.methods.get("unmap").expect("unmap method not found!");
-    add_op_function(ast, unit, op, imp);
-    let op = unit
-        .methods
-        .get("protect")
-        .expect("protect method not found!");
-    add_op_function(ast, unit, op, imp);
+    add_op_function(ast, unit, "map", imp);
+    add_op_function(ast, unit, "unmap", imp);
+    add_op_function(ast, unit, "protect", imp);
 }
 
 /// generates the staticmap definitions
@@ -193,6 +237,26 @@ pub fn generate(
     scope.new_comment("include references to the used units");
     for u in unit.map.get_unit_names().iter() {
         scope.import("crate", &utils::to_struct_name(u, None));
+    }
+
+    if let VelosiAstStaticMap::ListComp(map) = &unit.map {
+        let dest_unit = ast.get_unit(map.elm.dst.ident().as_str()).unwrap();
+        match dest_unit {
+            VelosiAstUnit::Enum(e) => {
+                for variant in e.get_unit_names() {
+                    scope.import(
+                        &format!("crate::{}", variant.to_lowercase()),
+                        &utils::to_struct_name(variant, Some("Flags")),
+                    );
+                }
+            }
+            _ => {
+                scope.import(
+                    &format!("crate::{}", dest_unit.ident().to_lowercase()),
+                    &utils::to_struct_name(dest_unit.ident(), Some("Flags")),
+                );
+            }
+        }
     }
 
     // add the definitions

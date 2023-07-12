@@ -81,25 +81,32 @@ fn add_segment_struct(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
 
     // it has a single field, called 'interface'
     let iface_name = utils::to_struct_name(&struct_name, Some("Interface"));
-    st.field("interface", &format!("&'static {iface_name}"));
+    st.field("interface", &iface_name);
 
     // struct impl
     let imp = scope.new_impl(&struct_name);
 
     // constructor
-    imp.new_fn("from_addr")
+    let constructor = imp
+        .new_fn("new")
         .vis("pub")
-        .arg("base", "u64")
         .doc(&format!(
-            "creates a new reference to a {} unit",
+            "Creates a new {}.\n\n# Safety\nPossibly unsafe due to being given arbitrary addresses and using them to do casts to raw pointers.",
             unit.ident()
         ))
-        .ret(CG::Type::new("Self"))
-        .set_unsafe(true)
-        .line(format!(
-            "Self {{ interface: {}::from_addr(base) }}",
-            iface_name
-        ));
+        .ret("Self")
+        .set_unsafe(true);
+    for p in &unit.params {
+        constructor.arg(
+            p.ident(),
+            utils::ptype_to_rust_type(&p.ptype.typeinfo, &struct_name),
+        );
+    }
+    constructor.line(format!(
+        "Self {{ interface: {}::new({}) }}",
+        iface_name,
+        utils::params_to_args_list(&unit.params)
+    ));
 
     // op functions
     let op = unit.methods.get("map").expect("map method not found!");
@@ -114,11 +121,7 @@ fn add_segment_struct(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
 }
 
 fn add_op_fn(unit: &VelosiAstUnitSegment, op: &VelosiAstMethod, imp: &mut CG::Impl) {
-    let op_fn = imp
-        .new_fn(op.ident())
-        .vis("pub")
-        .arg_mut_self()
-        .ret(CG::Type::from("bool"));
+    let op_fn = imp.new_fn(op.ident()).vis("pub").arg_ref_self().ret("bool");
 
     for f in op.params.iter() {
         op_fn.arg(
@@ -171,7 +174,7 @@ pub fn generate(unit: &VelosiAstUnitSegment, outdir: &Path) -> Result<(), Velosi
     scope.import("crate::utils", "*");
 
     // add import for the interface
-    let iface_name = utils::to_struct_name(&unit.ident(), Some("Interface"));
+    let iface_name = utils::to_struct_name(unit.ident(), Some("Interface"));
     scope.import("super", &iface_name);
 
     // add the definitions

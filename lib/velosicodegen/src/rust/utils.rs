@@ -95,7 +95,17 @@ pub fn ptype_to_rust_type(ptype: &VelosiAstTypeInfo, unit_ident: &str) -> CG::Ty
 /// converts a [VelosiAstExpr] into a string representing the corresponding rust expression
 pub fn astexpr_to_rust(expr: &VelosiAstExpr) -> String {
     match expr {
-        VelosiAstExpr::IdentLiteral(i) => i.ident().to_string(),
+        VelosiAstExpr::IdentLiteral(i) => {
+            if i.has_state_references() {
+                let mut path_iter = i.path_split().skip(1);
+                let field = path_iter.next().unwrap();
+                let slice = path_iter.next().unwrap();
+
+                format!("{field}.extract_{slice}()")
+            } else {
+                i.ident().to_string()
+            }
+        }
         VelosiAstExpr::NumLiteral(i) => format!("{:#x}", i.val),
         VelosiAstExpr::BoolLiteral(i) => {
             if i.val {
@@ -296,6 +306,15 @@ pub fn params_to_args_list(params: &[Rc<VelosiAstParam>]) -> String {
     params
         .iter()
         .map(|p| p.ident_to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+// converts a list of parameters into a comma separated argument list with the same names
+pub fn params_to_self_args_list(params: &[Rc<VelosiAstParam>]) -> String {
+    params
+        .iter()
+        .map(|p| format!("self.{}", p.ident()))
         .collect::<Vec<_>>()
         .join(", ")
 }

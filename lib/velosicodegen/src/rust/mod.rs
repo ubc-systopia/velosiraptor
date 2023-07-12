@@ -142,6 +142,7 @@ impl BackendRust {
 
         scope.raw("pub type VirtAddr = u64;");
         scope.raw("pub type PhysAddr = u64;");
+        scope.raw("pub type GenAddr = u64;");
 
         save_scope(scope, &srcdir, MOD_UTILS)
     }
@@ -232,7 +233,7 @@ impl BackendRust {
                 }
                 VelosiAstUnit::Enum(e) => {
                     fs::create_dir_all(&srcdir)?;
-                    enums::generate(e, &srcdir).expect("code generation failed\n");
+                    enums::generate(ast, e, &srcdir).expect("code generation failed\n");
                 }
             }
 
