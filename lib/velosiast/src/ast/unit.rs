@@ -1366,18 +1366,6 @@ impl VelosiAstUnitEnum {
                                 differentiator.extend(pre);
                             }
 
-                            if let Some(m) = u.get_method("matchflags") {
-                                let pre = m.requires.iter().filter_map(|expr| {
-                                    if expr.has_state_references() {
-                                        Some(expr.clone())
-                                    } else {
-                                        None
-                                    }
-                                });
-
-                                differentiator.extend(pre);
-                            }
-
                             // now we need to match
                             let nparam = u.params_as_slice().len();
                             let nargs = args.len();
