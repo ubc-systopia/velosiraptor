@@ -30,7 +30,8 @@ use std::path::Path;
 use codegen_rs as CG;
 
 use velosiast::{
-    VelosiAst, VelosiAstMethod, VelosiAstStaticMap, VelosiAstUnit, VelosiAstUnitStaticMap,
+    VelosiAst, VelosiAstMethod, VelosiAstStaticMap, VelosiAstStaticMapListComp, VelosiAstUnit,
+    VelosiAstUnitStaticMap,
 };
 
 use super::utils;
@@ -50,11 +51,9 @@ fn add_unit_constants(scope: &mut CG::Scope, unit: &VelosiAstUnitStaticMap) {
     }
 }
 
-fn add_unit_flags(_scope: &mut CG::Scope, _unit: &VelosiAstUnitStaticMap) {
-    // TODO: add the flags as a union of all other units this one maps to?
-}
-
 fn add_op_fn_body_listcomp(
+    unit: &VelosiAstUnitStaticMap,
+    map: &VelosiAstStaticMapListComp,
     op_fn: &mut CG::Function,
     dest_unit: &VelosiAstUnit,
     op: &VelosiAstMethod,
@@ -62,7 +61,8 @@ fn add_op_fn_body_listcomp(
 ) {
     // idx = va / element_size
     op_fn.line(format!(
-        "let idx = va >> {:#x};",
+        "let {} = va >> {:#x};",
+        map.var.ident(),
         dest_unit.input_bitwidth()
     ));
 
@@ -72,12 +72,22 @@ fn add_op_fn_body_listcomp(
         dest_unit.input_bitwidth()
     ));
 
-    // target_unit = new((idx * 8) + self.base);
-    // TODO: if enum, need to decide which variant to make?
-    // TODO: base and idx * 0x8 are hardcoded
+    // set up fields
+    for p in &unit.params {
+        op_fn.line(format!("let {} = &self.{};", p.ident(), p.ident()));
+    }
+
+    // target_unit = Unit(args..);
     op_fn.line(format!(
-        "let target_unit = unsafe {{ {}::new((idx * 0x8) + self.base) }};",
-        utils::to_struct_name(dest_unit.ident(), None)
+        "let target_unit = unsafe {{ {}::new({}) }};",
+        utils::to_struct_name(dest_unit.ident(), None),
+        map.elm
+            .dst
+            .args
+            .iter()
+            .map(utils::astexpr_to_rust)
+            .collect::<Vec<_>>()
+            .join(", "),
     ));
 
     // target_unit.op(args)
@@ -128,6 +138,8 @@ fn add_op_function(
                         }
                         op_fn.line(format!("// {}", map));
                         add_op_fn_body_listcomp(
+                            unit,
+                            map,
                             op_fn,
                             dest_unit,
                             op,
@@ -151,7 +163,7 @@ fn add_op_function(
                     }
 
                     op_fn.line(format!("// {}", map));
-                    add_op_fn_body_listcomp(op_fn, dest_unit, op, None);
+                    add_op_fn_body_listcomp(unit, map, op_fn, dest_unit, op, None);
                 }
             }
         }
@@ -261,7 +273,6 @@ pub fn generate(
 
     // add the definitions
     add_unit_constants(&mut scope, unit);
-    add_unit_flags(&mut scope, unit);
     generate_unit_struct(&mut scope, ast, unit);
 
     // save the scope
