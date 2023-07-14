@@ -70,25 +70,8 @@ pub fn generate_interface(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
     // Step 2:  add the implementation
     let imp = scope.new_impl(&ifname);
 
-    let constructor = imp
-        .new_fn("new")
-        .vis("pub")
-        .doc(&format!(
-            "Creates a new {}.\n\n# Safety\nPossibly unsafe due to being given arbitrary addresses and using them to do casts to raw pointers.",
-            ifname,
-        ))
-        .ret("Self")
-        .set_unsafe(true);
-    for p in &unit.params {
-        constructor.arg(
-            p.ident(),
-            utils::ptype_to_rust_type(&p.ptype.typeinfo, &ifname),
-        );
-    }
-    constructor.line(format!(
-        "Self {{ {} }}",
-        utils::params_to_args_list(&unit.params),
-    ));
+    // constructor
+    utils::add_constructor(imp, ifname, &unit.params);
 
     for f in unit.interface.fields() {
         generate_read_field(f, imp);

@@ -201,25 +201,7 @@ fn generate_unit_struct(scope: &mut CG::Scope, ast: &VelosiAst, unit: &VelosiAst
     let imp = scope.new_impl(&struct_name);
 
     // constructor
-    let constructor = imp
-        .new_fn("new")
-        .vis("pub")
-        .doc(&format!(
-            "Creates a new {}.\n\n# Safety\nPossibly unsafe due to being given arbitrary addresses and using them to do casts to raw pointers.",
-            unit.ident()
-        ))
-        .ret(CG::Type::new("Self"))
-        .set_unsafe(true);
-    for p in &unit.params {
-        constructor.arg(
-            p.ident(),
-            utils::ptype_to_rust_type(&p.ptype.typeinfo, &struct_name),
-        );
-    }
-    constructor.line(format!(
-        "Self {{ {} }}",
-        utils::params_to_args_list(&unit.params)
-    ));
+    utils::add_constructor(imp, struct_name, &unit.params);
 
     // op functions
     add_op_function(ast, unit, "map", imp);

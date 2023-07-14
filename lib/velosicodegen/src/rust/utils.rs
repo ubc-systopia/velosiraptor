@@ -369,3 +369,32 @@ pub fn add_const_def(scope: &mut CG::Scope, c: &VelosiAstConst) {
     // make it public
     mconst.vis("pub");
 }
+
+/// adds a rust constructor that is a direct translation of the vrs constructor
+pub fn add_constructor(imp: &mut CG::Impl, unit_ident: String, params: &[Rc<VelosiAstParam>]) {
+    let constructor = add_constructor_signature(imp, unit_ident, params);
+    constructor.line(format!("Self {{ {} }}", params_to_args_list(params)));
+}
+
+pub fn add_constructor_signature<'a>(
+    imp: &'a mut CG::Impl,
+    unit_ident: String,
+    params: &'a [Rc<VelosiAstParam>],
+) -> &'a mut CG::Function {
+    let constructor = imp
+        .new_fn("new")
+        .vis("pub")
+        .doc(&format!(
+            "Creates a new {}.\n\n# Safety\nPossibly unsafe due to being given arbitrary addresses and using them to do casts to raw pointers.",
+            unit_ident
+        ))
+        .ret("Self")
+        .set_unsafe(true);
+    for p in params {
+        constructor.arg(
+            p.ident(),
+            ptype_to_rust_type(&p.ptype.typeinfo, &unit_ident),
+        );
+    }
+    constructor
+}
