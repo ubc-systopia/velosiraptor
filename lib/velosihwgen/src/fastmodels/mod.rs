@@ -51,8 +51,6 @@ mod unit;
 use unit::{generate_unit_header, generate_unit_impl, unit_impl_file};
 mod registers;
 use registers::{generate_register_header, generate_register_impl};
-mod fields;
-use fields::{generate_field_header, generate_field_impl, state_fields_impl_file};
 
 /// # The Arm FastModels Platform Module
 ///
@@ -71,8 +69,6 @@ use fields::{generate_field_header, generate_field_impl, state_fields_impl_file}
 ///  - outdir/hw/fastmodels/<unit>/interface.cpp
 ///  - outdir/hw/fastmodels/<unit>/state.hpp
 ///  - outdir/hw/fastmodels/<unit>/state.cpp
-///  - outdir/hw/fastmodels/<unit>/state_fields.hpp
-///  - outdir/hw/fastmodels/<unit>/state_fields.cpp
 ///  - outdir/hw/fastmodels/<unit>/unit.hpp
 ///  - outdir/hw/fastmodels/<unit>/unit.cpp
 ///  - outdir/hw/fastmodels/<vrs>_registers.cpp
@@ -134,13 +130,14 @@ impl ArmFastModelsModule {
             writeln!(f, "\tmake -C {}", u.ident())?;
         }
 
-        // todo archive all outputs
-
+        // temporarily commented out to make framework changes
+        /*
         writeln!(f, "deps_framework:")?;
         writeln!(f, "\t!(test -s $(FRAMEWORK_DIR)/.git) &&\\")?;
         writeln!(f, "\tgit clone $(FRAMEWORK_URL) $(FRAMEWORK_DIR);\\")?;
         writeln!(f, "\tgit -C $(FRAMEWORK_DIR) fetch;\\")?;
         writeln!(f, "\tgit -C $(FRAMEWORK_DIR) checkout $(FRAMEWORK_COMMIT)")?;
+        */
 
         writeln!(f, "\nclean:")?;
         writeln!(f, "\trm -rf {}", self.fdir)?;
@@ -201,11 +198,6 @@ impl ArmFastModelsModule {
             f,
             "TRANSLATION_UNIT_SRCS += $(SOURCE_DIR)/{}",
             state_impl_file(name)
-        )?;
-        writeln!(
-            f,
-            "TRANSLATION_UNIT_SRCS += $(SOURCE_DIR)/{}",
-            state_fields_impl_file(name)
         )?;
 
         writeln!(f, "\n# Object Files")?;
@@ -271,8 +263,6 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
             generate_unit_impl(u, unit_dir)?;
             generate_interface_header(&self.pkgname, u, unit_dir)?;
             generate_interface_impl(&self.pkgname, u, unit_dir)?;
-            generate_field_header(u, unit_dir)?;
-            generate_field_impl(u, unit_dir)?;
             generate_state_header(u, unit_dir)?;
             generate_state_impl(u, unit_dir)?;
         }
