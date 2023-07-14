@@ -118,6 +118,18 @@ fn add_segment_struct(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
         .get("protect")
         .expect("protect method not found!");
     add_op_fn(unit, op, imp);
+
+    // valid function
+    let op = unit.methods.get("valid").expect("valid method not found!");
+    let valid = imp.new_fn(op.ident()).vis("pub").arg_ref_self().ret("bool");
+    for f in unit.state.fields() {
+        valid.line(format!(
+            "let {} = self.interface.read_{}();",
+            f.ident(),
+            f.ident()
+        ));
+    }
+    valid.line(utils::astexpr_to_rust(op.body.as_ref().unwrap()));
 }
 
 fn add_op_fn(unit: &VelosiAstUnitSegment, op: &VelosiAstMethod, imp: &mut CG::Impl) {
