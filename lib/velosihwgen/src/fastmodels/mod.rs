@@ -115,29 +115,29 @@ impl ArmFastModelsModule {
 
         writeln!(
             f,
-            "FRAMEWORK_URL=https://github.com/achreto/fm-translation-framework"
+            "FRAMEWORK_URL=https://github.com/mlechu/arm-fastmodels-translation-framework",
         )?;
         writeln!(
             f,
-            "FRAMEWORK_COMMIT=040cdba09025d5c9cd9da9d2c9731a2f6677051b"
+            "FRAMEWORK_COMMIT=a77d004e59bbffc31c179ad89c7820c55c638efe",
         )?;
         writeln!(f, "FRAMEWORK_DIR={}", self.fdir)?;
 
         writeln!(f, "\nall: deps_framework")?;
         writeln!(f, "\tmake -C {}", self.fdir)?;
         for u in ast.units() {
+            if u.is_abstract() {
+                continue;
+            }
             // writeln!(f, "\tmake -d -I framework/build/include -C {}", u.ident())?;
             writeln!(f, "\tmake -C {}", u.ident())?;
         }
 
-        // temporarily commented out to make framework changes
-        /*
         writeln!(f, "deps_framework:")?;
         writeln!(f, "\t!(test -s $(FRAMEWORK_DIR)/.git) &&\\")?;
         writeln!(f, "\tgit clone $(FRAMEWORK_URL) $(FRAMEWORK_DIR);\\")?;
         writeln!(f, "\tgit -C $(FRAMEWORK_DIR) fetch;\\")?;
         writeln!(f, "\tgit -C $(FRAMEWORK_DIR) checkout $(FRAMEWORK_COMMIT)")?;
-        */
 
         writeln!(f, "\nclean:")?;
         writeln!(f, "\trm -rf {}", self.fdir)?;
@@ -164,12 +164,13 @@ impl ArmFastModelsModule {
         writeln!(f, "# compiler flags")?;
         writeln!(
             f,
-            "# PVLIB_HOME should be set by the fast models setup script"
+            "# PVLIB_HOME should be set by the fastmodels setup script"
         )?;
         writeln!(f, "CC      := g++")?;
         writeln!(f, "CCFLAGS := -Wall -O3 -Werror -std=c++2a -fPIC")?;
-        // writeln!(f, "CCFLAGS += -I include")?;
-        writeln!(f, "CCFLAGS += -I $(FRAMEWORK_DIR)/src/include")?;
+
+        // should probably include something from frameworkdir/build/(?)
+        writeln!(f, "CCFLAGS += -I $(FRAMEWORK_DIR)")?;
         writeln!(f, "CCFLAGS += -I $(PVLIB_HOME)/include")?;
         writeln!(f, "CCFLAGS += -I $(PVLIB_HOME)/include/fmruntime")?;
         writeln!(f, "CCFLAGS += -MMD -MP")?;
