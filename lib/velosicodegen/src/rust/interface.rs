@@ -33,7 +33,8 @@ use codegen_rs as CG;
 use super::{field, utils};
 use crate::VelosiCodeGenError;
 use velosiast::{
-    VelosiAstField, VelosiAstInterfaceField, VelosiAstInterfaceMemoryField, VelosiAstUnitSegment,
+    VelosiAstField, VelosiAstInterfaceField, VelosiAstInterfaceMemoryField,
+    VelosiAstInterfaceMmioField, VelosiAstUnitSegment,
 };
 
 /// returns the string of the field type
@@ -83,21 +84,26 @@ fn generate_read_field(f: &Rc<VelosiAstInterfaceField>, imp: &mut CG::Impl) {
     let fname = format!("read_{}", f.ident());
     let field_type = field::field_type(f);
 
-    // TODO: what about for other types
-    if let VelosiAstInterfaceField::Memory(VelosiAstInterfaceMemoryField { base, offset, .. }) =
-        f.as_ref()
-    {
-        imp.new_fn(&fname)
-            .vis("pub")
-            .doc(&format!("reads value from interface field '{}'", f.ident()))
-            .arg_ref_self()
-            .ret(&field_type)
-            .line(format!(
-                "let ptr = (self.{} + {}) as *mut {field_type};",
-                base.ident(),
-                offset
-            ))
-            .line("unsafe { *ptr }");
+    let read_fn = imp
+        .new_fn(&fname)
+        .vis("pub")
+        .doc(&format!("reads value from interface field '{}'", f.ident()))
+        .arg_ref_self()
+        .ret(&field_type);
+    match f.as_ref() {
+        VelosiAstInterfaceField::Memory(VelosiAstInterfaceMemoryField { base, offset, .. })
+        | VelosiAstInterfaceField::Mmio(VelosiAstInterfaceMmioField { base, offset, .. }) => {
+            read_fn
+                .line(format!(
+                    "let ptr = (self.{} + {} * 8) as *mut {field_type};",
+                    base.ident(),
+                    offset
+                ))
+                .line("unsafe { *ptr }");
+        }
+        VelosiAstInterfaceField::Register(_) => {
+            read_fn.line("// TODO: read register").line("todo!()");
+        }
     }
 }
 
@@ -105,24 +111,29 @@ fn generate_write_field(f: &Rc<VelosiAstInterfaceField>, imp: &mut CG::Impl) {
     let fname = format!("write_{}", f.ident());
     let field_type = field::field_type(f);
 
-    // TODO: what about for other types
-    if let VelosiAstInterfaceField::Memory(VelosiAstInterfaceMemoryField { base, offset, .. }) =
-        f.as_ref()
-    {
-        imp.new_fn(&fname)
-            .vis("pub")
-            .doc(&format!(
-                "writes value 'val' into interface field '{}'",
-                f.ident()
-            ))
-            .arg_ref_self()
-            .arg("val", &field_type)
-            .line(format!(
-                "let ptr = (self.{} + {}) as *mut {field_type};",
-                base.ident(),
-                offset
-            ))
-            .line("unsafe { *ptr = val }");
+    let write_fn = imp
+        .new_fn(&fname)
+        .vis("pub")
+        .doc(&format!(
+            "writes value 'val' into interface field '{}'",
+            f.ident()
+        ))
+        .arg_ref_self()
+        .arg("val", &field_type);
+    match f.as_ref() {
+        VelosiAstInterfaceField::Memory(VelosiAstInterfaceMemoryField { base, offset, .. })
+        | VelosiAstInterfaceField::Mmio(VelosiAstInterfaceMmioField { base, offset, .. }) => {
+            write_fn
+                .line(format!(
+                    "let ptr = (self.{} + {} * 8) as *mut {field_type};",
+                    base.ident(),
+                    offset
+                ))
+                .line("unsafe { *ptr = val }");
+        }
+        VelosiAstInterfaceField::Register(_) => {
+            write_fn.line("// TODO: write register").line("todo!()");
+        }
     }
 }
 
