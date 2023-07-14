@@ -169,26 +169,27 @@ fn add_create(c: &mut C::Class, ucn: &str) {
     // }
 }
 
-fn state_field_access(path: &Vec<&str>) -> C::Expr {
+fn state_field_access(access: &Vec<&str>) -> C::Expr {
     let st = C::Expr::field_access(&C::Expr::this(), "_state");
 
-    if path.len() == 1 {
+    if access.len() == 1 {
         return st;
     }
 
-    if path.len() == 2 {
-        let accname = format!("get_{}_val", &path[1]);
-        return C::Expr::method_call(&st, &accname, vec![]);
+    if access.len() == 2 {
+        let state_field = C::Expr::field_access(&st, &access[1]);
+        return C::Expr::method_call(&state_field, "get_value", vec![]);
     }
 
-    if path.len() == 3 {
-        let accname = format!("{}_field", &path[1]);
-        let mut fld = C::Expr::method_call(&st, &accname, vec![]);
-        // we'll get back a pointer
-        fld.set_ptr();
+    // state.field.get_slice_value("slice");
+    if access.len() == 3 {
+        let state_field = C::Expr::field_access(&st, &access[1]);
 
-        let accname = format!("get_{}_val", &path[2]);
-        return C::Expr::method_call(&fld, &accname, vec![]);
+        return C::Expr::method_call(
+            &state_field,
+            "get_slice_value",
+            vec![C::Expr::new_str(&access[2])],
+        );
     }
 
     panic!("unhandled!")
