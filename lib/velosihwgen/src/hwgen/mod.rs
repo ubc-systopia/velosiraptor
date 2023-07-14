@@ -41,7 +41,7 @@ use crate::hwgen::fastmodels::ArmFastModelsModule;
 
 // copy right notice for the generated files
 const COPYRIGHT: &str =
-    "Copyright (c) 2022 The University of British Columbia, Vancouver, BC, Canada";
+    "Copyright (c) 2023 The University of British Columbia, Vancouver, BC, Canada";
 
 // custom error definitions for the hardware generation
 custom_error! {#[derive(PartialEq, Eq)] pub HWGenError

@@ -41,22 +41,18 @@ use crate::fastmodels::interface::{interface_class_name, interface_header_file};
 use crate::fastmodels::state::{state_class_name, state_header_file};
 use crate::VelosiHwGenError;
 
-/// generates the name of the state field header file
 pub fn unit_header_file(name: &str) -> String {
     format!("{}_unit.hpp", name)
 }
 
-/// generates the path of the state field header file
 pub fn unit_header_file_path(name: &str) -> String {
     unit_header_file(name)
 }
 
-/// generates the name of the state field header file
 pub fn unit_impl_file(name: &str) -> String {
     format!("{}_unit.cpp", name)
 }
 
-/// generates the name of the state class
 pub fn unit_class_name(name: &str) -> String {
     format!("{}{}Unit", name[0..1].to_uppercase(), &name[1..])
 }
@@ -296,7 +292,7 @@ fn add_translate(c: &mut C::Class, tm: &VelosiAstMethod) {
     add_translate_remap(c, tm);
 
     // virtual bool do_translate(lvaddr_t src_addr, size_t size, access_mode_t mode,
-    // lpaddr_t *dst_addr) set_overridee;
+    // lpaddr_t *dst_addr) set_override;
 
     let src_addr_param =
         C::MethodParam::new(&tm.params[0].ident.ident, C::Type::new_typedef("lvaddr_t"));
@@ -425,11 +421,10 @@ pub fn generate_unit_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), V
     add_constructor(c, &ifn, &scn);
     add_create(c, &ucn);
 
-    //
     // virtual UnitBase *get_interface(void) set_overridee
     // {
     //     return &this->_interface;
-    //
+    // }
     c.new_method(
         "get_interface",
         C::Type::to_ptr(&C::Type::new_class("InterfaceBase")),
@@ -444,8 +439,7 @@ pub fn generate_unit_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), V
         "_interface",
     )));
 
-    //
-    // virtual StateBase *get_state(void) set_overridee
+    // virtual StateBase *get_state(void) set_override
     // {
     //     return &this->_state;
     // }
