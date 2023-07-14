@@ -49,11 +49,12 @@ fn generate_unit_struct(scope: &mut CG::Scope, ast: &VelosiAst, unit: &VelosiAst
 
     for param in &unit.params {
         let doc = format!("Parameter '{}' in unit '{}'", param.ident(), unit.ident());
+        let loc = format!("@loc: {}", param.loc.loc());
         let mut field = CG::Field::new(
             param.ident(),
             utils::ptype_to_rust_type(&param.ptype.typeinfo, &enum_name),
         );
-        field.doc(vec![&doc]);
+        field.doc(vec![&doc, &loc]);
         en.push_field(field);
     }
 
@@ -61,25 +62,7 @@ fn generate_unit_struct(scope: &mut CG::Scope, ast: &VelosiAst, unit: &VelosiAst
     let imp = scope.new_impl(&enum_name);
 
     // constructor
-    let constructor = imp
-        .new_fn("new")
-        .vis("pub")
-        .doc(&format!(
-            "Creates a new {}.\n\n# Safety\nPossibly unsafe due to being given arbitrary addresses and using them to do casts to raw pointers.",
-            unit.ident()
-        ))
-        .ret("Self")
-        .set_unsafe(true);
-    for p in &unit.params {
-        constructor.arg(
-            p.ident(),
-            utils::ptype_to_rust_type(&p.ptype.typeinfo, &enum_name),
-        );
-    }
-    constructor.line(format!(
-        "Self {{ {} }}",
-        utils::params_to_args_list(&unit.params)
-    ));
+    utils::add_constructor(imp, enum_name, &unit.params);
 
     // add differentiators
     for (variant, differentiator) in unit.get_unit_differentiators() {

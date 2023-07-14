@@ -87,21 +87,7 @@ fn add_segment_struct(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
     let imp = scope.new_impl(&struct_name);
 
     // constructor
-    let constructor = imp
-        .new_fn("new")
-        .vis("pub")
-        .doc(&format!(
-            "Creates a new {}.\n\n# Safety\nPossibly unsafe due to being given arbitrary addresses and using them to do casts to raw pointers.",
-            unit.ident()
-        ))
-        .ret("Self")
-        .set_unsafe(true);
-    for p in &unit.params {
-        constructor.arg(
-            p.ident(),
-            utils::ptype_to_rust_type(&p.ptype.typeinfo, &struct_name),
-        );
-    }
+    let constructor = utils::add_constructor_signature(imp, struct_name, &unit.params);
     constructor.line(format!(
         "Self {{ interface: {}::new({}) }}",
         iface_name,
