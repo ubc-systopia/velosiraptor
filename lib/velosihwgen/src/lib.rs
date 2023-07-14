@@ -29,7 +29,7 @@ use std::path::Path;
 mod fastmodels;
 
 const COPYRIGHT: &str =
-    "2022 Systopia Lab, Computer Science, University of British Columbia.\nAll rights reserved.";
+    "2023 Systopia Lab, Computer Science, University of British Columbia.\nAll rights reserved.";
 
 #[derive(Debug)]
 pub enum VelosiHwGenError {
