@@ -55,6 +55,8 @@ pub fn state_field_class_name(name: &str) -> String {
 }
 
 // TODO: I don't know how helpful it is to separate the header from the implementation in this case.
+// It may just make this file more confusing.
+
 pub fn generate_state_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
@@ -72,6 +74,7 @@ pub fn generate_state_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), 
 
     s.new_include("framework/types.hpp", false);
     s.new_include("framework/state_base.hpp", false);
+    s.new_include("framework/state_field_base.hpp", false);
 
     match unit.state() {
         None => {
@@ -101,14 +104,12 @@ pub fn generate_state_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), 
                         .new_method(&sl_getter_f, C::Type::new_uint(64))
                         .set_public()
                         .set_inline();
-                    m.body()
-                        .variable(C::Variable::new("data", C::Type::new_uint(64)))
-                        .method_call(
-                            C::Expr::this(),
-                            "get_slice_value",
-                            vec![C::Expr::new_str(sl.ident()), C::Expr::addr_of(&var)],
-                        )
-                        .return_expr(var.clone());
+
+                    m.body().return_expr(C::Expr::method_call(
+                        &C::Expr::this(),
+                        "get_slice_value",
+                        vec![C::Expr::new_str(sl.ident())],
+                    ));
 
                     let sl_setter_f = format!("set_{}_val", sl.ident());
                     let m = f_c
@@ -202,7 +203,7 @@ pub fn generate_state_impl(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), Ve
             cons.push_parent_initializer(C::Expr::fn_call("StateBase", vec![]));
 
             for f in state.fields() {
-                let fieldname = format!("_{}", f.ident());
+                let fieldname = f.ident();
                 let fieldclass = state_field_class_name(f.ident());
                 cons.push_initializer(fieldname.as_str(), C::Expr::fn_call(&fieldclass, vec![]));
 
