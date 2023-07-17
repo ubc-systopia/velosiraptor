@@ -72,9 +72,9 @@ impl VelosiCodeGen {
         VelosiCodeGen::C(BackendC::new(pkg, path.as_path()))
     }
 
-    pub fn prepare(&self) -> Result<(), VelosiCodeGenError> {
+    pub fn prepare(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
         match self {
-            VelosiCodeGen::Rust(b) => b.prepare(),
+            VelosiCodeGen::Rust(b) => b.prepare(ast),
             VelosiCodeGen::C(b) => b.prepare(),
         }
     }
@@ -108,7 +108,7 @@ impl VelosiCodeGen {
     }
 
     pub fn generate(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
-        self.prepare()?;
+        self.prepare(ast)?;
         self.generate_globals(ast)?;
         self.generate_interface(ast)?;
         self.generate_units(ast)?;
