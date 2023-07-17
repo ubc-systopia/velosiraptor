@@ -51,22 +51,6 @@ fn add_unit_constants(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
     }
 }
 
-fn add_unit_flags(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
-    let structname = utils::to_struct_name(unit.ident(), Some("Flags"));
-
-    if let Some(flags) = &unit.flags {
-        scope.new_comment("Defined unit flags");
-
-        let st = scope.new_struct(&structname);
-        for flag in &flags.flags {
-            st.field(flag.ident(), "bool").vis("pub");
-        }
-    } else {
-        scope.new_comment("Unit has no defined flags");
-        scope.new_struct(&structname);
-    }
-}
-
 fn add_segment_struct(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment, ast: &VelosiAst) {
     // create the struct in the scope
     let struct_name = utils::to_struct_name(unit.ident(), None);
@@ -99,14 +83,11 @@ fn add_segment_struct(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment, ast: &
 
     // getters
     for p in &unit.params {
-        let getter =
-            imp.new_fn(p.ident())
-                .vis("pub")
-                .arg_ref_self()
-                .ret(utils::vrs_type_to_rust_type(
-                    &p.ptype.typeinfo,
-                    &struct_name,
-                ));
+        let getter = imp
+            .new_fn(p.ident())
+            .vis("pub")
+            .arg_ref_self()
+            .ret(utils::vrs_type_to_rust_type(&p.ptype.typeinfo));
         getter.line(format!("self.interface.{}()", p.ident()));
     }
 
@@ -147,10 +128,7 @@ fn add_op_fn(
         .ret("bool");
 
     for f in method.params.iter() {
-        op_fn.arg(
-            f.ident(),
-            utils::vrs_type_to_rust_type(&f.ptype.typeinfo, unit.ident()),
-        );
+        op_fn.arg(f.ident(), utils::vrs_type_to_rust_type(&f.ptype.typeinfo));
     }
 
     // add requires
@@ -212,7 +190,6 @@ pub fn generate(
 
     // add the definitions
     add_unit_constants(&mut scope, unit);
-    add_unit_flags(&mut scope, unit);
     add_segment_struct(&mut scope, unit, ast);
 
     // save the scope

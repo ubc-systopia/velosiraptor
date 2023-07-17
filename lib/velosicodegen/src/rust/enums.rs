@@ -52,7 +52,7 @@ fn generate_unit_struct(scope: &mut CG::Scope, ast: &VelosiAst, unit: &VelosiAst
         let loc = format!("@loc: {}", param.loc.loc());
         let mut field = CG::Field::new(
             param.ident(),
-            utils::vrs_type_to_rust_type(&param.ptype.typeinfo, &enum_name),
+            utils::vrs_type_to_rust_type(&param.ptype.typeinfo),
         );
         field.doc(vec![&doc, &loc]);
         en.push_field(field);
@@ -70,7 +70,7 @@ fn generate_unit_struct(scope: &mut CG::Scope, ast: &VelosiAst, unit: &VelosiAst
             .new_fn(p.ident())
             .vis("pub")
             .arg_ref_self()
-            .ret(utils::vrs_type_to_rust_type(&p.ptype.typeinfo, &enum_name));
+            .ret(utils::vrs_type_to_rust_type(&p.ptype.typeinfo));
         getter.line(format!("self.{}", p.ident()));
     }
 
@@ -83,10 +83,14 @@ fn generate_unit_struct(scope: &mut CG::Scope, ast: &VelosiAst, unit: &VelosiAst
     for variant in unit.get_unit_names() {
         let variant_unit = ast.get_unit(variant).unwrap();
         add_specific_function(variant_unit, "map", imp);
-        add_specific_function(variant_unit, "protect", imp);
     }
 
     let op = unit.methods.get("unmap").expect("unmap method not found!");
+    add_delegate_function(ast, unit, op, imp);
+    let op = unit
+        .methods
+        .get("protect")
+        .expect("protect method not found!");
     add_delegate_function(ast, unit, op, imp);
 }
 
@@ -135,10 +139,7 @@ fn add_specific_function(variant_unit: &VelosiAstUnit, op_name: &str, imp: &mut 
         .ret(CG::Type::from("bool"));
 
     for f in op.params.iter() {
-        op_fn.arg(
-            f.ident(),
-            utils::vrs_type_to_rust_type(&f.ptype.typeinfo, variant_unit.ident()),
-        );
+        op_fn.arg(f.ident(), utils::vrs_type_to_rust_type(&f.ptype.typeinfo));
     }
 
     op_fn.line(format!(
@@ -163,10 +164,7 @@ fn add_delegate_function(
         .ret(CG::Type::from("bool"));
 
     for f in op.params.iter() {
-        op_fn.arg(
-            f.ident(),
-            utils::vrs_type_to_rust_type(&f.ptype.typeinfo, unit.ident()),
-        );
+        op_fn.arg(f.ident(), utils::vrs_type_to_rust_type(&f.ptype.typeinfo));
     }
 
     // check variant and delegate accordingly
@@ -227,12 +225,8 @@ pub fn generate(
 
     scope.new_comment("include references to the used units");
     for u in unit.get_unit_names() {
-        // import the struct itself as well as its' flags and interface
+        // import the struct itself as well as its' interface
         scope.import("crate", &utils::to_struct_name(u, None));
-        scope.import(
-            &format!("crate::{}", u.to_lowercase(),),
-            &utils::to_struct_name(u, Some("Flags")),
-        );
         scope.import(
             &format!("crate::{}", u.to_lowercase(),),
             &utils::to_struct_name(u, Some("Interface")),

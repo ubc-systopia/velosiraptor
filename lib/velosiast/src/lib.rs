@@ -34,6 +34,7 @@ use std::collections::hash_map::{Keys, Values, ValuesMut};
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
+use ast::VelosiAstFlags;
 // public re-exports
 pub use velosiparser::{VelosiParser, VelosiParserError, VelosiTokenStream};
 
@@ -202,6 +203,10 @@ impl VelosiAst {
 
     pub fn get_state_registers(&self) -> Vec<Rc<VelosiAstStateField>> {
         self.root.get_state_registers()
+    }
+
+    pub fn flags(&self) -> Option<&Rc<VelosiAstFlags>> {
+        self.root.flags.as_ref()
     }
 }
 

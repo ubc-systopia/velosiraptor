@@ -116,7 +116,7 @@ fn add_op_function(
         VelosiAstStaticMap::ListComp(map) => {
             let dest_unit = ast.get_unit(map.elm.dst.ident().as_str()).unwrap();
             match dest_unit {
-                VelosiAstUnit::Enum(e) if op_name == "map" || op_name == "protect" => {
+                VelosiAstUnit::Enum(e) if op_name == "map" => {
                     for variant in e.get_unit_names() {
                         let variant_unit = ast.get_unit(variant).unwrap();
                         let op = variant_unit.get_method(op_name).unwrap();
@@ -131,13 +131,7 @@ fn add_op_function(
                             .ret(CG::Type::from("bool"));
 
                         for f in op.params.iter() {
-                            op_fn.arg(
-                                f.ident(),
-                                utils::vrs_type_to_rust_type(
-                                    &f.ptype.typeinfo,
-                                    variant_unit.ident(),
-                                ),
-                            );
+                            op_fn.arg(f.ident(), utils::vrs_type_to_rust_type(&f.ptype.typeinfo));
                         }
                         op_fn.line(format!("// {}", map));
                         add_op_fn_body_listcomp(
@@ -163,10 +157,7 @@ fn add_op_function(
                         .ret(CG::Type::from("bool"));
 
                     for f in op.params.iter() {
-                        op_fn.arg(
-                            f.ident(),
-                            utils::vrs_type_to_rust_type(&f.ptype.typeinfo, dest_unit.ident()),
-                        );
+                        op_fn.arg(f.ident(), utils::vrs_type_to_rust_type(&f.ptype.typeinfo));
                     }
 
                     op_fn.line(format!("// {}", map));
@@ -198,7 +189,7 @@ fn generate_unit_struct(scope: &mut CG::Scope, ast: &VelosiAst, unit: &VelosiAst
         let loc = format!("@loc: {}", param.loc.loc());
         let mut f = CG::Field::new(
             param.ident(),
-            utils::vrs_type_to_rust_type(&param.ptype.typeinfo, &struct_name),
+            utils::vrs_type_to_rust_type(&param.ptype.typeinfo),
         );
         f.doc(vec![&doc, &loc]);
         st.push_field(f);
@@ -212,14 +203,11 @@ fn generate_unit_struct(scope: &mut CG::Scope, ast: &VelosiAst, unit: &VelosiAst
 
     // getters
     for p in &unit.params {
-        let getter =
-            imp.new_fn(p.ident())
-                .vis("pub")
-                .arg_ref_self()
-                .ret(utils::vrs_type_to_rust_type(
-                    &p.ptype.typeinfo,
-                    &struct_name,
-                ));
+        let getter = imp
+            .new_fn(p.ident())
+            .vis("pub")
+            .arg_ref_self()
+            .ret(utils::vrs_type_to_rust_type(&p.ptype.typeinfo));
         getter.line(format!("self.{}", p.ident()));
     }
 
@@ -260,25 +248,12 @@ pub fn generate(
 
     if let VelosiAstStaticMap::ListComp(map) = &unit.map {
         let dest_unit = ast.get_unit(map.elm.dst.ident().as_str()).unwrap();
-        match dest_unit {
-            VelosiAstUnit::Enum(e) => {
-                for variant in e.get_unit_names() {
-                    scope.import(
-                        &format!("crate::{}", variant.to_lowercase()),
-                        &utils::to_struct_name(variant, Some("Flags")),
-                    );
-
-                    let variant_unit = ast.get_unit(variant).unwrap();
-                    if let Some(map) = variant_unit.get_method("map") {
-                        utils::import_referenced_units(&mut scope, map);
-                    }
+        if let VelosiAstUnit::Enum(e) = dest_unit {
+            for variant in e.get_unit_names() {
+                let variant_unit = ast.get_unit(variant).unwrap();
+                if let Some(map) = variant_unit.get_method("map") {
+                    utils::import_referenced_units(&mut scope, map);
                 }
-            }
-            _ => {
-                scope.import(
-                    &format!("crate::{}", dest_unit.ident().to_lowercase()),
-                    &utils::to_struct_name(dest_unit.ident(), Some("Flags")),
-                );
             }
         }
     }

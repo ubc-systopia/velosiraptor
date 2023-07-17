@@ -110,7 +110,7 @@ impl BackendRust {
     ///
     /// This will setup the output directories, create the Toml file and
     /// create the `src` directory.
-    pub fn prepare(&self) -> Result<(), VelosiCodeGenError> {
+    pub fn prepare(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
         // create the output directory, if needed
 
         // create the package path
@@ -124,12 +124,12 @@ impl BackendRust {
         fs::create_dir_all(srcdir)?;
 
         // generate common utilities across units
-        self.generate_utils()?;
+        self.generate_utils(ast)?;
 
         Ok(())
     }
 
-    pub fn generate_utils(&self) -> Result<(), VelosiCodeGenError> {
+    pub fn generate_utils(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
         // get the source directory
         let srcdir = self.outdir.join("src");
 
@@ -143,6 +143,23 @@ impl BackendRust {
         scope.raw("pub type VirtAddr = u64;");
         scope.raw("pub type PhysAddr = u64;");
         scope.raw("pub type GenAddr = u64;");
+
+        if let Some(flags) = ast.flags() {
+            let st = scope.new_struct("Flags").vis("pub");
+            for flag in &flags.flags {
+                st.field(flag.ident(), "bool");
+            }
+
+            let imp = scope.new_impl("Flags");
+            for flag in &flags.flags {
+                let getter = imp
+                    .new_fn(flag.ident())
+                    .vis("pub")
+                    .arg_ref_self()
+                    .ret("bool");
+                getter.line(format!("self.{}", flag.ident()));
+            }
+        }
 
         save_scope(scope, &srcdir, MOD_UTILS)
     }

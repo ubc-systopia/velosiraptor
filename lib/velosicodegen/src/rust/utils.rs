@@ -79,7 +79,7 @@ pub fn num_to_rust_type(l: u64) -> &'static str {
 }
 
 /// obtains the appropriate rust type for the type info
-pub fn vrs_type_to_rust_type(ptype: &VelosiAstTypeInfo, unit_ident: &str) -> CG::Type {
+pub fn vrs_type_to_rust_type(ptype: &VelosiAstTypeInfo) -> CG::Type {
     match ptype {
         VelosiAstTypeInfo::Integer => CG::Type::new("u64"),
         VelosiAstTypeInfo::Bool => CG::Type::new("bool"),
@@ -87,7 +87,7 @@ pub fn vrs_type_to_rust_type(ptype: &VelosiAstTypeInfo, unit_ident: &str) -> CG:
         VelosiAstTypeInfo::VirtAddr => CG::Type::new("VirtAddr"),
         VelosiAstTypeInfo::PhysAddr => CG::Type::new("PhysAddr"),
         VelosiAstTypeInfo::Size => CG::Type::new("usize"),
-        VelosiAstTypeInfo::Flags => CG::Type::new(&to_struct_name(unit_ident, Some("Flags"))),
+        VelosiAstTypeInfo::Flags => CG::Type::new("Flags"),
         VelosiAstTypeInfo::TypeRef(s) => CG::Type::new(&to_struct_name(s, None)),
         _ => todo!(),
     }
@@ -263,7 +263,7 @@ pub fn op_to_rust_expr(
             format!("let {field}_{slice} = {field}.extract_{slice}();",)
         }
         VelosiOperation::WriteAction(field) => {
-            format!("self.interface.write_{field}(*{field});")
+            format!("self.interface.write_{field}({field});")
         }
         VelosiOperation::ReadAction(field) => {
             format!("let {field} = self.interface.read_{field}()")
@@ -355,7 +355,7 @@ fn opexpr_to_rust_expr(op: &VelosiOpExpr, ast: &VelosiAst, method: &VelosiAstMet
                 opexpr_to_rust_expr(y, ast, method)
             )
         }
-        VelosiOpExpr::Flags(v, f) => format!("{v}.{f}"),
+        VelosiOpExpr::Flags(v, f) => format!("{v}.{f}()"),
         VelosiOpExpr::Not(x) => format!("!{}", opexpr_to_rust_expr(x, ast, method)),
     }
 }
@@ -461,10 +461,7 @@ pub fn add_constructor_signature<'a>(
         .ret("Self")
         .set_unsafe(true);
     for p in params {
-        constructor.arg(
-            p.ident(),
-            vrs_type_to_rust_type(&p.ptype.typeinfo, unit_ident),
-        );
+        constructor.arg(p.ident(), vrs_type_to_rust_type(&p.ptype.typeinfo));
     }
     constructor
 }

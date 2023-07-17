@@ -60,10 +60,7 @@ pub fn generate_interface(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
     for p in &unit.params {
         let doc = format!("Parameter '{}' in unit '{}'", p.ident(), unit.ident());
         let loc = format!("@loc: {}", p.loc.loc());
-        let mut f = CG::Field::new(
-            p.ident(),
-            utils::vrs_type_to_rust_type(&p.ptype.typeinfo, &ifname),
-        );
+        let mut f = CG::Field::new(p.ident(), utils::vrs_type_to_rust_type(&p.ptype.typeinfo));
         f.doc(vec![&doc, &loc]);
         st.push_field(f);
     }
@@ -80,7 +77,7 @@ pub fn generate_interface(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
             .new_fn(p.ident())
             .vis("pub")
             .arg_ref_self()
-            .ret(utils::vrs_type_to_rust_type(&p.ptype.typeinfo, &ifname));
+            .ret(utils::vrs_type_to_rust_type(&p.ptype.typeinfo));
         getter.line(format!("self.{}", p.ident()));
     }
 
