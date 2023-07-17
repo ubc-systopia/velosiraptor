@@ -33,7 +33,7 @@ use codegen_rs as CG;
 
 // library internal includes
 use super::utils::{
-    add_header, save_scope, to_const_name, to_mask_str, to_rust_type, to_struct_name,
+    add_header, num_to_rust_type, save_scope, to_const_name, to_mask_str, to_struct_name,
 };
 use crate::VelosiCodeGenError;
 use velosiast::{VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField};
@@ -50,7 +50,7 @@ fn add_field_constants(scope: &mut CG::Scope, field: &VelosiAstInterfaceField) {
     // print the mask value
     let maskvalue = format!("0x{:x}", field.mask());
     // create and add the constant to the scope
-    let mconst = scope.new_const(&maskname, to_rust_type(field.nbits()), &maskvalue);
+    let mconst = scope.new_const(&maskname, num_to_rust_type(field.nbits()), &maskvalue);
     // adding the document comment
     mconst.doc(vec!["the mask value for the interface fields"]);
     // make it public
@@ -81,13 +81,13 @@ fn add_struct_definition(scope: &mut CG::Scope, field: &VelosiAstInterfaceField)
     ));
 
     // it has a single field, called 'val'
-    st.field("val", to_rust_type(field.nbits()));
+    st.field("val", num_to_rust_type(field.nbits()));
 }
 
 fn add_insert_fn(imp: &mut CG::Impl, fname: &str, fbits: u64, sl: &VelosiAstFieldSlice) {
     let fnname = format!("insert_{}", sl.ident());
-    let ftype = to_rust_type(sl.nbits());
-    let valtype = to_rust_type(fbits);
+    let ftype = num_to_rust_type(sl.nbits());
+    let valtype = num_to_rust_type(fbits);
     // set function
 
     let body = if sl.start != 0 {
@@ -119,7 +119,7 @@ fn add_insert_fn(imp: &mut CG::Impl, fname: &str, fbits: u64, sl: &VelosiAstFiel
 
 fn add_extract_fn(imp: &mut CG::Impl, fname: &str, sl: &VelosiAstFieldSlice) {
     let fnname = format!("extract_{}", sl.ident());
-    let ftype = to_rust_type(sl.nbits());
+    let ftype = num_to_rust_type(sl.nbits());
 
     let body = if sl.start != 0 {
         format!(

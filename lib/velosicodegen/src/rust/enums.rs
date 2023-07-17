@@ -52,7 +52,7 @@ fn generate_unit_struct(scope: &mut CG::Scope, ast: &VelosiAst, unit: &VelosiAst
         let loc = format!("@loc: {}", param.loc.loc());
         let mut field = CG::Field::new(
             param.ident(),
-            utils::ptype_to_rust_type(&param.ptype.typeinfo, &enum_name),
+            utils::vrs_type_to_rust_type(&param.ptype.typeinfo, &enum_name),
         );
         field.doc(vec![&doc, &loc]);
         en.push_field(field);
@@ -62,7 +62,17 @@ fn generate_unit_struct(scope: &mut CG::Scope, ast: &VelosiAst, unit: &VelosiAst
     let imp = scope.new_impl(&enum_name);
 
     // constructor
-    utils::add_constructor(imp, enum_name, &unit.params);
+    utils::add_constructor(imp, &enum_name, &unit.params);
+
+    // getters
+    for p in &unit.params {
+        let getter = imp
+            .new_fn(p.ident())
+            .vis("pub")
+            .arg_ref_self()
+            .ret(utils::vrs_type_to_rust_type(&p.ptype.typeinfo, &enum_name));
+        getter.line(format!("self.{}", p.ident()));
+    }
 
     // add differentiators
     for (variant, differentiator) in unit.get_unit_differentiators() {
@@ -103,7 +113,7 @@ fn add_differentiator_function(
         differentiator_fn.line(
             differentiator
                 .iter()
-                .map(|e| utils::astexpr_to_rust(e))
+                .map(|e| utils::astexpr_to_rust_expr(e, None))
                 .collect::<Vec<_>>()
                 .join(" && "),
         );
@@ -127,7 +137,7 @@ fn add_specific_function(variant_unit: &VelosiAstUnit, op_name: &str, imp: &mut 
     for f in op.params.iter() {
         op_fn.arg(
             f.ident(),
-            utils::ptype_to_rust_type(&f.ptype.typeinfo, variant_unit.ident()),
+            utils::vrs_type_to_rust_type(&f.ptype.typeinfo, variant_unit.ident()),
         );
     }
 
@@ -155,7 +165,7 @@ fn add_delegate_function(
     for f in op.params.iter() {
         op_fn.arg(
             f.ident(),
-            utils::ptype_to_rust_type(&f.ptype.typeinfo, unit.ident()),
+            utils::vrs_type_to_rust_type(&f.ptype.typeinfo, unit.ident()),
         );
     }
 
@@ -227,6 +237,11 @@ pub fn generate(
             &format!("crate::{}", u.to_lowercase(),),
             &utils::to_struct_name(u, Some("Interface")),
         );
+
+        let unit = ast.get_unit(u).unwrap();
+        if let Some(map) = unit.get_method("map") {
+            utils::import_referenced_units(&mut scope, map);
+        }
     }
 
     // add the definitions

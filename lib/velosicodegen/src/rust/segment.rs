@@ -29,7 +29,10 @@ use std::path::Path;
 
 use codegen_rs as CG;
 
-use velosiast::ast::{VelosiAstMethod, VelosiAstUnitSegment, VelosiOperation};
+use velosiast::{
+    ast::{VelosiAstMethod, VelosiAstUnitSegment, VelosiOperation},
+    VelosiAst,
+};
 
 use super::utils;
 use crate::VelosiCodeGenError;
@@ -64,7 +67,7 @@ fn add_unit_flags(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
     }
 }
 
-fn add_segment_struct(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
+fn add_segment_struct(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment, ast: &VelosiAst) {
     // create the struct in the scope
     let struct_name = utils::to_struct_name(unit.ident(), None);
     let st = scope.new_struct(&struct_name);
@@ -87,23 +90,36 @@ fn add_segment_struct(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
     let imp = scope.new_impl(&struct_name);
 
     // constructor
-    let constructor = utils::add_constructor_signature(imp, struct_name, &unit.params);
+    let constructor = utils::add_constructor_signature(imp, &struct_name, &unit.params);
     constructor.line(format!(
         "Self {{ interface: {}::new({}) }}",
         iface_name,
         utils::params_to_args_list(&unit.params)
     ));
 
+    // getters
+    for p in &unit.params {
+        let getter =
+            imp.new_fn(p.ident())
+                .vis("pub")
+                .arg_ref_self()
+                .ret(utils::vrs_type_to_rust_type(
+                    &p.ptype.typeinfo,
+                    &struct_name,
+                ));
+        getter.line(format!("self.interface.{}()", p.ident()));
+    }
+
     // op functions
     let op = unit.methods.get("map").expect("map method not found!");
-    add_op_fn(unit, op, imp);
+    add_op_fn(unit, ast, op, imp);
     let op = unit.methods.get("unmap").expect("unmap method not found!");
-    add_op_fn(unit, op, imp);
+    add_op_fn(unit, ast, op, imp);
     let op = unit
         .methods
         .get("protect")
         .expect("protect method not found!");
-    add_op_fn(unit, op, imp);
+    add_op_fn(unit, ast, op, imp);
 
     // valid function
     let op = unit.methods.get("valid").expect("valid method not found!");
@@ -115,39 +131,51 @@ fn add_segment_struct(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
             f.ident()
         ));
     }
-    valid.line(utils::astexpr_to_rust(op.body.as_ref().unwrap()));
+    valid.line(utils::astexpr_to_rust_expr(op.body.as_ref().unwrap(), None));
 }
 
-fn add_op_fn(unit: &VelosiAstUnitSegment, op: &VelosiAstMethod, imp: &mut CG::Impl) {
-    let op_fn = imp.new_fn(op.ident()).vis("pub").arg_ref_self().ret("bool");
+fn add_op_fn(
+    unit: &VelosiAstUnitSegment,
+    ast: &VelosiAst,
+    method: &VelosiAstMethod,
+    imp: &mut CG::Impl,
+) {
+    let op_fn = imp
+        .new_fn(method.ident())
+        .vis("pub")
+        .arg_ref_self()
+        .ret("bool");
 
-    for f in op.params.iter() {
+    for f in method.params.iter() {
         op_fn.arg(
             f.ident(),
-            utils::ptype_to_rust_type(&f.ptype.typeinfo, unit.ident()),
+            utils::vrs_type_to_rust_type(&f.ptype.typeinfo, unit.ident()),
         );
     }
 
     // add requires
-    if op.requires.is_empty() {
+    if method.requires.is_empty() {
         op_fn.line("// no requires clauses");
     } else {
         op_fn.line("// asserts for the requires clauses");
     }
-    for r in op.requires.iter() {
-        op_fn.line(format!("assert!({});", utils::astexpr_to_rust(r)));
+    for r in method.requires.iter() {
+        op_fn.line(format!(
+            "assert!({});",
+            utils::astexpr_to_rust_expr(r, Some(ast))
+        ));
     }
     op_fn.line("");
 
-    if !op.ops.is_empty() {
+    if !method.ops.is_empty() {
         op_fn.line("// configuration sequence");
-        let mut iter = op.ops.iter().peekable();
+        let mut iter = method.ops.iter().peekable();
         while let Some(op) = iter.next() {
             // if next op is a write action, end the method call chain
             if matches!(iter.peek(), Some(VelosiOperation::WriteAction(_))) {
-                op_fn.line(utils::op_to_rust_expr(op, &unit.interface) + ";");
+                op_fn.line(utils::op_to_rust_expr(op, &unit.interface, ast, method) + ";");
             } else {
-                op_fn.line(utils::op_to_rust_expr(op, &unit.interface));
+                op_fn.line(utils::op_to_rust_expr(op, &unit.interface, ast, method));
             }
         }
         op_fn.line("true");
@@ -158,7 +186,11 @@ fn add_op_fn(unit: &VelosiAstUnitSegment, op: &VelosiAstMethod, imp: &mut CG::Im
 }
 
 /// generates the VelosiAstUnitSegment definitions
-pub fn generate(unit: &VelosiAstUnitSegment, outdir: &Path) -> Result<(), VelosiCodeGenError> {
+pub fn generate(
+    unit: &VelosiAstUnitSegment,
+    ast: &VelosiAst,
+    outdir: &Path,
+) -> Result<(), VelosiCodeGenError> {
     log::info!("Generating segment unit {}", unit.ident());
 
     // the code generation scope
@@ -174,11 +206,14 @@ pub fn generate(unit: &VelosiAstUnitSegment, outdir: &Path) -> Result<(), Velosi
     // add import for the interface
     let iface_name = utils::to_struct_name(unit.ident(), Some("Interface"));
     scope.import("super", &iface_name);
+    if let Some(map) = unit.get_method("map") {
+        utils::import_referenced_units(&mut scope, map);
+    }
 
     // add the definitions
     add_unit_constants(&mut scope, unit);
     add_unit_flags(&mut scope, unit);
-    add_segment_struct(&mut scope, unit);
+    add_segment_struct(&mut scope, unit, ast);
 
     // save the scope
     utils::save_scope(scope, outdir, "unit")
