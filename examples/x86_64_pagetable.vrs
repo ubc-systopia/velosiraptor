@@ -47,7 +47,7 @@ flags {
 }
 
 
-abstract segment X86_64_PTableDescriptor(base: addr) {
+abstract segment X86_64_PTableDescriptor(base: paddr) {
 
     outbitwidth = PHYS_ADDR_BITS;
 
@@ -60,7 +60,7 @@ abstract segment X86_64_PTableDescriptor(base: addr) {
         bar
     };
 
-    state = StateDef(base: addr) {
+    state = StateDef(base: paddr) {
         mem entry [ base, 0, 8 ] {
             0 ..  1 present,  // whether this entry is valid
             1 ..  2 rw,       // Read/write; if 0, writes may not be allowed to the 512-GByte region controlled by this entry
@@ -78,7 +78,7 @@ abstract segment X86_64_PTableDescriptor(base: addr) {
         }
     };
 
-    interface = InterfaceDef(base: addr) {
+    interface = InterfaceDef(base: paddr) {
         mem entry [ base, 0, 8 ]
     };
 
@@ -106,7 +106,7 @@ abstract segment X86_64_PTableDescriptor(base: addr) {
     }
 }
 
-abstract segment X86_64_PageDescriptor(base: addr) {
+abstract segment X86_64_PageDescriptor(base: paddr) {
     outbitwidth = PHYS_ADDR_BITS;
 
     flags = {
@@ -126,11 +126,11 @@ abstract segment X86_64_PageDescriptor(base: addr) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-segment X86_64_PageTableEntry(base: addr) : X86_64_PageDescriptor {
+segment X86_64_PageTableEntry(base: paddr) : X86_64_PageDescriptor {
 
     inbitwidth = 12;
 
-    state = StateDef(base: addr) {
+    state = StateDef(base: paddr) {
         mem entry [ base, 0, 8 ] {
             0 ..  1 present,  // the present bit indicating this entry is valid
             1 ..  2 rw,       // Read/write; if 0, writes may not be allowed to the page
@@ -150,7 +150,7 @@ segment X86_64_PageTableEntry(base: addr) : X86_64_PageDescriptor {
         }
     };
 
-    interface = InterfaceDef(base: addr) {
+    interface = InterfaceDef(base: paddr) {
         mem entry [ base, 0, 8 ]
     };
 
@@ -189,7 +189,7 @@ segment X86_64_PageTableEntry(base: addr) : X86_64_PageDescriptor {
     synth fn unmap(va: vaddr, sz: size);
 }
 
-staticmap X86_64_PageTable(base : addr) {
+staticmap X86_64_PageTable(base : paddr) {
     // should be able to specify the alignment constraints here
     // mapdef = [ X86_64_PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..PTABLE_ENTRIES ];
     mapdef = [ X86_64_PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..512 ];
@@ -201,7 +201,7 @@ staticmap X86_64_PageTable(base : addr) {
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-segment X86_64_PDirEntryTable(base : addr) : X86_64_PTableDescriptor {
+segment X86_64_PDirEntryTable(base : paddr) : X86_64_PTableDescriptor {
 
     inbitwidth = LARGE_PAGE_BITS;
 
@@ -214,10 +214,10 @@ segment X86_64_PDirEntryTable(base : addr) : X86_64_PTableDescriptor {
     synth fn unmap(va: vaddr, sz: size);
 }
 
-segment X86_64_PDirEntryPage(base :addr) : X86_64_PageDescriptor {
+segment X86_64_PDirEntryPage(base :paddr) : X86_64_PageDescriptor {
     inbitwidth = LARGE_PAGE_BITS;
 
-    state = StateDef(base :addr) {
+    state = StateDef(base :paddr) {
         mem entry [ base, 0, 8] {
             0 ..  1 present,
             1 ..  2 rw,  // Read/write; if 0, writes may not be allowed to the page
@@ -239,7 +239,7 @@ segment X86_64_PDirEntryPage(base :addr) : X86_64_PageDescriptor {
         }
     };
 
-    interface = InterfaceDef(base: addr) {
+    interface = InterfaceDef(base: paddr) {
         mem entry [ base, 0, 8 ]
     };
 
@@ -279,12 +279,12 @@ segment X86_64_PDirEntryPage(base :addr) : X86_64_PageDescriptor {
         requires va == 0 && sz == LARGE_PAGE_SIZE
 }
 
-enum X86_64_PDirEntry(base: addr){
+enum X86_64_PDirEntry(base: paddr){
     X86_64_PDirEntryTable(base),
     X86_64_PDirEntryPage(base)
 }
 
-staticmap X86_64_PDir(base : addr) {
+staticmap X86_64_PDir(base : paddr) {
     mapdef = [ X86_64_PDirEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..512 ];
 }
 
@@ -294,7 +294,7 @@ staticmap X86_64_PDir(base : addr) {
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-segment X86_64_PDPTEntryTable(base : addr) : X86_64_PTableDescriptor {
+segment X86_64_PDPTEntryTable(base : paddr) : X86_64_PTableDescriptor {
 
     inbitwidth = HUGE_PAGE_BITS;
 
@@ -307,11 +307,11 @@ segment X86_64_PDPTEntryTable(base : addr) : X86_64_PTableDescriptor {
     synth fn unmap(va: vaddr, sz: size);
 }
 
-segment X86_64_PDPTEntryPage(base: addr) : X86_64_PageDescriptor {
+segment X86_64_PDPTEntryPage(base: paddr) : X86_64_PageDescriptor {
 
     inbitwidth = HUGE_PAGE_BITS;
 
-    state = StateDef(base :addr) {
+    state = StateDef(base :paddr) {
         mem entry [ base, 0, 8] {
             0 ..  1 present,
             1 ..  2 rw,  // Read/write; if 0, writes may not be allowed to the page
@@ -333,7 +333,7 @@ segment X86_64_PDPTEntryPage(base: addr) : X86_64_PageDescriptor {
         }
     };
 
-    interface = InterfaceDef(base: addr) {
+    interface = InterfaceDef(base: paddr) {
         mem entry [ base, 0, 8 ]
     };
 
@@ -377,12 +377,12 @@ segment X86_64_PDPTEntryPage(base: addr) : X86_64_PageDescriptor {
 
 }
 
-enum X86_64_PDPTEntry(base: addr) {
+enum X86_64_PDPTEntry(base: paddr) {
     X86_64_PDPTEntryTable(base),
     X86_64_PDPTEntryPage(base)
 }
 
-staticmap X86_64_PDPT(base: addr) {
+staticmap X86_64_PDPT(base: paddr) {
     mapdef = [ X86_64_PDPTEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..512 ];
 }
 
@@ -392,7 +392,7 @@ staticmap X86_64_PDPT(base: addr) {
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-segment X86_64_PML4Entry(base : addr) : X86_64_PTableDescriptor {
+segment X86_64_PML4Entry(base : paddr) : X86_64_PTableDescriptor {
 
     inbitwidth = PML4_PAGE_BITS;
 
@@ -405,7 +405,7 @@ segment X86_64_PML4Entry(base : addr) : X86_64_PTableDescriptor {
     synth fn unmap(va: vaddr, sz: size);
 }
 
-staticmap X86_64_PML4(base : addr) {
+staticmap X86_64_PML4(base : paddr) {
     mapdef = [ X86_64_PML4Entry(base + i * PTABLE_ENTRY_SIZE) for i in 0..512 ];
 }
 
@@ -418,7 +418,7 @@ staticmap X86_64_PML4(base : addr) {
 
 
 
-segment X86_MMU(base: addr) {
+segment X86_MMU(base: paddr) {
 
     inbitwidth = VSPACE_BITS;
 
@@ -434,7 +434,7 @@ segment X86_MMU(base: addr) {
         bar
     };
 
-    state = StateDef(base: addr) {
+    state = StateDef(base: paddr) {
         reg cr3 [ 8 ] {
             0 .. 12 pcid,
             12 .. 64 address
@@ -446,7 +446,7 @@ segment X86_MMU(base: addr) {
     };
 
     // making these as an MMIO register so we can access them.
-    interface = InterfaceDef(base: addr) {
+    interface = InterfaceDef(base: paddr) {
         mmio cr3 [ base, 0, 8 ],
         mmio cr4 [ base, 8, 4 ]
     };

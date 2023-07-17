@@ -224,7 +224,7 @@ impl BackendRust {
                         scope.raw("pub use interface::*;");
 
                         fs::create_dir_all(&srcdir)?;
-                        segment::generate(segment, &srcdir).expect("code generation failed\n");
+                        segment::generate(segment, ast, &srcdir).expect("code generation failed\n");
                     }
                 }
                 VelosiAstUnit::StaticMap(staticmap) => {

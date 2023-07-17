@@ -104,6 +104,11 @@ impl VelosiAstTypeInfo {
         matches!(self, GenAddr | VirtAddr | PhysAddr)
     }
 
+    // whether this is a physical address type
+    pub fn is_paddr(&self) -> bool {
+        matches!(self, Self::PhysAddr)
+    }
+
     // whether this is type refereces of another unit
     pub fn is_typeref(&self) -> bool {
         matches!(self, VelosiAstTypeInfo::TypeRef(_))

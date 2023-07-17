@@ -85,7 +85,7 @@ fn add_op_fn_body_listcomp(
             .dst
             .args
             .iter()
-            .map(utils::astexpr_to_rust)
+            .map(|e| utils::astexpr_to_rust_expr(e, None))
             .collect::<Vec<_>>()
             .join(", "),
     ));
@@ -133,7 +133,10 @@ fn add_op_function(
                         for f in op.params.iter() {
                             op_fn.arg(
                                 f.ident(),
-                                utils::ptype_to_rust_type(&f.ptype.typeinfo, variant_unit.ident()),
+                                utils::vrs_type_to_rust_type(
+                                    &f.ptype.typeinfo,
+                                    variant_unit.ident(),
+                                ),
                             );
                         }
                         op_fn.line(format!("// {}", map));
@@ -148,7 +151,11 @@ fn add_op_function(
                     }
                 }
                 _ => {
-                    let op = unit.get_method(op_name).unwrap();
+                    let op = if dest_unit.is_enum() {
+                        unit.get_method(op_name).unwrap()
+                    } else {
+                        dest_unit.get_method(op_name).unwrap()
+                    };
                     let op_fn = imp
                         .new_fn(op.ident())
                         .vis("pub")
@@ -158,7 +165,7 @@ fn add_op_function(
                     for f in op.params.iter() {
                         op_fn.arg(
                             f.ident(),
-                            utils::ptype_to_rust_type(&f.ptype.typeinfo, dest_unit.ident()),
+                            utils::vrs_type_to_rust_type(&f.ptype.typeinfo, dest_unit.ident()),
                         );
                     }
 
@@ -191,7 +198,7 @@ fn generate_unit_struct(scope: &mut CG::Scope, ast: &VelosiAst, unit: &VelosiAst
         let loc = format!("@loc: {}", param.loc.loc());
         let mut f = CG::Field::new(
             param.ident(),
-            utils::ptype_to_rust_type(&param.ptype.typeinfo, &struct_name),
+            utils::vrs_type_to_rust_type(&param.ptype.typeinfo, &struct_name),
         );
         f.doc(vec![&doc, &loc]);
         st.push_field(f);
@@ -201,7 +208,20 @@ fn generate_unit_struct(scope: &mut CG::Scope, ast: &VelosiAst, unit: &VelosiAst
     let imp = scope.new_impl(&struct_name);
 
     // constructor
-    utils::add_constructor(imp, struct_name, &unit.params);
+    utils::add_constructor(imp, &struct_name, &unit.params);
+
+    // getters
+    for p in &unit.params {
+        let getter =
+            imp.new_fn(p.ident())
+                .vis("pub")
+                .arg_ref_self()
+                .ret(utils::vrs_type_to_rust_type(
+                    &p.ptype.typeinfo,
+                    &struct_name,
+                ));
+        getter.line(format!("self.{}", p.ident()));
+    }
 
     // op functions
     add_op_function(ast, unit, "map", imp);
@@ -231,6 +251,11 @@ pub fn generate(
     scope.new_comment("include references to the used units");
     for u in unit.map.get_unit_names().iter() {
         scope.import("crate", &utils::to_struct_name(u, None));
+
+        let unit = ast.get_unit(u).unwrap();
+        if let Some(map) = unit.get_method("map") {
+            utils::import_referenced_units(&mut scope, map);
+        }
     }
 
     if let VelosiAstStaticMap::ListComp(map) = &unit.map {
@@ -242,6 +267,11 @@ pub fn generate(
                         &format!("crate::{}", variant.to_lowercase()),
                         &utils::to_struct_name(variant, Some("Flags")),
                     );
+
+                    let variant_unit = ast.get_unit(variant).unwrap();
+                    if let Some(map) = variant_unit.get_method("map") {
+                        utils::import_referenced_units(&mut scope, map);
+                    }
                 }
             }
             _ => {

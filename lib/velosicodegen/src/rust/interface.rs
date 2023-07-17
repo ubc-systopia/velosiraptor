@@ -62,7 +62,7 @@ pub fn generate_interface(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
         let loc = format!("@loc: {}", p.loc.loc());
         let mut f = CG::Field::new(
             p.ident(),
-            utils::ptype_to_rust_type(&p.ptype.typeinfo, &ifname),
+            utils::vrs_type_to_rust_type(&p.ptype.typeinfo, &ifname),
         );
         f.doc(vec![&doc, &loc]);
         st.push_field(f);
@@ -72,7 +72,17 @@ pub fn generate_interface(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
     let imp = scope.new_impl(&ifname);
 
     // constructor
-    utils::add_constructor(imp, ifname, &unit.params);
+    utils::add_constructor(imp, &ifname, &unit.params);
+
+    // getters
+    for p in &unit.params {
+        let getter = imp
+            .new_fn(p.ident())
+            .vis("pub")
+            .arg_ref_self()
+            .ret(utils::vrs_type_to_rust_type(&p.ptype.typeinfo, &ifname));
+        getter.line(format!("self.{}", p.ident()));
+    }
 
     for f in unit.interface.fields() {
         generate_read_field(f, imp);
