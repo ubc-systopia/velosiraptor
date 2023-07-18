@@ -64,6 +64,52 @@ impl Relations {
         Self(HashMap::new())
     }
 
+    pub fn from_ast(ast: &VelosiAst) -> Self {
+        let units = ast.units();
+        let mut relations = Self::new();
+
+        for unit in units {
+            if unit.is_abstract() {
+                continue;
+            }
+
+            use VelosiAstUnit::*;
+            match unit {
+                Segment(u) => {
+                    let mmap = u.get_method("map").unwrap();
+                    let next = mmap.get_param("pa").unwrap();
+                    if next.ptype.is_typeref() {
+                        let f = next.ptype.typeref().unwrap().clone();
+                        relations.insert(u.ident().clone(), ast.get_unit(&f).unwrap().clone());
+                    } else if !next.ptype.is_addr() {
+                        unreachable!();
+                    }
+                }
+                StaticMap(u) => match &u.map {
+                    VelosiAstStaticMap::ListComp(m) => {
+                        relations.insert(
+                            u.ident().clone(),
+                            ast.get_unit(m.elm.dst.ident()).unwrap().clone(),
+                        );
+                    }
+                    VelosiAstStaticMap::Explicit(_) => {
+                        unimplemented!("handle explicit maps")
+                    }
+                    _ => {
+                        unreachable!();
+                    }
+                },
+                Enum(u) => {
+                    for next in &u.get_unit_names() {
+                        relations.insert(u.ident().clone(), ast.get_unit(next).unwrap().clone());
+                    }
+                }
+            }
+        }
+
+        relations
+    }
+
     pub fn insert(&mut self, key: Rc<String>, value: VelosiAstUnit) {
         let entry = self.0.entry(key).or_insert_with(Vec::new);
         entry.push(value);

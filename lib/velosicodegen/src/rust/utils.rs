@@ -79,17 +79,20 @@ pub fn num_to_rust_type(l: u64) -> &'static str {
 }
 
 /// obtains the appropriate rust type for the type info
-pub fn vrs_type_to_rust_type(ptype: &VelosiAstTypeInfo) -> CG::Type {
-    match ptype {
-        VelosiAstTypeInfo::Integer => CG::Type::new("u64"),
-        VelosiAstTypeInfo::Bool => CG::Type::new("bool"),
-        VelosiAstTypeInfo::GenAddr => CG::Type::new("GenAddr"),
-        VelosiAstTypeInfo::VirtAddr => CG::Type::new("VirtAddr"),
-        VelosiAstTypeInfo::PhysAddr => CG::Type::new("PhysAddr"),
-        VelosiAstTypeInfo::Size => CG::Type::new("usize"),
-        VelosiAstTypeInfo::Flags => CG::Type::new("Flags"),
-        VelosiAstTypeInfo::TypeRef(s) => CG::Type::new(&to_struct_name(s, None)),
-        _ => todo!(),
+pub fn vrs_type_to_rust_type(ty: &VelosiAstTypeInfo) -> String {
+    match ty {
+        VelosiAstTypeInfo::Integer => "u64".to_string(),
+        VelosiAstTypeInfo::Bool => "bool".to_string(),
+        VelosiAstTypeInfo::GenAddr => "GenAddr".to_string(),
+        VelosiAstTypeInfo::VirtAddr => "VirtAddr".to_string(),
+        VelosiAstTypeInfo::PhysAddr => "PhysAddr".to_string(),
+        VelosiAstTypeInfo::Size => "usize".to_string(),
+        VelosiAstTypeInfo::Flags => "Flags".to_string(),
+        VelosiAstTypeInfo::TypeRef(s) => to_struct_name(s, None),
+        VelosiAstTypeInfo::Range => todo!(),
+        VelosiAstTypeInfo::State => todo!(),
+        VelosiAstTypeInfo::Interface => todo!(),
+        VelosiAstTypeInfo::Void => todo!(),
     }
 }
 
@@ -232,7 +235,16 @@ pub fn astexpr_to_rust_expr(expr: &VelosiAstExpr, ident_ctx: Option<&VelosiAst>)
             VelosiAstUnOp::Not => format!("~{}", astexpr_to_rust_expr(&i.expr, ident_ctx)),
             VelosiAstUnOp::LNot => format!("!{}", astexpr_to_rust_expr(&i.expr, ident_ctx)),
         },
-        _ => todo!(),
+        VelosiAstExpr::IfElse(ite) => format!(
+            "if {} {{ {} }} else {{ {} }}",
+            astexpr_to_rust_expr(&ite.cond, ident_ctx),
+            astexpr_to_rust_expr(&ite.then, ident_ctx),
+            astexpr_to_rust_expr(&ite.other, ident_ctx)
+        ),
+        VelosiAstExpr::Quantifier(_) => todo!(),
+        VelosiAstExpr::FnCall(_) => todo!(),
+        VelosiAstExpr::Slice(_) => todo!(),
+        VelosiAstExpr::Range(_) => todo!(),
     }
 }
 
