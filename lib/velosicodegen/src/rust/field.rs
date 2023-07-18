@@ -109,10 +109,14 @@ fn add_insert_fn(imp: &mut CG::Impl, fname: &str, fbits: u64, sl: &VelosiAstFiel
 
     imp.new_fn(&fnname)
         .vis("pub")
-        .arg_mut_self()
+        .mut_arg_self()
         .arg("val", CG::Type::new(ftype))
-        .doc(&format!("inserts value {}.{} in field", fname, sl.ident()))
-        .ret("&mut Self")
+        .doc(&format!(
+            "inserts value {}.{} in the field",
+            fname,
+            sl.ident()
+        ))
+        .ret("Self")
         .line(body)
         .line("self");
 }
@@ -140,7 +144,7 @@ fn add_extract_fn(imp: &mut CG::Impl, fname: &str, sl: &VelosiAstFieldSlice) {
     imp.new_fn(&fnname)
         .vis("pub")
         .doc(&format!(
-            "extracts value {}.{} from field",
+            "extracts value {}.{} from the field",
             fname,
             sl.ident()
         ))
