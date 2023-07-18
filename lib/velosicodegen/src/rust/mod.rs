@@ -146,6 +146,8 @@ impl BackendRust {
 
         if let Some(flags) = ast.flags() {
             let st = scope.new_struct("Flags").vis("pub");
+            st.derive("Copy");
+            st.derive("Clone");
             for flag in &flags.flags {
                 let mut field = CG::Field::new(flag.ident(), "bool");
                 field.annotation(vec!["pub"]);

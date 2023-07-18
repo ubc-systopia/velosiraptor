@@ -12,6 +12,7 @@ readme = "README.md"
 [dependencies]
 velosiast = { path = "../velosiast" }
 velosisynth = { path = "../velosisynth" }
+velosicomposition = { path = "../velosicomposition" }
 
 
 colored = "2.0.0"

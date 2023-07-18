@@ -33,6 +33,7 @@ use velosiast::{
     ast::{VelosiAstMethod, VelosiAstUnitSegment, VelosiOperation},
     VelosiAst,
 };
+use velosicomposition::Relations;
 
 use super::utils;
 use crate::VelosiCodeGenError;
@@ -58,6 +59,9 @@ fn add_segment_struct(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment, ast: &
 
     // make it public
     st.vis("pub");
+
+    st.derive("Copy");
+    st.derive("Clone");
 
     // add the doc field to the struct
     st.doc(&format!(
@@ -103,16 +107,10 @@ fn add_segment_struct(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment, ast: &
     add_op_fn(unit, ast, op, imp);
 
     // valid function
-    let op = unit.methods.get("valid").expect("valid method not found!");
-    let valid = imp.new_fn(op.ident()).vis("pub").arg_ref_self().ret("bool");
-    for f in unit.state.fields() {
-        valid.line(format!(
-            "let {} = self.interface.read_{}();",
-            f.ident(),
-            f.ident()
-        ));
-    }
-    valid.line(utils::astexpr_to_rust_expr(op.body.as_ref().unwrap(), None));
+    add_valid_fn(unit, imp);
+
+    // resolve function
+    add_resolve_fn(ast, unit, imp);
 }
 
 fn add_op_fn(
@@ -160,6 +158,58 @@ fn add_op_fn(
     } else {
         op_fn.line("// there is no configuration sequence");
         op_fn.line("false");
+    }
+}
+
+fn add_valid_fn(unit: &VelosiAstUnitSegment, imp: &mut CG::Impl) {
+    let op = unit.methods.get("valid").expect("valid method not found!");
+    let valid = imp.new_fn(op.ident()).vis("pub").arg_ref_self().ret("bool");
+    for f in unit.state.fields() {
+        valid.line(format!(
+            "let {} = self.interface.read_{}();",
+            f.ident(),
+            f.ident()
+        ));
+    }
+    valid.line(utils::astexpr_to_rust_expr(op.body.as_ref().unwrap(), None));
+}
+
+fn add_resolve_fn(ast: &VelosiAst, unit: &VelosiAstUnitSegment, imp: &mut CG::Impl) {
+    let relations = Relations::from_ast(ast);
+    if let Some(children) = relations.0.get(unit.ident()) {
+        if !children.is_empty() {
+            let child = &children[0];
+
+            // add the translate function as a helper
+            let op = unit
+                .methods
+                .get("translate")
+                .expect("map method not found!");
+            let translate = imp
+                .new_fn("translate")
+                .arg_ref_self()
+                .ret(utils::vrs_type_to_rust_type(&op.rtype.typeinfo));
+            for p in &op.params {
+                translate.arg(p.ident(), utils::vrs_type_to_rust_type(&p.ptype.typeinfo));
+            }
+
+            for f in unit.state.fields() {
+                translate.line(format!(
+                    "let {} = self.interface.read_{}();",
+                    f.ident(),
+                    f.ident()
+                ));
+            }
+            translate.line(utils::astexpr_to_rust_expr(op.body.as_ref().unwrap(), None));
+
+            // add resolve
+            let ret_ty = utils::to_struct_name(child.ident(), None);
+            let resolve = imp.new_fn("resolve").vis("pub").arg_ref_self().ret(&ret_ty);
+
+            resolve.line("let paddr = self.translate(0);");
+            resolve.line(format!("let ptr = paddr as *mut {};", ret_ty));
+            resolve.line("unsafe { *ptr }");
+        }
     }
 }
 

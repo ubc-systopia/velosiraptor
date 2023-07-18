@@ -57,6 +57,9 @@ pub fn generate_interface(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
     // c representation
     st.repr("C");
 
+    st.derive("Copy");
+    st.derive("Clone");
+
     for p in &unit.params {
         let doc = format!("Parameter '{}' in unit '{}'", p.ident(), unit.ident());
         let loc = format!("@loc: {}", p.loc.loc());
