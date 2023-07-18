@@ -355,7 +355,7 @@ fn opexpr_to_rust_expr(op: &VelosiOpExpr, ast: &VelosiAst, method: &VelosiAstMet
                 opexpr_to_rust_expr(y, ast, method)
             )
         }
-        VelosiOpExpr::Flags(v, f) => format!("{v}.{f}()"),
+        VelosiOpExpr::Flags(v, f) => format!("{v}.{f}"),
         VelosiOpExpr::Not(x) => format!("!{}", opexpr_to_rust_expr(x, ast, method)),
     }
 }
