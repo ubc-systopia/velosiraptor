@@ -147,17 +147,9 @@ impl BackendRust {
         if let Some(flags) = ast.flags() {
             let st = scope.new_struct("Flags").vis("pub");
             for flag in &flags.flags {
-                st.field(flag.ident(), "bool");
-            }
-
-            let imp = scope.new_impl("Flags");
-            for flag in &flags.flags {
-                let getter = imp
-                    .new_fn(flag.ident())
-                    .vis("pub")
-                    .arg_ref_self()
-                    .ret("bool");
-                getter.line(format!("self.{}", flag.ident()));
+                let mut field = CG::Field::new(flag.ident(), "bool");
+                field.annotation(vec!["pub"]);
+                st.push_field(field);
             }
         }
 
