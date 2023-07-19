@@ -677,11 +677,6 @@ impl Display for FieldActions {
                         write!(f, "\n    ")?;
                     }
                     write!(f, ".set({})", e)?;
-                    if !newline {
-                        write!(f, "\n    ")?;
-                    }
-                    write!(f, ".write()")?;
-                    newline = true;
                 }
                 FieldOp::InsertFieldSlices(ops) => {
                     for op in ops {
@@ -690,15 +685,12 @@ impl Display for FieldActions {
                         }
                         Display::fmt(&op, f)?;
                     }
-                    if !newline {
-                        write!(f, "\n    ")?;
-                    }
-                    write!(f, ".write()")?;
-                    newline = true;
                 }
                 FieldOp::ReadAction => write!(f, ".read()")?,
             }
         }
+        writeln!(f, "\n    .write()")?;
+
         Ok(())
     }
 }
