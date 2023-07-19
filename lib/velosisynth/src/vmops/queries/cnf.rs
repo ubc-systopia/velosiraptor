@@ -60,26 +60,32 @@ use super::ProgramBuilder;
 use crate::ProgramsIter;
 impl ProgramBuilder for ProgramsIter {
     fn next(&mut self, _z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
-        panic!("foo")
+        self.programs.pop().into()
     }
 
     fn m_op(&self) -> &VelosiAstMethod {
-        panic!("to_smt_query called on ProgramsIter!")
+        panic!("m_op shoud not be called on ProgramsIter!")
     }
 
     /// the assumptions for the program
     fn assms(&self) -> Rc<Vec<Term>> {
-        panic!("foo")
+        panic!("assms shoud not be called on ProgramsIter")
     }
 
     /// the expression that the program needs to establish
     fn goal_expr(&self) -> Rc<VelosiAstExpr> {
-        panic!("foo")
+        panic!("goal_expr shoud not be called on ProgramsIter")
     }
 
     fn do_fmt(&self, f: &mut Formatter<'_>, indent: usize, debug: bool) -> FmtResult {
         let i = " ".repeat(indent);
-        writeln!(f, "{i}  + ProgramsIter (num: {})", self.programs.len())
+        writeln!(
+            f,
+            "{i}  + ProgramsIter (num: {} / {})",
+            self.stat_num_programs - self.programs.len(),
+            self.stat_num_programs
+        )?;
+        Ok(())
     }
 }
 
@@ -208,7 +214,7 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
                     .into_iter()
                     .map(|p| {
                         exprs.push(p.goal_expr());
-                        ProgramVerifier::with_batchsize(prefix.to_string(), p, batch_size, priority)
+                        ProgramVerifier::with_batchsize(prefix.clone(), p, batch_size, priority)
                             .into()
                     })
                     .collect();
@@ -227,7 +233,7 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
                     if let Some(bool_expr_query) = bool_expr_query {
                         candidate_programs.push(
                             ProgramVerifier::with_batchsize(
-                                prefix.to_string(),
+                                prefix.clone(),
                                 Box::new(bool_expr_query),
                                 self.batchsize,
                                 self.priority,
@@ -341,8 +347,13 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
                     let candidate_programs = queries
                         .into_iter()
                         .map(|p| {
-                            ProgramVerifier::with_batchsize(Box::new(p), batch_size, priority)
-                                .into()
+                            ProgramVerifier::with_batchsize(
+                                prefix.clone(),
+                                Box::new(p),
+                                batch_size,
+                                priority,
+                            )
+                            .into()
                         })
                         .collect();
 
@@ -373,7 +384,13 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
                 let candidate_programs = queries
                     .into_iter()
                     .map(|p| {
-                        ProgramVerifier::with_batchsize(Box::new(p), batch_size, priority).into()
+                        ProgramVerifier::with_batchsize(
+                            prefix.clone(),
+                            Box::new(p),
+                            batch_size,
+                            priority,
+                        )
+                        .into()
                     })
                     .collect();
 
@@ -426,7 +443,7 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
                     .into_iter()
                     .map(|p| {
                         exprs.push(p.goal_expr());
-                        ProgramVerifier::with_batchsize(prefix.to_string(), p, batch_size, priority)
+                        ProgramVerifier::with_batchsize(prefix.clone(), p, batch_size, priority)
                             .into()
                     })
                     .collect();
@@ -445,7 +462,7 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
                     if let Some(bool_expr_query) = bool_expr_query {
                         candidate_programs.push(
                             ProgramVerifier::with_batchsize(
-                                prefix.to_string(),
+                                prefix.clone(),
                                 Box::new(bool_expr_query),
                                 self.batchsize,
                                 self.priority,
@@ -770,20 +787,24 @@ impl ProgramBuilder for CompoundQueryAll {
         }
 
         // loop over all program parts, and check if there is one next
-        let mut had_pending = false;
+        let mut programs_ready = true;
 
         for i in 0..self.partial_programs.len() {
+            // nothing to be done here
             if self.done[i] {
+                continue;
+            }
+
+            programs_ready &= !self.partial_programs[i].is_empty();
+
+            // if we still have partial programs, we can skip that one
+            if self.partial_program_idx[i] < self.partial_programs[i].len() {
                 continue;
             }
 
             match self.candidate_programs[i].next(z3) {
                 MaybeResult::Some(program) => self.partial_programs[i].push(program),
-                // it's a pending result
-                MaybeResult::Pending => {
-                    // reset the pending, so we check again next turn, so we are not all done
-                    had_pending = true;
-                }
+                MaybeResult::Pending => (),
                 MaybeResult::None => {
                     debug_assert!(!self.done[i]);
                     self.done[i] = true;
@@ -792,7 +813,7 @@ impl ProgramBuilder for CompoundQueryAll {
         }
 
         // if we are the first and we had pending, return as we can't do anyting yet
-        if self.partial_program_counter == 0 && had_pending {
+        if self.partial_program_counter == 0 && !programs_ready {
             return MaybeResult::Pending;
         }
 
@@ -805,15 +826,41 @@ impl ProgramBuilder for CompoundQueryAll {
         let mut had_none = false;
         for i in 0..self.partial_programs.len() {
             if carry {
+                debug_assert!(!self.partial_programs[i].is_empty());
+                debug_assert!(self.partial_program_idx[i] < self.partial_programs[i].len());
+                // carry flag indicating that we need to increment the current position
                 self.partial_program_idx[i] += 1;
-                // if we have reached the end, and this one is not done this means it's pending
                 if self.partial_program_idx[i] == self.partial_programs[i].len() {
+                    if !self.done[i] {
+                        // the current program is not done yet, we try to see if there is another
+                        // program available for that part
+                        match self.candidate_programs[i].next(z3) {
+                            MaybeResult::Some(program) => {
+                                // add the program to the list of partial programs and clear the
+                                // carry flag as we just incremented the current position. Meaning
+                                // that self.partial_program_idx[i] != self.partial_programs[i].len()
+                                self.partial_programs[i].push(program);
+                                carry = false;
+                            }
+                            MaybeResult::Pending => {
+                                // we are still pending, so we can just return pending and break
+                                // out of the loop here
+                                self.partial_program_idx = partial_program_idx;
+                                return MaybeResult::Pending;
+                            }
+                            MaybeResult::None => {
+                                // the current program is done now, so we can set the done flag
+                                debug_assert!(!self.done[i]);
+                                self.done[i] = true;
+                            }
+                        }
+                    }
+
+                    // we reached the end of the available programs for the current position
                     if self.done[i] {
+                        // we're done. we simply reset the current index, and continue with the
+                        // carry bit set.
                         self.partial_program_idx[i] = 0;
-                    } else {
-                        // here we had a pending query that we need.
-                        had_pending = true;
-                        break;
                     }
                 } else {
                     // no wrap around, so there is no carry here
@@ -850,6 +897,15 @@ impl ProgramBuilder for CompoundQueryAll {
         if carry {
             self.all_done = true;
         }
+
+        log::debug!(
+            "Program Idx: {:?} {}",
+            partial_program_idx
+                .iter()
+                .map(|i| *i as usize)
+                .collect::<Vec<_>>(),
+            self.partial_program_counter
+        );
 
         let prog = partial_program_idx
             .iter()
@@ -895,7 +951,7 @@ impl ProgramBuilder for CompoundQueryAll {
                         }
                     } else {
                         expr = Rc::new(VelosiAstExpr::BinOp(VelosiAstBinOpExpr {
-                            op: VelosiAstBinOp::Or,
+                            op: VelosiAstBinOp::Land,
                             lhs: expr,
                             rhs: e.clone(),
                             loc: VelosiTokenStream::default(),
@@ -910,7 +966,7 @@ impl ProgramBuilder for CompoundQueryAll {
 
     fn do_fmt(&self, f: &mut Formatter<'_>, indent: usize, debug: bool) -> FmtResult {
         let i = " ".repeat(indent);
-        writeln!(f, "{i} # CompoundQueryAll( assms )")?;
+        writeln!(f, "{i} # CompoundQueryAll( assms ==> {})", self.goal_expr())?;
         if self.candidate_programs.is_empty() {
             writeln!(f, "{i}   - true")
         } else {
