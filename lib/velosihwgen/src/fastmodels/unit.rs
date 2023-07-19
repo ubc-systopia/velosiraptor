@@ -23,11 +23,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! # The FastModels Platform Generator: State
-//!
-//! This module generates the unit description of the Arm FastModels implementation
-//! of the translation unit.
-
 use crustal as C;
 use std::path::Path;
 use velosiast::ast::{
@@ -35,6 +30,7 @@ use velosiast::ast::{
     VelosiAstFnCallExpr, VelosiAstIdentLiteralExpr, VelosiAstIfElseExpr, VelosiAstMethod,
     VelosiAstNumLiteralExpr, VelosiAstType, VelosiAstTypeInfo, VelosiAstUnOpExpr, VelosiAstUnit,
 };
+use velosiast::{VelosiAstUnitEnum, VelosiAstUnitStaticMap};
 
 use crate::fastmodels::add_header;
 use crate::fastmodels::interface::{interface_class_name, interface_header_file};
@@ -43,10 +39,6 @@ use crate::VelosiHwGenError;
 
 pub fn unit_header_file(name: &str) -> String {
     format!("{}_unit.hpp", name)
-}
-
-pub fn unit_header_file_path(name: &str) -> String {
-    unit_header_file(name)
 }
 
 pub fn unit_impl_file(name: &str) -> String {
@@ -158,13 +150,9 @@ fn add_create(c: &mut C::Class, ucn: &str) {
     //                                          pv::RandomContextTransactionGenerator *ptw_pvbus)
     // {
     //     Logging::debug("creating new translation unit.\n");
-
     //     TranslationUnit *t = new TranslationUnit(name, ptw_pvbus);
-
     //     t->_interface.debug_print_interface();
-
     //     Logging::debug("translation unit created.\n");
-
     //     return t;
     // }
 }
@@ -242,9 +230,9 @@ fn expr_to_cpp(expr: &VelosiAstExpr) -> C::Expr {
                 args.iter().map(|a| expr_to_cpp(a.as_ref())).collect(),
             )
         }
-        Slice { .. } => panic!("don't know how to handle slice"),
-        Range { .. } => panic!("don't know how to handle range"),
-        Quantifier { .. } => panic!("don't know how to handle quantifier"),
+        Slice { .. } => panic!("No C++ equivalent for expression type: slice"),
+        Range { .. } => panic!("No C++ equivalent for expression type: range"),
+        Quantifier { .. } => panic!("No C++ equivalent for expression type: quantifier"),
         IfElse(VelosiAstIfElseExpr {
             cond,
             then,
@@ -270,37 +258,11 @@ fn handle_requires_assert(method: &mut C::Method, expr: &VelosiAstExpr) {
     method.body().ifelse(assert_to_cpp(expr));
 }
 
-fn add_translate_remap(c: &mut C::Class, tm: &VelosiAstMethod) {
-    let src_addr_param =
-        C::MethodParam::new(&tm.params[0].ident.ident, C::Type::new_typedef("lvaddr_t"));
-    // let mode_param = C::MethodParam::new(
-    //     &tm.params[1].ident.ident,
-    //     C::Type::new_typedef("access_mode_t")
-    // );
-    let m = c
-        .new_method("do_translate_remap", C::Type::new_typedef("lpaddr_t"))
-        .push_param(src_addr_param);
-    // .push_param(mode_param);
-
-    if let Some(body) = &tm.body {
-        let mut b = C::Block::new();
-        b.return_expr(expr_to_cpp(body));
-        m.set_body(b);
-    }
-}
-
-fn add_translate(c: &mut C::Class, tm: &VelosiAstMethod) {
-    add_translate_remap(c, tm);
-
-    // virtual bool do_translate(lvaddr_t src_addr, size_t size, access_mode_t mode,
-    // lpaddr_t *dst_addr) set_override;
-
+// virtual bool do_translate(lvaddr_t src_addr, lpaddr_t *dst_addr) set_override;
+fn add_translate_method_segment(c: &mut C::Class, tm: &VelosiAstMethod) {
     let src_addr_param =
         C::MethodParam::new(&tm.params[0].ident.ident, C::Type::new_typedef("lvaddr_t"));
     let src_var = C::Expr::from_method_param(&src_addr_param);
-    let size_param = C::MethodParam::new("size", C::Type::new_size());
-    // let mode_param = C::MethodParam::new(&tm.params[1].ident.ident, C::Type::new_typedef("access_mode_t"));
-    // let mode_var = C::Expr::from_method_param(&mode_param);
     let dst_addr_param = C::MethodParam::new(
         "dst_addr",
         C::Type::to_ptr(&C::Type::new_typedef("lpaddr_t")),
@@ -311,19 +273,12 @@ fn add_translate(c: &mut C::Class, tm: &VelosiAstMethod) {
         .new_method("do_translate", C::Type::new_bool())
         .set_public()
         .set_override()
-        // .set_virtual()
+        .set_virtual()
         .push_param(src_addr_param)
-        .push_param(size_param)
-        // Since the signatures of the .vrs don't line up with the framework, this is a dummy param.
-        // I think it makes most sense to make the framework part of this project, or ditch it and take parts.
-        .push_param(C::MethodParam::new(
-            "temp_param",
-            C::Type::new_typedef("access_mode_t"),
-        ))
         .push_param(dst_addr_param);
 
     m.body().raw(format!(
-        "Logging::debug(\"TranslationUnit::translate(%lx)\", {});",
+        "Logging::debug(\"TranslationUnit::translate(%lx)\", {})",
         &tm.params[0].ident.ident
     ));
 
@@ -331,11 +286,33 @@ fn add_translate(c: &mut C::Class, tm: &VelosiAstMethod) {
         handle_requires_assert(m, e);
     }
 
-    m.body().assign(
-        C::Expr::deref(&dst_addr),
-        C::Expr::method_call(&C::Expr::this(), "do_translate_remap", vec![src_var]),
-    );
+    if let Some(body) = &tm.body {
+        m.body()
+            .assign(C::Expr::deref(&dst_addr), expr_to_cpp(body));
+    }
     m.body().return_expr(C::Expr::btrue());
+}
+
+fn translate_method_enum(e: &VelosiAstUnitEnum) -> C::Method {
+    let mut m = C::Method::new("do_translate", C::Type::new_bool());
+    m.body().new_return(Some(&C::Expr::bfalse()));
+    m.push_param(C::MethodParam::new("va", C::Type::new_typedef("lvaddr_t")));
+    m.push_param(C::MethodParam::new(
+        "dst_addr",
+        C::Type::new_typedef("lpaddr_t*"),
+    ));
+    return m;
+}
+
+fn translate_method_staticmap(s: &VelosiAstUnitStaticMap) -> C::Method {
+    let mut m = C::Method::new("do_translate", C::Type::new_bool());
+    m.body().new_return(Some(&C::Expr::bfalse()));
+    m.push_param(C::MethodParam::new("va", C::Type::new_typedef("lvaddr_t")));
+    m.push_param(C::MethodParam::new(
+        "dst_addr",
+        C::Type::new_typedef("lpaddr_t*"),
+    ));
+    return m;
 }
 
 fn ast_type_to_c_type(t: &VelosiAstType) -> C::Type {
@@ -343,12 +320,12 @@ fn ast_type_to_c_type(t: &VelosiAstType) -> C::Type {
         VelosiAstTypeInfo::Integer => C::Type::new_uint(64),
         VelosiAstTypeInfo::Bool => C::Type::new_bool(),
         VelosiAstTypeInfo::GenAddr => C::Type::new_typedef("genaddr_t"),
-        VelosiAstTypeInfo::VirtAddr => C::Type::new_uint(64),
-        VelosiAstTypeInfo::PhysAddr => C::Type::new_uint(64),
+        VelosiAstTypeInfo::VirtAddr => C::Type::new_typedef("lvaddr_t"),
+        VelosiAstTypeInfo::PhysAddr => C::Type::new_typedef("lpaddr_t"),
         VelosiAstTypeInfo::Size => C::Type::new_size(),
         VelosiAstTypeInfo::Flags => C::Type::new_uint(64),
         VelosiAstTypeInfo::Range => C::Type::new_uint(64),
-        // VelosiAstTypeInfo::TypeRef(0) => C::Type::new_uint(64),
+        VelosiAstTypeInfo::TypeRef(_) => C::Type::new_uint(64),
         VelosiAstTypeInfo::State => C::Type::new_uint(64),
         VelosiAstTypeInfo::Interface => C::Type::new_uint(64),
         VelosiAstTypeInfo::Void => C::Type::new_uint(64),
@@ -356,11 +333,13 @@ fn ast_type_to_c_type(t: &VelosiAstType) -> C::Type {
     }
 }
 
-fn add_method(c: &mut C::Class, tm: &VelosiAstMethod) {
-    // println!("{:?}", tm.ident());
+// how is this generating both a declaration in the header file
+// and an implementation in the cpp file?????
+fn add_method_decl(c: &mut C::Class, tm: &VelosiAstMethod) {
     match &tm.ident.ident[..] {
         "translate" => {
-            add_translate(c, tm);
+            // todo figure out why this needs its own special function
+            add_translate_method_segment(c, tm);
             return;
         }
         "map" => return,
@@ -422,9 +401,9 @@ pub fn generate_unit_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), V
     add_constructor(c, &ifn, &scn);
     add_create(c, &ucn);
 
-    // virtual UnitBase *get_interface(void) set_overridee
+    // virtual UnitBase *get_interface(void) set_override
     // {
-    //     return &this->_interface;
+    //    return &this->_interface;
     // }
     c.new_method(
         "get_interface",
@@ -467,13 +446,29 @@ pub fn generate_unit_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), V
     c.new_attribute("_state", state_ptr_type);
     c.new_attribute("_interface", iface_ptr_type);
 
-    // TODO: handle the methods!
-    for m in unit.methods() {
-        add_method(c, m);
+    for vrsm in unit.methods() {
+        let m = c.new_method(&vrsm.ident.ident, ast_type_to_c_type(&vrsm.rtype));
+        for p in &vrsm.params {
+            m.push_param(C::MethodParam::new(
+                &p.ident.ident,
+                ast_type_to_c_type(&p.ptype),
+            ));
+        }
+    }
+    match c.method_by_name("do_translate") {
+        None => {
+            c.new_method("do_translate", C::Type::new_bool())
+                .push_param(C::MethodParam::new("va", C::Type::new_typedef("lvaddr_t")))
+                .push_param(C::MethodParam::new(
+                    "dst_addr",
+                    C::Type::new_typedef("lpaddr_t*"),
+                ));
+        }
+        Some(_) => (),
     }
 
     // save the scope
-    let filename = unit_header_file_path(unit.ident());
+    let filename = unit_header_file(unit.ident());
     scope.set_filename(&filename);
     scope.to_file(outdir, true)?;
 
@@ -501,16 +496,14 @@ pub fn generate_unit_impl(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), Vel
     let ucn = unit_class_name(unit.ident());
     let c = scope.new_class(ucn.as_str());
 
-    c.set_base("TranslationUnitBase", C::Visibility::Public);
+    // c.set_base("TranslationUnitBase", C::Visibility::Public);
 
     let ifn = interface_class_name(unit.ident());
     let scn = state_class_name(unit.ident());
 
     add_constructor(c, &ifn, &scn);
 
-    // if !unit.is_abstract() {
     add_create(c, &ucn);
-    // }
 
     /*
      * -------------------------------------------------------------------------------------------
@@ -518,9 +511,20 @@ pub fn generate_unit_impl(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), Vel
      * -------------------------------------------------------------------------------------------
      */
 
-    // TODO: handle the methods!
-    for m in unit.methods() {
-        add_method(c, m)
+    match unit {
+        // segments have methods within the .vrs
+        VelosiAstUnit::Segment(_) => {
+            for m in unit.methods() {
+                add_method_decl(c, m)
+            }
+        }
+        // simpler units need do_translate
+        VelosiAstUnit::StaticMap(s) => {
+            c.push_method(translate_method_staticmap(s));
+        }
+        VelosiAstUnit::Enum(e) => {
+            c.push_method(translate_method_enum(e));
+        }
     }
 
     let filename = unit_impl_file(unit.ident());
