@@ -36,6 +36,7 @@ pub struct ProgramsIter {
     // ///
     // expr: Vec<Arc<Expression>>,
     pub programs: Vec<Program>,
+    pub stat_num_programs: usize,
 }
 
 impl ProgramsIter {
@@ -267,12 +268,6 @@ impl ProgramsBuilder {
                     continue;
                 }
 
-                // read first
-                fieldprogs.push(Arc::new(FieldActions(
-                    field.clone(),
-                    vec![FieldOp::ReadAction, op.clone()],
-                )));
-
                 // zero first
                 fieldprogs.push(Arc::new(FieldActions(
                     field.clone(),
@@ -280,6 +275,12 @@ impl ProgramsBuilder {
                         FieldOp::InsertField(Arc::new(Expression::Lit(Literal::Val(0)))),
                         op.clone(),
                     ],
+                )));
+
+                // read first
+                fieldprogs.push(Arc::new(FieldActions(
+                    field.clone(),
+                    vec![FieldOp::ReadAction, op.clone()],
                 )));
             }
 
@@ -337,7 +338,11 @@ impl ProgramsBuilder {
     pub fn into_iter(&mut self) -> ProgramsIter {
         let mut programs = self.construct_new_programs();
         programs.reverse();
-        ProgramsIter { programs }
+        let stat_num_programs = programs.len();
+        ProgramsIter {
+            programs,
+            stat_num_programs,
+        }
 
         // // construct the expressions
         // let exprs = self.construct_expressions();
