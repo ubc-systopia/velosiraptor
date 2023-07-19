@@ -51,7 +51,7 @@ pub fn make_program_builder_no_params(
     unit: &VelosiAstUnitSegment,
     pre: &VelosiAstExpr,
 ) -> ProgramsBuilder {
-    log::info!(target: "[vmops::utils]", "constructing programs;");
+    log::info!(target: "[vmops::utils]", "constructing programs for {pre}");
     // obtain the state references in the pre-condition
     let mut state_syms = HashSet::new();
     pre.get_state_references(&mut state_syms);
@@ -135,8 +135,11 @@ pub fn make_program_builder(
 }
 
 pub fn make_program_iter_mem(prog: Program) -> ProgramsIter {
+    let programs = prog.generate_possible_barriers();
+    let stat_num_programs = programs.len();
     ProgramsIter {
-        programs: prog.generate_possible_barriers(),
+        programs,
+        stat_num_programs,
     }
 }
 

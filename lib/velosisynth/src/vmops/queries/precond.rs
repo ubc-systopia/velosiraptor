@@ -39,15 +39,13 @@ use crate::{
 };
 
 use super::{
-    queryhelper::{
-        MaybeResult, MultiDimProgramQueries, ProgramBuilder, ProgramQueries, QueryBuilder,
-    },
+    queryhelper::{MultiDimProgramQueries, ProgramBuilder, ProgramQueries, QueryBuilder},
     utils::SynthOptions,
 };
 
-use crate::ProgramsIter;
-
 use super::utils;
+use super::MaybeResult;
+use crate::ProgramsIter;
 
 pub struct PrecondQueryBuilder<T>
 where
