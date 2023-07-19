@@ -34,12 +34,14 @@ use smt2::Term;
 use velosiast::{
     ast::{
         VelosiAstBinOp, VelosiAstBinOpExpr, VelosiAstBoolLiteralExpr, VelosiAstExpr,
-        VelosiAstMethod, VelosiAstUnitSegment,
+        VelosiAstFnCallExpr, VelosiAstIdentLiteralExpr, VelosiAstIdentifier, VelosiAstMethod,
+        VelosiAstTypeInfo, VelosiAstUnitSegment,
     },
     VelosiTokenStream,
 };
 
 use crate::{
+    model::method::{translate_map_result_name, translate_protect_result_name},
     z3::{Z3TaskPriority, Z3WorkerPool},
     Program,
 };
@@ -101,10 +103,45 @@ impl<'a> TranslateQueryBuilder<'a> {
 
         let programs = builder.into_iter();
         if programs.has_programs() {
+            let (ident, mut args) = match self.m_op.ident().as_str() {
+                "map" => (
+                    VelosiAstIdentifier::from(translate_map_result_name(None).as_str()),
+                    Vec::new(),
+                ),
+                "protect" => (
+                    VelosiAstIdentifier::from(translate_protect_result_name(None).as_str()),
+                    Vec::new(),
+                ),
+                err => panic!("Unknown method {}", err),
+            };
+
+            args.push(Rc::new(VelosiAstExpr::IdentLiteral(
+                VelosiAstIdentLiteralExpr::with_name("va".to_string(), VelosiAstTypeInfo::VirtAddr),
+            )));
+
+            args.push(Rc::new(VelosiAstExpr::IdentLiteral(
+                VelosiAstIdentLiteralExpr::with_name("sz".to_string(), VelosiAstTypeInfo::Size),
+            )));
+
+            args.push(Rc::new(VelosiAstExpr::IdentLiteral(
+                VelosiAstIdentLiteralExpr::with_name("flgs".to_string(), VelosiAstTypeInfo::Flags),
+            )));
+
+            args.push(Rc::new(VelosiAstExpr::IdentLiteral(
+                VelosiAstIdentLiteralExpr::with_name("pa".to_string(), VelosiAstTypeInfo::PhysAddr),
+            )));
+
+            let mut fn_call = VelosiAstFnCallExpr::new(ident, VelosiAstTypeInfo::Bool);
+            fn_call.add_args(args);
+
+            let assms = Rc::new(Vec::new());
+
             Some(TranslateQuery {
                 programs: programs.into(),
+                assms,
                 m_op: self.m_op,
                 m_translate: self.m_translate,
+                goal: Rc::new(VelosiAstExpr::FnCall(fn_call)),
             })
         } else {
             None
@@ -119,30 +156,31 @@ impl<'a> TranslateQueryBuilder<'a> {
 pub struct TranslateQuery {
     /// the programs that this query builder handles
     programs: Box<dyn ProgramBuilder>,
+    assms: Rc<Vec<Term>>,
     m_op: Rc<VelosiAstMethod>,
     m_translate: Rc<VelosiAstMethod>,
+    goal: Rc<VelosiAstExpr>,
 }
 
 impl TranslateQuery {}
 
 impl ProgramBuilder for TranslateQuery {
-    fn next(&mut self, _z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
-        panic!("foo")
+    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
+        self.programs.next(z3)
     }
 
     fn m_op(&self) -> &VelosiAstMethod {
-        panic!("to_smt_query called on ProgramsIter!")
+        self.m_op.as_ref()
     }
 
     /// the assumptions for the program
     fn assms(&self) -> Rc<Vec<Term>> {
-        panic!("foo")
+        self.assms.clone()
     }
 
     /// the expression that the program needs to establish
     fn goal_expr(&self) -> Rc<VelosiAstExpr> {
-        log::warn!("encountered empty compound query (ANY)");
-        Rc::new(VelosiAstExpr::BoolLiteral(VelosiAstBoolLiteralExpr::btrue()))
+        self.goal.clone()
     }
 
     fn do_fmt(&self, f: &mut Formatter<'_>, indent: usize, debug: bool) -> FmtResult {
