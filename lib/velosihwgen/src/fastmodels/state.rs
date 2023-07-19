@@ -58,13 +58,14 @@ pub fn state_field_class_name(name: &str) -> String {
 // It may just make this file more confusing.
 
 pub fn generate_state_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), VelosiHwGenError> {
-    let mut scope = C::Scope::new();
+    let mut scope_unguarded = C::Scope::new();
 
     let scn = state_class_name(unit.ident());
 
-    add_header(&mut scope, unit.ident(), "state");
+    add_header(&mut scope_unguarded, unit.ident(), "state");
 
-    let guard = scope.new_ifdef(format!("{}_STATE_HPP_", unit.ident().to_uppercase()).as_str());
+    let guard =
+        scope_unguarded.new_ifdef(format!("{}_STATE_HPP_", unit.ident().to_uppercase()).as_str());
 
     let s = guard.guard().then_scope();
 
@@ -78,10 +79,12 @@ pub fn generate_state_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), 
 
     match unit.state() {
         None => {
-            scope.new_comment("This unit does not have a state");
-            scope.new_comment(&format!("Abstract:  {}", unit.is_abstract()));
-            scope.new_comment(&format!("Enum:      {}", unit.is_enum()));
-            scope.new_comment(&format!("Staticmap: {}", unit.is_staticmap()));
+            s.new_comment("This unit has an empty state");
+            s.new_comment(&format!("Abstract:  {}", unit.is_abstract()));
+            s.new_comment(&format!("Enum:      {}", unit.is_enum()));
+            s.new_comment(&format!("Staticmap: {}", unit.is_staticmap()));
+            s.new_class(&scn) //empty state
+                .set_base("StateBase", C::Visibility::Public);
         }
 
         Some(state) => {
@@ -96,8 +99,7 @@ pub fn generate_state_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), 
                 let var = C::Expr::new_var("data", C::Type::new_uint(64));
 
                 // TODO: The per-slice getters and setters may or may not be helpful.
-                // Keeping them for now.
-
+                // Keeping them for now, but I don't plan to call them
                 for sl in &f.layout_as_slice().to_vec() {
                     let sl_getter_f = format!("get_{}_val", sl.ident());
                     let m = f_c
@@ -110,7 +112,6 @@ pub fn generate_state_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), 
                         "get_slice_value",
                         vec![C::Expr::new_str(sl.ident())],
                     ));
-
                     let sl_setter_f = format!("set_{}_val", sl.ident());
                     let m = f_c
                         .new_method(&sl_setter_f, C::Type::new_void())
@@ -125,11 +126,9 @@ pub fn generate_state_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), 
                 }
             }
 
-            let c = s.new_class(scn.as_str());
-
-            c.push_doc_str("Represents the State of the Translation Unit.");
+            // one class for state containing all fields
+            let c = s.new_class(&scn);
             c.set_base("StateBase", C::Visibility::Public);
-
             c.new_constructor();
 
             for f in state.fields() {
@@ -141,8 +140,8 @@ pub fn generate_state_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), 
     }
 
     let filename = state_header_file_path(unit.ident());
-    scope.set_filename(&filename);
-    scope.to_file(outdir, true)?;
+    scope_unguarded.set_filename(&filename);
+    scope_unguarded.to_file(outdir, true)?;
 
     Ok(())
 }
@@ -153,8 +152,6 @@ pub fn generate_state_impl(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), Ve
     let scn = state_class_name(unit.ident());
 
     add_header(&mut scope, unit.ident(), "state");
-
-    // #include "pv/RemapRequest.h"
 
     scope.new_comment("fastmodels includes");
     scope.new_include("pv/RemapRequest.h", true);
