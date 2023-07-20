@@ -26,361 +26,261 @@
 //! Synthesis of Virtual Memory Operations: Map
 
 use std::collections::LinkedList;
+use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
-use velosiast::ast::{VelosiAstMethod, VelosiAstUnitSegment};
+use smt2::Term;
 
-use crate::ProgramsIter;
-use crate::{programs::Program, z3::Z3WorkerPool, VelosiSynthIssues};
+use velosiast::ast::{
+    VelosiAstExpr, VelosiAstMethod, VelosiAstMethodProperty, VelosiAstUnitSegment,
+};
 
-use super::{precond, semantics, semprecond, utils};
+use crate::programs::Program;
 
-use super::queryhelper::PartQueries;
-use crate::vmops::queryhelper::MultiDimProgramQueries;
-use crate::vmops::queryhelper::ProgramBuilder;
-use crate::vmops::utils::SynthOptions;
-use crate::vmops::MaybeResult;
-use crate::Z3Ticket;
-use crate::DEFAULT_BATCH_SIZE;
+use crate::z3::{Z3TaskPriority, Z3WorkerPool};
 
-pub enum MapProgramQueries {
-    SingleQuery(ProgramsIter),
-    MultiQuery(MultiDimProgramQueries<PartQueries>),
-}
+use super::queries::{
+    BoolExprQueryBuilder, CompoundBoolExprQueryBuilder, MaybeResult, ProgramBuilder,
+    ProgramVerifier, TranslateQueryBuilder,
+};
+use super::SynchronousSync;
 
-impl ProgramBuilder for MapProgramQueries {
-    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
-        match self {
-            Self::SingleQuery(q) => q.next(z3),
-            Self::MultiQuery(q) => q.next(z3),
-        }
-    }
-}
-
+/// represents the queries for the map operation
 pub struct MapPrograms {
-    prefix: String,
-
-    programs: MapProgramQueries,
-    programs_done: bool,
-    queries: LinkedList<(Program, [Option<Z3Ticket>; 6])>,
-    candidates: Vec<Program>,
-
+    /// iterator of the candidate programs
+    candidate_programs: Box<dyn ProgramBuilder>,
+    /// reference to the map function
     m_fn: Rc<VelosiAstMethod>,
-    v_fn: Rc<VelosiAstMethod>,
-    t_fn: Rc<VelosiAstMethod>,
-    f_fn: Rc<VelosiAstMethod>,
-
-    mem_model: bool,
+    /// vector of all expressions that need to be satisfied
+    goal_exprs: Vec<Rc<VelosiAstExpr>>,
+    /// the starting program for the memory model
+    starting_prog: Option<Rc<Program>>,
 }
 
 impl MapPrograms {
     pub fn new(
-        prefix: String,
-        programs: MapProgramQueries,
-        m_fn: Rc<VelosiAstMethod>,
-        v_fn: Rc<VelosiAstMethod>,
-        t_fn: Rc<VelosiAstMethod>,
-        f_fn: Rc<VelosiAstMethod>,
-        mem_model: bool,
+        unit: &VelosiAstUnitSegment,
+        batch_size: usize,
+        starting_prog: Option<Rc<Program>>,
     ) -> Self {
+        log::info!(target : "[synth::map]", "setting up map synthesis.");
+
+        // obtain the op_fn, this is the map() function
+        let m_op = unit
+            .get_method("map")
+            .unwrap_or_else(|| panic!("no method 'map' in unit {}", unit.ident()));
+
+        // obtain the translate fn, this is handled slightly differently
+        let t_fn = unit
+            .get_method("translate")
+            .unwrap_or_else(|| panic!("no method 'translate' in unit {}", unit.ident()));
+
+        if let Some(_staring_prog) = &starting_prog {
+            // here we have a starting program, that should have satisfied all the preconditions.
+            // we now need to check if the program can be made to work with the memory model as well
+        } else {
+        }
+
+        let params = ["va", "sz"].into();
+        let goal_exprs = t_fn.requires.iter().enumerate().filter_map(|(i, req)| {
+            use crate::model::method::translate_range_name;
+            use velosiast::ast::VelosiAstFnCallExpr;
+            use velosiast::ast::VelosiAstIdentLiteralExpr;
+            use velosiast::ast::VelosiAstIdentifier;
+            use velosiast::ast::VelosiAstTypeInfo;
+            if req.has_state_references() && req.has_var_references(&params) {
+                let ident = VelosiAstIdentifier::from(translate_range_name(Some(i)).as_str());
+
+                let args = vec![
+                    Rc::new(VelosiAstExpr::IdentLiteral(
+                        VelosiAstIdentLiteralExpr::with_name(
+                            "va".to_string(),
+                            VelosiAstTypeInfo::VirtAddr,
+                        ),
+                    )),
+                    Rc::new(VelosiAstExpr::IdentLiteral(
+                        VelosiAstIdentLiteralExpr::with_name(
+                            "sz".to_string(),
+                            VelosiAstTypeInfo::Size,
+                        ),
+                    )),
+                ];
+
+                let mut fn_call = VelosiAstFnCallExpr::new(ident, VelosiAstTypeInfo::Bool);
+                fn_call.add_args(args);
+
+                Some(Rc::new(VelosiAstExpr::FnCall(fn_call)))
+            } else {
+                None
+            }
+        });
+
+        // we start with the translat function
+        let query = TranslateQueryBuilder::new(unit, m_op.clone(), t_fn.clone())
+            .build()
+            .expect("no query?");
+
+        let mut partial_programs = vec![ProgramVerifier::with_batchsize(
+            unit.ident().clone(),
+            query.into(),
+            batch_size,
+            Z3TaskPriority::High,
+        )
+        .into()];
+
+        // adding all the methods that are tagged with `#[remap]`
+        add_methods_tagged_with_remap(unit, m_op, batch_size, &mut partial_programs);
+
+        // now we got all the partial programs that we need to verify
+        let query = CompoundBoolExprQueryBuilder::new(unit, m_op.clone())
+            .partial_programs(partial_programs, false)
+            // .assms()
+            .all();
+
+        let query = query
+            .map(|query| {
+                ProgramVerifier::with_batchsize(
+                    unit.ident().clone(),
+                    query.into(),
+                    batch_size,
+                    Z3TaskPriority::High,
+                )
+            })
+            .expect("no query?");
+
         Self {
-            prefix,
-            programs,
-            programs_done: false,
-            queries: LinkedList::new(),
-            candidates: Vec::new(),
-            m_fn,
-            v_fn,
-            t_fn,
-            f_fn,
-            mem_model,
+            candidate_programs: query.into(),
+            m_fn: m_op.clone(),
+            goal_exprs: goal_exprs.collect(),
+            starting_prog,
         }
     }
 }
 
 impl ProgramBuilder for MapPrograms {
     fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
-        let has_work = !self.candidates.is_empty() || !self.queries.is_empty();
+        self.candidate_programs.next(z3)
+    }
 
-        // poll once, collect the program
-        match self.programs.next(z3) {
-            MaybeResult::Some(p) => self.candidates.push(p),
-            MaybeResult::Pending => {
-                if !has_work {
-                    return MaybeResult::Pending;
-                }
+    fn m_op(&self) -> &VelosiAstMethod {
+        self.m_fn.as_ref()
+    }
+
+    /// the assumptions for the program
+    fn assms(&self) -> Rc<Vec<Term>> {
+        unimplemented!()
+    }
+
+    /// the expression that the program needs to establish
+    fn goal_expr(&self) -> Rc<VelosiAstExpr> {
+        unimplemented!()
+    }
+
+    fn do_fmt(&self, f: &mut Formatter<'_>, indent: usize, debug: bool) -> FmtResult {
+        let i = " ".repeat(indent);
+        writeln!(f, "{i} @ MapPrograms",)?;
+        self.candidate_programs.do_fmt(f, indent + 4, debug)
+    }
+}
+
+impl SynchronousSync for MapPrograms {}
+
+/// Implement `From` for `ProgramVerifier
+///
+/// To allow conversions from ProgramVerifier -> Box<dyn ProgramBuilder>
+impl From<MapPrograms> for Box<dyn ProgramBuilder> {
+    fn from(q: MapPrograms) -> Self {
+        Box::new(q)
+    }
+}
+
+impl Display for MapPrograms {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
+        self.do_fmt(f, 0, false)
+    }
+}
+
+impl Debug for MapPrograms {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
+        self.do_fmt(f, 0, true)
+    }
+}
+
+/// this functions collects the methods tagged with `remap` and adds them to the partial programs
+fn add_methods_tagged_with_remap(
+    unit: &VelosiAstUnitSegment,
+    m_op: &Rc<VelosiAstMethod>,
+    batch_size: usize,
+    partial_programs: &mut Vec<Box<dyn ProgramBuilder>>,
+) {
+    for r_fn in unit.methods.values() {
+        // if the property is not set to remap, we don't care about it
+        if !r_fn.properties.contains(&VelosiAstMethodProperty::Remap) {
+            log::debug!(
+                target : "[synth::map]",
+                "skipping method {} (not remap)", r_fn.ident()
+            );
+            continue;
+        }
+
+        // we don't care about abstract or synth methods, the return type should always be boolean
+        if r_fn.is_abstract || r_fn.is_synth || !r_fn.rtype.is_boolean() {
+            log::debug!(
+                target : "[synth::map]",
+                "skipping method {} (abstract, synth, or not boolean)", r_fn.ident()
+            );
+            continue;
+        }
+
+        // split the body expressions into a list of conjuncts forming a CNF
+        let exprs = r_fn
+            .body
+            .as_ref()
+            .map(|body| body.split_cnf())
+            .unwrap_or_else(|| panic!("no body for method {}", r_fn.ident()));
+
+        log::info!(
+            target : "[synth::map]",
+            "handling method {}", r_fn.ident()
+        );
+
+        // build the query for the expressions of the body of the function,
+        let query: Option<Box<dyn ProgramBuilder>> = match exprs.as_slice() {
+            [] => unreachable!("slice of expressions was empty?"),
+            [exp] => {
+                log::debug!(target : "[synth::map]","single expr body {}", exp);
+
+                // just a single expression here
+                BoolExprQueryBuilder::new(unit, m_op.clone(), exp.clone())
+                    // .assms(): No assumptions, as they will be added by the map.assms()
+                    .variable_references(false)
+                    .build()
+                    .map(|e| e.into())
             }
-            MaybeResult::None => {
-                self.programs_done = true;
-                if !has_work {
-                    return MaybeResult::None;
-                }
+            _ => {
+                log::debug!(target : "[synth::map]", "mutliple expr body");
+
+                // handle all the expressions
+                CompoundBoolExprQueryBuilder::new(unit, m_op.clone())
+                    .exprs(exprs)
+                    // .assms(): No assumptions, as they will be added by the map.assms()
+                    .all()
+                    .map(|e| e.into())
             }
         };
 
-        // we have at least one candidate program
-        const CONFIG_MAX_QUERIES: usize = 4;
-        if self.queries.len() < CONFIG_MAX_QUERIES {
-            if let Some(prog) = self.candidates.pop() {
-                let valid_semantics = semantics::submit_program_query(
-                    z3,
-                    &self.prefix,
-                    self.m_fn.as_ref(),
-                    self.v_fn.as_ref(),
-                    None,
-                    prog.clone(),
-                    SynthOptions {
-                        negate: false,
-                        no_change: false,
-                        mem_model: self.mem_model,
-                    },
-                );
-
-                let translate_preconds = precond::submit_program_query(
-                    z3,
-                    &self.prefix,
-                    self.m_fn.as_ref(),
-                    self.t_fn.as_ref(),
-                    None,
-                    prog.clone(),
-                    SynthOptions {
-                        negate: false,
-                        no_change: false,
-                        mem_model: self.mem_model,
-                    },
-                );
-                let translate_semantics = semantics::submit_program_query(
-                    z3,
-                    &self.prefix,
-                    self.m_fn.as_ref(),
-                    self.t_fn.as_ref(),
-                    None,
-                    prog.clone(),
-                    SynthOptions {
-                        negate: false,
-                        no_change: false,
-                        mem_model: self.mem_model,
-                    },
-                );
-
-                let matchflags_preconds = precond::submit_program_query(
-                    z3,
-                    &self.prefix,
-                    self.m_fn.as_ref(),
-                    self.f_fn.as_ref(),
-                    None,
-                    prog.clone(),
-                    SynthOptions {
-                        negate: false,
-                        no_change: false,
-                        mem_model: self.mem_model,
-                    },
-                );
-                let matchflags_semantics = semantics::submit_program_query(
-                    z3,
-                    &self.prefix,
-                    self.m_fn.as_ref(),
-                    self.f_fn.as_ref(),
-                    None,
-                    prog.clone(),
-                    SynthOptions {
-                        negate: false,
-                        no_change: false,
-                        mem_model: self.mem_model,
-                    },
-                );
-
-                let semprodoncs = semprecond::submit_program_query(
-                    z3,
-                    &self.prefix,
-                    self.m_fn.as_ref(),
-                    self.t_fn.as_ref(),
-                    None,
-                    prog.clone(),
-                    SynthOptions {
-                        negate: false,
-                        no_change: false,
-                        mem_model: self.mem_model,
-                    },
-                );
-
-                self.queries.push_back((
-                    prog,
-                    [
-                        Some(semprodoncs),
-                        Some(valid_semantics),
-                        Some(translate_semantics),
-                        Some(matchflags_semantics),
-                        Some(translate_preconds),
-                        Some(matchflags_preconds),
-                    ],
-                ));
-            }
-        }
-
-        let mut res_program = None;
-        let mut remaining_queries = LinkedList::new();
-        'outer: while let Some((prog, mut tickets)) = self.queries.pop_front() {
-            let mut all_done = true;
-            for maybe_ticket in tickets.iter_mut() {
-                if let Some(ticket) = maybe_ticket {
-                    if let Some(result) = z3.get_result(*ticket) {
-                        // we got a result, check if it's sat
-                        let output = result.result();
-                        if utils::check_result_no_rewrite(output) == utils::QueryResult::Sat {
-                            // set the ticket to none to mark completion
-                            *maybe_ticket = None;
-                        } else {
-                            // unsat result, just drop the program and the tickets
-                            continue 'outer;
-                        }
-                    } else {
-                        all_done = false;
-                    }
-                }
-            }
-
-            // store the result
-            if all_done && res_program.is_none() {
-                res_program = Some(prog);
-            } else {
-                remaining_queries.push_back((prog, tickets));
-            }
-        }
-
-        self.queries = remaining_queries;
-
-        if let Some(prog) = res_program {
-            MaybeResult::Some(prog)
-        } else if !self.queries.is_empty() || !self.candidates.is_empty() || !self.programs_done {
-            MaybeResult::Pending
-        } else {
-            debug_assert!(self.programs.next(z3) == MaybeResult::None);
-            MaybeResult::None
+        // add the program verifier and add the query to the list
+        if let Some(query) = query {
+            log::debug!(target : "[synth::map]", "adding query to partial programs");
+            partial_programs.push(
+                ProgramVerifier::with_batchsize(
+                    unit.ident().clone(),
+                    query,
+                    batch_size,
+                    Z3TaskPriority::Medium,
+                )
+                .into(),
+            );
         }
     }
-}
-
-pub fn get_program_iter(
-    unit: &VelosiAstUnitSegment,
-    batch_size: usize,
-    starting_prog: Option<Program>,
-) -> MapPrograms {
-    log::info!(
-        target : "[synth::map]",
-        "starting synthesizing the map operation"
-    );
-
-    // obtain the functions for the map operation
-    let m_fn = unit
-        .get_method("map")
-        .unwrap_or_else(|| panic!("no method 'map' in unit {}", unit.ident()));
-    let v_fn = unit.get_method("valid").unwrap();
-    let t_fn = unit.get_method("translate").unwrap();
-    let f_fn = unit.get_method("matchflags").unwrap();
-
-    if let Some(prog) = starting_prog {
-        // ---------------------------------------------------------------------------------------------
-        // Translate: Add a query for each possible barrier position
-        // ---------------------------------------------------------------------------------------------
-        MapPrograms::new(
-            unit.ident_to_string(),
-            MapProgramQueries::SingleQuery(utils::make_program_iter_mem(prog)),
-            m_fn.clone(),
-            v_fn.clone(),
-            t_fn.clone(),
-            f_fn.clone(),
-            true,
-        )
-    } else {
-        // ---------------------------------------------------------------------------------------------
-        // Translate: Add a query for each of the pre-conditions of the function
-        // ---------------------------------------------------------------------------------------------
-
-        let mut map_queries = Vec::new();
-        if let Some(p) = precond::precond_query(unit, m_fn.clone(), t_fn.clone(), false, batch_size)
-        {
-            map_queries.push(PartQueries::Precond(p));
-        }
-
-        if let Some(p) = precond::precond_query(unit, m_fn.clone(), f_fn.clone(), false, batch_size)
-        {
-            map_queries.push(PartQueries::Precond(p));
-        }
-
-        if let Some(p) =
-            semprecond::semprecond_query(unit, m_fn.clone(), t_fn.clone(), false, batch_size)
-        {
-            map_queries.push(PartQueries::SemPrecond(p));
-        }
-
-        if let Some(p) = semantics::semantic_query(
-            unit,
-            m_fn.clone(),
-            v_fn.clone(),
-            v_fn,
-            false,
-            false,
-            batch_size,
-        ) {
-            map_queries.push(PartQueries::Semantic(p));
-        }
-
-        if let Some(p) = semantics::semantic_query(
-            unit,
-            m_fn.clone(),
-            t_fn.clone(),
-            t_fn,
-            false,
-            false,
-            batch_size,
-        ) {
-            map_queries.push(PartQueries::Semantic(p));
-        }
-
-        if let Some(p) = semantics::semantic_query(
-            unit,
-            m_fn.clone(),
-            f_fn.clone(),
-            f_fn,
-            false,
-            false,
-            batch_size,
-        ) {
-            map_queries.push(PartQueries::Semantic(p));
-        }
-
-        let programs = MultiDimProgramQueries::new(map_queries);
-
-        MapPrograms::new(
-            unit.ident_to_string(),
-            MapProgramQueries::MultiQuery(programs),
-            m_fn.clone(),
-            v_fn.clone(),
-            t_fn.clone(),
-            f_fn.clone(),
-            false,
-        )
-    }
-}
-
-pub fn synthesize(
-    z3: &mut Z3WorkerPool,
-    unit: &VelosiAstUnitSegment,
-    starting_prog: Option<Program>,
-) -> Result<Program, VelosiSynthIssues> {
-    let batch_size = std::cmp::max(DEFAULT_BATCH_SIZE, z3.num_workers());
-    let mut progs = get_program_iter(unit, batch_size, starting_prog);
-    loop {
-        match progs.next(z3) {
-            MaybeResult::Some(prog) => return Ok(prog),
-            MaybeResult::Pending => {
-                // just keep running
-            }
-            MaybeResult::None => {
-                break;
-            }
-        }
-    }
-    Err(VelosiSynthIssues::new())
 }
