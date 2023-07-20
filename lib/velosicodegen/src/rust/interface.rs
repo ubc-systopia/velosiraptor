@@ -105,7 +105,7 @@ fn generate_read_field(f: &Rc<VelosiAstInterfaceField>, imp: &mut CG::Impl) {
         | VelosiAstInterfaceField::Mmio(VelosiAstInterfaceMmioField { base, offset, .. }) => {
             read_fn
                 .line(format!(
-                    "let ptr = (self.{} + {} * 8) as *mut {field_type};",
+                    "let ptr = phys_to_virt(self.{} + {} * 0x8) as *mut {field_type};",
                     base.ident(),
                     offset
                 ))
@@ -135,7 +135,7 @@ fn generate_write_field(f: &Rc<VelosiAstInterfaceField>, imp: &mut CG::Impl) {
         | VelosiAstInterfaceField::Mmio(VelosiAstInterfaceMmioField { base, offset, .. }) => {
             write_fn
                 .line(format!(
-                    "let ptr = (self.{} + {} * 8) as *mut {field_type};",
+                    "let ptr = phys_to_virt(self.{} + {} * 0x8) as *mut {field_type};",
                     base.ident(),
                     offset
                 ))
@@ -202,6 +202,7 @@ pub fn generate(unit: &VelosiAstUnitSegment, outdir: &Path) -> Result<(), Velosi
     utils::add_header(&mut scope, &title);
 
     scope.import("crate::utils", "*");
+    scope.import("crate::os", "*");
 
     // add imports to used fields
     for f in unit.interface.fields() {

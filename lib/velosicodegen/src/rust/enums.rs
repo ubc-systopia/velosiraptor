@@ -95,6 +95,8 @@ fn generate_unit_struct(scope: &mut CG::Scope, ast: &VelosiAst, unit: &VelosiAst
         .get("protect")
         .expect("protect method not found!");
     add_delegate_function(ast, unit, op, imp);
+
+    add_valid_fn(ast, unit, imp);
 }
 
 fn add_differentiator_function(
@@ -205,9 +207,27 @@ fn add_delegate_function(
     }
 
     let mut panic = CG::Block::new("else");
-    panic.line("panic!(\"unable to distinguish variant\")");
+    panic.line("panic!(\"cannot perform operation on invalid enum\")");
 
     op_fn.push_block(panic);
+}
+
+fn add_valid_fn(ast: &VelosiAst, unit: &VelosiAstUnitEnum, imp: &mut CG::Impl) {
+    let valid = imp.new_fn("valid").vis("pub").arg_ref_self().ret("bool");
+    valid.line(
+        unit.get_unit_names()
+            .iter()
+            .map(|variant| {
+                let variant_unit = ast.get_unit(variant).unwrap();
+                format!(
+                    "unsafe {{ {}::new({}) }}.valid()",
+                    utils::to_struct_name(variant, None),
+                    utils::params_to_self_args_list(variant_unit.params_as_slice()),
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(" || "),
+    );
 }
 
 pub fn generate(

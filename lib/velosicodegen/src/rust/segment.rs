@@ -207,7 +207,7 @@ fn add_resolve_fn(ast: &VelosiAst, unit: &VelosiAstUnitSegment, imp: &mut CG::Im
             let resolve = imp.new_fn("resolve").vis("pub").arg_ref_self().ret(&ret_ty);
 
             resolve.line("let paddr = self.translate(0);");
-            resolve.line(format!("let ptr = paddr as *mut {};", ret_ty));
+            resolve.line(format!("let ptr = phys_to_virt(paddr) as *mut {};", ret_ty));
             resolve.line("unsafe { *ptr }");
         }
     }
@@ -230,6 +230,7 @@ pub fn generate(
 
     // import utils
     scope.import("crate::utils", "*");
+    scope.import("crate::os", "*");
 
     // add import for the interface
     let iface_name = utils::to_struct_name(unit.ident(), Some("Interface"));

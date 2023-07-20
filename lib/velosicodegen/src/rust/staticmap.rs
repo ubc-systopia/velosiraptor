@@ -150,8 +150,13 @@ fn add_op_function(
                     } else {
                         dest_unit.get_method(op_name).unwrap()
                     };
+                    let fn_name = if op_name == "map" {
+                        format!("map_{}", dest_unit.ident().to_lowercase())
+                    } else {
+                        op.ident_to_string()
+                    };
                     let op_fn = imp
-                        .new_fn(op.ident())
+                        .new_fn(&fn_name)
                         .vis("pub")
                         .arg_ref_self()
                         .ret(CG::Type::from("bool"));
