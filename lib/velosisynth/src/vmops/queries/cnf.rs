@@ -77,7 +77,7 @@ impl ProgramBuilder for ProgramsIter {
         panic!("goal_expr shoud not be called on ProgramsIter")
     }
 
-    fn do_fmt(&self, f: &mut Formatter<'_>, indent: usize, debug: bool) -> FmtResult {
+    fn do_fmt(&self, f: &mut Formatter<'_>, indent: usize, _debug: bool) -> FmtResult {
         let i = " ".repeat(indent);
         writeln!(
             f,
@@ -323,7 +323,7 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
 
             queries.push(CompoundBoolExprQuery::All(compound_query));
 
-            let batch_size = self.batchsize;
+            let _batch_size = self.batchsize;
 
             loop {
                 let mut queries_new = Vec::with_capacity(queries.len() / DEFAULT_CHUNK_SIZE + 1);
@@ -822,7 +822,7 @@ impl ProgramBuilder for CompoundQueryAll {
 
         // increment the current index
         let mut carry = true;
-        let mut had_pending = false;
+        let had_pending = false;
         let mut had_none = false;
         for i in 0..self.partial_programs.len() {
             if carry {
@@ -900,10 +900,7 @@ impl ProgramBuilder for CompoundQueryAll {
 
         log::debug!(
             "Program Idx: {:?} {}",
-            partial_program_idx
-                .iter()
-                .map(|i| *i as usize)
-                .collect::<Vec<_>>(),
+            partial_program_idx,
             self.partial_program_counter
         );
 

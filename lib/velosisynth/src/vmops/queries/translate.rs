@@ -26,29 +26,23 @@
 //! Handles Conjunctive Normal Form
 
 // std imports
-use std::collections::LinkedList;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
 use smt2::Term;
-use velosiast::{
-    ast::{
-        VelosiAstBinOp, VelosiAstBinOpExpr, VelosiAstBoolLiteralExpr, VelosiAstExpr,
-        VelosiAstFnCallExpr, VelosiAstIdentLiteralExpr, VelosiAstIdentifier, VelosiAstMethod,
-        VelosiAstTypeInfo, VelosiAstUnitSegment,
-    },
-    VelosiTokenStream,
+use velosiast::ast::{
+    VelosiAstExpr, VelosiAstFnCallExpr, VelosiAstIdentLiteralExpr, VelosiAstIdentifier,
+    VelosiAstMethod, VelosiAstTypeInfo, VelosiAstUnitSegment,
 };
 
 use crate::{
     model::method::{translate_map_result_name, translate_protect_result_name},
-    z3::{Z3TaskPriority, Z3WorkerPool},
+    z3::Z3WorkerPool,
     Program,
 };
 
 //use super::queryhelper::{MaybeResult, ProgramBuilder, QueryBuilder};
 use super::MaybeResult;
-use super::{BoolExprQueryBuilder, ProgramVerifier, DEFAULT_BATCH_SIZE};
 
 use super::utils;
 use super::ProgramBuilder;
