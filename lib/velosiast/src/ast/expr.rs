@@ -781,11 +781,7 @@ impl VelosiAstUnOpExpr {
 
     pub fn new_neg(expr: Rc<VelosiAstExpr>) -> VelosiAstExpr {
         let loc = expr.loc().clone();
-        VelosiAstExpr::UnOp(VelosiAstUnOpExpr::new(
-            VelosiAstUnOp::Not,
-            expr,
-            loc,
-        ))
+        VelosiAstExpr::UnOp(VelosiAstUnOpExpr::new(VelosiAstUnOp::Not, expr, loc))
     }
 
     pub fn from_parse_tree(
@@ -1483,14 +1479,15 @@ pub struct VelosiAstFnCallExpr {
 }
 
 impl VelosiAstFnCallExpr {
-    pub fn new(
-        ident: VelosiAstIdentifier,
-        etype: VelosiAstTypeInfo,
-    ) -> Self {
+    pub fn new(ident: VelosiAstIdentifier, etype: VelosiAstTypeInfo) -> Self {
         Self::with_loc(ident, etype, VelosiTokenStream::default())
     }
 
-    pub fn with_loc(ident: VelosiAstIdentifier, etype: VelosiAstTypeInfo,loc: VelosiTokenStream) -> Self {
+    pub fn with_loc(
+        ident: VelosiAstIdentifier,
+        etype: VelosiAstTypeInfo,
+        loc: VelosiTokenStream,
+    ) -> Self {
         VelosiAstFnCallExpr {
             ident,
             args: Vec::new(),
@@ -1499,12 +1496,12 @@ impl VelosiAstFnCallExpr {
         }
     }
 
-    pub fn push_arg(&mut self, arg: Rc<VelosiAstExpr>) -> &mut Self{
+    pub fn push_arg(&mut self, arg: Rc<VelosiAstExpr>) -> &mut Self {
         self.args.push(arg);
         self
     }
 
-    pub fn add_args(&mut self, args: Vec<Rc<VelosiAstExpr>>) -> &mut Self{
+    pub fn add_args(&mut self, args: Vec<Rc<VelosiAstExpr>>) -> &mut Self {
         self.args.extend(args);
         self
     }
@@ -1537,7 +1534,7 @@ impl VelosiAstFnCallExpr {
             ident: VelosiAstIdentifier::from(pt.name),
             args,
             etype: VelosiAstTypeInfo::Integer,
-            loc: pt.loc
+            loc: pt.loc,
         };
 
         let fn_sym = st.lookup(res.path());
@@ -1727,7 +1724,7 @@ impl Display for VelosiAstFnCallExpr {
         write!(format, "{}(", self.ident())?;
         for (i, p) in self.args.iter().enumerate() {
             if i != 0 {
-                write!(format, ".")?;
+                write!(format, ", ")?;
             }
             write!(format, "{p}")?;
         }

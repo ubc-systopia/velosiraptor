@@ -459,7 +459,7 @@ impl VelosiAstMethod {
 
         // a simple filter with obvioius duplicates
         let mut requires_set = HashSet::new();
-        let requires = requires
+        let requires: Vec<Rc<VelosiAstExpr>> = requires
             .into_iter()
             .filter(|r| {
                 let r_str = r.to_string();
@@ -557,6 +557,16 @@ impl VelosiAstMethod {
             let err = VelosiAstErrBuilder::warn(msg.to_string())
                 .add_hint(hint.to_string())
                 .add_location(rtype.loc.clone())
+                .build();
+            issues.push(err);
+        }
+
+        if !properties.is_empty() && !requires.is_empty() {
+            let msg = "methods with properties should not have a requires clause.";
+            let hint = "consider moving this into the body of the method, or add it to translate()";
+            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                .add_hint(hint.to_string())
+                .add_location(requires[0].loc().clone())
                 .build();
             issues.push(err);
         }
