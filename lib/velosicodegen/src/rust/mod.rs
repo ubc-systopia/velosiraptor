@@ -126,6 +126,9 @@ impl BackendRust {
         // generate common utilities across units
         self.generate_utils(ast)?;
 
+        // generate common utilities across units
+        self.generate_os_utils()?;
+
         Ok(())
     }
 
@@ -156,6 +159,35 @@ impl BackendRust {
         }
 
         save_scope(scope, &srcdir, MOD_UTILS)
+    }
+
+    pub fn generate_os_utils(&self) -> Result<(), VelosiCodeGenError> {
+        // get the source directory
+        let srcdir = self.outdir.join("src");
+
+        // the code generation scope
+        let mut scope = CG::Scope::new();
+
+        // constant definitions
+        let title = format!("OS Utilities for `{}` package", self.pkgname);
+        add_header(&mut scope, &title);
+
+        scope.import("crate::utils", "*");
+
+        scope
+            .new_fn("virt_to_phys")
+            .vis("pub")
+            .arg("vaddr", "VirtAddr")
+            .ret("PhysAddr")
+            .line("todo!()");
+        scope
+            .new_fn("phys_to_virt")
+            .vis("pub")
+            .arg("paddr", "PhysAddr")
+            .ret("VirtAddr")
+            .line("todo!()");
+
+        save_scope(scope, &srcdir, "os")
     }
 
     /// generates the global definitions.
@@ -283,6 +315,9 @@ impl BackendRust {
 
         scope.raw(&format!("pub mod {MOD_CONSTS};"));
         scope.raw(&format!("pub use {MOD_CONSTS}::*;"));
+
+        scope.raw("pub mod os;");
+        scope.raw("pub use os::*;");
 
         // import the units
         scope.new_comment("import the unit modules");
