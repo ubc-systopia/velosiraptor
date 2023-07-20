@@ -63,7 +63,7 @@ pub struct BoolExprQueryBuilder<'a> {
     /// whether to specialize the program for memory model
     mem_model: Option<Program>,
     /// whether or not to allow variable references
-    variable_references: bool,
+    variable_references: Option<bool>,
     /// programs generator
     programs: Option<Box<dyn ProgramBuilder>>,
 }
@@ -82,7 +82,7 @@ impl<'a> BoolExprQueryBuilder<'a> {
             assms: Rc::new(Vec::new()),
             negate: false,
             mem_model: None,
-            variable_references: false,
+            variable_references: None,
             programs: None,
         }
     }
@@ -106,8 +106,8 @@ impl<'a> BoolExprQueryBuilder<'a> {
     }
 
     /// whether we want to allow variable references in the pre-conditions
-    pub fn variable_references(mut self) -> Self {
-        self.variable_references = true;
+    pub fn variable_references(mut self, var_refs: bool) -> Self {
+        self.variable_references = Some(var_refs);
         self
     }
 
@@ -126,21 +126,35 @@ impl<'a> BoolExprQueryBuilder<'a> {
 
         // check if the expression has variable references and we want variable referenes
         let params = self.m_op.get_param_names();
-        if self.goal_expr.has_var_references(&params) != self.variable_references {
-            return None;
+        let has_var_refs = self.goal_expr.has_var_references(&params);
+        if let Some(var_refs) = &self.variable_references {
+            if has_var_refs != *var_refs {
+                return None;
+            }
         }
 
         let mem_model = self.mem_model.is_some();
 
-        // We either spec
+        // construct the program builder for the expression
         let programs = if let Some(programs) = self.programs {
+            // just use the supplied program if we have one
             programs
         } else if let Some(prog) = self.mem_model {
+            // if we are dealing with a memory model we already have the program, so
+            // specialize it
             Box::new(utils::make_program_iter_mem(prog))
         } else {
-            let programs =
+            // if we have variable references in the expression, then we need to do something
+            // slightly different here. Make sure we add the va/sz variables here
+            let programs = if has_var_refs {
+                utils::make_program_builder_no_params(self.unit, &self.goal_expr)
+                    .add_var(String::from("va"))
+                    .add_var(String::from("sz"))
+                    .into_iter()
+            } else {
                 utils::make_program_builder(self.unit, self.m_op.as_ref(), &self.goal_expr)
-                    .into_iter();
+                    .into_iter()
+            };
             if !programs.has_programs() {
                 return None;
             }
@@ -148,15 +162,37 @@ impl<'a> BoolExprQueryBuilder<'a> {
         };
 
         // convert the goal expression if needed
-        let expr = if self.negate {
-            let loc = self.goal_expr.loc().clone();
-            Rc::new(VelosiAstExpr::UnOp(VelosiAstUnOpExpr::new(
-                VelosiAstUnOp::LNot,
-                self.goal_expr,
-                loc,
-            )))
+        let expr = if has_var_refs {
+            // TODO: construct the goal expr here
+            // self.goal_expr
+            todo!("handle me!");
         } else {
             self.goal_expr
+        };
+
+        // negate the goal expressions if we need to
+        let expr = if self.negate {
+            match expr.as_ref() {
+                VelosiAstExpr::UnOp(VelosiAstUnOpExpr {
+                    op: VelosiAstUnOp::LNot,
+                    expr,
+                    ..
+                }) => {
+                    // if we have double negation simply remove it
+                    expr.clone()
+                }
+                _ => {
+                    // negate the expression
+                    let loc = expr.loc().clone();
+                    Rc::new(VelosiAstExpr::UnOp(VelosiAstUnOpExpr::new(
+                        VelosiAstUnOp::LNot,
+                        expr,
+                        loc,
+                    )))
+                }
+            }
+        } else {
+            expr
         };
 
         Some(BoolExprQuery {
