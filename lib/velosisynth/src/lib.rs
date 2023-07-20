@@ -52,6 +52,7 @@ use smt2::Smt2Context;
 use velosiast::VelosiAst;
 use velosiast::{ast::VelosiAstUnitSegment, VelosiAstUnitEnum};
 
+use crate::vmops::SynchronousSync;
 use crate::vmops::{
     enums, MapPrograms, MaybeResult, ProgramBuilder, ProtectPrograms, UnmapPrograms,
 };
@@ -59,7 +60,7 @@ pub use error::{VelosiSynthError, VelosiSynthIssues};
 pub use programs::{Program, ProgramsBuilder, ProgramsIter};
 pub use z3::{Z3Query, Z3TaskPriority, Z3Ticket, Z3Worker, Z3WorkerPool, Z3WorkerPoolStats};
 
-const DEFAULT_BATCH_SIZE: usize = 32;
+const DEFAULT_BATCH_SIZE: usize = 2;
 
 #[macro_export]
 macro_rules! synth_result_return (($res: expr, $issues: expr) => (
@@ -131,10 +132,13 @@ impl<'a> Z3SynthSegment<'a> {
     ) -> Self {
         let batch_size = std::cmp::max(DEFAULT_BATCH_SIZE, z3.num_workers());
 
+        let ctx = model::create(unit, false);
+        z3.reset_with_context(Z3Query::from(ctx));
+
         // XXX: move this to the the syntheisze() step.
-        let map_queries = vmops::map::get_program_iter(unit, batch_size, None);
-        let unmap_queries = vmops::unmap::get_program_iter(unit, batch_size, None);
-        let protect_queries = vmops::protect::get_program_iter(unit, batch_size, None);
+        let map_queries = MapPrograms::new(unit, batch_size, None);
+        let unmap_queries = UnmapPrograms::new(unit, batch_size, None);
+        let protect_queries = ProtectPrograms::new(unit, batch_size, None);
 
         z3.reset_with_context(Z3Query::with_model_contexts(vec![model]));
 
@@ -320,11 +324,11 @@ impl<'a> Z3SynthSegment<'a> {
 
             // use the previously generated programs as a starting point
             self.map_queries =
-                vmops::map::get_program_iter(unit, batch_size, self.map_program.take());
+                MapPrograms::new(unit, batch_size, self.map_program.take().map(Rc::new));
             self.unmap_queries =
-                vmops::unmap::get_program_iter(unit, batch_size, self.unmap_program.take());
+                UnmapPrograms::new(unit, batch_size, self.unmap_program.take().map(Rc::new));
             self.protect_queries =
-                vmops::protect::get_program_iter(unit, batch_size, self.protect_program.take());
+                ProtectPrograms::new(unit, batch_size, self.protect_program.take().map(Rc::new));
 
             // do the synthesis step again
             while !self.is_done() {
@@ -333,46 +337,19 @@ impl<'a> Z3SynthSegment<'a> {
         }
     }
 
-    pub fn synthesize_map(&mut self, mem_model: bool) -> Result<Program, VelosiSynthIssues> {
+    pub fn synthesize_map(&mut self, batch_size: usize, mem_model: bool) -> Option<Program> {
         self.done = true;
-
-        let prog = vmops::map::synthesize(&mut self.z3, self.unit, None)?;
-        if mem_model {
-            let ctx = model::create(self.unit, true);
-            self.z3.reset_with_context(Z3Query::from(ctx));
-
-            vmops::map::synthesize(&mut self.z3, self.unit, Some(prog))
-        } else {
-            Ok(prog)
-        }
+        MapPrograms::synthesize(&mut self.z3, self.unit, batch_size, mem_model)
     }
 
-    pub fn synthesize_unmap(&mut self, mem_model: bool) -> Result<Program, VelosiSynthIssues> {
+    pub fn synthesize_unmap(&mut self, batch_size: usize, mem_model: bool) -> Option<Program> {
         self.done = true;
-
-        let prog = vmops::unmap::synthesize(&mut self.z3, self.unit, None)?;
-        if mem_model {
-            let ctx = model::create(self.unit, true);
-            self.z3.reset_with_context(Z3Query::from(ctx));
-
-            vmops::unmap::synthesize(&mut self.z3, self.unit, Some(prog))
-        } else {
-            Ok(prog)
-        }
+        UnmapPrograms::synthesize(&mut self.z3, self.unit, batch_size, mem_model)
     }
 
-    pub fn synthesize_protect(&mut self, mem_model: bool) -> Result<Program, VelosiSynthIssues> {
+    pub fn synthesize_protect(&mut self, batch_size: usize, mem_model: bool) -> Option<Program> {
         self.done = true;
-
-        let prog = vmops::protect::synthesize(&mut self.z3, self.unit, None)?;
-        if mem_model {
-            let ctx = model::create(self.unit, true);
-            self.z3.reset_with_context(Z3Query::from(ctx));
-
-            vmops::protect::synthesize(&mut self.z3, self.unit, Some(prog))
-        } else {
-            Ok(prog)
-        }
+        ProtectPrograms::synthesize(&mut self.z3, self.unit, batch_size, mem_model)
     }
 
     /// terminates the worker pool

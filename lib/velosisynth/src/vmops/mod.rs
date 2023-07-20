@@ -26,21 +26,63 @@
 //! Synthesis of Virtual Memory Operations
 
 pub mod enums;
-pub mod map;
-pub mod map_new;
-pub mod protect;
+mod map;
+mod protect;
 mod queries;
-pub mod unmap;
-pub use queries::MaybeResult;
+mod unmap;
+
+use std::rc::Rc;
 
 // re-export the sanity checks
-pub use queries::precond;
-pub use queries::queryhelper;
 pub use queries::resultparser;
-pub use queries::semantics;
-pub use queries::semprecond;
 pub use queries::utils;
 
 pub use map::MapPrograms;
 pub use protect::ProtectPrograms;
 pub use unmap::UnmapPrograms;
+
+pub use queries::MaybeResult;
+pub use queries::ProgramBuilder;
+
+use velosiast::ast::VelosiAstUnitSegment;
+
+use crate::model;
+use crate::z3::{Z3Query, Z3WorkerPool};
+use crate::Program;
+
+pub trait SynchronousSync<T: ProgramBuilder = Self>: ProgramBuilder {
+    fn do_synthesize(&mut self, z3: &mut Z3WorkerPool) -> Option<Program> {
+        loop {
+            match self.next(z3) {
+                MaybeResult::Some(prog) => return Some(prog),
+                MaybeResult::Pending => continue,
+                MaybeResult::None => return None,
+            }
+        }
+    }
+
+    fn synthesize(
+        z3: &mut Z3WorkerPool,
+        unit: &VelosiAstUnitSegment,
+        batch_size: usize,
+        mem_model: bool,
+    ) -> Option<Program> {
+        let ctx = model::create(unit, false);
+        z3.reset_with_context(Z3Query::from(ctx));
+
+        let mut programs = MapPrograms::new(unit, batch_size, None);
+        if let Some(prog) = programs.do_synthesize(z3) {
+            if mem_model {
+                let ctx = model::create(unit, false);
+                z3.reset_with_context(Z3Query::from(ctx));
+
+                let mut programs = MapPrograms::new(unit, batch_size, Some(Rc::new(prog)));
+                programs.do_synthesize(z3)
+            } else {
+                Some(prog)
+            }
+        } else {
+            None
+        }
+    }
+}

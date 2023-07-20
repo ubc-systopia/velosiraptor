@@ -23,300 +23,117 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Synthesis of Virtual Memory Operations: Protect
+//! Synthesis of Virtual Memory Operations: Unmap
 
-use std::collections::LinkedList;
+use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
-use velosiast::ast::{VelosiAstMethod, VelosiAstUnitSegment};
+use smt2::Term;
 
-use crate::error::VelosiSynthErrorBuilder;
-use crate::vmops::utils::SynthOptions;
-use crate::{programs::Program, z3::Z3WorkerPool, VelosiSynthIssues};
+use velosiast::ast::{VelosiAstExpr, VelosiAstMethod, VelosiAstUnitSegment};
 
-use super::{semantics, utils};
+use crate::programs::Program;
 
-use crate::vmops::queryhelper::MultiDimProgramQueries;
-use crate::vmops::queryhelper::{ProgramBuilder, ProgramQueries};
-use crate::vmops::semantics::SemanticQueries;
-use crate::vmops::MaybeResult;
-use crate::DEFAULT_BATCH_SIZE;
-use crate::{ProgramsIter, Z3Ticket};
+use crate::z3::{Z3TaskPriority, Z3WorkerPool};
 
-pub enum ProtectProgramQueries {
-    SingleQuery(ProgramsIter),
-    MultiQuery(MultiDimProgramQueries<ProgramQueries<SemanticQueries>>),
-}
-
-impl ProgramBuilder for ProtectProgramQueries {
-    fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
-        match self {
-            Self::SingleQuery(q) => q.next(z3),
-            Self::MultiQuery(q) => q.next(z3),
-        }
-    }
-}
+use super::queries::{CompoundBoolExprQueryBuilder, MaybeResult, ProgramBuilder, ProgramVerifier};
+use super::SynchronousSync;
 
 pub struct ProtectPrograms {
-    prefix: String,
-
-    programs: ProtectProgramQueries,
-    programs_done: bool,
-
-    queries: LinkedList<(Program, [Option<Z3Ticket>; 4])>,
-    candidates: Vec<Program>,
-
-    m_fn: Rc<VelosiAstMethod>,
-    v_fn: Rc<VelosiAstMethod>,
-    t_fn: Rc<VelosiAstMethod>,
-    f_fn: Rc<VelosiAstMethod>,
-
-    mem_model: bool,
+    /// iterator of the candidate programs
+    candidate_programs: Box<dyn ProgramBuilder>,
 }
 
 impl ProtectPrograms {
     pub fn new(
-        prefix: String,
-        programs: ProtectProgramQueries,
-        m_fn: Rc<VelosiAstMethod>,
-        v_fn: Rc<VelosiAstMethod>,
-        t_fn: Rc<VelosiAstMethod>,
-        f_fn: Rc<VelosiAstMethod>,
-        mem_model: bool,
+        unit: &VelosiAstUnitSegment,
+        batch_size: usize,
+        starting_prog: Option<Rc<Program>>,
     ) -> Self {
+        log::info!(target : "[synth::protect]", "setting up protect synthesis.");
+
+        // obtain the op_fn, this is the map() function
+        let m_op = unit
+            .get_method("map")
+            .unwrap_or_else(|| panic!("no method 'map' in unit {}", unit.ident()));
+
+        // obtain the translate fn, this is handled slightly differently
+        let t_fn = unit
+            .get_method("translate")
+            .unwrap_or_else(|| panic!("no method 'translate' in unit {}", unit.ident()));
+
+        if let Some(_staring_prog) = &starting_prog {
+            // here we have a starting program, that should have satisfied all the preconditions.
+            // we now need to check if the program can be made to work with the memory model as well
+        } else {
+        }
+
+        let partial_programs = Vec::new();
+
+        // now we got all the partial programs that we need to verify
+        let query = CompoundBoolExprQueryBuilder::new(unit, m_op.clone())
+            .partial_programs(partial_programs, false)
+            // .assms()
+            .any();
+
+        let query = ProgramVerifier::with_batchsize(
+            unit.ident().clone(),
+            query.into(),
+            batch_size,
+            Z3TaskPriority::High,
+        );
+
         Self {
-            prefix,
-            programs,
-            programs_done: false,
-            queries: LinkedList::new(),
-            candidates: Vec::new(),
-            m_fn,
-            v_fn,
-            t_fn,
-            f_fn,
-            mem_model,
+            candidate_programs: Box::new(query),
         }
     }
 }
 
 impl ProgramBuilder for ProtectPrograms {
     fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
-        let has_work = !self.candidates.is_empty() || !self.queries.is_empty();
+        self.candidate_programs.next(z3)
+    }
 
-        // poll once, collect the program
-        match self.programs.next(z3) {
-            MaybeResult::Some(p) => self.candidates.push(p),
-            MaybeResult::Pending => {
-                if !has_work {
-                    return MaybeResult::Pending;
-                }
-            }
-            MaybeResult::None => {
-                self.programs_done = true;
-                if !has_work {
-                    return MaybeResult::None;
-                }
-            }
-        };
+    fn m_op(&self) -> &VelosiAstMethod {
+        unimplemented!()
+    }
 
-        // we have at least one candidate program
-        const CONFIG_MAX_QUERIES: usize = 4;
-        if self.queries.len() < CONFIG_MAX_QUERIES {
-            if let Some(prog) = self.candidates.pop() {
-                let valid_semantics = semantics::submit_program_query(
-                    z3,
-                    &self.prefix,
-                    self.m_fn.as_ref(),
-                    self.v_fn.as_ref(),
-                    None,
-                    prog.clone(),
-                    SynthOptions {
-                        negate: false,
-                        no_change: true,
-                        mem_model: self.mem_model,
-                    },
-                );
+    /// the assumptions for the program
+    fn assms(&self) -> Rc<Vec<Term>> {
+        unimplemented!()
+    }
 
-                let translate_semantics = semantics::submit_program_query(
-                    z3,
-                    &self.prefix,
-                    self.m_fn.as_ref(),
-                    self.t_fn.as_ref(),
-                    None,
-                    prog.clone(),
-                    SynthOptions {
-                        negate: false,
-                        no_change: true,
-                        mem_model: self.mem_model,
-                    },
-                );
+    /// the expression that the program needs to establish
+    fn goal_expr(&self) -> Rc<VelosiAstExpr> {
+        unimplemented!()
+    }
 
-                let matchflags_semantics = semantics::submit_program_query(
-                    z3,
-                    &self.prefix,
-                    self.m_fn.as_ref(),
-                    self.f_fn.as_ref(),
-                    None,
-                    prog.clone(),
-                    SynthOptions {
-                        negate: false,
-                        no_change: false,
-                        mem_model: self.mem_model,
-                    },
-                );
-
-                // let semprodoncs = semprecond::submit_program_query(
-                //     z3,
-                //     self.m_fn.as_ref(),
-                //     self.t_fn.as_ref(),
-                //     None,
-                //     false,
-                //     true,
-                //     prog.clone(),
-                // );
-
-                self.queries.push_back((
-                    prog,
-                    [
-                        None,
-                        Some(valid_semantics),
-                        Some(translate_semantics),
-                        Some(matchflags_semantics),
-                    ],
-                ));
-            }
-        }
-
-        let mut res_program = None;
-        let mut remaining_queries = LinkedList::new();
-        'outer: while let Some((prog, mut tickets)) = self.queries.pop_front() {
-            let mut all_done = true;
-            for (_i, maybe_ticket) in tickets.iter_mut().enumerate() {
-                if let Some(ticket) = maybe_ticket {
-                    if let Some(result) = z3.get_result(*ticket) {
-                        // we got a result, check if it's sat
-                        let output = result.result();
-                        if utils::check_result_no_rewrite(output) == utils::QueryResult::Sat {
-                            // set the ticket to none to mark completion
-                            *maybe_ticket = None;
-                            // record that we've found a program that satisfies the first query
-                        } else {
-                            // unsat result, just drop the program and the tickets
-                            continue 'outer;
-                        }
-                    } else {
-                        all_done = false;
-                    }
-                }
-            }
-
-            // store the result
-            if all_done && res_program.is_none() {
-                res_program = Some(prog);
-            } else {
-                remaining_queries.push_back((prog, tickets));
-            }
-        }
-
-        self.queries = remaining_queries;
-
-        if let Some(prog) = res_program {
-            MaybeResult::Some(prog)
-        } else if !self.queries.is_empty() || !self.candidates.is_empty() || !self.programs_done {
-            MaybeResult::Pending
-        } else {
-            debug_assert!(self.programs.next(z3) == MaybeResult::None);
-            MaybeResult::None
-        }
+    fn do_fmt(&self, f: &mut Formatter<'_>, indent: usize, debug: bool) -> FmtResult {
+        let i = " ".repeat(indent);
+        writeln!(f, "{i} @ ProtectPrograms",)?;
+        self.candidate_programs.do_fmt(f, indent + 4, debug)
     }
 }
 
-pub fn get_program_iter(
-    unit: &VelosiAstUnitSegment,
-    batch_size: usize,
-    starting_prog: Option<Program>,
-) -> ProtectPrograms {
-    log::info!(
-        target : "[synth::protect]",
-        "starting synthesizing the protect operation"
-    );
+impl SynchronousSync for ProtectPrograms {}
 
-    // obtain the functions for the map operation
-    let m_fn = unit.get_method("protect").unwrap();
-    let v_fn = unit.get_method("valid").unwrap();
-    let t_fn = unit.get_method("translate").unwrap();
-    let f_fn = unit.get_method("matchflags").unwrap();
-
-    if let Some(prog) = starting_prog {
-        // ---------------------------------------------------------------------------------------------
-        // Translate: Add a query for each possible barrier position
-        // ---------------------------------------------------------------------------------------------
-        ProtectPrograms::new(
-            unit.ident_to_string(),
-            ProtectProgramQueries::SingleQuery(utils::make_program_iter_mem(prog)),
-            m_fn.clone(),
-            v_fn.clone(),
-            t_fn.clone(),
-            f_fn.clone(),
-            true,
-        )
-    } else {
-        // ---------------------------------------------------------------------------------------------
-        // Translate: Add a query for each of the pre-conditions of the function
-        // ---------------------------------------------------------------------------------------------
-
-        let mut protec_queries = Vec::with_capacity(2);
-
-        if let Some(p) = semantics::semantic_query(
-            unit,
-            m_fn.clone(),
-            f_fn.clone(),
-            f_fn,
-            false,
-            false,
-            batch_size,
-        ) {
-            protec_queries.push(p);
-        }
-
-        let programs = MultiDimProgramQueries::new(protec_queries);
-
-        ProtectPrograms::new(
-            unit.ident_to_string(),
-            ProtectProgramQueries::MultiQuery(programs),
-            m_fn.clone(),
-            v_fn.clone(),
-            t_fn.clone(),
-            f_fn.clone(),
-            false,
-        )
+/// Implement `From` for `ProgramVerifier
+///
+/// To allow conversions from ProgramVerifier -> Box<dyn ProgramBuilder>
+impl From<ProtectPrograms> for Box<dyn ProgramBuilder> {
+    fn from(q: ProtectPrograms) -> Self {
+        Box::new(q)
     }
 }
 
-pub fn synthesize(
-    z3: &mut Z3WorkerPool,
-    unit: &VelosiAstUnitSegment,
-    starting_prog: Option<Program>,
-) -> Result<Program, VelosiSynthIssues> {
-    let batch_size = std::cmp::max(DEFAULT_BATCH_SIZE, z3.num_workers());
-    let mut progs = get_program_iter(unit, batch_size, starting_prog);
-    loop {
-        match progs.next(z3) {
-            MaybeResult::Some(prog) => return Ok(prog),
-            MaybeResult::Pending => {
-                // just keep running
-            }
-            MaybeResult::None => {
-                break;
-            }
-        }
+impl Display for ProtectPrograms {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
+        self.do_fmt(f, 0, false)
     }
+}
 
-    let m_fn = unit.get_method("protect").unwrap();
-    let msg = "failed to synthesize a program for the protect operation";
-    let err = VelosiSynthErrorBuilder::err(msg.to_string())
-        .add_location(m_fn.loc.clone())
-        .build();
-
-    Err(err.into())
+impl Debug for ProtectPrograms {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
+        self.do_fmt(f, 0, true)
+    }
 }

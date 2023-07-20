@@ -39,6 +39,8 @@ use velosiast::{AstResult, VelosiAst, VelosiAstUnit};
 use velosisynth::create_models;
 use velosisynth::Z3SynthFactory;
 
+const BATCH_SIZE: usize = 2;
+
 pub fn main() {
     // get the command line argumentts
     let matches = command!() // requires `cargo` feature
@@ -197,27 +199,27 @@ pub fn main() {
 
                     Some("map") => {
                         println!("Synthesizing MAP for unit {}", synth.unit_ident());
-                        match synth.synthesize_map(mem_model) {
-                            Ok(p) => log::warn!(target: "main", "Program: {}", p),
-                            Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
+                        match synth.synthesize_map(BATCH_SIZE, mem_model) {
+                            Some(p) => log::warn!(target: "main", "Program: {}", p),
+                            None => log::error!(target: "main", "Synthesis failed:\n"),
                         }
                         None
                     }
 
                     Some("unmap") => {
                         println!("Synthesizing UNMAP for unit {}", synth.unit_ident());
-                        match synth.synthesize_unmap(mem_model) {
-                            Ok(p) => log::warn!(target: "main", "Program: {}", p),
-                            Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
+                        match synth.synthesize_unmap(BATCH_SIZE, mem_model) {
+                            Some(p) => log::warn!(target: "main", "Program: {}", p),
+                            None => log::error!(target: "main", "Synthesis failed:\n"),
                         }
                         None
                     }
 
                     Some("protect") => {
                         println!("Synthesizing PROTECT for unit {}", synth.unit_ident());
-                        match synth.synthesize_protect(mem_model) {
-                            Ok(p) => log::warn!(target: "main", "Program: {}", p),
-                            Err(e) => log::error!(target: "main", "Synthesis failed:\n{}", e),
+                        match synth.synthesize_protect(BATCH_SIZE, mem_model) {
+                            Some(p) => log::warn!(target: "main", "Program: {}", p),
+                            None => log::error!(target: "main", "Synthesis failed:\n"),
                         }
                         None
                     }
