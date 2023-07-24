@@ -207,8 +207,20 @@ fn add_resolve_fn(ast: &VelosiAst, unit: &VelosiAstUnitSegment, imp: &mut CG::Im
             let resolve = imp.new_fn("resolve").vis("pub").arg_ref_self().ret(&ret_ty);
 
             resolve.line("let paddr = self.translate(0);");
-            resolve.line(format!("let ptr = phys_to_virt(paddr) as *mut {};", ret_ty));
-            resolve.line("unsafe { *ptr }");
+            resolve.line(format!(
+                "unsafe {{ {}::new({}) }}",
+                ret_ty,
+                child
+                    .params_as_slice()
+                    .iter()
+                    .map(|p| if p.ptype.typeinfo.is_paddr() {
+                        "paddr".to_string()
+                    } else {
+                        format!("self.{}", p.ident())
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
         }
     }
 }
