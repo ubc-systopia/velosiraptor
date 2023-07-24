@@ -637,7 +637,7 @@ impl VelosiAstMethod {
         &self,
         issues: &mut VelosiAstIssues,
         sig: &str,
-        params: &[(&str, VelosiAstTypeInfo)],
+        params: &[(&str, bool, VelosiAstTypeInfo)],
     ) {
         if self.params.len() != params.len() {
             let msg = format!("mismatched number of parameter in special method: `{sig}`");
@@ -670,9 +670,24 @@ impl VelosiAstMethod {
                 issues.push(err);
             }
 
-            if p.ptype.typeinfo != params[i].1 {
+            let is_user_def_type = p.ptype.typeinfo.is_typeref();
+            let is_expected_type = p.ptype.typeinfo == params[i].2;
+            if params[i].1 {
+                if !is_user_def_type && !is_expected_type {
+                    let msg = format!("mismatch of parameter type in special method: `{sig}`");
+                    let hint = format!(
+                        "expected {} or a user-defined type, found {}",
+                        params[i].2, p.ptype
+                    );
+                    let err = VelosiAstErrBuilder::err(msg.to_string())
+                        .add_hint(hint)
+                        .add_location(p.loc.clone())
+                        .build();
+                    issues.push(err);
+                }
+            } else if !is_expected_type {
                 let msg = format!("mismatch of parameter type in special method: `{sig}`");
-                let hint = format!("expected {}, found {}", params[i].1, p.ptype);
+                let hint = format!("expected {}, found {}", params[i].2, p.ptype);
                 let err = VelosiAstErrBuilder::err(msg.to_string())
                     .add_hint(hint)
                     .add_location(p.loc.clone())
@@ -755,7 +770,7 @@ impl VelosiAstMethod {
                 self.check_arguments_exact(
                     issues,
                     FN_SIG_TRANSLATE,
-                    &[("va", VelosiAstTypeInfo::VirtAddr)],
+                    &[("va", false, VelosiAstTypeInfo::VirtAddr)],
                 );
                 self.check_not_synth(issues);
                 self.check_translate_preconds(issues);
@@ -766,14 +781,23 @@ impl VelosiAstMethod {
                 self.check_arguments_exact(
                     issues,
                     FN_SIG_MATCHFLAGS,
-                    &[("flgs", VelosiAstTypeInfo::Flags)],
+                    &[("flgs", false, VelosiAstTypeInfo::Flags)],
                 );
                 self.check_not_synth(issues);
             }
             "map" => {
                 // fn map(va: vaddr, sz: size, flgs: flags, pa: paddr)
                 self.check_rettype(issues, FN_SIG_MAP, VelosiAstTypeInfo::Void);
-                //self.check_arguments_exact(issues, FN_SIG_MAP, &[("va", VelosiAstTypeInfo::VirtAddr), ("sz", VelosiAstTypeInfo::Size), ("flgs", VelosiAstTypeInfo::Flags), ("pa", VelosiAstTypeInfo::PhysAddr)]);
+                self.check_arguments_exact(
+                    issues,
+                    FN_SIG_MAP,
+                    &[
+                        ("va", false, VelosiAstTypeInfo::VirtAddr),
+                        ("sz", false, VelosiAstTypeInfo::Size),
+                        ("flgs", false, VelosiAstTypeInfo::Flags),
+                        ("pa", true, VelosiAstTypeInfo::PhysAddr),
+                    ],
+                );
             }
             "unmap" => {
                 // fn unmap(va: vaddr, sz: size)
@@ -782,8 +806,8 @@ impl VelosiAstMethod {
                     issues,
                     FN_SIG_UNMAP,
                     &[
-                        ("va", VelosiAstTypeInfo::VirtAddr),
-                        ("sz", VelosiAstTypeInfo::Size),
+                        ("va", false, VelosiAstTypeInfo::VirtAddr),
+                        ("sz", false, VelosiAstTypeInfo::Size),
                     ],
                 );
             }
@@ -794,9 +818,9 @@ impl VelosiAstMethod {
                     issues,
                     FN_SIG_PROTECT,
                     &[
-                        ("va", VelosiAstTypeInfo::VirtAddr),
-                        ("sz", VelosiAstTypeInfo::Size),
-                        ("flgs", VelosiAstTypeInfo::Flags),
+                        ("va", false, VelosiAstTypeInfo::VirtAddr),
+                        ("sz", false, VelosiAstTypeInfo::Size),
+                        ("flgs", false, VelosiAstTypeInfo::Flags),
                     ],
                 );
             }
