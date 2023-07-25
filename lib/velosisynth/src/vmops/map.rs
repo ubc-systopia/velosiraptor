@@ -25,22 +25,19 @@
 
 //! Synthesis of Virtual Memory Operations: Map
 
-use std::collections::LinkedList;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
 use smt2::Term;
 
-use velosiast::ast::{
-    VelosiAstExpr, VelosiAstMethod, VelosiAstMethodProperty, VelosiAstUnitSegment,
-};
+use velosiast::ast::{VelosiAstBinOpExpr, VelosiAstExpr, VelosiAstMethod, VelosiAstUnitSegment};
 
 use crate::programs::Program;
 
 use crate::z3::{Z3TaskPriority, Z3WorkerPool};
 
 use super::queries::{
-    BoolExprQueryBuilder, CompoundBoolExprQueryBuilder, MaybeResult, ProgramBuilder,
+    utils, BoolExprQueryBuilder, CompoundBoolExprQueryBuilder, MaybeResult, ProgramBuilder,
     ProgramVerifier, TranslateQueryBuilder,
 };
 use super::SynchronousSync;
@@ -51,8 +48,6 @@ pub struct MapPrograms {
     candidate_programs: Box<dyn ProgramBuilder>,
     /// reference to the map function
     m_fn: Rc<VelosiAstMethod>,
-    /// vector of all expressions that need to be satisfied
-    goal_exprs: Vec<Rc<VelosiAstExpr>>,
     /// the starting program for the memory model
     starting_prog: Option<Rc<Program>>,
 }
@@ -65,98 +60,89 @@ impl MapPrograms {
     ) -> Self {
         log::info!(target : "[synth::map]", "setting up map synthesis.");
 
+        let mut partial_programs = Vec::new();
+
         // obtain the op_fn, this is the map() function
         let m_op = unit
             .get_method("map")
             .unwrap_or_else(|| panic!("no method 'map' in unit {}", unit.ident()));
 
-        // obtain the translate fn, this is handled slightly differently
-        let t_fn = unit
-            .get_method("translate")
-            .unwrap_or_else(|| panic!("no method 'translate' in unit {}", unit.ident()));
+        // handle the translate function
+        if let Some(m) = unit.get_method("translate") {
+            // obtain the translate query
+            let query = TranslateQueryBuilder::new(unit, m_op.clone(), m.clone())
+                .build()
+                .expect("no query?");
 
-        if let Some(_staring_prog) = &starting_prog {
-            // here we have a starting program, that should have satisfied all the preconditions.
-            // we now need to check if the program can be made to work with the memory model as well
-        } else {
-        }
-
-        let params = ["va", "sz"].into();
-        let goal_exprs = t_fn.requires.iter().enumerate().filter_map(|(i, req)| {
-            use crate::model::method::translate_range_name;
-            use velosiast::ast::VelosiAstFnCallExpr;
-            use velosiast::ast::VelosiAstIdentLiteralExpr;
-            use velosiast::ast::VelosiAstIdentifier;
-            use velosiast::ast::VelosiAstTypeInfo;
-            if req.has_state_references() && req.has_var_references(&params) {
-                let ident = VelosiAstIdentifier::from(translate_range_name(Some(i)).as_str());
-
-                let args = vec![
-                    Rc::new(VelosiAstExpr::IdentLiteral(
-                        VelosiAstIdentLiteralExpr::with_name(
-                            "va".to_string(),
-                            VelosiAstTypeInfo::VirtAddr,
-                        ),
-                    )),
-                    Rc::new(VelosiAstExpr::IdentLiteral(
-                        VelosiAstIdentLiteralExpr::with_name(
-                            "sz".to_string(),
-                            VelosiAstTypeInfo::Size,
-                        ),
-                    )),
-                ];
-
-                let mut fn_call = VelosiAstFnCallExpr::new(ident, VelosiAstTypeInfo::Bool);
-                fn_call.add_args(args);
-
-                Some(Rc::new(VelosiAstExpr::FnCall(fn_call)))
-            } else {
-                None
-            }
-        });
-
-        // we start with the translat function
-        let query = TranslateQueryBuilder::new(unit, m_op.clone(), t_fn.clone())
-            .build()
-            .expect("no query?");
-
-        let mut partial_programs = vec![ProgramVerifier::with_batchsize(
-            unit.ident().clone(),
-            query.into(),
-            batch_size,
-            Z3TaskPriority::High,
-        )
-        .into()];
-
-        // adding all the methods that are tagged with `#[remap]`
-        add_methods_tagged_with_remap(unit, m_op, batch_size, &mut partial_programs);
-
-        // now we got all the partial programs that we need to verify
-        let query = CompoundBoolExprQueryBuilder::new(unit, m_op.clone())
-            .partial_programs(partial_programs, false)
-            // .assms()
-            .all();
-
-        let query = query
-            .map(|query| {
+            partial_programs.push(
                 ProgramVerifier::with_batchsize(
                     unit.ident().clone(),
                     query.into(),
                     batch_size,
-                    Z3TaskPriority::High,
+                    Z3TaskPriority::Low,
                 )
-            })
-            .expect("no query?");
+                .into(),
+            );
 
-        Self {
-            candidate_programs: query.into(),
-            m_fn: m_op.clone(),
-            goal_exprs: goal_exprs.collect(),
-            starting_prog,
+            // add the pre-conditions for the translate
+            utils::add_method_preconds(unit, m_op, m, batch_size, false, &mut partial_programs);
+        }
+
+        // add the methods that must be true
+        utils::add_methods_tagged_with_remap(unit, m_op, batch_size, false, &mut partial_programs);
+
+        // we now have all the partial programs ready
+        let query = if let Some(starting_prog) = &starting_prog {
+            // here we have a starting program, that should have satisfied all the preconditions.
+            // we now need to check if the program can be made to work with the memory model as well
+            if let Some(p) = partial_programs.pop() {
+                let goal_expr = partial_programs.into_iter().fold(p.goal_expr(), |acc, x| {
+                    Rc::new(VelosiAstExpr::BinOp(VelosiAstBinOpExpr::land(
+                        acc,
+                        x.goal_expr(),
+                    )))
+                });
+
+                // we got the goal expression that is now an AND of everything, so we can now
+                // form the boolean expression
+
+                BoolExprQueryBuilder::new(unit, m_op.clone(), goal_expr)
+                    .mem_model(starting_prog.clone())
+                    .build()
+                    .map(|e| e.into())
+            } else {
+                None
+            }
+        } else {
+            // construct a new compound query builder
+            CompoundBoolExprQueryBuilder::new(unit, m_op.clone())
+                .partial_programs(partial_programs, false)
+                // .assms()
+                .all()
+                .map(|e| e.into())
+        };
+
+        if let Some(query) = query {
+            let query = ProgramVerifier::with_batchsize(
+                unit.ident().clone(),
+                query,
+                batch_size,
+                Z3TaskPriority::High,
+            );
+
+            Self {
+                candidate_programs: query.into(),
+                m_fn: m_op.clone(),
+                // goal_exprs: Vec::new(),
+                starting_prog,
+            }
+        } else {
+            todo!("handle the case where there was no query here")
         }
     }
 }
 
+/// Implement the PrograBuilder trait for MapPrograms
 impl ProgramBuilder for MapPrograms {
     fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
         self.candidate_programs.next(z3)
@@ -183,104 +169,28 @@ impl ProgramBuilder for MapPrograms {
     }
 }
 
+/// Implement `SynchronousSync` for `UnmapPrograms`
 impl SynchronousSync for MapPrograms {}
 
-/// Implement `From` for `ProgramVerifier
+/// Implement `From` for `MapPrograms`
 ///
-/// To allow conversions from ProgramVerifier -> Box<dyn ProgramBuilder>
+/// To allow conversions from MapPrograms -> Box<dyn ProgramBuilder>
 impl From<MapPrograms> for Box<dyn ProgramBuilder> {
     fn from(q: MapPrograms) -> Self {
         Box::new(q)
     }
 }
 
+/// Implement the Display trait for MapPrograms
 impl Display for MapPrograms {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
         self.do_fmt(f, 0, false)
     }
 }
 
+/// Implement the Debug trait for MapPrograms
 impl Debug for MapPrograms {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
         self.do_fmt(f, 0, true)
-    }
-}
-
-/// this functions collects the methods tagged with `remap` and adds them to the partial programs
-fn add_methods_tagged_with_remap(
-    unit: &VelosiAstUnitSegment,
-    m_op: &Rc<VelosiAstMethod>,
-    batch_size: usize,
-    partial_programs: &mut Vec<Box<dyn ProgramBuilder>>,
-) {
-    for r_fn in unit.methods.values() {
-        // if the property is not set to remap, we don't care about it
-        if !r_fn.properties.contains(&VelosiAstMethodProperty::Remap) {
-            log::debug!(
-                target : "[synth::map]",
-                "skipping method {} (not remap)", r_fn.ident()
-            );
-            continue;
-        }
-
-        // we don't care about abstract or synth methods, the return type should always be boolean
-        if r_fn.is_abstract || r_fn.is_synth || !r_fn.rtype.is_boolean() {
-            log::debug!(
-                target : "[synth::map]",
-                "skipping method {} (abstract, synth, or not boolean)", r_fn.ident()
-            );
-            continue;
-        }
-
-        // split the body expressions into a list of conjuncts forming a CNF
-        let exprs = r_fn
-            .body
-            .as_ref()
-            .map(|body| body.split_cnf())
-            .unwrap_or_else(|| panic!("no body for method {}", r_fn.ident()));
-
-        log::info!(
-            target : "[synth::map]",
-            "handling method {}", r_fn.ident()
-        );
-
-        // build the query for the expressions of the body of the function,
-        let query: Option<Box<dyn ProgramBuilder>> = match exprs.as_slice() {
-            [] => unreachable!("slice of expressions was empty?"),
-            [exp] => {
-                log::debug!(target : "[synth::map]","single expr body {}", exp);
-
-                // just a single expression here
-                BoolExprQueryBuilder::new(unit, m_op.clone(), exp.clone())
-                    // .assms(): No assumptions, as they will be added by the map.assms()
-                    .variable_references(false)
-                    .build()
-                    .map(|e| e.into())
-            }
-            _ => {
-                log::debug!(target : "[synth::map]", "mutliple expr body");
-
-                // handle all the expressions
-                CompoundBoolExprQueryBuilder::new(unit, m_op.clone())
-                    .exprs(exprs)
-                    // .assms(): No assumptions, as they will be added by the map.assms()
-                    .all()
-                    .map(|e| e.into())
-            }
-        };
-
-        // add the program verifier and add the query to the list
-        if let Some(query) = query {
-            log::debug!(target : "[synth::map]", "adding query to partial programs");
-            partial_programs.push(
-                ProgramVerifier::with_batchsize(
-                    unit.ident().clone(),
-                    query,
-                    batch_size,
-                    Z3TaskPriority::Medium,
-                )
-                .into(),
-            );
-        }
     }
 }
