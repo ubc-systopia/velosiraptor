@@ -53,14 +53,14 @@ use velosiast::VelosiAst;
 use velosiast::{ast::VelosiAstUnitSegment, VelosiAstUnitEnum};
 
 use crate::vmops::SynchronousSync;
-use crate::vmops::{
-    enums, MapPrograms, MaybeResult, ProgramBuilder, ProtectPrograms, UnmapPrograms,
+pub use crate::vmops::{
+    enums, BoolExprQuery, BoolExprQueryBuilder, CompoundBoolExprQueryBuilder, CompoundQueryAll,
+    CompoundQueryAny, MapPrograms, MaybeResult, ProgramBuilder, ProgramVerifier, ProtectPrograms,
+    TranslateQuery, TranslateQueryBuilder, UnmapPrograms, DEFAULT_BATCH_SIZE,
 };
 pub use error::{VelosiSynthError, VelosiSynthIssues};
 pub use programs::{Program, ProgramsBuilder, ProgramsIter};
 pub use z3::{Z3Query, Z3TaskPriority, Z3Ticket, Z3Worker, Z3WorkerPool, Z3WorkerPoolStats};
-
-const DEFAULT_BATCH_SIZE: usize = 2;
 
 #[macro_export]
 macro_rules! synth_result_return (($res: expr, $issues: expr) => (

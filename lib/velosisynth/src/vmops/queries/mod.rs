@@ -51,7 +51,7 @@ use crate::z3::Z3WorkerPool;
 
 // re-exports
 pub use boolexpr::{BoolExprQuery, BoolExprQueryBuilder};
-pub use cnf::CompoundBoolExprQueryBuilder;
+pub use cnf::{CompoundBoolExprQueryBuilder, CompoundQueryAll, CompoundQueryAny};
 pub use translate::{TranslateQuery, TranslateQueryBuilder};
 pub use verifier::{ProgramVerifier, DEFAULT_BATCH_SIZE};
 

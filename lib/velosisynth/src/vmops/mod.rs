@@ -37,12 +37,17 @@ use std::rc::Rc;
 pub use queries::resultparser;
 pub use queries::utils;
 
+// reexport the program synthesis wrappers
 pub use map::MapPrograms;
 pub use protect::ProtectPrograms;
 pub use unmap::UnmapPrograms;
 
-pub use queries::MaybeResult;
-pub use queries::ProgramBuilder;
+/// re-export the query builder stuff
+pub use queries::{
+    BoolExprQuery, BoolExprQueryBuilder, CompoundBoolExprQueryBuilder, CompoundQueryAll,
+    CompoundQueryAny, MaybeResult, ProgramBuilder, ProgramVerifier, TranslateQuery,
+    TranslateQueryBuilder, DEFAULT_BATCH_SIZE,
+};
 
 use velosiast::ast::VelosiAstUnitSegment;
 
