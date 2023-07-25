@@ -36,7 +36,10 @@ use crate::programs::Program;
 
 use crate::z3::{Z3TaskPriority, Z3WorkerPool};
 
-use super::queries::{CompoundBoolExprQueryBuilder, MaybeResult, ProgramBuilder, ProgramVerifier};
+use super::queries::{
+    CompoundBoolExprQueryBuilder, MaybeResult, ProgramBuilder, ProgramVerifier,
+    TranslateQueryBuilder,
+};
 use super::SynchronousSync;
 
 pub struct ProtectPrograms {
@@ -62,13 +65,25 @@ impl ProtectPrograms {
             .get_method("translate")
             .unwrap_or_else(|| panic!("no method 'translate' in unit {}", unit.ident()));
 
+        // we start with the translate function
+        let translate_result = TranslateQueryBuilder::new(unit, m_op.clone(), t_fn.clone())
+            .no_change() // we want the translate result to not change here
+            .build()
+            .expect("no query for the translate result");
+
         if let Some(_staring_prog) = &starting_prog {
             // here we have a starting program, that should have satisfied all the preconditions.
             // we now need to check if the program can be made to work with the memory model as well
         } else {
         }
 
-        let partial_programs = Vec::new();
+        let partial_programs = vec![ProgramVerifier::with_batchsize(
+            unit.ident().clone(),
+            translate_result.into(),
+            batch_size,
+            Z3TaskPriority::High,
+        )
+        .into()];
 
         // now we got all the partial programs that we need to verify
         let query = CompoundBoolExprQueryBuilder::new(unit, m_op.clone())
