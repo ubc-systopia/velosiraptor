@@ -83,18 +83,31 @@ macro_rules! synth_result_unwrap (($e: expr, $issues: expr) => (
 ));
 
 pub struct SynthResult {
-    map: Program,
-    unmap: Program,
-    protect: Program,
+    map: Option<Program>,
+    unmap: Option<Program>,
+    protect: Option<Program>,
 }
 
 impl Display for SynthResult {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(
-            f,
-            "Programs:\n- map:\n    {}\n-unmap:\n    {}\n-protect:\n    {}",
-            self.map, self.unmap, self.protect
-        )
+        writeln!(f, "Programs:")?;
+        if let Some(p) = &self.map {
+            writeln!(f, "map() {{\n{}\n}} ", p)?;
+        } else {
+            writeln!(f, "map() {{\nUNKNOWN\n}} ")?;
+        }
+
+        if let Some(p) = &self.protect {
+            writeln!(f, "protect() {{\n{}\n}} ", p)?;
+        } else {
+            writeln!(f, "protect() {{\nUNKNOWN\n}} ")?;
+        }
+
+        if let Some(p) = &self.unmap {
+            writeln!(f, "unmap() {{\n{}\n}} ", p)
+        } else {
+            writeln!(f, "unmap() {{\nUNKNOWN\n}} ")
+        }
     }
 }
 
@@ -188,7 +201,7 @@ impl<'a> Z3SynthSegment<'a> {
         synth_result_return!((), issues)
     }
 
-    pub fn finalize(mut self) -> Result<bool, Self> {
+    pub fn finalize(mut self) -> Result<SynthResult, Self> {
         if !self.is_done() {
             log::error!("called finalize() but synthesis is not done yet.");
             return Err(self);
@@ -200,28 +213,32 @@ impl<'a> Z3SynthSegment<'a> {
         let protect_program = self.protect_program.take();
         let unit = self.destroy();
 
-        if let Some(prog) = map_program {
+        if let Some(prog) = &map_program {
             log::info!(target : "[Z3Synth]", "successfully synthesized program\n{}.map() {{ {} }}", unit.ident(), prog);
             unit.set_method_ops("map", prog.into());
         } else {
             log::warn!(target : "[Z3Synth]", "map() {{ UNKNOWN }} ");
         }
 
-        if let Some(prog) = unmap_program {
+        if let Some(prog) = &unmap_program {
             log::info!(target : "[Z3Synth]", "successfully synthesized program\n{}.unmap() {{ {} }}", unit.ident(), prog);
             unit.set_method_ops("unmap", prog.into());
         } else {
             log::warn!(target : "[Z3Synth]", "unmap() {{ UNKNOWN }}");
         }
 
-        if let Some(prog) = protect_program {
+        if let Some(prog) = &protect_program {
             log::info!(target : "[Z3Synth]", "successfully synthesized program\n{}.protect() {{ {} }}", unit.ident(),prog);
             unit.set_method_ops("protect", prog.into());
         } else {
             log::warn!(target : "[Z3Synth]", "protect() {{ UNKNOWN }}");
         }
 
-        Ok(true)
+        Ok(SynthResult {
+            map: map_program,
+            unmap: unmap_program,
+            protect: protect_program,
+        })
     }
 
     /// checks whether the synthesis has completed, either with result or not
@@ -260,7 +277,7 @@ impl<'a> Z3SynthSegment<'a> {
                 }
                 MaybeResult::Pending => all_done = false,
                 MaybeResult::None => {
-                    all_done = true;
+                    all_done &= true;
                     log::warn!("did not find a map program");
                     self.map_program = Some(Program::new());
                     self.t_map_synthesis = Instant::now() - t_synth_start;
@@ -277,7 +294,7 @@ impl<'a> Z3SynthSegment<'a> {
                 }
                 MaybeResult::Pending => all_done = false,
                 MaybeResult::None => {
-                    all_done = true;
+                    all_done &= true;
                     log::warn!("did not find a unmap program");
                     self.unmap_program = Some(Program::new());
                     self.t_unmap_synthesis = Instant::now() - t_synth_start;
@@ -295,7 +312,7 @@ impl<'a> Z3SynthSegment<'a> {
                 MaybeResult::Pending => all_done = false,
                 MaybeResult::None => {
                     log::warn!("did not find a protect program");
-                    all_done = true;
+                    all_done &= true;
                     self.protect_program = Some(Program::new());
                     self.t_protect_synthesis = Instant::now() - t_synth_start;
                 }

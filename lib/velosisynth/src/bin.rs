@@ -133,17 +133,18 @@ pub fn main() {
     let mut t_synth = Vec::new();
     for unit in ast.units_mut() {
         use std::rc::Rc;
+
+        if let Some(unit_filter) = matches.get_one::<String>("unit").map(|s| s.as_str()) {
+            if !(unit_filter == "all" || unit_filter == unit.ident().as_str()) {
+                continue;
+            }
+        }
+
         match unit {
             VelosiAstUnit::Segment(u) => {
                 if u.is_abstract {
                     // don't handle abstract units
                     continue;
-                }
-
-                if let Some(unit_filter) = matches.get_one::<String>("unit").map(|s| s.as_str()) {
-                    if !(unit_filter == "all" || unit_filter == u.ident().as_str()) {
-                        continue;
-                    }
                 }
 
                 let seg = Rc::get_mut(u);
