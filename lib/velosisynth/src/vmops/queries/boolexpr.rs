@@ -61,7 +61,7 @@ pub struct BoolExprQueryBuilder<'a> {
     /// whether or not to negate the expression
     negate: bool,
     /// whether to specialize the program for memory model
-    mem_model: Option<Program>,
+    mem_model: Option<Rc<Program>>,
     /// whether or not to allow variable references
     variable_references: Option<bool>,
     /// programs generator
@@ -100,7 +100,7 @@ impl<'a> BoolExprQueryBuilder<'a> {
     }
 
     /// sets the memory model to be used
-    pub fn mem_model(mut self, prog: Program) -> Self {
+    pub fn mem_model(mut self, prog: Rc<Program>) -> Self {
         self.mem_model = Some(prog);
         self
     }
@@ -142,7 +142,7 @@ impl<'a> BoolExprQueryBuilder<'a> {
         } else if let Some(prog) = self.mem_model {
             // if we are dealing with a memory model we already have the program, so
             // specialize it
-            Box::new(utils::make_program_iter_mem(prog))
+            Box::new(utils::make_program_iter_mem(&prog))
         } else {
             // if we have variable references in the expression, then we need to do something
             // slightly different here. Make sure we add the va/sz variables here
