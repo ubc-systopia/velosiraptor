@@ -183,8 +183,8 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
     }
 
     /// whether or not to negate the conjunct
-    pub fn negate(mut self) -> Self {
-        self.negate = !self.negate;
+    pub fn negate(mut self, toggle: bool) -> Self {
+        self.negate = toggle;
         self
     }
 
@@ -258,7 +258,7 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
             // negate the the expressions
             let exprs = exprs
                 .into_iter()
-                .map(|e| Rc::new(VelosiAstUnOpExpr::new_neg(e)))
+                .map(|e| Rc::new(VelosiAstUnOpExpr::new_lnot(e)))
                 .collect();
 
             let compound_query = CompoundQueryAny {
@@ -702,7 +702,7 @@ impl ProgramBuilder for CompoundQueryAny {
                         }
                     } else {
                         expr = Rc::new(VelosiAstExpr::BinOp(VelosiAstBinOpExpr {
-                            op: VelosiAstBinOp::Or,
+                            op: VelosiAstBinOp::Lor,
                             lhs: expr,
                             rhs: e.clone(),
                             loc: VelosiTokenStream::default(),
@@ -786,9 +786,10 @@ impl ProgramBuilder for CompoundQueryAll {
             return MaybeResult::None;
         }
 
-        // loop over all program parts, and check if there is one next
         let mut programs_ready = true;
+        let mut had_none = false;
 
+        // loop over all program parts, and check if there is one next
         for i in 0..self.partial_programs.len() {
             // nothing to be done here
             if self.done[i] {
@@ -808,13 +809,24 @@ impl ProgramBuilder for CompoundQueryAll {
                 MaybeResult::None => {
                     debug_assert!(!self.done[i]);
                     self.done[i] = true;
+                    had_none = true;
+
+                    if self.partial_program_counter == 0 {
+                        log::warn!("Partial program was empty\n{}", self.candidate_programs[i]);
+                    }
                 }
             }
         }
 
         // if we are the first and we had pending, return as we can't do anyting yet
         if self.partial_program_counter == 0 && !programs_ready {
-            return MaybeResult::Pending;
+            if had_none {
+                log::warn!("one of the programs was empty!");
+                self.all_done = true;
+                return MaybeResult::None;
+            } else {
+                return MaybeResult::Pending;
+            }
         }
 
         // create a snapshot of current, as we may need to roll back
