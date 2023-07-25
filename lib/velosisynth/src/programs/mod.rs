@@ -916,11 +916,11 @@ impl Default for Program {
     }
 }
 
-impl From<Program> for Vec<VelosiOperation> {
-    fn from(mut prog: Program) -> Self {
+impl From<&Program> for Vec<VelosiOperation> {
+    fn from(prog: &Program) -> Self {
         let mut ops: Vec<VelosiOperation> = prog
             .0
-            .iter_mut()
+            .iter()
             .filter_map(|f| match f {
                 ProgramActions::GlobalBarrier => None,
                 ProgramActions::FieldActions(a) => Some(a),
