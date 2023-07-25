@@ -266,6 +266,18 @@ impl VelosiAstBinOpExpr {
         VelosiAstBinOpExpr { lhs, op, rhs, loc }
     }
 
+    pub fn land(lhs: Rc<VelosiAstExpr>,  rhs: Rc<VelosiAstExpr>) -> Self {
+        Self::new(
+            lhs, VelosiAstBinOp::Land, rhs, Default::default()
+        )
+    }
+
+    pub fn lor(lhs: Rc<VelosiAstExpr>, rhs: Rc<VelosiAstExpr>) -> Self {
+        Self::new(
+            lhs, VelosiAstBinOp::Lor, rhs, Default::default()
+        )
+    }
+
     pub fn from_parse_tree(
         pt: VelosiParseTreeBinOpExpr,
         st: &mut SymbolTable,
@@ -779,9 +791,9 @@ impl VelosiAstUnOpExpr {
         VelosiAstUnOpExpr { op, expr, loc }
     }
 
-    pub fn new_neg(expr: Rc<VelosiAstExpr>) -> VelosiAstExpr {
+    pub fn new_lnot(expr: Rc<VelosiAstExpr>) -> VelosiAstExpr {
         let loc = expr.loc().clone();
-        VelosiAstExpr::UnOp(VelosiAstUnOpExpr::new(VelosiAstUnOp::Not, expr, loc))
+        VelosiAstExpr::UnOp(VelosiAstUnOpExpr::new(VelosiAstUnOp::LNot, expr, loc))
     }
 
     pub fn from_parse_tree(
@@ -2591,6 +2603,16 @@ impl Display for VelosiAstExpr {
             Slice(i) => Display::fmt(&i, format),
             Range(i) => Display::fmt(&i, format),
         }
+    }
+}
+
+impl From<&VelosiAstParam> for VelosiAstExpr {
+    fn from(p: &VelosiAstParam) -> Self {
+        VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
+            vec![p.ident.clone()],
+            p.ptype.typeinfo.clone(),
+            p.loc.clone(),
+        ))
     }
 }
 
