@@ -25,7 +25,7 @@
 
 //! State Synthesis Module: Rosette
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::rc::Rc;
 
 // rosette language library imports
@@ -33,7 +33,7 @@ use smt2::{Function, Smt2Context, SortedVar, Term};
 
 // crate imports
 use super::{expr, types};
-use velosiast::ast::{VelosiAstBinOp, VelosiAstExpr, VelosiAstMethod, VelosiAstParam};
+use velosiast::ast::{VelosiAstBinOp, VelosiAstExpr, VelosiAstMethod};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Function Names
@@ -846,91 +846,91 @@ pub fn call_method(m: &VelosiAstMethod, args: Vec<Term>) -> Term {
 //     Term::fn_apply(name, fn_args)
 // }
 
-pub fn call_method_pre(m: &VelosiAstMethod, idx: Option<usize>, args: Vec<Term>) -> Term {
-    let mut check_args = args;
-    for a in m.params.iter() {
-        check_args.push(Term::ident(a.ident_to_string()));
-    }
+// pub fn call_method_pre(m: &VelosiAstMethod, idx: Option<usize>, args: Vec<Term>) -> Term {
+//     let mut check_args = args;
+//     for a in m.params.iter() {
+//         check_args.push(Term::ident(a.ident_to_string()));
+//     }
 
-    let name = if let Some(i) = idx {
-        method_precond_i_name(m.ident(), i)
-    } else {
-        method_precond_name(m.ident())
-    };
-    Term::fn_apply(name, check_args)
-}
+//     let name = if let Some(i) = idx {
+//         method_precond_i_name(m.ident(), i)
+//     } else {
+//         method_precond_name(m.ident())
+//     };
+//     Term::fn_apply(name, check_args)
+// }
 
-pub fn call_method_sempre(m: &VelosiAstMethod, idx: Option<usize>, args: Vec<Term>) -> Term {
-    let mut check_args = args;
-    for a in m.params.iter() {
-        check_args.push(Term::ident(a.ident_to_string()));
-    }
+// pub fn call_method_sempre(m: &VelosiAstMethod, idx: Option<usize>, args: Vec<Term>) -> Term {
+//     let mut check_args = args;
+//     for a in m.params.iter() {
+//         check_args.push(Term::ident(a.ident_to_string()));
+//     }
 
-    Term::fn_apply(translate_range_name(idx), check_args)
-}
+//     Term::fn_apply(translate_range_name(idx), check_args)
+// }
 
-pub fn call_method_result_check_part(
-    m: &VelosiAstMethod,
-    g: &VelosiAstMethod,
-    idx: Option<usize>,
-    args: Vec<Term>,
-) -> Term {
-    let name = match (m.ident().as_str(), g.ident().as_str()) {
-        ("map", "valid") => valid_map_result_name(idx),
-        ("unmap", "valid") => valid_unmap_result_name(idx),
-        ("protect", "valid") => valid_protect_result_name(idx),
-        ("map", "translate") => translate_map_result_name(idx),
-        ("protect", "translate") => translate_protect_result_name(idx),
-        ("map", "matchflags") => matchflags_map_result_name(idx),
-        ("unmap", "matchflags") => matchflags_unmap_result_name(idx),
-        ("protect", "matchflags") => matchflags_protect_result_name(idx),
-        (a, b) => unreachable!("case: {} {}", a, b),
-    };
+// pub fn call_method_result_check_part(
+//     m: &VelosiAstMethod,
+//     g: &VelosiAstMethod,
+//     idx: Option<usize>,
+//     args: Vec<Term>,
+// ) -> Term {
+//     let name = match (m.ident().as_str(), g.ident().as_str()) {
+//         ("map", "valid") => valid_map_result_name(idx),
+//         ("unmap", "valid") => valid_unmap_result_name(idx),
+//         ("protect", "valid") => valid_protect_result_name(idx),
+//         ("map", "translate") => translate_map_result_name(idx),
+//         ("protect", "translate") => translate_protect_result_name(idx),
+//         ("map", "matchflags") => matchflags_map_result_name(idx),
+//         ("unmap", "matchflags") => matchflags_unmap_result_name(idx),
+//         ("protect", "matchflags") => matchflags_protect_result_name(idx),
+//         (a, b) => unreachable!("case: {} {}", a, b),
+//     };
 
-    let mut check_args = args;
-    for a in m.params.iter() {
-        check_args.push(Term::ident(a.ident_to_string()));
-    }
+//     let mut check_args = args;
+//     for a in m.params.iter() {
+//         check_args.push(Term::ident(a.ident_to_string()));
+//     }
 
-    // matchflags need access to the flags but are not provided in unmap
-    if (m.ident().as_str(), g.ident().as_str()) == ("unmap", "matchflags") {
-        check_args.push(Term::ident("flgs".to_string()));
-    }
+//     // matchflags need access to the flags but are not provided in unmap
+//     if (m.ident().as_str(), g.ident().as_str()) == ("unmap", "matchflags") {
+//         check_args.push(Term::ident("flgs".to_string()));
+//     }
 
-    Term::fn_apply(name, check_args)
-}
+//     Term::fn_apply(name, check_args)
+// }
 
-pub fn combine_method_params(
-    prefix: &str,
-    pvars: Vec<SortedVar>,
-    p1: &[Rc<VelosiAstParam>],
-    p2: &[Rc<VelosiAstParam>],
-) -> Vec<SortedVar> {
-    // all possible variables
-    let mut vars = HashMap::new();
-    for v in pvars {
-        vars.insert(v.ident.clone(), v);
-    }
+// pub fn combine_method_params(
+//     prefix: &str,
+//     pvars: Vec<SortedVar>,
+//     p1: &[Rc<VelosiAstParam>],
+//     p2: &[Rc<VelosiAstParam>],
+// ) -> Vec<SortedVar> {
+//     // all possible variables
+//     let mut vars = HashMap::new();
+//     for v in pvars {
+//         vars.insert(v.ident.clone(), v);
+//     }
 
-    for p in p1.iter() {
-        if vars.contains_key(p.ident().as_str()) {
-            continue;
-        }
-        let v = SortedVar::new(p.ident_to_string(), types::type_to_smt2(prefix, &p.ptype));
-        vars.insert(p.ident_to_string(), v);
-    }
+//     for p in p1.iter() {
+//         if vars.contains_key(p.ident().as_str()) {
+//             continue;
+//         }
+//         let v = SortedVar::new(p.ident_to_string(), types::type_to_smt2(prefix, &p.ptype));
+//         vars.insert(p.ident_to_string(), v);
+//     }
 
-    for p in p2.iter() {
-        if vars.contains_key(p.ident().as_str()) {
-            continue;
-        }
-        let v = SortedVar::new(p.ident_to_string(), types::type_to_smt2(prefix, &p.ptype));
-        vars.insert(p.ident_to_string(), v);
-    }
+//     for p in p2.iter() {
+//         if vars.contains_key(p.ident().as_str()) {
+//             continue;
+//         }
+//         let v = SortedVar::new(p.ident_to_string(), types::type_to_smt2(prefix, &p.ptype));
+//         vars.insert(p.ident_to_string(), v);
+//     }
 
-    let mut res = vec![];
-    for (_, v) in vars.into_iter() {
-        res.push(v);
-    }
-    res
-}
+//     let mut res = vec![];
+//     for (_, v) in vars.into_iter() {
+//         res.push(v);
+//     }
+//     res
+// }
