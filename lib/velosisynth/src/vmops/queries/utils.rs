@@ -26,12 +26,17 @@
 //! Synthesis of Virtual Memory Operations: Map
 
 use std::collections::HashSet;
+use std::rc::Rc;
 use std::sync::Arc;
 
-use velosiast::ast::{VelosiAstExpr, VelosiAstMethod, VelosiAstUnitSegment};
+use velosiast::ast::{
+    VelosiAstExpr, VelosiAstFnCallExpr, VelosiAstIdentLiteralExpr, VelosiAstIdentifier,
+    VelosiAstMethod, VelosiAstMethodProperty, VelosiAstTypeInfo, VelosiAstUnitSegment,
+};
 
 use crate::{
     model::{
+        method::{method_precond_i_name, translate_range_name},
         types,
         velosimodel::{model_get_fn_name, WBUFFER_PREFIX},
     },
@@ -40,6 +45,9 @@ use crate::{
 use smt2::Term;
 
 use super::resultparser;
+use super::{BoolExprQueryBuilder, CompoundBoolExprQueryBuilder, ProgramBuilder, ProgramVerifier};
+
+use crate::z3::Z3TaskPriority;
 
 pub struct SynthOptions {
     pub negate: bool,
@@ -134,7 +142,7 @@ pub fn make_program_builder(
     builder
 }
 
-pub fn make_program_iter_mem(prog: Program) -> ProgramsIter {
+pub fn make_program_iter_mem(prog: &Program) -> ProgramsIter {
     let programs = prog.generate_possible_barriers();
     let stat_num_programs = programs.len();
     ProgramsIter {
@@ -151,17 +159,17 @@ pub enum QueryResult {
     Error,
 }
 
-pub fn check_result_no_rewrite(output: &str) -> QueryResult {
-    let mut reslines = output.lines();
-    match reslines.next() {
-        Some("sat") => QueryResult::Sat,
-        Some("unsat") => QueryResult::Unsat,
-        Some(_a) => QueryResult::Error,
-        None => {
-            unreachable!("unexpected none output")
-        }
-    }
-}
+// pub fn check_result_no_rewrite(output: &str) -> QueryResult {
+//     let mut reslines = output.lines();
+//     match reslines.next() {
+//         Some("sat") => QueryResult::Sat,
+//         Some("unsat") => QueryResult::Unsat,
+//         Some(_a) => QueryResult::Error,
+//         None => {
+//             unreachable!("unexpected none output")
+//         }
+//     }
+// }
 
 pub fn check_result(output: &str, program: &mut Program) -> QueryResult {
     let mut reslines = output.lines();
@@ -213,4 +221,166 @@ pub fn add_empty_wbuffer_precond(prefix: &str, pre: Term) -> Term {
         ),
         pre,
     )
+}
+
+/// this functions collects the methods tagged with `remap` and adds them to the partial programs
+///
+/// # Params
+///
+///  - `unit`:              the unit to search for methods
+///  - `m_op`:              the current operation (map/protect/unmap)
+///  - `batch_size`:        number of queries to emit to the verifier
+///  - `negate`:            whether to negate the expression
+///  - `partial_programs`:  the list of partial programs to add the queries to
+pub fn add_methods_tagged_with_remap(
+    unit: &VelosiAstUnitSegment,
+    m_op: &Rc<VelosiAstMethod>,
+    batch_size: usize,
+    negate: bool,
+    partial_programs: &mut Vec<Box<dyn ProgramBuilder>>,
+) {
+    for r_fn in unit.methods.values() {
+        // if the property is not set to remap, we don't care about it
+        if !r_fn.properties.contains(&VelosiAstMethodProperty::Remap) {
+            log::debug!(
+                target : "[synth::map]",
+                "skipping method {} (not tagged with remap)", r_fn.ident()
+            );
+            continue;
+        }
+
+        // we don't care about abstract or synth methods, the return type should always be boolean
+        if r_fn.is_abstract || r_fn.is_synth || !r_fn.rtype.is_boolean() {
+            log::debug!(
+                target : "[synth::map]",
+                "skipping method {} (abstract, synth, or not boolean)", r_fn.ident()
+            );
+            continue;
+        }
+
+        // split the body expressions into a list of conjuncts forming a CNF
+        let exprs = r_fn
+            .body
+            .as_ref()
+            .map(|body| body.split_cnf())
+            .unwrap_or_else(|| panic!("no body for method {}", r_fn.ident()));
+
+        // build the query for the expressions of the body of the function,
+        let query: Option<Box<dyn ProgramBuilder>> = match exprs.as_slice() {
+            [] => unreachable!("slice of expressions was empty?"),
+            [exp] => {
+                log::debug!(target : "[synth::utils]", "handling {} with single expr body {}", r_fn.ident(), exp);
+
+                // just a single expression here
+                BoolExprQueryBuilder::new(unit, m_op.clone(), exp.clone())
+                    // .assms(): No assumptions, as they will be added by the map.assms()
+                    .variable_references(false)
+                    .negate(negate)
+                    .build()
+                    .map(|e| e.into())
+            }
+            _ => {
+                log::debug!(target : "[synth::utils]", "handling {} with multiple expr body (CNF)", r_fn.ident());
+
+                // handle all the expressions
+                CompoundBoolExprQueryBuilder::new(unit, m_op.clone())
+                    .exprs(exprs)
+                    // .assms(): No assumptions, as they will be added by the map.assms()
+                    .negate(negate) // !(A && B && C), we convert this to !A || !B || !C
+                    .all()
+                    .map(|e| e.into())
+            }
+        };
+
+        // add the program verifier and add the query to the list
+        if let Some(query) = query {
+            log::debug!(target : "[synth::map]", "adding query to partial programs");
+            partial_programs.push(
+                ProgramVerifier::with_batchsize(
+                    unit.ident().clone(),
+                    query,
+                    batch_size,
+                    Z3TaskPriority::Low,
+                )
+                .into(),
+            );
+        }
+    }
+}
+
+/// this function adds the pre-conditions of the methods to the partial programs
+///
+/// # Params
+///
+///  - `unit`               the unit to search for methods
+///  - `m_op`               the current operation (map/protect/unmap)
+///  - `m`                  the method to take the pre-conditions from
+///  - `batch_size`         the batchsize of the queries
+///  - `negate`             whether to negate the expression
+///  - `partial_programs`   the list of partial programs to add the queries to
+pub fn add_method_preconds(
+    unit: &VelosiAstUnitSegment,
+    m_op: &Rc<VelosiAstMethod>,
+    m: &Rc<VelosiAstMethod>,
+    batch_size: usize,
+    negate: bool,
+    partial_programs: &mut Vec<Box<dyn ProgramBuilder>>,
+) {
+    if m.ident().as_str() != "translate" {
+        todo!("handling of methods other than translate is NYI");
+    }
+
+    let params = m.get_param_names();
+    for (i, e) in m.requires.iter().enumerate() {
+        if !e.has_state_references() {
+            // if it hasn't state references then we can skip it
+            continue;
+        }
+
+        // check if we have avariable references here
+        let (ident, var_refs, args) = if e.has_var_references(&params) {
+            (
+                VelosiAstIdentifier::from(translate_range_name(Some(i)).as_str()),
+                true,
+                vec![
+                    Rc::new(m.params[0].as_ref().into()),
+                    Rc::new(VelosiAstExpr::IdentLiteral(
+                        VelosiAstIdentLiteralExpr::with_name(
+                            String::from("sz"),
+                            VelosiAstTypeInfo::Size,
+                        ),
+                    )),
+                ],
+            )
+        } else {
+            (
+                VelosiAstIdentifier::from(method_precond_i_name("translate", i).as_str()),
+                false,
+                vec![Rc::new(m.params[0].as_ref().into())],
+            )
+        };
+
+        let mut fn_call = VelosiAstFnCallExpr::new(ident, VelosiAstTypeInfo::Bool);
+        fn_call.add_args(args);
+
+        let query =
+            BoolExprQueryBuilder::new(unit, m_op.clone(), Rc::new(VelosiAstExpr::FnCall(fn_call)))
+                // .assms(m.assms.clone())
+                .variable_references(var_refs)
+                .negate(negate) // we negate the expression here
+                .build()
+                .map(|e| e.into());
+
+        if let Some(query) = query {
+            partial_programs.push(
+                ProgramVerifier::with_batchsize(
+                    unit.ident().clone(),
+                    query,
+                    batch_size,
+                    Z3TaskPriority::Low,
+                )
+                .into(),
+            );
+        }
+    }
 }
