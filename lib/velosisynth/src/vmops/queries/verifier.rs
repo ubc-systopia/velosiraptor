@@ -37,7 +37,7 @@ use velosiast::ast::{VelosiAstExpr, VelosiAstMethod};
 // carte imports
 use crate::{
     model::expr::expr_to_smt2,
-    model::method::{call_method, call_method_assms, combine_method_params},
+    model::method::{call_method, call_method_assms},
     model::types,
     z3::{Z3Query, Z3TaskPriority, Z3Ticket, Z3WorkerPool},
     Program,
@@ -151,15 +151,14 @@ impl ProgramVerifier {
         // Variable setup
         // -----------------------------------------------------------------------------------------
 
-        // obtain the forall params
-        // TODO: shall we just take all of `va`, `pa`, `sz` and `flgs` instead?
-        let stvar = SortedVar::new("st!0".to_string(), types::model(self.prefix.as_str()));
-        let vars = combine_method_params(
-            self.prefix.as_str(),
-            vec![stvar],
-            m_op.params.as_slice(),
-            &[],
-        );
+        // obtain the forall params, let's just add all of them
+        let vars = vec![
+            SortedVar::new("st!0".to_string(), types::model(self.prefix.as_str())),
+            SortedVar::new("va".to_string(), types::vaddr(self.prefix.as_str())),
+            SortedVar::new("pa".to_string(), types::paddr(self.prefix.as_str())),
+            SortedVar::new("sz".to_string(), types::size(self.prefix.as_str())),
+            SortedVar::new("flgs".to_string(), types::flags(self.prefix.as_str())),
+        ];
 
         // apply the program (i.e., call the corresponding function)
         let m_op_call = call_method(m_op, vec![Term::from("st!0")]);
