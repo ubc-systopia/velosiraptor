@@ -259,7 +259,7 @@ pub fn add_methods_tagged_with_remap(
             continue;
         }
 
-        let mut params = m_op.get_param_names();
+        let params = m_op.get_param_names();
 
         // split the body expressions into a list of conjuncts forming a CNF
         let exprs: Vec<Rc<VelosiAstExpr>> = r_fn
@@ -340,6 +340,10 @@ pub fn add_method_preconds(
 ) {
     if m.ident().as_str() != "translate" {
         todo!("handling of methods other than translate is NYI");
+    }
+
+    if var_refs.is_some() {
+        log::warn!("handling of var_refs is currently not fully supported yet\n");
     }
 
     let params = m.get_param_names();
