@@ -622,16 +622,12 @@ impl ProgramBuilder for CompoundQueryAny {
             return MaybeResult::None;
         }
 
-        // set all_done flag to true, and clear it if we have more to process
-        self.all_done = true;
-
         // loop over all candidate programs and find the ones that satisfy the query
         // return the first one we find, no matter the order
         let mut had_pending = false;
         for (i, cp) in self.candidate_programs.iter_mut().enumerate() {
             // if we have a partial program for this part, return it. This should be order preserving
             if !self.partial_programs[i].is_empty() {
-                self.all_done = true;
                 return MaybeResult::Some(self.partial_programs[i].pop_front().unwrap());
             }
 
@@ -639,7 +635,6 @@ impl ProgramBuilder for CompoundQueryAny {
             if self.done[i] {
                 continue;
             }
-            self.all_done = true;
 
             match cp.next(z3) {
                 MaybeResult::Some(program) => {
@@ -665,9 +660,10 @@ impl ProgramBuilder for CompoundQueryAny {
             }
         }
 
-        if had_pending || !self.all_done {
+        if had_pending {
             MaybeResult::Pending
         } else {
+            self.all_done = true;
             MaybeResult::None
         }
     }
