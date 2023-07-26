@@ -144,35 +144,19 @@ impl<'a> BoolExprQueryBuilder<'a> {
             // specialize it
             Box::new(utils::make_program_iter_mem(&prog))
         } else {
-            // if we have variable references in the expression, then we need to do something
-            // slightly different here. Make sure we add the va/sz variables here
-            let programs = if has_var_refs {
-                utils::make_program_builder_no_params(self.unit, &self.goal_expr)
-                    .add_var(String::from("va"))
-                    .add_var(String::from("sz"))
-                    .into_iter()
-            } else {
+            // construct the program builder
+            let programs =
                 utils::make_program_builder(self.unit, self.m_op.as_ref(), &self.goal_expr)
-                    .into_iter()
-            };
+                    .into_iter();
             if !programs.has_programs() {
                 return None;
             }
             Box::new(programs)
         };
 
-        // convert the goal expression if needed
-        let expr = if has_var_refs {
-            // TODO: construct the goal expr here
-            // self.goal_expr
-            todo!("handle me!");
-        } else {
-            self.goal_expr
-        };
-
         // negate the goal expressions if we need to
         let expr = if self.negate {
-            match expr.as_ref() {
+            match self.goal_expr.as_ref() {
                 VelosiAstExpr::UnOp(VelosiAstUnOpExpr {
                     op: VelosiAstUnOp::LNot,
                     expr,
@@ -183,16 +167,16 @@ impl<'a> BoolExprQueryBuilder<'a> {
                 }
                 _ => {
                     // negate the expression
-                    let loc = expr.loc().clone();
+                    let loc = self.goal_expr.loc().clone();
                     Rc::new(VelosiAstExpr::UnOp(VelosiAstUnOpExpr::new(
                         VelosiAstUnOp::LNot,
-                        expr,
+                        self.goal_expr,
                         loc,
                     )))
                 }
             }
         } else {
-            expr
+            self.goal_expr
         };
 
         Some(BoolExprQuery {
