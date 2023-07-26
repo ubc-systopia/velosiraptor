@@ -34,6 +34,7 @@ pub mod utils;
 
 mod boolexpr;
 mod cnf;
+mod programsimplifier;
 mod translate;
 mod verifier;
 
@@ -54,6 +55,7 @@ pub use boolexpr::{BoolExprQuery, BoolExprQueryBuilder};
 pub use cnf::{CompoundBoolExprQueryBuilder, CompoundQueryAll, CompoundQueryAny};
 pub use translate::{TranslateQuery, TranslateQueryBuilder};
 pub use verifier::{ProgramVerifier, DEFAULT_BATCH_SIZE};
+pub use programsimplifier::ProgramSimplifier;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tri-State Result

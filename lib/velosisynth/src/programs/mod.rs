@@ -305,6 +305,11 @@ impl Expression {
             }
         }
     }
+
+    pub fn is_zero(&self) -> bool {
+        use Expression::*;
+        matches!(self, Lit(Literal::Val(0)))
+    }
 }
 
 impl From<&Expression> for VelosiOpExpr {
@@ -649,6 +654,48 @@ impl FieldActions {
         };
         smtops.push((fname, None));
     }
+
+    pub fn simplify(&self) -> Self {
+        let FieldActions(field, ops) = self;
+
+        let mut has_set_zero = false;
+        let ops = ops
+            .iter()
+            .filter_map(|op| match op {
+                FieldOp::InsertField(e) => {
+                    has_set_zero = e.is_zero();
+                    Some(FieldOp::InsertField(e.clone()))
+                }
+                FieldOp::InsertFieldSlices(ops) => {
+                    let ops = if has_set_zero {
+                        ops.iter()
+                            .filter_map(|op| {
+                                if op.1.is_zero() {
+                                    None
+                                } else {
+                                    Some(op.clone())
+                                }
+                            })
+                            .collect()
+                    } else {
+                        ops.clone()
+                    };
+
+                    if ops.is_empty() {
+                        None
+                    } else {
+                        Some(FieldOp::InsertFieldSlices(ops))
+                    }
+                }
+                FieldOp::ReadAction => {
+                    has_set_zero = false;
+                    Some(FieldOp::ReadAction)
+                }
+            })
+            .collect();
+
+        FieldActions(field.clone(), ops)
+    }
 }
 
 impl From<&FieldActions> for Vec<VelosiOperation> {
@@ -907,6 +954,21 @@ impl Program {
         }
 
         possibilities
+    }
+
+    pub fn simplify(mut self) -> Self {
+        let actions = self
+            .0
+            .iter_mut()
+            .map(|action| match action {
+                ProgramActions::GlobalBarrier => ProgramActions::GlobalBarrier,
+                ProgramActions::FieldActions(x) => {
+                    ProgramActions::FieldActions(x.simplify().into())
+                }
+            })
+            .collect();
+
+        Program(actions)
     }
 }
 
