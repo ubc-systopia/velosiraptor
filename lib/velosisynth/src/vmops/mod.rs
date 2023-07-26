@@ -67,6 +67,7 @@ pub trait SynchronousSync<T: ProgramBuilder = Self>: ProgramBuilder {
     }
 
     fn synthesize(
+        &mut self,
         z3: &mut Z3WorkerPool,
         unit: &VelosiAstUnitSegment,
         batch_size: usize,
@@ -75,9 +76,10 @@ pub trait SynchronousSync<T: ProgramBuilder = Self>: ProgramBuilder {
         let ctx = model::create(unit, false);
         z3.reset_with_context(Z3Query::from(ctx));
 
-        let mut programs = MapPrograms::new(unit, batch_size, None);
-        if let Some(prog) = programs.do_synthesize(z3) {
+        // let mut programs = MapPrograms::new(unit, batch_size, None);
+        if let Some(prog) = self.do_synthesize(z3) {
             if mem_model {
+                unimplemented!("handle me!");
                 let ctx = model::create(unit, false);
                 z3.reset_with_context(Z3Query::from(ctx));
 
