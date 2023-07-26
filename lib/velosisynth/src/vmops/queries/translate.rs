@@ -38,7 +38,7 @@ use velosiast::ast::{
 use crate::{
     model::method::{translate_map_result_name, translate_protect_result_name},
     z3::Z3WorkerPool,
-    Program,
+    Program, ProgramsIter,
 };
 
 //use super::queryhelper::{MaybeResult, ProgramBuilder, QueryBuilder};
@@ -79,51 +79,49 @@ impl<'a> TranslateQueryBuilder<'a> {
     }
 
     pub fn build(self) -> Option<TranslateQuery> {
-        let body = self.m_translate.body.as_ref().unwrap();
-        let mut builder = if self.no_change {
-            utils::make_program_builder(self.unit, self.m_op.as_ref(), body)
-        } else {
-            utils::make_program_builder_no_params(self.unit, body)
-        };
+        let (programs, ident, mut args) = match self.m_op.ident().as_str() {
+            "map" => {
+                let body = self.m_translate.body.as_ref().unwrap();
+                let mut builder = utils::make_program_builder_no_params(self.unit, body);
 
-        // add the source and destination addresses
-        if self.m_op.get_param("va").is_some() {
-            builder.add_var(String::from("va"));
-        }
+                // translate is a bit special here, for map we want the following two variables
+                builder.add_var(String::from("va"));
+                builder.add_var(String::from("pa"));
 
-        if self.m_op.get_param("pa").is_some() {
-            builder.add_var(String::from("pa"));
-        }
-
-        let programs = builder.into_iter();
-        if programs.has_programs() {
-            let (ident, mut args) = match self.m_op.ident().as_str() {
-                "map" => (
+                (
+                    builder.into_iter(),
                     VelosiAstIdentifier::from(translate_map_result_name(None).as_str()),
                     Vec::new(),
-                ),
-                "protect" => (
+                )
+            }
+            "protect" => {
+                // we don't use the builder here, as we just want an "empty" program that gets
+                // passed through the synthesis tree to ensure that the translation produces
+                // the same output address as before changing the permission bits
+                let programs = ProgramsIter {
+                    programs: vec![Program::new()],
+                    stat_num_programs: 1,
+                };
+
+                // add an additional argument that holds the previoius state
+                let args = vec![Rc::new(VelosiAstExpr::IdentLiteral(
+                    VelosiAstIdentLiteralExpr::with_name(
+                        "st!0".to_string(),
+                        VelosiAstTypeInfo::VirtAddr,
+                    ),
+                ))];
+
+                (
+                    programs,
                     VelosiAstIdentifier::from(translate_protect_result_name(None).as_str()),
-                    Vec::new(),
-                ),
-                err => panic!("Unknown method {}", err),
-            };
+                    args,
+                )
+            }
+            m => unreachable!("Why was this function called for method {}", m),
+        };
 
-            args.push(Rc::new(VelosiAstExpr::IdentLiteral(
-                VelosiAstIdentLiteralExpr::with_name("va".to_string(), VelosiAstTypeInfo::VirtAddr),
-            )));
-
-            args.push(Rc::new(VelosiAstExpr::IdentLiteral(
-                VelosiAstIdentLiteralExpr::with_name("sz".to_string(), VelosiAstTypeInfo::Size),
-            )));
-
-            args.push(Rc::new(VelosiAstExpr::IdentLiteral(
-                VelosiAstIdentLiteralExpr::with_name("flgs".to_string(), VelosiAstTypeInfo::Flags),
-            )));
-
-            args.push(Rc::new(VelosiAstExpr::IdentLiteral(
-                VelosiAstIdentLiteralExpr::with_name("pa".to_string(), VelosiAstTypeInfo::PhysAddr),
-            )));
+        if programs.has_programs() {
+            args.extend(self.m_op.params.iter().map(|p| Rc::new(p.as_ref().into())));
 
             let mut fn_call = VelosiAstFnCallExpr::new(ident, VelosiAstTypeInfo::Bool);
             fn_call.add_args(args);
