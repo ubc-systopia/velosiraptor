@@ -1241,6 +1241,8 @@ impl VelosiAstIdentLiteralExpr {
 
     pub fn has_var_references(&self, vars: &HashSet<&str>) -> bool {
         vars.contains(self.path().as_str())
+        // sort of a hack to support flgs.foo
+        || (vars.contains("flgs") && self.path().starts_with("flgs"))
     }
 
     pub fn has_interface_references(&self) -> bool {
