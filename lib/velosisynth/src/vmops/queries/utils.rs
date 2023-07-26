@@ -259,23 +259,33 @@ pub fn add_methods_tagged_with_remap(
             continue;
         }
 
+        let mut params = m_op.get_param_names();
+
         // split the body expressions into a list of conjuncts forming a CNF
-        let exprs = r_fn
+        let exprs : Vec<Rc<VelosiAstExpr>> = r_fn
             .body
             .as_ref()
             .map(|body| body.split_cnf())
-            .unwrap_or_else(|| panic!("no body for method {}", r_fn.ident()));
+            .unwrap_or_else(|| panic!("no body for method {}", r_fn.ident()))
+            .into_iter()
+            .filter(|e| {
+                if let Some(var_refs) = var_refs {
+                    e.has_var_references(&params) == var_refs
+                } else {
+                    true
+                }
+            })
+            .collect();
 
         // build the query for the expressions of the body of the function,
         let query: Option<Box<dyn ProgramBuilder>> = match exprs.as_slice() {
-            [] => unreachable!("slice of expressions was empty?"),
+            [] => continue,
             [exp] => {
                 log::debug!(target : "[synth::utils]", "handling {} with single expr body {}", r_fn.ident(), exp);
 
                 // just a single expression here
                 BoolExprQueryBuilder::new(unit, m_op.clone(), exp.clone())
                     // .assms(): No assumptions, as they will be added by the map.assms()
-                    .variable_references(false)
                     .negate(negate)
                     .build()
                     .map(|e| e.into())
