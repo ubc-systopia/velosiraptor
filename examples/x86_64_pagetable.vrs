@@ -343,8 +343,15 @@ segment X86_64_PDPTEntryPage(base: paddr) : X86_64_PageDescriptor {
     }
 
     #[remap]
+    fn res() -> bool {
+        (state.entry.res0_0 == 0)
+        && (state.entry.res0_1 == 0)
+        && (state.entry.pat == 0)
+        && (state.entry.g == 0)
+    }
+
+    #[remap]
     fn matchflags(flgs : flags) -> bool
-        requires valid()
     {
         (state.entry.rw == flgs.writable)
          && if (flgs.devicemem == 1) {
@@ -354,10 +361,7 @@ segment X86_64_PDPTEntryPage(base: paddr) : X86_64_PageDescriptor {
             }
          && (state.entry.us == flgs.usermode)
          && if flgs.executable == 1 {state.entry.xd == 0} else { state.entry.xd == 1}
-         //&& (state.entry.res0_0 == 0)
-         //&& (state.entry.res0_1 == 0)
-         //&& (state.entry.pat == 0)
-         //&& (state.entry.g == 0)
+
     }
 
     fn translate(va: vaddr) -> paddr
@@ -370,7 +374,8 @@ segment X86_64_PDPTEntryPage(base: paddr) : X86_64_PageDescriptor {
         requires va == 0 && sz == HUGE_PAGE_SIZE
         requires (pa & (HUGE_PAGE_SIZE - 1) == 0)
 
-    synth fn protect(va: vaddr, sz: size, flgs: flags);
+    synth fn protect(va: vaddr, sz: size, flgs: flags)
+        requires va == 0 && sz == HUGE_PAGE_SIZE
 
     synth fn unmap(va: vaddr, sz: size)
         requires va == 0 && sz == HUGE_PAGE_SIZE
