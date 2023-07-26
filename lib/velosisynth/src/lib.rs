@@ -356,17 +356,30 @@ impl<'a> Z3SynthSegment<'a> {
 
     pub fn synthesize_map(&mut self, batch_size: usize, mem_model: bool) -> Option<Program> {
         self.done = true;
-        MapPrograms::synthesize(&mut self.z3, self.unit, batch_size, mem_model)
+
+        let mut p = MapPrograms::new(self.unit, batch_size, None);
+        p.synthesize(&mut self.z3, self.unit, batch_size, mem_model)
     }
 
     pub fn synthesize_unmap(&mut self, batch_size: usize, mem_model: bool) -> Option<Program> {
         self.done = true;
-        UnmapPrograms::synthesize(&mut self.z3, self.unit, batch_size, mem_model)
+        let mut p = UnmapPrograms::new(
+            self.unit,
+            batch_size,
+            self.unmap_program.take().map(Rc::new),
+        );
+        p.synthesize(&mut self.z3, self.unit, batch_size, mem_model)
     }
 
     pub fn synthesize_protect(&mut self, batch_size: usize, mem_model: bool) -> Option<Program> {
         self.done = true;
-        ProtectPrograms::synthesize(&mut self.z3, self.unit, batch_size, mem_model)
+        let mut p = ProtectPrograms::new(
+            self.unit,
+            batch_size,
+            self.protect_program.take().map(Rc::new),
+        );
+
+        p.synthesize(&mut self.z3, self.unit, batch_size, mem_model)
     }
 
     /// terminates the worker pool
