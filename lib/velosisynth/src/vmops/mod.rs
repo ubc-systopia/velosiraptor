@@ -46,7 +46,7 @@ pub use unmap::UnmapPrograms;
 pub use queries::{
     BoolExprQuery, BoolExprQueryBuilder, CompoundBoolExprQueryBuilder, CompoundQueryAll,
     CompoundQueryAny, MaybeResult, ProgramBuilder, ProgramVerifier, TranslateQuery,
-    TranslateQueryBuilder, DEFAULT_BATCH_SIZE,
+    TranslateQueryBuilder, DEFAULT_BATCH_SIZE, ProgramSimplifier,
 };
 
 use velosiast::ast::VelosiAstUnitSegment;
@@ -79,7 +79,6 @@ pub trait SynchronousSync<T: ProgramBuilder = Self>: ProgramBuilder {
         // let mut programs = MapPrograms::new(unit, batch_size, None);
         if let Some(prog) = self.do_synthesize(z3) {
             if mem_model {
-                unimplemented!("handle me!");
                 let ctx = model::create(unit, false);
                 z3.reset_with_context(Z3Query::from(ctx));
 
