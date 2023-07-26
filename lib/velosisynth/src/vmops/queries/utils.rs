@@ -237,13 +237,14 @@ pub fn add_methods_tagged_with_remap(
     m_op: &Rc<VelosiAstMethod>,
     batch_size: usize,
     negate: bool,
+    var_refs: Option<bool>,
     partial_programs: &mut Vec<Box<dyn ProgramBuilder>>,
 ) {
     for r_fn in unit.methods.values() {
         // if the property is not set to remap, we don't care about it
         if !r_fn.properties.contains(&VelosiAstMethodProperty::Remap) {
             log::debug!(
-                target : "[synth::map]",
+                target : "[synth::utils]",
                 "skipping method {} (not tagged with remap)", r_fn.ident()
             );
             continue;
@@ -324,6 +325,7 @@ pub fn add_method_preconds(
     m: &Rc<VelosiAstMethod>,
     batch_size: usize,
     negate: bool,
+    var_refs: Option<bool>,
     partial_programs: &mut Vec<Box<dyn ProgramBuilder>>,
 ) {
     if m.ident().as_str() != "translate" {
