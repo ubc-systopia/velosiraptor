@@ -38,7 +38,7 @@ use crate::z3::{Z3TaskPriority, Z3WorkerPool};
 
 use super::queries::{
     utils, BoolExprQueryBuilder, CompoundBoolExprQueryBuilder, MaybeResult, ProgramBuilder,
-    ProgramVerifier, TranslateQueryBuilder,
+    ProgramVerifier, TranslateQueryBuilder, ProgramSimplifier
 };
 use super::SynchronousSync;
 
@@ -141,6 +141,13 @@ impl MapPrograms {
             let query = ProgramVerifier::with_batchsize(
                 unit.ident().clone(),
                 query,
+                batch_size,
+                Z3TaskPriority::High,
+            );
+
+            let query = ProgramVerifier::with_batchsize(
+                unit.ident().clone(),
+                ProgramSimplifier::new(query.into()).into(),
                 batch_size,
                 Z3TaskPriority::High,
             );
