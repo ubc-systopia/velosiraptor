@@ -55,21 +55,52 @@ impl ProtectPrograms {
     ) -> Self {
         log::info!(target : "[synth::protect]", "setting up protect synthesis.");
 
+        let mut partial_programs = Vec::new();
+
         // obtain the op_fn, this is the map() function
         let m_op = unit
-            .get_method("map")
+            .get_method("protect")
             .unwrap_or_else(|| panic!("no method 'map' in unit {}", unit.ident()));
 
-        // obtain the translate fn, this is handled slightly differently
-        let t_fn = unit
-            .get_method("translate")
-            .unwrap_or_else(|| panic!("no method 'translate' in unit {}", unit.ident()));
+        // handle the translate function
+        if let Some(m) = unit.get_method("translate") {
+            // obtain the translate query
+            let query = TranslateQueryBuilder::new(unit, m_op.clone(), m.clone())
+                .no_change()
+                .build()
+                .expect("no query?");
 
-        // we start with the translate function
-        let translate_result = TranslateQueryBuilder::new(unit, m_op.clone(), t_fn.clone())
-            .no_change() // we want the translate result to not change here
-            .build()
-            .expect("no query for the translate result");
+            partial_programs.push(
+                ProgramVerifier::with_batchsize(
+                    unit.ident().clone(),
+                    query.into(),
+                    batch_size,
+                    Z3TaskPriority::Low,
+                )
+                .into(),
+            );
+
+            // add the pre-conditions for the translate
+            utils::add_method_preconds(
+                unit,
+                m_op,
+                m,
+                batch_size,
+                false,
+                Some(true),
+                &mut partial_programs,
+            );
+        }
+
+        // add the methods that must be true
+        utils::add_methods_tagged_with_remap(
+            unit,
+            m_op,
+            batch_size,
+            false,
+            Some(true),
+            &mut partial_programs,
+        );
 
         if let Some(_staring_prog) = &starting_prog {
             // here we have a starting program, that should have satisfied all the preconditions.
@@ -77,19 +108,12 @@ impl ProtectPrograms {
         } else {
         }
 
-        let partial_programs = vec![ProgramVerifier::with_batchsize(
-            unit.ident().clone(),
-            translate_result.into(),
-            batch_size,
-            Z3TaskPriority::High,
-        )
-        .into()];
-
         // now we got all the partial programs that we need to verify
         let query = CompoundBoolExprQueryBuilder::new(unit, m_op.clone())
             .partial_programs(partial_programs, false)
             // .assms()
-            .any();
+            .all()
+            .expect("query?");
 
         let query = ProgramVerifier::with_batchsize(
             unit.ident().clone(),
