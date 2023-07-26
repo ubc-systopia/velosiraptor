@@ -262,7 +262,7 @@ pub fn add_methods_tagged_with_remap(
         let mut params = m_op.get_param_names();
 
         // split the body expressions into a list of conjuncts forming a CNF
-        let exprs : Vec<Rc<VelosiAstExpr>> = r_fn
+        let exprs: Vec<Rc<VelosiAstExpr>> = r_fn
             .body
             .as_ref()
             .map(|body| body.split_cnf())
