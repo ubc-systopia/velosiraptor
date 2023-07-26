@@ -33,6 +33,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use codegen_rs as CG;
+use velosicomposition::Relations;
 
 use crate::VelosiCodeGenError;
 use velosiast::{VelosiAst, VelosiAstUnit};
@@ -186,6 +187,12 @@ impl BackendRust {
             .arg("paddr", "PhysAddr")
             .ret("VirtAddr")
             .line("todo!()");
+        scope
+            .new_fn("alloc")
+            .vis("pub")
+            .arg("sz", "usize")
+            .ret("PhysAddr")
+            .line("todo!()");
 
         save_scope(scope, &srcdir, "os")
     }
@@ -235,6 +242,7 @@ impl BackendRust {
     pub fn generate_units(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
         // get the source dir
         let mut srcdir = self.outdir.join("src");
+        let relations = Relations::from_ast(ast);
 
         println!("##### rust generate_units");
 
@@ -267,12 +275,14 @@ impl BackendRust {
                         scope.raw("pub use interface::*;");
 
                         fs::create_dir_all(&srcdir)?;
-                        segment::generate(segment, ast, &srcdir).expect("code generation failed\n");
+                        segment::generate(segment, ast, &relations, &srcdir)
+                            .expect("code generation failed\n");
                     }
                 }
                 VelosiAstUnit::StaticMap(staticmap) => {
                     fs::create_dir_all(&srcdir)?;
-                    staticmap::generate(ast, staticmap, &srcdir).expect("code generation failed\n");
+                    staticmap::generate(ast, staticmap, &relations, &srcdir)
+                        .expect("code generation failed\n");
                 }
                 VelosiAstUnit::Enum(e) => {
                     fs::create_dir_all(&srcdir)?;

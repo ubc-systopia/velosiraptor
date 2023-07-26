@@ -392,11 +392,26 @@ pub fn params_to_args_list(params: &[Rc<VelosiAstParam>]) -> String {
         .join(", ")
 }
 
-// converts a list of parameters into a comma separated argument list with the same names
+// converts a list of parameters into a comma separated argument list with the same names prefixed by self
 pub fn params_to_self_args_list(params: &[Rc<VelosiAstParam>]) -> String {
     params
         .iter()
         .map(|p| format!("self.{}", p.ident()))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+// converts a list of parameters into a comma separated argument list with the same names, replacing paddr
+pub fn params_to_self_args_list_with_paddr(params: &[Rc<VelosiAstParam>], paddr: &str) -> String {
+    params
+        .iter()
+        .map(|p| {
+            if p.ptype.typeinfo.is_paddr() {
+                paddr.to_string()
+            } else {
+                format!("self.{}", p.ident())
+            }
+        })
         .collect::<Vec<_>>()
         .join(", ")
 }

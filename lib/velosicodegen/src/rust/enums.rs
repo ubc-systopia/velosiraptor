@@ -141,7 +141,7 @@ fn add_specific_function(variant_unit: &VelosiAstUnit, op_name: &str, imp: &mut 
         ))
         .vis("pub")
         .arg_ref_self()
-        .ret(CG::Type::from("bool"));
+        .ret("usize");
 
     for f in op.params.iter() {
         op_fn.arg(f.ident(), utils::vrs_type_to_rust_type(&f.ptype.typeinfo));
@@ -166,7 +166,7 @@ fn add_delegate_function(
         .new_fn(op.ident())
         .vis("pub")
         .arg_ref_self()
-        .ret(CG::Type::from("bool"));
+        .ret("usize");
 
     for f in op.params.iter() {
         op_fn.arg(f.ident(), utils::vrs_type_to_rust_type(&f.ptype.typeinfo));
