@@ -52,7 +52,12 @@ fn add_unit_constants(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment) {
     }
 }
 
-fn add_segment_struct(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment, ast: &VelosiAst) {
+fn add_segment_struct(
+    scope: &mut CG::Scope,
+    unit: &VelosiAstUnitSegment,
+    ast: &VelosiAst,
+    relations: &Relations,
+) {
     // create the struct in the scope
     let struct_name = utils::to_struct_name(unit.ident(), None);
     let st = scope.new_struct(&struct_name);
@@ -110,7 +115,7 @@ fn add_segment_struct(scope: &mut CG::Scope, unit: &VelosiAstUnitSegment, ast: &
     add_valid_fn(unit, imp);
 
     // resolve function
-    add_resolve_fn(ast, unit, imp);
+    add_resolve_fn(unit, relations, imp);
 }
 
 fn add_op_fn(
@@ -123,7 +128,7 @@ fn add_op_fn(
         .new_fn(method.ident())
         .vis("pub")
         .arg_ref_self()
-        .ret("bool");
+        .ret("usize");
 
     for f in method.params.iter() {
         op_fn.arg(f.ident(), utils::vrs_type_to_rust_type(&f.ptype.typeinfo));
@@ -154,10 +159,12 @@ fn add_op_fn(
                 op_fn.line(utils::op_to_rust_expr(op, &unit.interface, ast, method));
             }
         }
-        op_fn.line("true");
+
+        let page_size: usize = 1 << unit.inbitwidth;
+        op_fn.line(format!("{:#x}", page_size));
     } else {
         op_fn.line("// there is no configuration sequence");
-        op_fn.line("false");
+        op_fn.line("0");
     }
 }
 
@@ -174,8 +181,7 @@ fn add_valid_fn(unit: &VelosiAstUnitSegment, imp: &mut CG::Impl) {
     valid.line(utils::astexpr_to_rust_expr(op.body.as_ref().unwrap(), None));
 }
 
-fn add_resolve_fn(ast: &VelosiAst, unit: &VelosiAstUnitSegment, imp: &mut CG::Impl) {
-    let relations = Relations::from_ast(ast);
+fn add_resolve_fn(unit: &VelosiAstUnitSegment, relations: &Relations, imp: &mut CG::Impl) {
     if let Some(children) = relations.0.get(unit.ident()) {
         if !children.is_empty() {
             let child = &children[0];
@@ -210,16 +216,7 @@ fn add_resolve_fn(ast: &VelosiAst, unit: &VelosiAstUnitSegment, imp: &mut CG::Im
             resolve.line(format!(
                 "unsafe {{ {}::new({}) }}",
                 ret_ty,
-                child
-                    .params_as_slice()
-                    .iter()
-                    .map(|p| if p.ptype.typeinfo.is_paddr() {
-                        "paddr".to_string()
-                    } else {
-                        format!("self.{}", p.ident())
-                    })
-                    .collect::<Vec<_>>()
-                    .join(", ")
+                utils::params_to_self_args_list_with_paddr(child.params_as_slice(), "paddr")
             ));
         }
     }
@@ -229,6 +226,7 @@ fn add_resolve_fn(ast: &VelosiAst, unit: &VelosiAstUnitSegment, imp: &mut CG::Im
 pub fn generate(
     unit: &VelosiAstUnitSegment,
     ast: &VelosiAst,
+    relations: &Relations,
     outdir: &Path,
 ) -> Result<(), VelosiCodeGenError> {
     log::info!("Generating segment unit {}", unit.ident());
@@ -253,7 +251,7 @@ pub fn generate(
 
     // add the definitions
     add_unit_constants(&mut scope, unit);
-    add_segment_struct(&mut scope, unit, ast);
+    add_segment_struct(&mut scope, unit, ast, relations);
 
     // save the scope
     utils::save_scope(scope, outdir, "unit")
