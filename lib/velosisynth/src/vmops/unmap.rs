@@ -87,12 +87,27 @@ impl UnmapPrograms {
         }
 
         // next we add the methods
-        utils::add_methods_tagged_with_remap(unit, m_op, batch_size, true, None, &mut partial_programs);
+        utils::add_methods_tagged_with_remap(
+            unit,
+            m_op,
+            batch_size,
+            true,
+            None,
+            &mut partial_programs,
+        );
 
         // if none of them can be invalidated we see whether there are pre-conditions in the
         // translate function that we may select from
         if let Some(m) = unit.get_method("translate") {
-            utils::add_method_preconds(unit, m_op, m, batch_size, true, None,&mut partial_programs);
+            utils::add_method_preconds(
+                unit,
+                m_op,
+                m,
+                batch_size,
+                true,
+                None,
+                &mut partial_programs,
+            );
         }
 
         let query = if let Some(starting_prog) = &starting_prog {

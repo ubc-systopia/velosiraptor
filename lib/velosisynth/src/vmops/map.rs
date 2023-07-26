@@ -85,11 +85,26 @@ impl MapPrograms {
             );
 
             // add the pre-conditions for the translate
-            utils::add_method_preconds(unit, m_op, m, batch_size, false, None, &mut partial_programs);
+            utils::add_method_preconds(
+                unit,
+                m_op,
+                m,
+                batch_size,
+                false,
+                None,
+                &mut partial_programs,
+            );
         }
 
         // add the methods that must be true
-        utils::add_methods_tagged_with_remap(unit, m_op, batch_size, false, None, &mut partial_programs);
+        utils::add_methods_tagged_with_remap(
+            unit,
+            m_op,
+            batch_size,
+            false,
+            None,
+            &mut partial_programs,
+        );
 
         // we now have all the partial programs ready
         let query = if let Some(starting_prog) = &starting_prog {
