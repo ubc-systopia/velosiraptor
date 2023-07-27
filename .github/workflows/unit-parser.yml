@@ -20,8 +20,7 @@ jobs:
         uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          # can add a `-- --deny warnings` here to convert warnings into errors
-          args: --manifest-path  ./lib/velosiparser/Cargo.toml
+          args: --manifest-path  ./lib/velosiparser/Cargo.toml -- --deny warnings
       - name: libvelosiparser_build
         uses: actions-rs/cargo@v1
         with:
