@@ -79,12 +79,7 @@ custom_error! {pub VelosiParserError
 impl From<VelosiLexerError> for VelosiParserError {
     fn from(err: VelosiLexerError) -> Self {
         match err {
-            VelosiLexerError::ReadSourceFile { e } => {
-                // could not read the soruce file
-                let message = format!("Could not read the source file: {e}");
-                let e = VelosiParserErrBuilder::new(message).build();
-                VelosiParserError::LexingFailure { e }
-            }
+            VelosiLexerError::ReadSourceFile { e } => VelosiParserError::ReadSourceFile { e },
             VelosiLexerError::LexingFailure { r } => {
                 VelosiParserError::LexingFailure { e: r.into() }
             }
@@ -350,8 +345,9 @@ impl ImportResolver {
         // remove the imports from the current parsetree
         self.parsetree.filter_imports();
         ps.merge(self.parsetree);
-        imported.insert(c);
+        imported.insert(c.clone());
 
+        ps.set_context(c);
         ps
     }
 
