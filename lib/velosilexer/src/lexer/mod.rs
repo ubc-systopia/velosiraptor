@@ -207,5 +207,18 @@ fn token(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
 
 /// lexes a source span into a list of tokens
 pub fn lex(input: SrcSpan) -> IResult<SrcSpan, Vec<VelosiToken>> {
+    // if it's an empty file, simply return the empty token list
+    if input.is_empty() {
+        return Ok((input, Vec::new()));
+    }
+
+    // // try to consume all leading spaces. If we obtain the same length back, then
+    // // this indicates that we don't have any actual content in the input
+    let (input, _) = multispace0(input)?;
+    if input.is_empty() {
+        return Ok((input, Vec::new()));
+    }
+
+    // finally see whether we can lex the entire input
     all_consuming(many0(token))(input)
 }
