@@ -1,0 +1,5 @@
+error: Not supported character encountered: ```
+     --> tests/vrs/lex_05_invalid_token.vrs:6:5
+      |
+    6 |  foo ` bar
+      |      ^ Remove this unsupported character

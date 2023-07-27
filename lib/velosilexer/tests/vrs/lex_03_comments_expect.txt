@@ -1,0 +1,3 @@
+      [     ]  <start-of-file>
+ ---> <NO TOKENS>
+      [     ]  <end-of-file>
