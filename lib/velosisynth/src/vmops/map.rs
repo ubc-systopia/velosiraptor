@@ -38,7 +38,7 @@ use crate::z3::{Z3TaskPriority, Z3WorkerPool};
 
 use super::queries::{
     utils, BoolExprQueryBuilder, CompoundBoolExprQueryBuilder, MaybeResult, ProgramBuilder,
-    ProgramVerifier, TranslateQueryBuilder, ProgramSimplifier
+    ProgramSimplifier, ProgramVerifier, TranslateQueryBuilder,
 };
 use super::SynchronousSync;
 
