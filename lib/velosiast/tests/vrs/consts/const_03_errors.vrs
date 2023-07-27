@@ -1,0 +1,11 @@
+// that's a conflict
+const FOO : int = 1234;
+const FOO : int = 1234;
+
+// wrong types
+const BAR1: bool = 1234;
+const BAR2: int = true;
+const BAR3 : MyType = 1234;
+
+// undefined value
+const FOOBAR : bool = UNDEFINED;

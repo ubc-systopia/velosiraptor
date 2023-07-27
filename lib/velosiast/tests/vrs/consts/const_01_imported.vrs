@@ -1,0 +1,5 @@
+import const_00_defs;
+
+const BAR1: int = 1234;
+const BAR2: int = 0xabcd;
+const BAR3: int = FOO1 + FOO2;
