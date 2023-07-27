@@ -1,0 +1,6 @@
+error: circular dependency detected:
+  tests/vrs/imports/import_06_self_circular.vrs -> tests/vrs/imports/import_06_self_circular.vrs
+     --> tests/vrs/imports/import_06_self_circular.vrs:1:13
+      |
+    1 |  import      import_06_self_circular;
+      |              ^^^^^^^^^^^^^^^^^^^^^^^ try removing the following import

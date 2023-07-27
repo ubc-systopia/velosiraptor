@@ -1,0 +1,10 @@
+error: Duplicate import `no_import_1`
+     --> tests/vrs/imports/import_08_double.vrs:2:13
+      |
+    2 |  import      no_import_1;
+      |              ^^^^^^^^^^^ Remove this duplicate import.
+error: Previous import was here:
+     --> tests/vrs/imports/import_08_double.vrs:1:13
+      |
+    1 |  import      no_import_1;
+      |              ^^^^^^^^^^^

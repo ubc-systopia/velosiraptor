@@ -1,0 +1,5 @@
+VelosiParseTree(tests/vrs/imports/import_03_diamond.vrs)
+---------------------------------------------
+const FOO : int = 1234;
+
+---------------------------------------------

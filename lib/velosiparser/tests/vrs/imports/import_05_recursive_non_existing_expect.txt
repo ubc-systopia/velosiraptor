@@ -1,0 +1,10 @@
+error: Failed to resolve error: file not found: tests/vrs/imports/doesnt_exist.vrs
+     --> tests/vrs/imports/import_04_non_existing.vrs:1:13
+      |
+    1 |  import      doesnt_exist;
+      |              ^^^^^^^^^^^^ Remove this import or ensure the module is part of the search path
+error: failed to resolve tests/vrs/imports/import_04_non_existing.vrs
+     --> tests/vrs/imports/import_05_recursive_non_existing.vrs:1:13
+      |
+    1 |  import      import_04_non_existing;
+      |              ^^^^^^^^^^^^^^^^^^^^^^ Imported from here.

@@ -1,0 +1,9 @@
+VelosiParseTree(tests/vrs/imports/import_01_multi.vrs)
+---------------------------------------------
+const FOO : int = 1234;
+
+const BAR : int = 1234;
+
+const FOOBAR : int = 1234;
+
+---------------------------------------------
