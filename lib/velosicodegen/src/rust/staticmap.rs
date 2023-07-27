@@ -113,10 +113,9 @@ fn add_higher_order_map(
                             page_size
                         ));
                         while_block.line(format!(
-                            "self.{}_{}({});",
-                            op.ident(),
+                            "self.map_{}(va, {:#x}, flgs, pa);",
                             variant_unit.ident().to_lowercase(),
-                            utils::params_to_args_list(&op.params),
+                            page_size,
                         ));
                         while_block.line(format!("sz -= {:#x};", page_size));
                         while_block.line(format!("va += {:#x};", page_size));
@@ -166,8 +165,7 @@ fn add_higher_order_map(
                             ),
                         ));
                         if_block.line(format!(
-                            "self.{}_{}({});",
-                            op.ident(),
+                            "self.map_{}({});",
                             variant_unit.ident().to_lowercase(),
                             utils::params_to_args_list(&op.params),
                         ));
@@ -237,28 +235,23 @@ fn add_higher_order_map(
                         dest_unit.get_method("map").unwrap()
                     };
                     while_block.line(format!(
-                        "self.map_{}({});",
+                        "self.map_{}(va, {:#x}, flgs, {});",
                         dest_unit.ident().to_lowercase(),
-                        op.params
-                            .iter()
-                            .map(|p| {
-                                match &p.ptype.typeinfo {
-                                    VelosiAstTypeInfo::TypeRef(ty) => {
-                                        let child = ast.get_unit(ty).unwrap();
-                                        format!(
-                                            "unsafe {{ {}::new({}) }}",
-                                            utils::to_struct_name(ty, None),
-                                            utils::params_to_self_args_list_with_paddr(
-                                                child.params_as_slice(),
-                                                "pa"
-                                            )
-                                        )
-                                    }
-                                    _ => p.ident_to_string(),
-                                }
-                            })
-                            .collect::<Vec<_>>()
-                            .join(", ")
+                        page_size,
+                        match &op.params_map["pa"].ptype.typeinfo {
+                            VelosiAstTypeInfo::TypeRef(ty) => {
+                                let child = ast.get_unit(ty).unwrap();
+                                format!(
+                                    "unsafe {{ {}::new({}) }}",
+                                    utils::to_struct_name(ty, None),
+                                    utils::params_to_self_args_list_with_paddr(
+                                        child.params_as_slice(),
+                                        "pa"
+                                    )
+                                )
+                            }
+                            _ => "pa".to_string(),
+                        }
                     ));
                     while_block.line(format!("sz -= {:#x};", page_size));
                     while_block.line(format!("va += {:#x};", page_size));

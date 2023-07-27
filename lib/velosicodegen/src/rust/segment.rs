@@ -31,7 +31,7 @@ use codegen_rs as CG;
 
 use velosiast::{
     ast::{VelosiAstMethod, VelosiAstUnitSegment, VelosiOperation},
-    VelosiAst,
+    VelosiAst, VelosiAstUnit,
 };
 use velosicomposition::Relations;
 
@@ -101,31 +101,65 @@ fn add_segment_struct(
     }
 
     // op functions
+    let has_children = relations.0.get(unit.ident()).is_some();
     let op = unit.methods.get("map").expect("map method not found!");
-    add_op_fn(unit, ast, op, imp);
+    add_op_fn(unit, ast, op, "map", imp);
     let op = unit.methods.get("unmap").expect("unmap method not found!");
-    add_op_fn(unit, ast, op, imp);
+    add_op_fn(
+        unit,
+        ast,
+        op,
+        if has_children { "unmap_table" } else { "unmap" },
+        imp,
+    );
     let op = unit
         .methods
         .get("protect")
         .expect("protect method not found!");
-    add_op_fn(unit, ast, op, imp);
+    add_op_fn(
+        unit,
+        ast,
+        op,
+        if has_children {
+            "protect_table"
+        } else {
+            "protect"
+        },
+        imp,
+    );
 
     // valid function
     add_valid_fn(unit, imp);
 
-    // resolve function
-    add_resolve_fn(unit, relations, imp);
+    if let Some(children) = relations.0.get(unit.ident()) {
+        if !children.is_empty() {
+            let child = &children[0];
+
+            // higher-order unmap and protect
+            let op = unit.methods.get("unmap").expect("unmap method not found!");
+            add_higher_order_fn(op, imp);
+
+            let op = unit
+                .methods
+                .get("protect")
+                .expect("protect method not found!");
+            add_higher_order_fn(op, imp);
+
+            // resolve function
+            add_resolve_fn(unit, child, imp);
+        }
+    }
 }
 
 fn add_op_fn(
     unit: &VelosiAstUnitSegment,
     ast: &VelosiAst,
     method: &VelosiAstMethod,
+    method_name: &str,
     imp: &mut CG::Impl,
 ) {
     let op_fn = imp
-        .new_fn(method.ident())
+        .new_fn(&method_name)
         .vis("pub")
         .arg_ref_self()
         .ret("usize");
@@ -168,6 +202,22 @@ fn add_op_fn(
     }
 }
 
+fn add_higher_order_fn(method: &VelosiAstMethod, imp: &mut CG::Impl) {
+    let op_fn = imp
+        .new_fn(method.ident())
+        .vis("pub")
+        .arg_ref_self()
+        .ret("usize");
+    for f in method.params.iter() {
+        op_fn.arg(f.ident(), utils::vrs_type_to_rust_type(&f.ptype.typeinfo));
+    }
+    op_fn.line(format!(
+        "self.resolve().{}({})",
+        method.ident(),
+        utils::params_to_args_list(&method.params)
+    ));
+}
+
 fn add_valid_fn(unit: &VelosiAstUnitSegment, imp: &mut CG::Impl) {
     let op = unit.methods.get("valid").expect("valid method not found!");
     let valid = imp.new_fn(op.ident()).vis("pub").arg_ref_self().ret("bool");
@@ -181,45 +231,39 @@ fn add_valid_fn(unit: &VelosiAstUnitSegment, imp: &mut CG::Impl) {
     valid.line(utils::astexpr_to_rust_expr(op.body.as_ref().unwrap(), None));
 }
 
-fn add_resolve_fn(unit: &VelosiAstUnitSegment, relations: &Relations, imp: &mut CG::Impl) {
-    if let Some(children) = relations.0.get(unit.ident()) {
-        if !children.is_empty() {
-            let child = &children[0];
-
-            // add the translate function as a helper
-            let op = unit
-                .methods
-                .get("translate")
-                .expect("map method not found!");
-            let translate = imp
-                .new_fn("translate")
-                .arg_ref_self()
-                .ret(utils::vrs_type_to_rust_type(&op.rtype.typeinfo));
-            for p in &op.params {
-                translate.arg(p.ident(), utils::vrs_type_to_rust_type(&p.ptype.typeinfo));
-            }
-
-            for f in unit.state.fields() {
-                translate.line(format!(
-                    "let {} = self.interface.read_{}();",
-                    f.ident(),
-                    f.ident()
-                ));
-            }
-            translate.line(utils::astexpr_to_rust_expr(op.body.as_ref().unwrap(), None));
-
-            // add resolve
-            let ret_ty = utils::to_struct_name(child.ident(), None);
-            let resolve = imp.new_fn("resolve").vis("pub").arg_ref_self().ret(&ret_ty);
-
-            resolve.line("let paddr = self.translate(0);");
-            resolve.line(format!(
-                "unsafe {{ {}::new({}) }}",
-                ret_ty,
-                utils::params_to_self_args_list_with_paddr(child.params_as_slice(), "paddr")
-            ));
-        }
+fn add_resolve_fn(unit: &VelosiAstUnitSegment, child: &VelosiAstUnit, imp: &mut CG::Impl) {
+    // add the translate function as a helper
+    let op = unit
+        .methods
+        .get("translate")
+        .expect("map method not found!");
+    let translate = imp
+        .new_fn("translate")
+        .arg_ref_self()
+        .ret(utils::vrs_type_to_rust_type(&op.rtype.typeinfo));
+    for p in &op.params {
+        translate.arg(p.ident(), utils::vrs_type_to_rust_type(&p.ptype.typeinfo));
     }
+
+    for f in unit.state.fields() {
+        translate.line(format!(
+            "let {} = self.interface.read_{}();",
+            f.ident(),
+            f.ident()
+        ));
+    }
+    translate.line(utils::astexpr_to_rust_expr(op.body.as_ref().unwrap(), None));
+
+    // add resolve
+    let ret_ty = utils::to_struct_name(child.ident(), None);
+    let resolve = imp.new_fn("resolve").vis("pub").arg_ref_self().ret(&ret_ty);
+
+    resolve.line("let paddr = self.translate(0);");
+    resolve.line(format!(
+        "unsafe {{ {}::new({}) }}",
+        ret_ty,
+        utils::params_to_self_args_list_with_paddr(child.params_as_slice(), "paddr")
+    ));
 }
 
 /// generates the VelosiAstUnitSegment definitions
