@@ -42,5 +42,8 @@ velosicodegen = { path = "lib/velosicodegen" }
 log = { version = "0.4.19", features = ["max_level_trace", "release_max_level_warn"] }
 simplelog = { version = "^0.12.0", features = ["paris"] }
 
-
+# dependencies for testing
+[dev-dependencies]
+strip-ansi-escapes = "0.1.1"
+velosiparser = { path = "lib/velosiparser" }
 
