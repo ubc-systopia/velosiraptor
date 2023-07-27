@@ -1,0 +1,3 @@
+// some file to help with import tests
+
+const FOO : int = 1234;

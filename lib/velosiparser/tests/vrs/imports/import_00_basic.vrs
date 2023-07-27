@@ -1,0 +1,3 @@
+import    no_import_1;
+
+const FOOBAR : int = 1234;

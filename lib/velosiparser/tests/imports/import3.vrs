@@ -1,4 +1,0 @@
-import      import1;
-import      import2;
-
-const FOOBAR : int = 12345;

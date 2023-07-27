@@ -2,6 +2,6 @@ import consts;
 
 const FOOBAR: int = 1234;
 
-unit Abc {
+segment Abc {
   const FOOBAR: int = 5432;
-};
+}

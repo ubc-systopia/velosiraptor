@@ -1,0 +1,3 @@
+import      import_04_non_existing;
+
+const FOO : int = 12345;
