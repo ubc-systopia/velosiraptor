@@ -191,7 +191,12 @@ impl BackendRust {
             .new_fn("alloc")
             .vis("pub")
             .arg("sz", "usize")
-            .ret("PhysAddr")
+            .ret("VirtAddr")
+            .line("todo!()");
+        scope
+            .new_fn("free")
+            .vis("pub")
+            .arg("vaddr", "VirtAddr")
             .line("todo!()");
 
         save_scope(scope, &srcdir, "os")
