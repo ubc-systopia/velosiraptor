@@ -30,11 +30,14 @@
 // used standard library functionality
 use core::str::Split;
 use std::cmp::Ordering;
-use std::collections::hash_map::{Keys, Values, ValuesMut};
-use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
+
+use indexmap::{
+    map::{Keys, Values, ValuesMut},
+    IndexMap,
+};
 
 use velosiparser::{
     VelosiParseTree, VelosiParseTreeContextNode, VelosiParseTreeIdentifier, VelosiTokenStream,
@@ -238,10 +241,10 @@ impl Display for VelosiAstIdentifier {
 }
 
 /// Defines the root note of the ast
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiAstRoot {
-    pub consts: HashMap<String, Rc<VelosiAstConst>>,
-    pub units: HashMap<String, VelosiAstUnit>,
+    pub consts: IndexMap<String, Rc<VelosiAstConst>>,
+    pub units: IndexMap<String, VelosiAstUnit>,
     pub flags: Option<Rc<VelosiAstFlags>>,
     pub context: String,
 }
@@ -249,8 +252,8 @@ pub struct VelosiAstRoot {
 impl VelosiAstRoot {
     pub fn new(context: String) -> Self {
         Self {
-            consts: HashMap::new(),
-            units: HashMap::new(),
+            consts: IndexMap::new(),
+            units: IndexMap::new(),
             context,
             flags: None,
         }
@@ -409,6 +412,36 @@ impl VelosiAstRoot {
 
 /// Implementation of [Display] for [VelosiAstRoot]
 impl Display for VelosiAstRoot {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        writeln!(f, "VelosiAst({})", self.context)?;
+        writeln!(
+            f,
+            "--------------------------------------------------------"
+        )?;
+
+        for c in self.consts.values() {
+            writeln!(f)?;
+            Display::fmt(c, f)?;
+            writeln!(f)?;
+        }
+
+        for u in self.units.values() {
+            writeln!(f)?;
+            Display::fmt(u, f)?;
+            writeln!(f)?;
+        }
+
+        writeln!(
+            f,
+            "--------------------------------------------------------"
+        )?;
+
+        Ok(())
+    }
+}
+
+/// Implementation of [Debug] for [VelosiAstRoot]
+impl Debug for VelosiAstRoot {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         writeln!(f, "VelosiAst({})", self.context)?;
         writeln!(

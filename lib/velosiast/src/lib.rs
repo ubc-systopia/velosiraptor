@@ -30,9 +30,10 @@
 
 // used standard library functionality
 
-use std::collections::hash_map::{Keys, Values, ValuesMut};
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
+
+use indexmap::map::{Keys, Values, ValuesMut};
 
 use ast::VelosiAstFlags;
 // public re-exports
