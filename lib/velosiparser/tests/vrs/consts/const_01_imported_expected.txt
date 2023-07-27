@@ -1,0 +1,23 @@
+VelosiParseTree(tests/vrs/consts/const_01_imported.vrs)
+---------------------------------------------
+const FOO : int = 123;
+
+const FOO : int = 4660;
+
+const FOO : int = a;
+
+const FOO : int = BAR;
+
+const FOO : size = (FOO + FOOBAR);
+
+const FOO : MyType = 1234;
+
+const FOO : bool = 1234;
+
+const FOO : int = true;
+
+const FOOBAR : int = 1234;
+
+const FOOBAR : int = 43981;
+
+---------------------------------------------

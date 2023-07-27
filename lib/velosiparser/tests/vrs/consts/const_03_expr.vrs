@@ -1,0 +1,11 @@
+const FOO: int = 1234;
+const BAR: bool = true;
+
+const FOO : int = 123 + 123;
+const FOO : int = 123 - 4213;
+
+const TEST: int = 1 * abc;
+const TEST: int = 1 + 4 * 4;
+const TEST : int = 1 + 2 << 4;
+const TEST3: int = 1 + 4 * TEST;
+
