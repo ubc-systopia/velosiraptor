@@ -116,7 +116,7 @@ fn check_parse_circular_fail(vrs: &Path, exp: Option<&Path>) {
 
 /// Tests the basic import functionality
 #[test]
-fn basic_import() {
+fn import_basic() {
     let vrs = Path::new("tests/vrs/imports/import_00_basic.vrs");
     let exp = Path::new("tests/vrs/imports/import_00_basic_expect.txt");
     check_parse_ok(vrs, None);
@@ -125,7 +125,7 @@ fn basic_import() {
 
 /// Tests multiple import functionality
 #[test]
-fn multi_import() {
+fn import_multi() {
     let vrs = Path::new("tests/vrs/imports/import_01_multi.vrs");
     let exp = Path::new("tests/vrs/imports/import_01_multi_expect.txt");
     check_parse_ok(vrs, None);
@@ -134,7 +134,7 @@ fn multi_import() {
 
 /// Tests recursive import functionality
 #[test]
-fn recursive_import() {
+fn improt_recursive() {
     let vrs = Path::new("tests/vrs/imports/import_02_recursive.vrs");
     let exp = Path::new("tests/vrs/imports/import_02_recursive_expect.txt");
     check_parse_ok(vrs, None);
@@ -143,7 +143,7 @@ fn recursive_import() {
 
 /// theres the diamond import
 #[test]
-fn diamond_import() {
+fn import_diamond() {
     let vrs = Path::new("tests/vrs/imports/import_03_diamond.vrs");
     let exp = Path::new("tests/vrs/imports/import_03_diamond_expect.txt");
     check_parse_ok(vrs, None);
@@ -152,7 +152,7 @@ fn diamond_import() {
 
 /// theres the diamond import
 #[test]
-fn non_existing_import() {
+fn import_non_existing() {
     let vrs = Path::new("tests/vrs/imports/import_04_non_existing.vrs");
     let exp = Path::new("tests/vrs/imports/import_04_non_existing_expect.txt");
     check_parse_circular_fail(vrs, None);
@@ -161,7 +161,7 @@ fn non_existing_import() {
 
 /// theres the diamond import
 #[test]
-fn recursive_non_existing_import() {
+fn import_recursive_non_existing() {
     let vrs = Path::new("tests/vrs/imports/import_05_recursive_non_existing.vrs");
     let exp = Path::new("tests/vrs/imports/import_05_recursive_non_existing_expect.txt");
     check_parse_circular_fail(vrs, None);
@@ -170,7 +170,7 @@ fn recursive_non_existing_import() {
 
 /// tests whether self circular imports are detected
 #[test]
-fn self_circular_import() {
+fn import_self_circular() {
     let vrs = Path::new("tests/vrs/imports/import_06_self_circular.vrs");
     let exp = Path::new("tests/vrs/imports/import_06_self_circular_expect.txt");
     check_parse_circular_fail(vrs, None);
@@ -179,7 +179,7 @@ fn self_circular_import() {
 
 /// tests whether self circular imports are detected
 #[test]
-fn circular_import() {
+fn import_circular() {
     let vrs = Path::new("tests/vrs/imports/import_07_circular.vrs");
     let exp = Path::new("tests/vrs/imports/import_07_circular_expect.txt");
     check_parse_circular_fail(vrs, None);
@@ -188,7 +188,7 @@ fn circular_import() {
 
 /// tests whether self circular imports are detected
 #[test]
-fn double_import() {
+fn import_double() {
     let vrs = Path::new("tests/vrs/imports/import_08_double.vrs");
     let exp = Path::new("tests/vrs/imports/import_08_double_expect.txt");
     check_parse_circular_fail(vrs, None);
