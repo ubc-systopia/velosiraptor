@@ -45,8 +45,8 @@ pub use unmap::UnmapPrograms;
 /// re-export the query builder stuff
 pub use queries::{
     BoolExprQuery, BoolExprQueryBuilder, CompoundBoolExprQueryBuilder, CompoundQueryAll,
-    CompoundQueryAny, MaybeResult, ProgramBuilder, ProgramVerifier, TranslateQuery,
-    TranslateQueryBuilder, DEFAULT_BATCH_SIZE, ProgramSimplifier,
+    CompoundQueryAny, MaybeResult, ProgramBuilder, ProgramSimplifier, ProgramVerifier,
+    TranslateQuery, TranslateQueryBuilder, DEFAULT_BATCH_SIZE,
 };
 
 use velosiast::ast::VelosiAstUnitSegment;

@@ -53,9 +53,9 @@ use crate::z3::Z3WorkerPool;
 // re-exports
 pub use boolexpr::{BoolExprQuery, BoolExprQueryBuilder};
 pub use cnf::{CompoundBoolExprQueryBuilder, CompoundQueryAll, CompoundQueryAny};
+pub use programsimplifier::ProgramSimplifier;
 pub use translate::{TranslateQuery, TranslateQueryBuilder};
 pub use verifier::{ProgramVerifier, DEFAULT_BATCH_SIZE};
-pub use programsimplifier::ProgramSimplifier;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tri-State Result

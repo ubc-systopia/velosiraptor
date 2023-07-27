@@ -30,15 +30,9 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
 use smt2::Term;
-use velosiast::ast::{
-    VelosiAstExpr,
-    VelosiAstMethod,
-};
+use velosiast::ast::{VelosiAstExpr, VelosiAstMethod};
 
-use crate::{
-    z3::Z3WorkerPool,
-    Program,
-};
+use crate::{z3::Z3WorkerPool, Program};
 
 //use super::queryhelper::{MaybeResult, ProgramBuilder, QueryBuilder};
 use super::MaybeResult;
