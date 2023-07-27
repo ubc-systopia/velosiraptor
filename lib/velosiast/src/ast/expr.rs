@@ -266,16 +266,12 @@ impl VelosiAstBinOpExpr {
         VelosiAstBinOpExpr { lhs, op, rhs, loc }
     }
 
-    pub fn land(lhs: Rc<VelosiAstExpr>,  rhs: Rc<VelosiAstExpr>) -> Self {
-        Self::new(
-            lhs, VelosiAstBinOp::Land, rhs, Default::default()
-        )
+    pub fn land(lhs: Rc<VelosiAstExpr>, rhs: Rc<VelosiAstExpr>) -> Self {
+        Self::new(lhs, VelosiAstBinOp::Land, rhs, Default::default())
     }
 
     pub fn lor(lhs: Rc<VelosiAstExpr>, rhs: Rc<VelosiAstExpr>) -> Self {
-        Self::new(
-            lhs, VelosiAstBinOp::Lor, rhs, Default::default()
-        )
+        Self::new(lhs, VelosiAstBinOp::Lor, rhs, Default::default())
     }
 
     pub fn from_parse_tree(
