@@ -1,0 +1,5 @@
+const FOO: int = 1234;
+const BAR: bool = true;
+const foo: int = 1234;
+const _FOO : int = 4567;
+const _foo : int = 6765;

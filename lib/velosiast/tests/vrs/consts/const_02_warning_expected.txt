@@ -1,0 +1,27 @@
+VelosiAst(tests/vrs/consts/const_02_warning.vrs)
+--------------------------------------------------------
+
+const FOO : int = 0x4d2;
+
+const BAR : bool = true;
+
+const foo : int = 0x4d2;
+
+const _FOO : int = 0x11d7;
+
+const _foo : int = 0x1a6d;
+--------------------------------------------------------
+
+########################################################
+
+warning: identifier `foo` should have an upper case name
+     --> tests/vrs/consts/const_02_warning.vrs:3:7
+      |
+    3 |  const foo: int = 1234;
+      |        ^^^ convert the identifier to upper case (notice the capitalization): `FOO`
+warning: identifier `_foo` should have an upper case name
+     --> tests/vrs/consts/const_02_warning.vrs:5:7
+      |
+    5 |  const _foo : int = 6765;
+      |        ^^^^ convert the identifier to upper case (notice the capitalization): `_FOO`
+warning: generated 2 warnings

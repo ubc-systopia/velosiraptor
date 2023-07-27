@@ -1,0 +1,45 @@
+error: duplicate definitions with name `FOO`
+     --> tests/vrs/consts/const_03_errors.vrs:3:1
+      |
+    2 |  const FOO : int = 1234;
+      |  ^^^^^^^^^^^^^^^^^^^^^^^ previous definition of `FOO` was here
+   ...
+      |
+    3 |  const FOO : int = 1234;
+      |  ^^^^^^^^^^^^^^^^^^^^^^^ duplicate definition
+error: mismatched types
+     --> tests/vrs/consts/const_03_errors.vrs:6:20
+      |
+    6 |  const BAR1: bool = 1234;
+      |                     ^^^^ expected `boolean`, found `numeric`
+error: mismatched types
+     --> tests/vrs/consts/const_03_errors.vrs:7:19
+      |
+    7 |  const BAR2: int = true;
+      |                    ^^^^ expected `numeric`, found `boolean`
+error: no symbol named `MyType` found in the current scope
+     --> tests/vrs/consts/const_03_errors.vrs:8:14
+      |
+    8 |  const BAR3 : MyType = 1234;
+      |               ^^^^^^ not found in this scope
+error: Unsupported type. Constant definitions only support of the built-in types.
+     --> tests/vrs/consts/const_03_errors.vrs:8:14
+      |
+    8 |  const BAR3 : MyType = 1234;
+      |               ^^^^^^ Change this type to one of [`bool`, `int`, `size`, `addr`].
+error: no symbol named `UNDEFINED` found in the current scope
+     --> tests/vrs/consts/const_03_errors.vrs:11:23
+      |
+   11 |  const FOOBAR : bool = UNDEFINED;
+      |                        ^^^^^^^^^ not found in this scope
+error: Expected a constant expression.
+     --> tests/vrs/consts/const_03_errors.vrs:11:23
+      |
+   11 |  const FOOBAR : bool = UNDEFINED;
+      |                        ^^^^^^^^^ Convert this expression into a constant expression
+error: mismatched types
+     --> tests/vrs/consts/const_03_errors.vrs:11:23
+      |
+   11 |  const FOOBAR : bool = UNDEFINED;
+      |                        ^^^^^^^^^ expected `boolean`, found `numeric`
+error: could not compile due to 8 previous errors; 0 warnings emitted

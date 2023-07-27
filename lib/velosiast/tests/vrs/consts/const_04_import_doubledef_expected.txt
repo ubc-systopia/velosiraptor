@@ -1,0 +1,19 @@
+error: duplicate definitions with name `FOO1`
+     --> tests/vrs/consts/const_04_import_doubledef.vrs:3:1
+      |
+    1 |  const FOO1 : int = 123;
+      |  ^^^^^^^^^^^^^^^^^^^^^^^ previous definition of `FOO1` was here
+   ...
+      |
+    3 |  const FOO1: int = 1234;
+      |  ^^^^^^^^^^^^^^^^^^^^^^^ duplicate definition
+error: duplicate definitions with name `FOO2`
+     --> tests/vrs/consts/const_04_import_doubledef.vrs:4:1
+      |
+    2 |  const FOO2 : int = 0x1234;
+      |  ^^^^^^^^^^^^^^^^^^^^^^^^^^ previous definition of `FOO2` was here
+   ...
+      |
+    4 |  const FOO2: int = 0xabcd;
+      |  ^^^^^^^^^^^^^^^^^^^^^^^^^ duplicate definition
+error: could not compile due to 2 previous errors; 0 warnings emitted
