@@ -26,13 +26,13 @@
 //! # The FastModels Platform Generator: Interface
 
 use crate::fastmodels::add_header;
-use crate::fastmodels::registers::{registers_header_file};
+use crate::fastmodels::registers::registers_header_file;
 use crate::fastmodels::state::{state_class_name, state_header_file};
 use crate::VelosiHwGenError;
 use crustal as C;
 use std::path::Path;
 
-use velosiast::{VelosiAstField, VelosiAstUnit};
+use velosiast::VelosiAstUnit;
 
 /// generates the name of the state field header file
 pub fn interface_header_file(name: &str) -> String {

@@ -43,7 +43,7 @@ pub fn registers_impl_file(name: &str) -> String {
     format!("{}_registers.cpp", name)
 }
 
-pub fn registers_class_name(name: &str) -> String {
+pub fn register_class_name(name: &str) -> String {
     format!("{}{}Register", name[0..1].to_uppercase(), &name[1..])
 }
 
@@ -144,7 +144,7 @@ pub fn generate_register_impl(
         let rs = register_map(|r| r.clone(), u);
 
         for r in &rs {
-            let rcn = r.ident();
+            let rcn = register_class_name(r.ident());
             let c = scope.new_class(rcn.as_str());
             c.set_base("RegisterBase", C::Visibility::Public);
 
