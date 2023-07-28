@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Prepare
         run: |
-          apt-get install z3
+          sudo apt-get install z3
       - uses: actions/checkout@v3
         with:
           submodules: recursive
