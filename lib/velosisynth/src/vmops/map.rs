@@ -48,8 +48,8 @@ pub struct MapPrograms {
     candidate_programs: Box<dyn ProgramBuilder>,
     /// reference to the map function
     m_fn: Rc<VelosiAstMethod>,
-    /// the starting program for the memory model
-    starting_prog: Option<Rc<Program>>,
+    // /// the starting program for the memory model
+    // starting_prog: Option<Rc<Program>>,
 }
 
 impl MapPrograms {
@@ -156,7 +156,7 @@ impl MapPrograms {
                 candidate_programs: query.into(),
                 m_fn: m_op.clone(),
                 // goal_exprs: Vec::new(),
-                starting_prog,
+                // starting_prog,
             }
         } else {
             todo!("handle the case where there was no query here")
