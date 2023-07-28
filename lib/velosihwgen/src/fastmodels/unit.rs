@@ -230,7 +230,7 @@ fn expr_to_cpp(expr: &VelosiAstExpr) -> C::Expr {
             let e2 = expr_to_cpp(rhs);
             // implies "==>" needs a special case, others should be fine in cpp
             match op {
-                VelosiAstBinOp::Implies => C::Expr::binop(C::Expr::not(e), "||", e2),
+                VelosiAstBinOp::Implies => C::Expr::binop(C::Expr::lnot(e), "||", e2),
                 _ => C::Expr::binop(e, &format!("{}", op), e2),
             }
         }
@@ -247,7 +247,7 @@ fn expr_to_cpp(expr: &VelosiAstExpr) -> C::Expr {
             C::Expr::method_call(
                 &C::Expr::this(),
                 p[0],
-                args.iter().map(expr_to_cpp).collect(),
+                args.iter().map(|a| expr_to_cpp(a.as_ref())).collect(),
             )
         }
         Slice { .. } => panic!("don't know how to handle slice"),
@@ -264,7 +264,7 @@ fn expr_to_cpp(expr: &VelosiAstExpr) -> C::Expr {
 }
 
 fn assert_to_cpp(expr: &VelosiAstExpr) -> C::IfElse {
-    let mut c = C::IfElse::with_expr(C::Expr::not(expr_to_cpp(expr)));
+    let mut c = C::IfElse::with_expr(C::Expr::lnot(expr_to_cpp(expr)));
     c.then_branch()
         .raw(format!(
             "Logging::debug(\"TranslationUnit::translate() precondition/assertion failed ({})\");",
