@@ -4,26 +4,29 @@ on:
       - main
   pull_request:
 
-name: Unit Tests
+name: Unit Tests (root)
 jobs:
   compile_and_test:
-    name: "libvelosisynth"
+    name: "tests"
     runs-on: ubuntu-latest
     steps:
+      - name: Prepare
+        run: |
+          apt-get install z3
       - uses: actions/checkout@v3
         with:
           submodules: recursive
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - name: libvelosisynth_clippy
+      - name: clippy
         uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           # can add a `-- --deny warnings` here to convert warnings into errors
-          args:
-      - name: libvelosisynth_build
+          args: -- --deny warnings
+      - name: build
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --manifest-path ./lib/velosisynth/Cargo.toml
+          args:

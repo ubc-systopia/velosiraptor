@@ -4,7 +4,7 @@ on:
       - main
   pull_request:
 
-name: Unit Tests
+name: Unit Tests (libvelosiast)
 jobs:
   compile_and_test:
     runs-on: ubuntu-latest
