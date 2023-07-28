@@ -165,18 +165,18 @@ fn state_field_access(access: &Vec<&str>) -> C::Expr {
     }
 
     if access.len() == 2 {
-        let state_field = C::Expr::field_access(&st, &access[1]);
+        let state_field = C::Expr::field_access(&st, access[1]);
         return C::Expr::method_call(&state_field, "get_value", vec![]);
     }
 
     // state.field.get_slice_value("slice");
     if access.len() == 3 {
-        let state_field = C::Expr::field_access(&st, &access[1]);
+        let state_field = C::Expr::field_access(&st, access[1]);
 
         return C::Expr::method_call(
             &state_field,
             "get_slice_value",
-            vec![C::Expr::new_str(&access[2])],
+            vec![C::Expr::new_str(access[2])],
         );
     }
 
@@ -262,7 +262,7 @@ fn handle_requires_assert(method: &mut C::Method, expr: &VelosiAstExpr) {
 fn add_translate_method_segment(c: &mut C::Class, tm: &VelosiAstMethod) {
     let src_addr_param =
         C::MethodParam::new(&tm.params[0].ident.ident, C::Type::new_typedef("lvaddr_t"));
-    let src_var = C::Expr::from_method_param(&src_addr_param);
+    let _src_var = C::Expr::from_method_param(&src_addr_param);
     let dst_addr_param = C::MethodParam::new(
         "dst_addr",
         C::Type::to_ptr(&C::Type::new_typedef("lpaddr_t")),
@@ -293,7 +293,7 @@ fn add_translate_method_segment(c: &mut C::Class, tm: &VelosiAstMethod) {
     m.body().return_expr(C::Expr::btrue());
 }
 
-fn translate_method_enum(e: &VelosiAstUnitEnum) -> C::Method {
+fn translate_method_enum(_e: &VelosiAstUnitEnum) -> C::Method {
     let mut m = C::Method::new("do_translate", C::Type::new_bool());
     m.body().new_return(Some(&C::Expr::bfalse()));
     m.push_param(C::MethodParam::new("va", C::Type::new_typedef("lvaddr_t")));
@@ -301,10 +301,10 @@ fn translate_method_enum(e: &VelosiAstUnitEnum) -> C::Method {
         "dst_addr",
         C::Type::new_typedef("lpaddr_t*"),
     ));
-    return m;
+    m
 }
 
-fn translate_method_staticmap(s: &VelosiAstUnitStaticMap) -> C::Method {
+fn translate_method_staticmap(_s: &VelosiAstUnitStaticMap) -> C::Method {
     let mut m = C::Method::new("do_translate", C::Type::new_bool());
     m.body().new_return(Some(&C::Expr::bfalse()));
     m.push_param(C::MethodParam::new("va", C::Type::new_typedef("lvaddr_t")));
@@ -312,7 +312,7 @@ fn translate_method_staticmap(s: &VelosiAstUnitStaticMap) -> C::Method {
         "dst_addr",
         C::Type::new_typedef("lpaddr_t*"),
     ));
-    return m;
+    m
 }
 
 fn ast_type_to_c_type(t: &VelosiAstType) -> C::Type {
@@ -329,7 +329,6 @@ fn ast_type_to_c_type(t: &VelosiAstType) -> C::Type {
         VelosiAstTypeInfo::State => C::Type::new_uint(64),
         VelosiAstTypeInfo::Interface => C::Type::new_uint(64),
         VelosiAstTypeInfo::Void => C::Type::new_uint(64),
-        x => panic!("unhandled VelosiAstTypeInfo: {:?}", x),
     }
 }
 

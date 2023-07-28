@@ -205,7 +205,7 @@ pub fn generate_state_impl(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), Ve
                 cons.push_initializer(fieldname.as_str(), C::Expr::fn_call(&fieldclass, vec![]));
 
                 let this = C::Expr::this();
-                let field = C::Expr::field_access(&this, &fieldname);
+                let field = C::Expr::field_access(&this, fieldname);
                 cons.body().method_call(
                     C::Expr::this(),
                     "add_field",
