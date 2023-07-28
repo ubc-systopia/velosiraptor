@@ -14,65 +14,71 @@ const GRANULE_SIZE : size = 4096;
 // an entry in the table is invalid if it's present bit is set to 0. the remaining bits are ignored
 segment Invalid {
 
-    fn invariant() {
-        state.present == 0
+    fn inv() {
+        state.entry.present == 0
     }
 
     state = StateDef(base: addr) {
-        0 .. 1  present,
-        1 .. 64 ignored,
-    }
+        mem entry [base, 0, 8] {
+            0 .. 1  present,
+            1 .. 64 ignored,
+        }
+    };
 }
 
 segment TableDescriptor {
 
-    fn invariant() {
+    fn inv() {
         state.present == 1 && state.table == 1
     }
 
 
     state = StateDef(base :addr) {
-         0 ..  1 present,
-         1 ..  2 table,
-         2 .. 12 ignored,
-        12 .. 48 address,
-        48 .. 52 res_0,
-        52 .. 59 ignored,
-        59 .. 60 pxn_table, // PXN limit for subsequent levels of lookup
-        60 .. 61 xntable,   // XN limit for subsequent levels of lookup
-        61 .. 63 aptable,   // Access permissions limit for subsequent levels of lookup
-        63 .. 64 nstable,   // For memory accesses from Secure state, specifies the Security state for subsequent levels of lookup
-    }
+        mem entry [base, 0, 8] {
+            0 ..  1 present,
+            1 ..  2 table,
+            2 .. 12 ignored,
+            12 .. 48 address,
+            48 .. 52 res_0,
+            52 .. 59 ignored,
+            59 .. 60 pxn_table, // PXN limit for subsequent levels of lookup
+            60 .. 61 xntable,   // XN limit for subsequent levels of lookup
+            61 .. 63 aptable,   // Access permissions limit for subsequent levels of lookup
+            63 .. 64 nstable,   // For memory accesses from Secure state, specifies the Security state for subsequent levels of lookup
+        }
+    };
 }
 
 segment Block {
     state = StateDef(base :addr) {
-        0 ..  1 present,
-        1 ..  2 table,
-        // lower block attributes
-        2 ..  5 attr_idx,  // Stage 1 memory attributes index field
-        5 ..  6 ns,        // non-secure bit
-        6 ..  8 ap,        // access permissions (Memory access control on page D5-2754)
-        8 .. 10 sh,        // shareability field
-        10 .. 11 af,        // access flag
-        11 .. 12 ng,        // determines whether the TLB entry applies to all ASID values, or only to the current ASID value
-        12 .. 16 OA,        //
-        16 .. 17 nT,        // Block translation entry
-        // addr
-        21 .. 48 address,
+        mem entry [base, 0, 8] {
+            0 ..  1 present,
+            1 ..  2 table,
+            // lower block attributes
+            2 ..  5 attr_idx,  // Stage 1 memory attributes index field
+            5 ..  6 ns,        // non-secure bit
+            6 ..  8 ap,        // access permissions (Memory access control on page D5-2754)
+            8 .. 10 sh,        // shareability field
+            10 .. 11 af,        // access flag
+            11 .. 12 ng,        // determines whether the TLB entry applies to all ASID values, or only to the current ASID value
+            12 .. 16 OA,        //
+            16 .. 17 nT,        // Block translation entry
+            // addr
+            21 .. 48 address,
 
-        48 .. 50 res0,
+            48 .. 50 res0,
 
-        // upper block attributes
-        50 .. 51 gp,         // Guarded Page
-        51 .. 52 dbm,        // Dirty Bit Modifier
-        52 .. 53 contiguous, // A hint bit indicating that the translation table entry is one of a contiguous set of entries
-        53 .. 54 pxn,        // The Privileged execute-never field
-        54 .. 55 uxn,        // The Execute-never or Unprivileged execute-never field
-        55 .. 59 ignored,    // Reserved for software use
-        59 .. 62 pbha,       // Page-based Hardware Attributes bits.
-        63 .. 64 ignored,
-    }
+            // upper block attributes
+            50 .. 51 gp,         // Guarded Page
+            51 .. 52 dbm,        // Dirty Bit Modifier
+            52 .. 53 contiguous, // A hint bit indicating that the translation table entry is one of a contiguous set of entries
+            53 .. 54 pxn,        // The Privileged execute-never field
+            54 .. 55 uxn,        // The Execute-never or Unprivileged execute-never field
+            55 .. 59 ignored,    // Reserved for software use
+            59 .. 62 pbha,       // Page-based Hardware Attributes bits.
+            63 .. 64 ignored,
+        }
+    };
 }
 
 
@@ -83,43 +89,45 @@ segment Block {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 segment L3TableEntryPage {
-    // invariant
+    // inv
 
-    fn invariant() {
+    fn inv() {
         state.present == 1 && state.table == 1
     }
 
     state = StateDef(base :addr) {
-         0 ..  1 present,
-         1 ..  2 table,
+        mem entry [base, 0, 8] {
+            0 ..  1 present,
+            1 ..  2 table,
 
-         // lower block attributes
-         2 ..  5 attr_idx,  // Stage 1 memory attributes index field
-         5 ..  6 ns,        // non-secure bit
-         6 ..  8 ap,        // access permissions (Memory access control on page D5-2754)
-         8 .. 10 sh,        // shareability field
-        10 .. 11 af,        // access flag
-        11 .. 12 ng,        // determines whether the TLB entry applies to all ASID values, or only to the current ASID value
+            // lower block attributes
+            2 ..  5 attr_idx,  // Stage 1 memory attributes index field
+            5 ..  6 ns,        // non-secure bit
+            6 ..  8 ap,        // access permissions (Memory access control on page D5-2754)
+            8 .. 10 sh,        // shareability field
+            10 .. 11 af,        // access flag
+            11 .. 12 ng,        // determines whether the TLB entry applies to all ASID values, or only to the current ASID value
 
-        // output address to the page
-        12 .. 48 frame_address,
-        48 .. 50 res0,
+            // output address to the page
+            12 .. 48 frame_address,
+            48 .. 50 res0,
 
-        // upper block attributes
-        50 .. 51 gp,         // Guarded Page
-        51 .. 52 dbm,        // Dirty Bit Modifier
-        52 .. 53 contiguous, // A hint bit indicating that the translation table entry is one of a contiguous set of entries
-        53 .. 54 pxn,        // The Privileged execute-never field
-        54 .. 55 uxn,        // The Execute-never or Unprivileged execute-never field
-        55 .. 59 ignored,    // Reserved for software use
-        59 .. 62 pbha,       // Page-based Hardware Attributes bits.
-        63 .. 64 ignored,    // Ignored
-    }
+            // upper block attributes
+            50 .. 51 gp,         // Guarded Page
+            51 .. 52 dbm,        // Dirty Bit Modifier
+            52 .. 53 contiguous, // A hint bit indicating that the translation table entry is one of a contiguous set of entries
+            53 .. 54 pxn,        // The Privileged execute-never field
+            54 .. 55 uxn,        // The Execute-never or Unprivileged execute-never field
+            55 .. 59 ignored,    // Reserved for software use
+            59 .. 62 pbha,       // Page-based Hardware Attributes bits.
+            63 .. 64 ignored,    // Ignored
+        }
+    };
 }
 
 enum L3Table_Entry(base: addr){
     Invalid(base),
-    L3TableEntryPage(base),
+    L3TableEntryPage(base)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -134,38 +142,40 @@ segment L2TableEntryTable(base : addr) : TableDescriptor {
 
 segment L2TableEntryBlock {
 
-    fn invariant() {
+    fn inv() {
         state.present == 1 && state.table == 0
     }
 
 
     state = StateDef(base :addr) {
-        0 ..  1 present,
-        1 ..  2 table,
-        // lower block attributes
-        2 ..  5 attr_idx,  // Stage 1 memory attributes index field
-        5 ..  6 ns,        // non-secure bit
-        6 ..  8 ap,        // access permissions (Memory access control on page D5-2754)
-        8 .. 10 sh,        // shareability field
-        10 .. 11 af,        // access flag
-        11 .. 12 ng,        // determines whether the TLB entry applies to all ASID values, or only to the current ASID value
-        12 .. 16 OA,        //
-        16 .. 17 nT,        // Block translation entry
-        // addr
-        17 .. 21 res0,
-        21 .. 48 address,
-        48 .. 50 res0,
+        mem entry [base, 0, 8] {
+            0 ..  1 present,
+            1 ..  2 table,
+            // lower block attributes
+            2 ..  5 attr_idx,  // Stage 1 memory attributes index field
+            5 ..  6 ns,        // non-secure bit
+            6 ..  8 ap,        // access permissions (Memory access control on page D5-2754)
+            8 .. 10 sh,        // shareability field
+            10 .. 11 af,        // access flag
+            11 .. 12 ng,        // determines whether the TLB entry applies to all ASID values, or only to the current ASID value
+            12 .. 16 OA,        //
+            16 .. 17 nT,        // Block translation entry
+            // addr
+            17 .. 21 res0,
+            21 .. 48 address,
+            48 .. 50 res0,
 
-        // upper block attributes
-        50 .. 51 gp,         // Guarded Page
-        51 .. 52 dbm,        // Dirty Bit Modifier
-        52 .. 53 contiguous, // A hint bit indicating that the translation table entry is one of a contiguous set of entries
-        53 .. 54 pxn,        // The Privileged execute-never field
-        54 .. 55 uxn,        // The Execute-never or Unprivileged execute-never field
-        55 .. 59 ignored,    // Reserved for software use
-        59 .. 62 pbha,       // Page-based Hardware Attributes bits.
-        63 .. 64 ignored,
-    }
+            // upper block attributes
+            50 .. 51 gp,         // Guarded Page
+            51 .. 52 dbm,        // Dirty Bit Modifier
+            52 .. 53 contiguous, // A hint bit indicating that the translation table entry is one of a contiguous set of entries
+            53 .. 54 pxn,        // The Privileged execute-never field
+            54 .. 55 uxn,        // The Execute-never or Unprivileged execute-never field
+            55 .. 59 ignored,    // Reserved for software use
+            59 .. 62 pbha,       // Page-based Hardware Attributes bits.
+            63 .. 64 ignored,
+        }
+    };
 }
 
 
@@ -190,39 +200,41 @@ segment L1TableEntryTable(base : addr) : TableDescriptor {
 
 segment L1TableEntryBlock {
 
-    fn invariant() {
+    fn inv() {
         state.present == 1 && state.table == 0
     }
 
 
     state = StateDef(base :addr) {
-        0 ..  1 present,
-        1 ..  2 table,
-        // lower block attributes
-        2 ..  5 attr_idx,  // Stage 1 memory attributes index field
-        5 ..  6 ns,        // non-secure bit
-        6 ..  8 ap,        // access permissions (Memory access control on page D5-2754)
-        8 .. 10 sh,        // shareability field
-        10 .. 11 af,        // access flag
-        11 .. 12 ng,        // determines whether the TLB entry applies to all ASID values, or only to the current ASID value
-        12 .. 16 OA,        //
-        16 .. 17 nT,        // Block translation entry
+        mem entry [base, 0, 8] {
+            0 ..  1 present,
+            1 ..  2 table,
+            // lower block attributes
+            2 ..  5 attr_idx,  // Stage 1 memory attributes index field
+            5 ..  6 ns,        // non-secure bit
+            6 ..  8 ap,        // access permissions (Memory access control on page D5-2754)
+            8 .. 10 sh,        // shareability field
+            10 .. 11 af,        // access flag
+            11 .. 12 ng,        // determines whether the TLB entry applies to all ASID values, or only to the current ASID value
+            12 .. 16 OA,        //
+            16 .. 17 nT,        // Block translation entry
 
-        // addr
-        17 .. 30 res0,
-        30 .. 48 address,
-        48 .. 50 res0,
+            // addr
+            17 .. 30 res0,
+            30 .. 48 address,
+            48 .. 50 res0,
 
-        // upper block attributes
-        50 .. 51 gp,         // Guarded Page
-        51 .. 52 dbm,        // Dirty Bit Modifier
-        52 .. 53 contiguous, // A hint bit indicating that the translation table entry is one of a contiguous set of entries
-        53 .. 54 pxn,        // The Privileged execute-never field
-        54 .. 55 uxn,        // The Execute-never or Unprivileged execute-never field
-        55 .. 59 ignored,    // Reserved for software use
-        59 .. 62 pbha,       // Page-based Hardware Attributes bits.
-        63 .. 64 ignored,
-    }
+            // upper block attributes
+            50 .. 51 gp,         // Guarded Page
+            51 .. 52 dbm,        // Dirty Bit Modifier
+            52 .. 53 contiguous, // A hint bit indicating that the translation table entry is one of a contiguous set of entries
+            53 .. 54 pxn,        // The Privileged execute-never field
+            54 .. 55 uxn,        // The Execute-never or Unprivileged execute-never field
+            55 .. 59 ignored,    // Reserved for software use
+            59 .. 62 pbha,       // Page-based Hardware Attributes bits.
+            63 .. 64 ignored,
+        }
+    };
 }
 
 enum L1Table_Entry(base: addr){
@@ -245,10 +257,6 @@ enum L0Table_Entry(base: addr){
     Invalid(base),
     L0TableEntryTable(base)
 }
-
-
-
-
 
 
 // represents an x86 page table entry

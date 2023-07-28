@@ -132,9 +132,8 @@ unit R4700 {
     }
 
     map(addr, flags) {
-        assert type(addr) == PML4
-        assert aligned(addr, 4k);
-        assert size(addr) == 4k;
+        assert aligned(addr, 4096);
+        assert size(addr) == 4096;
     }
 
     // can't unmap
