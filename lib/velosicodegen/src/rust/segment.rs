@@ -159,7 +159,7 @@ fn add_op_fn(
     imp: &mut CG::Impl,
 ) {
     let op_fn = imp
-        .new_fn(&method_name)
+        .new_fn(method_name)
         .vis("pub")
         .arg_ref_self()
         .ret("usize");
