@@ -94,23 +94,6 @@ pub fn generate_interface_header(
     // add the state attribute
     c.new_attribute("_state", state_ptr_type);
 
-    // match unit.interface() {
-    //     None => {
-    //         scope.new_comment("This unit does not have an interface");
-    //         scope.new_comment(&format!("Abstract:  {}", unit.is_abstract()));
-    //         scope.new_comment(&format!("Enum:      {}", unit.is_enum()));
-    //         scope.new_comment(&format!("Staticmap: {}", unit.is_staticmap()));
-    //     }
-    //     Some(i) => {
-    //         for f in i.fields() {
-    //             let rcn = registers_class_name(f.ident());
-    //             let fieldname = format!("_{}", &f.ident());
-    //             let ty = C::Type::new_class(&rcn);
-    //             c.new_attribute(&fieldname, ty);
-    //         }
-    //     }
-    // }
-
     // save the scope
     let filename = interface_header_file_path(unit.ident());
     scope.set_filename(&filename);
@@ -155,27 +138,6 @@ pub fn generate_interface_impl(
 
     cons.push_parent_initializer(C::Expr::fn_call("InterfaceBase", vec![pa.clone()]));
     cons.push_initializer("_state", pa);
-
-    // registers are no longer relevant in unit context
-
-    // match unit.interface() {
-    //     None => (),
-    //     Some(i) => {
-    //         for f in i.fields() {
-    //             let fieldname = format!("_{}", f.ident());
-    //             let rcn = registers_class_name(f.ident());
-    //             cons.push_initializer(fieldname.as_str(), C::Expr::fn_call(&rcn, vec![pa.clone()]));
-    //
-    //             let this = C::Expr::this();
-    //             let field = C::Expr::field_access(&this, &fieldname);
-    //             cons.body().method_call(
-    //                 C::Expr::this(),
-    //                 "add_register",
-    //                 vec![C::Expr::addr_of(&field)],
-    //             );
-    //         }
-    //     }
-    // }
 
     let filename = interface_impl_file(unit.ident());
     scope.set_filename(&filename);

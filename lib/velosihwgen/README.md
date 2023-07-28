@@ -47,7 +47,7 @@ The first backend for hardware generation. WIP; folder structure of output is in
 
 1. First, generate the units from the .vrs specification.
 
-2. ARM FastModels is required to make and run the simulated hardware. (Here is a Dockerfile for a suitable environment)[https://gist.github.com/mlechu/9d238ae63a5fa3d6d66673f535996c85].
+2. ARM FastModels is required to make and run the simulated hardware. (Here is a Dockerfile for a suitable environment)[./src/fastmodels/templates/armfm-arm64.Dockerfile].
 
 3. Run `make`.
 
