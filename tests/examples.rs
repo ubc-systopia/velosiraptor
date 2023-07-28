@@ -26,8 +26,8 @@
 //! # VelosiParser Tests: Example Specs
 
 // std includes
-use std::fs::{self};
-use std::path::{Path, PathBuf};
+
+use std::path::{PathBuf};
 
 // use strip_ansi_escapes;
 
@@ -38,7 +38,7 @@ use velosiparser::{VelosiParser, VelosiParserError};
 /// Tests the basic import functionality
 #[test]
 fn examples_parse() {
-    let mut d = PathBuf::from("examples");
+    let d = PathBuf::from("examples");
     for f in d.read_dir().expect("could not read example directory") {
         let vrs = f.expect("could not read directory entry").path();
 
@@ -75,7 +75,7 @@ fn examples_parse() {
 /// Tests the basic import functionality
 #[test]
 fn examples_ast() {
-    let mut d = PathBuf::from("examples");
+    let d = PathBuf::from("examples");
     for f in d.read_dir().expect("could not read example directory") {
         let vrs = f.expect("could not read directory entry").path();
 
@@ -88,10 +88,10 @@ fn examples_ast() {
         print!("  - Parsing {path_str} ...");
 
         match VelosiAst::from_file(path_str) {
-            AstResult::Ok(ast) => {
+            AstResult::Ok(_ast) => {
                 println!(" ok. Successfully created Ast.");
             }
-            AstResult::Issues(ast, e) => {
+            AstResult::Issues(_ast, e) => {
                 println!(" ok  (with warningsk)");
                 println!(">>>>>>\n{}\n<<<<<<", e);
                 // panic!("Could not parse file");

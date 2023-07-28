@@ -20,6 +20,14 @@ const SEGMENT_GRANULARITY_SIZE : size = 4096;
 
 const SEGMENT_SIZE_MAX : size = 0xffff_ffff;
 
+
+flags {
+    execute,
+    read,
+    write,
+    usermode
+}
+
 // This defines an SMPT Entry
 abstract segment SegmentDescriptorBase(base: addr) {
 
@@ -27,9 +35,6 @@ abstract segment SegmentDescriptorBase(base: addr) {
     outbitwidth = 32;
 
 
-    flags = {
-        usermode,
-    };
 
     state = StateDef(base: addr) {
         mem entry_lo [ base, 0, 4 ] {
@@ -82,11 +87,6 @@ abstract segment SegmentDescriptorBase(base: addr) {
 
 segment SegmentDescriptorSystem(base: addr) : SegmentDescriptorBase {
 
-    flags = {
-        execute,
-        read,
-        write,
-    };
 
     fn matchflags(flgs : flags) -> bool
         requires state.entry_hi.p == 1;
@@ -110,12 +110,7 @@ segment SegmentDescriptorSystem(base: addr) : SegmentDescriptorBase {
 
 segment SegmentDescriptorData(base: addr) : SegmentDescriptorBase {
 
-    flags = {
-        usermode,
-        execute,
-        read,
-        write,
-    };
+
 
     #[remap]
     fn matchflags(flgs : flags) -> bool
