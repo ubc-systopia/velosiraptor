@@ -27,13 +27,35 @@
 
 // std includes
 
-use std::path::{PathBuf};
+use std::path::PathBuf;
+use std::rc::Rc;
 
 // use strip_ansi_escapes;
 
 // our library
-use velosiast::{AstResult, VelosiAst};
+use velosiast::{AstResult, VelosiAst, VelosiAstUnit};
 use velosiparser::{VelosiParser, VelosiParserError};
+use velosisynth::create_models;
+use velosisynth::Z3SynthFactory;
+
+fn get_ast(vrs: &str) -> VelosiAst {
+    match VelosiAst::from_file(vrs) {
+        AstResult::Ok(ast) => {
+            println!(" ok. Successfully created Ast.");
+            ast
+        }
+        AstResult::Issues(ast, e) => {
+            println!(" ok  (with warningsk)");
+            println!(">>>>>>\n{}\n<<<<<<", e);
+            ast
+        }
+        AstResult::Err(e) => {
+            println!(" fail  (expected ok)");
+            println!(">>>>>>\n{e}\n<<<<<<");
+            panic!("Failed to construct AST.");
+        }
+    }
+}
 
 /// Tests the basic import functionality
 #[test]
@@ -102,5 +124,93 @@ fn examples_ast() {
                 panic!("Failed to construct AST.");
             }
         }
+    }
+}
+
+#[test]
+fn examples_sanitycheck() {
+    let mut ast = get_ast("examples/x86_64_pagetable.vrs");
+
+    let mut synthfactory = Z3SynthFactory::new();
+    synthfactory.num_workers(2).default_log_dir();
+
+    let models = create_models(&ast);
+
+    let mut had_errors = false;
+    for unit in ast.units_mut() {
+        match unit {
+            VelosiAstUnit::Segment(u) => {
+                if u.is_abstract {
+                    continue;
+                }
+
+                print!(" - running sanity check for unit {}  ... ", u.ident());
+
+                let seg = Rc::get_mut(u).expect("could not get mut ref!");
+
+                let mut synth = synthfactory.create_segment(seg, models[seg.ident()].clone());
+
+                let sanity_check = synth.sanity_check();
+                if let Err(e) = sanity_check {
+                    println!(" failed.  Sanity check failed.");
+                    println!(">>>>>>\n{e}\n<<<<<<");
+
+                    had_errors = true;
+                } else {
+                    println!(" ok.  Sanity check passed.");
+                }
+            }
+            VelosiAstUnit::StaticMap(_) => {
+                // no-op
+            }
+            VelosiAstUnit::Enum(_) => {
+                // no-op
+            }
+        }
+    }
+
+    if had_errors {
+        panic!("Sanity check failed.");
+    }
+}
+
+#[test]
+fn examples_distinguish() {
+    let mut ast = get_ast("examples/x86_64_pagetable.vrs");
+
+    let mut synthfactory = Z3SynthFactory::new();
+    synthfactory.num_workers(2).default_log_dir();
+
+    let models = create_models(&ast);
+
+    let mut had_errors = false;
+    for unit in ast.units_mut() {
+        match unit {
+            VelosiAstUnit::Segment(_) => {
+                // no-op
+            }
+            VelosiAstUnit::StaticMap(_) => {
+                // no-op
+            }
+            VelosiAstUnit::Enum(e) => {
+                print!(" - running distinguish check for unit {}  ... ", e.ident());
+
+                let e = Rc::get_mut(e).expect("could not get mut ref!");
+
+                let mut synth = synthfactory.create_enum(e);
+
+                if let Err(e) = synth.distinguish(&models) {
+                    println!(" failed. Unable to distinguish variants");
+                    println!(">>>>>>\n{e}\n<<<<<<");
+                    had_errors = true;
+                } else {
+                    println!(" ok.  Units are distinguishable.");
+                }
+            }
+        }
+    }
+
+    if had_errors {
+        panic!("Sanity check failed.");
     }
 }

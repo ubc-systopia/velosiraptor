@@ -4,7 +4,7 @@ on:
       - main
   pull_request:
 
-name: Unit Tests
+name: Unit Tests (libvelosilexer)
 jobs:
   compile_and_test:
     name: "libvelosilexer"
