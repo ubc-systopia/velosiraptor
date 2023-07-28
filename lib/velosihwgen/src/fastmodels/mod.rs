@@ -150,7 +150,7 @@ impl ArmFastModelsModule {
         Ok(())
     }
 
-    fn generate_unit_makefile(&self, name: &str, out: &PathBuf) -> Result<(), VelosiHwGenError> {
+    fn generate_unit_makefile(&self, name: &str, out: &Path) -> Result<(), VelosiHwGenError> {
         let makefile = File::create(out.join("Makefile"))?;
         let mut f = BufWriter::new(makefile);
 
