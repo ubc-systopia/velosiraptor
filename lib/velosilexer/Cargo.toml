@@ -1,11 +1,36 @@
+####################################################################################################
+# Velosilexer Crate
+####################################################################################################
+
 [package]
 name = "velosilexer"
 description = "Lexer library for the Velosiraptor Language"
 license = "MIT"
-version = "0.1.0"
+version = "1.0.0"
+rust-version = "1.71"
 authors = ["Reto Achermann <achreto@cs.ubc.ca>"]
-edition = "2018"
+edition = "2021"
 readme = "README.md"
+keywords = ["compiler", "lexer", "nom"]
+categories = ["compilers", "parser-implementations", "parsing"]
+
+
+####################################################################################################
+# Targets
+####################################################################################################
+
+[lib]
+name = "velosilexer"
+path = "src/lib.rs"
+
+[[bin]]
+name = "velosilexer"
+path = "src/bin.rs"
+
+
+####################################################################################################
+# Dependencies
+####################################################################################################
 
 [dependencies]
 nom = "7.1.3"
@@ -16,11 +41,3 @@ custom_error = "1.9.2"
 # dependencies for testing
 [dev-dependencies]
 strip-ansi-escapes = "0.1.1"
-
-[lib]
-name = "velosilexer"
-path = "src/lib.rs"
-
-[[bin]]
-name = "velosilexer"
-path = "src/bin.rs"

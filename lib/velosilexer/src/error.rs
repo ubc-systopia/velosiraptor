@@ -167,7 +167,7 @@ impl Display for VelosiLexerErr {
     }
 }
 
-/// Implementation of [nom:error::ParseError] for [VelosiLexerErr]
+/// Implementation of [ParseError] for [VelosiLexerErr]
 impl ParseError<SrcSpan> for VelosiLexerErr {
     /// Creates an error from the input position and an ErrorKind
     fn from_error_kind(input: SrcSpan, kind: ErrorKind) -> Self {

@@ -3,7 +3,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2021, 2022 Systopia Lab, Computer Science, University of British Columbia
+// Copyright (c) 2021-2023 Systopia Lab, Computer Science, University of British Columbia
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! # VelosiParser Tests: Example Specs
+//! # VelosiParser Tests
 
 // std includes
 use std::fs::{self};
