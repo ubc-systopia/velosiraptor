@@ -40,7 +40,7 @@ use crate::ast::{
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
 
-#[derive(Eq, Clone, Debug)]
+#[derive(Eq, Clone)]
 pub struct VelosiAstParam {
     /// the identifier of the constant
     pub ident: VelosiAstIdentifier,
@@ -165,5 +165,12 @@ impl From<Rc<VelosiAstParam>> for Symbol {
 impl Display for VelosiAstParam {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "{}: {}", self.ident(), self.ptype)
+    }
+}
+
+/// Implementation of [Debug] for [VelosiAstParam]
+impl Debug for VelosiAstParam {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
     }
 }

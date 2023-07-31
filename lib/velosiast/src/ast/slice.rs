@@ -37,9 +37,12 @@ use velosiparser::VelosiParseTreeFieldSlice;
 
 use crate::ast::{VelosiAstIdentifier, VelosiAstNode, VelosiAstType};
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
-use crate::{ast_result_return, utils, AstResult, Symbol, VelosiTokenStream};
+use crate::{
+    ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable, VelosiTokenStream,
+};
 
-#[derive(Eq, Clone, Debug)]
+/// Represents a slice of a field
+#[derive(Eq, Clone)]
 pub struct VelosiAstFieldSlice {
     /// the name of the unit
     pub ident: VelosiAstIdentifier,
@@ -107,6 +110,55 @@ impl VelosiAstFieldSlice {
         ast_result_return!(Self::new(ident, pt.start, pt.end, pt.loc), issues)
     }
 
+    pub fn from_parse_tree_many(
+        ptlayout: Vec<VelosiParseTreeFieldSlice>,
+        st: &mut SymbolTable,
+        ident: &VelosiAstIdentifier,
+        size: u64,
+    ) -> AstResult<Vec<Rc<VelosiAstFieldSlice>>, VelosiAstIssues> {
+        let mut layout = Vec::new();
+        let mut issues = VelosiAstIssues::new();
+
+        // convert the slices
+        if ptlayout.is_empty() {
+            // if none, add syntactic sugar for a single slice that takes up the whole field
+            let slice = Rc::new(VelosiAstFieldSlice::new(
+                VelosiAstIdentifier::new(
+                    ident.path(),
+                    "val".to_string(),
+                    VelosiTokenStream::default(),
+                ),
+                0,
+                size * 8,
+                VelosiTokenStream::default(),
+            ));
+            st.insert(slice.clone().into())
+                .map_err(|e| issues.push(*e))
+                .ok();
+            layout.push(slice)
+        } else {
+            for s in ptlayout.into_iter() {
+                let slice = Rc::new(ast_result_unwrap!(
+                    VelosiAstFieldSlice::from_parse_tree(s, ident.path(), size * 8),
+                    issues
+                ));
+
+                st.insert(slice.clone().into())
+                    .map_err(|e| issues.push(*e))
+                    .ok();
+                layout.push(slice);
+            }
+        }
+
+        // sort the slices by the start value
+        layout.sort();
+
+        // overlap check
+        utils::slice_overlap_check(&mut issues, size * 8, layout.as_slice());
+
+        ast_result_return!(layout, issues)
+    }
+
     /// obtains a reference to the identifier
     pub fn ident(&self) -> &Rc<String> {
         self.ident.ident()
@@ -141,12 +193,14 @@ impl VelosiAstFieldSlice {
     }
 }
 
+/// Implementation of [PartialOrd] for [VelosiAstFieldSlice] for ordering
 impl PartialOrd for VelosiAstFieldSlice {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
+/// Implementation of [Ord] for [VelosiAstFieldSlice] for ordering
 impl Ord for VelosiAstFieldSlice {
     fn cmp(&self, other: &Self) -> Ordering {
         // if the start is smaller, then we're smaller
@@ -174,6 +228,7 @@ impl Ord for VelosiAstFieldSlice {
     }
 }
 
+/// Implementatino of [PartialEq] for [VelosiAstFieldSlice] for comparisions without the location
 impl PartialEq for VelosiAstFieldSlice {
     fn eq(&self, other: &Self) -> bool {
         self.start == other.start && self.end == other.end && self.ident == other.ident
@@ -192,5 +247,12 @@ impl From<Rc<VelosiAstFieldSlice>> for Symbol {
 impl Display for VelosiAstFieldSlice {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "{}..{} {}", self.start, self.end, self.path())
+    }
+}
+
+/// Implementation of [Debug] for [VelosiAstFieldSlice]
+impl Debug for VelosiAstFieldSlice {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
     }
 }

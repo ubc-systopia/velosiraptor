@@ -41,7 +41,7 @@ use crate::{
     utils, AstResult,
 };
 
-#[derive(Debug, Eq, Clone)]
+#[derive(Eq, Clone)]
 pub struct VelosiAstFlags {
     /// vector of defined flags
     pub flags: Vec<Rc<VelosiAstIdentifier>>,
@@ -111,6 +111,15 @@ impl PartialEq for VelosiAstFlags {
     }
 }
 
+/// Implementation fo the [From] trait for [Symbol]
+impl From<Rc<VelosiAstFlags>> for Symbol {
+    fn from(flags: Rc<VelosiAstFlags>) -> Self {
+        let ti = VelosiAstType::new(super::VelosiAstTypeInfo::Flags, flags.loc.clone());
+        let name = Rc::new(String::from("flags"));
+        Symbol::new(name, ti, VelosiAstNode::Flags(flags))
+    }
+}
+
 impl Display for VelosiAstFlags {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "{{ ")?;
@@ -124,11 +133,9 @@ impl Display for VelosiAstFlags {
     }
 }
 
-/// Implementation fo the [From] trait for [Symbol]
-impl From<Rc<VelosiAstFlags>> for Symbol {
-    fn from(flags: Rc<VelosiAstFlags>) -> Self {
-        let ti = VelosiAstType::new(super::VelosiAstTypeInfo::Flags, flags.loc.clone());
-        let name = Rc::new(String::from("flags"));
-        Symbol::new(name, ti, VelosiAstNode::Flags(flags))
+/// Implementation of [Debug] for [VelosiAstFlags]
+impl Debug for VelosiAstFlags {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
     }
 }

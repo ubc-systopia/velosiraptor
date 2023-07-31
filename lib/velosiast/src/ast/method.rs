@@ -50,7 +50,7 @@ pub const FN_SIG_PROTECT: &str = "fn protect(va: vaddr, sz: size, flgs: flags)";
 
 // const FN_SIG_INIT: &str = "fn init()";
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
+#[derive(PartialEq, Eq, Clone, Copy, Hash)]
 pub enum VelosiAstMethodProperty {
     Invariant,
     Remap,
@@ -86,7 +86,14 @@ impl Display for VelosiAstMethodProperty {
     }
 }
 
-#[derive(Eq, Clone, Debug)]
+/// Implementation of [Debug] for [VelosiAstMethodProperty]
+impl Debug for VelosiAstMethodProperty {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
+#[derive(Eq, Clone)]
 pub struct VelosiAstMethod {
     /// the name of the constant
     pub ident: VelosiAstIdentifier,
@@ -984,5 +991,12 @@ impl Display for VelosiAstMethod {
         } else {
             write!(f, "  {{ }}")
         }
+    }
+}
+
+/// Implementation of [Debug] for [VelosiAstMethod]
+impl Debug for VelosiAstMethod {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
     }
 }

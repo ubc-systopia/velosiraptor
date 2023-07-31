@@ -27,515 +27,31 @@
 //!
 //! This module defines the State AST nodes of the langauge
 
-use std::any::Any;
+// modules
+mod fields;
+
+// re-exports
+pub use fields::{VelosiAstStateField, VelosiAstStateMemoryField, VelosiAstStateRegisterField};
+
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::ops::Range;
 use std::rc::Rc;
 
-use velosiparser::{
-    VelosiParseTreeFieldSlice, VelosiParseTreeState, VelosiParseTreeStateDef,
-    VelosiParseTreeStateField, VelosiParseTreeStateFieldMemory, VelosiParseTreeStateFieldRegister,
-    VelosiTokenStream,
-};
+use velosiparser::{VelosiParseTreeState, VelosiParseTreeStateDef, VelosiTokenStream};
 
-use crate::ast::VelosiAstIdentifier;
 use crate::ast::{
     types::{VelosiAstType, VelosiAstTypeInfo},
-    VelosiAstField, VelosiAstFieldSlice, VelosiAstNode, VelosiAstParam,
+    VelosiAstNode, VelosiAstParam,
 };
 use crate::error::{VelosiAstErrBuilder, VelosiAstErrUndef, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// State Memory Fields
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Eq, Clone, Debug)]
-pub struct VelosiAstStateMemoryField {
-    /// the name of the unit
-    pub ident: VelosiAstIdentifier,
-    /// the size of the field
-    pub size: u64,
-    /// base this field is part of
-    pub base: VelosiAstIdentifier,
-    /// offset of this field within the base
-    pub offset: u64,
-    /// layout of the field
-    pub layout: Vec<Rc<VelosiAstFieldSlice>>,
-    /// hashmap of the layout from slice name to slice
-    pub layout_map: HashMap<String, Rc<VelosiAstFieldSlice>>,
-    /// the location of the type clause
-    pub loc: VelosiTokenStream,
-}
-
-impl VelosiAstStateMemoryField {
-    pub fn new(
-        ident: VelosiAstIdentifier,
-        size: u64,
-        base: VelosiAstIdentifier,
-        offset: u64,
-        layout: Vec<Rc<VelosiAstFieldSlice>>,
-        loc: VelosiTokenStream,
-    ) -> Self {
-        let mut layout_map = HashMap::new();
-        for slice in &layout {
-            layout_map.insert(slice.ident_to_string(), slice.clone());
-        }
-
-        Self {
-            ident,
-            size,
-            base,
-            offset,
-            layout,
-            layout_map,
-            loc,
-        }
-    }
-
-    pub fn from_parse_tree(
-        pt: VelosiParseTreeStateFieldMemory,
-        st: &mut SymbolTable,
-    ) -> AstResult<VelosiAstStateField, VelosiAstIssues> {
-        let mut issues = VelosiAstIssues::new();
-
-        // convert the identifer and check for format
-        let ident = VelosiAstIdentifier::from_parse_tree_with_prefix(pt.name, "state");
-        utils::check_snake_case(&mut issues, &ident);
-
-        // check the size
-        let size_loc = pt.loc.from_self_with_subrange(7..8);
-        let size = utils::check_field_size(&mut issues, pt.size, &size_loc);
-
-        // the offset should be aligned to the size
-        let offset = pt.offset;
-        if offset % size != 0 {
-            // warning
-            let msg = "Offset is not a multiple of size size of the memory field";
-            let hint = format!("Change offset to be a multiple of {size}");
-            let err = VelosiAstErrBuilder::err(msg.to_string())
-                .add_hint(hint)
-                .add_location(pt.loc.from_self_with_subrange(5..6))
-                .build();
-            issues.push(err);
-        }
-
-        // convert the base region, check whether it exists
-        let base = VelosiAstIdentifier::from(pt.base);
-        utils::check_param_exists(&mut issues, st, &base);
-
-        // convert the slices
-        let layout = ast_result_unwrap!(handle_layout(pt.layout, st, &ident, size), issues);
-
-        // construct the ast node and return
-        let res = Self::new(ident, size, base, offset, layout, pt.loc);
-        ast_result_return!(VelosiAstStateField::Memory(res), issues)
-    }
-
-    /// obtains a bitmask for the refrenced slices in the supplied refs
-    pub fn get_slice_mask_for_refs(&self, refs: &HashSet<Rc<String>>) -> u64 {
-        self.layout.iter().fold(0, |acc, slice| {
-            if refs.contains(slice.path()) {
-                acc | slice.mask()
-            } else {
-                acc
-            }
-        })
-    }
-
-    fn compare(&self, other: &Self) -> bool {
-        self.ident == other.ident
-            && self.size == other.size
-            && self.base == other.base
-            && self.offset == other.offset
-    }
-}
-
-/// Implementation of [PartialEq] for [VelosiAstStateMemoryField]
-impl PartialEq for VelosiAstStateMemoryField {
-    fn eq(&self, other: &Self) -> bool {
-        self.ident == other.ident
-            && self.size == other.size
-            && self.base == other.base
-            && self.offset == other.offset
-            && self.layout == other.layout
-        // layout map same as layout
-    }
-}
-
-/// Implementation of [Display] for [VelosiAstStateMemoryField]
-impl Display for VelosiAstStateMemoryField {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(
-            f,
-            "    mem {} [{}, {}, {}]",
-            self.ident, self.base, self.offset, self.size
-        )?;
-        if !self.layout.is_empty() {
-            writeln!(f, " {{")?;
-            for slice in &self.layout {
-                write!(f, "      ")?;
-                Display::fmt(slice, f)?;
-                writeln!(f, ",")?;
-            }
-            write!(f, "    }}")
-        } else {
-            Ok(())
-        }
-    }
-}
-
-impl VelosiAstField for VelosiAstStateMemoryField {
-    /// obtains a reference to the identifier
-    fn ident(&self) -> &Rc<String> {
-        self.ident.ident()
-    }
-
-    /// obtains a copy of the identifer
-    fn ident_to_string(&self) -> String {
-        self.ident.as_str().to_string()
-    }
-
-    /// obtains a reference to the fully qualified path
-    fn path(&self) -> &Rc<String> {
-        &self.ident.path
-    }
-
-    /// obtains a copy of the fully qualified path
-    fn path_to_string(&self) -> String {
-        self.ident.path.as_str().to_string()
-    }
-
-    /// obtains the layout of the field
-    fn layout(&self) -> &[Rc<VelosiAstFieldSlice>] {
-        self.layout.as_slice()
-    }
-
-    /// the size of the field in bits
-    fn nbits(&self) -> u64 {
-        self.size * 8
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// State Register Fields
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Eq, Clone, Debug)]
-pub struct VelosiAstStateRegisterField {
-    /// the name of the unit
-    pub ident: VelosiAstIdentifier,
-    /// the size of the field
-    pub size: u64,
-    /// layout of the field
-    pub layout: Vec<Rc<VelosiAstFieldSlice>>,
-    /// hashmap of the layout from slice name to slice
-    pub layout_map: HashMap<String, Rc<VelosiAstFieldSlice>>,
-    /// whether the field is private
-    pub private: bool,
-    /// the location of the type clause
-    pub loc: VelosiTokenStream,
-}
-
-impl VelosiAstStateRegisterField {
-    pub fn new(
-        ident: VelosiAstIdentifier,
-        size: u64,
-        layout: Vec<Rc<VelosiAstFieldSlice>>,
-        loc: VelosiTokenStream,
-    ) -> Self {
-        let mut layout_map = HashMap::new();
-        for slice in &layout {
-            layout_map.insert(slice.ident_to_string(), slice.clone());
-        }
-
-        Self {
-            ident,
-            size,
-            layout,
-            layout_map,
-            private: false, // let's just mark it as non-private for now.
-            loc,
-        }
-    }
-
-    pub fn from_parse_tree(
-        pt: VelosiParseTreeStateFieldRegister,
-        st: &mut SymbolTable,
-    ) -> AstResult<VelosiAstStateField, VelosiAstIssues> {
-        let mut issues = VelosiAstIssues::new();
-
-        // convert the identifer and check for format
-        let ident = VelosiAstIdentifier::from_parse_tree_with_prefix(pt.name, "state");
-        utils::check_snake_case(&mut issues, &ident);
-
-        // check the size
-        let size_loc = pt.loc.from_self_with_subrange(3..4);
-        let size = utils::check_field_size(&mut issues, pt.size, &size_loc);
-
-        // convert the slices
-        let layout = ast_result_unwrap!(handle_layout(pt.layout, st, &ident, size), issues);
-
-        // construct the ast node and return
-        let res = Self::new(ident, size, layout, pt.loc);
-        ast_result_return!(VelosiAstStateField::Register(res), issues)
-    }
-
-    /// obtains a bitmask for the refrenced slices in the supplied refs
-    pub fn get_slice_mask_for_refs(&self, refs: &HashSet<Rc<String>>) -> u64 {
-        self.layout.iter().fold(0, |acc, slice| {
-            if refs.contains(slice.path()) {
-                acc | slice.mask()
-            } else {
-                acc
-            }
-        })
-    }
-
-    fn compare(&self, other: &Self) -> bool {
-        self.ident == other.ident && self.size == other.size
-    }
-}
-
-impl PartialEq for VelosiAstStateRegisterField {
-    fn eq(&self, other: &Self) -> bool {
-        self.ident == other.ident && self.size == other.size && self.layout == other.layout
-        // we don't include the private elemenet
-    }
-}
-
-impl VelosiAstField for VelosiAstStateRegisterField {
-    /// obtains a reference to the identifier
-    fn ident(&self) -> &Rc<String> {
-        self.ident.ident()
-    }
-
-    /// obtains a copy of the identifer
-    fn ident_to_string(&self) -> String {
-        self.ident.as_str().to_string()
-    }
-
-    /// obtains a reference to the fully qualified path
-    fn path(&self) -> &Rc<String> {
-        &self.ident.path
-    }
-
-    /// obtains a copy of the fully qualified path
-    fn path_to_string(&self) -> String {
-        self.ident.path.as_str().to_string()
-    }
-
-    /// obtains the layout of the field
-    fn layout(&self) -> &[Rc<VelosiAstFieldSlice>] {
-        self.layout.as_slice()
-    }
-
-    /// the size of the field in bits
-    fn nbits(&self) -> u64 {
-        self.size * 8
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-/// Implementation of [Display] for [VelosiAstStateRegisterField]
-impl Display for VelosiAstStateRegisterField {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "    reg {} [{}]", self.ident, self.size)?;
-        if !self.layout.is_empty() {
-            writeln!(f, " {{")?;
-            for slice in &self.layout {
-                write!(f, "      ")?;
-                Display::fmt(slice, f)?;
-                writeln!(f, ",")?;
-            }
-            write!(f, "    }}")
-        } else {
-            Ok(())
-        }
-    }
-}
-
-fn handle_layout(
-    ptlayout: Vec<VelosiParseTreeFieldSlice>,
-    st: &mut SymbolTable,
-    ident: &VelosiAstIdentifier,
-    size: u64,
-) -> AstResult<Vec<Rc<VelosiAstFieldSlice>>, VelosiAstIssues> {
-    let mut layout = Vec::new();
-    let mut issues = VelosiAstIssues::new();
-
-    // convert the slices
-    if ptlayout.is_empty() {
-        // if none, add syntactic sugar for a single slice that takes up the whole field
-        let slice = Rc::new(VelosiAstFieldSlice::new(
-            VelosiAstIdentifier::new(
-                ident.path(),
-                "val".to_string(),
-                VelosiTokenStream::default(),
-            ),
-            0,
-            size * 8,
-            VelosiTokenStream::default(),
-        ));
-        st.insert(slice.clone().into())
-            .map_err(|e| issues.push(*e))
-            .ok();
-        layout.push(slice)
-    } else {
-        for s in ptlayout.into_iter() {
-            let slice = Rc::new(ast_result_unwrap!(
-                VelosiAstFieldSlice::from_parse_tree(s, ident.path(), size * 8),
-                issues
-            ));
-
-            st.insert(slice.clone().into())
-                .map_err(|e| issues.push(*e))
-                .ok();
-            layout.push(slice);
-        }
-    }
-
-    // sort the slices by the start value
-    layout.sort();
-
-    // overlap check
-    utils::slice_overlap_check(&mut issues, size * 8, layout.as_slice());
-
-    ast_result_return!(layout, issues)
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// State Field Wrapper
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub enum VelosiAstStateField {
-    Memory(VelosiAstStateMemoryField),
-    Register(VelosiAstStateRegisterField),
-}
-
-impl VelosiAstStateField {
-    /// obtains a reference to the identifier
-    pub fn ident(&self) -> &Rc<String> {
-        match self {
-            VelosiAstStateField::Memory(field) => field.ident(),
-            VelosiAstStateField::Register(field) => field.ident(),
-        }
-    }
-
-    /// obtains a copy of the identifer
-    pub fn ident_to_string(&self) -> String {
-        match self {
-            VelosiAstStateField::Memory(field) => field.ident_to_string(),
-            VelosiAstStateField::Register(field) => field.ident_to_string(),
-        }
-    }
-
-    /// obtains a reference to the fully qualified path
-    pub fn path(&self) -> &Rc<String> {
-        match self {
-            VelosiAstStateField::Memory(field) => field.path(),
-            VelosiAstStateField::Register(field) => field.path(),
-        }
-    }
-
-    /// obtains a copy of the fully qualified path
-    pub fn path_to_string(&self) -> String {
-        match self {
-            VelosiAstStateField::Memory(field) => field.path_to_string(),
-            VelosiAstStateField::Register(field) => field.path_to_string(),
-        }
-    }
-
-    pub fn update_symbol_table(&self, st: &mut SymbolTable) {
-        for slice in self.layout_as_slice() {
-            st.update(slice.clone().into())
-                .expect("updating symbol table\n");
-        }
-    }
-
-    pub fn size(&self) -> u64 {
-        match self {
-            VelosiAstStateField::Memory(field) => field.size,
-            VelosiAstStateField::Register(field) => field.size,
-        }
-    }
-
-    pub fn loc(&self) -> &VelosiTokenStream {
-        match self {
-            VelosiAstStateField::Memory(field) => &field.loc,
-            VelosiAstStateField::Register(field) => &field.loc,
-        }
-    }
-
-    pub fn layout_as_slice(&self) -> &[Rc<VelosiAstFieldSlice>] {
-        match self {
-            VelosiAstStateField::Memory(field) => field.layout.as_slice(),
-            VelosiAstStateField::Register(field) => field.layout.as_slice(),
-        }
-    }
-
-    pub fn get_slice_mask_for_refs(&self, refs: &HashSet<Rc<String>>) -> u64 {
-        match self {
-            VelosiAstStateField::Memory(field) => field.get_slice_mask_for_refs(refs),
-            VelosiAstStateField::Register(field) => field.get_slice_mask_for_refs(refs),
-        }
-    }
-
-    pub fn from_parse_tree(
-        pt: VelosiParseTreeStateField,
-        st: &mut SymbolTable,
-    ) -> AstResult<Self, VelosiAstIssues> {
-        use VelosiParseTreeStateField::*;
-        match pt {
-            Memory(pt) => VelosiAstStateMemoryField::from_parse_tree(pt, st),
-            Register(pt) => VelosiAstStateRegisterField::from_parse_tree(pt, st),
-        }
-    }
-
-    pub fn compare(&self, other: &Self) -> bool {
-        match (self, other) {
-            (VelosiAstStateField::Memory(m1), VelosiAstStateField::Memory(m2)) => m1.compare(m2),
-            (VelosiAstStateField::Register(r1), VelosiAstStateField::Register(r2)) => {
-                r1.compare(r2)
-            }
-            _ => false,
-        }
-    }
-}
-
-/// Implementation of [Display] for [VelosiAstStateField]
-impl Display for VelosiAstStateField {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        use VelosiAstStateField::*;
-        match self {
-            Memory(m) => Display::fmt(m, f),
-            Register(r) => Display::fmt(r, f),
-        }
-    }
-}
-
-/// Implementation fo the [From] trait for [Symbol] for conversion to symbol
-impl From<Rc<VelosiAstStateField>> for Symbol {
-    fn from(f: Rc<VelosiAstStateField>) -> Self {
-        let n = VelosiAstNode::StateField(f.clone());
-        Symbol::new(f.path().clone(), VelosiAstType::new_int(), n)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
 // State Definition
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Eq, Clone, Debug)]
+#[derive(Eq, Clone)]
 pub struct VelosiAstStateDef {
     /// the parameters of the memory state
     pub params: Vec<Rc<VelosiAstParam>>,
@@ -836,7 +352,14 @@ impl Display for VelosiAstStateDef {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+/// Implementation of [Debug] for [VelosiAstStateDef]
+impl Debug for VelosiAstStateDef {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
+#[derive(PartialEq, Eq, Clone)]
 pub enum VelosiAstState {
     StateDef(VelosiAstStateDef),
     NoneState(VelosiTokenStream),
@@ -969,5 +492,12 @@ impl Display for VelosiAstState {
             VelosiAstState::StateDef(s) => Display::fmt(s, f),
             VelosiAstState::NoneState(_) => writeln!(f, "NoneState"),
         }
+    }
+}
+
+/// Implementation of [Debug] for [VelosiAstState]
+impl Debug for VelosiAstState {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
     }
 }

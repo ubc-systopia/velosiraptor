@@ -36,7 +36,7 @@ use crate::ast::{expr::VelosiAstExpr, types::VelosiAstType, VelosiAstIdentifier,
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
 
-#[derive(Eq, Clone, Debug)]
+#[derive(Eq, Clone)]
 pub struct VelosiAstConst {
     /// the name of the constant
     pub ident: VelosiAstIdentifier,
@@ -187,5 +187,12 @@ impl Display for VelosiAstConst {
             self.ctype,
             self.value
         )
+    }
+}
+
+/// Implementation of [Debug] for [VelosiAstConst]
+impl Debug for VelosiAstConst {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
     }
 }

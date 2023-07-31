@@ -27,21 +27,26 @@
 //!
 //! This module defines type information nodes of the VelosiAst
 
+// used standard library functionality
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
-// parser types
+// used parse tree definitions
 use velosiparser::{VelosiParseTreeType, VelosiParseTreeTypeInfo};
 
-// use crate functionality
-use crate::{utils, VelosiTokenStream};
-
-use crate::ast::VelosiAstIdentifier;
+// used crate functionality
 use crate::error::VelosiAstIssues;
-use crate::{ast_result_return, AstResult, SymbolTable};
+use crate::{ast_result_return, utils, AstResult, SymbolTable, VelosiTokenStream};
 
-/// Represents the type information, either built in or a type ref
+// used definitions of references AST nodes
+use crate::ast::VelosiAstIdentifier;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Type Information
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Represents the type information, either built-in or a type ref to another unit
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub enum VelosiAstTypeInfo {
     /// built-in integer type
@@ -60,13 +65,13 @@ pub enum VelosiAstTypeInfo {
     Flags,
     /// built in range type
     Range,
-    /// type referece to user-define type
+    /// type referece to user-define type (unit)
     TypeRef(Rc<String>),
     /// Reference to the state
     State,
     /// Reference to the interface
     Interface,
-    ///
+    /// No type
     Void,
 }
 
@@ -208,8 +213,12 @@ impl Display for VelosiAstTypeInfo {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Type Ast Node
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Represents the type information
-#[derive(Eq, Clone, Debug)]
+#[derive(Eq, Clone)]
 pub struct VelosiAstType {
     /// the type information
     pub typeinfo: VelosiAstTypeInfo,
@@ -346,6 +355,9 @@ impl Hash for VelosiAstType {
     }
 }
 
+/// Implementation of [From] for [VelosiAstType]
+///
+/// Conversations from tye type information to the type node with the default tokenstream
 impl From<VelosiAstTypeInfo> for VelosiAstType {
     fn from(t: VelosiAstTypeInfo) -> Self {
         VelosiAstType::new(t, VelosiTokenStream::default())
@@ -356,5 +368,12 @@ impl From<VelosiAstTypeInfo> for VelosiAstType {
 impl Display for VelosiAstType {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         Display::fmt(&self.typeinfo, f)
+    }
+}
+
+/// Implementation of [Debug] for [VelosiAstType]
+impl Debug for VelosiAstType {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
     }
 }
