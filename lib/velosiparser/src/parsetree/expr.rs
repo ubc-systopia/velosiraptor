@@ -94,7 +94,7 @@ impl Display for VelosiParseTreeBinOp {
 }
 
 /// Represents a binary operation `expr <op> expr`
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeBinOpExpr {
     pub lhs: Box<VelosiParseTreeExpr>,
     pub op: VelosiParseTreeBinOp,
@@ -125,6 +125,13 @@ impl Display for VelosiParseTreeBinOpExpr {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeBinOpExpr]
+impl Debug for VelosiParseTreeBinOpExpr {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        write!(format, "({} {} {})", self.lhs, self.op, self.rhs)
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Unary Operation Expressions
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -150,7 +157,7 @@ impl Display for VelosiParseTreeUnOp {
 }
 
 /// Represents an unary operation
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeUnOpExpr {
     pub op: VelosiParseTreeUnOp,
     pub expr: Box<VelosiParseTreeExpr>,
@@ -171,6 +178,13 @@ impl VelosiParseTreeUnOpExpr {
 impl Display for VelosiParseTreeUnOpExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
         write!(format, "{}({})", self.op, self.expr)
+    }
+}
+
+/// Implementation of [Debug] for [VelosiParseTreeUnOpExpr]
+impl Debug for VelosiParseTreeUnOpExpr {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
     }
 }
 
@@ -197,7 +211,7 @@ impl Display for VelosiParseTreeQuantifier {
 }
 
 /// Represents an unary operation
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeQuantifierExpr {
     pub quant: VelosiParseTreeQuantifier,
     pub params: Vec<VelosiParseTreeParam>,
@@ -235,12 +249,19 @@ impl Display for VelosiParseTreeQuantifierExpr {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeQuantifierExpr]
+impl Debug for VelosiParseTreeQuantifierExpr {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Literal Expressions
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents an unary operation
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeIdentifierLiteral {
     pub path: Vec<VelosiParseTreeIdentifier>,
     pub loc: VelosiTokenStream,
@@ -265,8 +286,15 @@ impl Display for VelosiParseTreeIdentifierLiteral {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeIdentifierLiteral]
+impl Debug for VelosiParseTreeIdentifierLiteral {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 /// Represents an unary operation
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeNumLiteral {
     pub value: u64,
     pub loc: VelosiTokenStream,
@@ -288,8 +316,15 @@ impl Display for VelosiParseTreeNumLiteral {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeNumLiteral]
+impl Debug for VelosiParseTreeNumLiteral {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 /// Represents an unary operation
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeBoolLiteral {
     pub value: bool,
     pub loc: VelosiTokenStream,
@@ -312,12 +347,19 @@ impl Display for VelosiParseTreeBoolLiteral {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeBoolLiteral]
+impl Debug for VelosiParseTreeBoolLiteral {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Function Call Expression
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents an unary operation
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeFnCallExpr {
     pub name: VelosiParseTreeIdentifier,
     pub args: Vec<VelosiParseTreeExpr>,
@@ -348,12 +390,19 @@ impl Display for VelosiParseTreeFnCallExpr {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeFnCallExpr]
+impl Debug for VelosiParseTreeFnCallExpr {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // IF Else Expression
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents an unary operation
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeIfElseExpr {
     pub cond: Box<VelosiParseTreeExpr>,
     pub then: Box<VelosiParseTreeExpr>,
@@ -388,12 +437,19 @@ impl Display for VelosiParseTreeIfElseExpr {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeIfElseExpr]
+impl Debug for VelosiParseTreeIfElseExpr {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Range Expression
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents an unary operation
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeRangeExpr {
     pub start: u64,
     pub end: u64,
@@ -412,12 +468,19 @@ impl Display for VelosiParseTreeRangeExpr {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeRangeExpr]
+impl Debug for VelosiParseTreeRangeExpr {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Slice Expression
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents an unary operation
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeSliceExpr {
     pub name: VelosiParseTreeIdentifierLiteral,
     pub range: VelosiParseTreeRangeExpr,
@@ -444,12 +507,19 @@ impl Display for VelosiParseTreeSliceExpr {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeSliceExpr]
+impl Debug for VelosiParseTreeSliceExpr {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Expressions
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents an expression in the parse tree
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum VelosiParseTreeExpr {
     Identifier(VelosiParseTreeIdentifierLiteral),
     NumLiteral(VelosiParseTreeNumLiteral),
@@ -497,5 +567,12 @@ impl Display for VelosiParseTreeExpr {
             Slice(i) => Display::fmt(&i, format),
             Range(i) => Display::fmt(&i, format),
         }
+    }
+}
+
+/// Implementation of [Debug] for [VelosiParseTreeExpr]
+impl Debug for VelosiParseTreeExpr {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
     }
 }

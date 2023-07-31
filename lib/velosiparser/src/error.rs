@@ -327,7 +327,7 @@ impl Display for VelosiParserErr {
     }
 }
 
-/// Implementation of [nom:error::ParseError] for [VelosiParserErr]
+/// Implementation of [ParseError] for [VelosiParserErr]
 impl ParseError<VelosiTokenStream> for VelosiParserErr {
     /// Creates an error from the input position and an ErrorKind
     fn from_error_kind(_input: VelosiTokenStream, kind: ErrorKind) -> Self {

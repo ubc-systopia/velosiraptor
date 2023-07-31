@@ -37,7 +37,7 @@ use super::{
 use crate::VelosiTokenStream;
 
 /// Represents a state field
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeInterfaceAction {
     pub src: VelosiParseTreeExpr,
     pub dst: VelosiParseTreeExpr,
@@ -56,8 +56,15 @@ impl Display for VelosiParseTreeInterfaceAction {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeInterfaceAction]
+impl Debug for VelosiParseTreeInterfaceAction {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 /// Represents a state field
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeInterfaceActions {
     pub actions: Vec<VelosiParseTreeInterfaceAction>,
     pub loc: VelosiTokenStream,
@@ -78,7 +85,14 @@ impl Display for VelosiParseTreeInterfaceActions {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+/// Implementation of [Debug] for [VelosiParseTreeInterfaceActions]
+impl Debug for VelosiParseTreeInterfaceActions {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
+#[derive(PartialEq, Eq, Clone)]
 pub enum VelosiParseTreeInterfaceFieldNode {
     Layout(Vec<VelosiParseTreeFieldSlice>),
     ReadActions(VelosiParseTreeInterfaceActions),
@@ -111,8 +125,15 @@ impl Display for VelosiParseTreeInterfaceFieldNode {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeInterfaceFieldNode]
+impl Debug for VelosiParseTreeInterfaceFieldNode {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 /// Represents a state field
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeInterfaceFieldMemory {
     pub name: VelosiParseTreeIdentifier,
     pub base: VelosiParseTreeIdentifier,
@@ -159,8 +180,15 @@ impl Display for VelosiParseTreeInterfaceFieldMemory {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeInterfaceFieldMemory]
+impl Debug for VelosiParseTreeInterfaceFieldMemory {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 /// Represents a state field
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeInterfaceFieldMmio {
     pub name: VelosiParseTreeIdentifier,
     pub base: VelosiParseTreeIdentifier,
@@ -207,8 +235,15 @@ impl Display for VelosiParseTreeInterfaceFieldMmio {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeInterfaceFieldMmio]
+impl Debug for VelosiParseTreeInterfaceFieldMmio {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 /// Represents a state field
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeInterfaceFieldRegister {
     pub name: VelosiParseTreeIdentifier,
     pub size: u64,
@@ -248,8 +283,15 @@ impl Display for VelosiParseTreeInterfaceFieldRegister {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeInterfaceFieldRegister]
+impl Debug for VelosiParseTreeInterfaceFieldRegister {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 /// Represents a component of the state, either a register or a memory location
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum VelosiParseTreeInterfaceField {
     Memory(VelosiParseTreeInterfaceFieldMemory),
     Mmio(VelosiParseTreeInterfaceFieldMmio),
@@ -267,8 +309,15 @@ impl Display for VelosiParseTreeInterfaceField {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeInterfaceField]
+impl Debug for VelosiParseTreeInterfaceField {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 /// Represents the parsed state description
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeInterfaceDef {
     /// parameters of the state
     pub params: Vec<VelosiParseTreeParam>,
@@ -311,8 +360,15 @@ impl Display for VelosiParseTreeInterfaceDef {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeInterfaceDef]
+impl Debug for VelosiParseTreeInterfaceDef {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 /// Represents the state definition
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum VelosiParseTreeInterface {
     InterfaceDef(VelosiParseTreeInterfaceDef),
     None(VelosiTokenStream),
@@ -336,5 +392,12 @@ impl Display for VelosiParseTreeInterface {
                 writeln!(f, "None;")
             }
         }
+    }
+}
+
+/// Implementation of [Debug] for [VelosiParseTreeInterface]
+impl Debug for VelosiParseTreeInterface {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
     }
 }

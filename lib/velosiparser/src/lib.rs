@@ -118,7 +118,7 @@ impl VelosiParser {
         }
     }
 
-    /// Parses the supplied [TokenStream] and converts it into a [VelosiParseTree]
+    /// Parses the supplied [VelosiTokenStream] and converts it into a [VelosiParseTree]
     ///
     /// This function will create a new `VelosiParseTree` from the supplied string.
     pub fn parse_tokstream(
@@ -129,7 +129,7 @@ impl VelosiParser {
         VelosiParser::maybe_resolve_imports(parser::parse(ts), resolve_imports)
     }
 
-    /// Parses the supplied [TokenStream] and converts it into a [VelosiParseTree]
+    /// Parses the supplied [VelosiTokenStream] and converts it into a [VelosiParseTree]
     ///
     /// This function will create a new `VelosiParseTree` from the supplied string.
     pub fn parse_tokstream_with_context(

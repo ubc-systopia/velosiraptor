@@ -33,16 +33,17 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 // use crate functionality
 use crate::VelosiTokenStream;
 
-pub mod constparams;
-pub mod expr;
-pub mod field;
-pub mod interface;
-pub mod map;
-pub mod state;
-pub mod types;
-pub mod unit;
+mod consts;
+mod expr;
+mod field;
+mod interface;
+mod map;
+mod params;
+mod state;
+mod types;
+mod unit;
 
-pub use constparams::{VelosiParseTreeConstDef, VelosiParseTreeParam};
+pub use consts::VelosiParseTreeConstDef;
 pub use expr::{
     VelosiParseTreeBinOp, VelosiParseTreeBinOpExpr, VelosiParseTreeBoolLiteral,
     VelosiParseTreeExpr, VelosiParseTreeFnCallExpr, VelosiParseTreeIdentifierLiteral,
@@ -61,6 +62,7 @@ pub use map::{
     VelosiParseTreeMap, VelosiParseTreeMapElement, VelosiParseTreeMapExplicit,
     VelosiParseTreeMapListComp,
 };
+pub use params::VelosiParseTreeParam;
 pub use state::{
     VelosiParseTreeState, VelosiParseTreeStateDef, VelosiParseTreeStateField,
     VelosiParseTreeStateFieldMemory, VelosiParseTreeStateFieldRegister,

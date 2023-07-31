@@ -3,7 +3,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2021 Systopia Lab, Computer Science, University of British Columbia
+// Copyright (c) 2021-2023 Systopia Lab, Computer Science, University of British Columbia
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -35,6 +35,80 @@ use crate::error::{IResult, VelosiParserErr};
 use crate::parsetree::{VelosiParseTreeIdentifier, VelosiParseTreeType, VelosiParseTreeTypeInfo};
 use crate::{VelosiKeyword, VelosiOpToken, VelosiTokenKind, VelosiTokenStream};
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Terminal Parsers: Identifiers and Numbers
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Parses an identifier token and returns the remaining stream and the parsed indentifier
+pub fn ident(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeIdentifier> {
+    // we hit EOF, report the expected string
+    if input.is_empty() {
+        let expected = VelosiTokenKind::Identifier(String::new());
+        return Err(Err::Error(VelosiParserErr::from_expected(input, expected)));
+    }
+
+    // now we can take the first token
+    let (rem, tok) = take(1usize)(input.clone())?;
+
+    // unwrap the token and check it if it matches
+    let t = tok.peek().unwrap();
+    if let VelosiTokenKind::Identifier(s) = t.kind() {
+        Ok((rem, VelosiParseTreeIdentifier::new(s.clone(), tok)))
+    } else {
+        let expected = VelosiTokenKind::Identifier(String::new());
+        let err = VelosiParserErr::from_expected(input.from_self_with_subrange(0..1), expected);
+        Err(Err::Error(err))
+    }
+}
+
+/// Parses a numeric literal token and returns the remaining stream and the parsed number as u64
+pub fn num(input: VelosiTokenStream) -> IResult<VelosiTokenStream, u64> {
+    // we hit EOF, report the expected number
+    if input.is_empty() {
+        let expected = VelosiTokenKind::NumLiteral(0);
+        return Err(Err::Error(VelosiParserErr::from_expected(input, expected)));
+    }
+
+    // now we can take the first token
+    let (rem, tok) = take(1usize)(input.clone())?;
+
+    // unwrap the token and check it if it matches
+    let t = tok.peek().unwrap();
+    if let VelosiTokenKind::NumLiteral(s) = t.kind() {
+        Ok((rem, *s))
+    } else {
+        let expected = VelosiTokenKind::NumLiteral(0);
+        let err = VelosiParserErr::from_expected(input.from_self_with_subrange(0..1), expected);
+        Err(Err::Error(err))
+    }
+}
+
+/// Parses a boolean literal token and returns the remaining stream and the parsed boolean
+pub fn boolean(input: VelosiTokenStream) -> IResult<VelosiTokenStream, bool> {
+    // we hit EOF, report the expected boolean
+    if input.is_empty() {
+        let expected = VelosiTokenKind::BoolLiteral(false);
+        return Err(Err::Error(VelosiParserErr::from_expected(input, expected)));
+    }
+
+    // now we can take the first token
+    let (rem, tok) = take(1usize)(input.clone())?;
+
+    // unwrap the token and check it if it matches
+    let t = tok.peek().unwrap();
+    if let VelosiTokenKind::BoolLiteral(s) = t.kind() {
+        Ok((rem, *s))
+    } else {
+        let expected = VelosiTokenKind::BoolLiteral(false);
+        let err = VelosiParserErr::from_expected(input.from_self_with_subrange(0..1), expected);
+        Err(Err::Error(err))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Terminal Parsers: Punctuations and Operators
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // macro to generate terminal parsers for operator tokens.
 macro_rules! terminalparser (($vis:vis $name:ident, $tag: expr) => (
     $vis fn $name(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiTokenKind> {
@@ -44,6 +118,7 @@ macro_rules! terminalparser (($vis:vis $name:ident, $tag: expr) => (
             return Err(Err::Error(VelosiParserErr::from_expected(input, expected)));
         }
 
+        // now we can take the first token
         let (rem, tok) = take(1usize)(input.clone())?;
         // unwrap the token and check it if it matches
         let t = tok.peek().unwrap();
@@ -118,68 +193,14 @@ terminalparser!(pub coloncolon, VelosiOpToken::ColonColon);
 // terminalparser!(pub questionmark, VelosiOpToken::QuestionMark);
 terminalparser!(pub hashtag, VelosiOpToken::HashTag);
 
-pub fn ident(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeIdentifier> {
-    // we hit EOF, report the expected string
-    if input.is_empty() {
-        let expected = VelosiTokenKind::Identifier(String::new());
-        return Err(Err::Error(VelosiParserErr::from_expected(input, expected)));
-    }
-
-    // now we can take the first token
-    let (rem, tok) = take(1usize)(input.clone())?;
-
-    // unwrap the token and check it if it matches
-    let t = tok.peek().unwrap();
-    if let VelosiTokenKind::Identifier(s) = t.kind() {
-        Ok((rem, VelosiParseTreeIdentifier::new(s.clone(), tok)))
-    } else {
-        let expected = VelosiTokenKind::Identifier(String::new());
-        let err = VelosiParserErr::from_expected(input.from_self_with_subrange(0..1), expected);
-        Err(Err::Error(err))
-    }
-}
-
-pub fn num(input: VelosiTokenStream) -> IResult<VelosiTokenStream, u64> {
-    // we hit EOF, report the expected number
-    if input.is_empty() {
-        let expected = VelosiTokenKind::NumLiteral(0);
-        return Err(Err::Error(VelosiParserErr::from_expected(input, expected)));
-    }
-
-    let (rem, tok) = take(1usize)(input.clone())?;
-
-    // unwrap the token and check it if it matches
-    let t = tok.peek().unwrap();
-    if let VelosiTokenKind::NumLiteral(s) = t.kind() {
-        Ok((rem, *s))
-    } else {
-        let expected = VelosiTokenKind::NumLiteral(0);
-        let err = VelosiParserErr::from_expected(input.from_self_with_subrange(0..1), expected);
-        Err(Err::Error(err))
-    }
-}
-
-pub fn boolean(input: VelosiTokenStream) -> IResult<VelosiTokenStream, bool> {
-    // we hit EOF, report the expected boolean
-    if input.is_empty() {
-        let expected = VelosiTokenKind::BoolLiteral(false);
-        return Err(Err::Error(VelosiParserErr::from_expected(input, expected)));
-    }
-
-    let (rem, tok) = take(1usize)(input.clone())?;
-
-    // unwrap the token and check it if it matches
-    let t = tok.peek().unwrap();
-    if let VelosiTokenKind::BoolLiteral(s) = t.kind() {
-        Ok((rem, *s))
-    } else {
-        let expected = VelosiTokenKind::BoolLiteral(false);
-        let err = VelosiParserErr::from_expected(input.from_self_with_subrange(0..1), expected);
-        Err(Err::Error(err))
-    }
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Terminal Parsers: Keywords
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 macro_rules! keywordparser (($vis:vis $name:ident, $tag: expr) => (
+    #[doc = "Parses the`"]
+    #[doc = stringify!($tag)]
+    #[doc = "` keyword."]
     $vis fn $name(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiKeyword> {
         // we hit EOF, report the expected number
         if input.is_empty() {
@@ -201,55 +222,61 @@ macro_rules! keywordparser (($vis:vis $name:ident, $tag: expr) => (
     }
 ));
 
-//keywordparser!(pub kw_unit, VelosiKeyword::Unit);
-keywordparser!(pub kw_import, VelosiKeyword::Import);
 keywordparser!(pub kw_const, VelosiKeyword::Const);
-keywordparser!(pub kw_map, VelosiKeyword::Map);
+keywordparser!(pub kw_import, VelosiKeyword::Import);
+keywordparser!(pub kw_staticmap, VelosiKeyword::StaticMap);
+keywordparser!(pub kw_segment, VelosiKeyword::Segment);
 keywordparser!(pub kw_enum, VelosiKeyword::Enum);
 
-keywordparser!(pub kw_synth, VelosiKeyword::Synth);
-keywordparser!(pub kw_abstract, VelosiKeyword::Abstract);
-
-// keywordparser!(pub kw_let, VelosiKeyword::Let);
-keywordparser!(pub kw_if, VelosiKeyword::If);
-keywordparser!(pub kw_else, VelosiKeyword::Else);
+keywordparser!(pub kw_inbitwidth, VelosiKeyword::InBitWidth);
+keywordparser!(pub kw_outbitwidth, VelosiKeyword::OutBitWidth);
 keywordparser!(pub kw_state, VelosiKeyword::State);
-keywordparser!(pub kw_interface, VelosiKeyword::Interface);
-
 keywordparser!(pub kw_statedef, VelosiKeyword::StateDef);
+keywordparser!(pub kw_interface, VelosiKeyword::Interface);
 keywordparser!(pub kw_interfacedef, VelosiKeyword::InterfaceDef);
+keywordparser!(pub kw_mapdef, VelosiKeyword::MapDef);
 
 keywordparser!(pub kw_mem, VelosiKeyword::Mem);
 keywordparser!(pub kw_reg, VelosiKeyword::Reg);
 keywordparser!(pub kw_mmio, VelosiKeyword::Mmio);
 
-keywordparser!(pub kw_none, VelosiKeyword::None);
-keywordparser!(pub kw_layout, VelosiKeyword::Layout);
-keywordparser!(pub kw_fn, VelosiKeyword::Fn);
 keywordparser!(pub kw_readaction, VelosiKeyword::ReadActions);
 keywordparser!(pub kw_writeaction, VelosiKeyword::WriteActions);
+keywordparser!(pub kw_layout, VelosiKeyword::Layout);
+
+keywordparser!(pub kw_fn, VelosiKeyword::Fn);
+keywordparser!(pub kw_synth, VelosiKeyword::Synth);
+keywordparser!(pub kw_abstract, VelosiKeyword::Abstract);
+
+keywordparser!(pub kw_if, VelosiKeyword::If);
+keywordparser!(pub kw_else, VelosiKeyword::Else);
+keywordparser!(pub kw_for, VelosiKeyword::For);
+// keywordparser!(pub kw_let, VelosiKeyword::Let);
+keywordparser!(pub kw_in, VelosiKeyword::In);
+// keywordparser!(pub kw_return, VelosiKeyword::Return);
+
 keywordparser!(pub kw_requires, VelosiKeyword::Requires);
 // keywordparser!(pub kw_ensures, VelosiKeyword::Ensures);
 // keywordparser!(pub kw_assert, VelosiKeyword::Assert);
-// keywordparser!(pub kw_return, VelosiKeyword::Return);
 keywordparser!(pub kw_forall, VelosiKeyword::Forall);
 keywordparser!(pub kw_exists, VelosiKeyword::Exists);
-keywordparser!(pub kw_staticmap, VelosiKeyword::StaticMap);
-keywordparser!(pub kw_segment, VelosiKeyword::Segment);
-keywordparser!(pub kw_for, VelosiKeyword::For);
-keywordparser!(pub kw_in, VelosiKeyword::In);
-keywordparser!(pub kw_inbitwidth, VelosiKeyword::InBitWidth);
-keywordparser!(pub kw_outbitwidth, VelosiKeyword::OutBitWidth);
+// keywordparser!(pub kw_invariant, VelosiKeyword::Invariant);
 
-// types
-keywordparser!(pub kw_size, VelosiKeyword::SizeType);
-keywordparser!(pub kw_flags, VelosiKeyword::FlagsType);
 keywordparser!(pub kw_addr, VelosiKeyword::AddressType);
 keywordparser!(pub kw_vaddr, VelosiKeyword::VAddrType);
 keywordparser!(pub kw_paddr, VelosiKeyword::PAddrType);
+keywordparser!(pub kw_size, VelosiKeyword::SizeType);
 keywordparser!(pub kw_bool, VelosiKeyword::BooleanType);
+keywordparser!(pub kw_flags, VelosiKeyword::FlagsType);
 keywordparser!(pub kw_int, VelosiKeyword::IntegerType);
 
+keywordparser!(pub kw_none, VelosiKeyword::None);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Terminal Parsers: Types
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Parses a builtin type token
 fn builtin_type(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeTypeInfo> {
     let (rem, tok) = alt((
         kw_size, kw_flags, kw_addr, kw_vaddr, kw_paddr, kw_bool, kw_int,
@@ -268,9 +295,7 @@ fn builtin_type(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPa
     Ok((rem, ti))
 }
 
-/// parses a type expression
-///
-/// returns the type
+/// parses a type token
 pub fn typeinfo(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeType> {
     let mut pos = input.clone();
     let (rem, tok) = alt((builtin_type, map(ident, VelosiParseTreeTypeInfo::from)))(input)?;

@@ -86,7 +86,7 @@ impl Display for VelosiParseTreeTypeInfo {
 }
 
 /// Represents the type information
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeType {
     /// the type information
     pub typeinfo: VelosiParseTreeTypeInfo,
@@ -105,5 +105,12 @@ impl VelosiParseTreeType {
 impl Display for VelosiParseTreeType {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         Display::fmt(&self.typeinfo, f)
+    }
+}
+
+/// Implementation of [Debug] for [VelosiParseTreeType]
+impl Debug for VelosiParseTreeType {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
     }
 }
