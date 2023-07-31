@@ -31,7 +31,7 @@ use codegen_rs as CG;
 
 use velosiast::{
     ast::{VelosiAstMethod, VelosiAstUnitSegment, VelosiOperation},
-    VelosiAst, VelosiAstUnit,
+    VelosiAst, VelosiAstField, VelosiAstUnit,
 };
 use velosicomposition::Relations;
 
@@ -168,6 +168,12 @@ fn add_op_fn(
         op_fn.arg(f.ident(), utils::vrs_type_to_rust_type(&f.ptype.typeinfo));
     }
 
+    if method.ident().as_str() == "map" {
+        op_fn.line("assert!(!self.valid());");
+    } else {
+        op_fn.line("assert!(self.valid());");
+    }
+
     // add requires
     if method.requires.is_empty() {
         op_fn.line("// no requires clauses");
@@ -192,6 +198,19 @@ fn add_op_fn(
             } else {
                 op_fn.line(utils::op_to_rust_expr(op, &unit.interface, ast, method));
             }
+        }
+
+        if method_name == "unmap_table" {
+            op_fn.line("// free the previously allocated table");
+            op_fn.line(format!(
+                "free(phys_to_virt(self.interface.{}()));",
+                unit.params
+                    .iter()
+                    .find(|param| param.ptype.typeinfo.is_paddr())
+                    .unwrap()
+                    .ident()
+            ));
+            op_fn.line("");
         }
 
         let page_size: usize = 1 << unit.inbitwidth;
@@ -221,7 +240,7 @@ fn add_higher_order_fn(method: &VelosiAstMethod, imp: &mut CG::Impl) {
 fn add_valid_fn(unit: &VelosiAstUnitSegment, imp: &mut CG::Impl) {
     let op = unit.methods.get("valid").expect("valid method not found!");
     let valid = imp.new_fn(op.ident()).vis("pub").arg_ref_self().ret("bool");
-    for f in unit.state.fields() {
+    for f in unit.interface.fields() {
         valid.line(format!(
             "let {} = self.interface.read_{}();",
             f.ident(),
@@ -245,7 +264,7 @@ fn add_resolve_fn(unit: &VelosiAstUnitSegment, child: &VelosiAstUnit, imp: &mut 
         translate.arg(p.ident(), utils::vrs_type_to_rust_type(&p.ptype.typeinfo));
     }
 
-    for f in unit.state.fields() {
+    for f in unit.interface.fields() {
         translate.line(format!(
             "let {} = self.interface.read_{}();",
             f.ident(),
@@ -291,6 +310,14 @@ pub fn generate(
     scope.import("super", &iface_name);
     if let Some(map) = unit.get_method("map") {
         utils::import_referenced_units(&mut scope, map);
+    }
+
+    // import fields
+    for field in unit.interface.fields() {
+        scope.import(
+            "super::fields",
+            &utils::to_struct_name(field.ident(), Some("Field")),
+        );
     }
 
     // add the definitions
