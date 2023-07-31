@@ -161,8 +161,9 @@ fn add_struct_impl(scope: &mut CG::Scope, field: &VelosiAstInterfaceField) {
     imp.new_fn("new")
         .vis("pub")
         .doc(&format!("creates a new {} field value", field.ident()))
+        .arg("val", num_to_rust_type(field.nbits()))
         .ret(CG::Type::new("Self"))
-        .line("Self { val: 0 }");
+        .line("Self { val }");
 
     // add the get/set functions
     for sl in field.layout() {
@@ -177,7 +178,7 @@ fn add_default_impl(scope: &mut CG::Scope, field: &VelosiAstInterfaceField) {
 
     imp.new_fn("default")
         .ret(CG::Type::new("Self"))
-        .line("Self::new()");
+        .line("Self::new(0)");
 }
 
 /// generates the field value interface
