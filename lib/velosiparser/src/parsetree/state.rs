@@ -36,7 +36,7 @@ use crate::parsetree::{
 };
 use crate::VelosiTokenStream;
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeStateFieldMemory {
     pub name: VelosiParseTreeIdentifier,
     pub base: VelosiParseTreeIdentifier,
@@ -84,7 +84,14 @@ impl Display for VelosiParseTreeStateFieldMemory {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+/// Implementation of [Debug] for [VelosiParseTreeStateFieldMemory]
+impl Debug for VelosiParseTreeStateFieldMemory {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeStateFieldRegister {
     pub name: VelosiParseTreeIdentifier,
     pub size: u64,
@@ -125,6 +132,13 @@ impl Display for VelosiParseTreeStateFieldRegister {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeStateFieldRegister]
+impl Debug for VelosiParseTreeStateFieldRegister {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 /// Represents a component of the state, either a register or a memory location
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum VelosiParseTreeStateField {
@@ -143,7 +157,7 @@ impl Display for VelosiParseTreeStateField {
 }
 
 /// Represents the parsed state description
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeStateDef {
     /// parameters of the state
     pub params: Vec<VelosiParseTreeParam>,
@@ -183,6 +197,13 @@ impl Display for VelosiParseTreeStateDef {
             writeln!(f, ",")?;
         }
         writeln!(f, "  }};")
+    }
+}
+
+/// Implementation of [Debug] for [VelosiParseTreeStateDef]
+impl Debug for VelosiParseTreeStateDef {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
     }
 }
 

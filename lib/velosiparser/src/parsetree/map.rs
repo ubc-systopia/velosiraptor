@@ -39,7 +39,7 @@ use crate::parsetree::{
 use crate::VelosiTokenStream;
 
 /// Represents possible nodes in the unit definitions
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum VelosiParseTreeMap {
     ListComp(Box<VelosiParseTreeMapListComp>),
     Explicit(Box<VelosiParseTreeMapExplicit>),
@@ -64,8 +64,15 @@ impl Display for VelosiParseTreeMap {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeMap]
+impl Debug for VelosiParseTreeMap {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 /// Represents possible nodes in the unit definitions
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeMapExplicit {
     pub entries: Vec<VelosiParseTreeMapElement>,
     pub loc: VelosiTokenStream,
@@ -91,8 +98,15 @@ impl Display for VelosiParseTreeMapExplicit {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeMapExplicit]
+impl Debug for VelosiParseTreeMapExplicit {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 /// Represents possible nodes in the unit definitions
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeMapListComp {
     pub elm: VelosiParseTreeMapElement,
     pub var: VelosiParseTreeIdentifier,
@@ -122,8 +136,15 @@ impl Display for VelosiParseTreeMapListComp {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeMapListComp]
+impl Debug for VelosiParseTreeMapListComp {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 /// Represents possible nodes in the unit definitions
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeMapElement {
     pub src: Option<VelosiParseTreeRangeExpr>,
     pub dst: VelosiParseTreeFnCallExpr,
@@ -157,5 +178,12 @@ impl Display for VelosiParseTreeMapElement {
             write!(f, " @ {offset}")?;
         }
         Ok(())
+    }
+}
+
+/// Implementation of [Debug] for [VelosiParseTreeMapElement]
+impl Debug for VelosiParseTreeMapElement {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
     }
 }

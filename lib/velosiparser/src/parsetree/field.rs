@@ -35,7 +35,7 @@ use crate::parsetree::VelosiParseTreeIdentifier;
 use crate::VelosiTokenStream;
 
 /// Represents the state definition
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeFieldSlice {
     pub start: u64,
     pub end: u64,
@@ -65,8 +65,15 @@ impl Display for VelosiParseTreeFieldSlice {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeFieldSlice]
+impl Debug for VelosiParseTreeFieldSlice {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 /// Represents a state field
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeField {
     pub name: VelosiParseTreeIdentifier,
     pub offset: Option<(VelosiParseTreeIdentifier, u64)>,
@@ -107,5 +114,12 @@ impl Display for VelosiParseTreeField {
             writeln!(f, ",")?;
         }
         write!(f, "    }}")
+    }
+}
+
+/// Implementation of [Debug] for [VelosiParseTreeField]
+impl Debug for VelosiParseTreeField {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
     }
 }

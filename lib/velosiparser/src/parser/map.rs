@@ -31,7 +31,7 @@
 use crate::error::IResult;
 use crate::parser::expr::{expr, fn_call_expr_raw, range_expr};
 use crate::parser::terminals::{
-    assign, at, comma, fatarrow, ident, kw_for, kw_in, kw_map, lbrack, rbrack, semicolon,
+    assign, at, comma, fatarrow, ident, kw_for, kw_in, kw_mapdef, lbrack, rbrack, semicolon,
 };
 use crate::parsetree::{
     VelosiParseTreeExpr, VelosiParseTreeFnCallExpr, VelosiParseTreeMap, VelosiParseTreeMapElement,
@@ -59,7 +59,7 @@ use nom::{
 ///  - `map = [UnitA(x) for x in 1..2]`
 ///
 pub fn staticmap(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
-    let (i1, _) = kw_map(input)?;
+    let (i1, _) = kw_mapdef(input)?;
     let (i2, m) = cut(delimited(
         assign,
         alt((explicitmap, listcomprehensionmap)),

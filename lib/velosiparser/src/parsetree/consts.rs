@@ -25,7 +25,7 @@
 
 //! # VelosiParser -- Parse Tree Constants and Parameters
 //!
-//! This module defines the constants and parameter nodes for the velosiraptor parse tree.
+//! This module defines the constant nodes for the velosiraptor parse tree.
 
 // used standard library functionality
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
@@ -35,7 +35,7 @@ use super::{VelosiParseTreeExpr, VelosiParseTreeIdentifier, VelosiParseTreeType}
 use crate::VelosiTokenStream;
 
 /// A constant definition within the root or unit context
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeConstDef {
     /// the name of the constant
     pub name: VelosiParseTreeIdentifier,
@@ -62,6 +62,7 @@ impl VelosiParseTreeConstDef {
         }
     }
 
+    /// returns a reference to the location of the constant definition
     pub fn loc(&self) -> &VelosiTokenStream {
         &self.loc
     }
@@ -74,30 +75,10 @@ impl Display for VelosiParseTreeConstDef {
     }
 }
 
-/// A parameter definition within the methods, unit, or quantifier context
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub struct VelosiParseTreeParam {
-    /// the name of the parameter
-    pub name: VelosiParseTreeIdentifier,
-    /// the type of the param
-    pub ptype: VelosiParseTreeType,
-    /// the location of the entire import clause
-    pub loc: VelosiTokenStream,
-}
-
-impl VelosiParseTreeParam {
-    pub fn new(
-        name: VelosiParseTreeIdentifier,
-        ptype: VelosiParseTreeType,
-        loc: VelosiTokenStream,
-    ) -> Self {
-        VelosiParseTreeParam { name, ptype, loc }
-    }
-}
-
-/// Implementation of the [Display] trait for the [VelosiParseTreeParam] struct
-impl Display for VelosiParseTreeParam {
+/// Implementation of the [Display] trait for the [VelosiParseTreeConstDef] struct
+impl Debug for VelosiParseTreeConstDef {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "{}: {}", self.name, self.ptype)
+        writeln!(f, "// {}", self.loc)?;
+        write!(f, "const {} : {} = {};", self.name, self.ctype, self.value)
     }
 }

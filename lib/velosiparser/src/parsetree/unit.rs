@@ -41,7 +41,7 @@ use crate::VelosiTokenStream;
 pub type VelosiParseTreeMethodProperty =
     (VelosiParseTreeIdentifier, Option<VelosiParseTreeIdentifier>);
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeMethod {
     /// the name of the unit (identifier)
     pub name: VelosiParseTreeIdentifier,
@@ -120,8 +120,15 @@ impl Display for VelosiParseTreeMethod {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeMethod]
+impl Debug for VelosiParseTreeMethod {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 /// reprsents a flag
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeFlags {
     /// vector of defined flags
     pub flags: Vec<VelosiParseTreeIdentifier>,
@@ -153,8 +160,15 @@ impl Display for VelosiParseTreeFlags {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeFlags]
+impl Debug for VelosiParseTreeFlags {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 /// reprsents a flag
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeEnum {
     /// vector of defined flags
     pub ident: VelosiParseTreeIdentifier,
@@ -192,11 +206,18 @@ impl Display for VelosiParseTreeEnum {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeEnum]
+impl Debug for VelosiParseTreeEnum {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 /// Represents possible definitions of a unit body
 ///
 /// The enum captures all possible elements of a unit body ([VelosiParseTreeUnitDef]).
 ///
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum VelosiParseTreeUnitNode {
     /// A constant definition
     Const(VelosiParseTreeConstDef),
@@ -258,6 +279,13 @@ impl Display for VelosiParseTreeUnitNode {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeUnitNode]
+impl Debug for VelosiParseTreeUnitNode {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 /// Represents a unit definition
 ///
 /// The unit definition corresponds to the definition of a basic building block
@@ -272,7 +300,7 @@ impl Display for VelosiParseTreeUnitNode {
 /// A unit has a set of nodes ([VelosiParseTreeUnitNode]) that contain the definitions
 /// of the body of the unit.
 ///
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeUnitDef {
     /// the name of the unit (identifier)
     pub name: VelosiParseTreeIdentifier,
@@ -336,6 +364,13 @@ impl Display for VelosiParseTreeUnitDef {
     }
 }
 
+/// Implementation of [Debug] for [VelosiParseTreeUnitDef]
+impl Debug for VelosiParseTreeUnitDef {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 /// Unit Node Representation
 ///
 /// A unit in the Velosiraptor language represents a basic building block.
@@ -348,7 +383,7 @@ impl Display for VelosiParseTreeUnitDef {
 /// restrict the parsing as such. Thus each unit body is defined by the
 /// [VelosiParseTreeUnitDef] struct.
 ///
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum VelosiParseTreeUnit {
     /// This unit is a configurable segment
     Segment(VelosiParseTreeUnitDef),
@@ -391,5 +426,12 @@ impl Display for VelosiParseTreeUnit {
                 Display::fmt(&unit, f)
             }
         }
+    }
+}
+
+/// Implementation of [Debug] for [VelosiParseTreeUnit]
+impl Debug for VelosiParseTreeUnit {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
     }
 }
