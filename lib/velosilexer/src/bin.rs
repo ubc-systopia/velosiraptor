@@ -25,7 +25,8 @@
 
 //! # VelosiLexer -- The Velosiraptor Lexer Example Programm
 //!
-//! This example program
+//! This is a simple program that lexes the input string or supplied
+//! file name and prints the resulting tokens to stdout.
 
 use std::env;
 use std::io;

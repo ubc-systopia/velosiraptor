@@ -194,17 +194,6 @@ fn identifier_test_keywords() {
         ))
     );
 
-    let sp = SrcSpan::new("unit".to_string());
-    let rem = sp.slice(4..4);
-    let ident = sp.slice(0..4);
-    assert_eq!(
-        identifier(sp),
-        Ok((
-            rem,
-            VelosiToken::new(VelosiTokenKind::Keyword(VelosiKeyword::Unit), ident)
-        ))
-    );
-
     let sp = SrcSpan::new("unit_".to_string());
     let rem = sp.slice(5..5);
     let ident = sp.slice(0..5);

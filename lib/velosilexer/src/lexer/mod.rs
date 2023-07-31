@@ -55,7 +55,7 @@ macro_rules! namedtag (
     )
 );
 
-// // delimiters
+// delimiters
 namedtag!(lparen, VelosiOpToken::LParen);
 namedtag!(rparen, VelosiOpToken::RParen);
 namedtag!(lbrace, VelosiOpToken::LBrace);

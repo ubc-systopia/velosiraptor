@@ -3,7 +3,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2021, 2022 Systopia Lab, Computer Science, University of British Columbia
+// Copyright (c) 2021-2023 Systopia Lab, Computer Science, University of British Columbia
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -61,7 +61,7 @@ custom_error! {pub VelosiLexerError
 pub struct VelosiLexer;
 
 impl VelosiLexer {
-    /// Lexes the supplied [SrcSpan] and converts it into a [TokenStream]
+    /// Lexes the supplied [SrcSpan] and converts it into a [VelosiTokenStream]
     ///
     /// This function will create a new `SrcSpan` from the supplied string.
     pub fn lex_srcspan(content: SrcSpan) -> Result<VelosiTokenStream, VelosiLexerError> {
@@ -73,7 +73,7 @@ impl VelosiLexer {
         }
     }
 
-    /// Lexes the supplied string and converts it into a [TokenStream]
+    /// Lexes the supplied string and converts it into a [VelosiTokenStream]
     ///
     /// This function will create a new `SrcSpan` from the supplied string.
     pub fn lex_string(content: String) -> Result<VelosiTokenStream, VelosiLexerError> {
@@ -81,7 +81,7 @@ impl VelosiLexer {
         VelosiLexer::lex_srcspan(sp)
     }
 
-    /// Lexes the supplied file and converts it into a [TokenStream]
+    /// Lexes the supplied file and converts it into a [VelosiTokenStream]
     pub fn lex_file(filename: &str) -> Result<VelosiTokenStream, VelosiLexerError> {
         let file_contents = fs::read_to_string(filename);
         match file_contents {

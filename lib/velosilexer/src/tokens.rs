@@ -3,7 +3,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2021, 2022 Systopia Lab, Computer Science, University of British Columbia
+// Copyright (c) 2021-2023 Systopia Lab, Computer Science, University of British Columbia
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -26,43 +26,41 @@
 //! # Velosilexer Tokens
 //!
 //! The VelosiLexer Tokens represent the language tokens that are produces by
-//! the lexing process, and that the parser will work on.
+//! the lexing process, and that the parser will work on. Those tokens define
+//! the type used in the TokenStream.
 
 // used standard library modules
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
 // used external dependencies
-use crate::TokKind;
+use tokstream::TokKind;
 
-/// Enumeration of all keywords in the language
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Keywords
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Enumeration of all keywords in the Velosiraptor language
+///
+/// Each keyword is represented by a variant of this enum.
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum VelosiKeyword {
     //
     // language keywords
     //
-    /// This token was originally used for unit definitions, It's not in use
-    /// under the new unit scheme, but we're choosing to keep it as a reserved
-    /// keyword for now.
-    /// TODO: Will need to revisit this at somepoint -Ilias
-    Unit,
+    /// constant values
+    Const,
+    /// import statements
+    Import,
     /// base type for static maps
     StaticMap,
-    /// base type for direct segments
+    /// base type for configurable segments
     Segment,
-    /// the base type for enum
+    /// base type for enum
     Enum,
 
     //
-    // modifiers
-    //
-    /// indicates a synthesis target (function)
-    Synth,
-    /// unit or function that is abstract
-    Abstract,
-
-    //
-    // Unit "fields"
+    // Unit "elements"
     //
     /// the unit input bitwidth
     InBitWidth,
@@ -70,18 +68,17 @@ pub enum VelosiKeyword {
     OutBitWidth,
     /// represents the "state field"
     State,
-    /// interface statement
-    Interface,
-
-    //
-    // State Kinds
-    //
     /// state definition
     StateDef,
+    /// interface statement
+    Interface,
+    /// interface definition
     InterfaceDef,
+    /// map definition
+    MapDef,
 
     //
-    // State / Interface Fields
+    // state & interface fields
     //
     /// field referring to a memory location
     Mem,
@@ -91,14 +88,24 @@ pub enum VelosiKeyword {
     Mmio,
 
     //
-    // Interface descriptions
+    // interface descriptions
     //
-    /// A read action from the interface on the state
+    /// A read action block from the interface on the state
     ReadActions,
-    /// A write action from the interface on the state
+    /// A write action block from the interface on the state
     WriteActions,
-    /// Used in identifying the Bitslice layout of an Interface field
+    /// Bitfield layout description of an interface field
     Layout,
+
+    //
+    // method definition
+    //
+    /// represents a method
+    Fn,
+    /// indicates a synthesis target (function)
+    Synth,
+    /// unit or function that is abstract
+    Abstract,
 
     //
     // control flow and expressions
@@ -113,28 +120,8 @@ pub enum VelosiKeyword {
     Let,
     /// inclusion statement,
     In,
-    /// represents a function
-    Fn,
     /// the return keyword
     Return,
-
-    //
-    // types
-    //
-    /// represents the generic address type
-    AddressType,
-    /// represents a virtual address value type
-    VAddrType,
-    /// represents a physical address value type
-    PAddrType,
-    /// represents a size value type
-    SizeType,
-    /// A boolean type
-    BooleanType,
-    /// An generic integer value type
-    IntegerType,
-    /// Represents the permission flags
-    FlagsType,
 
     //
     // constraint keywords
@@ -153,54 +140,82 @@ pub enum VelosiKeyword {
     Invariant,
 
     //
+    // builtin types
+    //
+    /// represents the generic address type
+    AddressType,
+    /// represents a virtual address value type
+    VAddrType,
+    /// represents a physical address value type
+    PAddrType,
+    /// represents a size value type
+    SizeType,
+    /// A boolean type
+    BooleanType,
+    /// An generic integer value type
+    IntegerType,
+    /// Represents the permission flags
+    FlagsType,
+
+    //
     // other keywords
     //
-    /// constant values
-    Const,
-    /// constant values
-    Map,
-    /// import statements
-    Import,
     /// Null-like value
     None,
 }
 
 impl VelosiKeyword {
+    /// Obtains the string slice representation of the keyword
     pub const fn as_str(&self) -> &'static str {
         match self {
-            VelosiKeyword::Unit => "unit",
+            // language keywords
+            VelosiKeyword::Const => "const",
+            VelosiKeyword::Import => "import",
             VelosiKeyword::StaticMap => "staticmap",
             VelosiKeyword::Segment => "segment",
             VelosiKeyword::Enum => "enum",
-            //
-            VelosiKeyword::Synth => "synth",
-            VelosiKeyword::Abstract => "abstract",
-            //
+
+            // Unit "elements"
             VelosiKeyword::InBitWidth => "inbitwidth",
             VelosiKeyword::OutBitWidth => "outbitwidth",
             VelosiKeyword::State => "state",
-            VelosiKeyword::Interface => "interface",
-
             VelosiKeyword::StateDef => "StateDef",
+            VelosiKeyword::Interface => "interface",
             VelosiKeyword::InterfaceDef => "InterfaceDef",
+            VelosiKeyword::MapDef => "mapdef",
 
+            // state & interface fields
             VelosiKeyword::Mem => "mem",
             VelosiKeyword::Reg => "reg",
             VelosiKeyword::Mmio => "mmio",
 
-            //
+            // interface descriptions
             VelosiKeyword::ReadActions => "ReadActions",
             VelosiKeyword::WriteActions => "WriteActions",
             VelosiKeyword::Layout => "Layout",
 
+            // method definition
+            VelosiKeyword::Fn => "fn",
+            VelosiKeyword::Synth => "synth",
+            VelosiKeyword::Abstract => "abstract",
+
+            // control flow and expressions
             VelosiKeyword::If => "if",
             VelosiKeyword::Else => "else",
             VelosiKeyword::For => "for",
             VelosiKeyword::Let => "let",
             VelosiKeyword::In => "in",
-            VelosiKeyword::Fn => "fn",
             VelosiKeyword::Return => "return",
-            //
+
+            // constraint keywords
+            VelosiKeyword::Requires => "requires",
+            VelosiKeyword::Ensures => "ensures",
+            VelosiKeyword::Assert => "assert",
+            VelosiKeyword::Forall => "forall",
+            VelosiKeyword::Exists => "exists",
+            VelosiKeyword::Invariant => "invariant",
+
+            // built-intypes
             VelosiKeyword::AddressType => "addr",
             VelosiKeyword::VAddrType => "vaddr",
             VelosiKeyword::PAddrType => "paddr",
@@ -208,60 +223,60 @@ impl VelosiKeyword {
             VelosiKeyword::BooleanType => "bool",
             VelosiKeyword::IntegerType => "int",
             VelosiKeyword::FlagsType => "flags",
-            //
-            VelosiKeyword::Requires => "requires",
-            VelosiKeyword::Ensures => "ensures",
-            VelosiKeyword::Assert => "assert",
-            VelosiKeyword::Forall => "forall",
-            VelosiKeyword::Exists => "exists",
-            VelosiKeyword::Invariant => "invariant",
-            //
-            VelosiKeyword::Const => "const",
-            VelosiKeyword::Map => "mapdef",
-            VelosiKeyword::Import => "import",
-            //
+
+            // other keywords
             VelosiKeyword::None => "None",
         }
     }
 }
 
+/// Implementation of [TryFrom] for [VelosiKeyword]
 impl<'a> TryFrom<&'a str> for VelosiKeyword {
     type Error = &'a str;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
         match value {
-            "unit" => Ok(VelosiKeyword::Unit),
+            // language keywords
+            "const" => Ok(VelosiKeyword::Const),
+            "import" => Ok(VelosiKeyword::Import),
             "staticmap" => Ok(VelosiKeyword::StaticMap),
             "segment" => Ok(VelosiKeyword::Segment),
             "enum" => Ok(VelosiKeyword::Enum),
-            //
-            "synth" => Ok(VelosiKeyword::Synth),
-            "abstract" => Ok(VelosiKeyword::Abstract),
-            //
+            //  Unit "elements"
             "inbitwidth" => Ok(VelosiKeyword::InBitWidth),
             "outbitwidth" => Ok(VelosiKeyword::OutBitWidth),
             "state" => Ok(VelosiKeyword::State),
-            "interface" => Ok(VelosiKeyword::Interface),
-            //
             "StateDef" => Ok(VelosiKeyword::StateDef),
+            "interface" => Ok(VelosiKeyword::Interface),
             "InterfaceDef" => Ok(VelosiKeyword::InterfaceDef),
-            //
+            "mapdef" => Ok(VelosiKeyword::MapDef),
+            // state & interface fields
             "reg" => Ok(VelosiKeyword::Reg),
             "mem" => Ok(VelosiKeyword::Mem),
             "mmio" => Ok(VelosiKeyword::Mmio),
-            //
+            //  interface descriptions
             "ReadActions" => Ok(VelosiKeyword::ReadActions),
             "WriteActions" => Ok(VelosiKeyword::WriteActions),
             "Layout" => Ok(VelosiKeyword::Layout),
-            //
+            // method definition
+            "fn" => Ok(VelosiKeyword::Fn),
+            "synth" => Ok(VelosiKeyword::Synth),
+            "abstract" => Ok(VelosiKeyword::Abstract),
+            // control flow and expressions
             "if" => Ok(VelosiKeyword::If),
             "else" => Ok(VelosiKeyword::Else),
             "for" => Ok(VelosiKeyword::For),
             "let" => Ok(VelosiKeyword::Let),
             "in" => Ok(VelosiKeyword::In),
-            "fn" => Ok(VelosiKeyword::Fn),
             "return" => Ok(VelosiKeyword::Return),
-            //
+            // constraint keywords
+            "requires" => Ok(VelosiKeyword::Requires),
+            "ensures" => Ok(VelosiKeyword::Ensures),
+            "assert" => Ok(VelosiKeyword::Assert),
+            "forall" => Ok(VelosiKeyword::Forall),
+            "exists" => Ok(VelosiKeyword::Exists),
+            "invariant" => Ok(VelosiKeyword::Invariant),
+            // builtin types
             "addr" => Ok(VelosiKeyword::AddressType),
             "vaddr" => Ok(VelosiKeyword::VAddrType),
             "paddr" => Ok(VelosiKeyword::PAddrType),
@@ -269,17 +284,7 @@ impl<'a> TryFrom<&'a str> for VelosiKeyword {
             "bool" => Ok(VelosiKeyword::BooleanType),
             "int" => Ok(VelosiKeyword::IntegerType),
             "flags" => Ok(VelosiKeyword::FlagsType),
-            "requires" => Ok(VelosiKeyword::Requires),
-            "ensures" => Ok(VelosiKeyword::Ensures),
-            "assert" => Ok(VelosiKeyword::Assert),
-            "forall" => Ok(VelosiKeyword::Forall),
-            "exists" => Ok(VelosiKeyword::Exists),
-            "invariant" => Ok(VelosiKeyword::Invariant),
-            //
-            "const" => Ok(VelosiKeyword::Const),
-            "mapdef" => Ok(VelosiKeyword::Map),
-            "import" => Ok(VelosiKeyword::Import),
-            //
+            // other
             "None" => Ok(VelosiKeyword::None),
             _ => Err(value),
         }
@@ -293,7 +298,11 @@ impl Display for VelosiKeyword {
     }
 }
 
-/// Operator Tokens
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Operator Tokens
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Operator Tokens representing the different operators and punctuations in the Velosiraptor Language
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum VelosiOpToken {
     // punctuations
@@ -358,6 +367,7 @@ pub enum VelosiOpToken {
 }
 
 impl VelosiOpToken {
+    /// Obtains the string slice representation of the operator token
     pub fn as_str(&self) -> &'static str {
         use VelosiOpToken::*;
         match self {
@@ -432,10 +442,10 @@ impl Display for VelosiOpToken {
 }
 
 /// Implementation of the [TryFrom<&str>] trait for [VelosiOpToken]
-impl TryFrom<&str> for VelosiOpToken {
-    type Error = ();
+impl<'a> TryFrom<&'a str> for VelosiOpToken {
+    type Error = &'a str;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
         use VelosiOpToken::*;
         match value {
             // punctuations
@@ -498,32 +508,34 @@ impl TryFrom<&str> for VelosiOpToken {
             "?" => Ok(QuestionMark),
             "#" => Ok(HashTag),
 
-            _ => Err(()),
+            _ => Err(value),
         }
     }
 }
 
-/// Represents the content of a token
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Token Kind
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Represents the different Velosiraptor token kinds
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum VelosiTokenKind {
-    // illegal token
+    /// represents an illegal token
     Illegal,
-
-    // literals, integers of booleans
-    NumLiteral(u64),   // 1234 0x134 0o1234 0b1111
-    BoolLiteral(bool), // true | false
-
-    // identifier
-    Identifier(String), // abc ab_cd
-
-    // Keywords
-    Keyword(VelosiKeyword),
-
-    // comments
-    Comment(String),      // //
-    BlockComment(String), // /* */
-
-    OpToken(VelosiOpToken),
+    /// A numeric literal (1234 0x134 0o1234 0b1111)
+    NumLiteral(u64),
+    /// a boolean literal (true | false)
+    BoolLiteral(bool),
+    /// an identifier (abc ab_cd)
+    Identifier(String),
+    /// a keyword token ([VelosiKeyword])
+    Keyword(VelosiKeyword), //
+    /// an operator token ([VelosiOpToken])
+    OpToken(VelosiOpToken), //
+    /// a single line comment token (// ... )
+    Comment(String),
+    /// a block comment token (/* */)
+    BlockComment(String),
 }
 
 /// Implementation for VelosiTokenKind
@@ -565,7 +577,7 @@ impl Display for VelosiTokenKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         use VelosiTokenKind::*;
         match self {
-            Illegal => write!(f, "Illegal"),
+            Illegal => write!(f, "illegal token"),
             NumLiteral(n) => write!(f, "{n}"),
             BoolLiteral(n) => write!(f, "{n}"),
             Identifier(n) => write!(f, "{n}"),
@@ -630,14 +642,6 @@ use std::convert::TryInto;
 
 #[test]
 fn test_enum_str() {
-    // probably something like this would be enough:
-    assert_eq!(
-        VelosiKeyword::Unit.as_str().try_into(),
-        Ok(VelosiKeyword::Unit)
-    );
-
-    assert_eq!("unit".try_into(), Ok(VelosiKeyword::Unit));
-    assert_eq!(VelosiKeyword::Unit.as_str(), "unit");
     assert_eq!("segment".try_into(), Ok(VelosiKeyword::Segment));
     assert_eq!(VelosiKeyword::Segment.as_str(), "segment");
     assert_eq!("staticmap".try_into(), Ok(VelosiKeyword::StaticMap));
@@ -722,8 +726,8 @@ fn test_enum_str() {
 
     assert_eq!("const".try_into(), Ok(VelosiKeyword::Const));
     assert_eq!(VelosiKeyword::Const.as_str(), "const");
-    assert_eq!("mapdef".try_into(), Ok(VelosiKeyword::Map));
-    assert_eq!(VelosiKeyword::Map.as_str(), "mapdef");
+    assert_eq!("mapdef".try_into(), Ok(VelosiKeyword::MapDef));
+    assert_eq!(VelosiKeyword::MapDef.as_str(), "mapdef");
     assert_eq!("import".try_into(), Ok(VelosiKeyword::Import));
     assert_eq!(VelosiKeyword::Import.as_str(), "import");
     assert_eq!("None".try_into(), Ok(VelosiKeyword::None));
