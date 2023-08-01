@@ -407,7 +407,7 @@ fn handle_nodes(
         if nodes.layout.is_empty() {
             // just add a single slice that takes up the whole field
             let slice = Rc::new(VelosiAstFieldSlice::new(
-                VelosiAstIdentifier::new(
+                VelosiAstIdentifier::with_prefix(
                     ident.path(),
                     "val".to_string(),
                     VelosiTokenStream::default(),
@@ -452,7 +452,7 @@ fn handle_nodes(
                 }
             }
 
-            let stident = VelosiAstIdentifier::new("", sf.path().to_string(), sf.loc.clone());
+            let stident = VelosiAstIdentifier::new(sf.path().to_string(), sf.loc.clone());
 
             let stexpr = Rc::new(VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
                 vec![stident],
@@ -460,11 +460,8 @@ fn handle_nodes(
                 VelosiTokenStream::default(),
             )));
 
-            let sifdent = VelosiAstIdentifier::new(
-                "",
-                sf.path().replace("state", "interface"),
-                sf.loc.clone(),
-            );
+            let sifdent =
+                VelosiAstIdentifier::new(sf.path().replace("state", "interface"), sf.loc.clone());
             let ifexpr = Rc::new(VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
                 vec![sifdent],
                 VelosiAstTypeInfo::Integer,
@@ -527,7 +524,7 @@ fn handle_nodes(
                 }
             }
 
-            let stident = VelosiAstIdentifier::new("", sf.path().to_string(), sf.loc.clone());
+            let stident = VelosiAstIdentifier::new(sf.path().to_string(), sf.loc.clone());
 
             let stexpr = Rc::new(VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
                 vec![stident],
@@ -535,11 +532,8 @@ fn handle_nodes(
                 VelosiTokenStream::default(),
             )));
 
-            let sifdent = VelosiAstIdentifier::new(
-                "",
-                sf.path().replace("state", "interface"),
-                sf.loc.clone(),
-            );
+            let sifdent =
+                VelosiAstIdentifier::new(sf.path().replace("state", "interface"), sf.loc.clone());
             let ifexpr = Rc::new(VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
                 vec![sifdent],
                 VelosiAstTypeInfo::Integer,

@@ -57,7 +57,7 @@ impl VelosiAstParam {
 
     pub fn with_name(name: String, ptype: VelosiAstTypeInfo) -> Self {
         VelosiAstParam::new(
-            VelosiAstIdentifier::with_name(name),
+            VelosiAstIdentifier::from(name),
             ptype.into(),
             VelosiTokenStream::empty(),
         )

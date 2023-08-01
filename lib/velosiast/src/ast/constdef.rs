@@ -72,51 +72,33 @@ impl VelosiAstConst {
         )
     }
 
-    /// obtains a reference to the identifier
-    pub fn ident(&self) -> &Rc<String> {
-        self.ident.ident()
+    /// creates a new boolean constant with the given identifier and value
+    pub fn new_bool(ident: &str, value: bool) -> Self {
+        Self::new(
+            ident.into(),
+            VelosiAstType::new_int(),
+            VelosiAstExpr::BoolLiteral(value.into()),
+            VelosiTokenStream::default(),
+        )
     }
 
-    /// obtains a copy of the identifer
-    pub fn ident_to_string(&self) -> String {
-        self.ident.as_str().to_string()
-    }
-
-    /// obtains a reference to the fully qualified path
-    pub fn path(&self) -> &Rc<String> {
-        &self.ident.path
-    }
-
-    /// obtains a copy of the fully qualified path
-    pub fn path_to_string(&self) -> String {
-        self.ident.path.as_str().to_string()
-    }
-
-    pub fn try_into_u64(&self) -> Option<u64> {
-        match &self.value {
-            VelosiAstExpr::NumLiteral(n) => Some(n.val),
-            _ => None,
-        }
-    }
-
-    pub fn try_into_bool(&self) -> Option<bool> {
-        match &self.value {
-            VelosiAstExpr::BoolLiteral(n) => Some(n.val),
-            _ => None,
-        }
-    }
-
-    // converts the parse tree node into an ast node, performing checks
+    /// converts the parse tree node into an ast node, performing validity checks
+    ///
+    /// # Returns
+    ///
+    ///  - Ok, if the conversion was successful without issues
+    ///  - Issues, if there were issues but the conversion still succeeded
+    ///  - Err, if there were fatal errors
+    ///
     pub fn from_parse_tree(
         pt: VelosiParseTreeConstDef,
         st: &mut SymbolTable,
     ) -> AstResult<Self, VelosiAstIssues> {
         let mut issues = VelosiAstIssues::new();
 
-        let name = VelosiAstIdentifier::from(pt.name);
-
-        // check whether the name is in the right format
-        utils::check_upper_case(&mut issues, &name);
+        // convert the identifier and check whether it is in the right format
+        let ident = VelosiAstIdentifier::from(pt.name);
+        utils::check_upper_case(&mut issues, &ident);
 
         // obtain the type information, must be a built-in type
         let ctype = ast_result_unwrap!(VelosiAstType::from_parse_tree(pt.ctype, st), issues);

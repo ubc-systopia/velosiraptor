@@ -265,7 +265,7 @@ impl VelosiAstType {
         // check the type reference
         if let VelosiAstTypeInfo::TypeRef(tname) = &res.typeinfo {
             // hacky way for the type check
-            let id = VelosiAstIdentifier::new("", tname.to_string(), res.loc.clone());
+            let id = VelosiAstIdentifier::new(tname.to_string(), res.loc.clone());
             utils::check_type_exists(&mut issues, st, &id);
             ast_result_return!(res, issues)
         } else {
