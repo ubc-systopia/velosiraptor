@@ -203,7 +203,7 @@ impl VelosiAstMethod {
 
     pub fn default_map() -> Self {
         Self::new_synth(
-            VelosiAstIdentifier::with_name("map".to_string()),
+            VelosiAstIdentifier::from("map"),
             VelosiAstType::new_void(),
             vec![
                 Rc::new(VelosiAstParam::with_name(
@@ -231,7 +231,7 @@ impl VelosiAstMethod {
 
     pub fn default_unmap() -> Self {
         Self::new_synth(
-            VelosiAstIdentifier::with_name("unmap".to_string()),
+            VelosiAstIdentifier::from("unmap"),
             VelosiAstType::new_void(),
             vec![
                 Rc::new(VelosiAstParam::with_name(
@@ -251,7 +251,7 @@ impl VelosiAstMethod {
 
     pub fn default_protect() -> Self {
         Self::new_synth(
-            VelosiAstIdentifier::with_name("protect".to_string()),
+            VelosiAstIdentifier::from("protect"),
             VelosiAstType::new_void(),
             vec![
                 Rc::new(VelosiAstParam::with_name(
@@ -275,7 +275,7 @@ impl VelosiAstMethod {
 
     pub fn default_translate() -> Self {
         Self::new(
-            VelosiAstIdentifier::with_name("protect".to_string()),
+            VelosiAstIdentifier::from("protect"),
             VelosiAstType::new_paddr(),
             vec![Rc::new(VelosiAstParam::with_name(
                 "va".to_string(),
@@ -291,7 +291,7 @@ impl VelosiAstMethod {
 
     pub fn default_matchflags() -> Self {
         Self::new(
-            VelosiAstIdentifier::with_name("protect".to_string()),
+            VelosiAstIdentifier::from("protect"),
             VelosiAstType::new_bool(),
             vec![Rc::new(VelosiAstParam::with_name(
                 "flgs".to_string(),
@@ -305,7 +305,7 @@ impl VelosiAstMethod {
 
     pub fn default_valid() -> Self {
         Self::new(
-            VelosiAstIdentifier::with_name("valid".to_string()),
+            VelosiAstIdentifier::from("valid"),
             VelosiAstType::new_bool(),
             Vec::new(),
             Vec::new(),                                             // no requires
