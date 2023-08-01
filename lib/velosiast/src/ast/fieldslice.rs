@@ -29,6 +29,7 @@
 //!
 
 // used standard library functionality
+use std::any::Any;
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
@@ -40,6 +41,39 @@ use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
 use crate::{
     ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable, VelosiTokenStream,
 };
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Field Trait
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub trait VelosiAstField {
+    /// obtains a reference to the identifier
+    fn ident(&self) -> &Rc<String>;
+
+    /// obtains a copy of the identifer
+    fn ident_to_string(&self) -> String;
+
+    /// obtains a reference to the fully qualified path
+    fn path(&self) -> &Rc<String>;
+
+    /// obtains a copy of the fully qualified path
+    fn path_to_string(&self) -> String;
+
+    /// obtains the layout of the field
+    fn layout(&self) -> &[Rc<VelosiAstFieldSlice>];
+
+    /// the size of the field in bits
+    fn nbits(&self) -> u64;
+
+    // /// obtain the field type
+    // fn ftype(&self) -> VelosiAstFieldType;
+
+    fn as_any(&self) -> &dyn Any;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Field Slice Definition
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents a slice of a field
 #[derive(Eq, Clone)]
@@ -123,7 +157,7 @@ impl VelosiAstFieldSlice {
         if ptlayout.is_empty() {
             // if none, add syntactic sugar for a single slice that takes up the whole field
             let slice = Rc::new(VelosiAstFieldSlice::new(
-                VelosiAstIdentifier::new(
+                VelosiAstIdentifier::with_prefix(
                     ident.path(),
                     "val".to_string(),
                     VelosiTokenStream::default(),
