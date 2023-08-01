@@ -25,21 +25,26 @@
 
 //! # VelosiAst -- Flags Definitions
 //!
-//! This module defines the flags in a unit definition
+//! This module defines permission / access flags of a memory access
 
+// used standard library functionality
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
+// used parse tree definitions
 use velosiparser::{VelosiParseTreeFlags, VelosiTokenStream};
 
-use crate::symboltable::{Symbol, SymbolTable};
-use crate::{
-    ast::{VelosiAstIdentifier, VelosiAstNode, VelosiAstType, VelosiAstTypeInfo},
-    ast_result_return,
-    error::{VelosiAstErrDoubleDef, VelosiAstIssues},
-    utils, AstResult,
-};
+// used crate functionality
+use crate::error::{VelosiAstErrDoubleDef, VelosiAstIssues};
+use crate::{ast_result_return, utils, AstResult, Symbol, SymbolTable};
+
+// used definitions of references AST nodes
+use crate::ast::{VelosiAstIdentifier, VelosiAstNode, VelosiAstType, VelosiAstTypeInfo};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Flags Definition
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Eq, Clone)]
 pub struct VelosiAstFlags {

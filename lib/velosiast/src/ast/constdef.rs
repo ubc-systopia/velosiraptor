@@ -27,15 +27,27 @@
 //!
 //! This module defines the Constant AST nodes of the langauge
 
+// used standard library functionality
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
+// used parse tree definitions
 use velosiparser::{VelosiParseTreeConstDef, VelosiTokenStream};
 
-use crate::ast::{expr::VelosiAstExpr, types::VelosiAstType, VelosiAstIdentifier, VelosiAstNode};
+// used crate functionality
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
 use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
 
+// used definitions of references AST nodes
+use crate::ast::{expr::VelosiAstExpr, types::VelosiAstType, VelosiAstIdentifier, VelosiAstNode};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Constant Definition
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Constant AST Node
+///
+/// This node represents a constant definition in the specification language.
 #[derive(Eq, Clone)]
 pub struct VelosiAstConst {
     /// the name of the constant
@@ -49,12 +61,18 @@ pub struct VelosiAstConst {
 }
 
 impl VelosiAstConst {
+    /// creates a new constant definition with the given type and value
+    ///
+    /// # Panics
+    ///
+    /// The function panics if the given expression is not a constant or has a mismatched type.
     pub fn new(
         ident: VelosiAstIdentifier,
         ctype: VelosiAstType,
         value: VelosiAstExpr,
         loc: VelosiTokenStream,
     ) -> Self {
+        assert!(value.is_const_expr());
         Self {
             ident,
             ctype,
@@ -63,6 +81,7 @@ impl VelosiAstConst {
         }
     }
 
+    /// creates a new integer constant with the given identifier and value
     pub fn new_int(ident: &str, value: u64) -> Self {
         Self::new(
             ident.into(),
@@ -139,8 +158,47 @@ impl VelosiAstConst {
             issues.push(err);
         }
 
-        let res = Self::new(name, ctype, value, pt.loc);
+        let res = Self {
+            ident,
+            ctype,
+            value,
+            loc: pt.loc,
+        };
         ast_result_return!(res, issues)
+    }
+
+    /// obtains a reference to the identifier
+    pub fn ident(&self) -> &Rc<String> {
+        self.ident.ident()
+    }
+
+    /// obtains a copy of the identifer
+    pub fn ident_to_string(&self) -> String {
+        self.ident.as_str().to_string()
+    }
+
+    /// obtains a reference to the fully qualified path
+    pub fn path(&self) -> &Rc<String> {
+        &self.ident.path
+    }
+
+    /// obtains a copy of the fully qualified path
+    pub fn path_to_string(&self) -> String {
+        self.ident.path.as_str().to_string()
+    }
+
+    pub fn try_into_u64(&self) -> Option<u64> {
+        match &self.value {
+            VelosiAstExpr::NumLiteral(n) => Some(n.val),
+            _ => None,
+        }
+    }
+
+    pub fn try_into_bool(&self) -> Option<bool> {
+        match &self.value {
+            VelosiAstExpr::BoolLiteral(n) => Some(n.val),
+            _ => None,
+        }
     }
 }
 
