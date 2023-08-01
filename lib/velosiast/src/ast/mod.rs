@@ -25,41 +25,24 @@
 
 //! # VelosiAst -- The Ast for the Velosiraptor Language
 //!
-//! This module defines the AST of the langauge
+//! This module defines the AST of the langauge with its different AST nodes.
 
-// used standard library functionality
-use core::str::Split;
-use std::cmp::Ordering;
-use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
-use std::hash::{Hash, Hasher};
-use std::rc::Rc;
-
-use indexmap::{
-    map::{Keys, Values, ValuesMut},
-    IndexMap,
-};
-
-use velosiparser::{
-    VelosiParseTree, VelosiParseTreeContextNode, VelosiParseTreeIdentifier, VelosiTokenStream,
-};
-
-use crate::error::VelosiAstIssues;
-use crate::{ast_result_return, ast_result_unwrap, AstResult, SymbolTable};
-
+// modules
 mod constdef;
 mod expr;
-mod field;
+mod fieldslice;
 mod flags;
+mod identifier;
 mod interface;
 mod map;
 mod method;
 mod operations;
 mod param;
-mod slice;
 mod state;
 mod types;
 mod unit;
 
+// public re-exports
 pub use constdef::VelosiAstConst;
 pub use expr::{
     VelosiAstBinOp, VelosiAstBinOpExpr, VelosiAstBoolLiteralExpr, VelosiAstExpr,
@@ -67,8 +50,9 @@ pub use expr::{
     VelosiAstQuantifier, VelosiAstQuantifierExpr, VelosiAstRangeExpr, VelosiAstSliceExpr,
     VelosiAstUnOp, VelosiAstUnOpExpr,
 };
-pub use field::VelosiAstField;
+pub use fieldslice::{VelosiAstField, VelosiAstFieldSlice};
 pub use flags::VelosiAstFlags;
+pub use identifier::VelosiAstIdentifier;
 pub use interface::{
     VelosiAstInterface, VelosiAstInterfaceAction, VelosiAstInterfaceField,
     VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField, VelosiAstInterfaceRegisterField,
@@ -80,11 +64,36 @@ pub use map::{
 pub use method::{VelosiAstMethod, VelosiAstMethodProperty};
 pub use operations::{VelosiOpExpr, VelosiOperation};
 pub use param::VelosiAstParam;
-pub use slice::VelosiAstFieldSlice;
 pub use state::{VelosiAstState, VelosiAstStateField};
 pub use types::{VelosiAstType, VelosiAstTypeInfo};
 pub use unit::{VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment, VelosiAstUnitStaticMap};
 
+// used standard library functionality
+
+use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+
+use std::rc::Rc;
+
+// used third party cartes
+use indexmap::{
+    map::{Keys, Values, ValuesMut},
+    IndexMap,
+};
+
+// used parse tree definitions
+use velosiparser::{VelosiParseTree, VelosiParseTreeContextNode, VelosiTokenStream};
+
+// used crate functionality
+use crate::error::VelosiAstIssues;
+use crate::{ast_result_return, ast_result_unwrap, AstResult, SymbolTable};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// AST Node
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Represents a node in the AST.
+///
+/// This is a wrapper around the actual node that enables passing around AST nodes generically.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum VelosiAstNode {
     Unit(VelosiAstUnit),
