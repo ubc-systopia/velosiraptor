@@ -267,7 +267,8 @@ pub fn op_to_rust_expr(
         }
         VelosiOperation::InsertField(field, arg) => {
             format!(
-                "self.interface.write_{field}({});",
+                "let {field} = {}::new({});\n{field}\n",
+                to_struct_name(field, Some("Field")),
                 opexpr_to_rust_expr(arg, ast, method)
             )
         }
