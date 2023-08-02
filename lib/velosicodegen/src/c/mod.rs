@@ -32,6 +32,7 @@ use std::path::PathBuf;
 use crustal as C;
 
 use velosiast::{VelosiAst, VelosiAstUnit};
+use velosicomposition::Relations;
 
 use crate::VelosiCodeGenError;
 
@@ -115,6 +116,7 @@ impl BackendC {
 
     pub fn generate_units(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
         let mut srcdir = self.outdir.clone();
+        let relations = Relations::from_ast(ast);
 
         for unit in ast.units() {
             match unit {
@@ -124,12 +126,14 @@ impl BackendC {
                         continue;
                     }
                     srcdir.push(segment.ident().to_lowercase());
-                    segment::generate(segment, &srcdir).expect("code generation failed\n");
+                    segment::generate(segment, &relations, &srcdir)
+                        .expect("code generation failed\n");
                     srcdir.pop();
                 }
                 VelosiAstUnit::StaticMap(staticmap) => {
                     srcdir.push(staticmap.ident().to_lowercase());
-                    staticmap::generate(ast, staticmap, &srcdir).expect("code generation failed\n");
+                    staticmap::generate(ast, staticmap, &relations, &srcdir)
+                        .expect("code generation failed\n");
                     srcdir.pop();
                 }
                 VelosiAstUnit::Enum(e) => {

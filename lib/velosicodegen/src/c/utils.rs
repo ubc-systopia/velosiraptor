@@ -83,7 +83,40 @@ pub trait UnitUtils {
         format!("{}_{}", self.my_ident().to_ascii_lowercase(), op.ident())
     }
 
+    fn to_op_fn_name_table(&self, op: &VelosiAstMethod) -> String {
+        format!(
+            "{}_{}_table",
+            self.my_ident().to_ascii_lowercase(),
+            op.ident()
+        )
+    }
+
+    fn to_op_fn_name_one(&self, op: &VelosiAstMethod) -> String {
+        format!(
+            "{}_{}_one",
+            self.my_ident().to_ascii_lowercase(),
+            op.ident()
+        )
+    }
+
+    fn to_op_fn_name_on_unit(&self, op: &VelosiAstMethod, variant_unit: &VelosiAstUnit) -> String {
+        format!(
+            "{}_{}_{}",
+            self.my_ident().to_ascii_lowercase(),
+            op.ident(),
+            variant_unit.ident().to_ascii_lowercase(),
+        )
+    }
+
     fn translate_fn_name(&self) -> String {
+        format!("{}_translate", self.my_ident().to_ascii_lowercase())
+    }
+
+    fn valid_fn_name(&self) -> String {
+        format!("{}_valid", self.my_ident().to_ascii_lowercase())
+    }
+
+    fn resolve_fn_name(&self) -> String {
         format!("{}_resolve", self.my_ident().to_ascii_lowercase())
     }
 
@@ -256,7 +289,11 @@ pub trait UnitUtils {
             },
             Quantifier(_i) => panic!("don't know how to handle quantifier"),
             FnCall(i) => C::Expr::fn_call(i.ident(), vec![]),
-            IfElse(_i) => panic!("don't know how to handle ifelse"),
+            IfElse(i) => C::Expr::ternary(
+                self.expr_to_cpp(var_mappings, &i.cond),
+                self.expr_to_cpp(var_mappings, &i.then),
+                self.expr_to_cpp(var_mappings, &i.other),
+            ),
             Slice(_i) => panic!("don't know how to handle slices"),
             Range(_i) => panic!("don't know how to handle range"),
         }
