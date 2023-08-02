@@ -305,12 +305,12 @@ fn add_higher_order_fn(
 
             let mut while_block = CG::Block::new(&format!("while sz >= {:#x}", base_page_size));
             while_block.line(format!(
-                "let unmapped = self.{}_one({});",
+                "let changed = self.{}_one({});",
                 op_name,
                 utils::params_to_args_list(&op.params)
             ));
-            while_block.line("sz -= unmapped;");
-            while_block.line("va += unmapped as u64;");
+            while_block.line("sz -= changed;");
+            while_block.line("va += changed as u64;");
             op_fn.push_block(while_block);
             op_fn.line("");
 
