@@ -31,6 +31,8 @@ use std::path::Path;
 use crustal as C;
 
 use velosiast::ast::{VelosiAstMethod, VelosiAstUnitSegment};
+use velosiast::VelosiAstUnit;
+use velosicomposition::Relations;
 
 use super::utils::{self, FieldUtils, UnitUtils};
 use crate::VelosiCodeGenError;
@@ -185,9 +187,66 @@ fn add_constructor_function(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
 // scope.push_function(fun);
 // }
 
-fn add_op_fn(scope: &mut C::Scope, unit: &VelosiAstUnitSegment, op: &VelosiAstMethod) {
+fn add_valid_fn(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
+    let mut valid = C::Function::with_string(unit.valid_fn_name(), C::Type::new_bool());
+    valid.set_static().set_inline();
+    let v = valid
+        .new_param("unit", C::Type::to_ptr(&unit.to_ctype()))
+        .to_expr();
+
+    let op = unit.methods.get("valid").expect("valid method not found!");
+    let valid_body = op.body.as_ref().unwrap();
+
+    let mut state_refs = HashSet::new();
+    valid_body.get_state_references(&mut state_refs);
+
+    let iface = &unit.interface;
+
+    let mut vars = HashMap::new();
+    vars.insert("$unit", v.clone());
+
+    let state = &unit.state;
+    for sref in &state_refs {
+        let val = iface
+            .read_state_expr(sref, state.get_field_range(sref))
+            .unwrap();
+
+        let sref_var_name = format!("{}_val", sref.replace('.', "_"));
+
+        let sref_var = valid
+            .body()
+            .new_variable(sref_var_name.as_str(), C::Type::new_uint64())
+            .to_expr();
+
+        valid
+            .body()
+            .assign(sref_var.clone(), unit.expr_to_cpp(&vars, &val));
+
+        vars.insert(sref.as_str(), sref_var);
+    }
+
+    valid
+        .body()
+        .return_expr(unit.expr_to_cpp(&vars, valid_body));
+
+    scope.push_function(valid);
+}
+
+fn add_op_fn(
+    scope: &mut C::Scope,
+    unit: &VelosiAstUnitSegment,
+    op: &VelosiAstMethod,
+    has_children: bool,
+) {
     // declare the function
-    let mut fun = C::Function::with_string(unit.to_op_fn_name(op), C::Type::new_bool());
+    let mut fun = C::Function::with_string(
+        if has_children {
+            unit.to_op_fn_name_table(op)
+        } else {
+            unit.to_op_fn_name(op)
+        },
+        C::Type::new_size(),
+    );
     fun.set_static().set_inline();
 
     // add the parameters
@@ -242,10 +301,12 @@ fn add_op_fn(scope: &mut C::Scope, unit: &VelosiAstUnitSegment, op: &VelosiAstMe
         for op in &op.ops {
             utils::op_to_c_expr(unit.ident(), fun.body(), op, &field_vars);
         }
-        fun.body().return_expr(C::Expr::btrue());
+
+        let page_size: u64 = 1 << unit.inbitwidth;
+        fun.body().return_expr(C::Expr::new_num(page_size));
     } else {
         fun.body().new_comment("there is no configuration sequence");
-        fun.body().return_expr(C::Expr::bfalse());
+        fun.body().return_expr(C::Expr::new_num(0));
     }
 
     scope.push_function(fun);
@@ -253,21 +314,132 @@ fn add_op_fn(scope: &mut C::Scope, unit: &VelosiAstUnitSegment, op: &VelosiAstMe
 
 fn add_map_function(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
     let m_fn = unit.get_method("map").unwrap();
-    add_op_fn(scope, unit, m_fn);
+    add_op_fn(scope, unit, m_fn, false);
 }
 
-fn add_unmap_function(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
+fn add_unmap_function(scope: &mut C::Scope, unit: &VelosiAstUnitSegment, has_children: bool) {
     let m_fn = unit.get_method("unmap").unwrap();
-    add_op_fn(scope, unit, m_fn);
+    add_op_fn(scope, unit, m_fn, has_children);
 }
 
-fn add_protect_function(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
+fn add_protect_function(scope: &mut C::Scope, unit: &VelosiAstUnitSegment, has_children: bool) {
     let m_fn = unit.get_method("protect").unwrap();
-    add_op_fn(scope, unit, m_fn);
+    add_op_fn(scope, unit, m_fn, has_children);
+}
+
+fn add_higher_order_fn(
+    scope: &mut C::Scope,
+    unit: &VelosiAstUnitSegment,
+    op: &VelosiAstMethod,
+    child: &VelosiAstUnit,
+) {
+    // declare the function
+    let mut fun = C::Function::with_string(unit.to_op_fn_name(op), C::Type::new_size());
+    fun.set_static().set_inline();
+
+    // add the parameters
+    let mut param_exprs = HashMap::new();
+
+    let v = fun
+        .new_param("unit", C::Type::to_ptr(&unit.to_ctype()))
+        .to_expr();
+    param_exprs.insert("unit", v.clone());
+    for f in op.params.iter() {
+        let p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo));
+        param_exprs.insert(f.ident().as_str(), p.to_expr());
+    }
+
+    let mut args = vec![C::Expr::fn_call(&unit.resolve_fn_name(), vec![v.clone()])];
+    args.extend(
+        op.params
+            .iter()
+            .map(|param| param_exprs[param.ident().as_str()].clone()),
+    );
+
+    fun.body()
+        .return_expr(C::Expr::fn_call(&child.to_op_fn_name(op), args));
+
+    scope.push_function(fun);
+}
+
+fn add_resolve_fn(scope: &mut C::Scope, unit: &VelosiAstUnitSegment, child: &VelosiAstUnit) {
+    // add the translate function as a helper
+    let op = unit
+        .methods
+        .get("translate")
+        .expect("map method not found!");
+
+    let mut translate =
+        C::Function::with_string(unit.translate_fn_name(), C::Type::new_typedef("paddr_t"));
+    translate.set_static().set_inline();
+
+    let mut vars = HashMap::new();
+    let v = translate
+        .new_param("unit", C::Type::to_ptr(&unit.to_ctype()))
+        .to_expr();
+    vars.insert("unit", v.clone());
+    for f in op.params.iter() {
+        let p = translate.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo));
+        vars.insert(f.ident().as_str(), p.to_expr());
+    }
+
+    let translate_body = op.body.as_ref().unwrap();
+
+    let mut state_refs = HashSet::new();
+    translate_body.get_state_references(&mut state_refs);
+
+    let iface = &unit.interface;
+
+    vars.insert("$unit", v.clone());
+
+    let state = &unit.state;
+    for sref in &state_refs {
+        let val = iface
+            .read_state_expr(sref, state.get_field_range(sref))
+            .unwrap();
+
+        let sref_var_name = format!("{}_val", sref.replace('.', "_"));
+
+        let sref_var = translate
+            .body()
+            .new_variable(sref_var_name.as_str(), C::Type::new_uint64())
+            .to_expr();
+
+        translate
+            .body()
+            .assign(sref_var.clone(), unit.expr_to_cpp(&vars, &val));
+
+        vars.insert(sref.as_str(), sref_var);
+    }
+
+    translate
+        .body()
+        .return_expr(unit.expr_to_cpp(&vars, translate_body));
+
+    scope.push_function(translate);
+
+    // add resolve
+    let mut resolve = C::Function::with_string(unit.resolve_fn_name(), child.to_ctype());
+    resolve.set_static().set_inline();
+
+    let v = resolve
+        .new_param("unit", C::Type::to_ptr(&unit.to_ctype()))
+        .to_expr();
+
+    let paddr = C::Expr::fn_call(&unit.translate_fn_name(), vec![v, C::Expr::new_num(0)]);
+    resolve
+        .body()
+        .return_expr(C::Expr::fn_call(&child.constructor_fn_name(), vec![paddr]));
+
+    scope.push_function(resolve);
 }
 
 /// generates the VelosiAstUnitSegment definitions
-pub fn generate(unit: &VelosiAstUnitSegment, outdir: &Path) -> Result<(), VelosiCodeGenError> {
+pub fn generate(
+    unit: &VelosiAstUnitSegment,
+    relations: &Relations,
+    outdir: &Path,
+) -> Result<(), VelosiCodeGenError> {
     log::info!("Generating segment unit {}", unit.ident());
 
     // the code generation scope
@@ -292,9 +464,32 @@ pub fn generate(unit: &VelosiAstUnitSegment, outdir: &Path) -> Result<(), Velosi
     add_unit_flags(s, unit);
     add_constructor_function(s, unit);
     add_map_function(s, unit);
-    add_unmap_function(s, unit);
-    add_protect_function(s, unit);
+
+    let has_children = relations.0.get(unit.ident()).is_some();
+    add_unmap_function(s, unit, has_children);
+    add_protect_function(s, unit, has_children);
+
+    add_valid_fn(s, unit);
     // add_translate_function(s, unit);
+
+    if let Some(children) = relations.0.get(unit.ident()) {
+        if !children.is_empty() {
+            let child = &children[0];
+
+            // resolve function
+            add_resolve_fn(s, unit, child);
+
+            // higher-order unmap and protect
+            let op = unit.methods.get("unmap").expect("unmap method not found!");
+            add_higher_order_fn(s, unit, op, child);
+
+            let op = unit
+                .methods
+                .get("protect")
+                .expect("protect method not found!");
+            add_higher_order_fn(s, unit, op, child);
+        }
+    }
 
     log::debug!("saving the scope!");
     // save the scope

@@ -25,15 +25,16 @@
 
 //! StaticMap Generation (C)
 
-use std::collections::HashMap;
 use std::path::Path;
+use std::{collections::HashMap, rc::Rc};
 
 use crustal as C;
 
 use velosiast::{
-    VelosiAst, VelosiAstMethod, VelosiAstStaticMap, VelosiAstStaticMapListComp,
+    VelosiAst, VelosiAstMethod, VelosiAstStaticMap, VelosiAstStaticMapListComp, VelosiAstUnit,
     VelosiAstUnitStaticMap,
 };
+use velosicomposition::Relations;
 
 use super::utils::{self, UnitUtils};
 use crate::VelosiCodeGenError;
@@ -444,12 +445,565 @@ fn add_unit_flags(_scope: &mut C::Scope, _unit: &VelosiAstUnitStaticMap) {
 //     scope.push_function(fun);
 // }
 
+fn base_inbitwidth(relations: &Relations, ident: &Rc<String>, inbitwidth: u64) -> u64 {
+    if let Some(units) = relations.0.get(ident) {
+        units
+            .iter()
+            .map(|u| base_inbitwidth(relations, u.ident(), u.input_bitwidth()))
+            .chain(std::iter::once(inbitwidth))
+            .min()
+            .unwrap()
+    } else {
+        inbitwidth
+    }
+}
+
+fn add_higher_order_map(
+    scope: &mut C::Scope,
+    ast: &VelosiAst,
+    unit: &VelosiAstUnitStaticMap,
+    relations: &Relations,
+) {
+    let base_page_size: usize = 1 << base_inbitwidth(relations, unit.ident(), unit.inbitwidth);
+
+    match &unit.map {
+        VelosiAstStaticMap::Explicit(_) => {
+            // TODO: Explicit map
+        }
+        VelosiAstStaticMap::ListComp(map) => {
+            let dest_unit = ast.get_unit(map.elm.dst.ident().as_str()).unwrap();
+            match dest_unit {
+                VelosiAstUnit::Enum(e) => {
+                    let op = unit.get_method("map").unwrap();
+
+                    let mut fun =
+                        C::Function::with_string(unit.to_op_fn_name(op), C::Type::new_size());
+                    fun.set_static().set_inline();
+
+                    let mut param_exprs = HashMap::new();
+
+                    let v = fun
+                        .new_param("unit", C::Type::to_ptr(&unit.to_ctype()))
+                        .to_expr();
+                    param_exprs.insert("unit", v.clone());
+                    for f in op.params.iter() {
+                        let p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo));
+                        param_exprs.insert(f.ident().as_str(), p.to_expr());
+                    }
+
+                    let va = &param_exprs["va"];
+                    let sz = &param_exprs["sz"];
+                    let pa = &param_exprs["pa"];
+                    let body = &mut fun.body();
+
+                    // add assertions
+                    for arg in [va, sz, pa] {
+                        body.fn_call(
+                            "assert",
+                            vec![C::Expr::binop(
+                                C::Expr::binop(
+                                    arg.clone(),
+                                    "%",
+                                    C::Expr::new_num(base_page_size as u64),
+                                ),
+                                "==",
+                                C::Expr::new_num(0),
+                            )],
+                        );
+                    }
+
+                    let original_sz = body
+                        .new_variable("original_sz", C::Type::new_size())
+                        .to_expr();
+                    body.assign(original_sz.clone(), sz.clone());
+
+                    let (has_children, no_children): (Vec<_>, Vec<_>) = e
+                        .get_unit_names()
+                        .into_iter()
+                        .partition(|variant| relations.0.get(*variant).is_some());
+
+                    for variant in no_children {
+                        let variant_unit = ast.get_unit(variant).unwrap();
+                        let page_size: usize = 1 << variant_unit.input_bitwidth();
+
+                        let mut if_block = C::IfElse::new(&C::Expr::binop(
+                            C::Expr::binop(
+                                C::Expr::binop(
+                                    C::Expr::binop(
+                                        va.clone(),
+                                        "%",
+                                        C::Expr::new_num(page_size as u64),
+                                    ),
+                                    "==",
+                                    C::Expr::new_num(0),
+                                ),
+                                "&&",
+                                C::Expr::binop(
+                                    C::Expr::binop(
+                                        pa.clone(),
+                                        "%",
+                                        C::Expr::new_num(page_size as u64),
+                                    ),
+                                    "==",
+                                    C::Expr::new_num(0),
+                                ),
+                            ),
+                            "&&",
+                            C::Expr::binop(sz.clone(), ">=", C::Expr::new_num(page_size as u64)),
+                        ));
+                        let i = if_block
+                            .then_branch()
+                            .new_variable("i", C::Type::new_size())
+                            .to_expr();
+                        if_block.then_branch().assign(
+                            i.clone(),
+                            C::Expr::binop(
+                                va.clone(),
+                                ">>",
+                                C::Expr::new_num(variant_unit.input_bitwidth()),
+                            ),
+                        );
+
+                        let mut while_block = C::WhileLoop::new(&C::Expr::binop(
+                            C::Expr::binop(
+                                C::Expr::binop(
+                                    va.clone(),
+                                    ">>",
+                                    C::Expr::new_num(variant_unit.input_bitwidth()),
+                                ),
+                                "==",
+                                i,
+                            ),
+                            "&&",
+                            C::Expr::binop(sz.clone(), ">=", C::Expr::new_num(page_size as u64)),
+                        ));
+
+                        let mut args = Vec::new();
+                        for arg in op.params.iter() {
+                            if arg.ident().as_str() == "sz" {
+                                args.push(C::Expr::new_num(page_size as u64))
+                            } else {
+                                let e = param_exprs[arg.ident().as_str()].clone();
+                                args.push(e);
+                            }
+                        }
+
+                        while_block
+                            .body()
+                            .fn_call(&unit.to_op_fn_name_on_unit(op, variant_unit), args);
+                        while_block.body().assign(
+                            sz.clone(),
+                            C::Expr::binop(sz.clone(), "-", C::Expr::new_num(page_size as u64)),
+                        );
+                        while_block.body().assign(
+                            va.clone(),
+                            C::Expr::binop(va.clone(), "+", C::Expr::new_num(page_size as u64)),
+                        );
+                        while_block.body().assign(
+                            pa.clone(),
+                            C::Expr::binop(pa.clone(), "+", C::Expr::new_num(page_size as u64)),
+                        );
+
+                        if_block.then_branch().while_loop(while_block);
+                        body.ifelse(if_block);
+                    }
+
+                    for variant in &has_children {
+                        let children = relations.0.get(*variant).unwrap();
+                        let child = &children[0];
+                        let variant_unit = ast.get_unit(variant).unwrap();
+
+                        let i = body.new_variable("i", C::Type::new_size()).to_expr();
+                        body.assign(
+                            i.clone(),
+                            C::Expr::binop(
+                                va.clone(),
+                                ">>",
+                                C::Expr::new_num(variant_unit.input_bitwidth()),
+                            ),
+                        );
+
+                        let tunit = body
+                            .new_variable("targetunit", dest_unit.to_ctype())
+                            .to_expr();
+
+                        let unit_var = param_exprs.get("unit").unwrap();
+                        let mut var_mappings = HashMap::new();
+                        for p in unit.params_as_slice() {
+                            var_mappings.insert(
+                                p.ident().as_str(),
+                                C::Expr::field_access(unit_var, p.ident().as_str()),
+                            );
+                        }
+
+                        var_mappings.insert(map.var.ident().as_str(), i);
+
+                        let args = map
+                            .elm
+                            .dst
+                            .args
+                            .iter()
+                            .map(|p| unit.expr_to_cpp(&var_mappings, p))
+                            .collect();
+
+                        body.assign(
+                            tunit.clone(),
+                            C::Expr::fn_call(&dest_unit.constructor_fn_name(), args),
+                        );
+
+                        let mut if_block = C::IfElse::new(&C::Expr::uop(
+                            "!",
+                            C::Expr::fn_call(&dest_unit.valid_fn_name(), vec![tunit.clone()]),
+                        ));
+                        let child_paddr = if_block
+                            .then_branch()
+                            .new_variable("child_paddr", C::Type::new_typedef("paddr_t"))
+                            .to_expr();
+                        if_block.then_branch().assign(
+                            child_paddr.clone(),
+                            C::Expr::fn_call(
+                                "virt_to_phys",
+                                vec![C::Expr::fn_call(
+                                    "alloc",
+                                    vec![C::Expr::new_num(base_page_size as u64)],
+                                )],
+                            ),
+                        );
+                        let child_var = if_block
+                            .then_branch()
+                            .new_variable("child", child.to_ctype())
+                            .to_expr();
+                        if_block.then_branch().assign(
+                            child_var.clone(),
+                            C::Expr::fn_call(&child.constructor_fn_name(), vec![child_paddr]),
+                        );
+
+                        let mut args = Vec::new();
+                        for arg in op.params.iter() {
+                            if arg.ident().as_str() == "pa" {
+                                args.push(child_var.clone())
+                            } else {
+                                let e = param_exprs[arg.ident().as_str()].clone();
+                                args.push(e);
+                            }
+                        }
+
+                        if_block
+                            .then_branch()
+                            .fn_call(&unit.to_op_fn_name_on_unit(op, variant_unit), args);
+
+                        body.ifelse(if_block);
+
+                        let child_var = body.new_variable("child", child.to_ctype()).to_expr();
+
+                        body.assign(
+                            child_var.clone(),
+                            C::Expr::fn_call(
+                                &variant_unit.resolve_fn_name(),
+                                vec![C::Expr::fn_call(
+                                    &variant_unit.constructor_fn_name(),
+                                    variant_unit
+                                        .params_as_slice()
+                                        .iter()
+                                        .map(|param| C::Expr::field_access(&tunit, param.ident()))
+                                        .collect(),
+                                )],
+                            ),
+                        );
+                        let mapped_sz = body
+                            .new_variable("mapped_sz", C::Type::new_size())
+                            .to_expr();
+                        let mut args = vec![C::Expr::addr_of(&child_var)];
+                        args.extend(
+                            op.params
+                                .iter()
+                                .map(|param| param_exprs[param.ident().as_str()].clone()),
+                        );
+
+                        body.assign(
+                            mapped_sz.clone(),
+                            C::Expr::fn_call(&child.to_op_fn_name(op), args),
+                        );
+                        body.assign(
+                            sz.clone(),
+                            C::Expr::binop(sz.clone(), "-", mapped_sz.clone()),
+                        );
+                        if variant != has_children.last().unwrap() {
+                            body.assign(
+                                va.clone(),
+                                C::Expr::binop(va.clone(), "+", mapped_sz.clone()),
+                            );
+                            body.assign(
+                                pa.clone(),
+                                C::Expr::binop(pa.clone(), "+", mapped_sz.clone()),
+                            );
+                        }
+                    }
+
+                    body.return_expr(C::Expr::binop(original_sz, "-", sz.clone()));
+
+                    scope.push_function(fun);
+                }
+                _ => {
+                    let op = unit.get_method("map").unwrap();
+
+                    let mut fun =
+                        C::Function::with_string(unit.to_op_fn_name(op), C::Type::new_size());
+                    fun.set_static().set_inline();
+
+                    let mut param_exprs = HashMap::new();
+
+                    let v = fun
+                        .new_param("unit", C::Type::to_ptr(&unit.to_ctype()))
+                        .to_expr();
+                    param_exprs.insert("unit", v);
+                    for f in op.params.iter() {
+                        let p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo));
+                        param_exprs.insert(f.ident().as_str(), p.to_expr());
+                    }
+
+                    let va = &param_exprs["va"];
+                    let sz = &param_exprs["sz"];
+                    let pa = &param_exprs["pa"];
+                    let body = &mut fun.body();
+
+                    // add assertions
+                    for arg in [va, sz, pa] {
+                        body.fn_call(
+                            "assert",
+                            vec![C::Expr::binop(
+                                C::Expr::binop(
+                                    arg.clone(),
+                                    "%",
+                                    C::Expr::new_num(base_page_size as u64),
+                                ),
+                                "==",
+                                C::Expr::new_num(0),
+                            )],
+                        );
+                    }
+
+                    let original_sz = body
+                        .new_variable("original_sz", C::Type::new_size())
+                        .to_expr();
+                    body.assign(original_sz.clone(), sz.clone());
+                    let page_size: usize = 1 << dest_unit.input_bitwidth();
+
+                    let mut if_block = C::IfElse::new(&C::Expr::binop(
+                        C::Expr::binop(
+                            C::Expr::binop(
+                                C::Expr::binop(va.clone(), "%", C::Expr::new_num(page_size as u64)),
+                                "==",
+                                C::Expr::new_num(0),
+                            ),
+                            "&&",
+                            C::Expr::binop(
+                                C::Expr::binop(pa.clone(), "%", C::Expr::new_num(page_size as u64)),
+                                "==",
+                                C::Expr::new_num(0),
+                            ),
+                        ),
+                        "&&",
+                        C::Expr::binop(sz.clone(), ">=", C::Expr::new_num(page_size as u64)),
+                    ));
+                    let i = if_block
+                        .then_branch()
+                        .new_variable("i", C::Type::new_size())
+                        .to_expr();
+                    if_block.then_branch().assign(
+                        i.clone(),
+                        C::Expr::binop(
+                            va.clone(),
+                            ">>",
+                            C::Expr::new_num(dest_unit.input_bitwidth()),
+                        ),
+                    );
+
+                    let mut while_block = C::WhileLoop::new(&C::Expr::binop(
+                        C::Expr::binop(
+                            C::Expr::binop(
+                                va.clone(),
+                                ">>",
+                                C::Expr::new_num(dest_unit.input_bitwidth()),
+                            ),
+                            "==",
+                            i,
+                        ),
+                        "&&",
+                        C::Expr::binop(sz.clone(), ">=", C::Expr::new_num(page_size as u64)),
+                    ));
+
+                    let op = if dest_unit.is_enum() {
+                        unit.get_method("map").unwrap()
+                    } else {
+                        dest_unit.get_method("map").unwrap()
+                    };
+                    let mut args = Vec::new();
+                    for arg in op.params.iter() {
+                        if arg.ident().as_str() == "pa" {
+                            match &arg.ptype.typeinfo {
+                                velosiast::ast::VelosiAstTypeInfo::TypeRef(ty) => {
+                                    let child = ast.get_unit(ty).unwrap();
+                                    args.push(C::Expr::fn_call(
+                                        &child.constructor_fn_name(),
+                                        op.params
+                                            .iter()
+                                            .map(|param| {
+                                                param_exprs[param.ident().as_str()].clone()
+                                            })
+                                            .collect(),
+                                    ));
+                                }
+                                _ => {
+                                    let e = param_exprs[arg.ident().as_str()].clone();
+                                    args.push(e);
+                                }
+                            }
+                        } else if arg.ident().as_str() == "sz" {
+                            args.push(C::Expr::new_num(page_size as u64))
+                        } else {
+                            let e = param_exprs[arg.ident().as_str()].clone();
+                            args.push(e);
+                        }
+                    }
+
+                    while_block
+                        .body()
+                        .fn_call(&unit.to_op_fn_name_on_unit(op, dest_unit), args);
+                    while_block.body().assign(
+                        sz.clone(),
+                        C::Expr::binop(sz.clone(), "-", C::Expr::new_num(page_size as u64)),
+                    );
+                    while_block.body().assign(
+                        va.clone(),
+                        C::Expr::binop(va.clone(), "+", C::Expr::new_num(page_size as u64)),
+                    );
+                    while_block.body().assign(
+                        pa.clone(),
+                        C::Expr::binop(pa.clone(), "+", C::Expr::new_num(page_size as u64)),
+                    );
+
+                    if_block.then_branch().while_loop(while_block);
+                    body.ifelse(if_block);
+
+                    body.return_expr(C::Expr::binop(original_sz, "-", sz.clone()));
+
+                    scope.push_function(fun);
+                }
+            }
+        }
+        VelosiAstStaticMap::None(_) => {
+            // No map defined for this unit
+        }
+    }
+}
+
+fn add_higher_order_function(
+    scope: &mut C::Scope,
+    unit: &VelosiAstUnitStaticMap,
+    relations: &Relations,
+    op_name: &str,
+) {
+    let base_page_size: usize = 1 << base_inbitwidth(relations, unit.ident(), unit.inbitwidth);
+
+    match &unit.map {
+        VelosiAstStaticMap::Explicit(_) => {
+            // TODO: Explicit map
+        }
+        VelosiAstStaticMap::ListComp(_) => {
+            let op = unit.get_method(op_name).unwrap();
+
+            let mut fun = C::Function::with_string(unit.to_op_fn_name(op), C::Type::new_size());
+            fun.set_static().set_inline();
+
+            let mut param_exprs = HashMap::new();
+
+            let v = fun
+                .new_param("unit", C::Type::to_ptr(&unit.to_ctype()))
+                .to_expr();
+            param_exprs.insert("unit", v.clone());
+            for f in op.params.iter() {
+                let p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo));
+                param_exprs.insert(f.ident().as_str(), p.to_expr());
+            }
+
+            let va = &param_exprs["va"];
+            let sz = &param_exprs["sz"];
+            let body = &mut fun.body();
+
+            // add assertions
+            for arg in [va, sz] {
+                body.fn_call(
+                    "assert",
+                    vec![C::Expr::binop(
+                        C::Expr::binop(arg.clone(), "%", C::Expr::new_num(base_page_size as u64)),
+                        "==",
+                        C::Expr::new_num(0),
+                    )],
+                );
+            }
+
+            let original_sz = body
+                .new_variable("original_sz", C::Type::new_size())
+                .to_expr();
+            body.assign(original_sz.clone(), sz.clone());
+
+            let mut while_block = C::WhileLoop::new(&C::Expr::binop(
+                sz.clone(),
+                ">=",
+                C::Expr::new_num(base_page_size as u64),
+            ));
+            let changed = while_block
+                .body()
+                .new_variable("changed", C::Type::new_size())
+                .to_expr();
+
+            let mut args = vec![C::Expr::addr_of(&v)];
+            args.extend(
+                op.params
+                    .iter()
+                    .map(|param| param_exprs[param.ident().as_str()].clone()),
+            );
+            while_block.body().assign(
+                changed.clone(),
+                C::Expr::fn_call(&unit.to_op_fn_name_one(op), args),
+            );
+            while_block
+                .body()
+                .assign(sz.clone(), C::Expr::binop(sz.clone(), "-", changed.clone()));
+            while_block
+                .body()
+                .assign(va.clone(), C::Expr::binop(va.clone(), "+", changed));
+
+            body.while_loop(while_block);
+            body.return_expr(C::Expr::binop(original_sz, "-", sz.clone()));
+
+            scope.push_function(fun);
+        }
+        VelosiAstStaticMap::None(_) => {
+            // No map defined for this unit
+        }
+    }
+}
+
+fn add_higher_order_functions(
+    scope: &mut C::Scope,
+    ast: &VelosiAst,
+    unit: &VelosiAstUnitStaticMap,
+    relations: &Relations,
+) {
+    add_higher_order_map(scope, ast, unit, relations);
+    add_higher_order_function(scope, unit, relations, "unmap");
+    add_higher_order_function(scope, unit, relations, "protect");
+}
+
 fn add_op_fn_body_listcomp(
     scope: &mut C::Block,
     ast: &VelosiAst,
     unit: &VelosiAstUnitStaticMap,
     map: &VelosiAstStaticMapListComp,
     op: &VelosiAstMethod,
+    variant_unit: Option<&VelosiAstUnit>,
     mut params_exprs: HashMap<&str, C::Expr>,
 ) {
     scope.new_comment(map.to_string().as_str());
@@ -523,58 +1077,113 @@ fn add_op_fn_body_listcomp(
         let e = params_exprs.remove(arg.ident().as_str()).unwrap();
         args.push(e);
     }
-    scope.return_expr(C::Expr::fn_call(&dest_unit.to_op_fn_name(op), args));
+    let fn_name = match variant_unit {
+        Some(variant_unit) => dest_unit.to_op_fn_name_on_unit(op, variant_unit),
+        None => dest_unit.to_op_fn_name(op),
+    };
+
+    scope.return_expr(C::Expr::fn_call(&fn_name, args));
 }
 
 fn add_op_function(
     scope: &mut C::Scope,
     ast: &VelosiAst,
     unit: &VelosiAstUnitStaticMap,
-    op: &VelosiAstMethod,
+    op_name: &str,
 ) {
-    // declare the function
-    let mut fun = C::Function::with_string(unit.to_op_fn_name(op), C::Type::new_bool());
-    fun.set_static().set_inline();
-
-    let mut param_exprs = HashMap::new();
-
-    let v = fun
-        .new_param("unit", C::Type::to_ptr(&unit.to_ctype()))
-        .to_expr();
-    param_exprs.insert("unit", v);
-    for f in op.params.iter() {
-        let p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo));
-        param_exprs.insert(f.ident().as_str(), p.to_expr());
-    }
-
-    // todo: add requires
-
     match &unit.map {
         VelosiAstStaticMap::Explicit(_) => {
-            fun.body().new_comment("TODO: Explicit map");
+            // TODO: explicit map
         }
         VelosiAstStaticMap::ListComp(map) => {
-            add_op_fn_body_listcomp(fun.body(), ast, unit, map, op, param_exprs);
+            let dest_unit = ast.get_unit(map.elm.dst.ident().as_str()).unwrap();
+            match dest_unit {
+                VelosiAstUnit::Enum(e) if op_name == "map" => {
+                    for variant in e.get_unit_names() {
+                        let variant_unit = ast.get_unit(variant).unwrap();
+                        let op = variant_unit.get_method(op_name).unwrap();
+
+                        // declare the function
+                        let mut fun = C::Function::with_string(
+                            unit.to_op_fn_name_on_unit(op, variant_unit),
+                            C::Type::new_size(),
+                        );
+                        fun.set_static().set_inline();
+
+                        let mut param_exprs = HashMap::new();
+
+                        let v = fun
+                            .new_param("unit", C::Type::to_ptr(&unit.to_ctype()))
+                            .to_expr();
+                        param_exprs.insert("unit", v);
+                        for f in op.params.iter() {
+                            let p =
+                                fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo));
+                            param_exprs.insert(f.ident().as_str(), p.to_expr());
+                        }
+
+                        // todo: add requires
+
+                        add_op_fn_body_listcomp(
+                            fun.body(),
+                            ast,
+                            unit,
+                            map,
+                            op,
+                            Some(variant_unit),
+                            param_exprs,
+                        );
+
+                        // push the function to the scope
+                        scope.push_function(fun);
+                    }
+                }
+                _ => {
+                    let op = if dest_unit.is_enum() {
+                        unit.get_method(op_name).unwrap()
+                    } else {
+                        dest_unit.get_method(op_name).unwrap()
+                    };
+                    let fn_name = if op_name == "map" {
+                        unit.to_op_fn_name_on_unit(op, dest_unit)
+                    } else {
+                        unit.to_op_fn_name_one(op)
+                    };
+
+                    // declare the function
+                    let mut fun = C::Function::with_string(fn_name, C::Type::new_size());
+                    fun.set_static().set_inline();
+
+                    let mut param_exprs = HashMap::new();
+
+                    let v = fun
+                        .new_param("unit", C::Type::to_ptr(&unit.to_ctype()))
+                        .to_expr();
+                    param_exprs.insert("unit", v);
+                    for f in op.params.iter() {
+                        let p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo));
+                        param_exprs.insert(f.ident().as_str(), p.to_expr());
+                    }
+
+                    // todo: add requires
+
+                    add_op_fn_body_listcomp(fun.body(), ast, unit, map, op, None, param_exprs);
+
+                    // push the function to the scope
+                    scope.push_function(fun);
+                }
+            }
         }
         VelosiAstStaticMap::None(_) => {
-            fun.body().new_comment("No map defined for this unit");
+            // no map defined
         }
     }
-
-    // push the function to the scope
-    scope.push_function(fun);
 }
 
 fn add_op_functions(scope: &mut C::Scope, ast: &VelosiAst, unit: &VelosiAstUnitStaticMap) {
-    let op = unit.methods.get("map").expect("map method not found!");
-    add_op_function(scope, ast, unit, op);
-    let op = unit.methods.get("unmap").expect("unmap method not found!");
-    add_op_function(scope, ast, unit, op);
-    let op = unit
-        .methods
-        .get("protect")
-        .expect("protect method not found!");
-    add_op_function(scope, ast, unit, op);
+    add_op_function(scope, ast, unit, "map");
+    add_op_function(scope, ast, unit, "unmap");
+    add_op_function(scope, ast, unit, "protect");
 }
 
 fn generate_unit_struct(scope: &mut C::Scope, unit: &VelosiAstUnitStaticMap) {
@@ -627,6 +1236,7 @@ fn add_constructor_function(scope: &mut C::Scope, unit: &VelosiAstUnitStaticMap)
 pub fn generate(
     ast: &VelosiAst,
     unit: &VelosiAstUnitStaticMap,
+    relations: &Relations,
     outdir: &Path,
 ) -> Result<(), VelosiCodeGenError> {
     log::info!("Generating staticmap unit {}", unit.ident());
@@ -661,6 +1271,7 @@ pub fn generate(
     add_unit_flags(s, unit);
     generate_unit_struct(s, unit);
     add_constructor_function(s, unit);
+    add_higher_order_functions(s, ast, unit, relations);
     add_op_functions(s, ast, unit);
 
     // add_translate_function(s, unit);

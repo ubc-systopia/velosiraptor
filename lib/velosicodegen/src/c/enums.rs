@@ -220,16 +220,9 @@ fn add_map_function(
 
         // declare the function
 
-        let mut fn_name = unit.to_op_fn_name(variant_op);
-        fn_name.push('_');
-        fn_name.push_str(
-            &variant_unit
-                .ident()
-                .replace(unit.ident().as_str(), "")
-                .to_ascii_lowercase(),
-        );
+        let fn_name = unit.to_op_fn_name_on_unit(variant_op, variant_unit);
 
-        let mut fun = C::Function::with_string(fn_name, C::Type::new_bool());
+        let mut fun = C::Function::with_string(fn_name, C::Type::new_size());
         fun.set_static().set_inline();
 
         // add the parameters
@@ -285,7 +278,7 @@ fn add_op_function(
     // map_page() map_ptable()
     //  -> create state struct
     //  -> call map()
-    let mut fun = C::Function::with_string(unit.to_op_fn_name(op), C::Type::new_bool());
+    let mut fun = C::Function::with_string(unit.to_op_fn_name(op), C::Type::new_size());
     fun.set_static().set_inline();
 
     let v = fun
@@ -394,6 +387,37 @@ fn add_translate_function(
     Ok(())
 }
 
+fn add_valid_fn(scope: &mut C::Scope, ast: &VelosiAst, unit: &VelosiAstUnitEnum) {
+    let mut valid = C::Function::with_string(unit.valid_fn_name(), C::Type::new_bool());
+    valid.set_static().set_inline();
+    let v = valid
+        .new_param("unit", C::Type::to_ptr(&unit.to_ctype()))
+        .to_expr();
+
+    let expr = unit
+        .get_unit_names()
+        .iter()
+        .map(|variant| {
+            let variant_unit = ast.get_unit(variant).unwrap();
+            C::Expr::fn_call(
+                &variant_unit.valid_fn_name(),
+                vec![C::Expr::fn_call(
+                    &variant_unit.constructor_fn_name(),
+                    variant_unit
+                        .params_as_slice()
+                        .iter()
+                        .map(|param| C::Expr::field_access(&v, param.ident()))
+                        .collect(),
+                )],
+            )
+        })
+        .reduce(|acc, e| C::Expr::binop(acc, "||", e))
+        .unwrap();
+    valid.body().return_expr(expr);
+
+    scope.push_function(valid);
+}
+
 pub fn generate(
     ast: &VelosiAst,
     unit: &VelosiAstUnitEnum,
@@ -422,6 +446,7 @@ pub fn generate(
     add_unmap_function(s, ast, unit)?;
     add_protect_function(s, ast, unit)?;
     add_translate_function(s, ast, unit)?;
+    add_valid_fn(s, ast, unit);
 
     // save the scope
     log::debug!("saving the scope!");
