@@ -49,47 +49,67 @@ pub fn unit_class_name(name: &str) -> String {
     format!("{}{}Unit", name[0..1].to_uppercase(), &name[1..])
 }
 
-fn add_constructor(c: &mut C::Class, ifn: &str, scn: &str) {
-    // TranslationUnit::TranslationUnit(std::string const                     &name,
-    //                                  pv::RandomContextTransactionGenerator *ptw_pvbus)
-    //     : TranslationUnitBase(name, ptw_pvbus, 0, CONFIG_END_ADDRESS)
-    //     , _state(TranslationUnitState())
-    //     , _interface(TranslationUnitInterface(&_state))
-    // {
-    // }
-    //     TranslationUnit(std::string const                     &name,
-    //     pv::RandomContextTransactionGenerator *ptw_pvbus = nullptr);
+fn add_constructor(c: &mut C::Class, unit: &VelosiAstUnit, ifn: &str, scn: &str) {
+    // MyUnit::MyUnit(std::string const                     &name,
+    //                pv::RandomContextTransactionGenerator *ptw_pvbus,
+    //                lpaddr_t                              base)
+    //     : TranslationUnitBase(name, ptw_pvbus)
+    //     , state(MyUnitState())
+    //     , interface(MyUnitInterface(&state))
+    // {}
     let mut arg0_type = C::Type::new_std_string();
     arg0_type.constant().reference();
 
     let mut arg1_type = C::Type::new_class("pv::RandomContextTransactionGenerator");
     arg1_type.pointer();
 
-    c.new_constructor()
+    let ctor = c
+        .new_constructor()
         .private()
         .push_param(C::MethodParam::new("name", arg0_type.clone()))
+        .push_param(C::MethodParam::new(
+            "base",
+            C::Type::new_typedef("lpaddr_t"),
+        ))
         .push_parent_initializer(C::Expr::fn_call(
             "TranslationUnitBase",
             vec![
                 C::Expr::new_var("name", arg0_type),
+                C::Expr::new_var("base", C::Type::new_typedef("lpaddr_t")),
                 C::Expr::new_var("ptw_pvbus", arg1_type.clone()),
             ],
         ))
-        .push_initializer("_state", C::Expr::fn_call(scn, vec![]))
+        .push_initializer("state", C::Expr::fn_call(scn, vec![]))
         .push_initializer(
-            "_interface",
+            "interface",
             C::Expr::fn_call(
                 ifn,
                 vec![C::Expr::addr_of(&C::Expr::new_var(
-                    "_state",
+                    "state",
                     C::Type::new_class("Interface"),
                 ))],
             ),
-        )
-        .new_param("ptw_pvbus", arg1_type)
+        );
+
+    ctor.new_param("ptw_pvbus", arg1_type)
         .set_default_value("nullptr");
+
+    // Filling in the state by reading data at the base addr of the unit
+    match unit.state() {
+        None => (),
+        Some(_) => {
+            let mut ctor_body = C::Block::new();
+            ctor_body.method_call(
+                C::Expr::Raw("this".to_string()),
+                "populate_state",
+                vec![C::Expr::Raw("base".to_string())],
+            );
+            ctor.set_body(ctor_body);
+        }
+    }
 }
 
+// I don't know what this function does or where its arguments should come from
 fn add_create(c: &mut C::Class, ucn: &str) {
     // static TranslationUnit *create(sg::ComponentBase *parentComponent, std::string const &name,
     //     sg::CADIBase                          *cadi,
@@ -115,16 +135,19 @@ fn add_create(c: &mut C::Class, ucn: &str) {
     let mut arg3_type = C::Type::new_class("pv::RandomContextTransactionGenerator");
     arg3_type.pointer();
 
+    let arg4_type = C::Type::new_typedef("lpaddr_t");
+
     // arguments
     m.push_param(C::MethodParam::new("parentComponent", arg0_type))
         .push_param(C::MethodParam::new("name", arg1_type))
         .push_param(C::MethodParam::new("cadi", arg2_type))
-        .push_param(C::MethodParam::new("ptw_pvbus", arg3_type));
+        .push_param(C::MethodParam::new("ptw_pvbus", arg3_type))
+        .push_param(C::MethodParam::new("base", arg4_type));
 
     let unitvar = C::Expr::new_var("t", unit_ptr_type.clone());
 
-    let statevar = C::Expr::field_access(&unitvar, "_state");
-    let ifvar = C::Expr::field_access(&unitvar, "_interface");
+    let statevar = C::Expr::field_access(&unitvar, "state");
+    let ifvar = C::Expr::field_access(&unitvar, "interface");
 
     //  TranslationUnit *t;
     m.body()
@@ -136,11 +159,11 @@ fn add_create(c: &mut C::Class, ucn: &str) {
         // t = new TranslationUnit(name, ptw_pvbus)
         .assign(
             unitvar.clone(),
-            C::Expr::Raw(format!(" new {}(name, ptw_pvbus)", ucn)),
+            C::Expr::Raw(format!(" new {}(name, base, ptw_pvbus)", ucn)),
         )
-        // t->_state.print_state_fields();
+        // t->state.print_state_fields();
         .method_call(statevar, "print_state_fields", vec![])
-        // t->_interface.debug_print_interface();
+        // t->interface.debug_print_interface();
         .method_call(ifvar, "debug_print_interface", vec![])
         // return t;
         .return_expr(unitvar);
@@ -151,14 +174,14 @@ fn add_create(c: &mut C::Class, ucn: &str) {
     // {
     //     Logging::debug("creating new translation unit.\n");
     //     TranslationUnit *t = new TranslationUnit(name, ptw_pvbus);
-    //     t->_interface.debug_print_interface();
+    //     t->interface.debug_print_interface();
     //     Logging::debug("translation unit created.\n");
     //     return t;
     // }
 }
 
 fn state_field_access(access: &Vec<&str>) -> C::Expr {
-    let st = C::Expr::field_access(&C::Expr::this(), "_state");
+    let st = C::Expr::field_access(&C::Expr::this(), "state");
 
     if access.len() == 1 {
         return st;
@@ -190,7 +213,7 @@ fn expr_to_cpp(expr: &VelosiAstExpr) -> C::Expr {
             let p: Vec<&str> = ident.path_split().collect();
             match p[0] {
                 "state" => {
-                    // this->_state.control_field()
+                    // this->state.control_field()
                     state_field_access(&p)
                 }
                 "interface" => panic!("state not implemented"),
@@ -332,9 +355,7 @@ fn ast_type_to_c_type(t: &VelosiAstType) -> C::Type {
     }
 }
 
-// how is this generating both a declaration in the header file
-// and an implementation in the cpp file?????
-fn add_method_decl(c: &mut C::Class, tm: &VelosiAstMethod) {
+fn add_method(c: &mut C::Class, tm: &VelosiAstMethod) {
     match &tm.ident.ident[..] {
         "translate" => {
             // todo figure out why this needs its own special function
@@ -367,19 +388,16 @@ fn add_method_decl(c: &mut C::Class, tm: &VelosiAstMethod) {
 pub fn generate_unit_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
-    // document header
     add_header(&mut scope, unit.ident(), "unit");
 
     let ifn = interface_class_name(unit.ident());
     let scn = state_class_name(unit.ident());
     let ucn = unit_class_name(unit.ident());
 
-    // set the header guard, and create
-    let hdrguard = format!("{}_UNIT_HPP_", unit.ident().to_uppercase());
-    let guard = scope.new_ifdef(&hdrguard);
+    let header_guard = format!("{}_UNIT_HPP_", unit.ident().to_uppercase());
+    let guard = scope.new_ifdef(&header_guard);
     let s = guard.guard().then_scope();
 
-    // adding the includes
     s.new_comment("system includes");
     s.new_include("string.h", true);
     s.new_include("assert.h", true);
@@ -397,43 +415,34 @@ pub fn generate_unit_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), V
 
     c.set_base("TranslationUnitBase", C::Visibility::Public);
 
-    add_constructor(c, &ifn, &scn);
+    add_constructor(c, &unit, &ifn, &scn);
     add_create(c, &ucn);
 
-    // virtual UnitBase *get_interface(void) set_override
-    // {
-    //    return &this->_interface;
-    // }
+    // overrides virtual interface getter
     c.new_method(
         "get_interface",
         C::Type::to_ptr(&C::Type::new_class("InterfaceBase")),
     )
     .set_public()
-    // .set_virtual()
     .set_inside_def()
     .set_override()
     .body()
     .return_expr(C::Expr::addr_of(&C::Expr::field_access(
         &C::Expr::this(),
-        "_interface",
+        "interface",
     )));
 
-    // virtual StateBase *get_state(void) set_override
-    // {
-    //     return &this->_state;
-    // }
     c.new_method(
         "get_state",
         C::Type::to_ptr(&C::Type::new_class("StateBase")),
     )
     .set_public()
-    // .set_virtual()
-    .set_override()
     .set_inside_def()
+    .set_override()
     .body()
     .return_expr(C::Expr::addr_of(&C::Expr::field_access(
         &C::Expr::this(),
-        "_state",
+        "state",
     )));
 
     // attributes
@@ -442,8 +451,8 @@ pub fn generate_unit_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), V
     let iface_ptr_type = C::Type::new_class(&ifn);
 
     // add the state attribute
-    c.new_attribute("_state", state_ptr_type);
-    c.new_attribute("_interface", iface_ptr_type);
+    c.new_attribute("state", state_ptr_type);
+    c.new_attribute("interface", iface_ptr_type);
 
     for vrsm in unit.methods() {
         let m = c.new_method(&vrsm.ident.ident, ast_type_to_c_type(&vrsm.rtype));
@@ -495,26 +504,18 @@ pub fn generate_unit_impl(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), Vel
     let ucn = unit_class_name(unit.ident());
     let c = scope.new_class(ucn.as_str());
 
-    // c.set_base("TranslationUnitBase", C::Visibility::Public);
-
     let ifn = interface_class_name(unit.ident());
     let scn = state_class_name(unit.ident());
 
-    add_constructor(c, &ifn, &scn);
+    add_constructor(c, &unit, &ifn, &scn);
 
     add_create(c, &ucn);
-
-    /*
-     * -------------------------------------------------------------------------------------------
-     * Translations
-     * -------------------------------------------------------------------------------------------
-     */
 
     match unit {
         // segments have methods within the .vrs
         VelosiAstUnit::Segment(_) => {
             for m in unit.methods() {
-                add_method_decl(c, m)
+                add_method(c, m)
             }
         }
         // simpler units need do_translate

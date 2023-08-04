@@ -119,7 +119,7 @@ impl ArmFastModelsModule {
         )?;
         writeln!(
             f,
-            "FRAMEWORK_COMMIT=59e51e383165731e26cae00c08c1e9adea2b6f23",
+            "FRAMEWORK_COMMIT=ef7c98835cdcc3a57a9ffda813bfc6d4feeddd53",
         )?;
         writeln!(f, "FRAMEWORK_DIR={}", self.fdir)?;
 

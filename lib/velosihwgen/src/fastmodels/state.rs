@@ -54,18 +54,18 @@ pub fn state_field_class_name(name: &str) -> String {
     format!("{}{}StateField", name[0..1].to_uppercase(), &name[1..])
 }
 
-// TODO: I don't know how helpful it is to separate the header from the implementation in this case.
+// TODO: I don't know how helpful it is to separate the header from the implementation
 // It may just make this file more confusing.
 
 pub fn generate_state_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), VelosiHwGenError> {
-    let mut scope_unguarded = C::Scope::new();
+    let mut scope = C::Scope::new();
 
     let scn = state_class_name(unit.ident());
 
-    add_header(&mut scope_unguarded, unit.ident(), "state");
+    add_header(&mut scope, unit.ident(), "state");
 
     let guard =
-        scope_unguarded.new_ifdef(format!("{}_STATE_HPP_", unit.ident().to_uppercase()).as_str());
+        scope.new_ifdef(format!("{}_STATE_HPP_", unit.ident().to_uppercase()).as_str());
 
     let s = guard.guard().then_scope();
 
@@ -140,8 +140,8 @@ pub fn generate_state_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), 
     }
 
     let filename = state_header_file_path(unit.ident());
-    scope_unguarded.set_filename(&filename);
-    scope_unguarded.to_file(outdir, true)?;
+    scope.set_filename(&filename);
+    scope.to_file(outdir, true)?;
 
     Ok(())
 }
