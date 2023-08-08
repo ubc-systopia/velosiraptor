@@ -31,7 +31,7 @@
 
 // used standard library modules
 use std::convert::TryFrom;
-use std::fmt::{Display, Formatter, Result as FmtResult};
+use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 // used external dependencies
 use tokstream::TokKind;
@@ -43,7 +43,7 @@ use tokstream::TokKind;
 /// Enumeration of all keywords in the Velosiraptor language
 ///
 /// Each keyword is represented by a variant of this enum.
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum VelosiKeyword {
     //
     // language keywords
@@ -298,12 +298,19 @@ impl Display for VelosiKeyword {
     }
 }
 
+/// Implementation of the [Debug] trait for [VelosiKeyword]
+impl Debug for VelosiKeyword {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        Display::fmt(self, f)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Operator Tokens
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Operator Tokens representing the different operators and punctuations in the Velosiraptor Language
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum VelosiOpToken {
     // punctuations
     Dot,       // .
@@ -434,13 +441,6 @@ impl VelosiOpToken {
     }
 }
 
-/// Implementation of the [Display] trait for [VelosiOpToken]
-impl Display for VelosiOpToken {
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
-        write!(f, "{}", self.as_str())
-    }
-}
-
 /// Implementation of the [TryFrom<&str>] trait for [VelosiOpToken]
 impl<'a> TryFrom<&'a str> for VelosiOpToken {
     type Error = &'a str;
@@ -513,12 +513,26 @@ impl<'a> TryFrom<&'a str> for VelosiOpToken {
     }
 }
 
+/// Implementation of the [Display] trait for [VelosiOpToken]
+impl Display for VelosiOpToken {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+/// Implementation of the [Debug] trait for [VelosiOpToken]
+impl Debug for VelosiOpToken {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        Display::fmt(self, f)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Token Kind
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents the different Velosiraptor token kinds
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum VelosiTokenKind {
     /// represents an illegal token
     Illegal,
@@ -558,6 +572,7 @@ impl VelosiTokenKind {
         }
     }
 
+    /// returns a string that hints at the kind of token
     pub fn as_hint_str(&self) -> &'static str {
         use VelosiTokenKind::*;
         match self {
@@ -573,6 +588,7 @@ impl VelosiTokenKind {
     }
 }
 
+/// Implementation of the [Display] trait for [VelosiTokenKind]
 impl Display for VelosiTokenKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         use VelosiTokenKind::*;
@@ -589,6 +605,14 @@ impl Display for VelosiTokenKind {
     }
 }
 
+/// Implementation of the [Debug] trait for [VelosiTokenKind]
+impl Debug for VelosiTokenKind {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        Display::fmt(self, f)
+    }
+}
+
+/// Implementatino of [TokKind] for [VelosiTokenKind]
 impl TokKind for VelosiTokenKind {
     /// whether the token is a keyword
     fn is_keyword(&self) -> bool {
@@ -637,9 +661,11 @@ impl TokKind for VelosiTokenKind {
     }
 }
 
-#[cfg(test)]
-use std::convert::TryInto;
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Tests
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg(test)]
 #[test]
 fn test_enum_str() {
     assert_eq!("segment".try_into(), Ok(VelosiKeyword::Segment));

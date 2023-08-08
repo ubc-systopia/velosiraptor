@@ -33,17 +33,24 @@ use nom::{
     sequence::delimited,
     Err,
 };
+use tokstream::{SrcSpan, Tok};
 
+// used crate dependencies
 use crate::error::{IResult, VelosiLexerErrBuilder};
-use crate::{SrcSpan, Tok, VelosiOpToken, VelosiToken, VelosiTokenKind};
+use crate::{VelosiOpToken, VelosiToken, VelosiTokenKind};
 
+// modules
 mod comments;
 mod identifier;
 mod number;
 
 use comments::{blockcomment, linecomment};
-use identifier::identifier;
+use identifier::identifier_or_keyword;
 use number::number;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Operator Token Parser
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // macro to generate a parser to recognize a token
 macro_rules! namedtag (
@@ -117,7 +124,11 @@ namedtag!(coloncolon, VelosiOpToken::ColonColon);
 namedtag!(questionmark, VelosiOpToken::QuestionMark);
 namedtag!(hashtag, VelosiOpToken::HashTag);
 
-/// symbols with two character width
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Combined Operator Parsers
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// symbols with two or more character width
 fn punctuation2(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
     alt((
         // arrows etc
@@ -156,6 +167,7 @@ fn bitwiseop(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
     alt((xor, not, and, or))(input)
 }
 
+// parses punctuations
 fn puncts(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
     alt((dot, comma, colon, semicolon))(input)
 }
@@ -177,6 +189,9 @@ fn punctuation1(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
     ))(input)
 }
 
+/// recognies any character that is not parsed by any of the other parsers
+///
+/// This parser will accept any input and will always return an error
 fn any(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
     let (_, t) = take(1usize)(input)?;
 
@@ -188,12 +203,26 @@ fn any(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
     Err(Err::Failure(err))
 }
 
-/// recognizes a token
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Token Parser
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// recognizes a token and removes leading and trailing whitespaces
+///
+/// # Arguments
+///
+/// * `input` - the input source span to be lexed
+///
+/// # Returns
+///
+/// Returns a tuple of the remaining input and token on success
+/// Otherwise, the an [crate::error::VelosiLexerErr] error is returned.
+///
 fn token(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
     delimited(
         multispace0,
         alt((
-            identifier,
+            identifier_or_keyword,
             number,
             blockcomment,
             linecomment,
@@ -205,15 +234,29 @@ fn token(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
     )(input)
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Lexer
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// lexes a source span into a list of tokens
+///
+/// # Arguments
+///
+/// * `input` - the input source span to be lexed
+///
+/// # Returns
+///
+/// Returns a tuple of the remaining input and the vector of tokens on success.
+/// Otherwise, the an [crate::error::VelosiLexerErr] error is returned.
+///
 pub fn lex(input: SrcSpan) -> IResult<SrcSpan, Vec<VelosiToken>> {
     // if it's an empty file, simply return the empty token list
     if input.is_empty() {
         return Ok((input, Vec::new()));
     }
 
-    // // try to consume all leading spaces. If we obtain the same length back, then
-    // // this indicates that we don't have any actual content in the input
+    // try to consume all leading spaces. If we obtain the same length back, then
+    // this indicates that we don't have any actual content in the input
     let (input, _) = multispace0(input)?;
     if input.is_empty() {
         return Ok((input, Vec::new()));

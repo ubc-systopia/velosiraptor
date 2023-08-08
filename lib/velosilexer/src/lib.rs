@@ -34,7 +34,7 @@ use std::io::Error;
 
 // external dependencies
 use custom_error::custom_error;
-use tokstream::{Tok, TokStream};
+use tokstream::{SrcSpan, Tok, TokStream};
 
 // crate modules
 mod error;
@@ -44,7 +44,6 @@ mod tokens;
 // re-exports
 pub use error::VelosiLexerErr;
 pub use tokens::{VelosiKeyword, VelosiOpToken, VelosiTokenKind};
-pub use tokstream::{SrcSpan, TokKind};
 
 /// the type for the VelosiLexer tokens
 pub type VelosiToken = Tok<VelosiTokenKind>;
@@ -61,27 +60,41 @@ custom_error! {pub VelosiLexerError
 pub struct VelosiLexer;
 
 impl VelosiLexer {
-    /// Lexes the supplied [SrcSpan] and converts it into a [VelosiTokenStream]
-    ///
-    /// This function will create a new `SrcSpan` from the supplied string.
-    pub fn lex_srcspan(content: SrcSpan) -> Result<VelosiTokenStream, VelosiLexerError> {
-        match lexer::lex(content) {
-            Ok((_, tokens)) => Ok(TokStream::new_filtered(tokens)),
-            Err(nom::Err::Error(r)) => Err(VelosiLexerError::LexingFailure { r }),
-            Err(nom::Err::Failure(r)) => Err(VelosiLexerError::LexingFailure { r }),
-            _ => Err(VelosiLexerError::LexingIncomplete),
-        }
-    }
-
     /// Lexes the supplied string and converts it into a [VelosiTokenStream]
     ///
+    /// White space characters are removed and are not present in the returned token stream.
+    /// Comments will be part of the tokens.
+    ///
     /// This function will create a new `SrcSpan` from the supplied string.
+    ///
+    /// # Arguments
+    ///
+    /// * `content` - the string to be lexed
+    ///
+    /// # Returns
+    ///
+    /// Returns a [VelosiTokenStream] if the file was successfully read and lexxed into tokens.
+    /// Otherwise, it returns an [VelosiTokenKind].
+    ///
     pub fn lex_string(content: String) -> Result<VelosiTokenStream, VelosiLexerError> {
         let sp = SrcSpan::new(content);
         VelosiLexer::lex_srcspan(sp)
     }
 
     /// Lexes the supplied file and converts it into a [VelosiTokenStream]
+    ///
+    /// White space characters are removed and are not present in the returned token stream.
+    /// Comments will be part of the tokens.
+    ///
+    /// # Arguments
+    ///
+    /// * `filename` - the name of the file to be lexed
+    ///
+    /// # Returns
+    ///
+    /// Returns a [VelosiTokenStream] if the file was successfully read and lexxed into tokens.
+    /// Otherwise, it returns an [VelosiLexerError].
+    ///
     pub fn lex_file(filename: &str) -> Result<VelosiTokenStream, VelosiLexerError> {
         let file_contents = fs::read_to_string(filename);
         match file_contents {
@@ -90,6 +103,26 @@ impl VelosiLexer {
                 VelosiLexer::lex_srcspan(sp)
             }
             Err(e) => Err(VelosiLexerError::ReadSourceFile { e }),
+        }
+    }
+
+    /// Lexes the supplied [SrcSpan] and converts it into a [VelosiTokenStream]
+    ///
+    /// # Arguments
+    ///
+    /// * `content` - source span to be lexed
+    ///
+    /// # Returns
+    ///
+    /// Returns a [VelosiTokenStream] if the file was successfully read and lexxed into tokens.
+    /// Otherwise, it returns an [VelosiLexerError].
+    ///
+    fn lex_srcspan(content: SrcSpan) -> Result<VelosiTokenStream, VelosiLexerError> {
+        match lexer::lex(content) {
+            Ok((_, tokens)) => Ok(TokStream::new_filtered(tokens)),
+            Err(nom::Err::Error(r)) => Err(VelosiLexerError::LexingFailure { r }),
+            Err(nom::Err::Failure(r)) => Err(VelosiLexerError::LexingFailure { r }),
+            _ => Err(VelosiLexerError::LexingIncomplete),
         }
     }
 }

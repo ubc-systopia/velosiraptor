@@ -3,7 +3,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2021, 2022 Systopia Lab, Computer Science, University of British Columbia
+// Copyright (c) 2021-2023 Systopia Lab, Computer Science, University of British Columbia
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,6 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+//! VelosiLexer - Comments Parsing
+
 // used exernal dependencies
 use nom::{
     bytes::complete::{tag, take_until, take_while},
@@ -31,11 +33,35 @@ use nom::{
     sequence::terminated,
     Err,
 };
+use tokstream::{SrcSpan, Tok};
 
+// used crate dependencies
 use crate::error::{IResult, VelosiLexerErrBuilder};
-use crate::{SrcSpan, Tok, VelosiToken, VelosiTokenKind};
+use crate::{VelosiToken, VelosiTokenKind};
 
-/// parses and consumes an end of line comment `// foo`
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Comment Parsers
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// parses and consumes an end of line comment
+///
+/// This consumes the entire line starting from the comment token `//`.
+///
+/// The resulting comment token contains the trimmed comment string.
+///
+/// # Arguments
+///
+/// * `input` - the input source span to be lexed
+///
+/// # Returns
+///
+/// Returns a tuple of the remaining input and the parsed comment token on success.
+/// Otherwise, the an [crate::error::VelosiLexerErr] error is returned.
+///
+/// # Grammar
+///
+/// `LINECOMMENT := // ANY \n`
+///
 pub fn linecomment(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
     // try to match the opening comment `//`, there is no match, return.
     let (input, _) = tag("//")(input)?;
@@ -49,10 +75,25 @@ pub fn linecomment(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
     Ok((input, Tok::new(VelosiTokenKind::Comment(comment), c)))
 }
 
-/// parses and consumes a block comment `/* bar */`
+/// parses and consumes a block comment
 ///
 /// The parser here currently does not support nested block comments.
-/// the block comment must be closed again
+///
+/// Unclosed block comments result in an error.
+///
+/// # Arguments
+///
+/// * `input` - the input source span to be lexed
+///
+/// # Returns
+///
+/// Returns a tuple of the remaining input and the parsed comment token on success.
+/// Otherwise, the an [crate::error::VelosiLexerErr] error is returned.
+///
+/// # Grammar
+///
+/// `BLOCKCOMMENT := /* ANY */`
+///
 pub fn blockcomment(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
     // try to match the opening comment keyword, there is no match, return.
     let (i1, c) = tag("/*")(input)?;
@@ -75,6 +116,10 @@ pub fn blockcomment(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Tests
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(test)]
 use nom::Slice;
@@ -138,6 +183,7 @@ fn parse_blockcomment_test_one() {
         ))
     );
 }
+
 #[test]
 fn parse_blockcomment_test_newline() {
     let sp = SrcSpan::new("/* foo \nbar */".to_string());
