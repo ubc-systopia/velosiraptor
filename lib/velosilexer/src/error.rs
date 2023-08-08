@@ -25,8 +25,8 @@
 
 //! Lexer Errors for the VelosiLexer
 
-//
-use std::fmt::{Display, Formatter, Result};
+// used standard library components
+use std::fmt::{Display, Formatter, Result as FmtResult};
 
 // external dependencies
 use colored::*;
@@ -35,18 +35,28 @@ use nom::{
     Err,
 };
 
-use crate::SrcSpan;
+// used tokenstream components
+pub use tokstream::SrcSpan;
 
-/// define the type of IResult
-pub type IResult<I, O> = std::result::Result<(I, O), Err<VelosiLexerErr>>;
+/// IResult type for [nom] compatibility
+pub type IResult<I, O> = Result<(I, O), Err<VelosiLexerErr>>;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Error Builder
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Error builder for lexer errors
 pub(crate) struct VelosiLexerErrBuilder {
+    /// error message to be displayed
     message: String,
+    /// a optional hint that is displayed along with the error message
     hint: Option<String>,
+    /// option location of the error in the source file / token stream
     location: Option<SrcSpan>,
 }
 
 impl VelosiLexerErrBuilder {
+    /// creates a new [VelosiLexerErrBuilder] with the given message
     pub fn new(message: String) -> Self {
         Self {
             message,
@@ -55,17 +65,20 @@ impl VelosiLexerErrBuilder {
         }
     }
 
-    pub fn add_hint(&mut self, hint: String) -> &mut Self {
+    /// adds a hint to the current builder, this replaces the previous hint
+    pub fn add_hint(mut self, hint: String) -> Self {
         self.hint = Some(hint);
         self
     }
 
-    pub fn add_location(&mut self, location: SrcSpan) -> &mut Self {
+    /// adds a location to the current builder, this replaces the previous location
+    pub fn add_location(mut self, location: SrcSpan) -> Self {
         self.location = Some(location);
         self
     }
 
-    pub fn build(&mut self) -> VelosiLexerErr {
+    /// Constructs the [VelosiLexerErr] from the current builder
+    pub fn build(mut self) -> VelosiLexerErr {
         VelosiLexerErr {
             message: self.message.clone(),
             kinds: Vec::new(),
@@ -75,16 +88,20 @@ impl VelosiLexerErrBuilder {
     }
 }
 
-/// Defines a Lexer Error
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Custom Parser Error
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Represents an error that occurred during lexing
 #[derive(PartialEq, Eq, Debug)]
 pub struct VelosiLexerErr {
-    /// error message
+    /// error message to be displayed
     message: String,
-    /// error kinds fron Nom
-    kinds: Vec<ErrorKind>,
-    /// Hint
+    /// optional hint on how to resolve the error
     hint: Option<String>,
-    /// the location where the error happened
+    /// any error kinds that were encountered (supplied by [nom])
+    kinds: Vec<ErrorKind>,
+    /// the location in the source where the error happened
     location: SrcSpan,
 }
 
@@ -92,7 +109,7 @@ impl VelosiLexerErr {}
 
 /// Implementation of [Display] for [VelosiLexerErr]
 impl Display for VelosiLexerErr {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         // closure for coloring
         let red = |s: &str| s.bright_red().bold();
         let blue = |s: &str| s.bold().blue();

@@ -23,9 +23,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Parses numbers
+//! VelosiLexer - Number Parsing
 
-// the used nom componets
+// used external dependencies
 use nom::{
     branch::alt,
     bytes::complete::{is_a, tag},
@@ -35,10 +35,62 @@ use nom::{
     sequence::pair,
     Err, InputLength, Slice,
 };
+use tokstream::{SrcSpan, Tok};
 
+// used crate dependencies
 use crate::error::{IResult, VelosiLexerErrBuilder};
-use crate::{SrcSpan, Tok, VelosiToken, VelosiTokenKind};
+use crate::{VelosiToken, VelosiTokenKind};
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Number Parsing
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// parses a number in base 2, 8, 16, 10
+///
+/// Numbers can be separated by `_` to improve readabililty.
+///
+/// The parsed numbers must fit in 64-bits.
+///
+/// # Arguments
+///
+/// * `input` - the input source span to be lexed
+///
+/// # Returns
+///
+/// Returns a tuple of the remaining input and the parsed number token on success.
+/// Otherwise, the an [crate::error::VelosiLexerErr] error is returned.
+///
+/// # Grammar
+///
+/// `NUMBER := BASE16 | BASE8 | BASE2 | BASE10`
+///
+pub fn number(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
+    alt((base16, base8, base2, base10))(input)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Number Parsing: Base 10
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// parses a number in base 10
+///
+/// Numbers can be separated by `_` to improve readabililty.
+///
+/// The parsed numbers must fit in 64-bits.
+///
+/// # Arguments
+///
+/// * `input` - the input source span to be lexed
+///
+/// # Returns
+///
+/// Returns a tuple of the remaining input and the parsed number token on success.
+/// Otherwise, the an [crate::error::VelosiLexerErr] error is returned.
+///
+/// # Grammar
+///
+/// `BASE10 := DIGIT [DIGIT, '_']*`
+///
 fn base10(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
     // match a digit followed by alphanumeric characters and the `_`
     // this is needed to recognize patterns of: 1234asdf
@@ -86,6 +138,11 @@ fn base10(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
     Ok((rem, Tok::new(VelosiTokenKind::NumLiteral(num), numsp)))
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Number Parsing: Base 2, 8, 16
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Macro to generate the parser function
 macro_rules! namedbase (
     ($name:ident, $radix:expr, $tag:expr, $pattern:expr) => (
         fn $name(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
@@ -130,14 +187,72 @@ macro_rules! namedbase (
     )
 );
 
+// parses a number in base 16
+//
+// Numbers can be separated by `_` to improve readabililty.
+//
+// The parsed numbers must fit in 64-bits.
+//
+// # Arguments
+//
+// * `input` - the input source span to be lexed
+//
+// # Returns
+//
+// Returns a tuple of the remaining input and the parsed number token on success.
+// Otherwise, the an [crate::error::VelosiLexerErr] error is returned.
+//
+// # Grammar
+//
+// `BASE16 := '0x' HEX_DIGIT [HEX_DIGIT, '_']*`
+//
 namedbase!(base16, 16, "0x", hex_digit1);
+
+// parses a number in base 8
+//
+// Numbers can be separated by `_` to improve readabililty.
+//
+// The parsed numbers must fit in 64-bits.
+//
+// # Arguments
+//
+// * `input` - the input source span to be lexed
+//
+// # Returns
+//
+// Returns a tuple of the remaining input and the parsed number token on success.
+// Otherwise, the an [crate::error::VelosiLexerErr] error is returned.
+//
+// # Grammar
+//
+// `BASE16 := '0o' OCT_DIGIT [OCT_DIGIT, '_']*`
+//
 namedbase!(base8, 8, "0o", oct_digit1);
+
+// parses a number in base 2
+//
+// Numbers can be separated by `_` to improve readabililty.
+//
+// The parsed numbers must fit in 64-bits.
+//
+// # Arguments
+//
+// * `input` - the input source span to be lexed
+//
+// # Returns
+//
+// Returns a tuple of the remaining input and the parsed number token on success.
+// Otherwise, the an [crate::error::VelosiLexerErr] error is returned.
+//
+// # Grammar
+//
+// `BASE16 := '0b' BIN_DIGIT [BIN_DIGIT, '_']*`
+//
 namedbase!(base2, 2, "0b", is_a("01"));
 
-/// parses a rust-like identifiers
-pub fn number(input: SrcSpan) -> IResult<SrcSpan, VelosiToken> {
-    alt((base16, base8, base2, base10))(input)
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Tests
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn decimal_test() {
