@@ -1,0 +1,14 @@
+segment Foo {
+    flags = { foo, bar };
+    flags = { FOO, BAR };
+
+    // with trailing comma
+    flags = { foo, bar, };
+    flags = { FOO, BAR, };
+
+    // empty flags
+    flags = { };
+
+    // repetition
+    flags = { FOO, FOO, };
+}

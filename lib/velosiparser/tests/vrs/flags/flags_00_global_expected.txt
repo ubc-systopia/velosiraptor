@@ -1,0 +1,15 @@
+VelosiParseTree(tests/vrs/flags/flags_00_global.vrs)
+---------------------------------------------
+flags = { foo, bar };
+
+flags = { FOO, BAR };
+
+flags = { foo, bar };
+
+flags = { FOO, BAR };
+
+flags = {  };
+
+flags = { FOO, FOO };
+
+---------------------------------------------

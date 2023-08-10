@@ -149,14 +149,14 @@ impl VelosiParseTreeFlags {
 
 impl Display for VelosiParseTreeFlags {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "flags = {{")?;
+        write!(f, "flags = {{ ")?;
         for (i, flag) in self.flags.iter().enumerate() {
             if i > 0 {
                 write!(f, ", ")?;
             }
             write!(f, "{}", flag.name)?;
         }
-        writeln!(f, "}};")
+        write!(f, " }};")
     }
 }
 

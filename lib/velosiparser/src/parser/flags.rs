@@ -23,11 +23,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Flags Parser
+//! # VelosiParser: Flags
 //!
-//! Parses a Flag definition
+//! Parses permission and access mode flags in the global and unit context
 
-// the used nom functionality
+// external dependencies
 use nom::{
     combinator::{cut, opt},
     multi::separated_list0,
@@ -40,15 +40,35 @@ use crate::parser::terminals::{assign, comma, ident, kw_flags, lbrace, rbrace, s
 use crate::parsetree::VelosiParseTreeFlags;
 use crate::VelosiTokenStream;
 
-/// parses flags
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Flags Parsers
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// parses flags in the global context
 ///
 /// # Arguments
 ///
-/// # Return Value
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized expression as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///             and that another parser would fail.
 ///
 /// # Grammar
 ///
 /// `FLAGS := KW_FLAGS LBRACE LIST(COMMA, IDENT) RBRACE`
+///
+/// # Examples
+///
+/// `flags { read, write }`
+///
 pub fn flags(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeFlags> {
     let mut pos = input.clone();
     // parse the `flags` keyword, return otherwise
@@ -70,11 +90,27 @@ pub fn flags(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParse
 ///
 /// # Arguments
 ///
-/// # Return Value
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized expression as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///             and that another parser would fail.
 ///
 /// # Grammar
 ///
-/// `FLAGS := KW_FLAGS LBRACE LIST(COMMA, IDENT) RBRACE`
+/// `FLAGS := KW_FLAGS ASSIGN LBRACE LIST(COMMA, IDENT) RBRACE SEMICOLON`
+///
+/// # Examples
+///
+/// `flags = { read, write };`
+///
 pub fn flags_unit(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeFlags> {
     let mut pos = input.clone();
     // parse the `flags` keyword, return otherwise
@@ -92,24 +128,72 @@ pub fn flags_unit(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Velosi
     Ok((i2, VelosiParseTreeFlags::new(flags, pos)))
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Tests
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[cfg(test)]
-use crate::VelosiLexer;
+use velosilexer::VelosiLexer;
+
+#[cfg(test)]
+use crate::{test_parse_and_check_fail, test_parse_and_compare_ok};
 
 #[test]
-fn test_ok() {
-    let content = "flags = { FOO, BAR }; ";
-    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
-    assert!(flags_unit(ts).is_ok());
+fn test_flags_global_ok() {
+    test_parse_and_compare_ok!("flags { foo, bar }", flags, "flags = { foo, bar };");
+    test_parse_and_compare_ok!("flags { FOO, BAR }", flags, "flags = { FOO, BAR };");
 
-    let content = "flags = { FOO, BAR, }; ";
-    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
-    assert!(flags_unit(ts).is_ok());
+    // with trailing comma
+    test_parse_and_compare_ok!("flags { foo, bar, }", flags, "flags = { foo, bar };");
+    test_parse_and_compare_ok!("flags { FOO, BAR, }", flags, "flags = { FOO, BAR };");
 
-    let content = "flags { FOO, BAR }";
-    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
-    assert!(flags(ts).is_ok());
+    // empty flags
+    test_parse_and_compare_ok!("flags { }", flags, "flags = {  };");
 
-    let content = "flags { FOO, BAR, }";
-    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
-    assert!(flags(ts).is_ok());
+    // repetition
+    test_parse_and_compare_ok!("flags { FOO, FOO, }", flags, "flags = { FOO, FOO };");
+}
+
+#[test]
+fn test_flags_global_fail() {
+    test_parse_and_check_fail!("flags { FOO FOO }", flags);
+    test_parse_and_check_fail!("flags { FOO FOO, }", flags);
+    test_parse_and_check_fail!("flags { 1, foo(), }", flags);
+    test_parse_and_check_fail!("flags = { FOO FOO, };", flags);
+}
+
+#[test]
+fn test_flags_unit_ok() {
+    test_parse_and_compare_ok!("flags = { foo, bar };", flags_unit, "flags = { foo, bar };");
+    test_parse_and_compare_ok!("flags = { FOO, BAR };", flags_unit, "flags = { FOO, BAR };");
+
+    // with trailing comma
+    test_parse_and_compare_ok!(
+        "flags = { foo, bar, };",
+        flags_unit,
+        "flags = { foo, bar };"
+    );
+    test_parse_and_compare_ok!(
+        "flags = { FOO, BAR, };",
+        flags_unit,
+        "flags = { FOO, BAR };"
+    );
+
+    // empty flags
+    test_parse_and_compare_ok!("flags = { };", flags_unit, "flags = {  };");
+
+    // repetition
+    test_parse_and_compare_ok!(
+        "flags = { FOO, FOO, };",
+        flags_unit,
+        "flags = { FOO, FOO };"
+    );
+}
+
+#[test]
+fn test_flags_unit_fail() {
+    test_parse_and_check_fail!("flags = { FOO FOO };", flags_unit);
+    test_parse_and_check_fail!("flags = { FOO FOO, };", flags_unit);
+    test_parse_and_check_fail!("flags = { 1, foo(), };", flags_unit);
+    test_parse_and_check_fail!("flags { FOO, BAR }", flags_unit);
 }
