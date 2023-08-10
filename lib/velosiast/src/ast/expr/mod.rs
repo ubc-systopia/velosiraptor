@@ -100,6 +100,7 @@ impl VelosiAstExpr {
             IfElse(e) => VelosiAstIfElseExpr::from_parse_tree(e, st),
             Slice(e) => VelosiAstSliceExpr::from_parse_tree(e, st),
             Range(e) => VelosiAstRangeExpr::from_parse_tree(e, st),
+            Element(_e) => panic!("handle me!"),
         }
     }
 
