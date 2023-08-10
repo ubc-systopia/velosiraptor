@@ -72,10 +72,7 @@ impl VelosiAstSliceExpr {
         // process the function call arguments
 
         let range = ast_result_unwrap!(VelosiAstRangeExpr::from_parse_tree(pt.range, st), issues);
-        let name = ast_result_unwrap!(
-            VelosiAstIdentLiteralExpr::from_parse_tree(pt.name, st),
-            issues
-        );
+        let name = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(*pt.name, st), issues);
 
         if let VelosiAstExpr::Range(r) = range {
             if let VelosiAstExpr::IdentLiteral(n) = name {
