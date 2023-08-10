@@ -29,7 +29,7 @@
 //  3. List Comprehension with explicit address ranges.
 
 use crate::error::IResult;
-use crate::parser::expr::{expr, fn_call_expr_raw, range_expr};
+use crate::parser::expr::{expr, fn_call_expr, range_expr};
 use crate::parser::terminals::{
     assign, at, comma, fatarrow, ident, kw_for, kw_in, kw_mapdef, lbrack, rbrack, semicolon,
 };
@@ -171,11 +171,15 @@ fn map_src(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTr
 fn map_dst(
     input: VelosiTokenStream,
 ) -> IResult<VelosiTokenStream, (VelosiParseTreeFnCallExpr, Option<VelosiParseTreeExpr>)> {
-    let (i1, cons) = fn_call_expr_raw(input)?;
+    let (i1, cons) = fn_call_expr(input)?;
     // get the offset
     let (i2, offset) = opt(preceded(at, expr))(i1)?;
 
-    Ok((i2, (cons, offset)))
+    if let VelosiParseTreeExpr::FnCall(cons) = cons {
+        Ok((i2, (cons, offset)))
+    } else {
+        unreachable!("should always be a function call expression");
+    }
 }
 
 #[cfg(test)]

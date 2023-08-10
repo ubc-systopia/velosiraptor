@@ -1,0 +1,5 @@
+error: expected `:`, found `=`
+     --> tests/vrs/consts/const_05_missing_type.vrs:1:11
+      |
+    1 |  const FOO = 1234;
+      |            ^ help: add `:` here.
