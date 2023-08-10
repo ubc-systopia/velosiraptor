@@ -25,7 +25,8 @@
 
 //! # VelosiLexer -- The Velosiraptor Lexer Example Programm
 //!
-//! This example program
+//! This example program simply parses the supplied string via stdin or supplied file
+//! and prints the parse tree to stdout.
 
 use std::env;
 use std::io;

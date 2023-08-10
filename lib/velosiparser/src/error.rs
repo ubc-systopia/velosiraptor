@@ -25,8 +25,8 @@
 
 //! # Parser Errors for the VelosiParser
 
-//
-use std::fmt::{Display, Formatter, Result};
+// used standard library components
+use std::fmt::{Display, Formatter, Result as FmtResult};
 
 // external dependencies
 use colored::*;
@@ -35,19 +35,31 @@ use nom::{
     Err,
 };
 
-use crate::{VelosiTokenKind, VelosiTokenStream};
+// used lexer components
 use velosilexer::VelosiLexerErr;
 
-/// define the type of IResult
-pub type IResult<I, O> = std::result::Result<(I, O), Err<VelosiParserErr>>;
+// used parser components
+use crate::{VelosiTokenKind, VelosiTokenStream};
 
+/// IResult type for [nom] compatibility
+pub type IResult<I, O> = Result<(I, O), Err<VelosiParserErr>>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Error Builder
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Error builder for parser errors
 pub(crate) struct VelosiParserErrBuilder {
+    /// error message to be displayed
     message: String,
+    /// a optional hint that is displayed along with the error message
     hint: Option<String>,
+    /// option location of the error in the source file / token stream
     tokstream: Option<VelosiTokenStream>,
 }
 
 impl VelosiParserErrBuilder {
+    /// creates a new [VelosiParserErrBuilder] with the given message
     pub fn new(message: String) -> Self {
         Self {
             message,
@@ -56,17 +68,20 @@ impl VelosiParserErrBuilder {
         }
     }
 
-    pub fn add_hint(&mut self, hint: String) -> &mut Self {
+    /// adds a hint to the current builder, this replaces the previous hint
+    pub fn add_hint(mut self, hint: String) -> Self {
         self.hint = Some(hint);
         self
     }
 
-    pub fn add_tokstream(&mut self, tokstream: VelosiTokenStream) -> &mut Self {
+    /// adds a location to the current builder, this replaces the previous location
+    pub fn add_tokstream(mut self, tokstream: VelosiTokenStream) -> Self {
         self.tokstream = Some(tokstream);
         self
     }
 
-    pub fn build(&mut self) -> VelosiParserErr {
+    /// Constructs the [VelosiParserErr] from the current builder
+    pub fn build(mut self) -> VelosiParserErr {
         VelosiParserErr::Custom(VelosiParserErrCustom {
             message: self.message.clone(),
             kinds: Vec::new(),
@@ -76,22 +91,26 @@ impl VelosiParserErrBuilder {
     }
 }
 
-/// Defines a Lexer Error
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Custom Parser Error
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Represents a custom parser error
 #[derive(PartialEq, Eq, Debug)]
 pub struct VelosiParserErrCustom {
-    /// error message
+    /// error message to be displayed
     message: String,
-    /// error kinds fron Nom
-    kinds: Vec<ErrorKind>,
-    /// Hint
+    /// an optional hint
     hint: Option<String>,
+    /// list of error kinds
+    kinds: Vec<ErrorKind>,
     /// the location where the error happened
     tokstream: VelosiTokenStream,
 }
 
 /// Implementation of [Display] for [VelosiParserErrCustom]
 impl Display for VelosiParserErrCustom {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         // closure for coloring
         let red = |s: &str| s.bright_red().bold();
         let blue = |s: &str| s.bold().blue();
@@ -168,13 +187,21 @@ impl Display for VelosiParserErrCustom {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Expected Token Error
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Represents an error that gathers the expected tokens
 #[derive(PartialEq, Eq, Debug)]
 pub struct VelosiParserErrExpected {
+    /// list of expected tokens
     kind: Vec<VelosiTokenKind>,
+    /// location where the error happened
     tokstream: VelosiTokenStream,
 }
 
 impl VelosiParserErrExpected {
+    /// creates a new [VelosiParserErrExpected] with the given locaton and kind
     pub fn new(tokstream: VelosiTokenStream, kind: VelosiTokenKind) -> Self {
         Self {
             kind: vec![kind],
@@ -182,6 +209,7 @@ impl VelosiParserErrExpected {
         }
     }
 
+    /// merges the `other` error with the current one
     pub fn merge(&mut self, other: Self) {
         self.kind.extend(other.kind);
     }
@@ -189,7 +217,7 @@ impl VelosiParserErrExpected {
 
 /// Implementation of [Display] for [VelosiParserErrExpected]
 impl Display for VelosiParserErrExpected {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         // closure for coloring
         let red = |s: &str| s.bright_red().bold();
         let blue = |s: &str| s.bold().blue();
@@ -287,7 +315,11 @@ impl Display for VelosiParserErrExpected {
     }
 }
 
-/// Defines a Lexer Error
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Parser Error
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Defines a parser error
 #[derive(PartialEq, Eq, Debug)]
 pub enum VelosiParserErr {
     Expected(VelosiParserErrExpected),
@@ -303,6 +335,18 @@ impl VelosiParserErr {
     }
 }
 
+impl From<VelosiParserErrExpected> for VelosiParserErr {
+    fn from(err: VelosiParserErrExpected) -> Self {
+        VelosiParserErr::Expected(err)
+    }
+}
+
+impl From<VelosiParserErrCustom> for VelosiParserErr {
+    fn from(err: VelosiParserErrCustom) -> Self {
+        VelosiParserErr::Custom(err)
+    }
+}
+
 impl From<VelosiLexerErr> for VelosiParserErr {
     fn from(err: VelosiLexerErr) -> Self {
         VelosiParserErr::Lexer(err)
@@ -311,7 +355,7 @@ impl From<VelosiLexerErr> for VelosiParserErr {
 
 /// Implementation of [Display] for [VelosiParserErr]
 impl Display for VelosiParserErr {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
             VelosiParserErr::Expected(e) => e.fmt(f),
             VelosiParserErr::Custom(e) => e.fmt(f),
@@ -339,6 +383,7 @@ impl ParseError<VelosiTokenStream> for VelosiParserErr {
         other
     }
 
+    /// combines two errors into one
     fn or(mut self, other: Self) -> Self {
         use VelosiParserErr::*;
         let mut other = other;

@@ -3,7 +3,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2021, 2022 Systopia Lab, Computer Science, University of British Columbia
+// Copyright (c) 2021-2023 Systopia Lab, Computer Science, University of British Columbia
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -36,15 +36,16 @@ use std::path::{Path, PathBuf};
 // external dependencies
 use custom_error::custom_error;
 
-pub use velosilexer::{VelosiLexer, VelosiLexerError, VelosiTokenStream};
-
-use velosilexer::{VelosiKeyword, VelosiOpToken, VelosiTokenKind};
+// imports from the lexer
+use velosilexer::{VelosiKeyword, VelosiLexer, VelosiOpToken, VelosiTokenKind, VelosiTokenStream};
 
 // crate modules
 mod error;
 mod parser;
 mod parsetree;
+mod utils;
 
+// re-exports
 pub use error::VelosiParserErr;
 pub use parsetree::{
     VelosiParseTree, VelosiParseTreeBinOp, VelosiParseTreeBinOpExpr, VelosiParseTreeBoolLiteral,
@@ -64,11 +65,15 @@ pub use parsetree::{
     VelosiParseTreeUnOp, VelosiParseTreeUnOpExpr, VelosiParseTreeUnit, VelosiParseTreeUnitDef,
     VelosiParseTreeUnitNode,
 };
+pub use velosilexer::VelosiLexerError;
 
-use error::IResult;
-use error::VelosiParserErrBuilder;
+use error::{IResult, VelosiParserErrBuilder};
 
-// // custom error definitions
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Error Definitions
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// custom error definitions
 custom_error! {pub VelosiParserError
     ReadSourceFile {e: Error} = "Could not read the source file.",
     LexingFailure { e: VelosiParserErr }   = "Lexing failed.",
@@ -76,6 +81,7 @@ custom_error! {pub VelosiParserError
     ImportFailure { e: VelosiParserErr } = "Import failed.",
 }
 
+/// Converting [VelosiLexerError] -> [VelosiParserError]
 impl From<VelosiLexerError> for VelosiParserError {
     fn from(err: VelosiLexerError) -> Self {
         match err {
@@ -92,10 +98,135 @@ impl From<VelosiLexerError> for VelosiParserError {
     }
 }
 
-/// represents the lexer state
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// VelosiParser
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// represents the parser state
 pub struct VelosiParser;
 
 impl VelosiParser {
+    /// Parses the supplied [VelosiTokenStream] and converts it into a [VelosiParseTree]
+    ///
+    /// This function will create a new [VelosiParseTree] from the token stream.
+    ///
+    /// Any tokens that are not marked as `keep` will be be filtered out (e.g., comments)
+    ///
+    /// # Arguments
+    ///
+    /// * `tokens`          - the token stream to parse
+    /// * `resolve_imports` - whether to resolve imports
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(VelosiParseTree)`    - if the parsing was successful
+    /// * `Err(VelosiParserError)` - if the parsing has failed.
+    ///
+    pub fn parse_tokstream(
+        tokens: VelosiTokenStream,
+        resolve_imports: bool,
+    ) -> Result<VelosiParseTree, VelosiParserError> {
+        let ts = tokens.with_retained(|t| t.keep());
+        VelosiParser::maybe_resolve_imports(parser::parse(ts), resolve_imports)
+    }
+
+    /// Parses the supplied [VelosiTokenStream] and converts it into a [VelosiParseTree]
+    ///
+    /// This function will create a new [VelosiParseTree] from the token stream and sets its context
+    ///
+    /// Any tokens that are not marked as `keep` will be be filtered out (e.g., comments)
+    ///
+    /// # Arguments
+    ///
+    /// * `tokens`          - the token stream to parse
+    /// * `context`         - the context to give to the parse tree
+    /// * `resolve_imports` - whether to resolve imports
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(VelosiParseTree)`    - if the parsing was successful
+    /// * `Err(VelosiParserError)` - if the parsing has failed.
+    pub fn parse_tokstream_with_context(
+        tokens: VelosiTokenStream,
+        context: String,
+        resolve_imports: bool,
+    ) -> Result<VelosiParseTree, VelosiParserError> {
+        let ts = tokens.with_retained(|t| t.keep());
+        VelosiParser::maybe_resolve_imports(
+            parser::parse_with_context(ts, context),
+            resolve_imports,
+        )
+    }
+
+    /// Parses the supplied string and converts it into a [VelosiParseTree]
+    ///
+    /// This function will create a new [VelosiParseTree] from the supplied string. It will first
+    /// attempt to lex the string into a token stream and then parse the token stream to create
+    /// a parse tree.
+    ///
+    /// Any tokens that are not marked as `keep` will be be filtered out (e.g., comments)
+    ///
+    /// # Arguments
+    ///
+    /// * `content`         - the token stream to parse
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(VelosiParseTree)`    - if the parsing was successful
+    /// * `Err(VelosiParserError)` - if the parsing has failed.
+    ///
+    pub fn parse_string(content: String) -> Result<VelosiParseTree, VelosiParserError> {
+        match VelosiLexer::lex_string(content) {
+            Ok(tokens) => {
+                VelosiParser::parse_tokstream_with_context(tokens, "$buf".to_string(), false)
+            }
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Parses the supplied file and converts it into a [VelosiParseTree]
+    ///
+    /// The context of the [VelosiParseTree] will be set to the filename.
+    ///
+    /// Any tokens that are not marked as `keep` will be be filtered out (e.g., comments)
+    ///
+    /// # Arguments
+    ///
+    /// * `filename`         - the token stream to parse
+    /// * `resolve_imports`  - whether to resolve imports
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(VelosiParseTree)`    - if the parsing was successful
+    /// * `Err(VelosiParserError)` - if the parsing has failed.
+    ///
+    pub fn parse_file(
+        filename: &str,
+        resolve_imports: bool,
+    ) -> Result<VelosiParseTree, VelosiParserError> {
+        match VelosiLexer::lex_file(filename) {
+            Ok(tokens) => VelosiParser::parse_tokstream_with_context(
+                tokens,
+                filename.to_string(),
+                resolve_imports,
+            ),
+
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Resolves the imports of the given [VelosiParseTree]
+    ///
+    /// This function recusrively traverses the
+    pub fn resolve_imports(ptree: VelosiParseTree) -> Result<VelosiParseTree, VelosiParserError> {
+        // get the path context for circle detection
+        let mut importpath = Vec::new();
+        let import_resolver = Self::do_resolve_imports(ptree, &mut importpath)?;
+
+        Ok(import_resolver.flatten())
+    }
+
+    /// Resolves the imports in the supplied [VelosiParseTree] if neede
     fn maybe_resolve_imports(
         res: IResult<VelosiTokenStream, VelosiParseTree>,
         resolve_imports: bool,
@@ -115,60 +246,6 @@ impl VelosiParser {
                 let e = VelosiParserErrBuilder::new(message.to_string()).build();
                 Err(VelosiParserError::ParsingFailure { e })
             }
-        }
-    }
-
-    /// Parses the supplied [VelosiTokenStream] and converts it into a [VelosiParseTree]
-    ///
-    /// This function will create a new `VelosiParseTree` from the supplied string.
-    pub fn parse_tokstream(
-        tokens: VelosiTokenStream,
-        resolve_imports: bool,
-    ) -> Result<VelosiParseTree, VelosiParserError> {
-        let ts = tokens.with_retained(|t| t.keep());
-        VelosiParser::maybe_resolve_imports(parser::parse(ts), resolve_imports)
-    }
-
-    /// Parses the supplied [VelosiTokenStream] and converts it into a [VelosiParseTree]
-    ///
-    /// This function will create a new `VelosiParseTree` from the supplied string.
-    pub fn parse_tokstream_with_context(
-        tokens: VelosiTokenStream,
-        context: String,
-        resolve_imports: bool,
-    ) -> Result<VelosiParseTree, VelosiParserError> {
-        let ts = tokens.with_retained(|t| t.keep());
-        VelosiParser::maybe_resolve_imports(
-            parser::parse_with_context(ts, context),
-            resolve_imports,
-        )
-    }
-
-    /// Parses the supplied string and converts it into a [VelosiParseTree]
-    ///
-    /// This function will create a new `VelosiParseTree` from the supplied string.
-    pub fn parse_string(content: String) -> Result<VelosiParseTree, VelosiParserError> {
-        match VelosiLexer::lex_string(content) {
-            Ok(tokens) => {
-                VelosiParser::parse_tokstream_with_context(tokens, "$buf".to_string(), false)
-            }
-            Err(e) => Err(e.into()),
-        }
-    }
-
-    /// Parses the supplied file and converts it into a [VelosiParseTree]
-    pub fn parse_file(
-        filename: &str,
-        resolve_imports: bool,
-    ) -> Result<VelosiParseTree, VelosiParserError> {
-        match VelosiLexer::lex_file(filename) {
-            Ok(tokens) => VelosiParser::parse_tokstream_with_context(
-                tokens,
-                filename.to_string(),
-                resolve_imports,
-            ),
-
-            Err(e) => Err(e.into()),
         }
     }
 
@@ -301,27 +378,31 @@ impl VelosiParser {
 
         Ok(ImportResolver::new(ptree, resolved_imports))
     }
-
-    /// Resolves the imports of the given [VelosiParseTree]
-    pub fn resolve_imports(ptree: VelosiParseTree) -> Result<VelosiParseTree, VelosiParserError> {
-        // get the path context for circle detection
-        let mut importpath = Vec::new();
-        let import_resolver = Self::do_resolve_imports(ptree, &mut importpath)?;
-
-        Ok(import_resolver.flatten())
-    }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Import Resolver
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Resolves imports recursively, flattens them to a single parse tree
 struct ImportResolver {
     parsetree: VelosiParseTree,
     imports: Vec<ImportResolver>,
 }
 
 impl ImportResolver {
+    /// Creates a new [ImportResolver] from a parse tree and its imports
     pub fn new(parsetree: VelosiParseTree, imports: Vec<ImportResolver>) -> Self {
         Self { parsetree, imports }
     }
 
+    /// Flattens the imports into a single [VelosiParseTree]
+    pub fn flatten(self) -> VelosiParseTree {
+        let mut imported = HashSet::new();
+        self.do_flatten(&mut imported)
+    }
+
+    /// Performs the actual flattenign work
     fn do_flatten(mut self, imported: &mut HashSet<String>) -> VelosiParseTree {
         let c = if let Some(s) = &self.parsetree.context {
             s.clone()
@@ -350,52 +431,4 @@ impl ImportResolver {
         ps.set_context(c);
         ps
     }
-
-    pub fn flatten(self) -> VelosiParseTree {
-        let mut imported = HashSet::new();
-        self.do_flatten(&mut imported)
-    }
 }
-
-// #[cfg(test)]
-// use std::path::PathBuf;
-
-// /// test parsing of files
-// #[test]
-// fn parsing_imports() {
-//     let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-//     d.push("tests/imports");
-
-//     for f in vec!["basicimport.vrs", "multiimport.vrs"] {
-//         d.push(f);
-//         let filename = format!("{}", d.display());
-
-//         println!("filename: {}", filename);
-
-//         // lex the file
-//         let err = Parser::parse_file(&filename);
-//         assert!(err.is_ok());
-
-//         d.pop();
-//     }
-// }
-
-// /// test parsing of files
-// #[test]
-// fn parsing_consts() {
-//     let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-//     d.push("tests/parser");
-
-//     for f in vec!["consts.vrs", "consts2.vrs"] {
-//         d.push(f);
-//         let filename = format!("{}", d.display());
-
-//         println!("filename: {}", filename);
-
-//         // lex the file
-//         let err = Parser::parse_file(&filename);
-//         assert!(err.is_ok());
-
-//         d.pop();
-//     }
-// }
