@@ -1,0 +1,1 @@
+mmio foo [ base, 0, 8 ] {}

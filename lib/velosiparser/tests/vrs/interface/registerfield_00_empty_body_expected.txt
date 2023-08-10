@@ -1,0 +1,5 @@
+error: empty interface field block
+     --> tests/vrs/interface/registerfield_00_empty_body.vrs:1:17
+      |
+    1 |  reg foo [ 8 ] {}
+      |                   remove the block or fill it in explicitly

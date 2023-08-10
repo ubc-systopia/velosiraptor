@@ -52,7 +52,7 @@ impl VelosiParseTreeInterfaceAction {
 
 impl Display for VelosiParseTreeInterfaceAction {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "{} -> {}", self.src, self.dst)
+        write!(f, "{} -> {};", self.src, self.dst)
     }
 }
 
@@ -79,7 +79,7 @@ impl VelosiParseTreeInterfaceActions {
 impl Display for VelosiParseTreeInterfaceActions {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         for a in &self.actions {
-            writeln!(f, "        {a},")?;
+            writeln!(f, "        {a}")?;
         }
         Ok(())
     }
@@ -344,14 +344,14 @@ impl VelosiParseTreeInterfaceDef {
 
 impl Display for VelosiParseTreeInterfaceDef {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        if !self.params.is_empty() {
-            write!(f, "InterfaceDef(")?;
-            for param in &self.params {
-                Display::fmt(param, f)?;
+        write!(f, "InterfaceDef(")?;
+        for (i, param) in self.params.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
             }
-            write!(f, ")")?;
+            Display::fmt(param, f)?;
         }
-        writeln!(f, " {{")?;
+        writeln!(f, ") {{")?;
         for field in &self.fields {
             Display::fmt(field, f)?;
             writeln!(f, ",")?;

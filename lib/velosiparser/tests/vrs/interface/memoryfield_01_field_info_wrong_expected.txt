@@ -1,0 +1,5 @@
+error: expected `identifier`, found `0`
+     --> tests/vrs/interface/memoryfield_01_field_info_wrong.vrs:1:11
+      |
+    1 |  mem foo [ 0 ] {Layout {}}
+      |            ^ help: add `identifier` here.

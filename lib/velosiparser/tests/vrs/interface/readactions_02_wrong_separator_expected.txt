@@ -1,0 +1,5 @@
+error: expected `;`, found `,`
+     --> tests/vrs/interface/readactions_02_wrong_separator.vrs:1:21
+      |
+    1 |  ReadActions { A -> B,  A -> B; }
+      |                      ^ help: add `;` here.

@@ -1,0 +1,4 @@
+InterfaceDef(base: foo){
+    reg foo [ 8 ];
+    reg foo [ 8 ]
+}

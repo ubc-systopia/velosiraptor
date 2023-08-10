@@ -1,0 +1,5 @@
+error: expected `,`, found `]`
+     --> tests/vrs/interface/memoryfield_02_field_info_wrong_2.vrs:1:19
+      |
+    1 |  mem foo [ base, 8 ] {Layout {}}
+      |                    ^ help: add `,` here.
