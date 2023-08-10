@@ -21,7 +21,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --manifest-path  ./lib/velosisynth/Cargo.toml -- --deny warnings
-      - name: libvelosisynth_build
+      - name: libvelosisynth_test
         uses: actions-rs/cargo@v1
         with:
           command: test
