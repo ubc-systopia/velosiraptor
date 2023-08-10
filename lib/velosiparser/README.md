@@ -1,11 +1,14 @@
 # Velosiparser Library
 
 This library implements the Velosiparser, the parser for the Velosiraptor Specification Language
-source files (*.vrs).
+source files (*.vrs). The parser consumes a sequence of lexemes produced by the Velosilexer and
+produces a parse tree.
+
 
 ## License
 
 see the LICENSE file.
+
 
 ## Authors
 
@@ -19,6 +22,7 @@ of Rust.
 
 Run `cargo fmt` before committing.
 
+
 ## Building
 
 To build the library
@@ -27,7 +31,10 @@ To build the library
 $ cargo build
 ```
 
+
 ## Documentation
+
+To build the source code documentation, simply run the cargo doc command.
 
 ```
 $ cargo doc --no-deps
@@ -35,6 +42,8 @@ $ cargo doc --no-deps
 
 
 ## Testing
+
+To run tests for the parser, use the cargo test command.
 
 ```
 $ cargo test
