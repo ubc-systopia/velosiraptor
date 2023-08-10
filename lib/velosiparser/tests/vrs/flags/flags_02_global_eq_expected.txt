@@ -1,0 +1,5 @@
+error: expected `{`, found `=`
+     --> tests/vrs/flags/flags_02_global_eq.vrs:1:7
+      |
+    1 |  flags = { foo, bar }
+      |        ^ help: add `{` here.
