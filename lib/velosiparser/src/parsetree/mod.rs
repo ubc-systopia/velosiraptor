@@ -46,10 +46,10 @@ mod unit;
 pub use consts::VelosiParseTreeConstDef;
 pub use expr::{
     VelosiParseTreeBinOp, VelosiParseTreeBinOpExpr, VelosiParseTreeBoolLiteral,
-    VelosiParseTreeExpr, VelosiParseTreeFnCallExpr, VelosiParseTreeIdentifierLiteral,
-    VelosiParseTreeIfElseExpr, VelosiParseTreeNumLiteral, VelosiParseTreeQuantifier,
-    VelosiParseTreeQuantifierExpr, VelosiParseTreeRangeExpr, VelosiParseTreeSliceExpr,
-    VelosiParseTreeUnOp, VelosiParseTreeUnOpExpr,
+    VelosiParseTreeElementExpr, VelosiParseTreeExpr, VelosiParseTreeFnCallExpr,
+    VelosiParseTreeIdentifierLiteral, VelosiParseTreeIfElseExpr, VelosiParseTreeNumLiteral,
+    VelosiParseTreeQuantifier, VelosiParseTreeQuantifierExpr, VelosiParseTreeRangeExpr,
+    VelosiParseTreeSliceExpr, VelosiParseTreeUnOp, VelosiParseTreeUnOpExpr,
 };
 pub use field::{VelosiParseTreeField, VelosiParseTreeFieldSlice};
 pub use interface::{

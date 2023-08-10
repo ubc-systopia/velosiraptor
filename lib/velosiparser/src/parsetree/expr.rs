@@ -121,14 +121,25 @@ impl VelosiParseTreeBinOpExpr {
 /// Implementation of [Display] for [VelosiParseTreeBinOpExpr]
 impl Display for VelosiParseTreeBinOpExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
-        write!(format, "({} {} {})", self.lhs, self.op, self.rhs)
+        if self.lhs.needs_paren() {
+            write!(format, "({})", self.lhs)?;
+        } else {
+            write!(format, "{}", self.lhs)?;
+        }
+        write!(format, " {} ", self.op)?;
+
+        if self.rhs.needs_paren() {
+            write!(format, "({})", self.rhs)
+        } else {
+            write!(format, "{}", self.rhs)
+        }
     }
 }
 
 /// Implementation of [Debug] for [VelosiParseTreeBinOpExpr]
 impl Debug for VelosiParseTreeBinOpExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
-        write!(format, "({} {} {})", self.lhs, self.op, self.rhs)
+        Display::fmt(&self, format)
     }
 }
 
@@ -238,14 +249,14 @@ impl VelosiParseTreeQuantifierExpr {
 /// Implementation of [Display] for [VelosiParseTreeQuantifierExpr]
 impl Display for VelosiParseTreeQuantifierExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
-        write!(format, "({} |", self.quant)?;
+        write!(format, "{} ", self.quant)?;
         for (i, p) in self.params.iter().enumerate() {
             if i != 0 {
                 write!(format, ", ")?;
             }
             write!(format, "{p}")?;
         }
-        write!(format, " :: {})", self.expr)
+        write!(format, " :: {}", self.expr)
     }
 }
 
@@ -382,7 +393,7 @@ impl Display for VelosiParseTreeFnCallExpr {
         write!(format, "{}(", self.name)?;
         for (i, p) in self.args.iter().enumerate() {
             if i != 0 {
-                write!(format, ".")?;
+                write!(format, ", ")?;
             }
             write!(format, "{p}")?;
         }
@@ -482,18 +493,22 @@ impl Debug for VelosiParseTreeRangeExpr {
 /// Represents an unary operation
 #[derive(PartialEq, Eq, Clone)]
 pub struct VelosiParseTreeSliceExpr {
-    pub name: VelosiParseTreeIdentifierLiteral,
+    pub name: Box<VelosiParseTreeExpr>,
     pub range: VelosiParseTreeRangeExpr,
     pub loc: VelosiTokenStream,
 }
 
 impl VelosiParseTreeSliceExpr {
     pub fn new(
-        name: VelosiParseTreeIdentifierLiteral,
+        name: VelosiParseTreeExpr,
         range: VelosiParseTreeRangeExpr,
         loc: VelosiTokenStream,
     ) -> Self {
-        Self { name, range, loc }
+        Self {
+            name: Box::new(name),
+            range,
+            loc,
+        }
     }
 }
 
@@ -509,6 +524,45 @@ impl Display for VelosiParseTreeSliceExpr {
 
 /// Implementation of [Debug] for [VelosiParseTreeSliceExpr]
 impl Debug for VelosiParseTreeSliceExpr {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Element Expressino
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Represents an element access expression
+#[derive(PartialEq, Eq, Clone)]
+pub struct VelosiParseTreeElementExpr {
+    pub name: Box<VelosiParseTreeExpr>,
+    pub idx: Box<VelosiParseTreeExpr>,
+    pub loc: VelosiTokenStream,
+}
+
+impl VelosiParseTreeElementExpr {
+    pub fn new(
+        name: VelosiParseTreeExpr,
+        idx: VelosiParseTreeExpr,
+        loc: VelosiTokenStream,
+    ) -> Self {
+        Self {
+            name: Box::new(name),
+            idx: Box::new(idx),
+            loc,
+        }
+    }
+}
+
+impl Display for VelosiParseTreeElementExpr {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        write!(format, "{}[{}]", self.name, self.idx)
+    }
+}
+
+/// Implementation of [Debug] for [VelosiParseTreeElementExpr]
+impl Debug for VelosiParseTreeElementExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
         Display::fmt(&self, format)
     }
@@ -531,6 +585,7 @@ pub enum VelosiParseTreeExpr {
     IfElse(VelosiParseTreeIfElseExpr),
     Slice(VelosiParseTreeSliceExpr),
     Range(VelosiParseTreeRangeExpr),
+    Element(VelosiParseTreeElementExpr),
 }
 
 impl VelosiParseTreeExpr {
@@ -547,7 +602,15 @@ impl VelosiParseTreeExpr {
             IfElse(i) => &i.loc,
             Slice(i) => &i.loc,
             Range(i) => &i.loc,
+            Element(i) => &i.loc,
         }
+    }
+
+    fn needs_paren(&self) -> bool {
+        matches!(
+            self,
+            VelosiParseTreeExpr::BinOp(_) | VelosiParseTreeExpr::Quantifier(_)
+        )
     }
 }
 
@@ -566,6 +629,7 @@ impl Display for VelosiParseTreeExpr {
             IfElse(i) => Display::fmt(&i, format),
             Slice(i) => Display::fmt(&i, format),
             Range(i) => Display::fmt(&i, format),
+            Element(i) => Display::fmt(&i, format),
         }
     }
 }

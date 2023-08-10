@@ -3,7 +3,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2021 Systopia Lab, Computer Science, University of British Columbia
+// Copyright (c) 2021-2023 Systopia Lab, Computer Science, University of British Columbia
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,10 +23,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! VelosiParseTreeExpression Parsing
+//! # VelosiParser: Expressions
 //!
+//! This module contains the parser for expressions.
 
-// the used nom componets
+// external dependencies
 use nom::{
     branch::alt,
     bytes::complete::take,
@@ -42,6 +43,10 @@ use crate::error::{IResult, VelosiParserErr};
 use crate::parser::{param::parameter, terminals::*};
 use crate::parsetree::*;
 use crate::{VelosiKeyword, VelosiTokenKind, VelosiTokenStream};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Notes on Operator Precedence
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Precedence of Operators  (strong to weak)
 // Operator                         Associativity       Example
@@ -64,10 +69,192 @@ use crate::{VelosiKeyword, VelosiTokenKind, VelosiTokenStream};
 // .. ..=                           Require parentheses
 // =                                                    Assign
 
-/// folds expressions
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Expression Parsers (public exports)
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// parses an expression
 ///
-/// convert a list of expressions with the same precedence into a tree
-/// representation
+/// This is the entry point into the expression parsing functionality. This parser recognizes any
+/// syntactically valid expression starting from the weakest binding operator.
+///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized expression as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///             and that another parser would fail.
+///
+/// # Grammar
+///
+/// `EXPR := IMPLIES_EXPR`
+///
+/// # Examples
+///
+///  * `a + b` (binary operation)
+///  * `foo()` (function call)
+///
+pub fn expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
+    implies_expr(input)
+}
+
+/// parses a quantifier expression (forall & exists)
+///
+/// This expression evaluates to a boolean.
+///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized expression as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///             and that another parser would fail.
+///
+/// # Grammar
+///
+/// `QUANTIFIER_EXPR := (KW_FORALL | KW_EXISTS) (IDENT COLON TYPE)+ PATHSEP EXPR
+///
+/// # Examples
+///
+///  * `forall x : int :: x > 0`
+///  * `exists y : int :: y < 0
+///
+pub fn quantifier_expr(
+    input: VelosiTokenStream,
+) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
+    let mut pos = input.clone();
+    // try parse the keyword
+    let (i2, quantifier) = alt((kw_exists, kw_forall))(input)?;
+    // now we're in a quantifier, get the list of variables
+    let (i3, vars) = cut(separated_list1(comma, parameter))(i2)?;
+
+    // then the `::` followed by an expression
+    let (i4, expr) = cut(preceded(coloncolon, expr))(i3)?;
+
+    // get the quantifier
+    let kind = match quantifier {
+        VelosiKeyword::Forall => VelosiParseTreeQuantifier::Forall,
+        VelosiKeyword::Exists => VelosiParseTreeQuantifier::Exists,
+        _ => unreachable!(),
+    };
+
+    pos.span_until_start(&i4);
+    let binop = VelosiParseTreeQuantifierExpr::new(kind, vars, expr, pos);
+    Ok((i4, VelosiParseTreeExpr::Quantifier(binop)))
+}
+
+/// parses a range expression
+///
+/// The range expression is used to specify a range of values from a starting
+/// value, up to but not including end value.
+///
+/// Currently, we only allow numeric literal expressions for the start and end values
+///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized expression as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///             and that another parser would fail.
+///
+/// # Grammar
+///
+/// `RANGE_EXPR := NUM_LIT_EXPR .. NUM_LIT_EXPR`
+///
+/// # Examples
+///
+/// `0..10` corresponds to the mathematical interval `[0, 10)`
+///
+/// an arithmetic expression evalutes to a number a | b
+pub fn range_expr(
+    input: VelosiTokenStream,
+) -> IResult<VelosiTokenStream, VelosiParseTreeRangeExpr> {
+    let mut pos = input.clone();
+    let (i, (s, _, e)) = tuple((num_lit_expr, dotdot, num_lit_expr))(input)?;
+    pos.span_until_start(&i);
+
+    match (s, e) {
+        (VelosiParseTreeExpr::NumLiteral(s), VelosiParseTreeExpr::NumLiteral(e)) => {
+            let range = VelosiParseTreeRangeExpr::new(s.value, e.value, pos);
+            Ok((i, range))
+            //Ok((i, VelosiParseTreeExpr::Range(range)))
+        }
+        _ => unreachable!(),
+    }
+}
+
+/// pares a function call expression
+///
+/// This may also be used to recognize function-call like expressions such as constructing a new
+/// Unit type.
+///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized expression as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///             and that another parser would fail.
+///
+/// # Grammar
+///
+/// `FN_CALL_EXPR := IDENT LPAREN LIST(COMMA, EXPR) RPAREN
+///
+/// # Examples
+///
+///  * `a()`
+///  * `b(a)`
+///
+pub fn fn_call_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
+    let mut pos = input.clone();
+    let (i, id) = ident(input)?;
+
+    let (i, args) = delimited(lparen, cut(separated_list0(comma, expr)), cut(rparen))(i)?;
+
+    pos.span_until_start(&i);
+    Ok((
+        i,
+        VelosiParseTreeExpr::FnCall(VelosiParseTreeFnCallExpr::new(id, args, pos)),
+    ))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helper Functions and Macros
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// folds expressions into a tree
+///
+/// Converts a list of expressions with the same precedence into a tree of binary operations.
 fn fold_exprs(
     initial: VelosiParseTreeExpr,
     remainder: Vec<(VelosiParseTreeBinOp, VelosiParseTreeExpr)>,
@@ -83,8 +270,7 @@ fn fold_exprs(
 
 /// builds a binary operator parser
 ///
-/// this constructs a binary operation parser for one or more operators with the same
-/// precedence.
+/// this constructs a binary operation parser for one or more operators with the same precedence.
 /// The macro supports multiple `(op, parser)` tuples as arguments.
 ///
 /// # Grammar
@@ -123,7 +309,19 @@ macro_rules! binop_parser (
 );
 
 /// builds a unary operator parser
+//////
+/// * `input` - input token stream to be parsed
 ///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized constant definition as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///             and that another parser would fail.
 /// This constructs a unuary operator parser for one or more operators with the same precedence.
 /// The unary oparator may or may not be present.
 /// The macro supports multiple `(op, parser)` tuples as arguments.
@@ -145,7 +343,7 @@ macro_rules! unop_parser (
                         let mut pos = i.clone();
 
                         let (unop, unop_parse) = $optup;
-                        let (i2, op) = preceded(unop_parse, cut($next))(i.clone())?;
+                        let (i2, op) = preceded(unop_parse, cut($this))(i.clone())?;
 
                         // expand the position until the end
                         pos.span_until_start(&i2);
@@ -206,50 +404,9 @@ macro_rules! cmp_parser (
     )
 );
 
-/// parses a quantifier expression
-///
-/// # Grammar
-///
-/// `QUANTIFIER_EXPR := KW_FORALL | KW_EXISTS (VARS)+ PathSep EXPR
-/// `QUANTIFIER_EXPR := KW_FORALL | KW_EXISTS (VARS)+ PIPE EXPR PathSep EXPR.
-///
-/// # Example
-///
-/// forall x :: x > 0
-///
-pub fn quantifier_expr(
-    input: VelosiTokenStream,
-) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
-    let mut pos = input.clone();
-    // try parse the keyword
-    let (i2, quantifier) = alt((kw_exists, kw_forall))(input)?;
-    // now we're in a quantifier, get the list of variables
-    let (i3, vars) = cut(separated_list1(comma, parameter))(i2)?;
-
-    // then the `::` followed by an expression
-    let (i4, expr) = cut(preceded(coloncolon, expr))(i3)?;
-
-    // get the quantifier
-    let kind = match quantifier {
-        VelosiKeyword::Forall => VelosiParseTreeQuantifier::Forall,
-        VelosiKeyword::Exists => VelosiParseTreeQuantifier::Exists,
-        _ => unreachable!(),
-    };
-
-    pos.span_until_start(&i4);
-    let binop = VelosiParseTreeQuantifierExpr::new(kind, vars, expr, pos);
-    Ok((i4, VelosiParseTreeExpr::Quantifier(binop)))
-}
-
-/// parses an expression
-///
-/// This is the entry point into the expression parsing functionality. This
-/// parser recognizes any valid expression, but does not perform any type
-/// checking.
-///
-pub fn expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
-    implies_expr(input)
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Parsing Binary and Unary Operators with Precedence
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // ===>                               left to right
 binop_parser!(
@@ -310,15 +467,44 @@ unop_parser!(
     (VelosiParseTreeUnOp::LNot, lnot)
 );
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Parsing Binary and Unary Operators with Precedence
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// parse a term expression
 ///
-/// This is an expression term including literals, function calls, element acesses,
-/// identifiers, and `( expr )`.
+/// A term expression refers to an element of a binary expression or unary expression that itself
+/// is not a binary or unary exprssion. Term expressions include literals, function calls,
+/// identifiers, element accesses, range exprssions, and conditionals.
+///
+/// Moreover, expressions can be explicitly grouped using parenthesis. This is also recognized here.
+///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized expression as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///             and that another parser would fail.
 ///
 /// # Grammar
 ///
 /// `TERM_EXPR := NUM_LIT_EXPR | BOOL_LIT_EXPR | FN_CALL_EXPR | ELEMENT_EXPR | IDENT_EXPR | LPAREN EXPR RPAREN
-pub fn term_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
+///
+/// # Examples
+///
+/// * `1`
+/// * `foo`
+/// * `foo(1, 2)`
+///
+fn term_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
     alt((
         // try to parse a number
         num_lit_expr,
@@ -329,7 +515,7 @@ pub fn term_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiP
         // slice expression
         slice_expr,
         // element expression returning a boolean
-        // element_expr,
+        element_expr,
         // if-then-else expression
         if_else_expr,
         // it can be a identifier (variable)
@@ -339,41 +525,28 @@ pub fn term_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiP
     ))(input)
 }
 
-/// parses a range expression
-///
-/// The range expression is used to specify a range of values from a starting
-/// value, up to but not including end value.
-///
-/// # Grammar
-///
-/// `RANGE_EXPR := ARITH_EXPR .. ARITH_EXPR`
-///
-/// # Example
-///
-/// `0..10` corresponds to the mathematical interval `[0, 10)`
-///
-/// an arithmetic expression evalutes to a number a | b
-pub fn range_expr(
-    input: VelosiTokenStream,
-) -> IResult<VelosiTokenStream, VelosiParseTreeRangeExpr> {
-    let mut pos = input.clone();
-    let (i, (s, _, e)) = tuple((num_lit_expr, dotdot, num_lit_expr))(input)?;
-    pos.span_until_start(&i);
-
-    match (s, e) {
-        (VelosiParseTreeExpr::NumLiteral(s), VelosiParseTreeExpr::NumLiteral(e)) => {
-            let range = VelosiParseTreeRangeExpr::new(s.value, e.value, pos);
-            Ok((i, range))
-            //Ok((i, VelosiParseTreeExpr::Range(range)))
-        }
-        _ => unreachable!(),
-    }
-}
-
 /// parses an if-then-else expression
 ///
-/// The if then else expression is used to specify a conditional expression, both branches must
-/// be present
+/// The if-then-else expression is used to specify a conditional expression, both branches must
+/// be present.
+///
+/// Note, the parser does not enforce that the condition is a boolean expression and that the
+/// two branches have the same type.
+///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized expression as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///             and that another parser would fail.
 ///
 /// # Grammar
 ///
@@ -381,9 +554,9 @@ pub fn range_expr(
 ///
 /// # Example
 ///
-/// `if 3 > a { 1 } else { 2 }`
+/// * `if 3 > a { 1 } else { 2 }`
 ///
-pub fn if_else_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
+fn if_else_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
     let mut pos = input.clone();
 
     let (i1, _) = kw_if(input)?;
@@ -402,15 +575,27 @@ pub fn if_else_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Velo
 ///
 /// The numeric literal is a hexdecima, decimal, octal or binary number
 ///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized expression as a parse tree node.
+/// * Err: The parser did not succed. This is a recoverable error indicating that the parser did
+///        not recognize the input but another parser might.
+///
 /// # Grammar
 ///
 /// `NUM := HEX_NUM | DEC_NUM | OCT_NUM | BIN_NUM`
 ///
 /// # Example
 ///
-/// `1234`, `0xabc`
+/// * `1234`
+/// * `0xabc`
 ///
-pub fn num_lit_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
+fn num_lit_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
     let mut pos = input.clone();
     let (i, n) = num(input)?;
     pos.span_until_start(&i);
@@ -424,6 +609,17 @@ pub fn num_lit_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Velo
 ///
 /// This corresponds to true or false.
 ///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized expression as a parse tree node.
+/// * Err: The parser did not succed. This is a recoverable error indicating that the parser did
+///        not recognize the input but another parser might.
+///
 /// # Grammar
 ///
 /// `BOOL := true | false
@@ -431,7 +627,7 @@ pub fn num_lit_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Velo
 /// # Example
 ///
 /// `true`, `false
-pub fn bool_lit_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
+fn bool_lit_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
     let mut pos = input.clone();
     let (i, n) = boolean(input)?;
     pos.span_until_start(&i);
@@ -445,6 +641,21 @@ pub fn bool_lit_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vel
 ///
 /// The slice expression refers to range of elements within an array-like structure
 ///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized expression as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///             and that another parser would fail.
+///
 /// # Grammar
 ///
 /// SLICE_EXPR := IDENT_EXPR LBRACK RANGE_EXPR RBRACK
@@ -453,9 +664,9 @@ pub fn bool_lit_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vel
 ///
 /// `foo[0..1]`
 ///
-pub fn slice_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
+fn slice_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
     let mut pos = input.clone();
-    let (i, (p, e)) = pair(ident_path, delimited(lbrack, cut(range_expr), cut(rbrack)))(input)?;
+    let (i, (p, e)) = pair(ident_expr, delimited(lbrack, range_expr, cut(rbrack)))(input)?;
     pos.span_until_start(&i);
 
     Ok((
@@ -464,9 +675,71 @@ pub fn slice_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Velosi
     ))
 }
 
-fn ident_path(
-    input: VelosiTokenStream,
-) -> IResult<VelosiTokenStream, VelosiParseTreeIdentifierLiteral> {
+/// parses an element access expression
+///
+/// This constructs a parser that recognizes an element access `foo[0]`.
+///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized expression as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///             and that another parser would fail.
+///
+/// # Grammar
+///
+/// `ELEMENT_EXPR := IDENT_EXPR LBRACK NUM_LIT RBRACK`
+///
+/// # Example
+///
+///  * `foo[1]`
+fn element_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
+    let mut pos = input.clone();
+    let (i, (path, e)) = pair(ident_expr, delimited(lbrack, num_lit_expr, rbrack))(input)?;
+
+    pos.span_until_start(&i);
+    Ok((
+        i,
+        VelosiParseTreeExpr::Element(VelosiParseTreeElementExpr::new(path, e, pos)),
+    ))
+}
+
+/// parses an identifier expression
+///
+/// This parser recognizes identifiers includingthe special keywords `state` and `interface`.
+///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized expression as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///             and that another parser would fail.
+///
+/// # Grammar
+///
+/// `IDENT_EXPR := (KW_STATE | KW_INTERFACE | IDENT) (DOT IDENT)*
+///
+/// # Example
+///  * variable: `a`
+///  * State reference: `state.a`
+///
+fn ident_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
     let mut pos = input.clone();
     // we need to match on the state and interface keywords as well,
     // so we are doing this manually here, try to take a single token
@@ -498,201 +771,199 @@ fn ident_path(
 
     pos.span_until_start(&i);
 
-    Ok((i, VelosiParseTreeIdentifierLiteral::new(path, pos)))
+    Ok((
+        i,
+        VelosiParseTreeExpr::Identifier(VelosiParseTreeIdentifierLiteral::new(path, pos)),
+    ))
 }
 
-/// parses an identifier expression
-///
-/// This parser recognizes identifiers includingthe special keywords `state` and `interface`.
-///
-/// # Grammar
-///
-/// `IDENT_EXPR := (KW_STATE | KW_INTERFACE | IDENT) (DOT IDENT)*
-///
-/// # Example
-///  * variable: `a`
-///  * State reference: `state.a`
-///
-fn ident_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
-    let (i, id) = ident_path(input)?;
-    Ok((i, VelosiParseTreeExpr::Identifier(id)))
-}
-
-/// parses an expression list
-///
-/// # Grammar
-///
-/// `EXPR_LIST := [ EXPR (COMMA EXPR)* ]?`
-pub fn expr_list(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vec<VelosiParseTreeExpr>> {
-    separated_list0(comma, expr)(input)
-}
-
-/// pares a function call expression
-///
-/// This parser recognizes a function call expression.
-///
-/// # Grammar
-///
-/// `FN_CALL_EXPR := IDENT (DOT IDENT)* LPAREN LIST(COMMA, EXPR) RPAREN
-///
-/// # Example
-///
-///  * `a()`
-///  * `b(a)`
-///  * `a.b(c)`
-///
-pub fn fn_call_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
-    let (i, expr) = fn_call_expr_raw(input)?;
-    Ok((i, VelosiParseTreeExpr::FnCall(expr)))
-}
-
-pub fn fn_call_expr_raw(
-    input: VelosiTokenStream,
-) -> IResult<VelosiTokenStream, VelosiParseTreeFnCallExpr> {
-    let mut pos = input.clone();
-    let (i, id) = ident(input)?;
-
-    let (i, args) = delimited(lparen, cut(expr_list), cut(rparen))(i)?;
-
-    pos.span_until_start(&i);
-    Ok((i, VelosiParseTreeFnCallExpr::new(id, args, pos)))
-}
-
-/// parses a slice element expression
-///
-/// This constructs a parser that recognizes an element access `foo[0]`.
-///
-/// # Grammar
-///
-/// `ELEMENT_EXPR := IDENT_EXPR LBRACK NUM_LIT RBRACK`
-///
-/// # Example
-///
-///  * `foo[1]`
-// fn element_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
-//     let (i, (path, e)) =
-//         pair(separated_list1(dot, ident), delimited(lbrack, expr, rbrack))(input.clone())?;
-//     let pos = input.expand_until(&i);
-//     Ok((
-//         i,
-//         VelosiParseTreeExpr::Element {
-//             path,
-//             idx: Box::new(e),
-//             pos,
-//         },
-//     ))
-// }
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Testing
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(test)]
 use velosilexer::VelosiLexer;
 
 #[cfg(test)]
-macro_rules! parse_equal (
-    ($parser:expr, $lhs:expr, $rhs:expr) => (
-        let ts = VelosiLexer::lex_string($lhs.to_string()).unwrap();
-        let (_, res) = $parser(ts).unwrap();
-        assert_eq!(
-            res.to_string().as_str(),
-            $rhs
-        );
-    )
-);
-
-#[cfg(test)]
-macro_rules! parse_fail(
-    ($parser:expr, $lhs:expr) => (
-        let ts = VelosiLexer::lex_string($lhs.to_string()).unwrap();
-        let res = $parser(ts);
-        assert!(res.is_err(),);
-    )
-);
+use crate::{test_parse_and_check_fail, test_parse_and_compare_ok};
 
 #[test]
 fn test_literals() {
-    // some literals
-    parse_equal!(expr, "1", "1");
-    parse_equal!(expr, "true", "true");
-    parse_equal!(expr, "ident", "ident");
-    parse_equal!(expr, "ident.path.expr", "ident.path.expr");
-    parse_equal!(expr, "(1)", "1");
-    //parse_equal!(expr, "foo[3]", "foo[3]");
-    parse_equal!(expr, "foo[3..4]", "foo[3..4]");
-    parse_equal!(expr, "bar()", "bar()");
-    //parse_equal!(expr, "foo.bar[3]", "foo.bar[3]");
-    parse_equal!(expr, "foo.bar[0..3]", "foo.bar[0..3]");
-    // unclosed
-    parse_fail!(expr, "(1");
-    parse_fail!(expr, "(1(");
+    test_parse_and_compare_ok!("1", expr);
+    test_parse_and_compare_ok!("true", expr);
+    test_parse_and_compare_ok!("ident", expr);
+    test_parse_and_compare_ok!("ident.path.expr", expr);
+    test_parse_and_compare_ok!("(1)", expr, "1");
 }
 
 #[test]
-fn test_arithmetic() {
-    // some arithmetic o
-    parse_equal!(expr, "1 + 2 * 3 + 4", "((1 + (2 * 3)) + 4)");
-    parse_equal!(
-        expr,
-        "1 + 2 * 3 + 4 << 5 * 2",
-        "(((1 + (2 * 3)) + 4) << (5 * 2))"
-    );
-    parse_equal!(expr, "1 + a + b + 4 + 5", "((((1 + a) + b) + 4) + 5)");
-    parse_equal!(expr, "a + 1 + b + 4 + 5", "((((a + 1) + b) + 4) + 5)");
-    parse_equal!(expr, "a + 1", "(a + 1)");
+fn test_literals_fail() {
+    test_parse_and_check_fail!("(1", expr);
+    test_parse_and_check_fail!("(1(", expr);
+    test_parse_and_check_fail!("ident.path.", expr);
 }
 
 #[test]
-fn test_boolean() {
-    parse_equal!(
-        expr,
-        "a && b || c && d || x > 9",
-        "(((a && b) || (c && d)) || (x > 9))"
-    );
+fn test_fncall() {
+    test_parse_and_compare_ok!("bar()", expr);
+    test_parse_and_compare_ok!("bar(123)", expr);
+    test_parse_and_compare_ok!("bar(123, 456)", expr);
+    test_parse_and_compare_ok!("bar(123, 456, foo(bar))", expr);
+    test_parse_and_compare_ok!("bar(123, 456, foo(bar, 1234))", expr);
+    test_parse_and_compare_ok!("bar(baz[3], 456, foo(bar, 1234))", expr);
+}
 
-    parse_equal!(expr, "a ==> b || c ==> d", "((a ==> (b || c)) ==> d)");
+#[test]
+fn test_fncall_fail() {
+    test_parse_and_check_fail!("bar(", expr);
+    test_parse_and_check_fail!("bar(123]", expr);
+}
 
-    parse_equal!(
-        expr,
-        "a.a && b.b || c.x && d.d.a || x > 9 && !zyw",
-        "(((a.a && b.b) || (c.x && d.d.a)) || ((x > 9) && !(zyw)))"
+#[test]
+fn test_slice() {
+    test_parse_and_compare_ok!("foo[3..4]", expr);
+    test_parse_and_compare_ok!("foo.bar[0..3]", expr);
+    test_parse_and_compare_ok!("foo[1..2]", slice_expr);
+
+    // currently we don't support this
+    test_parse_and_check_fail!("foo[1+2..1+2]", slice_expr);
+    test_parse_and_check_fail!("foo[a..b]", slice_expr);
+}
+
+#[test]
+fn test_element() {
+    test_parse_and_compare_ok!("foo[3]", expr);
+    test_parse_and_compare_ok!("foo.bar[3]", expr);
+
+    // currently we don't support this
+    test_parse_and_check_fail!("foo.bar[a]", expr);
+    test_parse_and_check_fail!("foo.bar[a+1]", expr);
+    test_parse_and_check_fail!("foo.bar[baz(3)]", expr);
+    test_parse_and_check_fail!("foo.bar[bar.foo[3]]", expr);
+}
+
+#[test]
+fn test_ifelse() {
+    test_parse_and_compare_ok!("if true { 3 } else { 4 }", expr);
+    test_parse_and_compare_ok!("if FOO { 3 } else { 4 }", expr);
+    test_parse_and_compare_ok!("if foo() { bar() } else { baz() }", expr);
+
+    test_parse_and_compare_ok!(
+        "if foo() { if bar() { 3 } else { 4 } } else { baz() }",
+        expr
     );
-    parse_equal!(expr, "a && b == true", "(a && (b == true))");
-    parse_equal!(
-        expr,
-        "s.x || a() && b() || c",
-        "((s.x || (a() && b())) || c)"
-    );
-    parse_equal!(
-        expr,
-        "a && b && c || d || true",
-        "((((a && b) && c) || d) || true)"
-    );
-    parse_equal!(expr, "a < 123 && b > 432", "((a < 123) && (b > 432))");
-    parse_equal!(expr, "true == a", "(true == a)");
-    parse_equal!(expr, "a == true", "(a == true)");
+    // doesn't do type check, so that's ok
+    test_parse_and_compare_ok!("if FOO + 3 { 3 } else { 4 }", expr);
+}
+
+#[test]
+fn test_ifelse_fail() {
+    test_parse_and_check_fail!("if true { 3 }", expr);
 }
 
 #[test]
 fn test_range() {
     // parse_equal!(range_expr, "a..b", "a..b");
-    parse_equal!(range_expr, "1..2", "1..2");
-    // parse_equal! {
-    //     range_expr,
-    //     "a+b..1+5",
-    //     "(a + b)..(1 + 5)"
-    // }
+    test_parse_and_compare_ok!("1..2", range_expr);
+
+    // currently we don't support this
+    test_parse_and_check_fail!("a..b", range_expr);
+    test_parse_and_check_fail!("1+2..a+2", range_expr);
 }
 
 #[test]
-fn test_slice() {
-    parse_equal!(slice_expr, "foo[1..2]", "foo[1..2]");
-    // parse_equal!(slice_expr, "foo[a..len]", "foo[a..len]");
-    // parse_equal! {
-    //     slice_expr,
-    //     "foo[a+4..len-1]",
-    //     "foo[(a + 4)..(len - 1)]"
-    // }
+fn test_quantifier() {
+    test_parse_and_compare_ok!("forall x: int :: x > 0", quantifier_expr);
+    test_parse_and_compare_ok!("exists x: int :: x > 0", quantifier_expr);
+
+    test_parse_and_compare_ok!(
+        "forall x: int, y: size :: x > 0 && a < b",
+        quantifier_expr,
+        "forall x: int, y: size :: (x > 0) && (a < b)"
+    );
+    test_parse_and_compare_ok!(
+        "exists x: int, y: size :: x > 0 && y < 0",
+        quantifier_expr,
+        "exists x: int, y: size :: (x > 0) && (y < 0)"
+    );
 }
 
 #[test]
-fn test_fncall() {
-    parse_equal!(expr, "bar(123)", "bar(123)");
+fn test_ops_same_precedence() {
+    test_parse_and_compare_ok!("1 + 2 + 3", expr, "(1 + 2) + 3");
+    test_parse_and_compare_ok!("1 + 2 - 3", expr, "(1 + 2) - 3");
+    test_parse_and_compare_ok!("1 + 2 - 3 + 4", expr, "((1 + 2) - 3) + 4");
+
+    test_parse_and_compare_ok!("1 << 2 >> 3", expr, "(1 << 2) >> 3");
+    test_parse_and_compare_ok!("1 >> 2 << 3", expr, "(1 >> 2) << 3");
+
+    test_parse_and_compare_ok!("1 && 2 && 3", expr, "(1 && 2) && 3");
+    test_parse_and_compare_ok!("1 || 2 || 3", expr, "(1 || 2) || 3");
+
+    test_parse_and_compare_ok!("1 & 2 & 3", expr, "(1 & 2) & 3");
+    test_parse_and_compare_ok!("1 | 2 | 3", expr, "(1 | 2) | 3");
+
+    test_parse_and_compare_ok!("~1", expr, "~(1)");
+    test_parse_and_compare_ok!("~~1", expr, "~(~(1))");
+
+    test_parse_and_compare_ok!("true == a", expr);
+    test_parse_and_compare_ok!("a == true", expr);
+}
+
+#[test]
+fn test_ops_parens() {
+    test_parse_and_compare_ok!("1 + (2 + 3)", expr, "1 + (2 + 3)");
+    test_parse_and_compare_ok!("1 + (2 + 3) + 4", expr, "(1 + (2 + 3)) + 4");
+}
+
+#[test]
+fn test_ops_different_precedence() {
+    test_parse_and_compare_ok!("1 + 2 * 3 + 4", expr, "(1 + (2 * 3)) + 4");
+    test_parse_and_compare_ok!("1 + 2 + 3 * 4 + 5", expr, "((1 + 2) + (3 * 4)) + 5");
+
+    test_parse_and_compare_ok!(
+        "a && b && c || d || e && f",
+        expr,
+        "(((a && b) && c) || d) || (e && f)"
+    );
+
+    test_parse_and_compare_ok!(
+        "a || b || c && d && e || f",
+        expr,
+        "((a || b) || ((c && d) && e)) || f"
+    );
+
+    test_parse_and_compare_ok!(
+        "a == 1 && b == 2 || c == 3 && d != 4 && e > 5",
+        expr,
+        "((a == 1) && (b == 2)) || (((c == 3) && (d != 4)) && (e > 5))"
+    );
+
+    test_parse_and_compare_ok!(
+        "a +1 == 1 && b- 2 == 2 || c * 2 + 2 == 3 && d << 3 != 4 && e << 4 * 4 > 5",
+        expr,
+        "(((a + 1) == 1) && ((b - 2) == 2)) || (((((c * 2) + 2) == 3) && ((d << 3) != 4)) && ((e << (4 * 4)) > 5))"
+    );
+
+    test_parse_and_compare_ok!(
+        "a == b | c ^ d & e << f & g >> i",
+        expr,
+        "a == (b | (c ^ ((d & (e << f)) & (g >> i))))"
+    );
+
+    test_parse_and_compare_ok!("s.x || a() && b() || c", expr, "(s.x || (a() && b())) || c");
+
+    test_parse_and_compare_ok!(
+        "a.a && b.b || c.x && d.d.a || x > 9 && !zyw",
+        expr,
+        "((a.a && b.b) || (c.x && d.d.a)) || ((x > 9) && !(zyw))"
+    );
+
+    test_parse_and_compare_ok!(
+        "a == ~b | c ^ d & ~e << f & g >> i",
+        expr,
+        "a == (~(b) | (c ^ ((d & (~(e) << f)) & (g >> i))))"
+    );
+
+    test_parse_and_compare_ok!("a ==> b || c ==> d", expr, "(a ==> (b || c)) ==> d");
 }

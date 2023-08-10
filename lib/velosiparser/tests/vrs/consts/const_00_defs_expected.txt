@@ -8,7 +8,7 @@ const FOO : int = a;
 
 const FOO : int = BAR;
 
-const FOO : size = (FOO + FOOBAR);
+const FOO : size = FOO + FOOBAR;
 
 const FOO : MyType = 1234;
 

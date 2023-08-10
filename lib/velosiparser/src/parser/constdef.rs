@@ -3,7 +3,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2021 Systopia Lab, Computer Science, University of British Columbia
+// Copyright (c) 2021-2023 Systopia Lab, Computer Science, University of British Columbia
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +23,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! # Constant Definitions
+//! # VelosiParser: Constant Definitions
+//!
+//! This module contains the parser for constant definitions either globally or within the
+//! unit contexts.
 
 // external dependencies
 use nom::{
@@ -38,23 +41,37 @@ use crate::parser::terminals::{assign, colon, ident, kw_const, semicolon, typein
 use crate::parsetree::VelosiParseTreeConstDef;
 use crate::VelosiTokenStream;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Constant Parsing
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// parses and consumes an constant definition
 ///
 /// The constant definition assigns a name to a constant value.
 ///
-/// # Grammar
+/// # Arguments
 ///
-/// CONST := KW_CONST IDENT COLON TYPE ASSIGN EXPR SEMICOLON;
+/// * `input` - input token stream to be parsed
 ///
 /// # Results
 ///
-///  * OK:       when the parser successfully recognizes the constant definition
-///  * Error:    when the parse could not recognize the constant definition
-///  * Failure:  when the parser recognizes the constant definition, but it was malformed
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized constant definition as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///             and that another parser would fail.
+///
+/// # Grammar
+///
+/// `CONSTDEF := KW_CONST IDENT COLON TYPE ASSIGN EXPR SEMICOLON;`
 ///
 /// # Examples
 ///
-/// `const FOO : int = 1234;`
+///  * `const FOO : int = 1234;`
+///  * `const BAR : int = 1234 + FOO;`
 ///
 pub fn constdef(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeConstDef> {
     let mut pos = input.clone();
@@ -73,58 +90,70 @@ pub fn constdef(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPa
     Ok((i3, VelosiParseTreeConstDef::new(ident, ti, valexpr, pos)))
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Tests
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[cfg(test)]
 use velosilexer::VelosiLexer;
 
+#[cfg(test)]
+use crate::{test_parse_and_check_fail, test_parse_and_compare_ok};
+
 #[test]
-fn test_ok() {
-    // corresponds to `0 16 foobar`
-
-    let content = "const FOO : int = 1234;";
-    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
-    let (_, res) = constdef(ts).unwrap();
-    assert_eq!(res.to_string().as_str(), "const FOO : int = 1234;");
-
-    let content = "const FOO : addr = 0x1200;";
-    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
-    assert!(constdef(ts).is_ok());
-
-    let content = "const FOO : size = 0x1200;";
-    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
-    assert!(constdef(ts).is_ok());
-
-    let content = "const FOO : bool = true;";
-    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
-    assert!(constdef(ts).is_ok());
-
-    // wrong type, but should parse
-    let content = "const FOO : size = true;";
-    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
-    assert!(constdef(ts).is_ok());
-
-    // wrong type, but should parse
-    let content = "const FOO : bool = 0x123;";
-    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
-    assert!(constdef(ts).is_ok());
-
-    // wrong type, but should parse
-    let content = "const FOO : addr = true;";
-    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
-    assert!(constdef(ts).is_ok());
+fn test_ok_simple_defs() {
+    test_parse_and_compare_ok!("const FOO : int = 1234;", constdef);
+    test_parse_and_compare_ok!("const FOO : bool = true;", constdef);
+    test_parse_and_compare_ok!("const foo : int = 1234;", constdef);
+    test_parse_and_compare_ok!("const FOO : int = BAR;", constdef);
+    test_parse_and_compare_ok!(
+        "const FOO : addr = 0x1200;",
+        constdef,
+        "const FOO : addr = 4608;"
+    );
 }
 
 #[test]
-fn test_fails() {
-    // no semicolon
-    let content = "const FOO : int = 1234 asdf";
-    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
-    assert!(constdef(ts).is_err());
+fn test_ok_expr() {
+    test_parse_and_compare_ok!(
+        "const FOO : int = 1+2;",
+        constdef,
+        "const FOO : int = 1 + 2;"
+    );
 
-    // cannot use keywords
-    let content = "const FOO : int = int;";
-    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
-    assert!(constdef(ts).is_err());
+    test_parse_and_compare_ok!(
+        "const FOO : int = BAR+2;",
+        constdef,
+        "const FOO : int = BAR + 2;"
+    );
+}
 
+#[test]
+fn test_ok_type_mismatch() {
+    // wrong type, but should parse
+    test_parse_and_compare_ok!("const FOO : size = true;", constdef);
+    test_parse_and_compare_ok!("const FOO : addr = true;", constdef);
+    test_parse_and_compare_ok!(
+        "const FOO : bool = 0x123;",
+        constdef,
+        "const FOO : bool = 291;"
+    );
+}
+
+#[test]
+fn test_fail_no_semicolon() {
+    // no semicolon at the end
+    test_parse_and_check_fail!("const FOO : int = 1234 asdf", constdef);
+    test_parse_and_check_fail!("const FOO : int = 1234 asdf;", constdef);
+}
+
+#[test]
+fn test_fail_types_keyword() {
+    test_parse_and_check_fail!("const FOO : int = int;", constdef);
+}
+
+#[test]
+fn test_fail_no_type() {
     // no type
     let content = "const FOO  = true;";
     let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
