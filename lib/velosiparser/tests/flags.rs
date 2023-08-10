@@ -26,12 +26,7 @@
 //! # VelosiParser Tests: Example Specs
 
 // std includes
-use std::fs::{self};
-
 use std::path::Path;
-
-// our library
-use velosiparser::{VelosiParser, VelosiParserError};
 
 mod utils;
 

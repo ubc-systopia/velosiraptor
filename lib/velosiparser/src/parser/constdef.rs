@@ -62,7 +62,7 @@ use crate::VelosiTokenStream;
 ///    * Error: a recoverable error indicating that the parser did not recognize the input but
 ///             another parser might, or
 ///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
-///             and that another parser would fail.
+///               and that another parser would fail.
 ///
 /// # Grammar
 ///
