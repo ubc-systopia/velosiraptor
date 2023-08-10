@@ -38,19 +38,28 @@ use crate::VelosiTokenStream;
 ///
 /// The import directive tells the compiler to include the contents of the imported file
 ///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized import directive as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///               and that another parser would fail.
+///
 /// # Grammar
 ///
 /// `IMPORT := KW_IMPORT IDENT SEMICOLON`
 ///
-/// # Results
-///
-///  * OK:       when the parser successfully recognizes the import directive
-///  * Error:    when the parse could not recognize the import directive
-///  * Failure:  when the parser recognizes the import directive, but it was malformed
-///
 /// # Examples
 ///
-/// `import foo;`
+///  * `import foo;`
 ///
 pub fn import(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeContextNode> {
     // record the start
