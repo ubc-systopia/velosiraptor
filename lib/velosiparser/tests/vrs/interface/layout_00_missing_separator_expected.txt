@@ -1,0 +1,5 @@
+error: expected `}`, found `1`
+     --> tests/vrs/interface/layout_00_missing_separator.vrs:3:5
+      |
+    3 |      1 .. 2 bar
+      |      ^ help: add `}` here.

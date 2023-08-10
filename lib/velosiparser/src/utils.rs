@@ -52,6 +52,7 @@ macro_rules! test_parse_and_compare_fail ((
     match  nom::combinator::all_consuming($parser)(ts) {
         Ok((_, res)) => panic!("parsing should have failed, but succeeded with {}", res),
         Err(nom::Err::Failure(e)) => {
+            println!(">>>>>>>\n{e}\n<<<<<<<");
             let plain_bytes = strip_ansi_escapes::strip(e.to_string())
                 .expect("could not string the ansi escapes");
             let error_str = String::from_utf8(plain_bytes).expect("could not convert to utf8");
@@ -95,18 +96,56 @@ macro_rules! test_parse_and_compare_file_ok ((
 
 #[cfg(test)]
 #[macro_export]
-macro_rules! test_parse_and_compare_file_fail ((
-    $input: expr, $parser:ident, $expfile: expr) => (
-        let ts = VelosiLexer::lex_file($infile).expect("lexing of file failed");
-    match  nom::combinator::all_consuming($parser)(ts) {
-        Ok((_, res)) => panic!("parsing should have failed, but succeeded with {}", res),
-        Err(nom::Err::Failure(e)) => {
-            let plain_bytes = strip_ansi_escapes::strip(e.to_string())
-                .expect("could not string the ansi escapes");
-            let error_str = String::from_utf8(plain_bytes).expect("could not convert to utf8");
-            let expected = fs::read_to_string($expfile).expect("could not read the exected output file");
-            assert_eq!(e.to_string(), expected);
+macro_rules! test_parse_and_compare_file_fail {
+    ($infile: expr, $parser:ident) => {
+        let infile = format!("tests/vrs/{}.vrs", $infile);
+        let expfile = format!("tests/vrs/{}_expected.txt", $infile);
+        let ts = VelosiLexer::lex_file(infile.as_str()).expect("lexing of file failed");
+        match nom::combinator::all_consuming($parser)(ts) {
+            Ok((_, res)) => panic!("parsing should have failed, but succeeded with {}", res),
+            Err(nom::Err::Failure(e)) | Err(nom::Err::Error(e)) => {
+                println!(">>>>>>>\n{e}\n<<<<<<<");
+                let plain_bytes = strip_ansi_escapes::strip(e.to_string())
+                    .expect("could not string the ansi escapes");
+                let error_str = String::from_utf8(plain_bytes).expect("could not convert to utf8");
+                let expected =
+                    fs::read_to_string(expfile).expect("could not read the exected output file");
+                assert_eq!(error_str.to_string(), expected);
+            }
+            e => panic!("Unexpected error: {:?}", e),
         }
-        e => panic!("parsing should have failed, but succeeded with {}", e)
-    }
-));
+    };
+    ($infile: expr, $parser:ident, $expfile: expr) => {
+        let ts = VelosiLexer::lex_file($infile.display().to_string().as_str())
+            .expect("lexing of file failed");
+        match nom::combinator::all_consuming($parser)(ts) {
+            Ok((_, res)) => panic!("parsing should have failed, but succeeded with {}", res),
+            Err(nom::Err::Failure(e)) | Err(nom::Err::Error(e)) => {
+                println!(">>>>>>>\n{e}\n<<<<<<<");
+                let plain_bytes = strip_ansi_escapes::strip(e.to_string())
+                    .expect("could not string the ansi escapes");
+                let error_str = String::from_utf8(plain_bytes).expect("could not convert to utf8");
+                let expected =
+                    fs::read_to_string($expfile).expect("could not read the exected output file");
+                assert_eq!(error_str.to_string(), expected);
+            }
+            e => panic!("Unexpected error: {:?}", e),
+        }
+    };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Open the test files
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// #[cfg(test)]
+// use std::path::PathBuf;
+
+// #[cfg(test)]
+// pub fn test_utils_file_path(relpath: &str) -> PathBuf {
+//     //let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+//     let mut d = PathBuf::from("tests/vrs");
+//     // d.push("tests/vrs");
+//     d.push(relpath);
+//     d
+// }
