@@ -1,0 +1,5 @@
+segment MyUnit {
+  state = StateDef(base: foo) {
+        reg foo [ 8 ] {}
+    };
+}
