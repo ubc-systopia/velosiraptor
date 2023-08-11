@@ -122,7 +122,7 @@ segment X86_32_PageTableEntry(base : addr) {
     synth fn unmap(va: vaddr, sz: size)
         requires (va == 0);
         requires sz == BASE_PAGE_SIZE;
-    {}
+
 
     // mapping an entry
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
