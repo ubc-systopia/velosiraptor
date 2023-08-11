@@ -1,0 +1,7 @@
+segment MyUnit {
+    // method with pre-condition
+    fn foo(bar) -> bool
+    {
+
+    }
+}

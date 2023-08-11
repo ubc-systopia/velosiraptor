@@ -57,6 +57,8 @@ pub struct VelosiParseTreeMethod {
     pub rettype: Option<VelosiParseTreeType>,
     /// the nodes defined in the parse tree
     pub requires: Vec<VelosiParseTreeExpr>,
+    /// the nodes defined in the parse tree
+    pub ensures: Vec<VelosiParseTreeExpr>,
     /// the body of the method
     pub body: Option<VelosiParseTreeExpr>,
     /// the position in the source tree where this unit is defined
@@ -107,12 +109,18 @@ impl Display for VelosiParseTreeMethod {
             write!(f, ")")?;
         }
 
-        for (i, require) in self.requires.iter().enumerate() {
-            if i == 0 {
-                writeln!(f)?;
-            }
-            writeln!(f, "    requires {require}")?;
+        for require in self.requires.iter() {
+            write!(f, "\n    requires {require}")?;
         }
+
+        for ensure in self.ensures.iter() {
+            write!(f, "\n    ensures {ensure}")?;
+        }
+
+        if !self.requires.is_empty() || !self.ensures.is_empty() {
+            writeln!(f)?;
+        }
+
         if let Some(body) = &self.body {
             writeln!(f, "  {{\n    {body}\n  }}")?;
         }

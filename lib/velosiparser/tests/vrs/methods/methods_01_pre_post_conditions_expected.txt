@@ -1,0 +1,52 @@
+VelosiParseTree(tests/vrs/methods/methods_01_pre_post_conditions.vrs)
+---------------------------------------------
+segment MyUnit {
+  fn foo() -> bool
+    requires true
+
+
+  fn foo() -> bool
+    ensures true
+
+
+  fn foo() -> bool
+    requires true
+    ensures true
+
+
+  fn foo() -> bool
+    requires true
+  {
+    true
+  }
+
+
+  fn foo() -> bool
+    ensures true
+  {
+    true
+  }
+
+
+  fn foo() -> bool
+    requires true
+    ensures true
+  {
+    true
+  }
+
+
+  fn bar(val: int) -> int
+    requires true
+    requires (val > 0) && true
+    ensures bar(val) == (val + 1)
+    ensures true
+  {
+    1 + val
+  }
+
+
+}
+
+
+---------------------------------------------
