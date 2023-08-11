@@ -32,6 +32,7 @@ use crate::programs::ProgramActions;
 
 use super::{Expression, FieldActions, FieldOp, FieldSliceOp, Literal, Program};
 
+#[derive(Default)]
 pub struct ProgramsIter {
     // ///
     // expr: Vec<Arc<Expression>>,
@@ -46,15 +47,6 @@ impl ProgramsIter {
 
     pub fn has_programs(&self) -> bool {
         !self.programs.is_empty()
-    }
-}
-
-impl Default for ProgramsIter {
-    fn default() -> Self {
-        ProgramsIter {
-            programs: Vec::new(),
-            stat_num_programs: 0,
-        }
     }
 }
 
