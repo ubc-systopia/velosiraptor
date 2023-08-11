@@ -37,7 +37,8 @@ use std::path::{Path, PathBuf};
 use custom_error::custom_error;
 
 // imports from the lexer
-use velosilexer::{VelosiKeyword, VelosiLexer, VelosiOpToken, VelosiTokenKind};
+pub use velosilexer::{VelosiKeyword, VelosiLexer, VelosiLexerError, VelosiTokenStream};
+use velosilexer::{VelosiOpToken, VelosiTokenKind};
 
 // crate modules
 mod error;
@@ -47,6 +48,7 @@ mod utils;
 
 // re-exports
 pub use error::VelosiParserErr;
+use error::{IResult, VelosiParserErrBuilder};
 pub use parsetree::{
     VelosiParseTree, VelosiParseTreeBinOp, VelosiParseTreeBinOpExpr, VelosiParseTreeBoolLiteral,
     VelosiParseTreeConstDef, VelosiParseTreeContextNode, VelosiParseTreeExpr, VelosiParseTreeField,
@@ -65,9 +67,9 @@ pub use parsetree::{
     VelosiParseTreeUnOp, VelosiParseTreeUnOpExpr, VelosiParseTreeUnit, VelosiParseTreeUnitDef,
     VelosiParseTreeUnitNode,
 };
-pub use velosilexer::{VelosiLexerError, VelosiTokenStream};
 
-use error::{IResult, VelosiParserErrBuilder};
+// some re-exports for simplyfying the testing
+pub use parser::{parse_interface, parse_method, parse_state, parse_staticmap};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Error Definitions
