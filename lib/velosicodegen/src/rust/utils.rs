@@ -267,7 +267,7 @@ pub fn op_to_rust_expr(
         }
         VelosiOperation::InsertField(field, arg) => {
             format!(
-                "let {field} = {}::new({});\n{field}\n",
+                "let {field} = {}::new({});\n{field}",
                 to_struct_name(field, Some("Field")),
                 opexpr_to_rust_expr(arg, ast, method)
             )
@@ -281,6 +281,7 @@ pub fn op_to_rust_expr(
         VelosiOperation::ReadAction(field) => {
             format!("let {field} = self.interface.read_{field}()")
         }
+        VelosiOperation::GlobalBarrier => "atomic::fence(Ordering::SeqCst);".to_string(),
         VelosiOperation::Return => String::new(),
     }
 }

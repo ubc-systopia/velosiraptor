@@ -302,6 +302,8 @@ pub fn generate(
     utils::add_header(&mut scope, &title);
 
     // import utils
+    scope.import("core::sync::atomic", "self");
+    scope.import("core::sync::atomic", "Ordering");
     scope.import("crate::utils", "*");
     scope.import("crate::os", "*");
 

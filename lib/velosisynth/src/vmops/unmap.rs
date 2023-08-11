@@ -33,6 +33,7 @@ use smt2::Term;
 use velosiast::ast::{VelosiAstBinOpExpr, VelosiAstExpr, VelosiAstMethod, VelosiAstUnitSegment};
 
 use crate::programs::Program;
+use crate::ProgramsIter;
 
 use crate::z3::{Z3TaskPriority, Z3WorkerPool};
 
@@ -130,7 +131,7 @@ impl UnmapPrograms {
                     .expect("no query?")
                     .into()
             } else {
-                unreachable!("there were no partial programs?")
+                ProgramsIter::default().into()
             }
         } else {
             // now we've got all the partial programs and we can start verifying
