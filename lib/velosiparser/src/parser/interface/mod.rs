@@ -39,10 +39,9 @@ use nom::{
 
 // used crate components
 use crate::error::IResult;
-use crate::parser::{param::parameter, terminals::*};
+use crate::parser::{parameter::param_list, terminals::*};
 use crate::parsetree::{
-    VelosiParseTreeInterface, VelosiParseTreeInterfaceDef, VelosiParseTreeParam,
-    VelosiParseTreeUnitNode,
+    VelosiParseTreeInterface, VelosiParseTreeInterfaceDef, VelosiParseTreeUnitNode,
 };
 use crate::VelosiTokenStream;
 
@@ -159,7 +158,7 @@ fn ifacedef(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseT
 
     // try to barse the InterfaceDef keyword
     let (i1, _) = kw_interfacedef(input)?;
-    let (i2, bases) = ifaceparams(i1)?;
+    let (i2, bases) = param_list(i1)?;
     let (i3, fields) = cut(delimited(
         lbrace,
         separated_list0(comma, field::ifacefield),
@@ -175,22 +174,6 @@ fn ifacedef(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseT
     ))
 }
 
-/// Parses and consumes a comma separated list of identifiers of the form "(ident, ..., ident)"
-///
-/// # GRAMMAR
-///
-/// `IFACEPARAMS := LPAREN SEPLIST(COMMA, PARAMETER) RPAREN
-pub fn ifaceparams(
-    input: VelosiTokenStream,
-) -> IResult<VelosiTokenStream, Vec<VelosiParseTreeParam>> {
-    let (i, p) = opt(delimited(
-        lparen,
-        cut(separated_list0(comma, parameter)),
-        cut(rparen),
-    ))(input)?;
-    Ok((i, p.unwrap_or_default()))
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -199,27 +182,7 @@ pub fn ifaceparams(
 use velosilexer::VelosiLexer;
 
 #[cfg(test)]
-use crate::{test_parse_and_check_fail, test_parse_and_check_ok, test_parse_and_compare_ok};
-
-#[test]
-fn test_iface_params_ok() {
-    // empty
-    test_parse_and_check_ok!("()", ifaceparams);
-    // one param
-    test_parse_and_check_ok!("(base: addr)", ifaceparams);
-    // two params
-    test_parse_and_check_ok!("(base: addr, base2: addr)", ifaceparams);
-}
-
-#[test]
-fn test_iface_params_fail() {
-    // no type
-    test_parse_and_check_fail!("(base)", ifaceparams);
-    // no separator
-    test_parse_and_check_fail!("(base: addr base2: addr)", ifaceparams);
-    // wrong separator
-    test_parse_and_check_fail!("(base: addr; base2: addr)", ifaceparams);
-}
+use crate::{test_parse_and_check_fail, test_parse_and_compare_ok};
 
 #[test]
 fn test_iface_none_ok() {

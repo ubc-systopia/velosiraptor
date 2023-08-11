@@ -44,7 +44,7 @@ use crate::parser::{
     interface::interface,
     map::staticmap,
     method::method,
-    param::parameter,
+    parameter::param_list,
     state::state,
     terminals::{
         assign, colon, comma, ident, kw_abstract, kw_enum, kw_inbitwidth, kw_outbitwidth,
@@ -80,8 +80,7 @@ use crate::VelosiTokenStream;
 ///
 ///  * None
 fn param_clause(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vec<VelosiParseTreeParam>> {
-    let params = delimited(lparen, separated_list0(comma, parameter), cut(rparen));
-    map(opt(params), |r| r.unwrap_or_default())(input)
+    map(opt(param_list), |r| r.unwrap_or_default())(input)
 }
 
 /// parses the derived clause of a unit
