@@ -1,0 +1,40 @@
+VelosiParseTree(tests/vrs/methods/methods_02_synth_abstract.vrs)
+---------------------------------------------
+segment MyUnit {
+  abstract fn foo() -> bool
+    requires true
+
+
+  abstract fn foo() -> bool
+    requires true
+  {
+    true
+  }
+
+
+  synth fn foo() -> bool
+    requires true
+
+
+  synth fn foo() -> bool
+    requires true
+  {
+    true
+  }
+
+
+  abstract synth fn foo() -> bool
+    requires true
+
+
+  abstract synth fn foo() -> bool
+    requires true
+  {
+    true
+  }
+
+
+}
+
+
+---------------------------------------------

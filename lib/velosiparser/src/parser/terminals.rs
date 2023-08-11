@@ -256,7 +256,7 @@ keywordparser!(pub kw_in, VelosiKeyword::In);
 // keywordparser!(pub kw_return, VelosiKeyword::Return);
 
 keywordparser!(pub kw_requires, VelosiKeyword::Requires);
-// keywordparser!(pub kw_ensures, VelosiKeyword::Ensures);
+keywordparser!(pub kw_ensures, VelosiKeyword::Ensures);
 // keywordparser!(pub kw_assert, VelosiKeyword::Assert);
 keywordparser!(pub kw_forall, VelosiKeyword::Forall);
 keywordparser!(pub kw_exists, VelosiKeyword::Exists);

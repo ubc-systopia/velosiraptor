@@ -23,9 +23,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Method parsing
+//! # VelosiParser: Methods
+//!
+//! This module contains the parser for method definitions within the unit contexts.
 
-// the used nom functions
+// external dependencies
 use nom::{
     branch::alt,
     combinator::{cut, opt},
@@ -33,15 +35,13 @@ use nom::{
     sequence::{delimited, preceded, terminated, tuple},
 };
 
-// library internal includes
+// used crate functionality
 use crate::error::IResult;
-use crate::parser::{
-    expr::{expr, quantifier_expr},
-    param::parameter,
-    terminals::{
-        comma, hashtag, ident, kw_abstract, kw_fn, kw_requires, kw_synth, lbrace, lbrack, lparen,
-        rarrow, rbrace, rbrack, rparen, semicolon, typeinfo,
-    },
+use crate::parser::expr::{expr, quantifier_expr};
+use crate::parser::param::parameter;
+use crate::parser::terminals::{
+    comma, hashtag, ident, kw_abstract, kw_ensures, kw_fn, kw_requires, kw_synth, lbrace, lbrack,
+    lparen, rarrow, rbrace, rbrack, rparen, semicolon, typeinfo,
 };
 use crate::parsetree::{
     VelosiParseTreeExpr, VelosiParseTreeMethod, VelosiParseTreeMethodProperty,
@@ -49,187 +49,39 @@ use crate::parsetree::{
 };
 use crate::VelosiTokenStream;
 
-/// Parses a require clause
-///
-/// This adds a pre-condition to the function/method
-///
-/// # Grammar
-///
-/// `REQUIRE := KW_REQUIRES BOOL_EXPR;`
-///
-/// # Results
-///
-///  * OK:      the parser could successfully recognize the requires clause
-///  * Error:   the parser could not recognize the requires clause
-///  * Failure: the parser recognized the requires clause, but it did not properly parse
-///
-/// # Examples
-///
-/// `requires arg > 0`
-///
-pub fn require_clauses(
-    input: VelosiTokenStream,
-) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
-    let (i1, _) = kw_requires(input)?;
-    cut(terminated(alt((quantifier_expr, expr)), opt(semicolon)))(i1)
-}
-
-/// Parses a ensures clause
-///
-/// This adds a post-condition to the function/method.
-///
-/// # Grammar
-///
-/// `ENSURES := KW_ENSURES BOOL_EXPR;`
-///
-/// # Results
-///
-///  * OK:      the parser could successfully recognize the ensures clause
-///  * Error:   the parser could not recognize the ensures clause
-///  * Failure: the parser recognized the ensures clause, but it did not properly parse
-///
-/// # Examples
-///
-/// `ensures ret < 5`
-///
-// pub fn ensure_clauses(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
-//     let (i1, _) = kw_ensures(input)?;
-//     cut(terminated(alt((quantifier_expr, expr)), semicolon))(i1)
-// }
-
-/// parses the method body
-///
-/// This parses the statements in the method body.
-/// The method body must have at least one statement.
-///
-/// # Grammar
-///
-/// FN_BODY := { STMT+ }
-///
-/// # Results
-///
-///  * OK:      the parser could successfully recognize the method body
-///  * Error:   the parser could not recognize the method body
-///  * Failure: the parser recognized the method body, but it did not properly parse
-///
-/// # Examples
-///
-/// `{ return 0; }`
-///
-/// # TODO: is this just a statement block?
-///
-fn method_body(
-    input: VelosiTokenStream,
-) -> IResult<VelosiTokenStream, Option<VelosiParseTreeExpr>> {
-    delimited(lbrace, opt(expr), cut(rbrace))(input)
-}
-
-/// parses an arguments list
-///
-/// This function parses a list of arguments with types annotations
-///
-/// # Grammar
-///
-/// ARG     := IDENT : TYPE
-/// ARGLIST := (ARG | ARG (, ARG)+ )
-///
-/// # Results
-///
-///  * OK:      the parser could successfully recognize the arglist
-///  * Error:   the parser could not recognize the arglist
-///  * Failure: the parser recognized the arglist, but it did not properly parse
-///
-/// # Examples
-///
-/// `a : bool, b : int`
-///
-fn param_list(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vec<VelosiParseTreeParam>> {
-    separated_list0(comma, parameter)(input)
-}
-
-/// parses a decorator/property element
-///
-/// # Grammar
-///
-/// DECORATOR_ELEMENT := IDENT (LPAREN IDENT RPAREN)?
-///
-/// # Results
-///
-///  * OK:      the parser could successfully recognize the decorator/property
-///  * Error:   the parser could not recognize the decorator/property
-///  * Failure: the parser recognized the decorator keyword, but failed to parse
-///
-fn decorator_element(
-    input: VelosiTokenStream,
-) -> IResult<VelosiTokenStream, VelosiParseTreeMethodProperty> {
-    let (i1, name) = ident(input)?;
-    let (i2, arg) = opt(delimited(lparen, cut(ident), cut(rparen)))(i1)?;
-    Ok((i2, (name, arg)))
-}
-
-/// parses a decorator
-///
-/// This function parses a function decorator/property
-///
-/// # Grammar
-///
-/// DECORATOR := KW_HASHTAG RBRAK DECORATOR_ELEMENT RBRAK
-///
-/// # Results
-///
-///  * OK:      the parser could successfully recognize the decorator/property
-///  * Error:   the parser could not recognize the decorator/property
-///  * Failure: the parser recognized the decorator keyword, but failed to parse
-fn decorator_list(
-    input: VelosiTokenStream,
-) -> IResult<VelosiTokenStream, Vec<VelosiParseTreeMethodProperty>> {
-    let (i1, _) = hashtag(input)?;
-
-    // [ ident ]
-    let (i2, decorators) = cut(delimited(
-        lbrack,
-        separated_list1(comma, decorator_element),
-        rbrack,
-    ))(i1)?;
-
-    Ok((i2, decorators))
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Method Parsing
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// parses a method definition
 ///
-/// This function parses a full method definition.
+/// This function parses a method definition in the unit context. The method's body can refer to
+/// the state, but not the interface.
 ///
-/// # Grammar
+/// # Arguments
 ///
-/// METHOD := KW_FN IDENT ( ARGLIST ) -> TYPE REQUIRES+ ENSURES+ METHOD_BODY
+/// * `input` - input token stream to be parsed
 ///
 /// # Results
 ///
-///  * OK:      the parser could successfully recognize the method definition
-///  * Error:   the parser could not recognize the method definition
-///  * Failure: the parser recognized the method definition, but it did not properly parse
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized method definition as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///               and that another parser would fail.
+///
+/// # Grammar
+///
+/// `METHOD := DECORATOR_LIST KW_ABSTRACT? KW_SYNTH? KW_FN IDENT LPAREN ARGLIST RPAREN RARROW TYPE REQUIRES* ENSURES* METHOD_BODY`
 ///
 /// # Examples
 ///
-/// `fn foo() -> addr`
+///  * `fn foo() -> addr`
+///  * `fn foo() -> addr { 0 }`
 ///
-///
-/// example of method syntax:
-/// fn method_name(arg1: Size, arg2: Integer, arg3: Boolean) -> Address {
-///     stmt;
-///     stmt;
-///     return stmt;
-/// }
-///
-/// Another example with pre-/post conditions
-/// fn method_name(arg1: Size, arg2: Integer, arg3: Boolean) -> Address
-///    requires arg1 > 4
-///    ensures  ret < 3
-/// {
-///     stmt;
-///     stmt;
-///     return stmt;
-/// }
 pub fn method(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
     let mut pos = input.clone();
 
@@ -253,20 +105,15 @@ pub fn method(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPars
     let (i4, rettype) = opt(preceded(rarrow, cut(typeinfo)))(i3)?;
 
     // get the ensures / requires clauses
-    //let (i5, (requires, ensures)) = tuple((many0(require_clauses), many0(ensure_clauses)))(i4)?;
-    let (i5, requires) = many0(require_clauses)(i4)?;
+    //let (i5, (requires, ensures)) = tuple((many0(requires_clause), many0(ensures_clause)))(i4)?;
+    let (i5, requires) = many0(requires_clause)(i4)?;
+    let (i6, ensures) = many0(ensures_clause)(i5)?;
 
     // try to parse the method body
-    let (i6, (body, _)) = tuple((opt(method_body), opt(semicolon)))(i5)?;
-
-    let body = if let Some(Some(e)) = body {
-        Some(e)
-    } else {
-        None
-    };
+    let (i7, (body, _)) = tuple((opt(method_body), opt(semicolon)))(i6)?;
 
     // create the token stream covering the entire method def
-    pos.span_until_start(&i6);
+    pos.span_until_start(&i7);
 
     let method = VelosiParseTreeMethod {
         name,
@@ -276,79 +123,293 @@ pub fn method(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPars
         params,
         rettype,
         requires,
-        // ensures,
+        ensures,
         body,
         pos,
     };
-    Ok((i6, VelosiParseTreeUnitNode::Method(method)))
+    Ok((i7, VelosiParseTreeUnitNode::Method(method)))
 }
+
+/// Parses a require clause of a method
+///
+/// This adds a pre-condition to the function/method
+///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized requires clause as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///               and that another parser would fail.
+///
+/// # Grammar
+///
+/// `REQUIRE := KW_REQUIRES BOOL_EXPR;`
+///
+/// # Examples
+///
+/// * `requires arg > 0`
+///
+pub fn requires_clause(
+    input: VelosiTokenStream,
+) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
+    let (i1, _) = kw_requires(input)?;
+    cut(terminated(alt((quantifier_expr, expr)), opt(semicolon)))(i1)
+}
+
+/// Parses a ensures clause
+///
+/// This adds a post-condition to the function/method.
+///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized ensures clause as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///               and that another parser would fail.
+///
+/// # Grammar
+///
+/// `ENSURES := KW_ENSURES BOOL_EXPR;`
+///
+/// # Examples
+///
+///  * `ensures ret < 5`
+///
+pub fn ensures_clause(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
+    let (i1, _) = kw_ensures(input)?;
+    cut(terminated(alt((quantifier_expr, expr)), opt(semicolon)))(i1)
+}
+
+/// parses the method body
+///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized method body as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///               and that another parser would fail.
+///
+/// # Grammar
+///
+/// `FN_BODY := LPAREN EXPR RPAREN`
+///
+/// # Examples
+///
+/// * `{ 0 }`
+///
+fn method_body(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
+    delimited(lbrace, cut(expr), cut(rbrace))(input)
+}
+
+/// parses an parameter list
+///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized param list as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///               and that another parser would fail.
+///
+/// # Grammar
+///
+/// ARG     := IDENT : TYPE
+/// ARGLIST := ARG (, ARG)*
+///
+/// # Examples
+///
+/// * `a : bool, b : int`
+///
+fn param_list(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vec<VelosiParseTreeParam>> {
+    separated_list0(comma, parameter)(input)
+}
+
+/// parses a decorator/property list of a method
+///
+/// This function parses a function decorator/property
+///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized decorator list as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///               and that another parser would fail.
+///
+/// # Grammar
+///
+/// `DECORATOR := KW_HASHTAG RBRAK DECORATOR_ELEMENT RBRAK`
+///
+/// # Example
+///
+/// * `#[foo]`
+///
+fn decorator_list(
+    input: VelosiTokenStream,
+) -> IResult<VelosiTokenStream, Vec<VelosiParseTreeMethodProperty>> {
+    let (i1, _) = hashtag(input)?;
+
+    // [ ident ]
+    let (i2, decorators) = cut(delimited(
+        lbrack,
+        separated_list1(comma, decorator_element),
+        rbrack,
+    ))(i1)?;
+
+    Ok((i2, decorators))
+}
+
+/// parses a decorator/property element
+///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized decorator/property as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///               and that another parser would fail.
+///
+/// # Grammar
+///
+/// `DECORATOR_ELEMENT := IDENT (LPAREN IDENT RPAREN)?`
+///
+/// # Examples
+///
+///  * `foo`
+///  * `bar(a)`
+///
+///
+fn decorator_element(
+    input: VelosiTokenStream,
+) -> IResult<VelosiTokenStream, VelosiParseTreeMethodProperty> {
+    let (i1, name) = ident(input)?;
+    let (i2, arg) = opt(delimited(lparen, cut(ident), cut(rparen)))(i1)?;
+    Ok((i2, (name, arg)))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Tests
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(test)]
 use velosilexer::VelosiLexer;
 
+#[cfg(test)]
+use crate::{test_parse_and_check_fail, test_parse_and_check_ok, test_parse_and_compare_ok};
+
 #[test]
-fn test_abstract() {
-    let content = "fn foo() -> addr;";
-    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
-    assert!(method(ts).is_ok());
-
-    let content = "fn foo(a : addr) -> addr;";
-    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
-    assert!(method(ts).is_ok());
-
-    let content = "fn foo();";
-    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
-    assert!(method(ts).is_ok());
+fn test_decorator_ok() {
+    test_parse_and_check_ok!("foo", decorator_element);
+    test_parse_and_check_ok!("foo(bar)", decorator_element);
 }
 
 #[test]
-fn test_fail() {
-    let content = "fn foo(a) -> Addr;";
-    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
-    assert!(method(ts).is_err());
+fn test_decorator_fail() {
+    test_parse_and_check_fail!("foo(bar, baz)", decorator_element);
+    test_parse_and_check_fail!("foo[bar, baz]", decorator_element);
 }
 
 #[test]
-fn test_ok() {
-    let content = "fn foo() -> Addr {}";
-    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
-    assert!(method(ts).is_ok());
-
-    let content = "fn foo() -> addr { 3 }";
-    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
-    assert!(method(ts).is_ok());
-
-    let content = "fn foo() -> addr requires x > 0; ensures y < 3; { let x : int = 3; }";
-    let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
-    assert!(method(ts).is_ok());
+fn test_decorator_list_ok() {
+    test_parse_and_check_ok!("#[foo]", decorator_list);
+    test_parse_and_check_ok!("#[foo(bar)]", decorator_list);
+    test_parse_and_check_ok!("#[foo(bar), baz]", decorator_list);
 }
 
-// #[test]
-// fn test_ok2() {
-//     let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-//     d.push("tests/parser");
+#[test]
+fn test_decorator_list_fail() {
+    test_parse_and_check_fail!("#[]", decorator_list);
+    test_parse_and_check_fail!("#[foo(bar),]", decorator_list);
+    test_parse_and_check_fail!("#[foo(bar) baz]", decorator_list);
+}
 
-//     for f in vec!["methods.vrs"] {
-//         d.push(f);
-//         let filename = format!("{}", d.display());
+#[test]
+fn test_method_body_ok() {
+    // empty body
+    test_parse_and_check_ok!("{ 3 }", method_body);
+}
 
-//         // lex the file
-//         let tokens = Lexer::lex_file(&filename);
-//         assert!(tokens.is_ok());
+#[test]
+fn test_method_body_fail() {
+    test_parse_and_check_fail!("{}", method_body);
+    test_parse_and_check_fail!("{ 3 ; 4}", method_body);
+}
 
-//         let ts = VelosiTokenStream::from_vec_filtered(tokens.unwrap().0);
-//         let res = many1(method)(ts);
+#[test]
+fn test_ensures_ok() {
+    // without semicolon
+    test_parse_and_check_ok!("ensures true", ensures_clause);
+    // with semicolon
+    test_parse_and_check_ok!("ensures true;", ensures_clause);
+    test_parse_and_check_ok!("ensures p > 0;", ensures_clause);
+    // doesn't make sense, but should parse
+    test_parse_and_check_ok!("ensures 3;", ensures_clause);
+}
 
-//         println!("{:?}", res);
+#[test]
+fn test_ensures_fail() {
+    // wrong terminator
+    test_parse_and_check_fail!("ensures true,", ensures_clause);
+}
 
-//         let (res, x) = res.unwrap();
+#[test]
+fn test_requires_ok() {
+    // without semicolon
+    test_parse_and_check_ok!("requires true", requires_clause);
+    // with semicolon
+    test_parse_and_check_ok!("requires true;", requires_clause);
+    test_parse_and_check_ok!("requires p > 0;", requires_clause);
+    // doesn't make sense, but should parse
+    test_parse_and_check_ok!("requires 3;", requires_clause);
+}
 
-//         println!("{}", res);
-//         println!("{:?}", x);
-
-//         // consumed all, but the EOF token
-//         assert!(res.is_eof());
-
-//         d.pop();
-//     }
-// }
+#[test]
+fn test_requires_fail() {
+    // wrong terminator
+    test_parse_and_check_fail!("requires true,", requires_clause);
+}

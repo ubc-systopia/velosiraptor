@@ -1,0 +1,37 @@
+segment MyUnit {
+
+
+    // abstract method
+    abstract fn foo() -> bool
+        requires true;
+
+    abstract fn foo() -> bool
+        requires true;
+    {
+        true
+    }
+
+
+    // synthesis method
+    synth fn foo() -> bool
+        requires true;
+
+
+    synth fn foo() -> bool
+        requires true;
+    {
+        true
+    }
+
+
+    // synth + abstract method
+    abstract synth fn foo() -> bool
+        requires true;
+
+    // synth + abstract method
+    abstract synth fn foo() -> bool
+        requires true;
+    {
+        true
+    }
+}

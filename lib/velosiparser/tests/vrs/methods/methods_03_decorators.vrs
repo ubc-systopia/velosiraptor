@@ -1,0 +1,37 @@
+segment MyUnit {
+    // method with pre-condition
+    #[prop]
+    fn foo() -> bool
+        requires true;
+
+    // method with post-condition
+    #[prop, prop2]
+    fn foo() -> bool
+        ensures true;
+
+    // method with pre and post conditions
+    #[prop(arg)]
+    fn foo() -> bool
+        requires true;
+        ensures true;
+
+
+    // method with pre-condition
+    #[prop(arg), prop2]
+    fn foo() -> bool
+        requires true;
+    {
+        true
+    }
+
+    // method with an argument
+    #[prop(arg), prop2]
+    fn bar(val: int) -> int
+        requires true;
+        requires val > 0 && true;
+        ensures bar(val) == val + 1;
+        ensures true;
+    {
+        1 + val
+    }
+}

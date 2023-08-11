@@ -1,0 +1,31 @@
+segment MyUnit {
+    // method without body
+    fn foo() -> bool
+
+    // method without body with semicolon
+    fn foo() -> bool;
+
+    // method with a body
+    fn foo() -> bool {
+        true
+    }
+
+    // another method with a body
+    fn bar() -> int {
+        1 + 2
+    }
+
+    // method with an argument
+    fn bar(val: int) -> int {
+        1 + val
+    }
+
+    // method with multiple arguments
+    fn bar(val: int, val2: bool) -> int {
+        if val2 {
+            1 + val
+        } else {
+            val
+        }
+    }
+}

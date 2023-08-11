@@ -1,0 +1,31 @@
+VelosiParseTree(tests/vrs/methods/methods_00_simple.vrs)
+---------------------------------------------
+segment MyUnit {
+  fn foo() -> bool
+
+  fn foo() -> bool
+
+  fn foo() -> bool  {
+    true
+  }
+
+
+  fn bar() -> int  {
+    1 + 2
+  }
+
+
+  fn bar(val: int) -> int  {
+    1 + val
+  }
+
+
+  fn bar(val: int, val2: bool) -> int  {
+    if val2 { 1 + val } else { val }
+  }
+
+
+}
+
+
+---------------------------------------------
