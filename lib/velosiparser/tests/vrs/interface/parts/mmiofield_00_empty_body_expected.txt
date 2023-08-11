@@ -1,5 +1,5 @@
 error: empty interface field block
-     --> tests/vrs/interface/mmiofield_00_empty_body.vrs:1:27
+     --> tests/vrs/interface/parts/mmiofield_00_empty_body.vrs:1:27
       |
     1 |  mmio foo [ base, 0, 8 ] {}
       |                             remove the block or fill it in explicitly

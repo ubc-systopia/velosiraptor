@@ -159,8 +159,11 @@ fn test_field_slice_fail() {
 
 #[test]
 fn test_field_slice_fail_error_msg() {
-    test_parse_and_compare_file_fail!("interface/layout_02_wrong_slice", iface_field_slice);
-    test_parse_and_compare_file_fail!("interface/layout_03_invalid_slice_end", iface_field_slice);
+    test_parse_and_compare_file_fail!("interface/parts/layout_02_wrong_slice", iface_field_slice);
+    test_parse_and_compare_file_fail!(
+        "interface/parts/layout_03_invalid_slice_end",
+        iface_field_slice
+    );
 }
 
 #[test]
@@ -201,6 +204,6 @@ fn test_layout_fail() {
 
 #[test]
 fn test_layout_fail_error_msg() {
-    test_parse_and_compare_file_fail!("interface/layout_00_missing_separator", layout);
-    test_parse_and_compare_file_fail!("interface/layout_01_wrong_separator", layout);
+    test_parse_and_compare_file_fail!("interface/parts/layout_00_missing_separator", layout);
+    test_parse_and_compare_file_fail!("interface/parts/layout_01_wrong_separator", layout);
 }

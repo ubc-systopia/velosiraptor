@@ -317,9 +317,18 @@ fn test_read_actions_fail() {
 #[test]
 fn test_read_actions_fail_error_msg() {
     // testing the error output
-    test_parse_and_compare_file_fail!("interface/readactions_00_missing_semicolon", readactions);
-    test_parse_and_compare_file_fail!("interface/readactions_01_missing_separator", readactions);
-    test_parse_and_compare_file_fail!("interface/readactions_02_wrong_separator", readactions);
+    test_parse_and_compare_file_fail!(
+        "interface/parts/readactions_00_missing_semicolon",
+        readactions
+    );
+    test_parse_and_compare_file_fail!(
+        "interface/parts/readactions_01_missing_separator",
+        readactions
+    );
+    test_parse_and_compare_file_fail!(
+        "interface/parts/readactions_02_wrong_separator",
+        readactions
+    );
 }
 
 #[test]
@@ -358,7 +367,16 @@ fn test_write_actions_fail() {
 #[test]
 fn test_write_actions_fail_error_msg() {
     // testing the error output
-    test_parse_and_compare_file_fail!("interface/writeactions_00_missing_semicolon", writeactions);
-    test_parse_and_compare_file_fail!("interface/writeactions_01_missing_separator", writeactions);
-    test_parse_and_compare_file_fail!("interface/writeactions_02_wrong_separator", writeactions);
+    test_parse_and_compare_file_fail!(
+        "interface/parts/writeactions_00_missing_semicolon",
+        writeactions
+    );
+    test_parse_and_compare_file_fail!(
+        "interface/parts/writeactions_01_missing_separator",
+        writeactions
+    );
+    test_parse_and_compare_file_fail!(
+        "interface/parts/writeactions_02_wrong_separator",
+        writeactions
+    );
 }

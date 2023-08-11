@@ -1,5 +1,5 @@
 error: expected `;`, found `A`
-     --> tests/vrs/interface/writeactions_01_missing_separator.vrs:1:24
+     --> tests/vrs/interface/parts/writeactions_01_missing_separator.vrs:1:24
       |
     1 |  WriteActions { A -> B  A -> B; }
       |                         ^ help: add `;` here.

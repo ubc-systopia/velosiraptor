@@ -1,0 +1,7 @@
+segment MyUnit {
+  interface = InterfaceDef(base: foo) {
+    reg foo [ 8 ],
+    mem bar [ base, 0, 8 ],
+    mmio baz [ base, 8, 8 ],
+  };
+}

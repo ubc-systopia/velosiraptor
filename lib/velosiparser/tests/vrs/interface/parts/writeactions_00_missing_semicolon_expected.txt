@@ -1,5 +1,5 @@
 error: expected `;`, found `}`
-     --> tests/vrs/interface/writeactions_00_missing_semicolon.vrs:1:23
+     --> tests/vrs/interface/parts/writeactions_00_missing_semicolon.vrs:1:23
       |
     1 |  WriteActions { A -> B }
       |                        ^ help: add `;` here.

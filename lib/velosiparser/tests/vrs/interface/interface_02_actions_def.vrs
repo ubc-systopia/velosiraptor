@@ -1,0 +1,63 @@
+segment MyUnit {
+  interface = InterfaceDef(base: foo) {
+    // register with a simple slice
+    reg foo [ 8 ] {
+      Layout {
+        0 .. 2 foo,
+      },
+      ReadActions {
+        // empty
+      },
+      WriteActions {
+        43 -> foo;
+      }
+    },
+    // double definition of the same register, should parse fine
+    reg foo [ 8 ] {
+      Layout {
+        0 .. 2 foo,
+        2 .. 4 bar,
+      },
+      ReadActions {
+        43 -> foo;
+        foo <- bar;
+      },
+      WriteActions {
+        43 -> foo;
+      }
+    },
+    // memory location with three slices
+    mem bar [ base, 0, 8 ] {
+      Layout {
+        0 .. 2 foo,
+        // invalid slice range, should parse fine
+        7 .. 4 bar,
+        // double definition of the slice, should parse fine
+        7 .. 4 bar,
+      },
+      ReadActions {
+        43 -> foo;
+        foo <- bar;
+      },
+      WriteActions {
+        43 -> foo;
+      },
+      // double the read actions
+      ReadActions {
+        43 -> foo;
+        foo <- bar;
+      },
+      WriteActions {
+        43 -> foo;
+      },
+      // another layout
+      Layout {
+        0 .. 2 foo,
+        // invalid slice range, should parse fine
+        7 .. 4 bar,
+        // double definition of the slice, should parse fine
+        7 .. 4 bar,
+      }
+    },
+  };
+}
