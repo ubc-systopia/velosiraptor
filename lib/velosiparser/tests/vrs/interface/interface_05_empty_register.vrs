@@ -1,0 +1,5 @@
+segment MyUnit {
+  interface = InterfaceDef(base: foo) {
+        reg foo [ 8 ] {}
+    };
+}

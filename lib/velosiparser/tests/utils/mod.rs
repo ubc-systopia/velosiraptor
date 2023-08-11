@@ -58,6 +58,10 @@ pub fn check_parse_ok(vrs: &Path, exp: Option<&Path>) {
                 println!(" ok. Successfully parsed. No comparison file given.");
             }
         }
+        Err(VelosiParserError::ParsingFailure { e }) => {
+            println!(" fail  ({e})");
+            panic!("Unexpected failure during parsing.");
+        }
         Err(e) => {
             println!(" fail  ({e})");
             panic!("Unexpected failure during parsing.");
