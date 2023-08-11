@@ -86,7 +86,7 @@ impl VelosiParseTreeMapExplicit {
 
 impl Display for VelosiParseTreeMapExplicit {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "[")?;
+        write!(f, "[ ")?;
         for (i, e) in self.entries.iter().enumerate() {
             if i != 0 {
                 write!(f, ", ")?;
@@ -94,7 +94,7 @@ impl Display for VelosiParseTreeMapExplicit {
             write!(f, "{e}")?;
         }
 
-        write!(f, "]")
+        write!(f, " ]")
     }
 }
 
@@ -132,7 +132,7 @@ impl VelosiParseTreeMapListComp {
 
 impl Display for VelosiParseTreeMapListComp {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "[{} for {} in {}]", self.elm, self.var, self.range)
+        write!(f, "[ {} for {} in {} ]", self.elm, self.var, self.range)
     }
 }
 

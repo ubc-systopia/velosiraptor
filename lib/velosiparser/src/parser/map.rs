@@ -23,10 +23,20 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// TODO:
-//  1. Parse Explicit Lists
-//  2. List Comprehension that split the address space equally amongst them.
-//  3. List Comprehension with explicit address ranges.
+//! # VelosiParser -- Static Map Parser
+//!
+//! Thid modules contains the parser for the static map construct representing a fixed
+//! address translation scheme. There are two ways to define a static map:
+//!  1. Explicitly list all the elements in the map.
+//!  2. Using the list comprehension syntax
+
+// used external dependencies
+use nom::{
+    branch::alt,
+    combinator::{cut, opt},
+    multi::separated_list1,
+    sequence::{delimited, pair, preceded, terminated, tuple},
+};
 
 use crate::error::IResult;
 use crate::parser::expr::{expr, fn_call_expr, range_expr};
@@ -40,23 +50,35 @@ use crate::parsetree::{
 };
 use crate::VelosiTokenStream;
 
-use nom::{
-    branch::alt,
-    combinator::{cut, opt},
-    multi::separated_list0,
-    sequence::{delimited, pair, preceded, terminated, tuple},
-};
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Static Map Parsing
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Parses a map statement
 ///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized static map definition as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///               and that another parser would fail.
+///
 /// # Grammar
 ///
-/// MAP := KW_MAP ASSIGN LBRACK (LISTCOMPREHENSIONMAP | EXPLICITMAP) RBRACK
+/// STATICMAP := KW_MAP ASSIGN LBRACK (LISTCOMPREHENSIONMAP | EXPLICITMAP) RBRACK SEMICOLON
 ///
 /// # Example
 ///
-///  - `map = [UnitA(), UnitB()]`
-///  - `map = [UnitA(x) for x in 1..2]`
+/// * `mapdef = [ UnitA(), UnitB() ]`
+/// * `mapdef = [ UnitA(x) for x in 1..2 ]`
 ///
 pub fn staticmap(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
     let (i1, _) = kw_mapdef(input)?;
@@ -71,19 +93,34 @@ pub fn staticmap(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiP
 
 /// Parses the body of an explicit map list
 ///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized explicit static map definition as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///               and that another parser would fail.
+///
 /// # Grammar
 ///
-/// EXPLICITMAP :=  [ MAP_ELEMENT (, MAP_ELEMENT)* ]
+/// `EXPLICITMAP :=  [ MAP_ELEMENT+ ]`
 ///
 /// # Example
 ///
-///  - `UnitA(), UnitB()`
+///  * `[ UnitA(), UnitB() ]`
 ///
 fn explicitmap(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeMap> {
     let mut pos = input.clone();
     let (i1, elms) = delimited(
         lbrack,
-        separated_list0(comma, map_element),
+        separated_list1(comma, map_element),
         rbrack, // can't use cut here
     )(input)?;
 
@@ -95,13 +132,28 @@ fn explicitmap(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPar
 
 /// Parses the body of a list comprehension map
 ///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized list comprehension static map definition as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///               and that another parser would fail.
+///
 /// # Grammar
 ///
-/// LISTCOMPREHENSIONMAP :=  MAP_ELEMENT KW_FOR IDENT KW_IN RANGE_EXPR
+/// LISTCOMPREHENSIONMAP :=  LBRACK MAP_ELEMENT KW_FOR IDENT KW_IN RANGE_EXPR RBRAK
 ///
 /// # Example
 ///
-///  - `[UnitA(x) for x in 1..2]`
+/// * `[ UnitA(x) for x in 1..2 ]`
 ///
 fn listcomprehensionmap(
     input: VelosiTokenStream,
@@ -126,16 +178,32 @@ fn listcomprehensionmap(
 
 /// parses a map elemenet
 ///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized static map element as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///               and that another parser would fail.
+///
 /// # Grammar
 ///
 /// MAP_ELEMENT := MAP_SRC? MAP_DST
 ///
 /// # Example
 ///
-///  - `UnitA()`
-///  - `UnitA(base)
-///  - `0..0x1000 => UnitA()`
-///  - `0..0x1000 => UnitA() @ 0x10`
+/// * `UnitA()`
+/// * `UnitA(base)
+/// * `0..0x1000 => UnitA()`
+/// * `0..0x1000 => UnitA() @ 0x10`
+///
 fn map_element(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeMapElement> {
     let mut pos = input.clone();
 
@@ -147,18 +215,49 @@ fn map_element(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPar
 
 /// parses a map source description
 ///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized source address range of a static map element as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///               and that another parser would fail.
+///
 /// # Grammar
 ///
 /// MAP_SRC := RANGE_EXPR RARROW
 ///
 /// # Example
 ///
-///  - `0..0x1000 =>`
+/// * `0..0x1000 =>`
+///
 fn map_src(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeRangeExpr> {
     terminated(range_expr, cut(fatarrow))(input)
 }
 
 /// parses the destination of a map element
+///
+/// # Arguments
+///
+/// * `input` - input token stream to be parsed
+///
+/// # Results
+///
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized destination unit of a static map element as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///               and that another parser would fail.
 ///
 /// # Grammar
 ///
@@ -182,8 +281,87 @@ fn map_dst(
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Tests
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[cfg(test)]
 use velosilexer::VelosiLexer;
+
+#[cfg(test)]
+use crate::{test_parse_and_check_fail, test_parse_and_check_ok, test_parse_and_compare_ok};
+
+#[test]
+fn test_map_dest_ok() {
+    test_parse_and_check_ok!("UnitA()", map_dst);
+    test_parse_and_check_ok!("UnitA(foo)", map_dst);
+    test_parse_and_check_ok!("UnitA(foo, bar)", map_dst);
+    test_parse_and_check_ok!("UnitA(foo, bar * i * 8)", map_dst);
+    test_parse_and_check_ok!("UnitA(foo) @ 123", map_dst);
+    test_parse_and_check_ok!("UnitA(foo) @ 123 + 432", map_dst);
+}
+
+#[test]
+fn test_map_dest_fail() {
+    test_parse_and_check_fail!("UnitA(foo) -> 123 + 432", map_dst);
+    test_parse_and_check_fail!("UnitA @ 123 + 432", map_dst);
+}
+
+#[test]
+fn test_map_src_ok() {
+    test_parse_and_check_ok!("0..0x1000 =>", map_src);
+    // TODO: sould have support for this...
+    test_parse_and_check_fail!("i * 0x1000..(i+1) * 0x1000 =>", map_src);
+}
+
+#[test]
+fn test_map_src_fail() {
+    test_parse_and_check_fail!("0 =>", map_src);
+    test_parse_and_check_fail!("0..10 ->", map_src);
+}
+
+#[test]
+fn test_map_element_ok() {
+    test_parse_and_compare_ok!("UnitA()", map_element);
+    test_parse_and_compare_ok!("UnitA(foo)", map_element);
+    test_parse_and_compare_ok!("UnitA(foo, bar)", map_element);
+    test_parse_and_compare_ok!("UnitA(foo + 123, bar)", map_element);
+
+    test_parse_and_compare_ok!("UnitA() @ 4096", map_element);
+    test_parse_and_compare_ok!("UnitA() @ 4096 + (i * 4096)", map_element);
+
+    test_parse_and_compare_ok!("0..4096 => UnitA() @ 4096", map_element);
+    test_parse_and_compare_ok!("0..4096 => UnitA() @ 4096 + (i * 4096)", map_element);
+
+    // TODO: sould have support for this...
+    test_parse_and_check_fail!("i * 4096..(i+1) * 4096 => UnitA()", map_element);
+}
+
+#[test]
+fn test_map_element_fail() {
+    test_parse_and_check_fail!("0..4096 -> UnitA() @ 4096", map_element);
+    test_parse_and_check_fail!("0..4096 -> UnitA @ 4096", map_element);
+}
+
+#[test]
+fn test_list_comprehension_map_ok() {
+    test_parse_and_compare_ok!("[ UnitA() for i in 0..1 ]", listcomprehensionmap);
+}
+
+#[test]
+fn test_list_comprehension_map_fail() {
+    test_parse_and_check_fail!("[ ]", listcomprehensionmap);
+}
+
+#[test]
+fn test_explicit_map_ok() {
+    test_parse_and_compare_ok!("[ UnitA() ]", explicitmap);
+}
+
+#[test]
+fn test_explicit_map_fail() {
+    test_parse_and_check_fail!("[ ]", explicitmap);
+}
 
 #[test]
 fn test_map_simple() {
