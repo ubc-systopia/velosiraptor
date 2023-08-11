@@ -30,6 +30,10 @@ use std::path::Path;
 
 mod utils;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Ok Tests
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// test basic interface definition
 #[test]
 fn interface_basic_def() {
@@ -57,19 +61,31 @@ fn interface_actions_def() {
     utils::check_parse_ok(vrs, Some(exp));
 }
 
-// test wrong syntax
-// #[test]
-// fn interface_register_defs_not_separated() {
-//     let vrs = Path::new("tests/vrs/interface/interface_00_register_not_separated.vrs");
-//     let exp = Path::new("tests/vrs/interface/interface_00_register_not_separated_expected.txt");
-//     utils::check_parse_fail(vrs, None);
-//     utils::check_parse_fail(vrs, Some(exp));
-// }
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Err Tests
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// #[test]
-// fn interface_register_defs_wrong_separator() {
-//     let vrs = Path::new("tests/vrs/interface/interface_01_register_wrong_separator.vrs");
-//     let exp = Path::new("tests/vrs/interface/interface_01_register_wrong_separator_expected.txt");
-//     utils::check_parse_fail(vrs, None);
-//     utils::check_parse_fail(vrs, Some(exp));
-// }
+/// test registers not properly separated
+#[test]
+fn interface_err_register_defs_not_separated() {
+    let vrs = Path::new("tests/vrs/interface/interface_03_register_not_separated.vrs");
+    let exp = Path::new("tests/vrs/interface/interface_03_register_not_separated_expected.txt");
+    utils::check_parse_fail(vrs, None);
+    utils::check_parse_fail(vrs, Some(exp));
+}
+
+#[test]
+fn interface_err_register_defs_wrong_separator() {
+    let vrs = Path::new("tests/vrs/interface/interface_04_register_wrong_separator.vrs");
+    let exp = Path::new("tests/vrs/interface/interface_04_register_wrong_separator_expected.txt");
+    utils::check_parse_fail(vrs, None);
+    utils::check_parse_fail(vrs, Some(exp));
+}
+
+#[test]
+fn interface_err_empty_register() {
+    let vrs = Path::new("tests/vrs/interface/interface_05_empty_register.vrs");
+    let exp = Path::new("tests/vrs/interface/interface_05_empty_register_expected.txt");
+    utils::check_parse_fail(vrs, None);
+    utils::check_parse_fail(vrs, Some(exp));
+}

@@ -1,0 +1,5 @@
+error: empty interface field block
+     --> tests/vrs/interface/interface_05_empty_register.vrs:4:5
+      |
+    4 |      };
+      |      ^^^^ remove the block or fill it in explicitly
