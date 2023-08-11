@@ -3,7 +3,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2021 Systopia Lab, Computer Science, University of British Columbia
+// Copyright (c) 2021-2023 Systopia Lab, Computer Science, University of British Columbia
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -31,21 +31,21 @@
 use nom::{
     branch::alt,
     combinator::{cut, opt},
-    multi::{many0, separated_list0, separated_list1},
+    multi::{many0, separated_list1},
     sequence::{delimited, preceded, terminated, tuple},
 };
 
 // used crate functionality
 use crate::error::IResult;
 use crate::parser::expr::{expr, quantifier_expr};
-use crate::parser::param::parameter;
+use crate::parser::parameter::param_list;
 use crate::parser::terminals::{
     comma, hashtag, ident, kw_abstract, kw_ensures, kw_fn, kw_requires, kw_synth, lbrace, lbrack,
     lparen, rarrow, rbrace, rbrack, rparen, semicolon, typeinfo,
 };
 use crate::parsetree::{
     VelosiParseTreeExpr, VelosiParseTreeMethod, VelosiParseTreeMethodProperty,
-    VelosiParseTreeParam, VelosiParseTreeUnitNode,
+    VelosiParseTreeUnitNode,
 };
 use crate::VelosiTokenStream;
 
@@ -99,7 +99,7 @@ pub fn method(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPars
     let (i2, name) = cut(ident)(i1)?;
 
     // arguments `LPAREN ARGLIST RPAREN`, fail on missing parenstheses
-    let (i3, params) = delimited(cut(lparen), param_list, cut(rparen))(i2)?;
+    let (i3, params) = cut(param_list)(i2)?;
 
     // get the return type `-> Type`, fail if there is no arrow, or type info
     let (i4, rettype) = opt(preceded(rarrow, cut(typeinfo)))(i3)?;
@@ -223,36 +223,6 @@ pub fn ensures_clause(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Ve
 ///
 fn method_body(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeExpr> {
     delimited(lbrace, cut(expr), cut(rbrace))(input)
-}
-
-/// parses an parameter list
-///
-/// # Arguments
-///
-/// * `input` - input token stream to be parsed
-///
-/// # Results
-///
-/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
-///        recognized param list as a parse tree node.
-/// * Err: The parser did not succed. The return value indicates whether this is:
-///
-///    * Error: a recoverable error indicating that the parser did not recognize the input but
-///             another parser might, or
-///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
-///               and that another parser would fail.
-///
-/// # Grammar
-///
-/// ARG     := IDENT : TYPE
-/// ARGLIST := ARG (, ARG)*
-///
-/// # Examples
-///
-/// * `a : bool, b : int`
-///
-fn param_list(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vec<VelosiParseTreeParam>> {
-    separated_list0(comma, parameter)(input)
 }
 
 /// parses a decorator/property list of a method
@@ -412,4 +382,9 @@ fn test_requires_ok() {
 fn test_requires_fail() {
     // wrong terminator
     test_parse_and_check_fail!("requires true,", requires_clause);
+}
+
+#[test]
+fn test_method_ok() {
+    // see the `tests` directory
 }

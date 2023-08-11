@@ -40,7 +40,7 @@ use nom::{
 
 // used crate functionality
 use crate::error::{IResult, VelosiParserErr};
-use crate::parser::{param::parameter, terminals::*};
+use crate::parser::{parameter::param, terminals::*};
 use crate::parsetree::*;
 use crate::{VelosiKeyword, VelosiTokenKind, VelosiTokenStream};
 
@@ -141,7 +141,7 @@ pub fn quantifier_expr(
     // try parse the keyword
     let (i2, quantifier) = alt((kw_exists, kw_forall))(input)?;
     // now we're in a quantifier, get the list of variables
-    let (i3, vars) = cut(separated_list1(comma, parameter))(i2)?;
+    let (i3, vars) = cut(separated_list1(comma, param))(i2)?;
 
     // then the `::` followed by an expression
     let (i4, expr) = cut(preceded(coloncolon, expr))(i3)?;

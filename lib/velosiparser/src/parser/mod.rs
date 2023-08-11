@@ -46,7 +46,7 @@ mod import;
 mod interface;
 mod map;
 mod method;
-mod param;
+mod parameter;
 mod state;
 mod terminals;
 mod unit;
