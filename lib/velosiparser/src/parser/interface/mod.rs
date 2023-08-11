@@ -196,15 +196,10 @@ pub fn ifaceparams(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(test)]
-use std::fs;
-#[cfg(test)]
 use velosilexer::VelosiLexer;
 
 #[cfg(test)]
-use crate::{
-    test_parse_and_check_fail, test_parse_and_check_ok, test_parse_and_compare_file_fail,
-    test_parse_and_compare_ok,
-};
+use crate::{test_parse_and_check_fail, test_parse_and_check_ok, test_parse_and_compare_ok};
 
 #[test]
 fn test_iface_params_ok() {
