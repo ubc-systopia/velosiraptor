@@ -43,10 +43,7 @@ use crate::parser::terminals::{
     comma, hashtag, ident, kw_abstract, kw_ensures, kw_fn, kw_requires, kw_synth, lbrace, lbrack,
     lparen, rarrow, rbrace, rbrack, rparen, semicolon, typeinfo,
 };
-use crate::parsetree::{
-    VelosiParseTreeExpr, VelosiParseTreeMethod, VelosiParseTreeMethodProperty,
-    VelosiParseTreeUnitNode,
-};
+use crate::parsetree::{VelosiParseTreeExpr, VelosiParseTreeMethod, VelosiParseTreeMethodProperty};
 use crate::VelosiTokenStream;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -82,7 +79,7 @@ use crate::VelosiTokenStream;
 ///  * `fn foo() -> addr`
 ///  * `fn foo() -> addr { 0 }`
 ///
-pub fn method(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
+pub fn method(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeMethod> {
     let mut pos = input.clone();
 
     // parse the decorator #[foo]
@@ -127,7 +124,7 @@ pub fn method(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPars
         body,
         pos,
     };
-    Ok((i7, VelosiParseTreeUnitNode::Method(method)))
+    Ok((i7, method))
 }
 
 /// Parses a require clause of a method
