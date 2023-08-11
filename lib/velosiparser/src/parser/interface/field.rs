@@ -398,12 +398,15 @@ fn test_register_field_fail() {
 #[test]
 fn test_register_field_fail_error_messages() {
     // empty field definition
-    test_parse_and_compare_file_fail!("interface/registerfield_00_empty_body", registerfield);
+    test_parse_and_compare_file_fail!("interface/parts/registerfield_00_empty_body", registerfield);
 
     // memory field information instead of register field information
-    test_parse_and_compare_file_fail!("interface/registerfield_01_field_info_wrong", registerfield);
     test_parse_and_compare_file_fail!(
-        "interface/registerfield_02_field_info_wrong_2",
+        "interface/parts/registerfield_01_field_info_wrong",
+        registerfield
+    );
+    test_parse_and_compare_file_fail!(
+        "interface/parts/registerfield_02_field_info_wrong_2",
         registerfield
     );
 }
@@ -477,11 +480,17 @@ fn test_memory_field_fail() {
 #[test]
 fn test_memory_field_fail_error_messages() {
     // empty field definition
-    test_parse_and_compare_file_fail!("interface/memoryfield_00_empty_body", memoryfield);
+    test_parse_and_compare_file_fail!("interface/parts/memoryfield_00_empty_body", memoryfield);
 
     // memory field information instead of register field information
-    test_parse_and_compare_file_fail!("interface/memoryfield_01_field_info_wrong", memoryfield);
-    test_parse_and_compare_file_fail!("interface/memoryfield_02_field_info_wrong_2", memoryfield);
+    test_parse_and_compare_file_fail!(
+        "interface/parts/memoryfield_01_field_info_wrong",
+        memoryfield
+    );
+    test_parse_and_compare_file_fail!(
+        "interface/parts/memoryfield_02_field_info_wrong_2",
+        memoryfield
+    );
 }
 
 #[test]
@@ -553,9 +562,9 @@ fn test_mmio_field_fail() {
 #[test]
 fn test_mmio_field_fail_error_messages() {
     // empty field definition
-    test_parse_and_compare_file_fail!("interface/mmiofield_00_empty_body", mmiofield);
+    test_parse_and_compare_file_fail!("interface/parts/mmiofield_00_empty_body", mmiofield);
 
     // memory field information instead of register field information
-    test_parse_and_compare_file_fail!("interface/mmiofield_01_field_info_wrong", mmiofield);
-    test_parse_and_compare_file_fail!("interface/mmiofield_02_field_info_wrong_2", mmiofield);
+    test_parse_and_compare_file_fail!("interface/parts/mmiofield_01_field_info_wrong", mmiofield);
+    test_parse_and_compare_file_fail!("interface/parts/mmiofield_02_field_info_wrong_2", mmiofield);
 }

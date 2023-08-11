@@ -1,5 +1,5 @@
 error: empty interface field block
-     --> tests/vrs/interface/memoryfield_00_empty_body.vrs:1:26
+     --> tests/vrs/interface/parts/memoryfield_00_empty_body.vrs:1:26
       |
     1 |  mem foo [ base, 8, 0 ] {}
       |                            remove the block or fill it in explicitly

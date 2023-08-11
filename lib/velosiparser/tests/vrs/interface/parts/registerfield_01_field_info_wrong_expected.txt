@@ -1,5 +1,5 @@
 error: expected `integer literal`, found `base`
-     --> tests/vrs/interface/registerfield_01_field_info_wrong.vrs:1:11
+     --> tests/vrs/interface/parts/registerfield_01_field_info_wrong.vrs:1:11
       |
     1 |  reg foo [ base, 8, 8] {Layout {}}
       |            ^^^^ help: add `integer literal` here.

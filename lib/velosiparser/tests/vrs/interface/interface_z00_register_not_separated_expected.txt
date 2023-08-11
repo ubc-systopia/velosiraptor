@@ -1,5 +1,5 @@
 error: expected `}`, found `reg`
-     --> tests/vrs/interface/interface_00_register_not_separated.vrs:3:5
+     --> tests/vrs/interface/parts/interface_00_register_not_separated.vrs:3:5
       |
     3 |      reg foo [ 8 ]
       |      ^^^ help: add `}` here.

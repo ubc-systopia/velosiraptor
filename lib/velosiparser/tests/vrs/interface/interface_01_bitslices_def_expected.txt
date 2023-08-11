@@ -1,0 +1,38 @@
+VelosiParseTree(tests/vrs/interface/interface_01_bitslices_def.vrs)
+---------------------------------------------
+segment MyUnit {
+  interface = InterfaceDef(base: foo) {
+    reg foo [ 8 ] {
+      Layout {
+        0..2 foo,
+      },
+    },
+    reg foo [ 8 ] {
+      Layout {
+        0..2 foo,
+        2..4 bar,
+      },
+    },
+    mem bar [ base, 0, 8 ] {
+      Layout {
+        0..2 foo,
+        7..4 bar,
+        7..4 bar,
+      },
+    },
+    mmio baz [ base, 8, 8 ] {
+      Layout {
+        0..256 foo,
+        1025..4 bar,
+      },
+      Layout {
+        0..2 foo,
+      },
+    },
+  };
+
+
+}
+
+
+---------------------------------------------
