@@ -1,0 +1,5 @@
+error: empty state field block
+     --> tests/vrs/state/state_04_empty_register.vrs:4:5
+      |
+    4 |      };
+      |      ^^^^ remove the block or fill it in explicitly

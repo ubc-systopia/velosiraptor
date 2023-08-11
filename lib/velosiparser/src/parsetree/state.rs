@@ -184,14 +184,11 @@ impl VelosiParseTreeStateDef {
 
 impl Display for VelosiParseTreeStateDef {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        if !self.params.is_empty() {
-            write!(f, "StateDef(")?;
-            for param in &self.params {
-                Display::fmt(param, f)?;
-            }
-            write!(f, ")")?;
+        write!(f, "StateDef(")?;
+        for param in &self.params {
+            Display::fmt(param, f)?;
         }
-        writeln!(f, " {{")?;
+        writeln!(f, ") {{")?;
         for field in &self.fields {
             Display::fmt(field, f)?;
             writeln!(f, ",")?;

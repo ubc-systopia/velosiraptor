@@ -1,0 +1,5 @@
+error: expected `}`, found `reg`
+     --> tests/vrs/state/state_02_register_not_separated.vrs:4:9
+      |
+    4 |          reg foo [ 8 ]
+      |          ^^^ help: add `}` here.

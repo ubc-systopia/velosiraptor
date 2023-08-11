@@ -1,0 +1,5 @@
+error: expected `}`, found `;`
+     --> tests/vrs/state/state_03_register_wrong_separator.vrs:3:22
+      |
+    3 |          reg foo [ 8 ];
+      |                       ^ help: add `}` here.

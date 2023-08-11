@@ -1,0 +1,5 @@
+error: empty state field block
+     --> tests/vrs/state/parts/memoryfield_00_empty_body.vrs:1:26
+      |
+    1 |  mem foo [ base, 8, 0 ] {}
+      |                            remove the block or fill it in explicitly

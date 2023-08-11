@@ -102,7 +102,7 @@ macro_rules! test_parse_and_compare_file_fail {
         let expfile = format!("tests/vrs/{}_expected.txt", $infile);
         let ts = VelosiLexer::lex_file(infile.as_str()).expect("lexing of file failed");
         match nom::combinator::all_consuming($parser)(ts) {
-            Ok((_, res)) => panic!("parsing should have failed, but succeeded with {}", res),
+            Ok((_, _res)) => panic!("parsing should have failed, but succeeded"),
             Err(nom::Err::Failure(e)) | Err(nom::Err::Error(e)) => {
                 println!(">>>>>>>\n{e}\n<<<<<<<");
                 let plain_bytes = strip_ansi_escapes::strip(e.to_string())
