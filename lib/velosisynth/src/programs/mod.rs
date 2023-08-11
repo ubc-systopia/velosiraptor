@@ -590,6 +590,17 @@ impl ProgramActions {
     }
 }
 
+impl From<&ProgramActions> for Vec<VelosiOperation> {
+    fn from(actions: &ProgramActions) -> Self {
+        match actions {
+            ProgramActions::GlobalBarrier => vec![VelosiOperation::GlobalBarrier],
+            ProgramActions::FieldActions(f) => {
+                <&FieldActions as std::convert::Into<Vec<VelosiOperation>>>::into(f)
+            }
+        }
+    }
+}
+
 impl Display for ProgramActions {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
@@ -983,11 +994,7 @@ impl From<&Program> for Vec<VelosiOperation> {
         let mut ops: Vec<VelosiOperation> = prog
             .0
             .iter()
-            .filter_map(|f| match f {
-                ProgramActions::GlobalBarrier => None,
-                ProgramActions::FieldActions(a) => Some(a),
-            })
-            .flat_map(|o| <&FieldActions as std::convert::Into<Vec<VelosiOperation>>>::into(o))
+            .flat_map(<&ProgramActions as std::convert::Into<Vec<VelosiOperation>>>::into)
             .collect();
         ops.push(VelosiOperation::Return);
         ops

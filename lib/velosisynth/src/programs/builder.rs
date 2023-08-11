@@ -49,6 +49,15 @@ impl ProgramsIter {
     }
 }
 
+impl Default for ProgramsIter {
+    fn default() -> Self {
+        ProgramsIter {
+            programs: Vec::new(),
+            stat_num_programs: 0,
+        }
+    }
+}
+
 pub struct ProgramsBuilder {
     /// the fields we have
     fields: HashMap<Arc<String>, Vec<(Arc<String>, usize)>>,

@@ -119,7 +119,7 @@ impl<'a> BoolExprQueryBuilder<'a> {
     /// builds the bool expr query or returns None if there are no queries to be run
     pub fn build(self) -> Option<BoolExprQuery> {
         // if the expression doesn't have state references, then nothing to be done.
-        if !self.goal_expr.has_state_references() {
+        if !self.goal_expr.has_state_references() && self.mem_model.is_none() {
             log::info!("No state references in the expression");
             return None;
         }

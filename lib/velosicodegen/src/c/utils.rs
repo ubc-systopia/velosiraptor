@@ -889,6 +889,9 @@ pub fn op_to_c_expr(
             let f = vars.get(field.as_str()).unwrap();
             c.assign(f.clone(), C::Expr::fn_call(&fname, vec![u.clone()]));
         }
+        VelosiOperation::GlobalBarrier => {
+            c.fn_call("__sync_synchronize", Vec::new());
+        }
         VelosiOperation::Return => (),
     }
 }
