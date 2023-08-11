@@ -51,6 +51,12 @@ mod state;
 mod terminals;
 mod unit;
 
+// some re-exports for testing
+pub use interface::interface as parse_interface;
+pub use map::staticmap as parse_staticmap;
+pub use method::method as parse_method;
+pub use state::state as parse_state;
+
 /// Parses a VelosiTokenStream into a VelosiParseTree
 ///
 /// The function takes the parse context as a explicit argument

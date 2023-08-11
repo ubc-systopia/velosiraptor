@@ -23,11 +23,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Unit Parser
+//! # VelosiParser -- Unit Definitions
 //!
-//! Parses a Unit definition including its state, constants etc.
+//! This module parses a unit definition with its state, interface and methods.
 
-// the used nom functionality
+// external dependencies
 use nom::{
     branch::alt,
     combinator::{cut, map, opt},
@@ -57,30 +57,38 @@ use crate::parsetree::{
 };
 use crate::VelosiTokenStream;
 
-/// parses the unit parameters
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Unit Definitions
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// parses and consumes a unit definition with its state, interface etc.
 ///
 /// # Arguments
 ///
-///  * `input`  - token stream representing the current input position
+/// * `input` - input token stream to be parsed
 ///
-/// # Return Value
+/// # Results
 ///
-/// Result type wrapping a vector of [VelosiParseTreeParam] and the remaining [VelosiTokenStream]
-/// if the parser succeeded, or an error wrapping the input position if the parser failed.
+/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
+///        recognized unit definition as a parse tree node.
+/// * Err: The parser did not succed. The return value indicates whether this is:
+///
+///    * Error: a recoverable error indicating that the parser did not recognize the input but
+///             another parser might, or
+///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
+///               and that another parser would fail.
 ///
 /// # Grammar
 ///
-/// `PARAM_CLAUSE := COLON IDENTIFIER`
+/// UNIT := UNIT_SEGMENT | UNIT_STATICMAP | UNIT_ENUM
 ///
 /// # Example
 ///
-///  * `: FooBar`
+/// * `segment Foo (bar: baz, foo: bar) : FooBar { ... }`
+/// * `staticmap Bar(foo: baz, bar: foo) : FooBar { ... }`
 ///
-/// # Notes
-///
-///  * None
-fn param_clause(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vec<VelosiParseTreeParam>> {
-    map(opt(param_list), |r| r.unwrap_or_default())(input)
+pub fn unit(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnit> {
+    alt((unit_segment, unit_staticmap, unit_enum))(input)
 }
 
 /// parses the derived clause of a unit
@@ -137,7 +145,7 @@ type UnitHeader = (
 ///
 ///  * `Foo (bar: baz, foo: bar) : FooBar`
 fn unit_header(input: VelosiTokenStream) -> IResult<VelosiTokenStream, UnitHeader> {
-    tuple((cut(ident), param_clause, opt(derived_clause)))(input)
+    tuple((cut(ident), param_list, opt(derived_clause)))(input)
 }
 
 /// parses the input bitwidth clause of the unit
@@ -360,25 +368,6 @@ fn unit_enum(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParse
 
     let unitdef = VelosiParseTreeUnitDef::new(unitname, params, false, derived, body, pos);
     Ok((i3, VelosiParseTreeUnit::Enum(unitdef)))
-}
-
-/// parses and consumes a unit definition with its state, interface etc.
-///
-/// # Arguments
-///
-///  * `input`  - token stream representing the current input position
-///
-/// # Return Value
-///
-/// Result type wrapping a [Unit] and the remaining [VelosiTokenStream] if the parser succeeded,
-/// or an error wrapping the input position if the parser failed.
-///
-/// # Grammar
-///
-/// UNIT := UNIT_SEGMENT | UNIT_STATICMAP | UNIT_ENUM
-///
-pub fn unit(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnit> {
-    alt((unit_segment, unit_staticmap, unit_enum))(input)
 }
 
 #[cfg(test)]
