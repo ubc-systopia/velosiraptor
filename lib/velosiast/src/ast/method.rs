@@ -440,7 +440,7 @@ impl VelosiAstMethod {
 
             if !exp.result_type().is_boolean() {
                 // check that the expression is boolean
-                let msg = "Requires clause has incompatible type ";
+                let msg = "Requires clause has incompatible type";
                 let hint = format!("Expected boolean, found {}", exp.result_type());
                 let err = VelosiAstErrBuilder::err(msg.to_string())
                     .add_hint(hint)
@@ -484,14 +484,14 @@ impl VelosiAstMethod {
 
             // check the return type matches the body
             if !rtype.typeinfo.compatible(body.result_type()) {
-                let msg = "Method body has incomptaible type. ";
+                let msg = "Method body has incompatible type.";
                 let hint = if rtype.is_boolean() {
                     format!("Expected boolean, found {}", body.result_type())
                 } else if rtype.is_void() {
                     format!("Expected (), found {}", body.result_type())
                 } else {
                     format!(
-                        "Expected [`bool`, `int`, `size`, `addr`], found {}",
+                        "Expected [`int`, `size`, `addr`], found {}",
                         body.result_type()
                     )
                 };

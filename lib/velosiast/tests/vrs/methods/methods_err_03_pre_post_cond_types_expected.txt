@@ -1,0 +1,35 @@
+error: Requires clause has incompatible type
+     --> tests/vrs/methods/methods_err_03_pre_post_cond_types.vrs:3:14
+      |
+    3 |      requires foo
+      |               ^^^ Expected boolean, found int
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: no symbol named `foobar` found in the current scope
+     --> tests/vrs/methods/methods_err_03_pre_post_cond_types.vrs:10:14
+      |
+   10 |      requires foobar
+      |               ^^^^^^ not found in this scope
+error: Requires clause has incompatible type
+     --> tests/vrs/methods/methods_err_03_pre_post_cond_types.vrs:10:14
+      |
+   10 |      requires foobar
+      |               ^^^^^^ Expected boolean, found int
+error: could not compile due to 2 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: Requires clause has incompatible type
+     --> tests/vrs/methods/methods_err_03_pre_post_cond_types.vrs:17:14
+      |
+   17 |      requires foo & 0x1
+      |               ^^^^^^^^^ Expected boolean, found int
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+

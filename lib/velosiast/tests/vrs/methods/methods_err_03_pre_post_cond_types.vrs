@@ -1,0 +1,22 @@
+// wrong type from parameter
+fn foo(foo: int, bar: int) -> int
+    requires foo
+{
+    1
+}
+
+// wrong type doesn't exist
+fn foo(foo: int, bar: int) -> int
+    requires foobar
+{
+    1
+}
+
+// wrong type
+fn foo(foo: int, bar: int) -> int
+    requires foo & 0x1
+{
+    1
+}
+
+// ensures: they are currently ignored

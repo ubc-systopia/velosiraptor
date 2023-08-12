@@ -1,0 +1,30 @@
+
+// method returning a bool
+fn foo() -> bool {
+    true
+}
+
+// method returning an int
+fn bar() -> int {
+    3
+}
+
+// method with one argument
+fn baz(v: bool) -> bool {
+    !v
+}
+
+// method returning an int
+fn bar(v: bool, u: bool) -> bool {
+    v && u
+}
+
+// method returning an int
+fn bar(v: int, u: int) -> int {
+    v & u
+}
+
+// parameter names
+fn bar_bar(v_3: int, u: int) -> int {
+    v_3 & u
+}

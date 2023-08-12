@@ -104,6 +104,10 @@ impl VelosiAstExpr {
         }
     }
 
+    fn needs_paren(&self) -> bool {
+        matches!(self, VelosiAstExpr::BinOp(_) | VelosiAstExpr::Quantifier(_))
+    }
+
     pub fn loc(&self) -> &VelosiTokenStream {
         use VelosiAstExpr::*;
         match self {

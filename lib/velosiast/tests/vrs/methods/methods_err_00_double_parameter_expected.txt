@@ -1,0 +1,28 @@
+error: duplicate definitions with name `foo`
+     --> tests/vrs/methods/methods_err_00_double_parameter.vrs:2:28
+      |
+    2 |  fn foo(foo: int, bar: int, foo: int) -> bool
+      |         ^^^^^^^^ previous definition of `foo` was here
+   ...
+      |
+    2 |  fn foo(foo: int, bar: int, foo: int) -> bool
+      |                             ^^^^^^^^ duplicate definition
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: duplicate definitions with name `foo`
+     --> tests/vrs/methods/methods_err_00_double_parameter.vrs:8:28
+      |
+    8 |  fn foo(foo: int, bar: int, foo: bool) -> bool
+      |         ^^^^^^^^ previous definition of `foo` was here
+   ...
+      |
+    8 |  fn foo(foo: int, bar: int, foo: bool) -> bool
+      |                             ^^^^^^^^^ duplicate definition
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+

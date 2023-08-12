@@ -1,0 +1,5 @@
+
+// method with post-condition
+#[remap]
+abstract fn foo() -> bool
+    ensures true;

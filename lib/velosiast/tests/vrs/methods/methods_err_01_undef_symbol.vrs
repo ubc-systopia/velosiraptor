@@ -1,0 +1,23 @@
+// undefined varaible
+fn foo(foo: int, bar: int) -> int
+{
+    foo + BAR
+}
+
+// undefined variable
+fn foo(foo: int, bar: int) -> int
+{
+    foobar
+}
+
+// wrong type
+fn foo(foo: int, bar: int) -> int
+{
+    foo()
+}
+
+// recursive call doesn't work
+fn bar(foo: int) -> int
+{
+    bar()
+}

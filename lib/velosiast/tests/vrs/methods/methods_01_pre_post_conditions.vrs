@@ -1,0 +1,51 @@
+
+// a requires caluse
+fn foo() -> bool
+    requires true
+{
+    true
+}
+
+// a ensures clause
+fn foo() -> bool
+    ensures true
+{
+    true
+}
+
+// both, ensures and requires
+fn foo() -> bool
+    requires true
+    ensures true
+{
+    true
+}
+
+// method returning an int
+fn bar() -> int {
+    3
+}
+
+// referencing the parameter
+fn baz(v: bool) -> bool
+    requires v == true
+{
+    !v
+}
+
+// method returning an int
+fn bar(v: bool, u: bool) -> bool
+    requires v != u
+{
+    v && u
+}
+
+// more complex pre-post conditions. ensures will be ignored.
+fn bar(val: int) -> int
+    requires true;
+    requires val > 0 && true;
+    ensures bar(val) == val + 1;
+    ensures true;
+{
+    1 + val
+}
