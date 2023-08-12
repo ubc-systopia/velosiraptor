@@ -698,7 +698,18 @@ impl Hash for VelosiAstBinOpExpr {
 
 impl Display for VelosiAstBinOpExpr {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
-        write!(format, "({} {} {})", self.lhs, self.op, self.rhs)
+        if self.lhs.needs_paren() {
+            write!(format, "({})", self.lhs)?;
+        } else {
+            write!(format, "{}", self.lhs)?;
+        }
+        write!(format, " {} ", self.op)?;
+
+        if self.rhs.needs_paren() {
+            write!(format, "({})", self.rhs)
+        } else {
+            write!(format, "{}", self.rhs)
+        }
     }
 }
 

@@ -1,0 +1,27 @@
+// undefined varaible
+fn foo(foo: int, bar: int) -> bool
+{
+    foo + BAR
+}
+
+// undefined variable
+fn foo(foo: int, bar: int) -> int
+{
+    foo > bar
+}
+
+// wrong type
+fn foo(foo: int, bar: int) -> int
+{
+    if foo > bar {
+        true
+    } else {
+        bar
+    }
+}
+
+// unknown symbols are int
+fn bar(foo: int) -> bool
+{
+    foobar
+}

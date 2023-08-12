@@ -1,0 +1,55 @@
+error: no symbol named `BAR` found in the current scope
+     --> tests/vrs/methods/methods_err_02_wrong_return_types.vrs:4:11
+      |
+    4 |      foo + BAR
+      |            ^^^ not found in this scope
+error: Method body has incompatible type.
+     --> tests/vrs/methods/methods_err_02_wrong_return_types.vrs:4:5
+      |
+    4 |      foo + BAR
+      |      ^^^^^^^^^ Expected boolean, found int
+error: could not compile due to 2 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: Method body has incompatible type.
+     --> tests/vrs/methods/methods_err_02_wrong_return_types.vrs:10:5
+      |
+   10 |      foo > bar
+      |      ^^^^^^^^^ Expected [`int`, `size`, `addr`], found bool
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: The two branches of the if-then-else expression have different types
+     --> tests/vrs/methods/methods_err_02_wrong_return_types.vrs:19:9
+      |
+   19 |          bar
+      |          ^^^ Convert this expression into a bool expression
+error: Method body has incompatible type.
+     --> tests/vrs/methods/methods_err_02_wrong_return_types.vrs:16:5
+      |
+   16 |      if foo > bar {
+      |      ^^^^^^^^^^^^^^ Expected [`int`, `size`, `addr`], found bool
+error: could not compile due to 2 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: no symbol named `foobar` found in the current scope
+     --> tests/vrs/methods/methods_err_02_wrong_return_types.vrs:26:5
+      |
+   26 |      foobar
+      |      ^^^^^^ not found in this scope
+error: Method body has incompatible type.
+     --> tests/vrs/methods/methods_err_02_wrong_return_types.vrs:26:5
+      |
+   26 |      foobar
+      |      ^^^^^^ Expected boolean, found int
+error: could not compile due to 2 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+

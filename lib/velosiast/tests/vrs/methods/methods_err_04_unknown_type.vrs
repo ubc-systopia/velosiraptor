@@ -1,0 +1,5 @@
+// wrong type from parameter
+fn foo(foo: int, bar: UNKNOWN) -> int
+{
+    1
+}

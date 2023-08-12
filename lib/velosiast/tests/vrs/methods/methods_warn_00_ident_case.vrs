@@ -1,0 +1,23 @@
+// upper case
+fn FOOBAR(foo: int, bar: int) -> int
+{
+    1
+}
+
+// camel case
+fn FooBar(foo: int, bar: int) -> int
+{
+    1
+}
+
+// upper case param
+fn foo(FOO: int, bar: int) -> int
+{
+    1
+}
+
+// camel case param
+fn foo(FooBar: int, bar: int) -> int
+{
+    1
+}

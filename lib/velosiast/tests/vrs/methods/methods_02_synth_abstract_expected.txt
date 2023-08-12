@@ -1,0 +1,17 @@
+  abstract fn foo() -> bool
+    requires true;
+  { }
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+  synth fn foo() -> bool
+    requires true;
+  { }
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+  synth fn foo() -> bool
+    requires true;
+  { }
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@

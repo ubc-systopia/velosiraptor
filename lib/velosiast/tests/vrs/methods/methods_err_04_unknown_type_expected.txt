@@ -1,0 +1,10 @@
+error: no symbol named `UNKNOWN` found in the current scope
+     --> tests/vrs/methods/methods_err_04_unknown_type.vrs:2:23
+      |
+    2 |  fn foo(foo: int, bar: UNKNOWN) -> int
+      |                        ^^^^^^^ not found in this scope
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+

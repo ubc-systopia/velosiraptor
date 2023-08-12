@@ -1,0 +1,11 @@
+// abstract method
+abstract fn foo() -> bool
+    requires true;
+
+// synthesis method
+synth fn foo() -> bool
+    requires true;
+
+
+synth fn foo() -> bool
+    requires true;

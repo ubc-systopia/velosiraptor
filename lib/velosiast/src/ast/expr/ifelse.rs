@@ -103,11 +103,11 @@ impl VelosiAstIfElseExpr {
 
         if !other_type.compatible(&then_type) {
             let msg = "The two branches of the if-then-else expression have different types";
-            let hint = format!("Convert this expression into a {then_type} exoression");
+            let hint = format!("Convert this expression into a {then_type} expression");
 
             let err = VelosiAstErrBuilder::err(msg.to_string())
                 .add_hint(hint)
-                .add_location(cond.loc().clone())
+                .add_location(other.loc().clone())
                 .build();
             issues.push(err);
         }

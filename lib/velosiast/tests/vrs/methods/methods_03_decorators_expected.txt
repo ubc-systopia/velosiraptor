@@ -1,0 +1,6 @@
+  #[remap]
+  abstract fn foo() -> bool
+    requires true;
+  { }
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@

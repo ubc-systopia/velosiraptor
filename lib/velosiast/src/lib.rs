@@ -46,7 +46,7 @@ mod symboltable;
 mod utils;
 
 use error::{VelosiAstErrBuilder, VelosiAstIssues};
-use symboltable::{Symbol, SymbolTable};
+pub use symboltable::{Symbol, SymbolTable};
 use velosiparser::VelosiParseTree;
 
 pub use crate::ast::{

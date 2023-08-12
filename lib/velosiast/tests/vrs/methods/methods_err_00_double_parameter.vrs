@@ -1,0 +1,11 @@
+// method with pre-condition
+fn foo(foo: int, bar: int, foo: int) -> bool
+{
+    true
+}
+
+// method with pre-condition
+fn foo(foo: int, bar: int, foo: bool) -> bool
+{
+    true
+}

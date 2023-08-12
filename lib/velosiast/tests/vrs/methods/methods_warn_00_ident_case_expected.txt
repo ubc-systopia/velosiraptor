@@ -1,0 +1,63 @@
+  fn FOOBAR(foo: int, bar: int) -> int
+    requires true;
+  {
+    0x1
+  }
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+warning: identifier `FOOBAR` should have an snake case name
+     --> tests/vrs/methods/methods_warn_00_ident_case.vrs:2:4
+      |
+    2 |  fn FOOBAR(foo: int, bar: int) -> int
+      |     ^^^^^^ convert the identifier to lower case (notice the snake_case): `foobar`
+warning: generated 1 warnings
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+  fn FooBar(foo: int, bar: int) -> int
+    requires true;
+  {
+    0x1
+  }
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+warning: identifier `FooBar` should have an snake case name
+     --> tests/vrs/methods/methods_warn_00_ident_case.vrs:8:4
+      |
+    8 |  fn FooBar(foo: int, bar: int) -> int
+      |     ^^^^^^ convert the identifier to lower case (notice the snake_case): `foobar`
+warning: generated 1 warnings
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+  fn foo(FOO: int, bar: int) -> int
+    requires true;
+  {
+    0x1
+  }
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+warning: identifier `FOO` should have an snake case name
+     --> tests/vrs/methods/methods_warn_00_ident_case.vrs:14:8
+      |
+   14 |  fn foo(FOO: int, bar: int) -> int
+      |         ^^^ convert the identifier to lower case (notice the snake_case): `foo`
+warning: generated 1 warnings
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+  fn foo(FooBar: int, bar: int) -> int
+    requires true;
+  {
+    0x1
+  }
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+warning: identifier `FooBar` should have an snake case name
+     --> tests/vrs/methods/methods_warn_00_ident_case.vrs:20:8
+      |
+   20 |  fn foo(FooBar: int, bar: int) -> int
+      |         ^^^^^^ convert the identifier to lower case (notice the snake_case): `foobar`
+warning: generated 1 warnings
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@

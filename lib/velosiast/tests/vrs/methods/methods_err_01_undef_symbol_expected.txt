@@ -1,0 +1,44 @@
+error: no symbol named `BAR` found in the current scope
+     --> tests/vrs/methods/methods_err_01_undef_symbol.vrs:4:11
+      |
+    4 |      foo + BAR
+      |            ^^^ not found in this scope
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: no symbol named `foobar` found in the current scope
+     --> tests/vrs/methods/methods_err_01_undef_symbol.vrs:10:5
+      |
+   10 |      foobar
+      |      ^^^^^^ not found in this scope
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: symbol named `foo` was defined with a different kind
+     --> tests/vrs/methods/methods_err_01_undef_symbol.vrs:16:5
+      |
+   16 |      foo()
+      |      ^^^^^ this is the symbol with the wrong kind
+     --> tests/vrs/methods/methods_err_01_undef_symbol.vrs:14:8
+      |
+   14 |  fn foo(foo: int, bar: int) -> int
+      |         ^^^^^^^^ symbol was defined here
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: no symbol named `bar` found in the current scope
+     --> tests/vrs/methods/methods_err_01_undef_symbol.vrs:22:5
+      |
+   22 |      bar()
+      |      ^^^^^ not found in this scope
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
