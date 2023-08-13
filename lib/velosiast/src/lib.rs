@@ -50,10 +50,10 @@ pub use symboltable::{Symbol, SymbolTable};
 use velosiparser::VelosiParseTree;
 
 pub use crate::ast::{
-    VelosiAstConst, VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField,
-    VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField, VelosiAstInterfaceRegisterField,
-    VelosiAstMethod, VelosiAstMethodProperty, VelosiAstRoot, VelosiAstStateField,
-    VelosiAstStaticMap, VelosiAstStaticMapElement, VelosiAstStaticMapExplicit,
+    VelosiAstConst, VelosiAstField, VelosiAstFieldSlice, VelosiAstInterface,
+    VelosiAstInterfaceField, VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField,
+    VelosiAstInterfaceRegisterField, VelosiAstMethod, VelosiAstMethodProperty, VelosiAstRoot,
+    VelosiAstStateField, VelosiAstStaticMap, VelosiAstStaticMapElement, VelosiAstStaticMapExplicit,
     VelosiAstStaticMapListComp, VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment,
     VelosiAstUnitStaticMap,
 };
