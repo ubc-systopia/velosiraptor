@@ -51,7 +51,7 @@ use crate::ast::{
 };
 use crate::ast::{VelosiAstBinOpExpr, VelosiAstNumLiteralExpr};
 use crate::error::{VelosiAstErrBuilder, VelosiAstErrUndef, VelosiAstIssues};
-use crate::{ast_result_return, ast_result_unwrap, AstResult, Symbol, SymbolTable};
+use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable};
 
 use super::expr::VelosiAstIdentLiteralExpr;
 
@@ -142,6 +142,9 @@ impl VelosiAstInterfaceDef {
             // we don't need to add those to the symbol table, as they are expected to match
             params.push(param);
         }
+
+        // check if we have double definitions in the parameters
+        utils::check_param_double_definitions(&mut issues, &params);
 
         let mut fields = Vec::new();
         for f in pt.fields.into_iter() {
