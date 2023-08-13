@@ -40,9 +40,7 @@ use nom::{
 // used crate components
 use crate::error::IResult;
 use crate::parser::{parameter::param_list, terminals::*};
-use crate::parsetree::{
-    VelosiParseTreeInterface, VelosiParseTreeInterfaceDef, VelosiParseTreeUnitNode,
-};
+use crate::parsetree::{VelosiParseTreeInterface, VelosiParseTreeInterfaceDef};
 use crate::VelosiTokenStream;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -81,7 +79,7 @@ mod layout;
 ///
 /// * `interface = None;`
 ///
-pub fn interface(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
+pub fn interface(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeInterface> {
     // let mut pos = input.clone();
 
     // try to match the interface keyword, if there is no match, return.
@@ -118,14 +116,13 @@ pub fn interface(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiP
 ///
 /// * `None`
 ///
-fn ifacenone(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
+fn ifacenone(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeInterface> {
     let mut pos = input.clone();
 
     let (i1, _) = kw_none(input)?;
 
     pos.span_until_start(&i1);
-    let iface = VelosiParseTreeInterface::None(pos);
-    Ok((i1, VelosiParseTreeUnitNode::Interface(iface)))
+    Ok((i1, VelosiParseTreeInterface::None(pos)))
 }
 
 /// parses and consumes an interface definition of a unit
@@ -153,7 +150,7 @@ fn ifacenone(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParse
 ///
 /// * `InterfaceDef(base: addr) {}`
 ///
-fn ifacedef(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
+fn ifacedef(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeInterface> {
     let mut pos = input.clone();
 
     // try to barse the InterfaceDef keyword
@@ -168,10 +165,7 @@ fn ifacedef(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseT
     pos.span_until_start(&i3);
 
     let st = VelosiParseTreeInterfaceDef::new(bases, fields, pos);
-    Ok((
-        i3,
-        VelosiParseTreeUnitNode::Interface(VelosiParseTreeInterface::InterfaceDef(st)),
-    ))
+    Ok((i3, VelosiParseTreeInterface::InterfaceDef(st)))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -186,7 +180,7 @@ use crate::{test_parse_and_check_fail, test_parse_and_compare_ok};
 
 #[test]
 fn test_iface_none_ok() {
-    test_parse_and_compare_ok!("None", ifacenone, "  interface = None;\n\n");
+    test_parse_and_compare_ok!("None", ifacenone, "None;\n");
 }
 
 #[test]
@@ -196,33 +190,29 @@ fn test_iface_none_fail() {
 
 #[test]
 fn test_iface_def_ok() {
-    test_parse_and_compare_ok!(
-        "InterfaceDef(){}",
-        ifacedef,
-        "  interface = InterfaceDef() {\n  };\n\n"
-    );
+    test_parse_and_compare_ok!("InterfaceDef(){}", ifacedef, "InterfaceDef() {\n  };\n");
     test_parse_and_compare_ok!(
         "InterfaceDef(base: foo){}",
         ifacedef,
-        "  interface = InterfaceDef(base: foo) {\n  };\n\n"
+        "InterfaceDef(base: foo) {\n  };\n"
     );
     // with a register
     test_parse_and_compare_ok!(
         "InterfaceDef(base: foo){ reg foo [ 8 ] }",
         ifacedef,
-        "  interface = InterfaceDef(base: foo) {\n    reg foo [ 8 ],\n  };\n\n"
+        "InterfaceDef(base: foo) {\n    reg foo [ 8 ],\n  };\n"
     );
     // trailing comma
     test_parse_and_compare_ok!(
         "InterfaceDef(base: foo){ reg foo [ 8 ], }",
         ifacedef,
-        "  interface = InterfaceDef(base: foo) {\n    reg foo [ 8 ],\n  };\n\n"
+        "InterfaceDef(base: foo) {\n    reg foo [ 8 ],\n  };\n"
     );
     // with two registers
     test_parse_and_compare_ok!(
         "InterfaceDef(base: foo){ reg foo [ 8 ], reg foo [ 8 ] }",
         ifacedef,
-        "  interface = InterfaceDef(base: foo) {\n    reg foo [ 8 ],\n    reg foo [ 8 ],\n  };\n\n"
+        "InterfaceDef(base: foo) {\n    reg foo [ 8 ],\n    reg foo [ 8 ],\n  };\n"
     );
 }
 
@@ -248,10 +238,10 @@ fn test_iface_def_fail() {
 
 #[test]
 fn test_iface() {
-    test_parse_and_compare_ok!("interface = None;", interface, "  interface = None;\n\n");
+    test_parse_and_compare_ok!("interface = None;", interface, "None;\n");
     test_parse_and_compare_ok!(
         "interface = InterfaceDef(base: foo){};",
         interface,
-        "  interface = InterfaceDef(base: foo) {\n  };\n\n"
+        "InterfaceDef(base: foo) {\n  };\n"
     );
 }
