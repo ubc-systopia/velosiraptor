@@ -39,7 +39,7 @@ use crate::parser::{
     parameter::param_list,
     terminals::{assign, comma, kw_none, kw_state, kw_statedef, lbrace, rbrace, semicolon},
 };
-use crate::parsetree::{VelosiParseTreeState, VelosiParseTreeStateDef, VelosiParseTreeUnitNode};
+use crate::parsetree::{VelosiParseTreeState, VelosiParseTreeStateDef};
 use crate::VelosiTokenStream;
 
 // submodules
@@ -74,7 +74,7 @@ mod fields;
 ///
 /// * `state = None;`
 /// * `state = StateDef() { };`
-pub fn state(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
+pub fn state(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeState> {
     // try to match the state keyword, if there is no match, return.
     let (i1, _) = kw_state(input)?;
 
@@ -107,7 +107,7 @@ pub fn state(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParse
 ///
 /// * `StateDef() {}`
 /// * `StateDef(base: int) { mem field [ base, 0, 0 ] }`
-fn statedef(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
+fn statedef(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeState> {
     let mut pos = input.clone();
 
     let (i1, _) = kw_statedef(input)?;
@@ -121,10 +121,7 @@ fn statedef(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseT
     pos.span_until_start(&i3);
 
     let st = VelosiParseTreeStateDef::new(bases, fields, pos);
-    Ok((
-        i3,
-        VelosiParseTreeUnitNode::State(VelosiParseTreeState::StateDef(st)),
-    ))
+    Ok((i3, VelosiParseTreeState::StateDef(st)))
 }
 
 /// parses and consumes a none state definition of a unit
@@ -151,17 +148,14 @@ fn statedef(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseT
 /// # Examples
 ///
 ///  * `None`
-fn none_state(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
+fn none_state(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeState> {
     let mut pos = input.clone();
 
     let (i1, _) = kw_none(input)?;
 
     pos.span_until_start(&i1);
 
-    Ok((
-        i1,
-        VelosiParseTreeUnitNode::State(VelosiParseTreeState::None(pos)),
-    ))
+    Ok((i1, VelosiParseTreeState::None(pos)))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -176,7 +170,7 @@ use crate::{test_parse_and_check_fail, test_parse_and_compare_ok};
 
 #[test]
 fn test_state_none_ok() {
-    test_parse_and_compare_ok!("None", none_state, "  state = None;\n\n");
+    test_parse_and_compare_ok!("None", none_state, "None;\n");
 }
 
 #[test]
@@ -186,29 +180,29 @@ fn test_state_none_fail() {
 
 #[test]
 fn test_iface_def_ok() {
-    test_parse_and_compare_ok!("StateDef(){}", statedef, "  state = StateDef() {\n  };\n\n");
+    test_parse_and_compare_ok!("StateDef(){}", statedef, "StateDef() {\n  };\n");
     test_parse_and_compare_ok!(
         "StateDef(base: foo){}",
         statedef,
-        "  state = StateDef(base: foo) {\n  };\n\n"
+        "StateDef(base: foo) {\n  };\n"
     );
     // with a register
     test_parse_and_compare_ok!(
         "StateDef(base: foo){ reg foo [ 8 ] }",
         statedef,
-        "  state = StateDef(base: foo) {\n    reg foo [ 8 ],\n  };\n\n"
+        "StateDef(base: foo) {\n    reg foo [ 8 ],\n  };\n"
     );
     // trailing comma
     test_parse_and_compare_ok!(
         "StateDef(base: foo){ reg foo [ 8 ], }",
         statedef,
-        "  state = StateDef(base: foo) {\n    reg foo [ 8 ],\n  };\n\n"
+        "StateDef(base: foo) {\n    reg foo [ 8 ],\n  };\n"
     );
     // with two registers
     test_parse_and_compare_ok!(
         "StateDef(base: foo){ reg foo [ 8 ], reg foo [ 8 ] }",
         statedef,
-        "  state = StateDef(base: foo) {\n    reg foo [ 8 ],\n    reg foo [ 8 ],\n  };\n\n"
+        "StateDef(base: foo) {\n    reg foo [ 8 ],\n    reg foo [ 8 ],\n  };\n"
     );
 }
 

@@ -52,7 +52,8 @@ use crate::parser::{
 };
 use crate::parsetree::{
     VelosiParseTreeConstDef, VelosiParseTreeEnum, VelosiParseTreeFlags, VelosiParseTreeIdentifier,
-    VelosiParseTreeParam, VelosiParseTreeUnit, VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,
+    VelosiParseTreeInterface, VelosiParseTreeParam, VelosiParseTreeState, VelosiParseTreeUnit,
+    VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,
 };
 use crate::VelosiTokenStream;
 use crate::{error::IResult, VelosiParseTreeMethod};
@@ -225,8 +226,12 @@ fn unit_body(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vec<VelosiP
         map(method, |s: VelosiParseTreeMethod| {
             VelosiParseTreeUnitNode::Method(s)
         }),
-        state,
-        interface,
+        map(state, |s: VelosiParseTreeState| {
+            VelosiParseTreeUnitNode::State(s)
+        }),
+        map(interface, |s: VelosiParseTreeInterface| {
+            VelosiParseTreeUnitNode::Interface(s)
+        }),
         map(flags::flags_unit, |s: VelosiParseTreeFlags| {
             VelosiParseTreeUnitNode::Flags(s)
         }),
