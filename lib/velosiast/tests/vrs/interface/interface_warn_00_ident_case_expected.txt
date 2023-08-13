@@ -1,0 +1,43 @@
+InterfaceDef(base: addr) {
+    reg interface.Foo [8] {
+      Layout {
+        0..64 interface.Foo.val,
+      },
+    },
+    mem interface.BAR [base, 0, 8] {
+      Layout {
+        0..64 interface.BAR.val,
+      },
+    },
+    mmio interface.FooBar [base, 8, 8] {
+      Layout {
+        0..64 interface.FooBar.val,
+      },
+    },
+    reg interface.foo_bar [8] {
+      Layout {
+        0..64 interface.foo_bar.val,
+      },
+    },
+  }
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+warning: identifier `Foo` should have a snake case name
+     --> tests/vrs/interface/interface_warn_00_ident_case.vrs:2:7
+      |
+    2 |    reg Foo [ 8 ],
+      |        ^^^ convert the identifier to lowercase (notice the snake_case): `foo`
+warning: identifier `BAR` should have a snake case name
+     --> tests/vrs/interface/interface_warn_00_ident_case.vrs:3:7
+      |
+    3 |    mem BAR [ base, 0, 8 ],
+      |        ^^^ convert the identifier to lowercase (notice the snake_case): `bar`
+warning: identifier `FooBar` should have a snake case name
+     --> tests/vrs/interface/interface_warn_00_ident_case.vrs:4:8
+      |
+    4 |    mmio FooBar [ base, 8, 8 ],
+      |         ^^^^^^ convert the identifier to lowercase (notice the snake_case): `foobar`
+warning: generated 3 warnings
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+

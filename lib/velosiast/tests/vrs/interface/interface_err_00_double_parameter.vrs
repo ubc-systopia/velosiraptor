@@ -1,0 +1,6 @@
+interface = InterfaceDef(base: addr, base: addr) {
+  reg foo [ 8 ],
+};
+
+
+
