@@ -25,6 +25,7 @@
 
 //! Utils Module
 
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use velosiparser::VelosiTokenStream;
@@ -33,7 +34,9 @@ use crate::ast::{
     VelosiAstExpr, VelosiAstFieldSlice, VelosiAstIdentifier, VelosiAstInterfaceAction,
     VelosiAstNode, VelosiAstParam, VelosiAstStaticMapElement,
 };
-use crate::error::{VelosiAstErrBuilder, VelosiAstErrUndef, VelosiAstIssues};
+use crate::error::{
+    VelosiAstErrBuilder, VelosiAstErrDoubleDef, VelosiAstErrUndef, VelosiAstIssues,
+};
 use crate::SymbolTable;
 
 /// checks if the identifier has snake case
@@ -64,9 +67,9 @@ pub fn check_snake_case(issues: &mut VelosiAstIssues, id: &VelosiAstIdentifier) 
         .chars()
         .all(|x| x.is_ascii_lowercase() || !x.is_alphabetic());
     if !allupper {
-        let msg = format!("identifier `{name}` should have an snake case name");
+        let msg = format!("identifier `{name}` should have a snake case name");
         let hint = format!(
-            "convert the identifier to lower case (notice the snake_case): `{}`",
+            "convert the identifier to lowercase (notice the snake_case): `{}`",
             name.to_ascii_lowercase()
         );
         let err = VelosiAstErrBuilder::warn(msg)
@@ -603,6 +606,21 @@ pub fn check_element_ranges(
             prev_end = *end;
             prev_idx = *idx;
             prev_start = *start;
+        }
+    }
+}
+
+pub fn check_param_double_definitions(issues: &mut VelosiAstIssues, params: &[Rc<VelosiAstParam>]) {
+    let mut params_map: HashMap<&str, &Rc<VelosiAstParam>> = HashMap::new();
+    for p in params.iter() {
+        let p_key = p.ident().as_str();
+        if let Some(param) = params_map.get(p_key) {
+            issues.push(
+                VelosiAstErrDoubleDef::new(p.ident().clone(), param.loc.clone(), p.loc.clone())
+                    .into(),
+            );
+        } else {
+            params_map.insert(p_key, p);
         }
     }
 }
