@@ -34,7 +34,7 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
 // the used library internal functionality
-use crate::ast::{VelosiAstNode, VelosiAstType};
+use crate::ast::{VelosiAstNode, VelosiAstParam, VelosiAstType, VelosiAstTypeInfo};
 use crate::error::{VelosiAstErr, VelosiAstErrDoubleDef};
 use crate::VelosiTokenStream;
 
@@ -61,6 +61,15 @@ impl Symbol {
             name,
             typeinfo,
             ast_node,
+        }
+    }
+
+    /// creates a new parameter symbol with a given name and type.
+    pub fn new_param(name: String, typeinfo: VelosiAstTypeInfo) -> Self {
+        Symbol {
+            name: Rc::new(name.clone()),
+            typeinfo: typeinfo.clone().into(),
+            ast_node: VelosiAstNode::Param(VelosiAstParam::with_name(name, typeinfo).into()),
         }
     }
 
