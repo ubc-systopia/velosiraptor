@@ -1,0 +1,52 @@
+state = StateDef() {
+    mem foo [ base, 8, 8 ],
+    mem bar [ base, 8, 8 ],
+};
+
+state = StateDef() {
+    mem foo [ base, 8, 8 ],
+    mem bar [ base, 12, 4 ],
+};
+
+state = StateDef() {
+    mem foo [ base, 8, 8 ],
+    mem bar [ base, 10, 4 ],
+};
+
+
+state = StateDef() {
+    mem foo [ base, 8, 8 ] {
+        0 .. 64 val1,
+        0 .. 64 val2,
+    }
+};
+
+state = StateDef() {
+    mem foo [ base, 8, 8 ] {
+        0 .. 64 val1,
+        16 .. 17 val2,
+    }
+};
+
+state = StateDef() {
+    mem foo [ base, 8, 8 ] {
+        0 .. 17 val1,
+        16 .. 17 val2,
+    }
+};
+
+state = StateDef() {
+    mem foo [ base, 8, 8 ] {
+        0 .. 17 val1,
+        0 .. 1 val2,
+    }
+};
+
+state = StateDef() {
+    mem foo [ base, 0, 4 ] {
+        0 .. 33 val
+    }
+};
+
+
+

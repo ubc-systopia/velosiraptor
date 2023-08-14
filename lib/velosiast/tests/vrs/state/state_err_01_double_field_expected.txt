@@ -1,0 +1,84 @@
+error: duplicate definitions with name `state.foo`
+     --> tests/vrs/state/state_err_01_double_field.vrs:3:5
+      |
+    2 |      reg foo [ 8 ],
+      |      ^^^^^^^^^^^^^ previous definition of `state.foo` was here
+   ...
+      |
+    3 |      reg foo [ 8 ],
+      |      ^^^^^^^^^^^^^ duplicate definition
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: duplicate definitions with name `state.foo`
+     --> tests/vrs/state/state_err_01_double_field.vrs:9:5
+      |
+    8 |      mem foo [ base, 8, 8 ],
+      |      ^^^^^^^^^^^^^^^^^^^^^^ previous definition of `state.foo` was here
+   ...
+      |
+    9 |      mem foo [ base, 8, 8 ],
+      |      ^^^^^^^^^^^^^^^^^^^^^^ duplicate definition
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: duplicate definitions with name `state.foo`
+     --> tests/vrs/state/state_err_01_double_field.vrs:15:5
+      |
+   14 |      mem foo [ base, 8, 8 ],
+      |      ^^^^^^^^^^^^^^^^^^^^^^ previous definition of `state.foo` was here
+   ...
+      |
+   15 |      reg foo [ 8 ],
+      |      ^^^^^^^^^^^^^ duplicate definition
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: duplicate definitions with name `state.foo`
+     --> tests/vrs/state/state_err_01_double_field.vrs:20:5
+      |
+   19 |      reg foo [ 8 ],
+      |      ^^^^^^^^^^^^^ previous definition of `state.foo` was here
+   ...
+      |
+   20 |      mem foo [ base, 8, 8 ],
+      |      ^^^^^^^^^^^^^^^^^^^^^^ duplicate definition
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: duplicate definitions with name `state.foo.foo`
+     --> tests/vrs/state/state_err_01_double_field.vrs:26:9
+      |
+   25 |          0 .. 32 foo,
+      |          ^^^^^^^^^^^ previous definition of `state.foo.foo` was here
+   ...
+      |
+   26 |          32 .. 64 foo
+      |          ^^^^^^^^^^^^ duplicate definition
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: duplicate definitions with name `state.foo.foo`
+     --> tests/vrs/state/state_err_01_double_field.vrs:33:9
+      |
+   32 |          0 .. 32 foo,
+      |          ^^^^^^^^^^^ previous definition of `state.foo.foo` was here
+   ...
+      |
+   33 |          32 .. 64 foo
+      |          ^^^^^^^^^^^^ duplicate definition
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+

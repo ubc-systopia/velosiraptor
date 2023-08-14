@@ -31,7 +31,7 @@ use std::path::Path;
 
 mod utils;
 
-use velosiast::{AstResult, SymbolTable, VelosiAstMethod};
+use velosiast::{SymbolTable, VelosiAstMethod};
 use velosiparser::{parse_method, VelosiLexer};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

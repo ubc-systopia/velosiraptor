@@ -1,0 +1,140 @@
+error: Memory field range overlap.
+     --> tests/vrs/state/state_err_02_overlapping_fields.vrs:2:5
+      |
+    2 |      mem foo [ base, 8, 8 ],
+      |      ^^^^^^^^^^^^^^^^^^^^^^ This field overlaps with field `state.bar`
+   ...
+      |
+    3 |      mem bar [ base, 8, 8 ],
+      |      ^^^^^^^^^^^^^^^^^^^^^^ This is the field that overlaps with.
+error: Memory field range overlap.
+     --> tests/vrs/state/state_err_02_overlapping_fields.vrs:3:5
+      |
+    3 |      mem bar [ base, 8, 8 ],
+      |      ^^^^^^^^^^^^^^^^^^^^^^ This field overlaps with field `state.foo`
+   ...
+      |
+    2 |      mem foo [ base, 8, 8 ],
+      |      ^^^^^^^^^^^^^^^^^^^^^^ This is the field that overlaps with.
+error: could not compile due to 2 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: Memory field range overlap.
+     --> tests/vrs/state/state_err_02_overlapping_fields.vrs:7:5
+      |
+    7 |      mem foo [ base, 8, 8 ],
+      |      ^^^^^^^^^^^^^^^^^^^^^^ This field overlaps with field `state.bar`
+   ...
+      |
+    8 |      mem bar [ base, 12, 4 ],
+      |      ^^^^^^^^^^^^^^^^^^^^^^^ This is the field that overlaps with.
+error: Memory field range overlap.
+     --> tests/vrs/state/state_err_02_overlapping_fields.vrs:8:5
+      |
+    8 |      mem bar [ base, 12, 4 ],
+      |      ^^^^^^^^^^^^^^^^^^^^^^^ This field overlaps with field `state.foo`
+   ...
+      |
+    7 |      mem foo [ base, 8, 8 ],
+      |      ^^^^^^^^^^^^^^^^^^^^^^ This is the field that overlaps with.
+error: could not compile due to 2 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: Offset is not a multiple of size of the memory field
+     --> tests/vrs/state/state_err_02_overlapping_fields.vrs:13:21
+      |
+   13 |      mem bar [ base, 10, 4 ],
+      |                      ^^ Change offset to be a multiple of 4
+error: Memory field range overlap.
+     --> tests/vrs/state/state_err_02_overlapping_fields.vrs:12:5
+      |
+   12 |      mem foo [ base, 8, 8 ],
+      |      ^^^^^^^^^^^^^^^^^^^^^^ This field overlaps with field `state.bar`
+   ...
+      |
+   13 |      mem bar [ base, 10, 4 ],
+      |      ^^^^^^^^^^^^^^^^^^^^^^^ This is the field that overlaps with.
+error: Memory field range overlap.
+     --> tests/vrs/state/state_err_02_overlapping_fields.vrs:13:5
+      |
+   13 |      mem bar [ base, 10, 4 ],
+      |      ^^^^^^^^^^^^^^^^^^^^^^^ This field overlaps with field `state.foo`
+   ...
+      |
+   12 |      mem foo [ base, 8, 8 ],
+      |      ^^^^^^^^^^^^^^^^^^^^^^ This is the field that overlaps with.
+error: could not compile due to 3 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: Field slices overlap at bit 0
+     --> tests/vrs/state/state_err_02_overlapping_fields.vrs:20:9
+      |
+   20 |          0 .. 64 val2,
+      |          ^^^^^^^^^^^^ This slice overlaps with slice `state.foo.val1`
+   ...
+      |
+   19 |          0 .. 64 val1,
+      |          ^^^^^^^^^^^^ This is the slice that overlaps with.
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: Field slices overlap at bit 16
+     --> tests/vrs/state/state_err_02_overlapping_fields.vrs:27:9
+      |
+   27 |          16 .. 17 val2,
+      |          ^^^^^^^^^^^^^ This slice overlaps with slice `state.foo.val1`
+   ...
+      |
+   26 |          0 .. 64 val1,
+      |          ^^^^^^^^^^^^ This is the slice that overlaps with.
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: Field slices overlap at bit 16
+     --> tests/vrs/state/state_err_02_overlapping_fields.vrs:34:9
+      |
+   34 |          16 .. 17 val2,
+      |          ^^^^^^^^^^^^^ This slice overlaps with slice `state.foo.val1`
+   ...
+      |
+   33 |          0 .. 17 val1,
+      |          ^^^^^^^^^^^^ This is the slice that overlaps with.
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: Field slices overlap at bit 0
+     --> tests/vrs/state/state_err_02_overlapping_fields.vrs:40:9
+      |
+   40 |          0 .. 17 val1,
+      |          ^^^^^^^^^^^^ This slice overlaps with slice `state.foo.val2`
+   ...
+      |
+   41 |          0 .. 1 val2,
+      |          ^^^^^^^^^^^ This is the slice that overlaps with.
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: End of range exceeds maximum number of bits of field (32).
+     --> tests/vrs/state/state_err_02_overlapping_fields.vrs:47:14
+      |
+   47 |          0 .. 33 val
+      |               ^^ Reduce the end of the range.
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+

@@ -166,9 +166,12 @@ impl VelosiAstFieldSlice {
                 size * 8,
                 VelosiTokenStream::default(),
             ));
-            st.insert(slice.clone().into())
-                .map_err(|e| issues.push(*e))
-                .ok();
+
+            // we only insert it if it is not there already.
+            if st.lookup(slice.path().as_str()).is_none() {
+                let _ = st.insert(slice.clone().into()).map_err(|e| issues.push(*e));
+            }
+
             layout.push(slice)
         } else {
             for s in ptlayout.into_iter() {

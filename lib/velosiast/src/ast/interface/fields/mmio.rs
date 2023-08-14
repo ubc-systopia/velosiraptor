@@ -118,7 +118,7 @@ impl VelosiAstInterfaceMmioField {
         let offset = pt.offset;
         if offset % size != 0 {
             // warning
-            let msg = "Offset is not a multiple of size size of the memory field";
+            let msg = "Offset is not a multiple of size of the memory field";
             let hint = format!("Change offset to be a multiple of {size}");
             let err = VelosiAstErrBuilder::err(msg.to_string())
                 .add_hint(hint)

@@ -1,0 +1,64 @@
+StateDef() {
+    reg state.Foo [8] {
+      0..64 state.Foo.val,
+    },
+  }
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+warning: identifier `Foo` should have a snake case name
+     --> tests/vrs/state/state_warn_00_field_name_case.vrs:2:9
+      |
+    2 |      reg Foo [ 8 ]
+      |          ^^^ convert the identifier to lowercase (notice the snake_case): `foo`
+warning: generated 1 warnings
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+StateDef() {
+    reg state.FOO [8] {
+      0..64 state.FOO.val,
+    },
+  }
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+warning: identifier `FOO` should have a snake case name
+     --> tests/vrs/state/state_warn_00_field_name_case.vrs:6:9
+      |
+    6 |      reg FOO [ 8 ]
+      |          ^^^ convert the identifier to lowercase (notice the snake_case): `foo`
+warning: generated 1 warnings
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+StateDef() {
+    reg state.foo [8] {
+      0..64 state.foo.BAR,
+    },
+  }
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+warning: identifier `BAR` should have a snake case name
+     --> tests/vrs/state/state_warn_00_field_name_case.vrs:12:17
+      |
+   12 |          0 .. 64 BAR
+      |                  ^^^ convert the identifier to lowercase (notice the snake_case): `bar`
+warning: generated 1 warnings
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+StateDef() {
+    reg state.foo [8] {
+      0..64 state.foo.Bar,
+    },
+  }
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+warning: identifier `Bar` should have a snake case name
+     --> tests/vrs/state/state_warn_00_field_name_case.vrs:18:17
+      |
+   18 |          0 .. 64 Bar
+      |                  ^^^ convert the identifier to lowercase (notice the snake_case): `bar`
+warning: generated 1 warnings
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
