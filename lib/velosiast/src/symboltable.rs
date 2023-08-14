@@ -202,7 +202,17 @@ impl SymbolTable {
     /// creates a new empty symbol table
     pub fn new() -> Self {
         let mut st = SymbolTable { syms: Vec::new() };
+        // create the global context
         st.create_context(String::from("global"));
+        st
+    }
+
+    /// creates a new symbol table with the given context
+    ///
+    /// This adds a current context in addition to the global one.
+    pub fn with_context(ctxt: &str) -> Self {
+        let mut st = SymbolTable::new();
+        st.create_context(ctxt.to_string());
         st
     }
 
