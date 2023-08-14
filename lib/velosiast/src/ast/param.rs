@@ -31,7 +31,8 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
-use velosiparser::{VelosiParseTreeIdentifier, VelosiParseTreeParam, VelosiTokenStream};
+use velosiparser::parsetree::{VelosiParseTreeIdentifier, VelosiParseTreeParam};
+use velosiparser::VelosiTokenStream;
 
 use crate::ast::{
     types::{VelosiAstType, VelosiAstTypeInfo},

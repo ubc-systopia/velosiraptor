@@ -55,7 +55,8 @@ use std::hash::Hash;
 use std::rc::Rc;
 
 // used parse tree definitions
-use velosiparser::{VelosiParseTreeExpr, VelosiTokenStream};
+use velosiparser::parsetree::VelosiParseTreeExpr;
+use velosiparser::VelosiTokenStream;
 
 // used crate functionality
 use crate::error::VelosiAstIssues;

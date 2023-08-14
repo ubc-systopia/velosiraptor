@@ -34,7 +34,7 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
-use velosiparser::VelosiParseTreeFieldSlice;
+use velosiparser::parsetree::VelosiParseTreeFieldSlice;
 
 use crate::ast::{VelosiAstIdentifier, VelosiAstNode, VelosiAstType};
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};

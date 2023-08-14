@@ -43,7 +43,8 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::ops::Range;
 use std::rc::Rc;
 
-use velosiparser::{VelosiParseTreeInterface, VelosiParseTreeInterfaceDef, VelosiTokenStream};
+use velosiparser::parsetree::{VelosiParseTreeInterface, VelosiParseTreeInterfaceDef};
+use velosiparser::VelosiTokenStream;
 
 use crate::ast::{
     types::{VelosiAstType, VelosiAstTypeInfo},

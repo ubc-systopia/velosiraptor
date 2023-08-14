@@ -37,7 +37,8 @@ use std::rc::Rc;
 // used third party cartes
 
 // used parse tree definitions
-use velosiparser::{VelosiParseTreeIdentifier, VelosiTokenStream};
+use velosiparser::parsetree::VelosiParseTreeIdentifier;
+use velosiparser::VelosiTokenStream;
 
 // used crate functionality
 
