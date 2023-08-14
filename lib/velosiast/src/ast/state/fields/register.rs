@@ -33,7 +33,8 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 use std::rc::Rc;
 
-use velosiparser::{VelosiParseTreeStateFieldRegister, VelosiTokenStream};
+use velosiparser::parsetree::VelosiParseTreeStateFieldRegister;
+use velosiparser::VelosiTokenStream;
 
 use crate::ast::VelosiAstIdentifier;
 use crate::ast::{VelosiAstField, VelosiAstFieldSlice, VelosiAstStateField};

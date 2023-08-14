@@ -81,7 +81,8 @@ use indexmap::{
 };
 
 // used parse tree definitions
-use velosiparser::{VelosiParseTree, VelosiParseTreeContextNode, VelosiTokenStream};
+use velosiparser::parsetree::{VelosiParseTree, VelosiParseTreeContextNode};
+use velosiparser::VelosiTokenStream;
 
 // used crate functionality
 use crate::error::VelosiAstIssues;

@@ -43,7 +43,8 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
 // used parse tree definitions
-use velosiparser::{VelosiParseTreeUnit, VelosiTokenStream};
+use velosiparser::parsetree::VelosiParseTreeUnit;
+use velosiparser::VelosiTokenStream;
 
 // used crate functionality
 use crate::error::VelosiAstIssues;

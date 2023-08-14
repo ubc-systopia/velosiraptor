@@ -35,10 +35,10 @@ use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 // used parse tree definitions
-use velosiparser::{
+use velosiparser::parsetree::{
     VelosiParseTreeBoolLiteral, VelosiParseTreeIdentifierLiteral, VelosiParseTreeNumLiteral,
-    VelosiTokenStream,
 };
+use velosiparser::VelosiTokenStream;
 
 // used crate functionality
 use crate::error::{VelosiAstErrBuilder, VelosiAstErrUndef, VelosiAstIssues};

@@ -47,7 +47,7 @@ mod utils;
 
 use error::{VelosiAstErrBuilder, VelosiAstIssues};
 pub use symboltable::{Symbol, SymbolTable};
-use velosiparser::VelosiParseTree;
+use velosiparser::parsetree::VelosiParseTree;
 
 pub use crate::ast::{
     VelosiAstConst, VelosiAstField, VelosiAstFieldSlice, VelosiAstInterface,

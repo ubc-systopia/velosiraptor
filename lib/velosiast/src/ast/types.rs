@@ -33,7 +33,7 @@ use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 // used parse tree definitions
-use velosiparser::{VelosiParseTreeType, VelosiParseTreeTypeInfo};
+use velosiparser::parsetree::{VelosiParseTreeType, VelosiParseTreeTypeInfo};
 
 // used crate functionality
 use crate::error::VelosiAstIssues;

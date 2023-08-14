@@ -41,7 +41,8 @@ pub use listcomp::VelosiAstStaticMapListComp;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 // used parse tree definitions
-use velosiparser::{VelosiParseTreeMap, VelosiTokenStream};
+use velosiparser::parsetree::VelosiParseTreeMap;
+use velosiparser::VelosiTokenStream;
 
 // used crate functionality
 use crate::error::VelosiAstIssues;

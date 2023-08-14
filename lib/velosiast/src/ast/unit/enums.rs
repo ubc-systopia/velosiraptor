@@ -36,7 +36,8 @@ use std::rc::Rc;
 use indexmap::IndexMap;
 
 // used parse tree definitions
-use velosiparser::{VelosiParseTreeUnitDef, VelosiParseTreeUnitNode, VelosiTokenStream};
+use velosiparser::parsetree::{VelosiParseTreeUnitDef, VelosiParseTreeUnitNode};
+use velosiparser::VelosiTokenStream;
 
 // used crate functionality
 use crate::error::{

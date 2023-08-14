@@ -34,7 +34,8 @@ use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 // used parse tree definitions
-use velosiparser::{VelosiParseTreeIfElseExpr, VelosiTokenStream};
+use velosiparser::parsetree::VelosiParseTreeIfElseExpr;
+use velosiparser::VelosiTokenStream;
 
 // used crate functionality
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
