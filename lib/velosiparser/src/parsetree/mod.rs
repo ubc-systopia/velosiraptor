@@ -36,6 +36,7 @@ use crate::VelosiTokenStream;
 mod consts;
 mod expr;
 mod field;
+mod identifier;
 mod interface;
 mod map;
 mod params;
@@ -52,6 +53,7 @@ pub use expr::{
     VelosiParseTreeSliceExpr, VelosiParseTreeUnOp, VelosiParseTreeUnOpExpr,
 };
 pub use field::{VelosiParseTreeField, VelosiParseTreeFieldSlice};
+pub use identifier::VelosiParseTreeIdentifier;
 pub use interface::{
     VelosiParseTreeInterface, VelosiParseTreeInterfaceAction, VelosiParseTreeInterfaceActions,
     VelosiParseTreeInterfaceDef, VelosiParseTreeInterfaceField,
@@ -73,27 +75,6 @@ pub use unit::{
     VelosiParseTreeMethodProperty, VelosiParseTreeUnit, VelosiParseTreeUnitDef,
     VelosiParseTreeUnitNode,
 };
-
-/// represents an identifier token
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub struct VelosiParseTreeIdentifier {
-    pub name: String,
-    pub loc: VelosiTokenStream,
-}
-
-impl VelosiParseTreeIdentifier {
-    /// creates a new identifier token
-    pub fn new(name: String, loc: VelosiTokenStream) -> Self {
-        Self { name, loc }
-    }
-}
-
-/// Implementation of the [Display] trait for [VelosiParseTreeIdentifier]
-impl Display for VelosiParseTreeIdentifier {
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
-        write!(f, "{}", self.name)
-    }
-}
 
 /// Import clause in the root context
 #[derive(PartialEq, Eq, Clone, Debug)]

@@ -43,30 +43,13 @@ use velosilexer::{VelosiOpToken, VelosiTokenKind};
 // crate modules
 mod error;
 mod parser;
-mod parsetree;
+pub mod parsetree;
 mod utils;
 
 // re-exports
 pub use error::VelosiParserErr;
 use error::{IResult, VelosiParserErrBuilder};
-pub use parsetree::{
-    VelosiParseTree, VelosiParseTreeBinOp, VelosiParseTreeBinOpExpr, VelosiParseTreeBoolLiteral,
-    VelosiParseTreeConstDef, VelosiParseTreeContextNode, VelosiParseTreeExpr, VelosiParseTreeField,
-    VelosiParseTreeFieldSlice, VelosiParseTreeFlags, VelosiParseTreeFnCallExpr,
-    VelosiParseTreeIdentifier, VelosiParseTreeIdentifierLiteral, VelosiParseTreeIfElseExpr,
-    VelosiParseTreeInterface, VelosiParseTreeInterfaceAction, VelosiParseTreeInterfaceActions,
-    VelosiParseTreeInterfaceDef, VelosiParseTreeInterfaceField,
-    VelosiParseTreeInterfaceFieldMemory, VelosiParseTreeInterfaceFieldMmio,
-    VelosiParseTreeInterfaceFieldNode, VelosiParseTreeInterfaceFieldRegister, VelosiParseTreeMap,
-    VelosiParseTreeMapElement, VelosiParseTreeMapExplicit, VelosiParseTreeMapListComp,
-    VelosiParseTreeMethod, VelosiParseTreeMethodProperty, VelosiParseTreeNumLiteral,
-    VelosiParseTreeParam, VelosiParseTreeQuantifier, VelosiParseTreeQuantifierExpr,
-    VelosiParseTreeRangeExpr, VelosiParseTreeSliceExpr, VelosiParseTreeState,
-    VelosiParseTreeStateDef, VelosiParseTreeStateField, VelosiParseTreeStateFieldMemory,
-    VelosiParseTreeStateFieldRegister, VelosiParseTreeType, VelosiParseTreeTypeInfo,
-    VelosiParseTreeUnOp, VelosiParseTreeUnOpExpr, VelosiParseTreeUnit, VelosiParseTreeUnitDef,
-    VelosiParseTreeUnitNode,
-};
+use parsetree::VelosiParseTree;
 
 // some re-exports for simplyfying the testing
 pub use parser::{parse_interface, parse_method, parse_state, parse_staticmap};
