@@ -23,66 +23,60 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! # VelosiParser -- Constant Definition Node of the Parse Tree
+//! # VelosiParser -- Identifier Node of the Parse Tree
 //!
-//! This module defines the constant nodes of the parse tree.
+//! This module defines the identifier nodes of the parse tree.
 
 // used standard library components
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 // use crate functionality
-use super::{VelosiParseTreeExpr, VelosiParseTreeIdentifier, VelosiParseTreeType};
 use crate::VelosiTokenStream;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Constant Definition Node
+// Identifier Node
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A constant definition within the root or unit context
+/// represents an identifier node in the parse tree
 #[derive(PartialEq, Eq, Clone)]
-pub struct VelosiParseTreeConstDef {
-    /// the name of the constant
-    pub name: VelosiParseTreeIdentifier,
-    /// the type of the constant
-    pub ctype: VelosiParseTreeType,
-    /// expression representing the value of the constnat
-    pub value: VelosiParseTreeExpr,
-    /// the location of the import clause
+pub struct VelosiParseTreeIdentifier {
+    /// string representing the identifier
+    pub name: String,
+    /// location where the identifier was found in the source code
     pub loc: VelosiTokenStream,
 }
 
-impl VelosiParseTreeConstDef {
-    pub fn new(
-        name: VelosiParseTreeIdentifier,
-        ctype: VelosiParseTreeType,
-        value: VelosiParseTreeExpr,
-        loc: VelosiTokenStream,
-    ) -> Self {
-        VelosiParseTreeConstDef {
-            name,
-            ctype,
-            value,
-            loc,
-        }
-    }
-
-    /// returns a reference to the location of the constant definition
-    pub fn loc(&self) -> &VelosiTokenStream {
-        &self.loc
+impl VelosiParseTreeIdentifier {
+    /// creates a new identifier node
+    pub fn new(name: String, loc: VelosiTokenStream) -> Self {
+        Self { name, loc }
     }
 }
 
-/// Implementation of the [Display] trait for the [VelosiParseTreeConstDef] struct
-impl Display for VelosiParseTreeConstDef {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "const {} : {} = {};", self.name, self.ctype, self.value)
+/// Implementation of the [Display] trait for [VelosiParseTreeIdentifier]
+impl Display for VelosiParseTreeIdentifier {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        write!(f, "{}", self.name)
     }
 }
 
-/// Implementation of the [Display] trait for the [VelosiParseTreeConstDef] struct
-impl Debug for VelosiParseTreeConstDef {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        writeln!(f, "// {}", self.loc)?;
-        write!(f, "const {} : {} = {};", self.name, self.ctype, self.value)
+/// Implementation of the [Debug] trait for [VelosiParseTreeIdentifier]
+impl Debug for VelosiParseTreeIdentifier {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        Display::fmt(self, f)
+    }
+}
+
+/// Conversion of [String] to [VelosiParseTreeIdentifier]
+impl From<String> for VelosiParseTreeIdentifier {
+    fn from(name: String) -> Self {
+        Self::new(name, VelosiTokenStream::default())
+    }
+}
+
+/// Conversion of &[str] to [VelosiParseTreeIdentifier]
+impl From<&str> for VelosiParseTreeIdentifier {
+    fn from(name: &str) -> Self {
+        Self::new(name.to_string(), VelosiTokenStream::default())
     }
 }

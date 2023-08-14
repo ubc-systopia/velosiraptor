@@ -36,6 +36,7 @@ use nom::{
 };
 
 // the used library-internal functionaltity
+use crate::error::IResult;
 use crate::parser::flags;
 use crate::parser::{
     constdef,
@@ -52,11 +53,10 @@ use crate::parser::{
 };
 use crate::parsetree::{
     VelosiParseTreeConstDef, VelosiParseTreeEnum, VelosiParseTreeFlags, VelosiParseTreeIdentifier,
-    VelosiParseTreeInterface, VelosiParseTreeParam, VelosiParseTreeState, VelosiParseTreeUnit,
-    VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,
+    VelosiParseTreeInterface, VelosiParseTreeMethod, VelosiParseTreeParam, VelosiParseTreeState,
+    VelosiParseTreeUnit, VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,
 };
 use crate::VelosiTokenStream;
-use crate::{error::IResult, VelosiParseTreeMethod};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Unit Definitions
