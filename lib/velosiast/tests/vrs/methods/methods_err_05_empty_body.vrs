@@ -1,0 +1,3 @@
+
+// method with pre-condition
+fn foo() -> bool

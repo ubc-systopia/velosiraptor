@@ -1,0 +1,20 @@
+error: method defined as abstract  cannot have a body.
+     --> tests/vrs/methods/methods_err_06_abstract_synth_with_body.vrs:3:1
+      |
+    3 |  abstract fn foo() -> bool
+      |  ^^^^^^^^ remove the `abstract ` modifier
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: method defined as synth  cannot have a body.
+     --> tests/vrs/methods/methods_err_06_abstract_synth_with_body.vrs:9:1
+      |
+    9 |  synth fn foo() -> bool
+      |  ^^^^^ remove the `synth ` modifier
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
