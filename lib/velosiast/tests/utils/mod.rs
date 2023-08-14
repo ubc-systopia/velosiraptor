@@ -24,12 +24,12 @@
 // SOFTWARE.
 
 // std includes
+use std::fmt::Display;
 use std::fs::{self};
 use std::path::Path;
 
 // our library
-use velosiast::{AstResult, VelosiAst};
-use velosiparser::{VelosiParser, VelosiParserError};
+use velosiast::{AstResult, VelosiAst, VelosiAstIssues};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Test Utils
@@ -200,4 +200,101 @@ pub fn check_parse_fail(vrs: &Path, exp: Option<&Path>) {
 pub fn strip_color(s: String) -> String {
     let plain_bytes = strip_ansi_escapes::strip(s).expect("could not string the ansi escapes");
     String::from_utf8(plain_bytes).expect("could not convert to utf8")
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub fn check_result_expect_ok<T>(output: &mut String, result: &AstResult<T, VelosiAstIssues>)
+where
+    T: Display,
+{
+    match result {
+        AstResult::Ok(ast) => {
+            println!(" ok. Successfully parsed.");
+            println!(">>>>>>\n{ast}\n<<<<<<");
+            output.push_str(&format!("{}\n\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n\n", ast));
+        }
+        AstResult::Issues(ast, issues) => {
+            println!(" fail  (issues)");
+            println!(">>>>>>\n{ast}\n<<<<<<");
+            println!(">>>>>>\n{issues}\n<<<<<<");
+            panic!("Unexpected issues during AST construction");
+        }
+        AstResult::Err(err) => {
+            println!(" fail  (errors)");
+            println!(">>>>>>\n{err}\n<<<<<<");
+            panic!("Unexpected error during AST construction.");
+        }
+    }
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub fn check_result_expect_warnings<T>(output: &mut String, result: &AstResult<T, VelosiAstIssues>)
+where
+    T: Display,
+{
+    match result {
+        AstResult::Ok(ast) => {
+            println!(" fail  (unexpected successfully parsed)");
+            println!(">>>>>>\n{ast}\n<<<<<<");
+            panic!("Unexpected success during AST construction.");
+        }
+        AstResult::Issues(ast, issues) => {
+            if issues.has_errors() {
+                println!(" fail  (issues)");
+                println!(">>>>>>\n{issues}\n<<<<<<");
+                panic!("Unexpected errors during AST construction");
+            } else {
+                println!(" ok  (expected issues)");
+                println!(">>>>>>\n{ast}\n<<<<<<");
+                println!(">>>>>>\n{issues}\n<<<<<<");
+
+                let error_str = strip_color(issues.to_string());
+                output
+                    .push_str(format!("{ast}\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n{error_str}").as_str());
+                output.push_str("\n\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n\n");
+            }
+        }
+        AstResult::Err(err) => {
+            println!(" fail  (unexpected fatal error)");
+            println!(">>>>>>\n{err}\n<<<<<<");
+            panic!("Unexpected fatal error during AST construction.");
+        }
+    }
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub fn check_result_expect_errors<T>(output: &mut String, result: &AstResult<T, VelosiAstIssues>)
+where
+    T: Display,
+{
+    match result {
+        AstResult::Ok(ast) => {
+            println!(" fail  (unexpected successfully parsed)");
+            println!(">>>>>>\n{ast}\n<<<<<<");
+            panic!("Unexpected success during AST construction.");
+        }
+        AstResult::Issues(ast, issues) => {
+            if issues.has_errors() {
+                println!(" ok  (expected error)");
+                println!(">>>>>>\n{issues}\n<<<<<<");
+                output.push_str(&format!(
+                    "{}\n\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n\n",
+                    strip_color(issues.to_string())
+                ));
+            } else {
+                println!(" fail  (issues)");
+                println!(">>>>>>\n{ast}\n<<<<<<");
+                println!(">>>>>>\n{issues}\n<<<<<<");
+                panic!("Unexpected issues during AST construction");
+            }
+        }
+        AstResult::Err(err) => {
+            println!(" fail  (unexpected fatal error)");
+            println!(">>>>>>\n{err}\n<<<<<<");
+            panic!("Unexpected fatal error during AST construction.");
+        }
+    }
 }

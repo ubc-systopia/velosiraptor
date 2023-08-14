@@ -1,0 +1,20 @@
+state = StateDef() {
+    reg Foo [ 8 ]
+};
+
+state = StateDef() {
+    reg FOO [ 8 ]
+};
+
+
+state = StateDef() {
+    reg foo [ 8 ] {
+        0 .. 64 BAR
+    }
+};
+
+state = StateDef() {
+    reg foo [ 8 ] {
+        0 .. 64 Bar
+    }
+};

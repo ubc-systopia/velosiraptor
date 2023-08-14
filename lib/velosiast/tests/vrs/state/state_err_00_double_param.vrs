@@ -1,0 +1,3 @@
+state = StateDef(base: addr, base: addr) {
+    reg foo [ 8 ]
+};

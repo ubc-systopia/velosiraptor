@@ -1,0 +1,96 @@
+StateDef() {
+    reg state.foo [8] {
+      0..64 state.foo.val,
+    },
+  }
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+StateDef(base: addr) {
+    mem state.foo [base, 8, 8] {
+      0..64 state.foo.val,
+    },
+  }
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+StateDef(base: addr) {
+    mem state.foo [base, 8, 8] {
+      0..64 state.foo.val,
+    },
+    reg state.bar [8] {
+      0..64 state.bar.val,
+    },
+  }
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+StateDef(base: addr) {
+    reg state.foo [8] {
+      0..64 state.foo.val,
+    },
+    reg state.bar [8] {
+      0..64 state.bar.val,
+    },
+  }
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+StateDef(base: addr) {
+    mem state.foo [base, 0, 8] {
+      0..64 state.foo.val,
+    },
+    mem state.bar [base, 8, 8] {
+      0..64 state.bar.val,
+    },
+  }
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+StateDef() {
+    reg state.foo [8] {
+      0..64 state.foo.val,
+    },
+  }
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+StateDef(base: addr) {
+    reg state.foo [8] {
+      0..32 state.foo.val,
+      32..64 state.foo.val2,
+    },
+  }
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+StateDef() {
+    mem state.foo [base, 8, 8] {
+      0..64 state.foo.val,
+    },
+  }
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+StateDef(base: addr) {
+    mem state.foo [base, 8, 8] {
+      0..32 state.foo.val,
+      32..64 state.foo.val2,
+    },
+  }
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+StateDef(base: addr) {
+    mem state.foo [base, 0, 8] {
+      0..32 state.foo.val,
+      32..64 state.foo.val2,
+    },
+    mem state.bar [base, 8, 8] {
+      0..32 state.bar.val,
+      32..64 state.bar.val2,
+    },
+  }
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+

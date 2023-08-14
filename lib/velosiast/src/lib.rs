@@ -45,7 +45,8 @@ mod error;
 mod symboltable;
 mod utils;
 
-use error::{VelosiAstErrBuilder, VelosiAstIssues};
+use error::VelosiAstErrBuilder;
+pub use error::VelosiAstIssues;
 pub use symboltable::{Symbol, SymbolTable};
 use velosiparser::parsetree::VelosiParseTree;
 

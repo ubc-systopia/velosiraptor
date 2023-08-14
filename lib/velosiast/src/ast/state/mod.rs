@@ -135,6 +135,9 @@ impl VelosiAstStateDef {
             // TODO: check that we don't have any double-defined parameters!
         }
 
+        // check if we have double definitions in the parameters
+        utils::check_param_double_definitions(&mut issues, &params);
+
         let mut fields = Vec::new();
         for f in pt.fields.into_iter() {
             let field = Rc::new(ast_result_unwrap!(

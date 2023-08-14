@@ -207,7 +207,7 @@ pub fn slice_overlap_check(
             }
             if let Some(s) = e {
                 let msg = format!("Field slices overlap at bit {i}");
-                let hint = format!("This slices overlaps with slice `{}`", s.ident);
+                let hint = format!("This slice overlaps with slice `{}`", s.ident);
                 let related = "This is the slice that overlaps with.";
                 let err = VelosiAstErrBuilder::err(msg)
                     .add_hint(hint)

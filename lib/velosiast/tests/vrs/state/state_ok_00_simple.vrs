@@ -1,0 +1,62 @@
+state = StateDef() {
+    reg foo [ 8 ]
+};
+
+state = StateDef(base: addr) {
+    mem foo [ base, 8, 8 ]
+};
+
+// two fields
+state = StateDef(base: addr) {
+    mem foo [ base, 8, 8 ],
+    reg bar [ 8 ]
+};
+
+state = StateDef(base: addr) {
+    reg foo [ 8 ],
+    reg bar [ 8 ]
+};
+
+state = StateDef(base: addr) {
+    mem foo [ base, 0, 8 ],
+    mem bar [ base, 8, 8 ],
+};
+
+// with slices
+
+state = StateDef() {
+    reg foo [ 8 ] {
+        0..64 val
+    }
+};
+
+state = StateDef(base: addr) {
+    reg foo [ 8 ] {
+        0..32 val,
+        32 .. 64 val2
+    }
+};
+
+state = StateDef() {
+    mem foo [ base, 8, 8 ] {
+        0..64 val
+    }
+};
+
+state = StateDef(base: addr) {
+     mem foo [ base, 8, 8 ] {
+        0..32 val,
+        32 .. 64 val2
+    }
+};
+
+state = StateDef(base: addr) {
+     mem foo [ base, 0, 8 ] {
+        0..32 val,
+        32 .. 64 val2
+    },
+     mem bar [ base, 8, 8 ] {
+        0..32 val,
+        32 .. 64 val2
+    }
+};
