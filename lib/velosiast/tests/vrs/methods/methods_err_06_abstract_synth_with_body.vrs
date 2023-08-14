@@ -1,0 +1,12 @@
+
+// abstract method with body
+abstract fn foo() -> bool
+{
+    true
+}
+
+// abstract method with body
+synth fn foo() -> bool
+{
+    true
+}

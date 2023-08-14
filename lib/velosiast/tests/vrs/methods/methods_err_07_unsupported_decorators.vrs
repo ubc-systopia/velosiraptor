@@ -1,0 +1,22 @@
+
+#[foo]
+abstract fn foo() -> bool
+    ensures true;
+
+#[bar]
+fn foo() -> bool
+{
+    true
+}
+
+#[foo, bar(baz)]
+fn foo() -> bool
+{
+    true
+}
+
+#[remap(foo)]
+fn foo() -> bool
+{
+    true
+}

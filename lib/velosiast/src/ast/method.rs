@@ -51,10 +51,11 @@ pub const FN_SIG_PROTECT: &str = "fn protect(va: vaddr, sz: size, flgs: flags)";
 
 // const FN_SIG_INIT: &str = "fn init()";
 
-#[derive(PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(PartialEq, Eq, Clone, Hash)]
 pub enum VelosiAstMethodProperty {
     Invariant,
     Remap,
+    Unknown(String),
 }
 
 impl VelosiAstMethodProperty {
@@ -63,16 +64,40 @@ impl VelosiAstMethodProperty {
         _st: &mut SymbolTable,
     ) -> AstResult<Self, VelosiAstIssues> {
         match pt.0.name.as_str() {
-            "invariant" => AstResult::Ok(Self::Invariant),
-            "remap" => AstResult::Ok(Self::Remap),
+            "invariant" => {
+                if let Some(arg) = pt.1 {
+                    let msg = "method property `invariant` doesn't support arguments";
+                    let hint = "remove these arguments";
+                    let err = VelosiAstErrBuilder::err(msg.to_string())
+                        .add_hint(hint.to_string())
+                        .add_location(arg.loc)
+                        .build();
+                    AstResult::Issues(Self::Invariant, VelosiAstIssues::from(err))
+                } else {
+                    AstResult::Ok(Self::Invariant)
+                }
+            }
+            "remap" => {
+                if let Some(arg) = pt.1 {
+                    let msg = "method property `remap` doesn't support arguments";
+                    let hint = "remove these arguments";
+                    let err = VelosiAstErrBuilder::err(msg.to_string())
+                        .add_hint(hint.to_string())
+                        .add_location(arg.loc)
+                        .build();
+                    AstResult::Issues(Self::Invariant, VelosiAstIssues::from(err))
+                } else {
+                    AstResult::Ok(Self::Remap)
+                }
+            }
             _ => {
-                let msg = "unknown method property";
+                let msg = "unsupported method property";
                 let hint = "supported method properties are `invariant` and `remap`";
                 let err = VelosiAstErrBuilder::err(msg.to_string())
                     .add_hint(hint.to_string())
                     .add_location(pt.0.loc)
                     .build();
-                AstResult::Err(VelosiAstIssues::from(err))
+                AstResult::Issues(Self::Unknown(pt.0.name), VelosiAstIssues::from(err))
             }
         }
     }
@@ -83,6 +108,7 @@ impl Display for VelosiAstMethodProperty {
         match self {
             Self::Invariant => write!(f, "invariant"),
             Self::Remap => write!(f, "remap"),
+            Self::Unknown(_) => write!(f, "none"),
         }
     }
 }
