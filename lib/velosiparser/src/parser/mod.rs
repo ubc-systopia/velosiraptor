@@ -52,6 +52,7 @@ mod terminals;
 mod unit;
 
 // some re-exports for testing
+pub use expr::expr as parse_expr;
 pub use interface::interface as parse_interface;
 pub use map::staticmap as parse_staticmap;
 pub use method::method as parse_method;

@@ -520,6 +520,8 @@ fn term_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParse
         if_else_expr,
         // it can be a identifier (variable)
         ident_expr,
+        // a quantifier expression
+        quantifier_expr,
         // its a term in parenthesis
         preceded(lparen, cut(terminated(expr, rparen))),
     ))(input)

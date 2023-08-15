@@ -52,7 +52,7 @@ use error::{IResult, VelosiParserErrBuilder};
 use parsetree::VelosiParseTree;
 
 // some re-exports for simplyfying the testing
-pub use parser::{parse_interface, parse_method, parse_state, parse_staticmap};
+pub use parser::{parse_expr, parse_interface, parse_method, parse_state, parse_staticmap};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Error Definitions
