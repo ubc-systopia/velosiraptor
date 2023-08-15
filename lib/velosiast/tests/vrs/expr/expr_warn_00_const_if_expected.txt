@@ -1,0 +1,64 @@
+0x4
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+warning: The condition of the if-then-else expression is always true.
+     --> tests/vrs/expr/expr_warn_00_const_if.vrs:1:4
+      |
+    1 |  if true { 4 } else { 2 };
+      |     ^^^^ This expression is always true.
+   ...
+      |
+    1 |  if true { 4 } else { 2 };
+      |            ^ Replace the if-then-else with the expression of the then branch.
+warning: generated 1 warnings
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+0x2
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+warning: The condition of the if-then-else expression is always false.
+     --> tests/vrs/expr/expr_warn_00_const_if.vrs:2:4
+      |
+    2 |  if false { 4 } else { 2 };
+      |     ^^^^^ This expression is always false.
+   ...
+      |
+    2 |  if false { 4 } else { 2 };
+      |                        ^ Replace the if-then-else with the expression of the else branch.
+warning: generated 1 warnings
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+0x3
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+warning: The condition of the if-then-else expression is always true.
+     --> tests/vrs/expr/expr_warn_00_const_if.vrs:3:4
+      |
+    3 |  if 1 > 0 { 3 } else { 2 };
+      |     ^^^^^ This expression is always true.
+   ...
+      |
+    3 |  if 1 > 0 { 3 } else { 2 };
+      |             ^ Replace the if-then-else with the expression of the then branch.
+warning: generated 1 warnings
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+0x2
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+warning: The condition of the if-then-else expression is always false.
+     --> tests/vrs/expr/expr_warn_00_const_if.vrs:4:4
+      |
+    4 |  if 1 < 0 { 3 } else { 2 };
+      |     ^^^^^ This expression is always false.
+   ...
+      |
+    4 |  if 1 < 0 { 3 } else { 2 };
+      |                        ^ Replace the if-then-else with the expression of the else branch.
+warning: generated 1 warnings
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+

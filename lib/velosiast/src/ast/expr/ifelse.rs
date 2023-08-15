@@ -113,6 +113,27 @@ impl VelosiAstIfElseExpr {
             issues.push(err);
         }
 
+        if let VelosiAstExpr::BoolLiteral(b) = &cond {
+            let (branch, loc) = if b.val {
+                ("then", then.loc().clone())
+            } else {
+                ("else", other.loc().clone())
+            };
+            let msg = format!(
+                "The condition of the if-then-else expression is always {}.",
+                b.val
+            );
+            let hint = format!("This expression is always {}.", b.val);
+            let hint2 =
+                format!("Replace the if-then-else with the expression of the {branch} branch.");
+            let err = VelosiAstErrBuilder::warn(msg.to_string())
+                .add_hint(hint)
+                .add_location(cond.loc().clone())
+                .add_related_location(hint2, loc)
+                .build();
+            issues.push(err);
+        }
+
         let mapping = HashMap::new();
         let e = VelosiAstIfElseExpr::new(
             Rc::new(cond),
