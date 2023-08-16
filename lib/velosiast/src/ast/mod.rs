@@ -61,7 +61,7 @@ pub use map::{
     VelosiAstStaticMap, VelosiAstStaticMapElement, VelosiAstStaticMapExplicit,
     VelosiAstStaticMapListComp,
 };
-pub use method::{VelosiAstMethod, VelosiAstMethodProperty};
+pub use method::{VelosiAstChildRepr, VelosiAstMethod, VelosiAstMethodProperty};
 pub use operations::{VelosiOpExpr, VelosiOperation};
 pub use param::VelosiAstParam;
 pub use state::{VelosiAstState, VelosiAstStateField};

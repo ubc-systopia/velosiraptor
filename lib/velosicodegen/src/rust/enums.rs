@@ -47,9 +47,6 @@ fn generate_unit_struct(scope: &mut CG::Scope, ast: &VelosiAst, unit: &VelosiAst
     ));
     en.repr("C");
 
-    en.derive("Copy");
-    en.derive("Clone");
-
     for param in &unit.params {
         let doc = format!("Parameter '{}' in unit '{}'", param.ident(), unit.ident());
         let loc = format!("@loc: {}", param.loc.loc());
