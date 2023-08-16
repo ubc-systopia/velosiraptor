@@ -72,7 +72,7 @@ fn add_higher_order_map(
                     let op_fn = imp
                         .new_fn(op.ident())
                         .vis("pub")
-                        .arg_ref_self()
+                        .arg_mut_self()
                         .ret("usize");
                     for f in op.params.iter() {
                         op_fn.arg(f.ident(), utils::vrs_type_to_rust_type(&f.ptype.typeinfo));
@@ -83,16 +83,25 @@ fn add_higher_order_map(
                     op_fn.line(format!("assert!(pa % {:#x} == 0);", base_page_size));
                     op_fn.line("");
 
+                    let (has_children, no_children): (Vec<_>, Vec<_>) = e
+                        .get_next_unit_idents()
+                        .into_iter()
+                        .partition(|variant| relations.0.get(*variant).is_some());
+
+                    // TODO: doesn't handle multiple no_children variants
+                    if let Some(variant) = no_children.first() {
+                        let variant_unit = ast.get_unit(variant).unwrap();
+                        let page_size: usize = 1 << variant_unit.input_bitwidth();
+
+                        op_fn.line(format!("self.prepare(sz / {:#x});", page_size));
+                        op_fn.line("");
+                    }
+
                     op_fn.line("let mut va = va;");
                     op_fn.line("let mut sz = sz;");
                     op_fn.line("let mut pa = pa;");
                     op_fn.line("let original_sz = sz;");
                     op_fn.line("");
-
-                    let (has_children, no_children): (Vec<_>, Vec<_>) = e
-                        .get_next_unit_idents()
-                        .into_iter()
-                        .partition(|variant| relations.0.get(*variant).is_some());
 
                     for variant in no_children {
                         let variant_unit = ast.get_unit(variant).unwrap();
@@ -153,16 +162,8 @@ fn add_higher_order_map(
 
                         let mut if_block = CG::Block::new("if !entry.valid()");
                         if_block.line(format!(
-                            "let child_paddr = virt_to_phys(alloc({:#x}));",
-                            base_page_size
-                        ));
-                        if_block.line(format!(
-                            "let pa = unsafe {{ {}::new({}) }};",
+                            "let pa = {}::alloc();",
                             utils::to_struct_name(child.ident(), None),
-                            utils::params_to_self_args_list_with_paddr(
-                                child.params_as_slice(),
-                                "child_paddr"
-                            ),
                         ));
                         if_block.line(format!(
                             "self.map_{}({});",
@@ -174,7 +175,7 @@ fn add_higher_order_map(
                         op_fn.line("");
 
                         op_fn.line(format!(
-                            "let child = unsafe {{ {}::new({}) }}.resolve();",
+                            "let mut child = unsafe {{ {}::new({}) }}.resolve();",
                             utils::to_struct_name(variant_unit.ident(), None),
                             utils::params_to_self_args_list_with_paddr(
                                 dest_unit.params_as_slice(),
@@ -200,7 +201,7 @@ fn add_higher_order_map(
                     let op_fn = imp
                         .new_fn(op.ident())
                         .vis("pub")
-                        .arg_ref_self()
+                        .arg_mut_self()
                         .ret("usize");
                     for f in op.params.iter() {
                         op_fn.arg(f.ident(), utils::vrs_type_to_rust_type(&f.ptype.typeinfo));
@@ -209,6 +210,9 @@ fn add_higher_order_map(
                     op_fn.line(format!("assert!(va % {:#x} == 0);", base_page_size));
                     op_fn.line(format!("assert!(sz % {:#x} == 0);", base_page_size));
                     op_fn.line(format!("assert!(pa % {:#x} == 0);", base_page_size));
+                    op_fn.line("");
+
+                    op_fn.line(format!("self.prepare(sz / {:#x});", base_page_size));
                     op_fn.line("");
 
                     op_fn.line("let mut va = va;");
@@ -288,7 +292,7 @@ fn add_higher_order_fn(
             let op_fn = imp
                 .new_fn(op.ident())
                 .vis("pub")
-                .arg_ref_self()
+                .arg_mut_self()
                 .ret("usize");
             for f in op.params.iter() {
                 op_fn.arg(f.ident(), utils::vrs_type_to_rust_type(&f.ptype.typeinfo));
@@ -356,23 +360,27 @@ fn add_op_fn_body_listcomp(
         dest_unit.input_bitwidth()
     ));
 
-    // set up fields
-    for p in &unit.params {
-        op_fn.line(format!("let {} = &self.{};", p.ident(), p.ident()));
-    }
-
     // target_unit = Unit(args..);
-    op_fn.line(format!(
-        "let target_unit = unsafe {{ {}::new({}) }};",
-        utils::to_struct_name(dest_unit.ident(), None),
-        map.elm
-            .dst
-            .args
-            .iter()
-            .map(|e| utils::astexpr_to_rust_expr(e, None))
-            .collect::<Vec<_>>()
-            .join(", "),
-    ));
+    if op.ident().as_str() == "map" {
+        // set up fields
+        for p in &unit.params {
+            op_fn.line(format!("let {} = &self.{};", p.ident(), p.ident()));
+        }
+
+        op_fn.line(format!(
+            "let mut target_unit = unsafe {{ {}::new({}) }};",
+            utils::to_struct_name(dest_unit.ident(), None),
+            map.elm
+                .dst
+                .args
+                .iter()
+                .map(|e| utils::astexpr_to_rust_expr(e, None))
+                .collect::<Vec<_>>()
+                .join(", "),
+        ));
+    } else {
+        op_fn.line("let mut target_unit = self.children[i as usize].take().unwrap();");
+    }
 
     // target_unit.op(args)
     let op_name = match suffix {
@@ -381,10 +389,15 @@ fn add_op_fn_body_listcomp(
     };
 
     op_fn.line(format!(
-        "target_unit.{}({})",
+        "let result = target_unit.{}({});",
         op_name,
         utils::params_to_args_list(&op.params)
     ));
+
+    if op.ident().as_str() == "map" {
+        op_fn.line("self.children[i as usize] = Some(target_unit);");
+    }
+    op_fn.line("result");
 }
 
 fn add_op_function(
@@ -411,7 +424,7 @@ fn add_op_function(
                                 variant_unit.ident().to_lowercase()
                             ))
                             .vis("pub")
-                            .arg_ref_self()
+                            .arg_mut_self()
                             .ret("usize");
 
                         for f in op.params.iter() {
@@ -439,7 +452,7 @@ fn add_op_function(
                     } else {
                         format!("{}_one", op.ident())
                     };
-                    let op_fn = imp.new_fn(&fn_name).vis("pub").arg_ref_self().ret("usize");
+                    let op_fn = imp.new_fn(&fn_name).vis("pub").arg_mut_self().ret("usize");
 
                     for f in op.params.iter() {
                         op_fn.arg(f.ident(), utils::vrs_type_to_rust_type(&f.ptype.typeinfo));
@@ -454,6 +467,27 @@ fn add_op_function(
             // No map defined for this unit
         }
     }
+}
+
+fn add_alloc_fn(imp: &mut CG::Impl, struct_name: String) {
+    let alloc_fn = imp
+        .new_fn("alloc")
+        .vis("pub")
+        .doc(&format!(
+            "Allocates a new {} in a possibly OS dependent way.",
+            struct_name
+        ))
+        .ret("Self");
+    alloc_fn.line("unimplemented!()");
+}
+
+fn add_prepare_fn(imp: &mut CG::Impl) {
+    let alloc_fn = imp
+        .new_fn("prepare")
+        .doc("Preparation for mapping in a possibly OS dependent way.")
+        .arg_ref_self()
+        .arg("num_mappings", "usize");
+    alloc_fn.line("unimplemented!()");
 }
 
 fn generate_unit_struct(
@@ -487,12 +521,33 @@ fn generate_unit_struct(
         f.doc(vec![&doc, &loc]);
         st.push_field(f);
     }
+    if let VelosiAstStaticMap::ListComp(map) = &unit.map {
+        let doc = "Track children for shadow page table walk";
+        let mut f = CG::Field::new(
+            "children",
+            format!(
+                "[Option<{}>; {}]",
+                utils::to_struct_name(map.elm.dst.ident().as_str(), None),
+                map.range.end,
+            ),
+        );
+        f.doc(vec![doc]);
+        st.push_field(f);
+    }
 
     // struct impl
     let imp = scope.new_impl(&struct_name);
 
     // constructor
-    utils::add_constructor(imp, &struct_name, &unit.params);
+    if let VelosiAstStaticMap::ListComp(map) = &unit.map {
+        let constructor = utils::add_constructor_signature(imp, &struct_name, &unit.params);
+        constructor.line(format!(
+            "Self {{ {}, children: [None; {}] }}",
+            utils::params_to_args_list(&unit.params),
+            map.range.end,
+        ));
+    }
+    add_alloc_fn(imp, struct_name);
 
     // getters
     for p in &unit.params {
@@ -505,6 +560,7 @@ fn generate_unit_struct(
     }
 
     // add higher-level functions
+    add_prepare_fn(imp);
     add_higher_order_map(ast, unit, relations, imp);
     add_higher_order_fn(unit, relations, "unmap", imp);
     add_higher_order_fn(unit, relations, "protect", imp);
