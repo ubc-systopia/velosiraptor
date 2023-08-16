@@ -29,6 +29,7 @@
 
 // used standard library functionality
 
+use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
@@ -38,7 +39,10 @@ use velosiparser::VelosiTokenStream;
 
 // used crate functionality
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
-use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, SymbolTable};
+use crate::{
+    ast_result_return, ast_result_unwrap, utils, AstResult, SymbolTable, VelosiAstChildRepr,
+    VelosiAstMethodProperty,
+};
 
 // used definitions of references AST nodes
 use crate::ast::{
@@ -53,6 +57,7 @@ pub struct VelosiAstStaticMapListComp {
     pub var: Rc<VelosiAstParam>,
     pub range: VelosiAstRangeExpr,
     pub loc: VelosiTokenStream,
+    pub properties: HashSet<VelosiAstMethodProperty>,
 }
 
 impl VelosiAstStaticMapListComp {
@@ -62,6 +67,7 @@ impl VelosiAstStaticMapListComp {
         var: Rc<VelosiAstParam>,
         range: VelosiAstRangeExpr,
         loc: VelosiTokenStream,
+        properties: HashSet<VelosiAstMethodProperty>,
     ) -> Self {
         VelosiAstStaticMapListComp {
             inputsize,
@@ -69,6 +75,7 @@ impl VelosiAstStaticMapListComp {
             var,
             range,
             loc,
+            properties,
         }
     }
 
@@ -78,6 +85,26 @@ impl VelosiAstStaticMapListComp {
         st: &mut SymbolTable,
     ) -> AstResult<VelosiAstStaticMap, VelosiAstIssues> {
         let mut issues = VelosiAstIssues::new();
+
+        // convert the properties
+        let mut properties: HashSet<VelosiAstMethodProperty> = HashSet::new();
+        for p in pt.properties.into_iter() {
+            let loc = p.0.loc.clone();
+            let prop = ast_result_unwrap!(VelosiAstMethodProperty::from_parse_tree(p, st), issues);
+
+            if properties.contains(&prop) {
+                let msg = "ignoring double defined property";
+                let hint = "remove the duplicate property";
+                let err = VelosiAstErrBuilder::warn(msg.to_string())
+                    .add_hint(hint.to_string())
+                    .add_location(loc)
+                    .build();
+
+                issues.push(err);
+            } else {
+                properties.insert(prop);
+            }
+        }
 
         // create the symbol table context
         st.create_context("staticmap".to_string());
@@ -151,12 +178,17 @@ impl VelosiAstStaticMapListComp {
         // drop the symbol table context here, so we can instanticate the variables
         st.drop_context();
 
-        let res = Self::new(elm, inputbits, var, range, pt.loc);
+        let res = Self::new(elm, inputbits, var, range, pt.loc, properties);
         ast_result_return!(VelosiAstStaticMap::ListComp(res), issues)
     }
 
     pub fn get_next_unit_idents(&self) -> Vec<&Rc<String>> {
         vec![self.elm.dst.ident()]
+    }
+
+    pub fn is_repr_list(&self) -> bool {
+        self.properties
+            .contains(&VelosiAstMethodProperty::Repr(VelosiAstChildRepr::List))
     }
 }
 

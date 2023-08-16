@@ -51,7 +51,7 @@ pub use symboltable::{Symbol, SymbolTable};
 use velosiparser::parsetree::VelosiParseTree;
 
 pub use crate::ast::{
-    VelosiAstConst, VelosiAstField, VelosiAstFieldSlice, VelosiAstInterface,
+    VelosiAstChildRepr, VelosiAstConst, VelosiAstField, VelosiAstFieldSlice, VelosiAstInterface,
     VelosiAstInterfaceField, VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField,
     VelosiAstInterfaceRegisterField, VelosiAstMethod, VelosiAstMethodProperty, VelosiAstRoot,
     VelosiAstStateField, VelosiAstStaticMap, VelosiAstStaticMapElement, VelosiAstStaticMapExplicit,

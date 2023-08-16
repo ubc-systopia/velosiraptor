@@ -65,9 +65,6 @@ fn add_segment_struct(
     // make it public
     st.vis("pub");
 
-    st.derive("Copy");
-    st.derive("Clone");
-
     // add the doc field to the struct
     st.doc(&format!(
         "Represents the Unit type '{}'.\n@loc: {}",
@@ -88,7 +85,10 @@ fn add_segment_struct(
         // add child to struct
         st.field(
             "child",
-            format!("Option<{}>", utils::to_struct_name(child.ident(), None)),
+            format!(
+                "Option<Box<{}>>",
+                utils::to_struct_name(child.ident(), None)
+            ),
         );
     });
 
@@ -207,12 +207,8 @@ fn add_op_fn(
     }
     op_fn.line("");
 
-    if has_child {
-        if method.ident().as_str() == "map" {
-            op_fn.line("self.child = Some(pa);");
-        } else {
-            op_fn.line("self.child = None;");
-        }
+    if has_child && method.ident().as_str() == "unmap" {
+        op_fn.line("self.child = None;");
     }
 
     if !method.ops.is_empty() {
@@ -238,6 +234,10 @@ fn add_op_fn(
                     .ident()
             ));
             op_fn.line("");
+        }
+
+        if has_child && method.ident().as_str() == "map" {
+            op_fn.line("self.child = Some(Box::new(pa));");
         }
 
         let page_size: usize = 1 << unit.inbitwidth;
@@ -279,9 +279,13 @@ fn add_valid_fn(unit: &VelosiAstUnitSegment, imp: &mut CG::Impl) {
 
 fn add_resolve_fn(child: &VelosiAstUnit, imp: &mut CG::Impl) {
     let ret_ty = utils::to_struct_name(child.ident(), None);
-    let resolve = imp.new_fn("resolve").vis("pub").arg_ref_self().ret(&ret_ty);
+    let resolve = imp
+        .new_fn("resolve")
+        .vis("pub")
+        .arg_mut_self()
+        .ret(format!("&mut {ret_ty}"));
 
-    resolve.line("self.child.unwrap()");
+    resolve.line("self.child.as_mut().unwrap()");
 }
 
 /// generates the VelosiAstUnitSegment definitions
@@ -301,6 +305,9 @@ pub fn generate(
     utils::add_header(&mut scope, &title);
 
     // import utils
+    scope.raw("extern crate alloc;");
+    scope.import("alloc::boxed", "Box");
+
     scope.import("core::sync::atomic", "self");
     scope.import("core::sync::atomic", "Ordering");
     scope.import("crate::utils", "*");

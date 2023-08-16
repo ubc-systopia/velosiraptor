@@ -86,11 +86,7 @@ pub fn method(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPars
     let (i0, props) = opt(decorator_list)(input)?;
 
     // parse and consume fn keyword
-    let (i1, (abs, synth, _)) = if props.is_some() {
-        cut(tuple((opt(kw_abstract), opt(kw_synth), kw_fn)))(i0)
-    } else {
-        tuple((opt(kw_abstract), opt(kw_synth), kw_fn))(i0)
-    }?;
+    let (i1, (abs, synth, _)) = tuple((opt(kw_abstract), opt(kw_synth), kw_fn))(i0)?;
 
     // get the method identifier, fail if there is not an identifier
     let (i2, name) = cut(ident)(i1)?;
@@ -249,7 +245,7 @@ fn method_body(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPar
 ///
 /// * `#[foo]`
 ///
-fn decorator_list(
+pub fn decorator_list(
     input: VelosiTokenStream,
 ) -> IResult<VelosiTokenStream, Vec<VelosiParseTreeMethodProperty>> {
     let (i1, _) = hashtag(input)?;

@@ -192,6 +192,7 @@ segment X86_64_PageTableEntry(base: paddr) : X86_64_PageDescriptor {
 staticmap X86_64_PageTable(base : paddr) {
     // should be able to specify the alignment constraints here
     // mapdef = [ X86_64_PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..PTABLE_ENTRIES ];
+    #[repr(array)]
     mapdef = [ X86_64_PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..512 ];
 }
 
@@ -285,6 +286,7 @@ enum X86_64_PDirEntry(base: paddr){
 }
 
 staticmap X86_64_PDir(base : paddr) {
+    #[repr(list)]
     mapdef = [ X86_64_PDirEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..512 ];
 }
 
@@ -388,6 +390,7 @@ enum X86_64_PDPTEntry(base: paddr) {
 }
 
 staticmap X86_64_PDPT(base: paddr) {
+    #[repr(array)]
     mapdef = [ X86_64_PDPTEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..512 ];
 }
 
@@ -411,6 +414,7 @@ segment X86_64_PML4Entry(base : paddr) : X86_64_PTableDescriptor {
 }
 
 staticmap X86_64_PML4(base : paddr) {
+    #[repr(array)]
     mapdef = [ X86_64_PML4Entry(base + i * PTABLE_ENTRY_SIZE) for i in 0..512 ];
 }
 

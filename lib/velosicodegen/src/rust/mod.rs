@@ -180,24 +180,24 @@ impl BackendRust {
             .vis("pub")
             .arg("vaddr", "VirtAddr")
             .ret("PhysAddr")
-            .line("todo!()");
+            .line("unimplemented!()");
         scope
             .new_fn("phys_to_virt")
             .vis("pub")
             .arg("paddr", "PhysAddr")
             .ret("VirtAddr")
-            .line("todo!()");
+            .line("unimplemented!()");
         scope
             .new_fn("alloc")
             .vis("pub")
             .arg("sz", "usize")
             .ret("VirtAddr")
-            .line("todo!()");
+            .line("unimplemented!()");
         scope
             .new_fn("free")
             .vis("pub")
             .arg("vaddr", "VirtAddr")
-            .line("todo!()");
+            .line("unimplemented!()");
 
         save_scope(scope, &srcdir, "os")
     }

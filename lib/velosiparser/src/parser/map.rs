@@ -40,6 +40,7 @@ use nom::{
 
 use crate::error::IResult;
 use crate::parser::expr::{expr, fn_call_expr, range_expr};
+use crate::parser::method::decorator_list;
 use crate::parser::terminals::{
     assign, at, comma, fatarrow, ident, kw_for, kw_in, kw_mapdef, lbrack, rbrack, semicolon,
 };
@@ -81,12 +82,22 @@ use crate::VelosiTokenStream;
 /// * `mapdef = [ UnitA(x) for x in 1..2 ]`
 ///
 pub fn staticmap(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
-    let (i1, _) = kw_mapdef(input)?;
-    let (i2, m) = cut(delimited(
+    // parse the decorator #[foo]
+    let (i0, props) = opt(decorator_list)(input)?;
+
+    let (i1, _) = kw_mapdef(i0)?;
+    let (i2, mut m) = cut(delimited(
         assign,
         alt((explicitmap, listcomprehensionmap)),
         semicolon,
     ))(i1)?;
+
+    match &mut m {
+        VelosiParseTreeMap::ListComp(l) => {
+            l.properties = props.unwrap_or_default();
+        }
+        VelosiParseTreeMap::Explicit(_) => {}
+    }
 
     Ok((i2, VelosiParseTreeUnitNode::Map(m)))
 }

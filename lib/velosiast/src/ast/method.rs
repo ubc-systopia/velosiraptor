@@ -3,7 +3,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2021, 2022 Systopia Lab, Computer Science, University of British Columbia
+// Copyright (c) 2021-2023 Systopia Lab, Computer Science, University of British Columbia
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -56,6 +56,13 @@ pub enum VelosiAstMethodProperty {
     Invariant,
     Remap,
     Unknown(String),
+    Repr(VelosiAstChildRepr),
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Hash)]
+pub enum VelosiAstChildRepr {
+    Array,
+    List,
 }
 
 impl VelosiAstMethodProperty {
@@ -90,6 +97,30 @@ impl VelosiAstMethodProperty {
                     AstResult::Ok(Self::Remap)
                 }
             }
+            "repr" => match pt.1 {
+                Some(arg) => match arg.name.as_str() {
+                    "array" => AstResult::Ok(Self::Repr(VelosiAstChildRepr::Array)),
+                    "list" => AstResult::Ok(Self::Repr(VelosiAstChildRepr::List)),
+                    _ => {
+                        let msg = "invalid argument";
+                        let hint = "repr property expects either `array` or `list`";
+                        let err = VelosiAstErrBuilder::err(msg.to_string())
+                            .add_hint(hint.to_string())
+                            .add_location(pt.0.loc)
+                            .build();
+                        AstResult::Err(VelosiAstIssues::from(err))
+                    }
+                },
+                None => {
+                    let msg = "missing argument";
+                    let hint = "repr property expects either `array` or `list`";
+                    let err = VelosiAstErrBuilder::err(msg.to_string())
+                        .add_hint(hint.to_string())
+                        .add_location(pt.0.loc)
+                        .build();
+                    AstResult::Err(VelosiAstIssues::from(err))
+                }
+            },
             _ => {
                 let msg = "unsupported method property";
                 let hint = "supported method properties are `invariant` and `remap`";
@@ -109,6 +140,8 @@ impl Display for VelosiAstMethodProperty {
             Self::Invariant => write!(f, "invariant"),
             Self::Remap => write!(f, "remap"),
             Self::Unknown(_) => write!(f, "none"),
+            Self::Repr(VelosiAstChildRepr::Array) => write!(f, "repr(array)"),
+            Self::Repr(VelosiAstChildRepr::List) => write!(f, "repr(list)"),
         }
     }
 }

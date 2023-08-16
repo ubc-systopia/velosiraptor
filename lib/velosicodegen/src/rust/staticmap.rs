@@ -175,13 +175,14 @@ fn add_higher_order_map(
                         op_fn.line("");
 
                         op_fn.line(format!(
-                            "let mut child = unsafe {{ {}::new({}) }}.resolve();",
+                            "let mut entry = unsafe {{ {}::new({}) }};",
                             utils::to_struct_name(variant_unit.ident(), None),
                             utils::params_to_self_args_list_with_paddr(
                                 dest_unit.params_as_slice(),
                                 "entry.base()"
                             ),
                         ));
+                        op_fn.line("let child = entry.resolve();");
                         op_fn.line(format!(
                             "let mapped_sz = child.map({});",
                             utils::params_to_args_list(&op.params)
@@ -361,25 +362,41 @@ fn add_op_fn_body_listcomp(
     ));
 
     // target_unit = Unit(args..);
-    if op.ident().as_str() == "map" {
-        // set up fields
-        for p in &unit.params {
-            op_fn.line(format!("let {} = &self.{};", p.ident(), p.ident()));
-        }
+    match op.ident().as_str() {
+        "map" => {
+            // set up fields
+            for p in &unit.params {
+                op_fn.line(format!("let {} = &self.{};", p.ident(), p.ident()));
+            }
 
-        op_fn.line(format!(
-            "let mut target_unit = unsafe {{ {}::new({}) }};",
-            utils::to_struct_name(dest_unit.ident(), None),
-            map.elm
-                .dst
-                .args
-                .iter()
-                .map(|e| utils::astexpr_to_rust_expr(e, None))
-                .collect::<Vec<_>>()
-                .join(", "),
-        ));
-    } else {
-        op_fn.line("let mut target_unit = self.children[i as usize].take().unwrap();");
+            op_fn.line(format!(
+                "let mut target_unit = unsafe {{ {}::new({}) }};",
+                utils::to_struct_name(dest_unit.ident(), None),
+                map.elm
+                    .dst
+                    .args
+                    .iter()
+                    .map(|e| utils::astexpr_to_rust_expr(e, None))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            ));
+        }
+        "unmap" => {
+            if map.is_repr_list() {
+                op_fn.line("let child_idx = self.children.iter().position(|(idx, _)| idx == &(i as usize)).unwrap();");
+                op_fn.line("let mut target_unit = self.children.remove(child_idx).1;");
+            } else {
+                op_fn.line("let mut target_unit = self.children[i as usize].take().unwrap();");
+            }
+        }
+        "protect" => {
+            if map.is_repr_list() {
+                op_fn.line("let target_unit = self.children.iter_mut().find(|(idx, _)| idx == &(i as usize)).map(|(_, entry)| entry).unwrap();");
+            } else {
+                op_fn.line("let target_unit = self.children[i as usize].as_mut().unwrap();");
+            }
+        }
+        _ => unreachable!(),
     }
 
     // target_unit.op(args)
@@ -395,7 +412,11 @@ fn add_op_fn_body_listcomp(
     ));
 
     if op.ident().as_str() == "map" {
-        op_fn.line("self.children[i as usize] = Some(target_unit);");
+        if map.is_repr_list() {
+            op_fn.line("self.children.push((i as usize, target_unit));");
+        } else {
+            op_fn.line("self.children[i as usize] = Some(target_unit);");
+        }
     }
     op_fn.line("result");
 }
@@ -508,9 +529,6 @@ fn generate_unit_struct(
     ));
     st.repr("C");
 
-    st.derive("Copy");
-    st.derive("Clone");
-
     for param in &unit.params {
         let doc = format!("Parameter '{}' in unit '{}'", param.ident(), unit.ident());
         let loc = format!("@loc: {}", param.loc.loc());
@@ -522,15 +540,20 @@ fn generate_unit_struct(
         st.push_field(f);
     }
     if let VelosiAstStaticMap::ListComp(map) = &unit.map {
-        let doc = "Track children for shadow page table walk";
-        let mut f = CG::Field::new(
-            "children",
+        let doc = "Track the children of this unit for shadow page table walk";
+        let ty = if map.is_repr_list() {
+            format!(
+                "Vec<(usize, {})>",
+                utils::to_struct_name(map.elm.dst.ident().as_str(), None),
+            )
+        } else {
             format!(
                 "[Option<{}>; {}]",
                 utils::to_struct_name(map.elm.dst.ident().as_str(), None),
                 map.range.end,
-            ),
-        );
+            )
+        };
+        let mut f = CG::Field::new("children", ty);
         f.doc(vec![doc]);
         st.push_field(f);
     }
@@ -541,11 +564,22 @@ fn generate_unit_struct(
     // constructor
     if let VelosiAstStaticMap::ListComp(map) = &unit.map {
         let constructor = utils::add_constructor_signature(imp, &struct_name, &unit.params);
-        constructor.line(format!(
-            "Self {{ {}, children: [None; {}] }}",
-            utils::params_to_args_list(&unit.params),
-            map.range.end,
-        ));
+        if map.is_repr_list() {
+            constructor.line(format!(
+                "Self {{ {}, children: Vec::new() }}",
+                utils::params_to_args_list(&unit.params),
+            ));
+        } else {
+            constructor.line(format!(
+                "const INIT: Option<{}> = None;",
+                utils::to_struct_name(map.elm.dst.ident(), None)
+            ));
+            constructor.line(format!(
+                "Self {{ {}, children: [INIT; {}] }}",
+                utils::params_to_args_list(&unit.params),
+                map.range.end
+            ));
+        }
     }
     add_alloc_fn(imp, struct_name);
 
@@ -603,6 +637,11 @@ pub fn generate(
     }
 
     if let VelosiAstStaticMap::ListComp(map) = &unit.map {
+        if map.is_repr_list() {
+            scope.raw("extern crate alloc;");
+            scope.import("alloc::vec", "Vec");
+        }
+
         let dest_unit = ast.get_unit(map.elm.dst.ident().as_str()).unwrap();
         if let VelosiAstUnit::Enum(e) = dest_unit {
             for variant in e.get_next_unit_idents() {
