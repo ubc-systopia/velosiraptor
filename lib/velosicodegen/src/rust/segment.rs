@@ -75,20 +75,41 @@ fn add_segment_struct(
         unit.loc.loc()
     ));
 
-    // it has a single field, called 'interface'
     let iface_name = utils::to_struct_name(&struct_name, Some("Interface"));
     st.field("interface", &iface_name);
+
+    let child = relations
+        .0
+        .get(unit.ident())
+        .filter(|children| !children.is_empty())
+        .map(|children| &children[0]);
+    let has_child = child.is_some();
+    child.iter().for_each(|child| {
+        // add child to struct
+        st.field(
+            "child",
+            format!("Option<{}>", utils::to_struct_name(child.ident(), None)),
+        );
+    });
 
     // struct impl
     let imp = scope.new_impl(&struct_name);
 
     // constructor
     let constructor = utils::add_constructor_signature(imp, &struct_name, &unit.params);
-    constructor.line(format!(
-        "Self {{ interface: {}::new({}) }}",
-        iface_name,
-        utils::params_to_args_list(&unit.params)
-    ));
+    if has_child {
+        constructor.line(format!(
+            "Self {{ interface: {}::new({}), child: None }}",
+            iface_name,
+            utils::params_to_args_list(&unit.params)
+        ));
+    } else {
+        constructor.line(format!(
+            "Self {{ interface: {}::new({}) }}",
+            iface_name,
+            utils::params_to_args_list(&unit.params)
+        ));
+    }
 
     // getters
     for p in &unit.params {
@@ -101,15 +122,15 @@ fn add_segment_struct(
     }
 
     // op functions
-    let has_children = relations.0.get(unit.ident()).is_some();
     let op = unit.methods.get("map").expect("map method not found!");
-    add_op_fn(unit, ast, op, "map", imp);
+    add_op_fn(unit, ast, op, "map", has_child, imp);
     let op = unit.methods.get("unmap").expect("unmap method not found!");
     add_op_fn(
         unit,
         ast,
         op,
-        if has_children { "unmap_table" } else { "unmap" },
+        if has_child { "unmap_table" } else { "unmap" },
+        has_child,
         imp,
     );
     let op = unit
@@ -120,35 +141,32 @@ fn add_segment_struct(
         unit,
         ast,
         op,
-        if has_children {
+        if has_child {
             "protect_table"
         } else {
             "protect"
         },
+        has_child,
         imp,
     );
 
     // valid function
     add_valid_fn(unit, imp);
 
-    if let Some(children) = relations.0.get(unit.ident()) {
-        if !children.is_empty() {
-            let child = &children[0];
+    child.iter().for_each(|child| {
+        // higher-order unmap and protect
+        let op = unit.methods.get("unmap").expect("unmap method not found!");
+        add_higher_order_fn(op, imp);
 
-            // higher-order unmap and protect
-            let op = unit.methods.get("unmap").expect("unmap method not found!");
-            add_higher_order_fn(op, imp);
+        let op = unit
+            .methods
+            .get("protect")
+            .expect("protect method not found!");
+        add_higher_order_fn(op, imp);
 
-            let op = unit
-                .methods
-                .get("protect")
-                .expect("protect method not found!");
-            add_higher_order_fn(op, imp);
-
-            // resolve function
-            add_resolve_fn(unit, child, imp);
-        }
-    }
+        // resolve function
+        add_resolve_fn(child, imp);
+    });
 }
 
 fn add_op_fn(
@@ -156,12 +174,13 @@ fn add_op_fn(
     ast: &VelosiAst,
     method: &VelosiAstMethod,
     method_name: &str,
+    has_child: bool,
     imp: &mut CG::Impl,
 ) {
     let op_fn = imp
         .new_fn(method_name)
         .vis("pub")
-        .arg_ref_self()
+        .arg_mut_self()
         .ret("usize");
 
     for f in method.params.iter() {
@@ -187,6 +206,14 @@ fn add_op_fn(
         ));
     }
     op_fn.line("");
+
+    if has_child {
+        if method.ident().as_str() == "map" {
+            op_fn.line("self.child = Some(pa);");
+        } else {
+            op_fn.line("self.child = None;");
+        }
+    }
 
     if !method.ops.is_empty() {
         op_fn.line("// configuration sequence");
@@ -225,7 +252,7 @@ fn add_higher_order_fn(method: &VelosiAstMethod, imp: &mut CG::Impl) {
     let op_fn = imp
         .new_fn(method.ident())
         .vis("pub")
-        .arg_ref_self()
+        .arg_mut_self()
         .ret("usize");
     for f in method.params.iter() {
         op_fn.arg(f.ident(), utils::vrs_type_to_rust_type(&f.ptype.typeinfo));
@@ -250,39 +277,11 @@ fn add_valid_fn(unit: &VelosiAstUnitSegment, imp: &mut CG::Impl) {
     valid.line(utils::astexpr_to_rust_expr(op.body.as_ref().unwrap(), None));
 }
 
-fn add_resolve_fn(unit: &VelosiAstUnitSegment, child: &VelosiAstUnit, imp: &mut CG::Impl) {
-    // add the translate function as a helper
-    let op = unit
-        .methods
-        .get("translate")
-        .expect("map method not found!");
-    let translate = imp
-        .new_fn("translate")
-        .arg_ref_self()
-        .ret(utils::vrs_type_to_rust_type(&op.rtype.typeinfo));
-    for p in &op.params {
-        translate.arg(p.ident(), utils::vrs_type_to_rust_type(&p.ptype.typeinfo));
-    }
-
-    for f in unit.interface.fields() {
-        translate.line(format!(
-            "let {} = self.interface.read_{}();",
-            f.ident(),
-            f.ident()
-        ));
-    }
-    translate.line(utils::astexpr_to_rust_expr(op.body.as_ref().unwrap(), None));
-
-    // add resolve
+fn add_resolve_fn(child: &VelosiAstUnit, imp: &mut CG::Impl) {
     let ret_ty = utils::to_struct_name(child.ident(), None);
     let resolve = imp.new_fn("resolve").vis("pub").arg_ref_self().ret(&ret_ty);
 
-    resolve.line("let paddr = self.translate(0);");
-    resolve.line(format!(
-        "unsafe {{ {}::new({}) }}",
-        ret_ty,
-        utils::params_to_self_args_list_with_paddr(child.params_as_slice(), "paddr")
-    ));
+    resolve.line("self.child.unwrap()");
 }
 
 /// generates the VelosiAstUnitSegment definitions
