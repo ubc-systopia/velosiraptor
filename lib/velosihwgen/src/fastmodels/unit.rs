@@ -44,7 +44,7 @@ pub fn unit_header_file(name: &str) -> String {
 }
 
 pub fn unit_class_name(name: &str) -> String {
-    format!("{}{}Unit", name[0..1].to_uppercase(), &name[1..])
+    format!("{}{}", name[0..1].to_uppercase(), &name[1..])
 }
 
 pub fn state_class_name(name: &str) -> String {
@@ -354,6 +354,14 @@ fn add_method_maybe(c: &mut C::Class, tm: &VelosiAstMethod) {
         return;
     }
 
+    // various todo functions
+    match &tm.ident.ident[..] {
+        "map" => return,
+        "unmap" => return,
+        "protect" => return,
+        _ => (),
+    }
+
     let m = c
         .new_method(&tm.ident.ident, ast_type_to_c_type(&tm.rtype))
         .set_inside_def();
@@ -472,9 +480,24 @@ fn add_state_classes(s: &mut Scope, unit: &VelosiAstUnit) {
 
 fn add_interface_class(s: &mut Scope, unit: &VelosiAstUnit) {
     let ifn = interface_class_name(unit.ident());
-    s.new_class(&ifn)
+    let c = s
+        .new_class(&ifn)
         .set_base("InterfaceBase", C::Visibility::Public)
         .push_doc_str("unused");
+
+    let scn = state_class_name(unit.ident());
+    let state_ptr_type = C::Type::to_ptr(&C::Type::new_class(&scn));
+
+    c.new_attribute("_state", state_ptr_type.clone());
+
+    let cons = c.new_constructor().set_inside_def(true);
+
+    let m = cons.new_param("state", state_ptr_type);
+
+    let pa = C::Expr::from_method_param(m);
+
+    cons.push_parent_initializer(C::Expr::fn_call("InterfaceBase", vec![pa.clone()]));
+    cons.push_initializer("_state", pa);
 }
 
 fn add_unit_class(s: &mut Scope, ucn: String, unit: &VelosiAstUnit, ifn: String, scn: String) {

@@ -40,7 +40,7 @@ use crustal as C;
 use crate::VelosiHwGenBackend;
 use crate::VelosiHwGenError;
 use crate::COPYRIGHT;
-use velosiast::VelosiAst;
+use velosiast::{VelosiAst, VelosiAstUnit};
 
 // the generators
 mod state;
@@ -51,6 +51,7 @@ mod unit;
 use unit::generate_unit_header;
 mod registers;
 use registers::{generate_register_header, generate_register_impl};
+use velosicomposition::Relations;
 
 use self::unit::unit_header_file;
 
@@ -109,6 +110,10 @@ impl ArmFastModelsModule {
     }
 
     fn generate_top_makefile(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
+        // let what = Relations::from_ast(ast);
+        // relations.0.get(unit.ident()).is_some();
+
+
         let makefile = File::create(&self.outdir.join("Makefile"))?;
         let mut f = BufWriter::new(makefile);
 
