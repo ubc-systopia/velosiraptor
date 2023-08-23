@@ -25,7 +25,7 @@
 
 //! # The FastModels Platform Generator: Interface
 
-use crate::fastmodels::add_header;
+use crate::fastmodels::add_header_comment;
 use crate::fastmodels::registers::registers_header_file;
 use crate::fastmodels::state::{state_class_name, state_header_file};
 use crate::VelosiHwGenError;
@@ -61,7 +61,7 @@ pub fn generate_interface_header(
 ) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
-    add_header(&mut scope, unit.ident(), "interface");
+    add_header_comment(&mut scope, unit.ident(), "interface");
 
     let hdrguard = format!("{}_INTERFACE_HPP_", unit.ident().to_uppercase());
     let guard = scope.new_ifdef(&hdrguard);
@@ -109,7 +109,7 @@ pub fn generate_interface_impl(
 ) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
-    add_header(&mut scope, unit.ident(), "interface");
+    add_header_comment(&mut scope, unit.ident(), "interface");
 
     scope.new_comment("fastmodels includes");
     scope.new_include("pv/RemapRequest.h", true);
