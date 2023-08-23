@@ -45,9 +45,13 @@ component ExamplePlatform
         BusDecoder0.pvbus_m_range[0x1D000000..0x1dffffff] => TranslationUnit.control;
         BusDecoder0.pvbus_m_range[0x80000000..0xbfffffff] => DRAM0.pvbus;
 
+        // access to DRAM1, translated
         BusDecoder0.pvbus_m_range[0xC0000000..0xffffffff] => TranslationUnit.pvbus_s;
         TranslationUnit.pvbus_m => DRAM1.pvbus;
         TranslationUnit.pvbus_ptw_m => DRAM1.pvbus;
+
+        // access to DRAM1, kernel interface (writable, not translated)
+        BusDecoder0.pvbus_m_range[0x1C0000000..0x1ffffffff] => DRAM1.pvbus;
 
         // UART to terminal
         pl011_uart.serial_out => telnetterminal.serial;
