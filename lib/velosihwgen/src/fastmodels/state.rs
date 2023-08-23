@@ -28,7 +28,7 @@
 //! This module generates the state description of the Arm FastModels implementation
 //! of the translation unit.
 
-use crate::fastmodels::add_header;
+use crate::fastmodels::add_header_comment;
 use crate::VelosiHwGenError;
 use crustal as C;
 use std::path::Path;
@@ -62,7 +62,7 @@ pub fn generate_state_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), 
 
     let scn = state_class_name(unit.ident());
 
-    add_header(&mut scope, unit.ident(), "state");
+    add_header_comment(&mut scope, unit.ident(), "state");
 
     let guard =
         scope.new_ifdef(format!("{}_STATE_HPP_", unit.ident().to_uppercase()).as_str());
@@ -151,7 +151,7 @@ pub fn generate_state_impl(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), Ve
 
     let scn = state_class_name(unit.ident());
 
-    add_header(&mut scope, unit.ident(), "state");
+    add_header_comment(&mut scope, unit.ident(), "state");
 
     scope.new_comment("fastmodels includes");
     scope.new_include("pv/RemapRequest.h", true);
@@ -171,7 +171,7 @@ pub fn generate_state_impl(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), Ve
                 let f_c = scope.new_class(rcn.as_str());
                 f_c.set_base("StateFieldBase", C::Visibility::Public);
 
-                let cons = f_c.new_constructor();
+                let cons = f_c.new_constructor().set_inside_def(true);
                 cons.push_parent_initializer(C::Expr::fn_call(
                     "StateFieldBase",
                     vec![

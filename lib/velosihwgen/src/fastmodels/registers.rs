@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use crate::fastmodels::add_header;
+use crate::fastmodels::add_header_comment;
 use crate::fastmodels::state::{state_class_name, state_header_file};
 use crate::VelosiHwGenError;
 use crustal as C;
@@ -74,7 +74,7 @@ pub fn generate_register_header(
     outdir: &Path,
 ) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
-    add_header(&mut scope, pkgname, "interface registers");
+    add_header_comment(&mut scope, pkgname, "interface registers");
 
     let hdrguard = format!("{}_REGISTERS_HPP_", pkgname.to_uppercase());
     let guard = scope.new_ifdef(&hdrguard);
@@ -130,7 +130,7 @@ pub fn generate_register_impl(
     let mut scope = C::Scope::new();
 
     // document header
-    add_header(&mut scope, pkgname, "interface registers");
+    add_header_comment(&mut scope, pkgname, "interface registers");
 
     // adding the includes
     scope.new_comment("framework includes");
