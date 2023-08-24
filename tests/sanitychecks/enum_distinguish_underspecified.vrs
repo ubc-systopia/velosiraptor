@@ -59,7 +59,7 @@ abstract segment X86_64_PTableDescriptor(base: addr) {
         bar
     };
 
-    state = StateDef(base: addr) {
+    state(base: addr) {
         mem entry [ base, 0, 8 ] {
             0 ..  1 present,  // whether this entry is valid
             1 ..  2 rw,       // Read/write; if 0, writes may not be allowed to the 512-GByte region controlled by this entry
@@ -77,7 +77,7 @@ abstract segment X86_64_PTableDescriptor(base: addr) {
         }
     };
 
-    interface = InterfaceDef(base: addr) {
+    interface(base: addr) {
         mem entry [ base, 0, 8 ]
     };
 
@@ -139,7 +139,7 @@ segment X86_64_PDirEntryTable(base : addr) : X86_64_PTableDescriptor {
 segment X86_64_PDirEntryPage(base :addr) : X86_64_PageDescriptor {
     inbitwidth = LARGE_PAGE_BITS;
 
-    state = StateDef(base :addr) {
+    state(base :addr) {
         mem entry [ base, 0, 8] {
             0 ..  1 present,
             1 ..  2 rw,  // Read/write; if 0, writes may not be allowed to the page
@@ -161,7 +161,7 @@ segment X86_64_PDirEntryPage(base :addr) : X86_64_PageDescriptor {
         }
     };
 
-    interface = InterfaceDef(base: addr) {
+    interface(base: addr) {
         mem entry [ base, 0, 8 ]
     };
 
@@ -205,7 +205,7 @@ segment X86_64_PDirEntryPage(base :addr) : X86_64_PageDescriptor {
 segment X86_64_PDirEntryTest(base :addr) : X86_64_PageDescriptor {
     inbitwidth = LARGE_PAGE_BITS;
 
-    state = StateDef(base :addr) {
+    state(base :addr) {
         mem entry [ base, 0, 8] {
             0 ..  1 present,
             1 ..  2 rw,  // Read/write; if 0, writes may not be allowed to the page
@@ -227,7 +227,7 @@ segment X86_64_PDirEntryTest(base :addr) : X86_64_PageDescriptor {
         }
     };
 
-    interface = InterfaceDef(base: addr) {
+    interface(base: addr) {
         mem entry [ base, 0, 8 ]
     };
 

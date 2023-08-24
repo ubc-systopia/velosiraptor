@@ -1,6 +1,6 @@
 segment MyUnit {
-  state = StateDef(base: foo) {
+  state(base: foo) {
     reg foo [ 8 ],
     mem bar [ base, 0, 8 ],
-  };
+  }
 }

@@ -12,11 +12,11 @@ segment Seg(base : addr) {
     flags = { dummy };
 
     // the state
-    state = StateDef(base: addr) {
+    state(base: addr) {
         reg pte [ 4 ]
     };
 
-    interface = InterfaceDef(base : addr) {
+    interface(base : addr) {
         mmio pte [base, 0, 4]
     };
 
@@ -44,11 +44,11 @@ segment Seg2(base : addr) {
     flags = { dummy };
 
     // the state
-    state = StateDef(base: addr) {
+    state(base: addr) {
         reg pte [ 4 ]
     };
 
-    interface = InterfaceDef(base : addr) {
+    interface(base : addr) {
         mmio pte [base, 0, 4]
     };
 
@@ -76,13 +76,13 @@ segment Seg3(base : addr) {
     flags = { dummy };
 
     // the state
-    state = StateDef(base: addr) {
+    state(base: addr) {
         reg pte [ 4 ] {
             0..32 _val // automatically generated slice
         }
     };
 
-    interface = InterfaceDef(base : addr) {
+    interface(base : addr) {
         mmio pte [base, 0, 4]
     };
 

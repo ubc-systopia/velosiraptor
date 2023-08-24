@@ -71,7 +71,7 @@ segment X86_32_PageTableEntry(base : addr) {
     };
 
     // the state
-    state = StateDef(base: addr) {
+    state(base: addr) {
         mem pte [base, 0, 4] {
             // the following fields at starting bit, ending bit, name
             0 ..  1 present,
@@ -86,11 +86,11 @@ segment X86_32_PageTableEntry(base : addr) {
             9 .. 12 ignored,
            12 .. 32 base,
         }
-    };
+    }
 
-    interface = InterfaceDef(base : addr) {
+    interface(base : addr) {
         mem pte [base, 0, 4]
-    };
+    }
 
     fn valid() -> bool {
         state.pte.present == 1
@@ -137,7 +137,7 @@ segment X86_32_PageTableEntry(base : addr) {
 
 // represents an x86 page table entry
 staticmap X86_32_PageTable(base : addr) {
-    mapdef = [ X86_32_PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..1024 ];
+    maps [ X86_32_PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..1024 ]
 }
 
 

@@ -70,14 +70,10 @@ pub enum VelosiKeyword {
     OutBitWidth,
     /// represents the "state field"
     State,
-    /// state definition
-    StateDef,
     /// interface statement
     Interface,
-    /// interface definition
-    InterfaceDef,
     /// map definition
-    MapDef,
+    Map,
 
     //
     // state & interface fields
@@ -186,10 +182,8 @@ impl VelosiKeyword {
             VelosiKeyword::InBitWidth => "inbitwidth",
             VelosiKeyword::OutBitWidth => "outbitwidth",
             VelosiKeyword::State => "state",
-            VelosiKeyword::StateDef => "StateDef",
             VelosiKeyword::Interface => "interface",
-            VelosiKeyword::InterfaceDef => "InterfaceDef",
-            VelosiKeyword::MapDef => "mapdef",
+            VelosiKeyword::Map => "maps",
 
             // state & interface fields
             VelosiKeyword::Mem => "mem",
@@ -256,10 +250,8 @@ impl<'a> TryFrom<&'a str> for VelosiKeyword {
             "inbitwidth" => Ok(VelosiKeyword::InBitWidth),
             "outbitwidth" => Ok(VelosiKeyword::OutBitWidth),
             "state" => Ok(VelosiKeyword::State),
-            "StateDef" => Ok(VelosiKeyword::StateDef),
             "interface" => Ok(VelosiKeyword::Interface),
-            "InterfaceDef" => Ok(VelosiKeyword::InterfaceDef),
-            "mapdef" => Ok(VelosiKeyword::MapDef),
+            "maps" => Ok(VelosiKeyword::Map),
             // state & interface fields
             "reg" => Ok(VelosiKeyword::Reg),
             "mem" => Ok(VelosiKeyword::Mem),
@@ -701,11 +693,8 @@ fn test_enum_str() {
     assert_eq!(VelosiKeyword::State.as_str(), "state");
     assert_eq!("interface".try_into(), Ok(VelosiKeyword::Interface));
     assert_eq!(VelosiKeyword::Interface.as_str(), "interface");
-    assert_eq!("StateDef".try_into(), Ok(VelosiKeyword::StateDef));
-    assert_eq!(VelosiKeyword::StateDef.as_str(), "StateDef");
-    assert_eq!("InterfaceDef".try_into(), Ok(VelosiKeyword::InterfaceDef));
-    assert_eq!("mapdef".try_into(), Ok(VelosiKeyword::MapDef));
-    assert_eq!(VelosiKeyword::MapDef.as_str(), "mapdef");
+    assert_eq!("maps".try_into(), Ok(VelosiKeyword::Map));
+    assert_eq!(VelosiKeyword::Map.as_str(), "maps");
 
     assert_eq!("mem".try_into(), Ok(VelosiKeyword::Mem));
     assert_eq!(VelosiKeyword::Mem.as_str(), "mem");

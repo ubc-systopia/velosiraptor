@@ -264,7 +264,6 @@ impl Display for VelosiParseTreeUnitNode {
                 Display::fmt(flags, f)?;
             }
             VelosiParseTreeUnitNode::State(state) => {
-                write!(f, "state = ")?;
                 let formatted = format!("{state}");
 
                 let lines = formatted.lines().enumerate().peekable();
@@ -279,7 +278,6 @@ impl Display for VelosiParseTreeUnitNode {
                 write!(f, ";")?;
             }
             VelosiParseTreeUnitNode::Interface(interface) => {
-                write!(f, "interface = ")?;
                 let formatted = format!("{interface}");
 
                 let lines = formatted.lines().enumerate().peekable();

@@ -42,7 +42,7 @@ use crate::error::IResult;
 use crate::parser::expr::{expr, fn_call_expr, range_expr};
 use crate::parser::method::decorator_list;
 use crate::parser::terminals::{
-    assign, at, comma, fatarrow, ident, kw_for, kw_in, kw_mapdef, lbrack, rbrack, semicolon,
+    at, comma, fatarrow, ident, kw_for, kw_in, kw_mapdef, lbrack, rbrack,
 };
 use crate::parsetree::{
     VelosiParseTreeExpr, VelosiParseTreeFnCallExpr, VelosiParseTreeMap, VelosiParseTreeMapElement,
@@ -74,23 +74,19 @@ use crate::VelosiTokenStream;
 ///
 /// # Grammar
 ///
-/// STATICMAP := KW_MAP ASSIGN LBRACK (LISTCOMPREHENSIONMAP | EXPLICITMAP) RBRACK SEMICOLON
+/// STATICMAP := KW_MAP LBRACK (LISTCOMPREHENSIONMAP | EXPLICITMAP) RBRACK
 ///
 /// # Example
 ///
-/// * `mapdef = [ UnitA(), UnitB() ]`
-/// * `mapdef = [ UnitA(x) for x in 1..2 ]`
+/// * `maps [ UnitA(), UnitB() ]`
+/// * `maps [ UnitA(x) for x in 1..2 ]`
 ///
 pub fn staticmap(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnitNode> {
     // parse the decorator #[foo]
     let (i0, props) = opt(decorator_list)(input)?;
 
     let (i1, _) = kw_mapdef(i0)?;
-    let (i2, mut m) = cut(delimited(
-        assign,
-        alt((explicitmap, listcomprehensionmap)),
-        semicolon,
-    ))(i1)?;
+    let (i2, mut m) = cut(alt((explicitmap, listcomprehensionmap)))(i1)?;
 
     match &mut m {
         VelosiParseTreeMap::ListComp(l) => {
@@ -171,6 +167,8 @@ fn listcomprehensionmap(
 ) -> IResult<VelosiTokenStream, VelosiParseTreeMap> {
     let mut pos = input.clone();
 
+    println!("trying list:comp map");
+
     let (i1, (elm, id, expr)) = delimited(
         lbrack,
         tuple((
@@ -180,6 +178,8 @@ fn listcomprehensionmap(
         )),
         rbrack,
     )(input)?;
+
+    println!("trying list:wee");
 
     pos.span_until_start(&i1);
 
@@ -376,22 +376,22 @@ fn test_explicit_map_fail() {
 
 #[test]
 fn test_map_simple() {
-    let content = "mapdef = [UnitA(), UnitB()];";
+    let content = "maps [UnitA(), UnitB()];";
     let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
     let res = staticmap(ts);
     assert!(res.is_ok());
 
-    let content = "mapdef = [UnitA()];";
+    let content = "maps [UnitA()];";
     let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
     let res = staticmap(ts);
     assert!(res.is_ok());
 
-    let content = "mapdef = [UnitA() @ a];";
+    let content = "maps [UnitA() @ a];";
     let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
     let res = staticmap(ts);
     assert!(res.is_ok());
 
-    let content = "mapdef = [ 0.. 1 => UnitA()];";
+    let content = "maps [ 0.. 1 => UnitA()];";
     let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
     let res = staticmap(ts);
     assert!(res.is_ok());
@@ -399,17 +399,17 @@ fn test_map_simple() {
 
 #[test]
 fn test_map_comprehension() {
-    let content = "mapdef = [UnitA() for i in 0..512];";
+    let content = "maps [UnitA() for i in 0..512];";
     let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
     let res = staticmap(ts);
     assert!(res.is_ok());
 
-    let content = "mapdef = [UnitA() @ i for i in 0..512];";
+    let content = "maps [UnitA() @ i for i in 0..512];";
     let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
     let res = staticmap(ts);
     assert!(res.is_ok());
 
-    let content = "mapdef = [0..1 => UnitA() @ i for i in 0..512];";
+    let content = "maps [0..1 => UnitA() @ i for i in 0..512];";
     let ts = VelosiLexer::lex_string(content.to_string()).unwrap();
     let res = staticmap(ts);
     assert!(res.is_ok());

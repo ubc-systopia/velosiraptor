@@ -12,14 +12,14 @@ segment Seg(base : addr) {
     flags = { dummy };
 
     // the state
-    state = StateDef(base: addr) {
+    state(base: addr) {
         reg pte [ 4 ] {
             0..8 foo,
             16..32 bar
         }
     };
 
-    interface = InterfaceDef(base : addr) {
+    interface(base : addr) {
         mmio pte [base, 0, 4]
     };
 
@@ -47,14 +47,14 @@ segment Seg2(base : addr) {
     flags = { dummy };
 
     // the state
-    state = StateDef(base: addr) {
+    state(base: addr) {
         reg pte [ 4 ] {
             0..9 foo,
             17..32 bar
         }
     };
 
-    interface = InterfaceDef(base : addr) {
+    interface(base : addr) {
         mmio pte [base, 0, 4]
     };
 
@@ -82,14 +82,14 @@ segment Seg3(base : addr) {
     flags = { dummy };
 
     // the state
-    state = StateDef(base: addr) {
+    state(base: addr) {
         reg pte [ 4 ] {
             0..8 bar,
             16..32 baz
         }
     };
 
-    interface = InterfaceDef(base : addr) {
+    interface(base : addr) {
         mmio pte [base, 0, 4]
     };
 
@@ -117,13 +117,13 @@ segment Seg4(base : addr) {
     flags = { dummy };
 
     // the state
-    state = StateDef(base: addr) {
+    state(base: addr) {
         reg pte [ 4 ] {
             0..8 foo,
         }
     };
 
-    interface = InterfaceDef(base : addr) {
+    interface(base : addr) {
         mmio pte [base, 0, 4]
     };
 
@@ -151,7 +151,7 @@ segment Seg5(base : addr) {
     flags = { dummy };
 
     // the state
-    state = StateDef(base: addr) {
+    state(base: addr) {
         reg pte [ 4 ] {
             0..8 foo,
             8..9 baz,
@@ -159,7 +159,7 @@ segment Seg5(base : addr) {
         }
     };
 
-    interface = InterfaceDef(base : addr) {
+    interface(base : addr) {
         mmio pte [base, 0, 4]
     };
 

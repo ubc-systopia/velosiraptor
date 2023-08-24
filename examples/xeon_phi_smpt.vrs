@@ -23,17 +23,17 @@ segment SMPTE(base: addr) {
         snoop_disabled,
     };
 
-    state = StateDef() {
+    state() {
         reg entry [ 4 ] {
             0 ..  1  snoop_disabled,
             1 ..  2  _,
             2 .. 32  host_address,
         }
-    };
+    }
 
-    interface = InterfaceDef(base: addr) {
+    interface(base: addr) {
         mmio entry [ base, 0, 4 ]
-    };
+    }
 
     #[remap]
     fn matchflags(flgs : flags) -> bool
@@ -57,5 +57,5 @@ segment SMPTE(base: addr) {
  }
 
 staticmap SMPT(base: addr) {
-    mapdef = [ SMPTE(base + i * SMPT_ENTRY_SIZE) for i in 0..32 ];
+    maps [ SMPTE(base + i * SMPT_ENTRY_SIZE) for i in 0..32 ]
 }

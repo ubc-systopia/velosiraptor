@@ -51,7 +51,7 @@ const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
         usermode
     };
 
-    state = StateDef(base: addr) {
+    state(base: addr) {
         mem pte [base, 0, 4] {
             // the following fields at starting bit, ending bit, name
             0 ..  1 present,
@@ -68,7 +68,7 @@ const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
         },
     };
 
-    interface = InterfaceDef(base : addr) {
+    interface(base : addr) {
         mem pte [base, 0, 4] {
             Layout {
                 // the following fields at starting bit, ending bit, name
@@ -150,7 +150,7 @@ const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
 
 // represents an x86 page table entry
 staticmap X86PageTable(base : addr) {
-    mapdef = [ X86PageTableEntry(base + i * 4) for i in 0..1024 ];
+    maps [ X86PageTableEntry(base + i * 4) for i in 0..1024
 }
 
 

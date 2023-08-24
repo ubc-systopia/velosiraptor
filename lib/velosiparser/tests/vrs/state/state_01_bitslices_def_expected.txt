@@ -1,7 +1,7 @@
 VelosiParseTree(tests/vrs/state/state_01_bitslices_def.vrs)
 ---------------------------------------------
 segment MyUnit {
-  state = StateDef(base: foobase2: addr) {
+  state(base: foobase2: addr) {
     reg foo [ 8 ] {
       0..2 foo,
     },

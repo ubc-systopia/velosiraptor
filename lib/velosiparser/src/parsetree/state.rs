@@ -158,7 +158,7 @@ impl Display for VelosiParseTreeStateField {
 
 /// Represents the parsed state description
 #[derive(PartialEq, Eq, Clone)]
-pub struct VelosiParseTreeStateDef {
+pub struct VelosiParseTreeState {
     /// parameters of the state
     pub params: Vec<VelosiParseTreeParam>,
     /// the fields defined in teh state
@@ -167,7 +167,7 @@ pub struct VelosiParseTreeStateDef {
     pub loc: VelosiTokenStream,
 }
 
-impl VelosiParseTreeStateDef {
+impl VelosiParseTreeState {
     /// Create a new state definition
     pub fn new(
         params: Vec<VelosiParseTreeParam>,
@@ -180,11 +180,16 @@ impl VelosiParseTreeStateDef {
             loc,
         }
     }
+
+    /// obtains the source position of the state definition
+    pub fn loc(&self) -> &VelosiTokenStream {
+        &self.loc
+    }
 }
 
-impl Display for VelosiParseTreeStateDef {
+impl Display for VelosiParseTreeState {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "StateDef(")?;
+        write!(f, "state(")?;
         for param in &self.params {
             Display::fmt(param, f)?;
         }
@@ -203,37 +208,9 @@ impl Display for VelosiParseTreeStateDef {
     }
 }
 
-/// Implementation of [Debug] for [VelosiParseTreeStateDef]
-impl Debug for VelosiParseTreeStateDef {
+/// Implementation of [Debug] for [VelosiParseTreeState]
+impl Debug for VelosiParseTreeState {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
         Display::fmt(&self, format)
-    }
-}
-
-/// Represents the state definition
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub enum VelosiParseTreeState {
-    StateDef(VelosiParseTreeStateDef),
-    None(VelosiTokenStream),
-}
-
-impl VelosiParseTreeState {
-    /// obtains the source position of the state definition
-    pub fn loc(&self) -> &VelosiTokenStream {
-        match self {
-            VelosiParseTreeState::StateDef(def) => &def.loc,
-            VelosiParseTreeState::None(loc) => loc,
-        }
-    }
-}
-
-impl Display for VelosiParseTreeState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        match self {
-            VelosiParseTreeState::StateDef(s) => Display::fmt(&s, f),
-            VelosiParseTreeState::None(_) => {
-                writeln!(f, "None")
-            }
-        }
     }
 }

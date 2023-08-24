@@ -31,7 +31,6 @@
 
 // used external dependencies
 use nom::{
-    branch::alt,
     combinator::{cut, opt},
     multi::separated_list0,
     sequence::{delimited, tuple},
@@ -40,7 +39,7 @@ use nom::{
 // used crate components
 use crate::error::IResult;
 use crate::parser::{parameter::param_list, terminals::*};
-use crate::parsetree::{VelosiParseTreeInterface, VelosiParseTreeInterfaceDef};
+use crate::parsetree::VelosiParseTreeInterface;
 use crate::VelosiTokenStream;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -52,78 +51,9 @@ mod actions;
 mod field;
 mod layout;
 
-/// parses a interface definition
-///
-/// This function parses a unit's interface definition.
-///
-/// # Arguments
-///
-/// * `input` - input token stream to be parsed
-///
-/// # Results
-///
-/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
-///        recognized interface definition as a parse tree node.
-/// * Err: The parser did not succed. The return value indicates whether this is:
-///
-///    * Error: a recoverable error indicating that the parser did not recognize the input but
-///             another parser might, or
-///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
-///               and that another parser would fail.
-///
-/// # Grammar
-///
-/// `INTERFACE := KW_INTERFACE ASSIGN (NONE | IFACEDEF) SEMICOLON`
-///
-/// # Examples
-///
-/// * `interface = None;`
-///
-pub fn interface(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeInterface> {
-    // let mut pos = input.clone();
-
-    // try to match the interface keyword, if there is no match, return.
-    let (i1, _) = kw_interface(input)?;
-
-    // We now attempt to parse the different interface types.
-    cut(delimited(assign, alt((ifacedef, ifacenone)), semicolon))(i1)
-}
-
-/// parses the none interface definition
-///
-/// This represents an empty or non-existent interface definition.
-///
-/// # Arguments
-///
-/// * `input` - input token stream to be parsed
-///
-/// # Results
-///
-/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
-///        recognized none interface as a parse tree node.
-/// * Err: The parser did not succed. The return value indicates whether this is:
-///
-///    * Error: a recoverable error indicating that the parser did not recognize the input but
-///             another parser might, or
-///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
-///               and that another parser would fail.
-///
-/// # Grammar
-///
-/// `NONE_INTERFACE := KW_NONE`
-///
-/// # Examples
-///
-/// * `None`
-///
-fn ifacenone(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeInterface> {
-    let mut pos = input.clone();
-
-    let (i1, _) = kw_none(input)?;
-
-    pos.span_until_start(&i1);
-    Ok((i1, VelosiParseTreeInterface::None(pos)))
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Interface Parsing
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// parses and consumes an interface definition of a unit
 ///
@@ -144,17 +74,17 @@ fn ifacenone(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParse
 ///
 /// # Grammar
 ///
-/// `IFACEDEF := KW_INTERFACEDEF IFACEPARAMS LBRACE INTERFACEFIELDS RBRACE`
+/// `INTERFACE := KW_INTERFACE IFACEPARAMS LBRACE INTERFACEFIELDS RBRACE`
 ///
 /// # Examples
 ///
-/// * `InterfaceDef(base: addr) {}`
+/// * `interface(base: addr) {}`
 ///
-fn ifacedef(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeInterface> {
+pub fn interface(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeInterface> {
     let mut pos = input.clone();
 
-    // try to barse the InterfaceDef keyword
-    let (i1, _) = kw_interfacedef(input)?;
+    // try to barse the interface keyword
+    let (i1, _) = kw_interface(input)?;
     let (i2, bases) = param_list(i1)?;
     let (i3, fields) = cut(delimited(
         lbrace,
@@ -164,8 +94,7 @@ fn ifacedef(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseT
 
     pos.span_until_start(&i3);
 
-    let st = VelosiParseTreeInterfaceDef::new(bases, fields, pos);
-    Ok((i3, VelosiParseTreeInterface::InterfaceDef(st)))
+    Ok((i3, VelosiParseTreeInterface::new(bases, fields, pos)))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -179,40 +108,30 @@ use velosilexer::VelosiLexer;
 use crate::{test_parse_and_check_fail, test_parse_and_compare_ok};
 
 #[test]
-fn test_iface_none_ok() {
-    test_parse_and_compare_ok!("None", ifacenone, "None\n");
-}
-
-#[test]
-fn test_iface_none_fail() {
-    // nothing really...
-}
-
-#[test]
 fn test_iface_def_ok() {
-    test_parse_and_compare_ok!("InterfaceDef(){}", ifacedef, "InterfaceDef() {\n}");
+    test_parse_and_compare_ok!("interface(){}", interface, "interface() {\n}");
     test_parse_and_compare_ok!(
-        "InterfaceDef(base: foo){}",
-        ifacedef,
-        "InterfaceDef(base: foo) {\n}"
+        "interface(base: foo){}",
+        interface,
+        "interface(base: foo) {\n}"
     );
     // with a register
     test_parse_and_compare_ok!(
-        "InterfaceDef(base: foo){ reg foo [ 8 ] }",
-        ifacedef,
-        "InterfaceDef(base: foo) {\n  reg foo [ 8 ],\n}"
+        "interface(base: foo){ reg foo [ 8 ] }",
+        interface,
+        "interface(base: foo) {\n  reg foo [ 8 ],\n}"
     );
     // trailing comma
     test_parse_and_compare_ok!(
-        "InterfaceDef(base: foo){ reg foo [ 8 ], }",
-        ifacedef,
-        "InterfaceDef(base: foo) {\n  reg foo [ 8 ],\n}"
+        "interface(base: foo){ reg foo [ 8 ], }",
+        interface,
+        "interface(base: foo) {\n  reg foo [ 8 ],\n}"
     );
     // with two registers
     test_parse_and_compare_ok!(
-        "InterfaceDef(base: foo){ reg foo [ 8 ], reg foo [ 8 ] }",
-        ifacedef,
-        "InterfaceDef(base: foo) {\n  reg foo [ 8 ],\n  reg foo [ 8 ],\n}"
+        "interface(base: foo){ reg foo [ 8 ], reg foo [ 8 ] }",
+        interface,
+        "interface(base: foo) {\n  reg foo [ 8 ],\n  reg foo [ 8 ],\n}"
     );
 }
 
@@ -220,28 +139,18 @@ fn test_iface_def_ok() {
 fn test_iface_def_fail() {
     // no separator
     test_parse_and_check_fail!(
-        "InterfaceDef(base: foo){ reg foo [ 8 ]\n reg foo [ 8 ] }",
-        ifacedef
+        "interface(base: foo){ reg foo [ 8 ]\n reg foo [ 8 ] }",
+        interface
     );
     // wrong separator
     test_parse_and_check_fail!(
-        "InterfaceDef(base: foo){ reg foo [ 8 ]; reg foo [ 8 ] }",
-        ifacedef
+        "interface(base: foo){ reg foo [ 8 ]; reg foo [ 8 ] }",
+        interface
     );
 }
 
 // #[test]
 // fn test_iface_def_fail_error_messages() {
-//     test_parse_and_compare_file_fail!("interface/parts/interface_00_register_not_separated", ifacedef);
-//     test_parse_and_compare_file_fail!("interface/parts/interface_01_register_wrong_separator", ifacedef);
+//     test_parse_and_compare_file_fail!("interface/parts/interface_00_register_not_separated", interface);
+//     test_parse_and_compare_file_fail!("interface/parts/interface_01_register_wrong_separator", interface);
 // }
-
-#[test]
-fn test_iface() {
-    test_parse_and_compare_ok!("interface = None;", interface, "None\n");
-    test_parse_and_compare_ok!(
-        "interface = InterfaceDef(base: foo){};",
-        interface,
-        "InterfaceDef(base: foo) {\n}"
-    );
-}

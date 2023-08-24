@@ -29,7 +29,7 @@ segment DirectSegment(base : addr) {
     };
 
     // the state will be two registers:
-    state = StateDef(base: addr) {
+    state(base: addr) {
         reg address [ 8 ] {
             0 .. 48 val,
         },
@@ -39,13 +39,13 @@ segment DirectSegment(base : addr) {
             2 ..  3 exec,
             4 .. 48 bytes,
         }
-    };
+    }
 
     // just expose the entire state as MMIO interface
-    interface = InterfaceDef(base: addr) {
+    interface(base: addr) {
         mmio address [ base, 0, 8 ],
         mmio length [ base, 8, 8 ],
-    };
+    }
 
     // add the valid bit
     fn valid() -> bool {

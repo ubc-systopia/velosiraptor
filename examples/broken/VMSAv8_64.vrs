@@ -18,7 +18,7 @@ segment Invalid {
         state.entry.present == 0
     }
 
-    state = StateDef(base: addr) {
+    state(base: addr) {
         mem entry [base, 0, 8] {
             0 .. 1  present,
             1 .. 64 ignored,
@@ -33,7 +33,7 @@ segment TableDescriptor {
     }
 
 
-    state = StateDef(base :addr) {
+    state(base :addr) {
         mem entry [base, 0, 8] {
             0 ..  1 present,
             1 ..  2 table,
@@ -50,7 +50,7 @@ segment TableDescriptor {
 }
 
 segment Block {
-    state = StateDef(base :addr) {
+    state(base :addr) {
         mem entry [base, 0, 8] {
             0 ..  1 present,
             1 ..  2 table,
@@ -95,7 +95,7 @@ segment L3TableEntryPage {
         state.present == 1 && state.table == 1
     }
 
-    state = StateDef(base :addr) {
+    state(base :addr) {
         mem entry [base, 0, 8] {
             0 ..  1 present,
             1 ..  2 table,
@@ -147,7 +147,7 @@ segment L2TableEntryBlock {
     }
 
 
-    state = StateDef(base :addr) {
+    state(base :addr) {
         mem entry [base, 0, 8] {
             0 ..  1 present,
             1 ..  2 table,
@@ -205,7 +205,7 @@ segment L1TableEntryBlock {
     }
 
 
-    state = StateDef(base :addr) {
+    state(base :addr) {
         mem entry [base, 0, 8] {
             0 ..  1 present,
             1 ..  2 table,
@@ -297,7 +297,7 @@ const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
     //     }
     // };
 
-    state = StateDef(base: addr) {
+    state(base: addr) {
         mem pte [base, 0, 4] {
             // the following fields at starting bit, ending bit, name
             0 ..  1 present,
@@ -319,7 +319,7 @@ const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
         // reg cr4 [4],
     };
 
-    interface = InterfaceDef(base : addr) {
+    interface(base : addr) {
         mem pte [base, 0, 4] {
 
             Layout {
@@ -410,7 +410,7 @@ const PAGE_SIZE_LARGE : size = 512 * PAGE_SIZE;
 
 // represents an x86 page table entry
 staticmap X86PageTable(base : addr) {
-    mapdef = [ X86PageTableEntry(base + i * 4) for i in 0..1024 ];
+    maps [ X86PageTableEntry(base + i * 4) for i in 0..1024 ]
 }
 
 

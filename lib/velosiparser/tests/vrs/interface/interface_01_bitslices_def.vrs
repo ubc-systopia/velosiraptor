@@ -1,5 +1,5 @@
 segment MyUnit {
-  interface = InterfaceDef(base: foo) {
+  interface(base: foo) {
     // register with a simple slice
     reg foo [ 8 ] {
       Layout {
@@ -34,5 +34,5 @@ segment MyUnit {
         0 .. 2 foo
       }
     },
-  };
+  }
 }
