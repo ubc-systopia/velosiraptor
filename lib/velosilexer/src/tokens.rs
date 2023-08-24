@@ -53,11 +53,13 @@ pub enum VelosiKeyword {
     /// import statements
     Import,
     /// base type for static maps
-    StaticMap,
-    /// base type for configurable segments
-    Segment,
-    /// base type for enum
-    Enum,
+    StaticMapUnit,
+    /// base type for configurable segments units
+    SegmentUnit,
+    /// base type for enum units
+    EnumUnit,
+    /// unit defining an operating system spec
+    OSSpecUnit,
 
     //
     // Unit "elements"
@@ -162,6 +164,10 @@ pub enum VelosiKeyword {
     //
     /// Null-like value
     None,
+    /// declaring something as being extern
+    Extern,
+    /// declaring at type alias
+    Type,
 }
 
 impl VelosiKeyword {
@@ -171,9 +177,10 @@ impl VelosiKeyword {
             // language keywords
             VelosiKeyword::Const => "const",
             VelosiKeyword::Import => "import",
-            VelosiKeyword::StaticMap => "staticmap",
-            VelosiKeyword::Segment => "segment",
-            VelosiKeyword::Enum => "enum",
+            VelosiKeyword::StaticMapUnit => "staticmap",
+            VelosiKeyword::SegmentUnit => "segment",
+            VelosiKeyword::EnumUnit => "enum",
+            VelosiKeyword::OSSpecUnit => "osspec",
 
             // Unit "elements"
             VelosiKeyword::InBitWidth => "inbitwidth",
@@ -226,6 +233,8 @@ impl VelosiKeyword {
 
             // other keywords
             VelosiKeyword::None => "None",
+            VelosiKeyword::Extern => "extern",
+            VelosiKeyword::Type => "type",
         }
     }
 }
@@ -239,9 +248,10 @@ impl<'a> TryFrom<&'a str> for VelosiKeyword {
             // language keywords
             "const" => Ok(VelosiKeyword::Const),
             "import" => Ok(VelosiKeyword::Import),
-            "staticmap" => Ok(VelosiKeyword::StaticMap),
-            "segment" => Ok(VelosiKeyword::Segment),
-            "enum" => Ok(VelosiKeyword::Enum),
+            "staticmap" => Ok(VelosiKeyword::StaticMapUnit),
+            "segment" => Ok(VelosiKeyword::SegmentUnit),
+            "enum" => Ok(VelosiKeyword::EnumUnit),
+            "osspec" => Ok(VelosiKeyword::OSSpecUnit),
             //  Unit "elements"
             "inbitwidth" => Ok(VelosiKeyword::InBitWidth),
             "outbitwidth" => Ok(VelosiKeyword::OutBitWidth),
@@ -286,6 +296,8 @@ impl<'a> TryFrom<&'a str> for VelosiKeyword {
             "flags" => Ok(VelosiKeyword::FlagsType),
             // other
             "None" => Ok(VelosiKeyword::None),
+            "extern" => Ok(VelosiKeyword::Extern),
+            "type" => Ok(VelosiKeyword::Type),
             _ => Err(value),
         }
     }
@@ -668,17 +680,18 @@ impl TokKind for VelosiTokenKind {
 #[cfg(test)]
 #[test]
 fn test_enum_str() {
-    assert_eq!("segment".try_into(), Ok(VelosiKeyword::Segment));
-    assert_eq!(VelosiKeyword::Segment.as_str(), "segment");
-    assert_eq!("staticmap".try_into(), Ok(VelosiKeyword::StaticMap));
-    assert_eq!(VelosiKeyword::StaticMap.as_str(), "staticmap");
-    assert_eq!("enum".try_into(), Ok(VelosiKeyword::Enum));
-    assert_eq!(VelosiKeyword::Enum.as_str(), "enum");
-
-    assert_eq!("synth".try_into(), Ok(VelosiKeyword::Synth));
-    assert_eq!(VelosiKeyword::Synth.as_str(), "synth");
-    assert_eq!("abstract".try_into(), Ok(VelosiKeyword::Abstract));
-    assert_eq!(VelosiKeyword::Abstract.as_str(), "abstract");
+    assert_eq!("const".try_into(), Ok(VelosiKeyword::Const));
+    assert_eq!(VelosiKeyword::Const.as_str(), "const");
+    assert_eq!("import".try_into(), Ok(VelosiKeyword::Import));
+    assert_eq!(VelosiKeyword::Import.as_str(), "import");
+    assert_eq!("segment".try_into(), Ok(VelosiKeyword::SegmentUnit));
+    assert_eq!(VelosiKeyword::SegmentUnit.as_str(), "segment");
+    assert_eq!("staticmap".try_into(), Ok(VelosiKeyword::StaticMapUnit));
+    assert_eq!(VelosiKeyword::StaticMapUnit.as_str(), "staticmap");
+    assert_eq!("enum".try_into(), Ok(VelosiKeyword::EnumUnit));
+    assert_eq!(VelosiKeyword::EnumUnit.as_str(), "enum");
+    assert_eq!("osspec".try_into(), Ok(VelosiKeyword::OSSpecUnit));
+    assert_eq!(VelosiKeyword::OSSpecUnit.as_str(), "osspec");
 
     assert_eq!("inbitwidth".try_into(), Ok(VelosiKeyword::InBitWidth));
     assert_eq!(VelosiKeyword::InBitWidth.as_str(), "inbitwidth");
@@ -688,10 +701,11 @@ fn test_enum_str() {
     assert_eq!(VelosiKeyword::State.as_str(), "state");
     assert_eq!("interface".try_into(), Ok(VelosiKeyword::Interface));
     assert_eq!(VelosiKeyword::Interface.as_str(), "interface");
-
     assert_eq!("StateDef".try_into(), Ok(VelosiKeyword::StateDef));
     assert_eq!(VelosiKeyword::StateDef.as_str(), "StateDef");
     assert_eq!("InterfaceDef".try_into(), Ok(VelosiKeyword::InterfaceDef));
+    assert_eq!("mapdef".try_into(), Ok(VelosiKeyword::MapDef));
+    assert_eq!(VelosiKeyword::MapDef.as_str(), "mapdef");
 
     assert_eq!("mem".try_into(), Ok(VelosiKeyword::Mem));
     assert_eq!(VelosiKeyword::Mem.as_str(), "mem");
@@ -707,6 +721,13 @@ fn test_enum_str() {
     assert_eq!("Layout".try_into(), Ok(VelosiKeyword::Layout));
     assert_eq!(VelosiKeyword::Layout.as_str(), "Layout");
 
+    assert_eq!("fn".try_into(), Ok(VelosiKeyword::Fn));
+    assert_eq!(VelosiKeyword::Fn.as_str(), "fn");
+    assert_eq!("synth".try_into(), Ok(VelosiKeyword::Synth));
+    assert_eq!(VelosiKeyword::Synth.as_str(), "synth");
+    assert_eq!("abstract".try_into(), Ok(VelosiKeyword::Abstract));
+    assert_eq!(VelosiKeyword::Abstract.as_str(), "abstract");
+
     assert_eq!("if".try_into(), Ok(VelosiKeyword::If));
     assert_eq!(VelosiKeyword::If.as_str(), "if");
     assert_eq!("else".try_into(), Ok(VelosiKeyword::Else));
@@ -717,10 +738,21 @@ fn test_enum_str() {
     assert_eq!(VelosiKeyword::Let.as_str(), "let");
     assert_eq!("in".try_into(), Ok(VelosiKeyword::In));
     assert_eq!(VelosiKeyword::In.as_str(), "in");
-    assert_eq!("fn".try_into(), Ok(VelosiKeyword::Fn));
-    assert_eq!(VelosiKeyword::Fn.as_str(), "fn");
     assert_eq!("return".try_into(), Ok(VelosiKeyword::Return));
     assert_eq!(VelosiKeyword::Return.as_str(), "return");
+
+    assert_eq!("requires".try_into(), Ok(VelosiKeyword::Requires));
+    assert_eq!(VelosiKeyword::Requires.as_str(), "requires");
+    assert_eq!("ensures".try_into(), Ok(VelosiKeyword::Ensures));
+    assert_eq!(VelosiKeyword::Ensures.as_str(), "ensures");
+    assert_eq!("assert".try_into(), Ok(VelosiKeyword::Assert));
+    assert_eq!(VelosiKeyword::Assert.as_str(), "assert");
+    assert_eq!("forall".try_into(), Ok(VelosiKeyword::Forall));
+    assert_eq!(VelosiKeyword::Forall.as_str(), "forall");
+    assert_eq!("exists".try_into(), Ok(VelosiKeyword::Exists));
+    assert_eq!(VelosiKeyword::Exists.as_str(), "exists");
+    assert_eq!("invariant".try_into(), Ok(VelosiKeyword::Invariant));
+    assert_eq!(VelosiKeyword::Invariant.as_str(), "invariant");
 
     assert_eq!("addr".try_into(), Ok(VelosiKeyword::AddressType));
     assert_eq!(VelosiKeyword::AddressType.as_str(), "addr");
@@ -737,25 +769,10 @@ fn test_enum_str() {
     assert_eq!("flags".try_into(), Ok(VelosiKeyword::FlagsType));
     assert_eq!(VelosiKeyword::FlagsType.as_str(), "flags");
 
-    assert_eq!("requires".try_into(), Ok(VelosiKeyword::Requires));
-    assert_eq!(VelosiKeyword::Requires.as_str(), "requires");
-    assert_eq!("ensures".try_into(), Ok(VelosiKeyword::Ensures));
-    assert_eq!(VelosiKeyword::Ensures.as_str(), "ensures");
-    assert_eq!("invariant".try_into(), Ok(VelosiKeyword::Invariant));
-    assert_eq!(VelosiKeyword::Invariant.as_str(), "invariant");
-    assert_eq!("assert".try_into(), Ok(VelosiKeyword::Assert));
-    assert_eq!(VelosiKeyword::Assert.as_str(), "assert");
-    assert_eq!("forall".try_into(), Ok(VelosiKeyword::Forall));
-    assert_eq!(VelosiKeyword::Forall.as_str(), "forall");
-    assert_eq!("exists".try_into(), Ok(VelosiKeyword::Exists));
-    assert_eq!(VelosiKeyword::Exists.as_str(), "exists");
-
-    assert_eq!("const".try_into(), Ok(VelosiKeyword::Const));
-    assert_eq!(VelosiKeyword::Const.as_str(), "const");
-    assert_eq!("mapdef".try_into(), Ok(VelosiKeyword::MapDef));
-    assert_eq!(VelosiKeyword::MapDef.as_str(), "mapdef");
-    assert_eq!("import".try_into(), Ok(VelosiKeyword::Import));
-    assert_eq!(VelosiKeyword::Import.as_str(), "import");
     assert_eq!("None".try_into(), Ok(VelosiKeyword::None));
     assert_eq!(VelosiKeyword::None.as_str(), "None");
+    assert_eq!("extern".try_into(), Ok(VelosiKeyword::Extern));
+    assert_eq!(VelosiKeyword::Extern.as_str(), "extern");
+    assert_eq!("type".try_into(), Ok(VelosiKeyword::Type));
+    assert_eq!(VelosiKeyword::Type.as_str(), "type");
 }
