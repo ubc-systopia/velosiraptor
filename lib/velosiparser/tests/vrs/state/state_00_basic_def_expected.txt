@@ -1,7 +1,7 @@
 VelosiParseTree(tests/vrs/state/state_00_basic_def.vrs)
 ---------------------------------------------
 segment MyUnit {
-  state = StateDef(base: foo) {
+  state(base: foo) {
     reg foo [ 8 ],
     mem bar [ base, 0, 8 ],
   };

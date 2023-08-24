@@ -1,5 +1,5 @@
 segment MyUnit {
-  state = StateDef(base: foo, base2: addr) {
+  state(base: foo, base2: addr) {
     // register with a simple slice
     reg foo [ 8 ] {
       0 .. 2 foo
@@ -23,5 +23,5 @@ segment MyUnit {
         1025 .. 4 bar,
         0 .. 2 foo,
     },
-  };
+  }
 }

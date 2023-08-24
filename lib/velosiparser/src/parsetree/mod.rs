@@ -56,9 +56,9 @@ pub use field::{VelosiParseTreeField, VelosiParseTreeFieldSlice};
 pub use identifier::VelosiParseTreeIdentifier;
 pub use interface::{
     VelosiParseTreeInterface, VelosiParseTreeInterfaceAction, VelosiParseTreeInterfaceActions,
-    VelosiParseTreeInterfaceDef, VelosiParseTreeInterfaceField,
-    VelosiParseTreeInterfaceFieldMemory, VelosiParseTreeInterfaceFieldMmio,
-    VelosiParseTreeInterfaceFieldNode, VelosiParseTreeInterfaceFieldRegister,
+    VelosiParseTreeInterfaceField, VelosiParseTreeInterfaceFieldMemory,
+    VelosiParseTreeInterfaceFieldMmio, VelosiParseTreeInterfaceFieldNode,
+    VelosiParseTreeInterfaceFieldRegister,
 };
 pub use map::{
     VelosiParseTreeMap, VelosiParseTreeMapElement, VelosiParseTreeMapExplicit,
@@ -66,8 +66,8 @@ pub use map::{
 };
 pub use params::VelosiParseTreeParam;
 pub use state::{
-    VelosiParseTreeState, VelosiParseTreeStateDef, VelosiParseTreeStateField,
-    VelosiParseTreeStateFieldMemory, VelosiParseTreeStateFieldRegister,
+    VelosiParseTreeState, VelosiParseTreeStateField, VelosiParseTreeStateFieldMemory,
+    VelosiParseTreeStateFieldRegister,
 };
 pub use types::{VelosiParseTreeExternType, VelosiParseTreeType, VelosiParseTreeTypeInfo};
 pub use unit::{

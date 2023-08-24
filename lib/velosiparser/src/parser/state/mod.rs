@@ -27,7 +27,6 @@
 
 // external dependencies
 use nom::{
-    branch::alt,
     combinator::{cut, opt},
     multi::separated_list0,
     sequence::{delimited, tuple},
@@ -35,11 +34,8 @@ use nom::{
 
 // lexer, parser terminals and ast
 use crate::error::IResult;
-use crate::parser::{
-    parameter::param_list,
-    terminals::{assign, comma, kw_none, kw_state, kw_statedef, lbrace, rbrace, semicolon},
-};
-use crate::parsetree::{VelosiParseTreeState, VelosiParseTreeStateDef};
+use crate::parser::{parameter::param_list, terminals::*};
+use crate::parsetree::VelosiParseTreeState;
 use crate::VelosiTokenStream;
 
 // submodules
@@ -49,7 +45,7 @@ mod fields;
 // State Parsing
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// parses and consumes a state definition
+/// parses and consumes a state definition of a unit
 ///
 /// # Arguments
 ///
@@ -68,49 +64,16 @@ mod fields;
 ///
 /// # Grammar
 ///
-/// `STATE := KW_STATE ASSIGN (NONE | STATEDEF) SEMICOLON`
+/// `STATE := KW_STATE STATEPARAMS LBRACE STATEFIELDS RBRACE`
 ///
 /// # Examples
 ///
-/// * `state = None;`
-/// * `state = StateDef() { };`
+/// * `state() {}`
+/// * `state(base: int) { mem field [ base, 0, 0 ] }`
 pub fn state(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeState> {
-    // try to match the state keyword, if there is no match, return.
-    let (i1, _) = kw_state(input)?;
-
-    // We now parse the different state types.
-    cut(delimited(assign, alt((statedef, none_state)), semicolon))(i1)
-}
-
-/// parses and consumes a memory state definition of a unit
-///
-/// # Arguments
-///
-/// * `input` - input token stream to be parsed
-///
-/// # Results
-///
-/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
-///        recognized statedef definition as a parse tree node.
-/// * Err: The parser did not succed. The return value indicates whether this is:
-///
-///    * Error: a recoverable error indicating that the parser did not recognize the input but
-///             another parser might, or
-///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
-///               and that another parser would fail.
-///
-/// # Grammar
-///
-/// `STATEDEF := KW_STATEDEF STATEPARAMS LBRACE STATEFIELDS RBRACE`
-///
-/// # Examples
-///
-/// * `StateDef() {}`
-/// * `StateDef(base: int) { mem field [ base, 0, 0 ] }`
-fn statedef(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeState> {
     let mut pos = input.clone();
 
-    let (i1, _) = kw_statedef(input)?;
+    let (i1, _) = kw_state(input)?;
     let (i2, bases) = param_list(i1)?;
     let (i3, fields) = cut(delimited(
         lbrace,
@@ -120,42 +83,7 @@ fn statedef(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseT
 
     pos.span_until_start(&i3);
 
-    let st = VelosiParseTreeStateDef::new(bases, fields, pos);
-    Ok((i3, VelosiParseTreeState::StateDef(st)))
-}
-
-/// parses and consumes a none state definition of a unit
-///
-/// # Arguments
-///
-/// * `input` - input token stream to be parsed
-///
-/// # Results
-///
-/// * Ok:  The parser succeeded. The return value is a tuple of the remaining input and the
-///        recognized none state definition as a parse tree node.
-/// * Err: The parser did not succed. The return value indicates whether this is:
-///
-///    * Error: a recoverable error indicating that the parser did not recognize the input but
-///             another parser might, or
-///    * Failure: a fatal failure indicating the parser recognized the input but failed to parse it
-///               and that another parser would fail.
-///
-/// # Grammar
-///
-/// `NONE := KW_NONE`
-///
-/// # Examples
-///
-///  * `None`
-fn none_state(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeState> {
-    let mut pos = input.clone();
-
-    let (i1, _) = kw_none(input)?;
-
-    pos.span_until_start(&i1);
-
-    Ok((i1, VelosiParseTreeState::None(pos)))
+    Ok((i3, VelosiParseTreeState::new(bases, fields, pos)))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -169,53 +97,33 @@ use velosilexer::VelosiLexer;
 use crate::{test_parse_and_check_fail, test_parse_and_compare_ok};
 
 #[test]
-fn test_state_none_ok() {
-    test_parse_and_compare_ok!("None", none_state, "None\n");
-}
-
-#[test]
-fn test_state_none_fail() {
-    // nothing really...
-}
-
-#[test]
-fn test_iface_def_ok() {
-    test_parse_and_compare_ok!("StateDef(){}", statedef, "StateDef() {\n}\n");
-    test_parse_and_compare_ok!(
-        "StateDef(base: foo){}",
-        statedef,
-        "StateDef(base: foo) {\n}\n"
-    );
+fn test_state_def_ok() {
+    test_parse_and_compare_ok!("state(){}", state, "state() {\n}\n");
+    test_parse_and_compare_ok!("state(base: foo){}", state, "state(base: foo) {\n}\n");
     // with a register
     test_parse_and_compare_ok!(
-        "StateDef(base: foo){ reg foo [ 8 ] }",
-        statedef,
-        "StateDef(base: foo) {\n  reg foo [ 8 ],\n}\n"
+        "state(base: foo){ reg foo [ 8 ] }",
+        state,
+        "state(base: foo) {\n  reg foo [ 8 ],\n}\n"
     );
     // trailing comma
     test_parse_and_compare_ok!(
-        "StateDef(base: foo){ reg foo [ 8 ], }",
-        statedef,
-        "StateDef(base: foo) {\n  reg foo [ 8 ],\n}\n"
+        "state(base: foo){ reg foo [ 8 ], }",
+        state,
+        "state(base: foo) {\n  reg foo [ 8 ],\n}\n"
     );
     // with two registers
     test_parse_and_compare_ok!(
-        "StateDef(base: foo){ reg foo [ 8 ], reg foo [ 8 ] }",
-        statedef,
-        "StateDef(base: foo) {\n  reg foo [ 8 ],\n  reg foo [ 8 ],\n}\n"
+        "state(base: foo){ reg foo [ 8 ], reg foo [ 8 ] }",
+        state,
+        "state(base: foo) {\n  reg foo [ 8 ],\n  reg foo [ 8 ],\n}\n"
     );
 }
 
 #[test]
 fn test_iface_def_fail() {
     // no separator
-    test_parse_and_check_fail!(
-        "StateDef(base: foo){ reg foo [ 8 ]\n reg foo [ 8 ] }",
-        statedef
-    );
+    test_parse_and_check_fail!("state(base: foo){ reg foo [ 8 ]\n reg foo [ 8 ] }", state);
     // wrong separator
-    test_parse_and_check_fail!(
-        "StateDef(base: foo){ reg foo [ 8 ]; reg foo [ 8 ] }",
-        statedef
-    );
+    test_parse_and_check_fail!("state(base: foo){ reg foo [ 8 ]; reg foo [ 8 ] }", state);
 }

@@ -15,7 +15,7 @@ segment myunit(base : addr) {
     };
 
     // the state
-    state = StateDef(base: addr) {
+    state(base: addr) {
         mem f [base, 0, 4] {
             // the following fields at starting bit, ending bit, name
             0 ..  1 present,
@@ -23,7 +23,7 @@ segment myunit(base : addr) {
         }
     };
 
-    interface = InterfaceDef(base : addr) {
+    interface(base : addr) {
         mem f [base, 0, 4]
     };
 

@@ -36,14 +36,14 @@ abstract segment SegmentDescriptorBase(base: addr) {
 
 
 
-    state = StateDef(base: addr) {
+    state(base: addr) {
         mem entry_lo [ base, 0, 4 ] {
             0  .. 16 limit0,  // segment limit [15:0]
             16 .. 32 base0,   // base[15:0]
         },
         mem entry_hi [ base, 4, 4 ] {
              0 ..  8  base1,  // base[16:23]
-             8 .. 12  type,   // the type of the
+             8 .. 12  typ,    // the type of the
             12 .. 13  s,      // system or data/code
             13 .. 15  dpl,    // privilege level (ring)
             15 .. 16  p,      // present
@@ -54,12 +54,12 @@ abstract segment SegmentDescriptorBase(base: addr) {
             23 .. 24  g,      // granularity, if limit is in 4 KiB increments
             24 .. 32  base2,  // base[32..24]
         }
-    };
+    }
 
-    interface = InterfaceDef(base: addr) {
+    interface(base: addr) {
         mem entry_lo [ base, 0, 4 ],
         mem entry_hi [ base, 4, 4 ],
-    };
+    }
 
     #[remap]
     abstract fn matchflags(flgs : flags) -> bool;

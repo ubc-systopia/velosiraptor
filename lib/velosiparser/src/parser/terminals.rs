@@ -232,10 +232,8 @@ keywordparser!(pub kw_osspec, VelosiKeyword::OSSpecUnit);
 keywordparser!(pub kw_inbitwidth, VelosiKeyword::InBitWidth);
 keywordparser!(pub kw_outbitwidth, VelosiKeyword::OutBitWidth);
 keywordparser!(pub kw_state, VelosiKeyword::State);
-keywordparser!(pub kw_statedef, VelosiKeyword::StateDef);
 keywordparser!(pub kw_interface, VelosiKeyword::Interface);
-keywordparser!(pub kw_interfacedef, VelosiKeyword::InterfaceDef);
-keywordparser!(pub kw_mapdef, VelosiKeyword::MapDef);
+keywordparser!(pub kw_mapdef, VelosiKeyword::Map);
 
 keywordparser!(pub kw_mem, VelosiKeyword::Mem);
 keywordparser!(pub kw_reg, VelosiKeyword::Reg);
@@ -271,7 +269,7 @@ keywordparser!(pub kw_bool, VelosiKeyword::BooleanType);
 keywordparser!(pub kw_flags, VelosiKeyword::FlagsType);
 keywordparser!(pub kw_int, VelosiKeyword::IntegerType);
 
-keywordparser!(pub kw_none, VelosiKeyword::None);
+// keywordparser!(pub kw_none, VelosiKeyword::None);
 keywordparser!(pub kw_extern, VelosiKeyword::Extern);
 keywordparser!(pub kw_type, VelosiKeyword::Type);
 

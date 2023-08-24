@@ -342,7 +342,7 @@ impl Debug for VelosiParseTreeInterfaceField {
 
 /// Represents the parsed state description
 #[derive(PartialEq, Eq, Clone)]
-pub struct VelosiParseTreeInterfaceDef {
+pub struct VelosiParseTreeInterface {
     /// parameters of the state
     pub params: Vec<VelosiParseTreeParam>,
     /// the fields defined in teh state
@@ -351,7 +351,7 @@ pub struct VelosiParseTreeInterfaceDef {
     pub loc: VelosiTokenStream,
 }
 
-impl VelosiParseTreeInterfaceDef {
+impl VelosiParseTreeInterface {
     /// Create a new state definition
     pub fn new(
         params: Vec<VelosiParseTreeParam>,
@@ -364,11 +364,16 @@ impl VelosiParseTreeInterfaceDef {
             loc,
         }
     }
+
+    /// obtains the source position of the state definition
+    pub fn loc(&self) -> &VelosiTokenStream {
+        &self.loc
+    }
 }
 
-impl Display for VelosiParseTreeInterfaceDef {
+impl Display for VelosiParseTreeInterface {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "InterfaceDef(")?;
+        write!(f, "interface(")?;
         for (i, param) in self.params.iter().enumerate() {
             if i > 0 {
                 write!(f, ", ")?;
@@ -387,41 +392,6 @@ impl Display for VelosiParseTreeInterfaceDef {
             writeln!(f, ",")?;
         }
         write!(f, "}}")
-    }
-}
-
-/// Implementation of [Debug] for [VelosiParseTreeInterfaceDef]
-impl Debug for VelosiParseTreeInterfaceDef {
-    fn fmt(&self, format: &mut Formatter) -> FmtResult {
-        Display::fmt(&self, format)
-    }
-}
-
-/// Represents the state definition
-#[derive(PartialEq, Eq, Clone)]
-pub enum VelosiParseTreeInterface {
-    InterfaceDef(VelosiParseTreeInterfaceDef),
-    None(VelosiTokenStream),
-}
-
-impl VelosiParseTreeInterface {
-    /// obtains the source position of the state definition
-    pub fn loc(&self) -> &VelosiTokenStream {
-        match self {
-            VelosiParseTreeInterface::InterfaceDef(def) => &def.loc,
-            VelosiParseTreeInterface::None(loc) => loc,
-        }
-    }
-}
-
-impl Display for VelosiParseTreeInterface {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        match self {
-            VelosiParseTreeInterface::InterfaceDef(s) => Display::fmt(&s, f),
-            VelosiParseTreeInterface::None(_) => {
-                writeln!(f, "None")
-            }
-        }
     }
 }
 
