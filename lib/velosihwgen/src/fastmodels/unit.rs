@@ -29,14 +29,12 @@ use std::rc::Rc;
 use velosiast::ast::{
     VelosiAstBinOp, VelosiAstBinOpExpr, VelosiAstBoolLiteralExpr, VelosiAstExpr,
     VelosiAstFnCallExpr, VelosiAstIdentLiteralExpr, VelosiAstIfElseExpr, VelosiAstMethod,
-    VelosiAstNumLiteralExpr, VelosiAstParam, VelosiAstType, VelosiAstTypeInfo, VelosiAstUnOpExpr,
-    VelosiAstUnit,
+    VelosiAstNumLiteralExpr, VelosiAstType, VelosiAstTypeInfo, VelosiAstUnOpExpr, VelosiAstUnit,
 };
 use velosiast::{VelosiAstUnitEnum, VelosiAstUnitStaticMap};
 use C::Scope;
 
 use crate::fastmodels::add_header_comment;
-use crate::fastmodels::interface::{interface_class_name, interface_header_file};
 use crate::VelosiHwGenError;
 
 pub fn unit_header_file(name: &str) -> String {
@@ -45,6 +43,10 @@ pub fn unit_header_file(name: &str) -> String {
 
 pub fn unit_class_name(name: &str) -> String {
     format!("{}{}", name[0..1].to_uppercase(), &name[1..])
+}
+
+pub fn interface_class_name(name: &str) -> String {
+    format!("{}{}Interface", name[0..1].to_uppercase(), &name[1..])
 }
 
 pub fn state_class_name(name: &str) -> String {
@@ -505,7 +507,7 @@ fn add_unit_class(s: &mut Scope, ucn: String, unit: &VelosiAstUnit, ifn: String,
     let c = s.new_class(&ucn);
     c.set_base("TranslationUnitBase", C::Visibility::Public);
 
-    add_constructor(c, &unit, &ifn, &scn);
+    add_constructor(c, unit, &ifn, &scn);
     add_create(c, &ucn);
 
     // overrides virtual interface getter
@@ -543,7 +545,7 @@ fn add_unit_class(s: &mut Scope, ucn: String, unit: &VelosiAstUnit, ifn: String,
         // segments have methods within the .vrs
         VelosiAstUnit::Segment(_) => {
             match unit.get_method("translate") {
-                Some(tm) => add_translate_method_segment(c, &tm),
+                Some(tm) => add_translate_method_segment(c, tm),
                 None => panic!("segment with no explicit translate"),
             }
 
@@ -587,12 +589,9 @@ pub fn generate_unit_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), V
     s.new_include("framework/translation_unit_base.hpp", false);
     s.new_include("framework/logging.hpp", false);
 
-    match next_unit(unit) {
-        Some(u) => {
-            s.new_comment("translation unit specific includes");
-            s.new_include(&format!("{u}_unit.hpp"), false);
-        }
-        None => (),
+    if let Some(u) = next_unit(unit) {
+        s.new_comment("translation unit specific includes");
+        s.new_include(&format!("{u}_unit.hpp"), false);
     }
 
     add_state_classes(s, unit);
