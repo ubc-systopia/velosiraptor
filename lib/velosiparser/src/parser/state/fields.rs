@@ -302,18 +302,18 @@ fn test_slice_fail() {
 
 #[test]
 fn test_stateregister_field_ok() {
-    test_parse_and_compare_ok!("reg foo [ 8 ]", registerfield, "    reg foo [ 8 ]");
+    test_parse_and_compare_ok!("reg foo [ 8 ]", registerfield, "reg foo [ 8 ]");
 
     test_parse_and_compare_ok!(
         "reg foo [ 8 ] { 0 .. 1 foo }",
         registerfield,
-        "    reg foo [ 8 ] {\n      0..1 foo,\n    }"
+        "reg foo [ 8 ] {\n  0..1 foo,\n}"
     );
 
     test_parse_and_compare_ok!(
         "reg foo [ 8 ] { 0 .. 1 foo, 0 ..1 bar }",
         registerfield,
-        "    reg foo [ 8 ] {\n      0..1 foo,\n      0..1 bar,\n    }"
+        "reg foo [ 8 ] {\n  0..1 foo,\n  0..1 bar,\n}"
     );
 }
 
@@ -349,19 +349,19 @@ fn test_statememory_field_ok() {
     test_parse_and_compare_ok!(
         "mem foo [ base, 8, 8 ]",
         memoryfield,
-        "    mem foo [ base, 8, 8 ]"
+        "mem foo [ base, 8, 8 ]"
     );
 
     test_parse_and_compare_ok!(
         "mem foo [ base, 8, 8 ] { 0 .. 1 foo }",
         memoryfield,
-        "    mem foo [ base, 8, 8 ] {\n      0..1 foo,\n    }"
+        "mem foo [ base, 8, 8 ] {\n  0..1 foo,\n}"
     );
 
     test_parse_and_compare_ok!(
         "mem foo [ base, 8, 8 ] { 0 .. 1 foo, 0 ..1 bar }",
         memoryfield,
-        "    mem foo [ base, 8, 8 ] {\n      0..1 foo,\n      0..1 bar,\n    }"
+        "mem foo [ base, 8, 8 ] {\n  0..1 foo,\n  0..1 bar,\n}"
     );
 }
 

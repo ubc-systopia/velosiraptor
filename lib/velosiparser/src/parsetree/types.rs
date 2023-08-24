@@ -34,6 +34,8 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use crate::parsetree::VelosiParseTreeIdentifier;
 use crate::VelosiTokenStream;
 
+use super::VelosiParseTreeParam;
+
 /// Represents the type information, either built in or a type ref
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum VelosiParseTreeTypeInfo {
@@ -110,6 +112,39 @@ impl Display for VelosiParseTreeType {
 
 /// Implementation of [Debug] for [VelosiParseTreeType]
 impl Debug for VelosiParseTreeType {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Extern Types
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Represents the type information
+#[derive(PartialEq, Eq, Clone)]
+pub struct VelosiParseTreeExternType {
+    /// the identifier of the type
+    pub ident: VelosiParseTreeIdentifier,
+    /// the type information
+    pub fields: Vec<VelosiParseTreeParam>,
+    /// the location of the type clause
+    pub loc: VelosiTokenStream,
+}
+
+/// Implementation of trait [Display] for [VelosiParseTreeExternType]
+impl Display for VelosiParseTreeExternType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        writeln!(f, "extern type {} {{", self.ident)?;
+        for field in &self.fields {
+            writeln!(f, "  {field}")?;
+        }
+        writeln!(f, "}}")
+    }
+}
+
+/// Implementation of [Debug] for [VelosiParseTreeExternType]
+impl Debug for VelosiParseTreeExternType {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
         Display::fmt(&self, format)
     }

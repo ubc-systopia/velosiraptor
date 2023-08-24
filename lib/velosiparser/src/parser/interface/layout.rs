@@ -169,28 +169,20 @@ fn test_field_slice_fail_error_msg() {
 #[test]
 fn test_layout_ok() {
     // empty layout
-    test_parse_and_compare_ok!("Layout { }", layout, "      Layout {\n      }");
-    test_parse_and_compare_ok!(
-        "Layout { 0..1 foo }",
-        layout,
-        "      Layout {\n        0..1 foo,\n      }"
-    );
+    test_parse_and_compare_ok!("Layout { }", layout, "Layout {\n}");
+    test_parse_and_compare_ok!("Layout { 0..1 foo }", layout, "Layout {\n  0..1 foo,\n}");
     test_parse_and_compare_ok!(
         "Layout { 0..1 foo, 1..2 bar }",
         layout,
-        "      Layout {\n        0..1 foo,\n        1..2 bar,\n      }"
+        "Layout {\n  0..1 foo,\n  1..2 bar,\n}"
     );
 
     // trailing comma
-    test_parse_and_compare_ok!(
-        "Layout { 0..1 foo, }",
-        layout,
-        "      Layout {\n        0..1 foo,\n      }"
-    );
+    test_parse_and_compare_ok!("Layout { 0..1 foo, }", layout, "Layout {\n  0..1 foo,\n}");
     test_parse_and_compare_ok!(
         "Layout { 0..1 foo, 1..2 bar, }",
         layout,
-        "      Layout {\n        0..1 foo,\n        1..2 bar,\n      }"
+        "Layout {\n  0..1 foo,\n  1..2 bar,\n}"
     );
 }
 

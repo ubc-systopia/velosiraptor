@@ -224,9 +224,10 @@ macro_rules! keywordparser (($vis:vis $name:ident, $tag: expr) => (
 
 keywordparser!(pub kw_const, VelosiKeyword::Const);
 keywordparser!(pub kw_import, VelosiKeyword::Import);
-keywordparser!(pub kw_staticmap, VelosiKeyword::StaticMap);
-keywordparser!(pub kw_segment, VelosiKeyword::Segment);
-keywordparser!(pub kw_enum, VelosiKeyword::Enum);
+keywordparser!(pub kw_staticmap, VelosiKeyword::StaticMapUnit);
+keywordparser!(pub kw_segment, VelosiKeyword::SegmentUnit);
+keywordparser!(pub kw_enum, VelosiKeyword::EnumUnit);
+keywordparser!(pub kw_osspec, VelosiKeyword::OSSpecUnit);
 
 keywordparser!(pub kw_inbitwidth, VelosiKeyword::InBitWidth);
 keywordparser!(pub kw_outbitwidth, VelosiKeyword::OutBitWidth);
@@ -271,6 +272,8 @@ keywordparser!(pub kw_flags, VelosiKeyword::FlagsType);
 keywordparser!(pub kw_int, VelosiKeyword::IntegerType);
 
 keywordparser!(pub kw_none, VelosiKeyword::None);
+keywordparser!(pub kw_extern, VelosiKeyword::Extern);
+keywordparser!(pub kw_type, VelosiKeyword::Type);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Terminal Parsers: Types

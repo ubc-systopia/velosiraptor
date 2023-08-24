@@ -170,7 +170,7 @@ use crate::{test_parse_and_check_fail, test_parse_and_compare_ok};
 
 #[test]
 fn test_state_none_ok() {
-    test_parse_and_compare_ok!("None", none_state, "None;\n");
+    test_parse_and_compare_ok!("None", none_state, "None\n");
 }
 
 #[test]
@@ -180,29 +180,29 @@ fn test_state_none_fail() {
 
 #[test]
 fn test_iface_def_ok() {
-    test_parse_and_compare_ok!("StateDef(){}", statedef, "StateDef() {\n  };\n");
+    test_parse_and_compare_ok!("StateDef(){}", statedef, "StateDef() {\n}\n");
     test_parse_and_compare_ok!(
         "StateDef(base: foo){}",
         statedef,
-        "StateDef(base: foo) {\n  };\n"
+        "StateDef(base: foo) {\n}\n"
     );
     // with a register
     test_parse_and_compare_ok!(
         "StateDef(base: foo){ reg foo [ 8 ] }",
         statedef,
-        "StateDef(base: foo) {\n    reg foo [ 8 ],\n  };\n"
+        "StateDef(base: foo) {\n  reg foo [ 8 ],\n}\n"
     );
     // trailing comma
     test_parse_and_compare_ok!(
         "StateDef(base: foo){ reg foo [ 8 ], }",
         statedef,
-        "StateDef(base: foo) {\n    reg foo [ 8 ],\n  };\n"
+        "StateDef(base: foo) {\n  reg foo [ 8 ],\n}\n"
     );
     // with two registers
     test_parse_and_compare_ok!(
         "StateDef(base: foo){ reg foo [ 8 ], reg foo [ 8 ] }",
         statedef,
-        "StateDef(base: foo) {\n    reg foo [ 8 ],\n    reg foo [ 8 ],\n  };\n"
+        "StateDef(base: foo) {\n  reg foo [ 8 ],\n  reg foo [ 8 ],\n}\n"
     );
 }
 

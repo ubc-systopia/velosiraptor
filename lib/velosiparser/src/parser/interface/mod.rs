@@ -180,7 +180,7 @@ use crate::{test_parse_and_check_fail, test_parse_and_compare_ok};
 
 #[test]
 fn test_iface_none_ok() {
-    test_parse_and_compare_ok!("None", ifacenone, "None;\n");
+    test_parse_and_compare_ok!("None", ifacenone, "None\n");
 }
 
 #[test]
@@ -190,29 +190,29 @@ fn test_iface_none_fail() {
 
 #[test]
 fn test_iface_def_ok() {
-    test_parse_and_compare_ok!("InterfaceDef(){}", ifacedef, "InterfaceDef() {\n  };\n");
+    test_parse_and_compare_ok!("InterfaceDef(){}", ifacedef, "InterfaceDef() {\n}");
     test_parse_and_compare_ok!(
         "InterfaceDef(base: foo){}",
         ifacedef,
-        "InterfaceDef(base: foo) {\n  };\n"
+        "InterfaceDef(base: foo) {\n}"
     );
     // with a register
     test_parse_and_compare_ok!(
         "InterfaceDef(base: foo){ reg foo [ 8 ] }",
         ifacedef,
-        "InterfaceDef(base: foo) {\n    reg foo [ 8 ],\n  };\n"
+        "InterfaceDef(base: foo) {\n  reg foo [ 8 ],\n}"
     );
     // trailing comma
     test_parse_and_compare_ok!(
         "InterfaceDef(base: foo){ reg foo [ 8 ], }",
         ifacedef,
-        "InterfaceDef(base: foo) {\n    reg foo [ 8 ],\n  };\n"
+        "InterfaceDef(base: foo) {\n  reg foo [ 8 ],\n}"
     );
     // with two registers
     test_parse_and_compare_ok!(
         "InterfaceDef(base: foo){ reg foo [ 8 ], reg foo [ 8 ] }",
         ifacedef,
-        "InterfaceDef(base: foo) {\n    reg foo [ 8 ],\n    reg foo [ 8 ],\n  };\n"
+        "InterfaceDef(base: foo) {\n  reg foo [ 8 ],\n  reg foo [ 8 ],\n}"
     );
 }
 
@@ -238,10 +238,10 @@ fn test_iface_def_fail() {
 
 #[test]
 fn test_iface() {
-    test_parse_and_compare_ok!("interface = None;", interface, "None;\n");
+    test_parse_and_compare_ok!("interface = None;", interface, "None\n");
     test_parse_and_compare_ok!(
         "interface = InterfaceDef(base: foo){};",
         interface,
-        "InterfaceDef(base: foo) {\n  };\n"
+        "InterfaceDef(base: foo) {\n}"
     );
 }

@@ -68,17 +68,17 @@ impl VelosiParseTreeStateFieldMemory {
 
 impl Display for VelosiParseTreeStateFieldMemory {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "    mem {} [ ", self.name)?;
+        write!(f, "mem {} [ ", self.name)?;
         write!(f, "{}, {}, ", self.base, self.offset)?;
         write!(f, "{} ]", self.size)?;
         if !self.layout.is_empty() {
             writeln!(f, " {{")?;
             for slice in &self.layout {
-                write!(f, "      ")?;
+                write!(f, "  ")?;
                 Display::fmt(slice, f)?;
                 writeln!(f, ",")?;
             }
-            write!(f, "    }}")?;
+            write!(f, "}}")?;
         }
         Ok(())
     }
@@ -117,16 +117,16 @@ impl VelosiParseTreeStateFieldRegister {
 
 impl Display for VelosiParseTreeStateFieldRegister {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "    reg {} [", self.name)?;
+        write!(f, "reg {} [", self.name)?;
         write!(f, " {} ]", self.size)?;
         if !self.layout.is_empty() {
             writeln!(f, " {{")?;
             for slice in &self.layout {
-                write!(f, "      ")?;
+                write!(f, "  ")?;
                 Display::fmt(slice, f)?;
                 writeln!(f, ",")?;
             }
-            write!(f, "    }}")?;
+            write!(f, "}}")?;
         }
         Ok(())
     }
@@ -190,10 +190,16 @@ impl Display for VelosiParseTreeStateDef {
         }
         writeln!(f, ") {{")?;
         for field in &self.fields {
-            Display::fmt(field, f)?;
+            let formatted = format!("{}", field);
+            for (i, line) in formatted.lines().enumerate() {
+                if i > 0 {
+                    writeln!(f)?;
+                }
+                write!(f, "  {line}")?;
+            }
             writeln!(f, ",")?;
         }
-        writeln!(f, "  }};")
+        writeln!(f, "}}")
     }
 }
 
@@ -226,7 +232,7 @@ impl Display for VelosiParseTreeState {
         match self {
             VelosiParseTreeState::StateDef(s) => Display::fmt(&s, f),
             VelosiParseTreeState::None(_) => {
-                writeln!(f, "None;")
+                writeln!(f, "None")
             }
         }
     }

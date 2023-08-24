@@ -284,21 +284,17 @@ fn test_action_components_fail() {
 #[test]
 fn test_read_actions_ok() {
     // empty
-    test_parse_and_compare_ok!(
-        "ReadActions { }",
-        readactions,
-        "      ReadActions {\n      }"
-    );
+    test_parse_and_compare_ok!("ReadActions { }", readactions, "ReadActions {\n}");
     // single
     test_parse_and_compare_ok!(
         "ReadActions { A -> B; }",
         readactions,
-        "      ReadActions {\n        A -> B;\n      }"
+        "ReadActions {\n  A -> B;\n}"
     );
     test_parse_and_compare_ok!(
         "ReadActions { A -> B; A -> B; }",
         readactions,
-        "      ReadActions {\n        A -> B;\n        A -> B;\n      }"
+        "ReadActions {\n  A -> B;\n  A -> B;\n}"
     );
 }
 
@@ -334,21 +330,17 @@ fn test_read_actions_fail_error_msg() {
 #[test]
 fn test_write_actions_ok() {
     // empty
-    test_parse_and_compare_ok!(
-        "WriteActions { }",
-        writeactions,
-        "      WriteActions {\n      }"
-    );
+    test_parse_and_compare_ok!("WriteActions { }", writeactions, "WriteActions {\n}");
     // single
     test_parse_and_compare_ok!(
         "WriteActions { A -> B; }",
         writeactions,
-        "      WriteActions {\n        A -> B;\n      }"
+        "WriteActions {\n  A -> B;\n}"
     );
     test_parse_and_compare_ok!(
         "WriteActions { A -> B; A -> B; }",
         writeactions,
-        "      WriteActions {\n        A -> B;\n        A -> B;\n      }"
+        "WriteActions {\n  A -> B;\n  A -> B;\n}"
     );
 }
 

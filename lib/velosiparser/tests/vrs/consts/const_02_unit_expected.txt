@@ -4,9 +4,7 @@ const FOOBAR : int = 1234;
 
 segment Abc {
   const FOOBAR : int = 5432;
-
   const FOOBAR : int = 5432;
-
 }
 
 

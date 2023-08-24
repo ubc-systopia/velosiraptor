@@ -1,0 +1,24 @@
+extern type Bar {
+    field: int
+}
+
+segment Foo {
+    extern type Bar {
+
+    }
+
+    extern type Bar {
+        field: int
+    }
+
+    extern type Bar {
+        field: int,
+        field: bool,
+    }
+
+
+    extern type Bar {
+        field: int,
+        field: Baz,
+    }
+}

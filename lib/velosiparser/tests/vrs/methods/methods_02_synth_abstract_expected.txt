@@ -4,17 +4,14 @@ segment MyUnit {
   abstract fn foo() -> bool
     requires true
 
-
   abstract fn foo() -> bool
     requires true
   {
     true
   }
 
-
   synth fn foo() -> bool
     requires true
-
 
   synth fn foo() -> bool
     requires true
@@ -22,17 +19,14 @@ segment MyUnit {
     true
   }
 
-
   abstract synth fn foo() -> bool
     requires true
-
 
   abstract synth fn foo() -> bool
     requires true
   {
     true
   }
-
 
 }
 

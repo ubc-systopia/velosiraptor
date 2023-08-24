@@ -341,47 +341,47 @@ fn test_register_field_ok() {
     test_parse_and_compare_ok!(
         "reg foo [ 8 ] { Layout {} }",
         registerfield,
-        "    reg foo [ 8 ] {\n      Layout {\n      },\n    }"
+        "reg foo [ 8 ] {\n  Layout {\n  },\n}"
     );
     // trailing comma is ok
     test_parse_and_compare_ok!(
         "reg foo [ 8 ] { Layout {}, }",
         registerfield,
-        "    reg foo [ 8 ] {\n      Layout {\n      },\n    }"
+        "reg foo [ 8 ] {\n  Layout {\n  },\n}"
     );
     // it's ok to have the elements twice
     test_parse_and_compare_ok!(
         "reg foo [ 8 ] { Layout {}, Layout {}, }",
         registerfield,
-        "    reg foo [ 8 ] {\n      Layout {\n      },\n      Layout {\n      },\n    }"
+        "reg foo [ 8 ] {\n  Layout {\n  },\n  Layout {\n  },\n}"
     );
 
     test_parse_and_compare_ok!(
         "reg foo [ 8 ] { WriteActions {}, WriteActions {}, }",
         registerfield,
-        "    reg foo [ 8 ] {\n      WriteActions {\n      },\n      WriteActions {\n      },\n    }"
+        "reg foo [ 8 ] {\n  WriteActions {\n  },\n  WriteActions {\n  },\n}"
     );
 
     test_parse_and_compare_ok!(
         "reg foo [ 8 ] { ReadActions {}, ReadActions {}, }",
         registerfield,
-        "    reg foo [ 8 ] {\n      ReadActions {\n      },\n      ReadActions {\n      },\n    }"
+        "reg foo [ 8 ] {\n  ReadActions {\n  },\n  ReadActions {\n  },\n}"
     );
     // different orders of the body elements are ok
     test_parse_and_compare_ok!(
         "reg foo [ 8 ] { Layout {}, WriteActions{}, ReadActions{} }",
         registerfield,
-        "    reg foo [ 8 ] {\n      Layout {\n      },\n      WriteActions {\n      },\n      ReadActions {\n      },\n    }"
+        "reg foo [ 8 ] {\n  Layout {\n  },\n  WriteActions {\n  },\n  ReadActions {\n  },\n}"
     );
     test_parse_and_compare_ok!(
         "reg foo [ 8 ] { ReadActions {}, Layout {}, WriteActions{}, }",
         registerfield,
-        "    reg foo [ 8 ] {\n      ReadActions {\n      },\n      Layout {\n      },\n      WriteActions {\n      },\n    }"
+        "reg foo [ 8 ] {\n  ReadActions {\n  },\n  Layout {\n  },\n  WriteActions {\n  },\n}"
     );
     test_parse_and_compare_ok!(
         "reg foo [ 8 ] { WriteActions {}, Layout {}, ReadActions{} }",
         registerfield,
-        "    reg foo [ 8 ] {\n      WriteActions {\n      },\n      Layout {\n      },\n      ReadActions {\n      },\n    }"
+        "reg foo [ 8 ] {\n  WriteActions {\n  },\n  Layout {\n  },\n  ReadActions {\n  },\n}"
     );
 }
 
@@ -416,53 +416,53 @@ fn test_memory_field_ok() {
     test_parse_and_compare_ok!(
         "mem foo [ base, 0, 8 ]",
         memoryfield,
-        "    mem foo [ base, 0, 8 ]"
+        "mem foo [ base, 0, 8 ]"
     );
 
     test_parse_and_compare_ok!(
         "mem foo [ base, 0, 8 ] { Layout {} }",
         memoryfield,
-        "    mem foo [ base, 0, 8 ] {\n      Layout {\n      },\n    }"
+        "mem foo [ base, 0, 8 ] {\n  Layout {\n  },\n}"
     );
     // trailing comma is ok
     test_parse_and_compare_ok!(
         "mem foo [ base, 0, 8 ] { Layout {}, }",
         memoryfield,
-        "    mem foo [ base, 0, 8 ] {\n      Layout {\n      },\n    }"
+        "mem foo [ base, 0, 8 ] {\n  Layout {\n  },\n}"
     );
     // it's ok to have the elements twice
     test_parse_and_compare_ok!(
         "mem foo [ base, 0, 8 ] { Layout {}, Layout {}, }",
         memoryfield,
-        "    mem foo [ base, 0, 8 ] {\n      Layout {\n      },\n      Layout {\n      },\n    }"
+        "mem foo [ base, 0, 8 ] {\n  Layout {\n  },\n  Layout {\n  },\n}"
     );
 
     test_parse_and_compare_ok!(
         "mem foo [ base, 0, 8 ] { WriteActions {}, WriteActions {}, }",
         memoryfield,
-        "    mem foo [ base, 0, 8 ] {\n      WriteActions {\n      },\n      WriteActions {\n      },\n    }"
+        "mem foo [ base, 0, 8 ] {\n  WriteActions {\n  },\n  WriteActions {\n  },\n}"
     );
 
     test_parse_and_compare_ok!(
         "mem foo [ base, 0, 8 ] { ReadActions {}, ReadActions {}, }",
         memoryfield,
-        "    mem foo [ base, 0, 8 ] {\n      ReadActions {\n      },\n      ReadActions {\n      },\n    }"
+        "mem foo [ base, 0, 8 ] {\n  ReadActions {\n  },\n  ReadActions {\n  },\n}"
     );
     // different orders of the body elements are ok
     test_parse_and_compare_ok!(
         "mem foo [ base, 0, 8 ] { Layout {}, WriteActions{}, ReadActions{} }",
         memoryfield,
-        "    mem foo [ base, 0, 8 ] {\n      Layout {\n      },\n      WriteActions {\n      },\n      ReadActions {\n      },\n    }"
+        "mem foo [ base, 0, 8 ] {\n  Layout {\n  },\n  WriteActions {\n  },\n  ReadActions {\n  },\n}"
     );
     test_parse_and_compare_ok!(
         "mem foo [ base, 0, 8 ] { ReadActions {}, Layout {}, WriteActions{}, }",
         memoryfield,
-        "    mem foo [ base, 0, 8 ] {\n      ReadActions {\n      },\n      Layout {\n      },\n      WriteActions {\n      },\n    }"
+        "mem foo [ base, 0, 8 ] {\n  ReadActions {\n  },\n  Layout {\n  },\n  WriteActions {\n  },\n}"
     );
     test_parse_and_compare_ok!(
         "mem foo [ base, 0, 8 ] { WriteActions {}, Layout {}, ReadActions{} }",
         memoryfield,
-        "    mem foo [ base, 0, 8 ] {\n      WriteActions {\n      },\n      Layout {\n      },\n      ReadActions {\n      },\n    }"
+        "mem foo [ base, 0, 8 ] {\n  WriteActions {\n  },\n  Layout {\n  },\n  ReadActions {\n  },\n}"
     );
 }
 
@@ -498,53 +498,53 @@ fn test_mmio_field_ok() {
     test_parse_and_compare_ok!(
         "mmio foo [ base, 0, 8 ]",
         mmiofield,
-        "    mmio foo [ base, 0, 8 ]"
+        "mmio foo [ base, 0, 8 ]"
     );
 
     test_parse_and_compare_ok!(
         "mmio foo [ base, 0, 8 ] { Layout {} }",
         mmiofield,
-        "    mmio foo [ base, 0, 8 ] {\n      Layout {\n      },\n    }"
+        "mmio foo [ base, 0, 8 ] {\n  Layout {\n  },\n}"
     );
     // trailing comma is ok
     test_parse_and_compare_ok!(
         "mmio foo [ base, 0, 8 ] { Layout {}, }",
         mmiofield,
-        "    mmio foo [ base, 0, 8 ] {\n      Layout {\n      },\n    }"
+        "mmio foo [ base, 0, 8 ] {\n  Layout {\n  },\n}"
     );
     // it's ok to have the elements twice
     test_parse_and_compare_ok!(
         "mmio foo [ base, 0, 8 ] { Layout {}, Layout {}, }",
         mmiofield,
-        "    mmio foo [ base, 0, 8 ] {\n      Layout {\n      },\n      Layout {\n      },\n    }"
+        "mmio foo [ base, 0, 8 ] {\n  Layout {\n  },\n  Layout {\n  },\n}"
     );
 
     test_parse_and_compare_ok!(
         "mmio foo [ base, 0, 8 ] { WriteActions {}, WriteActions {}, }",
         mmiofield,
-        "    mmio foo [ base, 0, 8 ] {\n      WriteActions {\n      },\n      WriteActions {\n      },\n    }"
+        "mmio foo [ base, 0, 8 ] {\n  WriteActions {\n  },\n  WriteActions {\n  },\n}"
     );
 
     test_parse_and_compare_ok!(
         "mmio foo [ base, 0, 8 ] { ReadActions {}, ReadActions {}, }",
         mmiofield,
-        "    mmio foo [ base, 0, 8 ] {\n      ReadActions {\n      },\n      ReadActions {\n      },\n    }"
+        "mmio foo [ base, 0, 8 ] {\n  ReadActions {\n  },\n  ReadActions {\n  },\n}"
     );
     // different orders of the body elements are ok
     test_parse_and_compare_ok!(
         "mmio foo [ base, 0, 8 ] { Layout {}, WriteActions{}, ReadActions{} }",
         mmiofield,
-        "    mmio foo [ base, 0, 8 ] {\n      Layout {\n      },\n      WriteActions {\n      },\n      ReadActions {\n      },\n    }"
+        "mmio foo [ base, 0, 8 ] {\n  Layout {\n  },\n  WriteActions {\n  },\n  ReadActions {\n  },\n}"
     );
     test_parse_and_compare_ok!(
         "mmio foo [ base, 0, 8 ] { ReadActions {}, Layout {}, WriteActions{}, }",
         mmiofield,
-        "    mmio foo [ base, 0, 8 ] {\n      ReadActions {\n      },\n      Layout {\n      },\n      WriteActions {\n      },\n    }"
+        "mmio foo [ base, 0, 8 ] {\n  ReadActions {\n  },\n  Layout {\n  },\n  WriteActions {\n  },\n}"
     );
     test_parse_and_compare_ok!(
         "mmio foo [ base, 0, 8 ] { WriteActions {}, Layout {}, ReadActions{} }",
         mmiofield,
-        "    mmio foo [ base, 0, 8 ] {\n      WriteActions {\n      },\n      Layout {\n      },\n      ReadActions {\n      },\n    }"
+        "mmio foo [ base, 0, 8 ] {\n  WriteActions {\n  },\n  Layout {\n  },\n  ReadActions {\n  },\n}"
     );
 }
 

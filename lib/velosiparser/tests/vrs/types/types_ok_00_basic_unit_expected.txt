@@ -1,0 +1,29 @@
+VelosiParseTree(tests/vrs/types/types_ok_00_basic_unit.vrs)
+---------------------------------------------
+extern type Bar {
+  field: int
+}
+
+
+segment Foo {
+  extern type Bar {
+  }
+
+  extern type Bar {
+    field: int
+  }
+
+  extern type Bar {
+    field: int
+    field: bool
+  }
+
+  extern type Bar {
+    field: int
+    field: Baz
+  }
+
+}
+
+
+---------------------------------------------
