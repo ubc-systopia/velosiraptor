@@ -31,7 +31,7 @@ use nom::{branch::alt, combinator::map, multi::many0, Err};
 // the used library-internal functionality
 use crate::error::{IResult, VelosiParserErrBuilder};
 use crate::parsetree::{
-    VelosiParseTree, VelosiParseTreeConstDef, VelosiParseTreeContextNode, VelosiParseTreeExpr,
+    VelosiParseTree, VelosiParseTreeConstDef, VelosiParseTreeContextNode,
     VelosiParseTreeExternType, VelosiParseTreeFlags, VelosiParseTreeUnit,
 };
 use crate::VelosiTokenStream;
