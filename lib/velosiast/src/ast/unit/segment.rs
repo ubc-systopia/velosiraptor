@@ -456,6 +456,9 @@ impl VelosiAstUnitSegment {
                     &mut issues,
                     "Segments"
                 ),
+                VelosiParseTreeUnitNode::Type(_t) => {
+                    todo!("handle me")
+                }
                 VelosiParseTreeUnitNode::Map(f) => {
                     unit_ignore_node!(VelosiParseTreeUnitNode::Map, f, &mut issues, "Segments")
                 }

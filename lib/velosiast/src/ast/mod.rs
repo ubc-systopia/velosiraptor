@@ -192,6 +192,9 @@ impl VelosiAstRoot {
                         root.flags = Some(c);
                     }
                 }
+                VelosiParseTreeContextNode::Type(_t) => {
+                    todo!("implement me")
+                }
                 VelosiParseTreeContextNode::Import(_i) => {
                     unreachable!("Import nodes should have been removed!");
                 }

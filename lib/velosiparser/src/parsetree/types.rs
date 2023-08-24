@@ -132,6 +132,12 @@ pub struct VelosiParseTreeExternType {
     pub loc: VelosiTokenStream,
 }
 
+impl VelosiParseTreeExternType {
+    pub fn loc(&self) -> &VelosiTokenStream {
+        &self.loc
+    }
+}
+
 /// Implementation of trait [Display] for [VelosiParseTreeExternType]
 impl Display for VelosiParseTreeExternType {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
