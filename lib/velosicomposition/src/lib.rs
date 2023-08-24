@@ -36,6 +36,7 @@ use std::rc::Rc;
 
 //use std::fmt::{Display, Formatter, Result as FmtResult};
 
+use std::collections::{HashMap, HashSet};
 use velosiast::ast::{VelosiAstStaticMap, VelosiAstUnit};
 use velosiast::VelosiAst;
 
@@ -110,6 +111,18 @@ impl Relations {
         relations
     }
 
+    pub fn get_roots(&self) -> Vec<Rc<String>> {
+        let all_units: HashSet<Rc<String>> = self.0.keys().cloned().collect();
+        let referenced_units: HashSet<Rc<String>> = self
+            .0
+            .values()
+            .flatten()
+            .map(|unit| unit.ident())
+            .cloned()
+            .collect();
+        all_units.sub(&referenced_units).into_iter().collect()
+    }
+
     pub fn insert(&mut self, key: Rc<String>, value: VelosiAstUnit) {
         let entry = self.0.entry(key).or_insert_with(Vec::new);
         entry.push(value);
@@ -182,8 +195,6 @@ impl Relations {
         self.do_print_unit_hierarchy(root, 0);
     }
 }
-
-use std::collections::{HashMap, HashSet};
 
 pub fn extract_composition(ast: &VelosiAst) {
     let units = ast.units();
