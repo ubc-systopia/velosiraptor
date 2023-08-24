@@ -1,0 +1,7 @@
+* Arm FastModels Translation Module Framework Library
+
+Files copied from [[https://github.com/achreto/fm-translation-framework][Reto's fastmodels framework]] for easy hacking and less submodule wrangling in
+summer 2023. Changes to this structure later are welcome. See his repo for more information.
+
+This framework provides a set of base classes from which the generated fastmodels code inherits,
+reducing the total amount of generated code.

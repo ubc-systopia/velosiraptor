@@ -90,8 +90,9 @@ use self::unit::unit_header_file;
 
 pub struct ArmFastModelsModule {
     outdir: PathBuf,
-    fdir: String, // relative to outdir
+    support_dir: PathBuf,
     pkgname: String,
+    framework_dir: String, // relative to outdir
 }
 
 pub fn add_header_comment(scope: &mut C::Scope, unit: &str, comp: &str) {
@@ -102,35 +103,32 @@ pub fn add_header_comment(scope: &mut C::Scope, unit: &str, comp: &str) {
 
 impl ArmFastModelsModule {
     pub fn new(hwdir: &Path, pkgname: String) -> ArmFastModelsModule {
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+
+        let support_dir = Path::new(&manifest_dir)
+            .join("src")
+            .join("fastmodels")
+            .join("support");
+
         ArmFastModelsModule {
             outdir: hwdir.join("fastmodels"),
-            fdir: "fm_translation_framework".to_string(),
+            framework_dir: "fm_translation_framework".to_string(),
+            support_dir,
             pkgname,
         }
     }
 
     fn generate_top_makefile(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
-        // let what = Relations::from_ast(ast);
-        // relations.0.get(unit.ident()).is_some();
-
-
         let makefile = File::create(&self.outdir.join("Makefile"))?;
         let mut f = BufWriter::new(makefile);
 
         writeln!(f, "# This file is auto-generated\n")?;
 
-        writeln!(
-            f,
-            "FRAMEWORK_URL=https://github.com/mlechu/arm-fastmodels-translation-framework",
-        )?;
-        writeln!(
-            f,
-            "FRAMEWORK_COMMIT=ef7c98835cdcc3a57a9ffda813bfc6d4feeddd53",
-        )?;
-        writeln!(f, "FRAMEWORK_DIR={}", self.fdir)?;
+        writeln!(f, "FRAMEWORK_DIR={}", self.framework_dir)?;
+        writeln!(f, "SUPPORT_DIR=support")?;
 
         writeln!(f, "\nall: deps_framework")?;
-        writeln!(f, "\tmake -C {}", self.fdir)?;
+        writeln!(f, "\tmake -C {}", self.framework_dir)?;
         for u in ast.units() {
             if u.is_abstract() {
                 continue;
@@ -139,14 +137,8 @@ impl ArmFastModelsModule {
             writeln!(f, "\tmake -C {}", u.ident())?;
         }
 
-        writeln!(f, "deps_framework:")?;
-        writeln!(f, "\t!(test -s $(FRAMEWORK_DIR)/.git) &&\\")?;
-        writeln!(f, "\tgit clone $(FRAMEWORK_URL) $(FRAMEWORK_DIR);\\")?;
-        writeln!(f, "\tgit -C $(FRAMEWORK_DIR) fetch;\\")?;
-        writeln!(f, "\tgit -C $(FRAMEWORK_DIR) checkout $(FRAMEWORK_COMMIT)")?;
-
         writeln!(f, "\nclean:")?;
-        writeln!(f, "\trm -rf {}", self.fdir)?;
+        writeln!(f, "\trm -rf {}", self.framework_dir)?;
 
         f.flush()?;
 
@@ -165,7 +157,7 @@ impl ArmFastModelsModule {
         writeln!(f, "\n# Set the build directory")?;
         writeln!(f, "BUILD_DIR := $(CURDIR)/build")?;
         writeln!(f, "SOURCE_DIR := $(CURDIR)")?;
-        writeln!(f, "FRAMEWORK_DIR ?= $(CURDIR)/../{}", self.fdir)?;
+        writeln!(f, "FRAMEWORK_DIR ?= $(CURDIR)/../{}", self.framework_dir)?;
 
         writeln!(f, "# compiler flags")?;
         writeln!(
@@ -243,9 +235,24 @@ impl ArmFastModelsModule {
     }
 }
 
+fn copy_recursive(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
+    fs::create_dir_all(&dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        if ty.is_dir() {
+            copy_recursive(entry.path(), dst.as_ref().join(entry.file_name()))?;
+        } else {
+            fs::copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
+        }
+    }
+    Ok(())
+}
+
 impl VelosiHwGenBackend for ArmFastModelsModule {
     fn prepare(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
         // outdir/hw/fastmodels/<pkgname>/<unitname>
+
         for u in ast.units() {
             if u.is_abstract() {
                 continue;
@@ -253,6 +260,11 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
             let out_subdir = &self.outdir.join(u.ident_to_string());
             fs::create_dir_all(out_subdir)?;
         }
+
+        copy_recursive(
+            self.support_dir.join("fm_translation_framework"),
+            self.outdir.join("fm_translation_framework"),
+        )?;
         Ok(())
     }
 
