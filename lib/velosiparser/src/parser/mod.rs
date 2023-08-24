@@ -31,8 +31,8 @@ use nom::{branch::alt, combinator::map, multi::many0, Err};
 // the used library-internal functionality
 use crate::error::{IResult, VelosiParserErrBuilder};
 use crate::parsetree::{
-    VelosiParseTree, VelosiParseTreeConstDef, VelosiParseTreeContextNode, VelosiParseTreeFlags,
-    VelosiParseTreeUnit,
+    VelosiParseTree, VelosiParseTreeConstDef, VelosiParseTreeContextNode, VelosiParseTreeExpr,
+    VelosiParseTreeExternType, VelosiParseTreeFlags, VelosiParseTreeUnit,
 };
 use crate::VelosiTokenStream;
 
@@ -49,6 +49,7 @@ mod method;
 mod parameter;
 mod state;
 mod terminals;
+mod types;
 mod unit;
 
 // some re-exports for testing
@@ -99,6 +100,9 @@ pub fn parse(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParse
     // let (rem, nodes) = many0(alt((import, constdef, unit)))(input)?;
     let (rem, nodes) = many0(alt((
         import::import,
+        map(types::extern_type, |s: VelosiParseTreeExternType| {
+            VelosiParseTreeContextNode::Type(s)
+        }),
         map(constdef::constdef, |s: VelosiParseTreeConstDef| {
             VelosiParseTreeContextNode::Const(s)
         }),

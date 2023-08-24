@@ -69,7 +69,7 @@ pub use state::{
     VelosiParseTreeState, VelosiParseTreeStateDef, VelosiParseTreeStateField,
     VelosiParseTreeStateFieldMemory, VelosiParseTreeStateFieldRegister,
 };
-pub use types::{VelosiParseTreeType, VelosiParseTreeTypeInfo};
+pub use types::{VelosiParseTreeExternType, VelosiParseTreeType, VelosiParseTreeTypeInfo};
 pub use unit::{
     VelosiParseTreeEnum, VelosiParseTreeFlags, VelosiParseTreeMethod,
     VelosiParseTreeMethodProperty, VelosiParseTreeUnit, VelosiParseTreeUnitDef,
@@ -103,6 +103,7 @@ pub enum VelosiParseTreeContextNode {
     Import(VelosiParseTreeImport),
     Unit(VelosiParseTreeUnit),
     Flags(VelosiParseTreeFlags),
+    Type(VelosiParseTreeExternType),
 }
 
 /// Implement [Display] for [VelosiParseTree]
@@ -114,6 +115,7 @@ impl Display for VelosiParseTreeContextNode {
             Import(s) => Display::fmt(&s, f),
             Unit(s) => Display::fmt(&s, f),
             Flags(s) => Display::fmt(&s, f),
+            Type(s) => Display::fmt(&s, f),
         }
     }
 }

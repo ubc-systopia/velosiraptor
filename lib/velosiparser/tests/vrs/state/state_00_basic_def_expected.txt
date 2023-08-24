@@ -5,8 +5,6 @@ segment MyUnit {
     reg foo [ 8 ],
     mem bar [ base, 0, 8 ],
   };
-
-
 }
 
 

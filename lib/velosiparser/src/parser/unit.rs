@@ -47,14 +47,16 @@ use crate::parser::{
     parameter::param_list,
     state::state,
     terminals::{
-        assign, colon, comma, ident, kw_abstract, kw_enum, kw_inbitwidth, kw_outbitwidth,
-        kw_segment, kw_staticmap, lbrace, lparen, rbrace, rparen, semicolon,
+        assign, colon, comma, ident, kw_abstract, kw_enum, kw_inbitwidth, kw_osspec,
+        kw_outbitwidth, kw_segment, kw_staticmap, lbrace, lparen, rbrace, rparen, semicolon,
     },
+    types,
 };
 use crate::parsetree::{
-    VelosiParseTreeConstDef, VelosiParseTreeEnum, VelosiParseTreeFlags, VelosiParseTreeIdentifier,
-    VelosiParseTreeInterface, VelosiParseTreeMethod, VelosiParseTreeParam, VelosiParseTreeState,
-    VelosiParseTreeUnit, VelosiParseTreeUnitDef, VelosiParseTreeUnitNode,
+    VelosiParseTreeConstDef, VelosiParseTreeEnum, VelosiParseTreeExternType, VelosiParseTreeFlags,
+    VelosiParseTreeIdentifier, VelosiParseTreeInterface, VelosiParseTreeMethod,
+    VelosiParseTreeParam, VelosiParseTreeState, VelosiParseTreeUnit, VelosiParseTreeUnitDef,
+    VelosiParseTreeUnitNode,
 };
 use crate::VelosiTokenStream;
 
@@ -81,7 +83,7 @@ use crate::VelosiTokenStream;
 ///
 /// # Grammar
 ///
-/// UNIT := UNIT_SEGMENT | UNIT_STATICMAP | UNIT_ENUM
+/// UNIT := UNIT_SEGMENT | UNIT_STATICMAP | UNIT_ENUM | UNIT_OSSPEC
 ///
 /// # Example
 ///
@@ -89,7 +91,7 @@ use crate::VelosiTokenStream;
 /// * `staticmap Bar(foo: baz, bar: foo) : FooBar { ... }`
 ///
 pub fn unit(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnit> {
-    alt((unit_segment, unit_staticmap, unit_enum))(input)
+    alt((unit_segment, unit_staticmap, unit_enum, unit_osspec))(input)
 }
 
 /// parses the derived clause of a unit
@@ -223,6 +225,9 @@ fn unit_body(input: VelosiTokenStream) -> IResult<VelosiTokenStream, Vec<VelosiP
     many0(alt((
         inbitwidth_clause,
         outbitwidth_clause,
+        map(types::extern_type, |s: VelosiParseTreeExternType| {
+            VelosiParseTreeUnitNode::Type(s)
+        }),
         map(method, |s: VelosiParseTreeMethod| {
             VelosiParseTreeUnitNode::Method(s)
         }),
@@ -377,29 +382,36 @@ fn unit_enum(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParse
     Ok((i3, VelosiParseTreeUnit::Enum(unitdef)))
 }
 
-#[cfg(test)]
-//use crate::lexer::Lexer;
-#[test]
-fn test_ok() {
+/// parses and consumes a osspec unit declaration
+///
+/// # Arguments
+///
+///  * `input`  - token stream representing the current input position
+///
+/// # Return Value
+///
+/// Result type wrapping a [VelosiParseTreeUnit] and the remaining [VelosiTokenStream] if the
+/// parser succeeded, or an error wrapping the input position if the parser failed.
+///
+/// # Grammar
+///
+/// UNIT_OSSPEC := KW_OSSPEC UNIT_HEADER LBRACE UNIT_BODY RBRACE
+///
+fn unit_osspec(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiParseTreeUnit> {
+    let mut pos = input.clone();
 
-    // we need some more tests here that also include the unit body, as the
-    // parser now requires certain elements to be present.
+    // try to match the staticmap keyword, if there is no match, return early.
+    let (i1, _) = kw_osspec(input)?;
 
-    // let tokens = Lexer::lex_string("stdio", "segment foo {}").unwrap();
-    // let ts = VelosiTokenStream::from_vec(tokens);
-    // println!("{:?}", unit_segment(ts.clone()));
-    // assert!(unit_segment(ts).is_ok());
+    // we've seen the `osspec` keyword, next there needs to be the unit identifier,
+    // followed by some optional parameters and the derived clause.
+    let (i2, (unitname, params, derived)) = cut(unit_header)(i1)?;
 
-    // let tokens = Lexer::lex_string("stdio", "segment foo(base: addr) : bar {}").unwrap();
-    // let ts = VelosiTokenStream::from_vec(tokens);
-    // assert!(unit_segment(ts).is_ok());
+    // parse the body within the curly brances
+    let (i3, body) = cut(delimited(lbrace, unit_body, rbrace))(i2)?;
 
-    // let tokens =
-    //     Lexer::lex_string("stdio", "segment foo : bar { const foo : int = 32; }").unwrap();
-    // let ts = VelosiTokenStream::from_vec(tokens);
-    // assert!(unit_segment(ts).is_ok());
+    pos.span_until_start(&i3);
 
-    // let tokens = Lexer::lex_string("stdio", "segment foo : bar { size = 33; }").unwrap();
-    // let ts = VelosiTokenStream::from_vec(tokens);
-    // assert!(unit_segment(ts).is_ok());
+    let unitdef = VelosiParseTreeUnitDef::new(unitname, params, false, derived, body, pos);
+    Ok((i3, VelosiParseTreeUnit::OSSpec(unitdef)))
 }

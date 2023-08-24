@@ -5,25 +5,25 @@ segment MyUnit {
 
   fn foo() -> bool
 
-  fn foo() -> bool  {
+  fn foo() -> bool
+  {
     true
   }
 
-
-  fn bar() -> int  {
+  fn bar() -> int
+  {
     1 + 2
   }
 
-
-  fn bar(val: int) -> int  {
+  fn bar(val: int) -> int
+  {
     1 + val
   }
 
-
-  fn bar(val: int, val2: bool) -> int  {
+  fn bar(val: int, val2: bool) -> int
+  {
     if val2 { 1 + val } else { val }
   }
-
 
 }
 

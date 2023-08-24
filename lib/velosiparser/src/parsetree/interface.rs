@@ -79,7 +79,7 @@ impl VelosiParseTreeInterfaceActions {
 impl Display for VelosiParseTreeInterfaceActions {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         for a in &self.actions {
-            writeln!(f, "        {a}")?;
+            writeln!(f, "{a}")?;
         }
         Ok(())
     }
@@ -103,25 +103,31 @@ pub enum VelosiParseTreeInterfaceFieldNode {
 impl Display for VelosiParseTreeInterfaceFieldNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            VelosiParseTreeInterfaceFieldNode::Layout(l) => {
-                writeln!(f, "      Layout {{")?;
-                for s in l {
-                    writeln!(f, "        {s},")?;
+            VelosiParseTreeInterfaceFieldNode::Layout(slices) => {
+                writeln!(f, "Layout {{")?;
+                for slice in slices {
+                    writeln!(f, "  {slice},")?;
                 }
+                write!(f, "}}")?;
             }
             VelosiParseTreeInterfaceFieldNode::ReadActions(a) => {
-                writeln!(f, "      ReadActions {{")?;
-                Display::fmt(a, f)?;
+                writeln!(f, "ReadActions {{")?;
+                let formatted = format!("{a}");
+                for l in formatted.lines() {
+                    writeln!(f, "  {l}")?;
+                }
+                write!(f, "}}")?;
             }
             VelosiParseTreeInterfaceFieldNode::WriteActions(a) => {
-                writeln!(f, "      WriteActions {{")?;
-                Display::fmt(a, f)?;
-            } // VelosiParseTreeInterfaceFieldNode::ReadWriteActions(a) => {
-              //     writeln!(f, "      ReadWriteActions {{")?;
-              //     Display::fmt(a, f)?;
-              // }
+                writeln!(f, "WriteActions {{")?;
+                let formatted = format!("{a}");
+                for l in formatted.lines() {
+                    writeln!(f, "  {l}")?;
+                }
+                write!(f, "}}")?;
+            }
         }
-        write!(f, "      }}")
+        Ok(())
     }
 }
 
@@ -165,16 +171,22 @@ impl VelosiParseTreeInterfaceFieldMemory {
 
 impl Display for VelosiParseTreeInterfaceFieldMemory {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "    mem {} [ ", self.name)?;
+        write!(f, "mem {} [ ", self.name)?;
         write!(f, "{}, {}, ", self.base, self.offset)?;
         write!(f, "{} ]", self.size)?;
         if !self.nodes.is_empty() {
             writeln!(f, " {{")?;
-            for n in &self.nodes {
-                Display::fmt(n, f)?;
+            for node in &self.nodes {
+                let formatted = format!("{node}");
+                for (i, l) in formatted.lines().enumerate() {
+                    if i > 0 {
+                        writeln!(f)?;
+                    }
+                    write!(f, "  {l}")?;
+                }
                 writeln!(f, ",")?;
             }
-            write!(f, "    }}")?;
+            write!(f, "}}")?;
         }
         Ok(())
     }
@@ -220,16 +232,22 @@ impl VelosiParseTreeInterfaceFieldMmio {
 
 impl Display for VelosiParseTreeInterfaceFieldMmio {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "    mmio {} [ ", self.name)?;
+        write!(f, "mmio {} [ ", self.name)?;
         write!(f, "{}, {}, ", self.base, self.offset)?;
         write!(f, "{} ]", self.size)?;
         if !self.nodes.is_empty() {
             writeln!(f, " {{")?;
-            for n in &self.nodes {
-                Display::fmt(n, f)?;
+            for node in &self.nodes {
+                let formatted = format!("{node}");
+                for (i, l) in formatted.lines().enumerate() {
+                    if i > 0 {
+                        writeln!(f)?;
+                    }
+                    write!(f, "  {l}")?;
+                }
                 writeln!(f, ",")?;
             }
-            write!(f, "    }}")?;
+            write!(f, "}}")?;
         }
         Ok(())
     }
@@ -269,15 +287,21 @@ impl VelosiParseTreeInterfaceFieldRegister {
 
 impl Display for VelosiParseTreeInterfaceFieldRegister {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "    reg {} [ ", self.name)?;
+        write!(f, "reg {} [ ", self.name)?;
         write!(f, "{} ]", self.size)?;
         if !self.nodes.is_empty() {
             writeln!(f, " {{")?;
-            for n in &self.nodes {
-                Display::fmt(n, f)?;
+            for node in &self.nodes {
+                let formatted = format!("{node}");
+                for (i, l) in formatted.lines().enumerate() {
+                    if i > 0 {
+                        writeln!(f)?;
+                    }
+                    write!(f, "  {l}")?;
+                }
                 writeln!(f, ",")?;
             }
-            write!(f, "    }}")?;
+            write!(f, "}}")?;
         }
         Ok(())
     }
@@ -353,10 +377,16 @@ impl Display for VelosiParseTreeInterfaceDef {
         }
         writeln!(f, ") {{")?;
         for field in &self.fields {
-            Display::fmt(field, f)?;
+            let formatted = format!("{}", field);
+            for (i, line) in formatted.lines().enumerate() {
+                if i > 0 {
+                    writeln!(f)?;
+                }
+                write!(f, "  {line}")?;
+            }
             writeln!(f, ",")?;
         }
-        writeln!(f, "  }};")
+        write!(f, "}}")
     }
 }
 
@@ -389,7 +419,7 @@ impl Display for VelosiParseTreeInterface {
         match self {
             VelosiParseTreeInterface::InterfaceDef(s) => Display::fmt(&s, f),
             VelosiParseTreeInterface::None(_) => {
-                writeln!(f, "None;")
+                writeln!(f, "None")
             }
         }
     }

@@ -751,7 +751,7 @@ fn ident_expr(input: VelosiTokenStream) -> IResult<VelosiTokenStream, VelosiPars
         match t.kind() {
             VelosiTokenKind::Keyword(VelosiKeyword::State) => String::from("state"),
             VelosiTokenKind::Keyword(VelosiKeyword::Interface) => String::from("interface"),
-            VelosiTokenKind::Keyword(VelosiKeyword::StaticMap) => String::from("staticmap"),
+            VelosiTokenKind::Keyword(VelosiKeyword::StaticMapUnit) => String::from("staticmap"),
             VelosiTokenKind::Identifier(s) => String::from(s),
             _ => {
                 let err = VelosiParserErr::from_expected(

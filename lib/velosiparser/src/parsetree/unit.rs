@@ -32,9 +32,9 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 // used parsetree nodes
 use crate::parsetree::{
-    VelosiParseTreeConstDef, VelosiParseTreeExpr, VelosiParseTreeIdentifier,
-    VelosiParseTreeInterface, VelosiParseTreeMap, VelosiParseTreeParam, VelosiParseTreeState,
-    VelosiParseTreeType,
+    VelosiParseTreeConstDef, VelosiParseTreeExpr, VelosiParseTreeExternType,
+    VelosiParseTreeIdentifier, VelosiParseTreeInterface, VelosiParseTreeMap, VelosiParseTreeParam,
+    VelosiParseTreeState, VelosiParseTreeType,
 };
 use crate::VelosiTokenStream;
 
@@ -75,7 +75,7 @@ impl VelosiParseTreeMethod {
 impl Display for VelosiParseTreeMethod {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         if !self.properties.is_empty() {
-            write!(f, "  #[")?;
+            write!(f, "#[")?;
             for (i, prop) in self.properties.iter().enumerate() {
                 if i > 0 {
                     write!(f, ", ")?;
@@ -89,7 +89,6 @@ impl Display for VelosiParseTreeMethod {
             writeln!(f, "]")?;
         }
 
-        write!(f, "  ")?;
         if self.is_abstract {
             write!(f, "abstract ")?;
         }
@@ -110,20 +109,19 @@ impl Display for VelosiParseTreeMethod {
         }
 
         for require in self.requires.iter() {
-            write!(f, "\n    requires {require}")?;
+            write!(f, "\n  requires {require}")?;
         }
 
         for ensure in self.ensures.iter() {
-            write!(f, "\n    ensures {ensure}")?;
-        }
-
-        if !self.requires.is_empty() || !self.ensures.is_empty() {
-            writeln!(f)?;
+            write!(f, "\n  ensures {ensure}")?;
         }
 
         if let Some(body) = &self.body {
-            writeln!(f, "  {{\n    {body}\n  }}")?;
+            writeln!(f, "\n{{\n  {body}\n}}")?;
+        } else {
+            writeln!(f)?;
         }
+
         Ok(())
     }
 }
@@ -245,6 +243,8 @@ pub enum VelosiParseTreeUnitNode {
     Map(VelosiParseTreeMap),
     /// Enum entry
     EnumEntry(VelosiParseTreeEnum),
+    /// Extern type definition
+    Type(VelosiParseTreeExternType),
 }
 
 /// Implement [Display] for [VelosiParseTreeUnitNode]
@@ -252,35 +252,57 @@ impl Display for VelosiParseTreeUnitNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
             VelosiParseTreeUnitNode::Const(const_def) => {
-                write!(f, "  ")?;
                 Display::fmt(const_def, f)?;
             }
             VelosiParseTreeUnitNode::InBitWidth(e, _) => {
-                write!(f, "  inbitwidth = {e};")?;
+                write!(f, "inbitwidth = {e};")?;
             }
             VelosiParseTreeUnitNode::OutBitWidth(e, _) => {
-                write!(f, "  outbitwidth = {e};")?;
+                write!(f, "outbitwidth = {e};")?;
             }
             VelosiParseTreeUnitNode::Flags(flags) => {
-                write!(f, "  ")?;
                 Display::fmt(flags, f)?;
             }
             VelosiParseTreeUnitNode::State(state) => {
-                write!(f, "  state = ")?;
-                Display::fmt(state, f)?;
+                write!(f, "state = ")?;
+                let formatted = format!("{state}");
+
+                let lines = formatted.lines().enumerate().peekable();
+                for (i, line) in lines {
+                    if i == 0 {
+                        write!(f, "{line}")?;
+                    } else {
+                        // we want the last one on the same hight as the other
+                        write!(f, "\n{line}")?;
+                    }
+                }
+                write!(f, ";")?;
             }
             VelosiParseTreeUnitNode::Interface(interface) => {
-                write!(f, "  interface = ")?;
-                Display::fmt(interface, f)?;
+                write!(f, "interface = ")?;
+                let formatted = format!("{interface}");
+
+                let lines = formatted.lines().enumerate().peekable();
+                for (i, line) in lines {
+                    if i == 0 {
+                        write!(f, "{line}")?;
+                    } else {
+                        // we want the last one on the same hight as the other
+                        write!(f, "\n{line}")?;
+                    }
+                }
+                write!(f, ";")?;
             }
             VelosiParseTreeUnitNode::Method(method) => Display::fmt(method, f)?,
             VelosiParseTreeUnitNode::Map(map) => {
-                write!(f, "  staticmap = ")?;
+                write!(f, "staticmap = ")?;
                 Display::fmt(map, f)?;
             }
             VelosiParseTreeUnitNode::EnumEntry(enum_entry) => {
-                write!(f, "  ")?;
                 Display::fmt(enum_entry, f)?;
+            }
+            VelosiParseTreeUnitNode::Type(ty) => {
+                Display::fmt(ty, f)?;
             }
         }
         writeln!(f)
@@ -365,7 +387,14 @@ impl Display for VelosiParseTreeUnitDef {
 
         writeln!(f, " {{")?;
         for n in self.nodes.iter() {
-            writeln!(f, "{n}")?;
+            let formatted = format!("{n}");
+            for l in formatted.lines() {
+                if l.trim().is_empty() {
+                    writeln!(f)?;
+                } else {
+                    writeln!(f, "  {l}")?;
+                }
+            }
         }
 
         writeln!(f, "}}")
@@ -399,6 +428,8 @@ pub enum VelosiParseTreeUnit {
     StaticMap(VelosiParseTreeUnitDef),
     /// This is an enum unit
     Enum(VelosiParseTreeUnitDef),
+    /// this is an OS Spec Unit
+    OSSpec(VelosiParseTreeUnitDef),
 }
 
 impl VelosiParseTreeUnit {
@@ -407,6 +438,7 @@ impl VelosiParseTreeUnit {
             VelosiParseTreeUnit::Segment(unit) => &unit.loc,
             VelosiParseTreeUnit::StaticMap(unit) => &unit.loc,
             VelosiParseTreeUnit::Enum(unit) => &unit.loc,
+            VelosiParseTreeUnit::OSSpec(unit) => &unit.loc,
         }
     }
 }
@@ -431,6 +463,10 @@ impl Display for VelosiParseTreeUnit {
             }
             VelosiParseTreeUnit::Enum(unit) => {
                 write!(f, "enum ")?;
+                Display::fmt(&unit, f)
+            }
+            VelosiParseTreeUnit::OSSpec(unit) => {
+                write!(f, "osspec ")?;
                 Display::fmt(&unit, f)
             }
         }

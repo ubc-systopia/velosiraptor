@@ -6,8 +6,6 @@ segment MyUnit {
     mem bar [ base, 0, 8 ],
     mmio baz [ base, 8, 8 ],
   };
-
-
 }
 
 

@@ -34,7 +34,7 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 // use crate functionality
 use crate::parsetree::{
     VelosiParseTreeExpr, VelosiParseTreeFnCallExpr, VelosiParseTreeIdentifier,
-    VelosiParseTreeRangeExpr,VelosiParseTreeMethodProperty
+    VelosiParseTreeMethodProperty, VelosiParseTreeRangeExpr,
 };
 use crate::VelosiTokenStream;
 

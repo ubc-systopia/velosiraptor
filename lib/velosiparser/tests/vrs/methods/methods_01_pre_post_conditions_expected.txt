@@ -4,15 +4,12 @@ segment MyUnit {
   fn foo() -> bool
     requires true
 
-
   fn foo() -> bool
     ensures true
-
 
   fn foo() -> bool
     requires true
     ensures true
-
 
   fn foo() -> bool
     requires true
@@ -20,13 +17,11 @@ segment MyUnit {
     true
   }
 
-
   fn foo() -> bool
     ensures true
   {
     true
   }
-
 
   fn foo() -> bool
     requires true
@@ -34,7 +29,6 @@ segment MyUnit {
   {
     true
   }
-
 
   fn bar(val: int) -> int
     requires true
@@ -44,7 +38,6 @@ segment MyUnit {
   {
     1 + val
   }
-
 
 }
 

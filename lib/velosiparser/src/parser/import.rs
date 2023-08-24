@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! # Import Clause
+//! # VelosiParser: Import Clause
 
 // external dependencies
 use nom::{combinator::cut, sequence::terminated};

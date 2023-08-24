@@ -20,8 +20,6 @@ segment MyUnit {
       0..2 foo,
     },
   };
-
-
 }
 
 
