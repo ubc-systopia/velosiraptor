@@ -40,18 +40,18 @@ use crustal as C;
 use crate::VelosiHwGenBackend;
 use crate::VelosiHwGenError;
 use crate::COPYRIGHT;
-use velosiast::{VelosiAst, VelosiAstUnit};
+use velosiast::{VelosiAst};
 
 // the generators
-mod state;
-use state::{generate_state_header, generate_state_impl, state_impl_file};
-mod interface;
-use interface::{generate_interface_header, generate_interface_impl, interface_impl_file};
+// mod state;
+// use state::{state_impl_file};
+// mod interface;
+// use interface::{interface_impl_file};
 mod unit;
 use unit::generate_unit_header;
 mod registers;
 use registers::{generate_register_header, generate_register_impl};
-use velosicomposition::Relations;
+
 
 use self::unit::unit_header_file;
 
@@ -188,16 +188,16 @@ impl ArmFastModelsModule {
             "TRANSLATION_UNIT_SRCS := $(SOURCE_DIR)/{}",
             unit_header_file(name)
         )?;
-        writeln!(
-            f,
-            "TRANSLATION_UNIT_SRCS += $(SOURCE_DIR)/{}",
-            interface_impl_file(name)
-        )?;
-        writeln!(
-            f,
-            "TRANSLATION_UNIT_SRCS += $(SOURCE_DIR)/{}",
-            state_impl_file(name)
-        )?;
+        // writeln!(
+        //     f,
+        //     "TRANSLATION_UNIT_SRCS += $(SOURCE_DIR)/{}",
+        //     interface_impl_file(name)
+        // )?;
+        // writeln!(
+        //     f,
+        //     "TRANSLATION_UNIT_SRCS += $(SOURCE_DIR)/{}",
+        //     state_impl_file(name)
+        // )?;
 
         writeln!(f, "\n# Object Files")?;
         writeln!(

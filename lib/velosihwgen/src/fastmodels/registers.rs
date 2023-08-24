@@ -24,7 +24,7 @@
 // SOFTWARE.
 
 use crate::fastmodels::add_header_comment;
-use crate::fastmodels::state::{state_class_name, state_header_file};
+use crate::fastmodels::unit::state_class_name;
 use crate::VelosiHwGenError;
 use crustal as C;
 use std::ops::Deref;
@@ -33,10 +33,6 @@ use velosiast::{VelosiAst, VelosiAstField, VelosiAstInterfaceField, VelosiAstUni
 
 pub fn registers_header_file(name: &str) -> String {
     format!("{}_registers.hpp", name)
-}
-
-pub fn registers_header_file_path(name: &str) -> String {
-    registers_header_file(name)
 }
 
 pub fn registers_impl_file(name: &str) -> String {
@@ -90,7 +86,7 @@ pub fn generate_register_header(
         let rs = register_map(|r| r.clone(), u);
 
         if !rs.is_empty() {
-            let state_h = u.ident_to_string() + "/" + &state_header_file(u.ident());
+            let state_h = u.ident_to_string();
             s.new_include(&state_h, false);
         }
 
@@ -115,7 +111,7 @@ pub fn generate_register_header(
     }
 
     // done, save the scope
-    let filename = registers_header_file_path(pkgname);
+    let filename = registers_header_file(pkgname);
     scope.set_filename(&filename);
     scope.to_file(outdir, true)?;
 
