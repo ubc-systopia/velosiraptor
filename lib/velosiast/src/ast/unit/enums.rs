@@ -391,6 +391,9 @@ impl VelosiAstUnitEnum {
                 VelosiParseTreeUnitNode::Map(m) => {
                     unit_ignore_node!(VelosiParseTreeUnitNode::Map, m, &mut issues, "Enum")
                 }
+                VelosiParseTreeUnitNode::Type(t) => {
+                    unit_ignore_node!(VelosiParseTreeUnitNode::Type, t, &mut issues, "Enum")
+                }
             }
         }
 

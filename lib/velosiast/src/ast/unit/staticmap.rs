@@ -249,6 +249,9 @@ impl VelosiAstUnitStaticMap {
                     &mut issues,
                     "StaticMap"
                 ),
+                VelosiParseTreeUnitNode::Type(t) => {
+                    unit_ignore_node!(VelosiParseTreeUnitNode::Type, t, &mut issues, "StaticMap")
+                }
             }
         }
 

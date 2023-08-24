@@ -97,6 +97,7 @@ impl VelosiAstUnit {
             Segment(pt) => VelosiAstUnitSegment::from_parse_tree(pt, st),
             StaticMap(pt) => VelosiAstUnitStaticMap::from_parse_tree(pt, st),
             Enum(pt) => VelosiAstUnitEnum::from_parse_tree(pt, st),
+            OSSpec(_pt) => todo!("handle me"),
         }
     }
 
