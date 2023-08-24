@@ -5,7 +5,7 @@ extern type Bar {
 }
 
 
-segment Foo {
+osspec Foo {
   extern type Bar {
   }
 

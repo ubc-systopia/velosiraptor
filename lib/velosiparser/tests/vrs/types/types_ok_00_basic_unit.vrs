@@ -2,7 +2,7 @@ extern type Bar {
     field: int
 }
 
-segment Foo {
+osspec Foo {
     extern type Bar {
 
     }
