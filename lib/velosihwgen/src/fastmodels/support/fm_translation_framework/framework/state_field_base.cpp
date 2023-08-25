@@ -53,7 +53,7 @@ bool StateFieldBase::add_slice(const std::string &name, uint8_t start, uint8_t e
 
     // taking >= here, as the end bit is (N-1) for a bitwidth of N
     if (end >= this->bitwidth) {
-        Logging::error("StateFieldBase::add_slice: end > bitwidth\n");
+        Logging::error("StateFieldBase::add_slice: end (%d) > bitwidth (%d)\n", end, this->bitwidth);
         return false;
     }
 
