@@ -57,9 +57,9 @@ impl VelosiHwGen {
         VelosiHwGen::FastModels(ArmFastModelsModule::new(path.as_path(), pkg))
     }
 
-    pub fn prepare(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
+    pub fn prepare(&self) -> Result<(), VelosiHwGenError> {
         match self {
-            VelosiHwGen::FastModels(b) => b.prepare(ast),
+            VelosiHwGen::FastModels(b) => b.prepare(),
         }
     }
 
@@ -69,16 +69,16 @@ impl VelosiHwGen {
         }
     }
 
-    pub fn finalize(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
+    pub fn finalize(&self, _ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
         match self {
-            VelosiHwGen::FastModels(b) => b.finalize(ast),
+            VelosiHwGen::FastModels(b) => b.finalize(),
         }
     }
 }
 
 pub trait VelosiHwGenBackend {
     /// prepares the component generation, creating the directories etc
-    fn prepare(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
+    fn prepare(&self) -> Result<(), VelosiHwGenError>;
     fn generate(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
-    fn finalize(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError>;
+    fn finalize(&self) -> Result<(), VelosiHwGenError>;
 }

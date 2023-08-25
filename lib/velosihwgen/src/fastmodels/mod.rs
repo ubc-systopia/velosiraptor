@@ -27,10 +27,11 @@
 //!
 //! This module contains a generator for a Arm FastModels component.
 
+use std::collections::HashMap;
 // the used external libraries
 use std::fs;
 use std::fs::File;
-use std::io::{BufWriter, Write};
+use std::io::{BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 
 // other libraries
@@ -40,7 +41,7 @@ use crustal as C;
 use crate::VelosiHwGenBackend;
 use crate::VelosiHwGenError;
 use crate::COPYRIGHT;
-use velosiast::{VelosiAst};
+use velosiast::VelosiAst;
 
 // the generators
 // mod state;
@@ -52,7 +53,6 @@ use unit::generate_unit_header;
 mod registers;
 use registers::{generate_register_header, generate_register_impl};
 
-
 use self::unit::unit_header_file;
 
 /// # The Arm FastModels Platform Module
@@ -62,31 +62,26 @@ use self::unit::unit_header_file;
 ///
 /// ## Generated File Structure
 ///
-/// main makefile will call all unit makefiles
-///  - outdir/hw/fastmodels/Makefile
+/// outdir/hw/fastmodels/Makefile
+/// outdir/hw/fastmodels/<vrs>.lisa
+/// outdir/hw/fastmodels/bootimg.bin
+/// outdir/hw/fastmodels/<vrs>_registers.cpp
+/// outdir/hw/fastmodels/<vrs>_registers.hpp
+/// outdir/hw/fastmodels/platform/Platform.sgproj
+/// outdir/hw/fastmodels/platform/Platform.lisa
 ///
-/// for unit in vrs:
-///  - outdir/hw/fastmodels/<unit>/
-///  - outdir/hw/fastmodels/<unit>/Makefile
-///  - outdir/hw/fastmodels/<unit>/<unit>_interface.hpp
-///  - outdir/hw/fastmodels/<unit>/<unit>_interface.cpp
-///  - outdir/hw/fastmodels/<unit>/<unit>_state.hpp
-///  - outdir/hw/fastmodels/<unit>/<unit>_state.cpp
-///  - outdir/hw/fastmodels/<unit>/<unit>_unit.hpp
-///  - outdir/hw/fastmodels/<vrs>_registers.cpp
-///  - outdir/hw/fastmodels/<vrs>_registers.hpp
+/// for subunit in vrs:
+///    outdir/hw/fastmodels/src/<subunit>.cpp
 ///
-///  Fastmodels framework lib is adjacent to units
-///  note no unit can share the name of the framework folder
-///  - outdir/hw/fastmodels/fm-translation-framework/
-///  - outdir/hw/fastmodels/fm-translation-framework/accessmode.hpp
-///  - outdir/hw/fastmodels/fm-translation-framework/interface_base.hpp
-///  - outdir/hw/fastmodels/fm-translation-framework/logging.hpp
-///  - outdir/hw/fastmodels/fm-translation-framework/register_base.hpp
-///  - outdir/hw/fastmodels/fm-translation-framework/state_base.hpp
-///  - outdir/hw/fastmodels/fm-translation-framework/state_field_base.hpp
-///  - outdir/hw/fastmodels/fm-translation-framework/translation_unit_base.hpp
-///  - outdir/hw/fastmodels/fm-translation-framework/types.hpp
+/// outdir/hw/fastmodels/fm-translation-framework/
+/// outdir/hw/fastmodels/fm-translation-framework/accessmode.hpp
+/// outdir/hw/fastmodels/fm-translation-framework/interface_base.hpp
+/// outdir/hw/fastmodels/fm-translation-framework/logging.hpp
+/// outdir/hw/fastmodels/fm-translation-framework/register_base.hpp
+/// outdir/hw/fastmodels/fm-translation-framework/state_base.hpp
+/// outdir/hw/fastmodels/fm-translation-framework/state_field_base.hpp
+/// outdir/hw/fastmodels/fm-translation-framework/translation_unit_base.hpp
+/// outdir/hw/fastmodels/fm-translation-framework/types.hpp
 
 pub struct ArmFastModelsModule {
     outdir: PathBuf,
@@ -249,59 +244,89 @@ fn copy_recursive(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Resu
     Ok(())
 }
 
-impl VelosiHwGenBackend for ArmFastModelsModule {
-    fn prepare(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
-        // outdir/hw/fastmodels/<pkgname>/<unitname>
+// Find-and-replace for support files
+fn fill_template(
+    src: impl AsRef<Path>,
+    dst: impl AsRef<Path>,
+    subs: HashMap<&String, &String>,
+) -> std::io::Result<()> {
+    let mut data = String::new();
+    let mut f = File::open(src).unwrap();
+    f.read_to_string(&mut data)?;
 
-        for u in ast.units() {
-            if u.is_abstract() {
-                continue;
-            }
-            let out_subdir = &self.outdir.join(u.ident_to_string());
-            fs::create_dir_all(out_subdir)?;
-        }
+    for (k, v) in subs {
+        data = data.replace(k, v);
+    }
+
+    let mut out = File::create(dst)?;
+    let _n = out.write(data.as_bytes())?;
+
+    Ok(())
+}
+
+impl VelosiHwGenBackend for ArmFastModelsModule {
+    fn prepare(&self) -> Result<(), VelosiHwGenError> {
+        fs::create_dir_all(self.outdir.join("src"))?;
+        fs::create_dir_all(self.outdir.join("platform"))?;
+
+        fs::copy(
+            self.support_dir.join("bootimg.bin"),
+            self.outdir.join("bootimg.bin"),
+        )?;
 
         copy_recursive(
             self.support_dir.join("fm_translation_framework"),
             self.outdir.join("fm_translation_framework"),
         )?;
+
         Ok(())
     }
 
     fn generate(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
+        let top_files = velosicomposition::Relations::from_ast(ast).get_roots();
+        if top_files.len() != 1 {
+            panic!("!= 1 root unit found");
+        }
+        let top_file = unit_header_file(&top_files[0]);
+
+        fill_template(
+            self.support_dir.join("TranslationUnit.lisa.template"),
+            &self.outdir.join(format!("{}.lisa", self.pkgname)),
+            HashMap::from([
+                (&"/* REPLACE top_class */".to_string(), &self.pkgname),
+                (&"/* REPLACE top_file */".to_string(), &top_file),
+            ]),
+        )?;
+
+        fill_template(
+            self.support_dir.join("Platform.lisa.template"),
+            &self.outdir.join("platform/Platform.lisa"),
+            HashMap::from([(&"/* REPLACE top_class */".to_string(), &self.pkgname)]),
+        )?;
+
+        fill_template(
+            self.support_dir.join("Platform.sgproj.template"),
+            &self.outdir.join("platform/Platform.sgproj"),
+            HashMap::from([(&"/* REPLACE pkgname */".to_string(), &self.pkgname)]),
+        )?;
+
         // check all units for registers and put them in the main directory
-        generate_register_header(&self.pkgname, ast, &self.outdir)?;
-        generate_register_impl(&self.pkgname, ast, &self.outdir)?;
+        generate_register_header(&self.pkgname, ast, &self.outdir.join("src"))?;
+        generate_register_impl(&self.pkgname, ast, &self.outdir.join("src"))?;
 
         for u in ast.units() {
             if u.is_abstract() {
                 continue;
             }
-
-            // let unit_dir = &self.outdir.join(u.ident_to_string());
-
-            generate_unit_header(u, &self.outdir)?;
-            // generate_interface_header(&self.pkgname, u, unit_dir)?;
-            // generate_interface_impl(&self.pkgname, u, unit_dir)?;
-            // generate_state_header(u, unit_dir)?;
-            // generate_state_impl(u, unit_dir)?;
+            generate_unit_header(u, &self.outdir.join("src"))?;
         }
+
+        self.generate_top_makefile(ast)?;
+
         Ok(())
     }
 
-    fn finalize(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
-        for u in ast.units() {
-            if u.is_abstract() {
-                continue;
-            }
-
-            let out_subdir = &self.outdir.join(u.ident_to_string());
-
-            self.generate_unit_makefile(&u.ident_to_string(), out_subdir)
-                .expect("Could not generate makefile");
-        }
-        self.generate_top_makefile(ast)
-            .expect("Could not generate makefile");
+    fn finalize(&self) -> Result<(), VelosiHwGenError> {
         Ok(())
     }
 }
