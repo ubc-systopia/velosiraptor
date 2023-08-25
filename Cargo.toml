@@ -4,7 +4,7 @@ description = "The Velosiraptor Compiler"
 license = "MIT"
 version = "0.1.0"
 authors = ["Reto Achermann <achreto@cs.ubc.ca>"]
-edition = "2018"
+edition = "2021"
 readme = "README.md"
 
 [workspace]
@@ -48,4 +48,8 @@ simplelog = { version = "^0.12.0", features = ["paris"] }
 strip-ansi-escapes = "0.1.1"
 rexpect = "0.5"
 velosiparser = { path = "lib/velosiparser" }
+
+# enable optimizations for the tests
+[profile.test]
+opt-level = 3
 
