@@ -59,7 +59,7 @@ pub fn main() {
     let hwgen = VelosiHwGen::new_fastmodels(Path::new("./out"), unit_name);
 
     hwgen
-        .prepare(&ast)
+        .prepare()
         .expect("could not prepare the hwgen backend");
 
     if let Err(e) = hwgen.generate(&ast) {

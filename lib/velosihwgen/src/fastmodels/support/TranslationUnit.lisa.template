@@ -1,4 +1,4 @@
-// TranslationUnit Component for ArmFastModels
+// /* REPLACE top_class */ Component for ArmFastModels
 //
 // SPDX-License-Identifier: MIT
 //
@@ -8,7 +8,9 @@
 //    1) The configuration space of the translation hardware
 //    2) The memory region that is translated by the unit
 //
-component TranslationUnit
+
+component /* REPLACE top_class */
+// component TranslationUnit
 {
     // --------------------------------------------------------------------------------------------
     // C++ Header Includes
@@ -18,8 +20,9 @@ component TranslationUnit
     includes
     {
         #include<framework/logging.hpp>
-        // TODO change
-        #include<unit.hpp>
+
+        #include</* REPLACE top_file */>
+        // #include <unit.hpp>
     }
 
 
@@ -207,9 +210,8 @@ component TranslationUnit
 
         pv::TransactionGenerator *tx_generator;
         protocol_PVBus *cpu_bus;
-
-        // the translatio nunit
-        TranslationUnit* unit;
+        /* REPLACE top_class */* unit;
+        // TranslationUnit* unit;
     }
 
 
@@ -237,10 +239,10 @@ component TranslationUnit
         // TODO: register the interrupt stuff
         Logging::init(level);
 
-        // create the translation unit object
-        // TODO replace
-        unit = TranslationUnit::create(this, getHierarchicalName(), cadi__,
+        unit = /* REPLACE top_class */::create(this, getHierarchicalName(), cadi__,
                                        ptw_master_control.createRandomContextTransactionGenerator());
+        // unit = TranslationUnit::create(this, getHierarchicalName(), cadi__,
+        //                                ptw_master_control.createRandomContextTransactionGenerator());
     }
 
     // reset the unit

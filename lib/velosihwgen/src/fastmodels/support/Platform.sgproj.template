@@ -38,9 +38,9 @@ config "default_armv8"
 files
     {
         path = "$(PVLIB_HOME)/etc/sglib.sgrepo";
-        path = "ExamplePlatform.lisa";
-        path = "../TranslationUnit.lisa";
+        path = "Platform.lisa";
+        path = "..//* REPLACE pkgname */.lisa";
         path = "../build/lib/libunit.a";
-        path = "../../framework/build/lib/libframework.a";
+        path = "../fm_translation_framework/framework/build/lib/libframework.a";
     }
 }
