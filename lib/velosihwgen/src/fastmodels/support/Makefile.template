@@ -2,20 +2,20 @@
 #
 # SPDX-License-Identifier: MIT
 #
-# Copyright (C) 2022, Reto Achermann (The University of British Columbia)
+# Copyright (C) 2023, Reto Achermann (The University of British Columbia)
 
 # This file is auto-generated
 
 # Set the build directory
 BUILD_DIR := $(CURDIR)/build
 SOURCE_DIR := $(CURDIR)/src
-FRAMEWORK_DIR := $(CURDIR)/../framework/build
+FRAMEWORK_DIR := $(CURDIR)/fm_translation_framework
 
 # compiler flags
 CC      := g++
 CCFLAGS := -Wall -O3 -Werror -std=c++2a -fPIC
-CCFLAGS += -I $(SOURCE_DIR)/include
-CCFLAGS += -I $(FRAMEWORK_DIR)/include
+CCFLAGS += -I $(SOURCE_DIR)
+CCFLAGS += -I $(FRAMEWORK_DIR)
 CCFLAGS += -I $(PVLIB_HOME)/include
 CCFLAGS += -I $(PVLIB_HOME)/include/fmruntime
 CCFLAGS += -MMD -MP
@@ -35,10 +35,8 @@ MKDIR := mkdir -p
 SIMGEN := simgen
 
 # Source Files
-TRANSLATION_UNIT_SRCS := $(SOURCE_DIR)/unit.cpp
-TRANSLATION_UNIT_SRCS += $(SOURCE_DIR)/interface.cpp
-TRANSLATION_UNIT_SRCS += $(SOURCE_DIR)/state.cpp
-TRANSLATION_UNIT_SRCS += $(SOURCE_DIR)/registers.cpp
+TRANSLATION_UNIT_SRCS := $(SOURCE_DIR)//* REPLACE top_file */
+# TRANSLATION_UNIT_SRCS := $(SOURCE_DIR)/unit.cpp
 
 # Object Files
 TRANSLATION_UNIT_OBJS := $(TRANSLATION_UNIT_SRCS:$(SOURCE_DIR)/%.cpp=$(BUILD_DIR)/objs/%.o)
@@ -52,10 +50,10 @@ $(TRANSLATION_UNIT_LIB): $(TRANSLATION_UNIT_OBJS)
 	$(AR) $(ARFLAGS) -o $@ $^
 
 PLATFORM_BIN  := $(BUILD_DIR)/plat_example_sim
-PLATFORM_PROJ := platform/ExamplePlatform.sgproj
-PLATFORM_LISA := platform/ExamplePlatform.lisa
+PLATFORM_PROJ := platform/Platform.sgproj
+PLATFORM_LISA := platform/Platform.lisa
 
-$(PLATFORM_BIN): $(TRANSLATION_UNIT_LIB) $(PLATFORM_LISA) $(PLATFORM_PROJ) TranslationUnit.lisa
+$(PLATFORM_BIN): $(TRANSLATION_UNIT_LIB) $(PLATFORM_LISA) $(PLATFORM_PROJ) /* REPLACE pkgname */.lisa
 	$(MKDIR) $(@D)
 	BUILD_DIR=$(BUILD_DIR) $(SIMGEN) -v on --num-comps-file 50 --gen-sysgen --warnings-as-errors \
 									 -p $(PLATFORM_PROJ) --build-directory $(BUILD_DIR)/plat_example -b
