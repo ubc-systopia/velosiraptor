@@ -478,7 +478,23 @@ impl VelosiAstUnitSegment {
                 issues.push(err);
             }
 
-            Rc::new(VelosiAstState::NoneState(pt.loc.clone()))
+            Rc::new(VelosiAstState::default())
+        };
+
+        let interface = if let Some(i) = interface {
+            i
+        } else {
+            if !pt.is_abstract {
+                let msg = "Segment unit has no interface definition";
+                let hint = "Change this to a `staticmap`, or add an interface definition.";
+                let err = VelosiAstErrBuilder::err(msg.to_string())
+                    .add_hint(hint.to_string())
+                    .add_location(pt.loc.from_self_with_subrange(0..1))
+                    .build();
+                issues.push(err);
+            }
+
+            Rc::new(VelosiAstInterface::default())
         };
 
         if !methods.contains_key("map") && !pt.is_abstract {
@@ -577,22 +593,6 @@ impl VelosiAstUnitSegment {
                 }
             }
         }
-
-        let interface = if let Some(i) = interface {
-            i
-        } else {
-            if !pt.is_abstract {
-                let msg = "Segment unit has no interface definition";
-                let hint = "Change this to a `staticmap`, or add an interface definition.";
-                let err = VelosiAstErrBuilder::err(msg.to_string())
-                    .add_hint(hint.to_string())
-                    .add_location(pt.loc.from_self_with_subrange(0..1))
-                    .build();
-                issues.push(err);
-            }
-
-            Rc::new(VelosiAstInterface::NoneInterface(pt.loc.clone()))
-        };
 
         let inbitwidth = if let Some((ibw, _)) = inbitwidth {
             ibw
@@ -775,13 +775,8 @@ impl Display for VelosiAstUnitSegment {
             writeln!(f, "  // no flags\n")?;
         }
 
-        write!(f, "  state = ")?;
         Display::fmt(&self.state, f)?;
-        writeln!(f, ";\n")?;
-
-        write!(f, "  interface = ")?;
         Display::fmt(&self.interface, f)?;
-        writeln!(f, ";\n")?;
 
         for (i, m) in self.methods().enumerate() {
             if i > 0 {

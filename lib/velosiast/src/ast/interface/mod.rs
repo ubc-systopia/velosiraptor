@@ -43,7 +43,7 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::ops::Range;
 use std::rc::Rc;
 
-use velosiparser::parsetree::{VelosiParseTreeInterface, VelosiParseTreeInterfaceDef};
+use velosiparser::parsetree::VelosiParseTreeInterface;
 use velosiparser::VelosiTokenStream;
 
 use crate::ast::{
@@ -60,8 +60,8 @@ use super::expr::VelosiAstIdentLiteralExpr;
 // Interface Definition
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Eq, Clone)]
-pub struct VelosiAstInterfaceDef {
+#[derive(Eq, Clone, Default)]
+pub struct VelosiAstInterface {
     /// the parameters of the memory Interface
     pub params: Vec<Rc<VelosiAstParam>>,
     /// a map of the parameter Interfaces
@@ -74,7 +74,7 @@ pub struct VelosiAstInterfaceDef {
     pub loc: VelosiTokenStream,
 }
 
-impl VelosiAstInterfaceDef {
+impl VelosiAstInterface {
     pub fn new(
         params: Vec<Rc<VelosiAstParam>>,
         fields: Vec<Rc<VelosiAstInterfaceField>>,
@@ -91,7 +91,7 @@ impl VelosiAstInterfaceDef {
             // let n = f.ident().split('.').last().unwrap();
             fields_map.insert(f.ident_to_string(), f.clone());
         }
-        VelosiAstInterfaceDef {
+        VelosiAstInterface {
             params,
             params_map,
             fields,
@@ -101,7 +101,7 @@ impl VelosiAstInterfaceDef {
     }
 
     pub fn from_parse_tree(
-        pt: VelosiParseTreeInterfaceDef,
+        pt: VelosiParseTreeInterface,
         st: &mut SymbolTable,
     ) -> AstResult<VelosiAstInterface, VelosiAstIssues> {
         let mut issues = VelosiAstIssues::new();
@@ -183,8 +183,7 @@ impl VelosiAstInterfaceDef {
             }
         }
 
-        let res = Self::new(params, fields, pt.loc);
-        ast_result_return!(VelosiAstInterface::InterfaceDef(res), issues)
+        ast_result_return!(Self::new(params, fields, pt.loc), issues)
     }
 
     pub fn derive_from(&mut self, other: &Self) {
@@ -362,10 +361,34 @@ impl VelosiAstInterfaceDef {
             Some(Rc::new(VelosiAstExpr::BinOp(accessor)))
         }
     }
+
+    pub fn name(&self) -> &str {
+        "interface"
+    }
+
+    pub fn update_symbol_table(&self, st: &mut SymbolTable) {
+        for f in &self.fields {
+            f.update_symbol_table(st);
+            st.update(f.clone().into())
+                .expect("state already exists in symbolt able?");
+        }
+    }
+
+    pub fn fields(&self) -> &[Rc<VelosiAstInterfaceField>] {
+        self.fields.as_slice()
+    }
+
+    pub fn field(&self, name: &str) -> Option<&VelosiAstInterfaceField> {
+        self.fields_map.get(name).map(|rc| rc.as_ref())
+    }
+
+    pub fn loc(&self) -> &VelosiTokenStream {
+        &self.loc
+    }
 }
 
-/// Implementation of [PartialEq] for [VelosiAstInterfaceDef]
-impl PartialEq for VelosiAstInterfaceDef {
+/// Implementation of [PartialEq] for [VelosiAstInterface]
+impl PartialEq for VelosiAstInterface {
     fn eq(&self, other: &Self) -> bool {
         self.params == other.params
         // the params map is basically the same as the params
@@ -374,10 +397,10 @@ impl PartialEq for VelosiAstInterfaceDef {
     }
 }
 
-/// Implementation of [Display] for [VelosiAstInterfaceDef]
-impl Display for VelosiAstInterfaceDef {
+/// Implementation of [Display] for [VelosiAstInterface]
+impl Display for VelosiAstInterface {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "InterfaceDef(")?;
+        write!(f, "interface(")?;
         for (i, p) in self.params.iter().enumerate() {
             if i > 0 {
                 write!(f, ", ")?;
@@ -395,119 +418,10 @@ impl Display for VelosiAstInterfaceDef {
     }
 }
 
-/// Implementation of [Debug] for [VelosiAstInterfaceDef]
-impl Debug for VelosiAstInterfaceDef {
+/// Implementation of [Debug] for [VelosiAstInterface]
+impl Debug for VelosiAstInterface {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
         Display::fmt(&self, format)
-    }
-}
-
-#[derive(PartialEq, Eq, Clone)]
-pub enum VelosiAstInterface {
-    InterfaceDef(VelosiAstInterfaceDef),
-    NoneInterface(VelosiTokenStream),
-}
-
-impl VelosiAstInterface {
-    // converts the parse tree node into an ast node, performing checks
-    pub fn from_parse_tree(
-        pt: VelosiParseTreeInterface,
-        st: &mut SymbolTable,
-    ) -> AstResult<Self, VelosiAstIssues> {
-        use VelosiParseTreeInterface::*;
-        match pt {
-            InterfaceDef(pt) => VelosiAstInterfaceDef::from_parse_tree(pt, st),
-            None(ts) => AstResult::Ok(VelosiAstInterface::NoneInterface(ts)),
-        }
-    }
-
-    pub fn name(&self) -> &str {
-        "Interface"
-    }
-
-    pub fn is_none(&self) -> bool {
-        matches!(self, VelosiAstInterface::NoneInterface(_))
-    }
-
-    pub fn derive_from(&mut self, other: &Self) {
-        use VelosiAstInterface::*;
-
-        if matches!(other, NoneInterface(_)) {
-            return;
-        }
-
-        if matches!(self, NoneInterface(_)) {
-            *self = other.clone();
-            return;
-        }
-
-        if let InterfaceDef(s) = self {
-            if let InterfaceDef(o) = other {
-                s.derive_from(o);
-            }
-        }
-    }
-
-    pub fn update_symbol_table(&self, st: &mut SymbolTable) {
-        if matches!(self, VelosiAstInterface::NoneInterface(_)) {
-            return;
-        }
-
-        for f in self.fields() {
-            f.update_symbol_table(st);
-            st.update(f.clone().into())
-                .expect("state already exists in symbolt able?");
-        }
-    }
-
-    pub fn fields(&self) -> &[Rc<VelosiAstInterfaceField>] {
-        match self {
-            VelosiAstInterface::InterfaceDef(def) => def.fields.as_slice(),
-            VelosiAstInterface::NoneInterface(_) => &[],
-        }
-    }
-
-    pub fn field(&self, name: &str) -> Option<&VelosiAstInterfaceField> {
-        match self {
-            VelosiAstInterface::InterfaceDef(def) => def.fields_map.get(name).map(|rc| rc.as_ref()),
-            VelosiAstInterface::NoneInterface(_) => None,
-        }
-    }
-
-    pub fn loc(&self) -> &VelosiTokenStream {
-        match self {
-            VelosiAstInterface::InterfaceDef(s) => &s.loc,
-            VelosiAstInterface::NoneInterface(s) => s,
-        }
-    }
-
-    // returns a list of all the fields with action that touch one of the state elements
-    pub fn fields_accessing_state(
-        &self,
-        state_syms: &HashSet<Rc<String>>,
-        state_bits: &HashMap<Rc<String>, u64>,
-    ) -> HashSet<Rc<String>> {
-        match self {
-            VelosiAstInterface::InterfaceDef(s) => s.fields_accessing_state(state_syms, state_bits),
-            VelosiAstInterface::NoneInterface(_s) => HashSet::new(),
-        }
-    }
-
-    pub fn read_state_expr(&self, state_ref: &str, bits: Range<u64>) -> Option<Rc<VelosiAstExpr>> {
-        match self {
-            VelosiAstInterface::InterfaceDef(s) => s.read_state_expr(state_ref, bits),
-            VelosiAstInterface::NoneInterface(_) => None,
-        }
-    }
-
-    pub fn compare(&self, other: &Self) -> bool {
-        match (self, other) {
-            (VelosiAstInterface::InterfaceDef(s), VelosiAstInterface::InterfaceDef(o)) => {
-                s.compare(o)
-            }
-            (VelosiAstInterface::NoneInterface(_), VelosiAstInterface::NoneInterface(_)) => true,
-            _ => false,
-        }
     }
 }
 
@@ -524,22 +438,5 @@ impl From<Rc<VelosiAstInterface>> for Symbol {
 impl From<Rc<VelosiAstInterface>> for VelosiAstType {
     fn from(c: Rc<VelosiAstInterface>) -> Self {
         VelosiAstType::new(VelosiAstTypeInfo::Interface, c.loc().clone())
-    }
-}
-
-/// Implementation of [Display] for [VelosiAstInterface]
-impl Display for VelosiAstInterface {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        match self {
-            VelosiAstInterface::InterfaceDef(s) => Display::fmt(s, f),
-            VelosiAstInterface::NoneInterface(_) => writeln!(f, "NoneInterface"),
-        }
-    }
-}
-
-/// Implementation of [Debug] for [VelosiAstInterface]
-impl Debug for VelosiAstInterface {
-    fn fmt(&self, format: &mut Formatter) -> FmtResult {
-        Display::fmt(&self, format)
     }
 }

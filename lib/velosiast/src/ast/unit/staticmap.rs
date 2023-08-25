@@ -449,9 +449,8 @@ impl Display for VelosiAstUnitStaticMap {
             write!(f, "  // no methods")?;
         }
 
-        write!(f, "\n  mapdef = ")?;
+        write!(f, "\n  map ")?;
         Display::fmt(&self.map, f)?;
-        write!(f, ";")?;
 
         write!(f, "\n}}")
     }

@@ -38,7 +38,7 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::ops::Range;
 use std::rc::Rc;
 
-use velosiparser::parsetree::{VelosiParseTreeState, VelosiParseTreeStateDef};
+use velosiparser::parsetree::VelosiParseTreeState;
 use velosiparser::VelosiTokenStream;
 
 use crate::ast::{
@@ -52,8 +52,8 @@ use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, Symb
 // State Definition
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Eq, Clone)]
-pub struct VelosiAstStateDef {
+#[derive(Eq, Clone, Default)]
+pub struct VelosiAstState {
     /// the parameters of the memory state
     pub params: Vec<Rc<VelosiAstParam>>,
     /// a map of the parameter states
@@ -66,7 +66,7 @@ pub struct VelosiAstStateDef {
     pub loc: VelosiTokenStream,
 }
 
-impl VelosiAstStateDef {
+impl VelosiAstState {
     pub fn new(
         params: Vec<Rc<VelosiAstParam>>,
         fields: Vec<Rc<VelosiAstStateField>>,
@@ -80,7 +80,7 @@ impl VelosiAstStateDef {
         for f in &fields {
             fields_map.insert(f.ident_to_string(), f.clone());
         }
-        VelosiAstStateDef {
+        VelosiAstState {
             params,
             params_map,
             fields,
@@ -90,7 +90,7 @@ impl VelosiAstStateDef {
     }
 
     pub fn from_parse_tree(
-        pt: VelosiParseTreeStateDef,
+        pt: VelosiParseTreeState,
         st: &mut SymbolTable,
     ) -> AstResult<VelosiAstState, VelosiAstIssues> {
         let mut issues = VelosiAstIssues::new();
@@ -223,8 +223,7 @@ impl VelosiAstStateDef {
             }
         }
 
-        let res = Self::new(params, fields, pt.loc);
-        ast_result_return!(VelosiAstState::StateDef(res), issues)
+        ast_result_return!(Self::new(params, fields, pt.loc), issues)
     }
 
     pub fn derive_from(&mut self, other: &Self) {
@@ -326,17 +325,41 @@ impl VelosiAstStateDef {
 
         true
     }
+
+    pub fn update_symbol_table(&self, st: &mut SymbolTable) {
+        for f in &self.fields {
+            f.update_symbol_table(st);
+            st.update(f.clone().into())
+                .expect("state already exists in symbolt able?");
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        "state"
+    }
+
+    pub fn nfields(&self) -> usize {
+        self.fields.len()
+    }
+
+    pub fn loc(&self) -> &VelosiTokenStream {
+        &self.loc
+    }
+
+    pub fn fields(&self) -> &[Rc<VelosiAstStateField>] {
+        self.fields.as_slice()
+    }
 }
 
-impl PartialEq for VelosiAstStateDef {
+impl PartialEq for VelosiAstState {
     fn eq(&self, other: &Self) -> bool {
         self.params == other.params && self.fields == other.fields
         // params_map and fields_map the same as params and fields
     }
 }
 
-/// Implementation of [Display] for [VelosiAstStateDef]
-impl Display for VelosiAstStateDef {
+/// Implementation of [Display] for [VelosiAstState]
+impl Display for VelosiAstState {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "StateDef(")?;
         for (i, p) in self.params.iter().enumerate() {
@@ -356,120 +379,10 @@ impl Display for VelosiAstStateDef {
     }
 }
 
-/// Implementation of [Debug] for [VelosiAstStateDef]
-impl Debug for VelosiAstStateDef {
+/// Implementation of [Debug] for [VelosiAstState]
+impl Debug for VelosiAstState {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
         Display::fmt(&self, format)
-    }
-}
-
-#[derive(PartialEq, Eq, Clone)]
-pub enum VelosiAstState {
-    StateDef(VelosiAstStateDef),
-    NoneState(VelosiTokenStream),
-}
-
-impl VelosiAstState {
-    // converts the parse tree node into an ast node, performing checks
-    pub fn from_parse_tree(
-        pt: VelosiParseTreeState,
-        st: &mut SymbolTable,
-    ) -> AstResult<Self, VelosiAstIssues> {
-        use VelosiParseTreeState::*;
-        match pt {
-            StateDef(pt) => VelosiAstStateDef::from_parse_tree(pt, st),
-            None(ts) => AstResult::Ok(VelosiAstState::NoneState(ts)),
-        }
-    }
-
-    pub fn derive_from(&mut self, other: &Self) {
-        use VelosiAstState::*;
-
-        if matches!(other, NoneState(_)) {
-            return;
-        }
-
-        if matches!(self, NoneState(_)) {
-            *self = other.clone();
-            return;
-        }
-
-        if let StateDef(s) = self {
-            if let StateDef(o) = other {
-                s.derive_from(o);
-            }
-        }
-    }
-
-    pub fn update_symbol_table(&self, st: &mut SymbolTable) {
-        if matches!(self, VelosiAstState::NoneState(_)) {
-            return;
-        }
-
-        for f in self.fields() {
-            f.update_symbol_table(st);
-            st.update(f.clone().into())
-                .expect("state already exists in symbolt able?");
-        }
-    }
-
-    pub fn name(&self) -> &str {
-        "state"
-    }
-
-    pub fn is_none_state(&self) -> bool {
-        matches!(self, VelosiAstState::NoneState(_))
-    }
-
-    pub fn nfields(&self) -> usize {
-        use VelosiAstState::*;
-        match self {
-            StateDef(s) => s.fields.len(),
-            NoneState(_) => 0,
-        }
-    }
-
-    pub fn loc(&self) -> &VelosiTokenStream {
-        match self {
-            VelosiAstState::StateDef(s) => &s.loc,
-            VelosiAstState::NoneState(s) => s,
-        }
-    }
-
-    pub fn fields(&self) -> &[Rc<VelosiAstStateField>] {
-        match self {
-            VelosiAstState::StateDef(s) => s.fields.as_slice(),
-            VelosiAstState::NoneState(_s) => &[],
-        }
-    }
-
-    pub fn get_field_slice_refs(&self, refs: &HashSet<Rc<String>>) -> HashMap<Rc<String>, u64> {
-        match self {
-            VelosiAstState::StateDef(s) => s.get_field_slice_refs(refs),
-            VelosiAstState::NoneState(_s) => HashMap::new(),
-        }
-    }
-
-    pub fn get_field_range(&self, stateref: &str) -> Range<u64> {
-        match self {
-            VelosiAstState::StateDef(s) => s.get_field_range(stateref),
-            VelosiAstState::NoneState(_s) => 0..0,
-        }
-    }
-
-    pub fn compare(&self, other: &Self) -> bool {
-        match (self, other) {
-            (VelosiAstState::StateDef(s), VelosiAstState::StateDef(o)) => s.compare(o),
-            (VelosiAstState::NoneState(_), VelosiAstState::NoneState(_)) => true,
-            _ => false,
-        }
-    }
-
-    pub fn get_registers(&self) -> Vec<Rc<VelosiAstStateField>> {
-        match self {
-            VelosiAstState::StateDef(s) => s.get_registers(),
-            VelosiAstState::NoneState(_) => vec![],
-        }
     }
 }
 
@@ -486,22 +399,5 @@ impl From<Rc<VelosiAstState>> for Symbol {
 impl From<Rc<VelosiAstState>> for VelosiAstType {
     fn from(c: Rc<VelosiAstState>) -> Self {
         VelosiAstType::new(VelosiAstTypeInfo::State, c.loc().clone())
-    }
-}
-
-/// Implementation of [Display] for [VelosiAstState]
-impl Display for VelosiAstState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        match self {
-            VelosiAstState::StateDef(s) => Display::fmt(s, f),
-            VelosiAstState::NoneState(_) => writeln!(f, "NoneState"),
-        }
-    }
-}
-
-/// Implementation of [Debug] for [VelosiAstState]
-impl Debug for VelosiAstState {
-    fn fmt(&self, format: &mut Formatter) -> FmtResult {
-        Display::fmt(&self, format)
     }
 }
