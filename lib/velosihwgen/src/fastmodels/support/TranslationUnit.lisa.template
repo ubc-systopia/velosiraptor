@@ -241,7 +241,7 @@ component /* REPLACE top_class */
 
         unit = /* REPLACE top_class */::create(this, getHierarchicalName(), cadi__,
                                                ptw_master_control.createRandomContextTransactionGenerator(),
-                                               0); // todo what should this be? base paddr
+                                               0x80000000); // todo what should this be? base paddr
         // unit = TranslationUnit::create(this, getHierarchicalName(), cadi__,
         //                                ptw_master_control.createRandomContextTransactionGenerator());
     }
