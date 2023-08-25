@@ -161,7 +161,7 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
     }
 
     fn generate(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
-        let top_files = velosicomposition::Relations::from_ast(ast).get_roots();
+        let top_files = velosicomposition::Relations::from_ast(ast).get_roots(ast);
         if top_files.len() != 1 {
             panic!("!= 1 root unit found");
         }

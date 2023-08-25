@@ -25,6 +25,7 @@
 
 use crate::fastmodels::add_header_comment;
 use crate::fastmodels::unit::state_class_name;
+use crate::fastmodels::unit::unit_header_file;
 use crate::VelosiHwGenError;
 use crustal as C;
 use std::ops::Deref;
@@ -86,7 +87,7 @@ pub fn generate_register_header(
         let rs = register_map(|r| r.clone(), u);
 
         if !rs.is_empty() {
-            let state_h = u.ident_to_string();
+            let state_h = unit_header_file(&u.ident_to_string());
             s.new_include(&state_h, false);
         }
 

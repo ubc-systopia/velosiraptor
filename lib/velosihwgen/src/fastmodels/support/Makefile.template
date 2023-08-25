@@ -37,6 +37,7 @@ SIMGEN := simgen
 # Source Files
 TRANSLATION_UNIT_SRCS := $(SOURCE_DIR)//* REPLACE top_file */
 # TRANSLATION_UNIT_SRCS := $(SOURCE_DIR)/unit.cpp
+TRANSLATION_UNIT_SRCS += $(SOURCE_DIR)//* REPLACE pkgname */_registers.hpp
 
 # Object Files
 TRANSLATION_UNIT_OBJS := $(TRANSLATION_UNIT_SRCS:$(SOURCE_DIR)/%.cpp=$(BUILD_DIR)/objs/%.o)
