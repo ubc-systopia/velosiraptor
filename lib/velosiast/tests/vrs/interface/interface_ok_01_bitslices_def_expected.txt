@@ -1,7 +1,7 @@
 VelosiParseTree(tests/vrs/interface/interface_01_bitslices_def.vrs)
 ---------------------------------------------
 segment MyUnit {
-  interface = InterfaceDef(base: foo) {
+  interface(base: foo) {
     reg foo [ 8 ] {
       Layout {
         0..2 foo,

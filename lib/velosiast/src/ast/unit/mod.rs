@@ -255,13 +255,7 @@ impl VelosiAstUnit {
         use VelosiAstUnit::*;
         match self {
             StaticMap(_) => None,
-            Segment(segment) => {
-                if !segment.interface.is_none() {
-                    Some(segment.interface.clone())
-                } else {
-                    None
-                }
-            }
+            Segment(segment) => Some(segment.interface.clone()),
             Enum(_) => None,
         }
     }
@@ -280,13 +274,7 @@ impl VelosiAstUnit {
         use VelosiAstUnit::*;
         match self {
             StaticMap(_) => None,
-            Segment(segment) => {
-                if !segment.state.is_none_state() {
-                    Some(segment.state.clone())
-                } else {
-                    None
-                }
-            }
+            Segment(segment) => Some(segment.state.clone()),
             Enum(_) => None,
         }
     }
