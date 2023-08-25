@@ -44,16 +44,12 @@ use crate::COPYRIGHT;
 use velosiast::VelosiAst;
 
 // the generators
-// mod state;
-// use state::{state_impl_file};
-// mod interface;
-// use interface::{interface_impl_file};
 mod unit;
 use unit::generate_unit_header;
 mod registers;
 use registers::{generate_register_header, generate_register_impl};
 
-use self::unit::unit_header_file;
+use self::unit::{unit_class_name, unit_header_file};
 
 /// # The Arm FastModels Platform Module
 ///
@@ -111,122 +107,6 @@ impl ArmFastModelsModule {
             support_dir,
             pkgname,
         }
-    }
-
-    fn generate_top_makefile(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
-        let makefile = File::create(&self.outdir.join("Makefile"))?;
-        let mut f = BufWriter::new(makefile);
-
-        writeln!(f, "# This file is auto-generated\n")?;
-
-        writeln!(f, "FRAMEWORK_DIR={}", self.framework_dir)?;
-        writeln!(f, "SUPPORT_DIR=support")?;
-
-        writeln!(f, "\nall: deps_framework")?;
-        writeln!(f, "\tmake -C {}", self.framework_dir)?;
-        for u in ast.units() {
-            if u.is_abstract() {
-                continue;
-            }
-            // writeln!(f, "\tmake -d -I framework/build/include -C {}", u.ident())?;
-            writeln!(f, "\tmake -C {}", u.ident())?;
-        }
-
-        writeln!(f, "\nclean:")?;
-        writeln!(f, "\trm -rf {}", self.framework_dir)?;
-
-        f.flush()?;
-
-        Ok(())
-    }
-
-    fn generate_unit_makefile(&self, name: &str, out: &Path) -> Result<(), VelosiHwGenError> {
-        let makefile = File::create(out.join("Makefile"))?;
-        let mut f = BufWriter::new(makefile);
-
-        let lib = format!("lib{}.a", self.pkgname);
-
-        writeln!(f, "# This file is auto-generated")?;
-
-        // flags for the compiler
-        writeln!(f, "\n# Set the build directory")?;
-        writeln!(f, "BUILD_DIR := $(CURDIR)/build")?;
-        writeln!(f, "SOURCE_DIR := $(CURDIR)")?;
-        writeln!(f, "FRAMEWORK_DIR ?= $(CURDIR)/../{}", self.framework_dir)?;
-
-        writeln!(f, "# compiler flags")?;
-        writeln!(
-            f,
-            "# PVLIB_HOME should be set by the fastmodels setup script"
-        )?;
-        writeln!(f, "CC      := g++")?;
-        writeln!(f, "CCFLAGS := -Wall -O3 -Werror -std=c++2a -fPIC")?;
-
-        // should probably include something from frameworkdir/build/(?)
-        writeln!(f, "CCFLAGS += -I $(FRAMEWORK_DIR)")?;
-        writeln!(f, "CCFLAGS += -I $(PVLIB_HOME)/include")?;
-        writeln!(f, "CCFLAGS += -I $(PVLIB_HOME)/include/fmruntime")?;
-        writeln!(f, "CCFLAGS += -MMD -MP")?;
-
-        // flags for creating the static library
-        writeln!(f, "# archive flags")?;
-        writeln!(f, "AR      := ar")?;
-        writeln!(f, "ARFLAGS := rcs")?;
-
-        // creating directories
-        writeln!(f, "# creating directories")?;
-        writeln!(f, "MKDIR := mkdir -p")?;
-
-        writeln!(f, "\n# Source Files")?;
-        writeln!(
-            f,
-            "TRANSLATION_UNIT_SRCS := $(SOURCE_DIR)/{}",
-            unit_header_file(name)
-        )?;
-        // writeln!(
-        //     f,
-        //     "TRANSLATION_UNIT_SRCS += $(SOURCE_DIR)/{}",
-        //     interface_impl_file(name)
-        // )?;
-        // writeln!(
-        //     f,
-        //     "TRANSLATION_UNIT_SRCS += $(SOURCE_DIR)/{}",
-        //     state_impl_file(name)
-        // )?;
-
-        writeln!(f, "\n# Object Files")?;
-        writeln!(
-            f,
-            "TRANSLATION_UNIT_OBJS := $(TRANSLATION_UNIT_SRCS:$(SOURCE_DIR)/%.cpp=$(BUILD_DIR)/objs/%.o)"
-        )?;
-
-        writeln!(f, "\n# The Translation Unit Library")?;
-        writeln!(f, "TRANSLATION_UNIT_LIB  := $(BUILD_DIR)/{}", lib)?;
-
-        // rule to build the library
-        writeln!(f, "\n# building the library")?;
-        writeln!(f, "$(TRANSLATION_UNIT_LIB): $(TRANSLATION_UNIT_OBJS)")?;
-        writeln!(f, "\t$(MKDIR) $(@D)")?;
-        writeln!(f, "\t$(AR) $(ARFLAGS) -o $@ $^")?;
-
-        writeln!(f, "\n# Targets")?;
-        writeln!(f, ".DEFAULT_GOAL = all")?;
-        writeln!(f, "all: $(TRANSLATION_UNIT_LIB)")?;
-
-        // compilation rules
-        writeln!(f, "\n# Compilation Rules")?;
-        writeln!(f, "$(BUILD_DIR)/objs/%.o: $(SOURCE_DIR)/%.cpp")?;
-        writeln!(f, "\t$(MKDIR) $(@D)")?;
-        writeln!(f, "\t$(CC) $(CCFLAGS) -c -o $@ $<")?;
-
-        // other rules
-        writeln!(f, "\n# clean up")?;
-        writeln!(f, "clean:")?;
-        writeln!(f, "\trm -rf $(BUILD_DIR)")?;
-
-        f.flush()?;
-
-        Ok(())
     }
 }
 
@@ -287,13 +167,15 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
         if top_files.len() != 1 {
             panic!("!= 1 root unit found");
         }
-        let top_file = unit_header_file(&top_files[0]);
+
+        let top_file = unit_header_file(&top_files[0]); // e.g. X86_MMU_unit.hpp
+        let top_class = unit_class_name(&top_files[0]); // e.g. X86_MMU
 
         fill_template(
             self.support_dir.join("TranslationUnit.lisa.template"),
             &self.outdir.join(format!("{}.lisa", self.pkgname)),
             HashMap::from([
-                (&"/* REPLACE top_class */".to_string(), &self.pkgname),
+                (&"/* REPLACE top_class */".to_string(), &top_class),
                 (&"/* REPLACE top_file */".to_string(), &top_file),
             ]),
         )?;
@@ -301,13 +183,22 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
         fill_template(
             self.support_dir.join("Platform.lisa.template"),
             &self.outdir.join("platform/Platform.lisa"),
-            HashMap::from([(&"/* REPLACE top_class */".to_string(), &self.pkgname)]),
+            HashMap::from([(&"/* REPLACE top_class */".to_string(), &top_class)]),
         )?;
 
         fill_template(
             self.support_dir.join("Platform.sgproj.template"),
             &self.outdir.join("platform/Platform.sgproj"),
             HashMap::from([(&"/* REPLACE pkgname */".to_string(), &self.pkgname)]),
+        )?;
+
+        fill_template(
+            self.support_dir.join("Makefile.template"),
+            &self.outdir.join("Makefile"),
+            HashMap::from([
+                (&"/* REPLACE top_file */".to_string(), &top_file),
+                (&"/* REPLACE pkgname */".to_string(), &self.pkgname),
+            ]),
         )?;
 
         // check all units for registers and put them in the main directory
@@ -320,8 +211,6 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
             }
             generate_unit_header(u, &self.outdir.join("src"))?;
         }
-
-        self.generate_top_makefile(ast)?;
 
         Ok(())
     }
