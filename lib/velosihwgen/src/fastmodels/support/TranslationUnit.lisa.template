@@ -240,7 +240,8 @@ component /* REPLACE top_class */
         Logging::init(level);
 
         unit = /* REPLACE top_class */::create(this, getHierarchicalName(), cadi__,
-                                       ptw_master_control.createRandomContextTransactionGenerator());
+                                               ptw_master_control.createRandomContextTransactionGenerator(),
+                                               0); // todo what should this be? base paddr
         // unit = TranslationUnit::create(this, getHierarchicalName(), cadi__,
         //                                ptw_master_control.createRandomContextTransactionGenerator());
     }

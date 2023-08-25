@@ -38,7 +38,7 @@ use crate::fastmodels::add_header_comment;
 use crate::VelosiHwGenError;
 
 pub fn unit_header_file(name: &str) -> String {
-    format!("{}_unit.hpp", name)
+    format!("{}_unit.cpp", name)
 }
 
 pub fn unit_class_name(name: &str) -> String {
@@ -591,7 +591,7 @@ pub fn generate_unit_header(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), V
 
     if let Some(u) = next_unit(unit) {
         s.new_comment("translation unit specific includes");
-        s.new_include(&format!("{u}_unit.hpp"), false);
+        s.new_include(&unit_header_file(&u.to_string()), false);
     }
 
     add_state_classes(s, unit);

@@ -44,6 +44,11 @@ TRANSLATION_UNIT_OBJS := $(TRANSLATION_UNIT_SRCS:$(SOURCE_DIR)/%.cpp=$(BUILD_DIR
 # The Translation Unit Library
 TRANSLATION_UNIT_LIB  := $(BUILD_DIR)/lib/libunit.a
 
+FRAMEWORK_LIB := $(FRAMEWORK_DIR)/build/lib/libframework.a
+
+$(FRAMEWORK_LIB):
+	make -C fm_translation_framework
+
 # building the library
 $(TRANSLATION_UNIT_LIB): $(TRANSLATION_UNIT_OBJS)
 	$(MKDIR) $(@D)
@@ -64,7 +69,7 @@ run: $(PLATFORM_BIN)
 
 # Targets
 .DEFAULT_GOAL = all
-all: $(TRANSLATION_UNIT_LIB) $(PLATFORM_BIN)
+all: $(FRAMEWORK_LIB) $(TRANSLATION_UNIT_LIB) $(PLATFORM_BIN)
 lib: $(TRANSLATION_UNIT_LIB)
 
 # Compilation Rules
