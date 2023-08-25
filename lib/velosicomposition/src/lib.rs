@@ -111,8 +111,16 @@ impl Relations {
         relations
     }
 
-    pub fn get_roots(&self) -> Vec<Rc<String>> {
-        let all_units: HashSet<Rc<String>> = self.0.keys().cloned().collect();
+    // todo: store all unit names (not just parents) within Relations instead of having the ast as a param here
+    //       unfortunately the current field is referred to as "0" and may require some refactoring in /codegen
+    pub fn get_roots(&self, ast: &VelosiAst) -> Vec<Rc<String>> {
+        let all_units: HashSet<Rc<String>> = ast
+            .units()
+            .filter(|u| !u.is_abstract())
+            .map(|u| u.ident())
+            .cloned()
+            .collect();
+
         let referenced_units: HashSet<Rc<String>> = self
             .0
             .values()
