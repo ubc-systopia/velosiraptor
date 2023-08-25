@@ -11,7 +11,7 @@ config "default"
         COMPILER = "gcc-7.3";
         CONFIG_NAME = "default";
         PLATFORM = "Linux64";
-        INCLUDE_DIRS = "../src/include;../../framework/build/include/";
+        INCLUDE_DIRS = "../src/;../fm_translation_framework/";
         PREPROCESSOR_DEFINES = "NDEBUG";
         SIMGEN_COMMAND_LINE = "--num-comps-file 50";
         SIMGEN_WARNINGS_AS_ERRORS = "1";
@@ -27,7 +27,7 @@ config "default_armv8"
         COMPILER = "gcc-9.3";
         CONFIG_NAME = "default_armv8";
         PLATFORM = "Linux64_armv8l";
-        INCLUDE_DIRS = "../src/include;../../framework/build/include/";
+        INCLUDE_DIRS = "../src/;../fm_translation_framework/";
         PREPROCESSOR_DEFINES = "NDEBUG";
         SIMGEN_COMMAND_LINE = "--num-comps-file 50";
         SIMGEN_WARNINGS_AS_ERRORS = "1";
@@ -41,6 +41,6 @@ files
         path = "Platform.lisa";
         path = "..//* REPLACE pkgname */.lisa";
         path = "../build/lib/libunit.a";
-        path = "../fm_translation_framework/framework/build/lib/libframework.a";
+        path = "../fm_translation_framework/build/lib/libframework.a";
     }
 }

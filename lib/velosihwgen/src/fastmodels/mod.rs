@@ -31,7 +31,7 @@ use std::collections::HashMap;
 // the used external libraries
 use std::fs;
 use std::fs::File;
-use std::io::{BufWriter, Read, Write};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 // other libraries
@@ -83,7 +83,6 @@ pub struct ArmFastModelsModule {
     outdir: PathBuf,
     support_dir: PathBuf,
     pkgname: String,
-    framework_dir: String, // relative to outdir
 }
 
 pub fn add_header_comment(scope: &mut C::Scope, unit: &str, comp: &str) {
@@ -103,7 +102,6 @@ impl ArmFastModelsModule {
 
         ArmFastModelsModule {
             outdir: hwdir.join("fastmodels"),
-            framework_dir: "fm_translation_framework".to_string(),
             support_dir,
             pkgname,
         }
