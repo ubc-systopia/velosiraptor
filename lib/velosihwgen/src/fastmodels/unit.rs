@@ -404,7 +404,7 @@ fn add_state_classes(s: &mut Scope, unit: &VelosiAstUnit) {
                     "StateFieldBase",
                     vec![
                         C::Expr::new_str(f.ident()),
-                        C::Expr::new_num(f.size()),
+                        C::Expr::new_num(f.size() * 8),
                         C::Expr::new_num(0),
                     ],
                 ));
