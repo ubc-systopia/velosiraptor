@@ -1,5 +1,0 @@
-error: expected `;`, found `}`
-     --> tests/vrs/interface/parts/readactions_00_missing_semicolon.vrs:1:22
-      |
-    1 |  ReadActions { A -> B }
-      |                       ^ help: add `;` here.

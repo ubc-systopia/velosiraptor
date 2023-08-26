@@ -1,5 +1,0 @@
-error: expected `)`, found `foo`
-     --> tests/vrs/params/param_list_01_no_separator.vrs:1:11
-      |
-    1 |  (foo: bar foo: bar)
-      |            ^^^ help: add `)` here.

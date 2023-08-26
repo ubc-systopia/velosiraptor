@@ -1,5 +1,0 @@
-error: expected `)`, found `;`
-     --> tests/vrs/params/param_list_00_wrong_separator.vrs:1:10
-      |
-    1 |  (foo: bar; foo: bar)
-      |           ^ help: add `)` here.

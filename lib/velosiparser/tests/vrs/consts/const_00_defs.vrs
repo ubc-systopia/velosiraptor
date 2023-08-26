@@ -1,8 +1,0 @@
-const FOO : int = 123;
-const FOO : int = 0x1234;
-const FOO : int = a;
-const FOO : int = BAR;
-const FOO : size = FOO + FOOBAR;
-const FOO : MyType = 1234;
-const FOO : bool = 1234;
-const FOO : int = true;

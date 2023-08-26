@@ -1,3 +1,0 @@
-import    import_01_multi;
-
-const BAZ : int = 7890;

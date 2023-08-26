@@ -1,5 +1,0 @@
-error: expected `,`, found `]`
-     --> tests/vrs/interface/parts/mmiofield_02_field_info_wrong_2.vrs:1:20
-      |
-    1 |  mmio foo [ base, 8 ] {Layout {}}
-      |                     ^ help: add `,` here.

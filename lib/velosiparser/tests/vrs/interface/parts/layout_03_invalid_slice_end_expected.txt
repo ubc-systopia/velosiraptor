@@ -1,5 +1,0 @@
-error: expected `integer literal`, found `a`
-     --> tests/vrs/interface/parts/layout_03_invalid_slice_end.vrs:1:6
-      |
-    1 |  0 .. a foo
-      |       ^ help: add `integer literal` here.

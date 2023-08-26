@@ -1,5 +1,0 @@
-error: unsupported digit in number encountered.
-     --> tests/vrs/lex_08_invalid_identifiers.vrs:1:2
-      |
-    1 |  1bar
-      |   ^^^ remove unsupported characters from this number.

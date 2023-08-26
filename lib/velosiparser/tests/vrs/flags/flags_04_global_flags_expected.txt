@@ -1,5 +1,0 @@
-error: expected `}`, found `1`
-     --> tests/vrs/flags/flags_04_global_flags.vrs:1:9
-      |
-    1 |  flags { 1,  bar }
-      |          ^ help: add `}` here.

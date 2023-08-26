@@ -231,26 +231,41 @@ impl VelosiAstUnitStaticMap {
                         map = Some(s);
                     }
                 }
-                VelosiParseTreeUnitNode::Flags(f) => {
-                    unit_ignore_node!(VelosiParseTreeUnitNode::Flags, f, &mut issues, "StaticMap")
+                VelosiParseTreeUnitNode::Flags(_) => {
+                    unit_ignore_node!(
+                        VelosiParseTreeUnitNode::Flags,
+                        node,
+                        &mut issues,
+                        "StaticMap"
+                    )
                 }
-                VelosiParseTreeUnitNode::State(f) => {
-                    unit_ignore_node!(VelosiParseTreeUnitNode::State, f, &mut issues, "StaticMap")
+                VelosiParseTreeUnitNode::State(_) => {
+                    unit_ignore_node!(
+                        VelosiParseTreeUnitNode::State,
+                        node,
+                        &mut issues,
+                        "StaticMap"
+                    )
                 }
-                VelosiParseTreeUnitNode::Interface(f) => unit_ignore_node!(
+                VelosiParseTreeUnitNode::Interface(_) => unit_ignore_node!(
                     VelosiParseTreeUnitNode::Interface,
-                    f,
+                    node,
                     &mut issues,
                     "StaticMap"
                 ),
-                VelosiParseTreeUnitNode::EnumEntry(f) => unit_ignore_node!(
+                VelosiParseTreeUnitNode::EnumEntry(_) => unit_ignore_node!(
                     VelosiParseTreeUnitNode::EnumEntry,
-                    f,
+                    node,
                     &mut issues,
                     "StaticMap"
                 ),
-                VelosiParseTreeUnitNode::Type(t) => {
-                    unit_ignore_node!(VelosiParseTreeUnitNode::Type, t, &mut issues, "StaticMap")
+                VelosiParseTreeUnitNode::Type(_) => {
+                    unit_ignore_node!(
+                        VelosiParseTreeUnitNode::Type,
+                        node,
+                        &mut issues,
+                        "StaticMap"
+                    )
                 }
             }
         }

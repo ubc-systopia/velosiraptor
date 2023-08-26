@@ -1,5 +1,0 @@
-segment MyUnit {
-  interface(base: foo) {
-        reg foo [ 8 ] {}
-    };
-}

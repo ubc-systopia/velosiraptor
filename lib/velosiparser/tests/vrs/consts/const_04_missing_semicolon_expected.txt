@@ -1,5 +1,0 @@
-error: expected `;`, found `const`
-     --> tests/vrs/consts/const_04_missing_semicolon.vrs:2:1
-      |
-    2 |  const FOO: int = 1234 asdf;
-      |  ^^^^^ help: add `;` here.

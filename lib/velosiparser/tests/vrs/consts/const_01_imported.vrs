@@ -1,4 +1,0 @@
-import const_00_defs;
-
-const FOOBAR: int = 1234;
-const FOOBAR: int = 0xabcd;

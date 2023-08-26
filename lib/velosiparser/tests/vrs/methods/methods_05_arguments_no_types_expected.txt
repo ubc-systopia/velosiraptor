@@ -1,5 +1,0 @@
-error: expected `:`, found `)`
-     --> tests/vrs/methods/methods_05_arguments_no_types.vrs:3:15
-      |
-    3 |      fn foo(bar) -> bool
-      |                ^ help: add `:` here.

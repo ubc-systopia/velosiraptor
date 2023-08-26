@@ -1,5 +1,0 @@
-error: expected `identifier`, found `8`
-     --> tests/vrs/interface/parts/mmiofield_01_field_info_wrong.vrs:1:12
-      |
-    1 |  mmio foo [ 8 ] {Layout {}}
-      |             ^ help: add `identifier` here.

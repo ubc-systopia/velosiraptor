@@ -590,7 +590,7 @@ impl VelosiAstMethod {
             let hint = format!("remove the `{ms}` modifier");
             let err = VelosiAstErrBuilder::err(msg)
                 .add_hint(hint)
-                .add_location(pt.pos.from_self_with_subrange(range))
+                .add_location(pt.loc.from_self_with_subrange(range))
                 .build();
             issues.push(err);
         }
@@ -601,7 +601,7 @@ impl VelosiAstMethod {
             let hint = "make this an `abstract fn` or `synth fn`";
             let err = VelosiAstErrBuilder::err(msg.to_string())
                 .add_hint(hint.to_string())
-                .add_location(pt.pos.from_self_with_subrange(0..1))
+                .add_location(pt.loc.from_self_with_subrange(0..1))
                 .build();
             issues.push(err);
         }
@@ -612,7 +612,7 @@ impl VelosiAstMethod {
             let hint = "remove the `abstract` modifier";
             let err = VelosiAstErrBuilder::warn(msg.to_string())
                 .add_hint(hint.to_string())
-                .add_location(pt.pos.from_self_with_subrange(0..1))
+                .add_location(pt.loc.from_self_with_subrange(0..1))
                 .build();
             issues.push(err);
         }
@@ -642,11 +642,11 @@ impl VelosiAstMethod {
         st.drop_context();
 
         let mut res = if pt.is_abstract {
-            Self::new_abstract(name, rtype, params, requires, body, pt.pos)
+            Self::new_abstract(name, rtype, params, requires, body, pt.loc)
         } else if pt.is_synth {
-            Self::new_synth(name, rtype, params, requires, body, pt.pos)
+            Self::new_synth(name, rtype, params, requires, body, pt.loc)
         } else {
-            Self::new(name, rtype, params, requires, body, pt.pos)
+            Self::new(name, rtype, params, requires, body, pt.loc)
         };
 
         if !properties.is_empty() {
