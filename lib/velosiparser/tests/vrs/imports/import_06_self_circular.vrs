@@ -1,3 +1,0 @@
-import      import_06_self_circular;
-
-const FOO : int = 12345;

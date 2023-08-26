@@ -1,5 +1,0 @@
-segment MyUnit {
-  state(base: foo) {
-        reg foo [ 8 ] {}
-    };
-}

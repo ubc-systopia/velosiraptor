@@ -315,20 +315,20 @@ fn handle_nodes(
 
     for ptn in ptnodes {
         match ptn {
-            VelosiParseTreeInterfaceFieldNode::Layout(slices) => {
-                if !nodes.layout.is_empty() && !slices.is_empty() {
+            VelosiParseTreeInterfaceFieldNode::Layout(layout) => {
+                if !nodes.layout.is_empty() && !layout.is_empty() {
                     let msg = "two layout blocks detected. Attempting to merge them.";
                     let hint = "consider merging with the previous block.";
                     let related = "this is the previous layout block.";
                     let err = VelosiAstErrBuilder::warn(msg.to_string())
                         .add_hint(hint.to_string())
-                        .add_location(slices[0].loc.clone())
+                        .add_location(layout.loc.clone())
                         .add_related_location(related.to_string(), nodes.layout[0].loc.clone())
                         .build();
                     issues.push(err);
                 }
 
-                for slice in slices {
+                for slice in layout.slices {
                     let slice = Rc::new(ast_result_unwrap!(
                         VelosiAstFieldSlice::from_parse_tree(slice, ident.path(), size * 8),
                         issues

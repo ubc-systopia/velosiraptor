@@ -96,7 +96,7 @@ impl VelosiAstFlags {
             }
         }
 
-        ast_result_return!(Self::new(flags, pt.pos), issues)
+        ast_result_return!(Self::new(flags, pt.loc), issues)
     }
 
     pub fn populate_symboltable(&self, varname: &str, st: &mut SymbolTable) {

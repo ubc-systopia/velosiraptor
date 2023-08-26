@@ -450,17 +450,17 @@ impl VelosiAstUnitSegment {
                         methods.insert(m.ident_to_string(), m);
                     }
                 }
-                VelosiParseTreeUnitNode::EnumEntry(f) => unit_ignore_node!(
+                VelosiParseTreeUnitNode::EnumEntry(_) => unit_ignore_node!(
                     VelosiParseTreeUnitNode::EnumEntry,
-                    f,
+                    node,
                     &mut issues,
                     "Segments"
                 ),
-                VelosiParseTreeUnitNode::Type(_t) => {
+                VelosiParseTreeUnitNode::Type(_) => {
                     todo!("handle me")
                 }
-                VelosiParseTreeUnitNode::Map(f) => {
-                    unit_ignore_node!(VelosiParseTreeUnitNode::Map, f, &mut issues, "Segments")
+                VelosiParseTreeUnitNode::Map(_) => {
+                    unit_ignore_node!(VelosiParseTreeUnitNode::Map, node, &mut issues, "Segments")
                 }
             }
         }

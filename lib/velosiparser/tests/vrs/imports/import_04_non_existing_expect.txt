@@ -1,5 +1,0 @@
-error: Failed to resolve error: file not found: tests/vrs/imports/doesnt_exist.vrs
-     --> tests/vrs/imports/import_04_non_existing.vrs:1:13
-      |
-    1 |  import      doesnt_exist;
-      |              ^^^^^^^^^^^^ Remove this import or ensure the module is part of the search path

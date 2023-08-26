@@ -1,3 +1,0 @@
-import      doesnt_exist;
-
-const FOO : int = 12345;

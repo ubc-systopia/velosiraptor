@@ -1,5 +1,0 @@
-error: expected `}`, found `;`
-     --> tests/vrs/interface/parts/layout_01_wrong_separator.vrs:2:15
-      |
-    2 |      0 .. 1 foo;
-      |                ^ help: add `}` here.

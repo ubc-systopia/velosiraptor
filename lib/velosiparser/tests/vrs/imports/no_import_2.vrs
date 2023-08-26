@@ -1,3 +1,0 @@
-// some file to help with import tests
-
-const BAR : int = 1234;

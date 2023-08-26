@@ -371,28 +371,33 @@ impl VelosiAstUnitEnum {
 
                     enums.insert(val.ident.ident.clone(), val);
                 }
-                VelosiParseTreeUnitNode::Const(c) => {
-                    unit_ignore_node!(VelosiParseTreeUnitNode::Const, c, &mut issues, "Enum")
+                VelosiParseTreeUnitNode::Const(_) => {
+                    unit_ignore_node!(VelosiParseTreeUnitNode::Const, node, &mut issues, "Enum")
                 }
                 VelosiParseTreeUnitNode::InBitWidth(_, _) => todo!(),
                 VelosiParseTreeUnitNode::OutBitWidth(_, _) => todo!(),
-                VelosiParseTreeUnitNode::Flags(f) => {
-                    unit_ignore_node!(VelosiParseTreeUnitNode::Flags, f, &mut issues, "Enum")
+                VelosiParseTreeUnitNode::Flags(_) => {
+                    unit_ignore_node!(VelosiParseTreeUnitNode::Flags, node, &mut issues, "Enum")
                 }
-                VelosiParseTreeUnitNode::State(pst) => {
-                    unit_ignore_node!(VelosiParseTreeUnitNode::State, pst, &mut issues, "Enum")
+                VelosiParseTreeUnitNode::State(_) => {
+                    unit_ignore_node!(VelosiParseTreeUnitNode::State, node, &mut issues, "Enum")
                 }
-                VelosiParseTreeUnitNode::Interface(pst) => {
-                    unit_ignore_node!(VelosiParseTreeUnitNode::Interface, pst, &mut issues, "Enum")
+                VelosiParseTreeUnitNode::Interface(_) => {
+                    unit_ignore_node!(
+                        VelosiParseTreeUnitNode::Interface,
+                        node,
+                        &mut issues,
+                        "Enum"
+                    )
                 }
-                VelosiParseTreeUnitNode::Method(m) => {
-                    unit_ignore_node!(VelosiParseTreeUnitNode::Method, m, &mut issues, "Enum")
+                VelosiParseTreeUnitNode::Method(_) => {
+                    unit_ignore_node!(VelosiParseTreeUnitNode::Method, node, &mut issues, "Enum")
                 }
-                VelosiParseTreeUnitNode::Map(m) => {
-                    unit_ignore_node!(VelosiParseTreeUnitNode::Map, m, &mut issues, "Enum")
+                VelosiParseTreeUnitNode::Map(_) => {
+                    unit_ignore_node!(VelosiParseTreeUnitNode::Map, node, &mut issues, "Enum")
                 }
-                VelosiParseTreeUnitNode::Type(t) => {
-                    unit_ignore_node!(VelosiParseTreeUnitNode::Type, t, &mut issues, "Enum")
+                VelosiParseTreeUnitNode::Type(_) => {
+                    unit_ignore_node!(VelosiParseTreeUnitNode::Type, node, &mut issues, "Enum")
                 }
             }
         }
