@@ -1,48 +1,47 @@
-  fn foo() -> bool
-    requires true;
-  {
-    true
-  }
+fn foo() -> bool
+  requires true;
+{
+  true
+}
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-  fn bar() -> int
-    requires true;
-  {
-    0x3
-  }
+fn bar() -> int
+  requires true;
+{
+  0x3
+}
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-  fn baz(v: bool) -> bool
-    requires true;
-  {
-    !(v)
-  }
+fn baz(v: bool) -> bool
+  requires true;
+{
+  !(v)
+}
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-  fn bar(v: bool, u: bool) -> bool
-    requires true;
-  {
-    v && u
-  }
+fn bar(v: bool, u: bool) -> bool
+  requires true;
+{
+  v && u
+}
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-  fn bar(v: int, u: int) -> int
-    requires true;
-  {
-    v & u
-  }
+fn bar(v: int, u: int) -> int
+  requires true;
+{
+  v & u
+}
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-  fn bar_bar(v_3: int, u: int) -> int
-    requires true;
-  {
-    v_3 & u
-  }
+fn bar_bar(v_3: int, u: int) -> int
+  requires true;
+{
+  v_3 & u
+}
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-

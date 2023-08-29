@@ -1,6 +1,5 @@
-  #[remap]
-  abstract fn foo() -> bool
-    requires true;
-  { }
+#[remap]
+abstract fn foo() -> bool
+  requires true;
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@

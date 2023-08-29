@@ -29,11 +29,13 @@
 
 // modules
 mod enums;
+mod osspec;
 mod segment;
 mod staticmap;
 
 // re-exports
 pub use enums::VelosiAstUnitEnum;
+pub use osspec::VelosiAstUnitOSSpec;
 pub use segment::VelosiAstUnitSegment;
 pub use staticmap::VelosiAstUnitStaticMap;
 
@@ -84,6 +86,7 @@ pub enum VelosiAstUnit {
     Segment(Rc<VelosiAstUnitSegment>),
     StaticMap(Rc<VelosiAstUnitStaticMap>),
     Enum(Rc<VelosiAstUnitEnum>),
+    OSSpec(Rc<VelosiAstUnitOSSpec>),
 }
 
 impl VelosiAstUnit {
@@ -97,7 +100,7 @@ impl VelosiAstUnit {
             Segment(pt) => VelosiAstUnitSegment::from_parse_tree(pt, st),
             StaticMap(pt) => VelosiAstUnitStaticMap::from_parse_tree(pt, st),
             Enum(pt) => VelosiAstUnitEnum::from_parse_tree(pt, st),
-            OSSpec(_pt) => todo!("handle me"),
+            OSSpec(pt) => VelosiAstUnitOSSpec::from_parse_tree(pt, st),
         }
     }
 
@@ -108,6 +111,7 @@ impl VelosiAstUnit {
             Segment(s) => s.ident(),
             StaticMap(s) => s.ident(),
             Enum(e) => e.ident(),
+            OSSpec(e) => e.ident(),
         }
     }
 
@@ -118,6 +122,7 @@ impl VelosiAstUnit {
             Segment(s) => s.ident_to_string(),
             StaticMap(s) => s.ident_to_string(),
             Enum(e) => e.ident_to_string(),
+            OSSpec(e) => e.ident_to_string(),
         }
     }
 
@@ -128,6 +133,7 @@ impl VelosiAstUnit {
             Segment(s) => s.path(),
             StaticMap(s) => s.path(),
             Enum(e) => e.path(),
+            OSSpec(e) => e.path(),
         }
     }
 
@@ -138,6 +144,7 @@ impl VelosiAstUnit {
             Segment(s) => s.path_to_string(),
             StaticMap(s) => s.path_to_string(),
             Enum(e) => e.path_to_string(),
+            OSSpec(e) => e.path_to_string(),
         }
     }
 
@@ -148,6 +155,7 @@ impl VelosiAstUnit {
             Segment(s) => s.is_abstract,
             StaticMap(_) => false,
             Enum(_) => false,
+            OSSpec(_) => false,
         }
     }
 
@@ -163,12 +171,17 @@ impl VelosiAstUnit {
         matches!(self, VelosiAstUnit::Enum(_))
     }
 
+    pub fn is_osspec(&self) -> bool {
+        matches!(self, VelosiAstUnit::OSSpec(_))
+    }
+
     pub fn params_as_slice(&self) -> &[Rc<VelosiAstParam>] {
         use VelosiAstUnit::*;
         match self {
             Segment(pt) => pt.params_as_slice(),
             StaticMap(pt) => pt.params_as_slice(),
             Enum(pt) => pt.params_as_slice(),
+            OSSpec(pt) => pt.params_as_slice(),
         }
     }
 
@@ -178,6 +191,7 @@ impl VelosiAstUnit {
             Segment(s) => s.inbitwidth,
             StaticMap(s) => s.inbitwidth,
             Enum(e) => e.inbitwidth,
+            OSSpec(_e) => panic!("output bit width not defined of OSSpec"),
         }
     }
 
@@ -187,6 +201,7 @@ impl VelosiAstUnit {
             Segment(s) => s.outbitwidth,
             StaticMap(s) => s.outbitwidth,
             Enum(e) => e.outbitwidth,
+            OSSpec(_e) => panic!("output bit width not defined of OSSpec"),
         }
     }
 
@@ -196,6 +211,7 @@ impl VelosiAstUnit {
             StaticMap(staticmap) => staticmap.vaddr_max(),
             Segment(segment) => segment.vaddr_max(),
             Enum(e) => e.vaddr_max(),
+            OSSpec(e) => e.vaddr_max(),
         }
     }
 
@@ -205,6 +221,7 @@ impl VelosiAstUnit {
             StaticMap(staticmap) => staticmap.paddr_max(),
             Segment(segment) => segment.paddr_max(),
             Enum(e) => e.paddr_max(),
+            OSSpec(_e) => unreachable!(),
         }
     }
 
@@ -214,6 +231,7 @@ impl VelosiAstUnit {
             StaticMap(staticmap) => Box::new(staticmap.methods()),
             Segment(segment) => Box::new(segment.methods()),
             Enum(_) => Box::new(std::iter::empty()),
+            OSSpec(e) => Box::new(e.methods()),
         }
     }
 
@@ -230,6 +248,7 @@ impl VelosiAstUnit {
             StaticMap(staticmap) => staticmap.get_method(name),
             Segment(segment) => segment.get_method(name),
             Enum(_) => None,
+            OSSpec(o) => o.get_method(name),
         }
     }
 
@@ -239,6 +258,7 @@ impl VelosiAstUnit {
             StaticMap(staticmap) => Box::new(staticmap.consts()),
             Segment(segment) => Box::new(segment.consts()),
             Enum(_) => Box::new(std::iter::empty()),
+            OSSpec(o) => Box::new(o.consts()),
         }
     }
 
@@ -248,6 +268,7 @@ impl VelosiAstUnit {
             StaticMap(_) => None,
             Segment(segment) => segment.flags.clone(),
             Enum(_) => None,
+            OSSpec(_) => None,
         }
     }
 
@@ -257,6 +278,7 @@ impl VelosiAstUnit {
             StaticMap(_) => None,
             Segment(segment) => Some(segment.interface.clone()),
             Enum(_) => None,
+            OSSpec(_) => None,
         }
     }
 
@@ -266,6 +288,7 @@ impl VelosiAstUnit {
             (Segment(s1), Segment(s2)) => s1.interface.compare(&s2.interface),
             (StaticMap(_), StaticMap(_)) => true,
             (Enum(_), Enum(_)) => true,
+            (OSSpec(_), OSSpec(_)) => true,
             _ => false,
         }
     }
@@ -276,6 +299,7 @@ impl VelosiAstUnit {
             StaticMap(_) => None,
             Segment(segment) => Some(segment.state.clone()),
             Enum(_) => None,
+            OSSpec(_) => None,
         }
     }
 
@@ -285,6 +309,7 @@ impl VelosiAstUnit {
             (Segment(s1), Segment(s2)) => s1.state.compare(&s2.state),
             (StaticMap(_), StaticMap(_)) => true,
             (Enum(_), Enum(_)) => true,
+            (OSSpec(_), OSSpec(_)) => true,
             _ => false,
         }
     }
@@ -295,6 +320,7 @@ impl VelosiAstUnit {
             Segment(s) => &s.loc,
             StaticMap(s) => &s.loc,
             Enum(e) => &e.loc,
+            OSSpec(e) => &e.loc,
         }
     }
 
@@ -332,6 +358,7 @@ impl Display for VelosiAstUnit {
             VelosiAstUnit::Segment(s) => Display::fmt(s, f),
             VelosiAstUnit::StaticMap(s) => Display::fmt(s, f),
             VelosiAstUnit::Enum(e) => Display::fmt(e, f),
+            VelosiAstUnit::OSSpec(o) => Display::fmt(o, f),
         }
     }
 }

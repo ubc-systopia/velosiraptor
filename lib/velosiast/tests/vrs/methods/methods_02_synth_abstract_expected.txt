@@ -1,17 +1,25 @@
-  abstract fn foo() -> bool
-    requires true;
-  { }
+abstract fn foo() -> bool
+  requires true;
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-  synth fn foo() -> bool
-    requires true;
-  { }
+synth fn foo() -> bool
+  requires true;
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-  synth fn foo() -> bool
-    requires true;
-  { }
+synth fn foo() -> bool
+  requires true;
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+extern fn foo() -> bool
+  requires true;
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+extern fn foo() -> bool
+  requires true;
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+

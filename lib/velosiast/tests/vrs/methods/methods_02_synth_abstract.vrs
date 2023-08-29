@@ -9,3 +9,9 @@ synth fn foo() -> bool
 
 synth fn foo() -> bool
     requires true;
+
+extern fn foo() -> bool
+
+extern fn foo() -> bool
+    requires true;
+
