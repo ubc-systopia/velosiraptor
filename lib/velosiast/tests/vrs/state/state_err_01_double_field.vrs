@@ -1,35 +1,35 @@
 state(base: addr) {
     reg foo [ 8 ],
     reg foo [ 8 ],
-};
+}
 
 
 state(base: addr) {
     mem foo [ base, 8, 8 ],
     mem foo [ base, 8, 8 ],
-};
+}
 
 
 state(base: addr) {
     mem foo [ base, 8, 8 ],
     reg foo [ 8 ],
-};
+}
 
 state(base: addr) {
     reg foo [ 8 ],
     mem foo [ base, 8, 8 ],
-};
+}
 
 state() {
     reg foo [ 8 ] {
         0 .. 32 foo,
         32 .. 64 foo
     }
-};
+}
 
 state() {
     mem foo [ base, 0, 8 ] {
         0 .. 32 foo,
         32 .. 64 foo
     }
-};
+}

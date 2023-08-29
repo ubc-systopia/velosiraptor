@@ -170,15 +170,15 @@ impl VelosiAstField for VelosiAstStateRegisterField {
 /// Implementation of [Display] for [VelosiAstStateRegisterField]
 impl Display for VelosiAstStateRegisterField {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "    reg {} [{}]", self.ident, self.size)?;
+        write!(f, "reg {} [{}]", self.ident, self.size)?;
         if !self.layout.is_empty() {
             writeln!(f, " {{")?;
             for slice in &self.layout {
-                write!(f, "      ")?;
+                write!(f, "  ")?;
                 Display::fmt(slice, f)?;
                 writeln!(f, ",")?;
             }
-            write!(f, "    }}")
+            write!(f, "}}")
         } else {
             Ok(())
         }

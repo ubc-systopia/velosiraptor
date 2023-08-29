@@ -1,6 +1,6 @@
 interface(base: addr, base: addr) {
   reg foo [ 8 ],
-};
+}
 
 
 

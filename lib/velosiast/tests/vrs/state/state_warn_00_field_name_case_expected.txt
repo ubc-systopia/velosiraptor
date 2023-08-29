@@ -1,8 +1,8 @@
-StateDef() {
-    reg state.Foo [8] {
-      0..64 state.Foo.val,
-    },
-  }
+state() {
+  reg state.Foo [8] {
+    0..64 state.Foo.val,
+  },
+}
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 warning: identifier `Foo` should have a snake case name
      --> tests/vrs/state/state_warn_00_field_name_case.vrs:2:9
@@ -14,11 +14,11 @@ warning: generated 1 warnings
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-StateDef() {
-    reg state.FOO [8] {
-      0..64 state.FOO.val,
-    },
-  }
+state() {
+  reg state.FOO [8] {
+    0..64 state.FOO.val,
+  },
+}
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 warning: identifier `FOO` should have a snake case name
      --> tests/vrs/state/state_warn_00_field_name_case.vrs:6:9
@@ -30,11 +30,11 @@ warning: generated 1 warnings
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-StateDef() {
-    reg state.foo [8] {
-      0..64 state.foo.BAR,
-    },
-  }
+state() {
+  reg state.foo [8] {
+    0..64 state.foo.BAR,
+  },
+}
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 warning: identifier `BAR` should have a snake case name
      --> tests/vrs/state/state_warn_00_field_name_case.vrs:12:17
@@ -46,11 +46,11 @@ warning: generated 1 warnings
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-StateDef() {
-    reg state.foo [8] {
-      0..64 state.foo.Bar,
-    },
-  }
+state() {
+  reg state.foo [8] {
+    0..64 state.foo.Bar,
+  },
+}
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 warning: identifier `Bar` should have a snake case name
      --> tests/vrs/state/state_warn_00_field_name_case.vrs:18:17
