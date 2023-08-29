@@ -255,3 +255,11 @@ fn methods_err_unsupported_decorators() {
     let exp = Path::new("tests/vrs/methods/methods_err_07_unsupported_decorators_expected.txt");
     parse_methods_from_file_err(&vrs, &exp);
 }
+
+// extern + synth/abstract
+#[test]
+fn methods_err_extern_fn_synth_abstract_body() {
+    let vrs = Path::new("tests/vrs/methods/methods_err_08_extern_synth_abstract_body.vrs");
+    let exp = Path::new("tests/vrs/methods/methods_err_08_extern_synth_abstract_body_expected.txt");
+    parse_methods_from_file_err(&vrs, &exp);
+}

@@ -782,11 +782,13 @@ impl Display for VelosiAstUnitSegment {
             if i > 0 {
                 writeln!(f, "\n")?;
             }
-            Display::fmt(m, f)?;
-        }
-
-        if self.methods.is_empty() {
-            write!(f, "  // no methods")?;
+            let formatted = format!("{m}");
+            for (i, l) in formatted.lines().enumerate() {
+                if i > 0 {
+                    writeln!(f)?;
+                }
+                write!(f, "  {l}")?;
+            }
         }
 
         write!(f, "\n}}")

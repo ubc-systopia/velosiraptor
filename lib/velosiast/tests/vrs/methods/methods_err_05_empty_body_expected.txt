@@ -1,8 +1,8 @@
-error: method with no body must be declared abstract or synth.
+error: method with no body must be declared extern, abstract or synth.
      --> tests/vrs/methods/methods_err_05_empty_body.vrs:3:1
       |
     3 |  fn foo() -> bool
-      |  ^^ make this an `abstract fn` or `synth fn`
+      |  ^^ make this an `extern fn`, `abstract fn` or `synth fn`
 error: could not compile due to 1 previous errors; 0 warnings emitted
 
 

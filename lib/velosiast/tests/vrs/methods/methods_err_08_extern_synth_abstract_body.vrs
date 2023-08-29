@@ -1,0 +1,8 @@
+extern abstract fn foo() -> bool
+
+
+extern synth fn foo() -> bool
+
+extern fn foo() -> bool {
+    true
+}

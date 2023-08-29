@@ -163,6 +163,8 @@ pub struct VelosiAstMethod {
     pub is_abstract: bool,
     /// wheather this is a method to be synthesized
     pub is_synth: bool,
+    /// whether this method is extern
+    pub is_extern: bool,
     /// the return type
     pub rtype: VelosiAstType,
     /// the method parameter
@@ -197,6 +199,35 @@ impl VelosiAstMethod {
             properties: HashSet::new(),
             is_abstract: false,
             is_synth: false,
+            is_extern: false,
+            rtype,
+            params,
+            params_map,
+            requires,
+            body,
+            ops: Vec::new(),
+            loc,
+        }
+    }
+
+    pub fn new_extern(
+        ident: VelosiAstIdentifier,
+        rtype: VelosiAstType,
+        params: Vec<Rc<VelosiAstParam>>,
+        requires: Vec<Rc<VelosiAstExpr>>,
+        body: Option<Rc<VelosiAstExpr>>,
+        loc: VelosiTokenStream,
+    ) -> Self {
+        let mut params_map = HashMap::new();
+        params.iter().for_each(|p| {
+            params_map.insert(p.ident_to_string(), p.clone());
+        });
+        Self {
+            ident,
+            properties: HashSet::new(),
+            is_abstract: false,
+            is_synth: false,
+            is_extern: true,
             rtype,
             params,
             params_map,
@@ -224,6 +255,7 @@ impl VelosiAstMethod {
             properties: HashSet::new(),
             is_abstract: true,
             is_synth: false,
+            is_extern: false,
             rtype,
             params,
             params_map,
@@ -251,6 +283,7 @@ impl VelosiAstMethod {
             properties: HashSet::new(),
             is_abstract: false,
             is_synth: true,
+            is_extern: false,
             rtype,
             params,
             params_map,
@@ -579,12 +612,43 @@ impl VelosiAstMethod {
         };
 
         // the method was abstract or synth but has a body...
-        if body.is_some() && (pt.is_abstract || pt.is_synth) {
-            let (ms, range) = match (pt.is_abstract, pt.is_synth) {
-                (true, true) => ("abstract & synth ", 0..2),
-                (false, true) => ("synth ", 0..1),
-                (true, false) => ("abstract ", 0..1),
-                (false, false) => unreachable!(),
+        if body.is_some() && (pt.is_abstract || pt.is_synth || pt.is_extern) {
+            let (ms, range) = match (pt.is_extern, pt.is_abstract, pt.is_synth) {
+                (true, true, true) => {
+                    // method is extern abstract synth)
+                    ("abstract", 1..2)
+                }
+                (true, true, false) => {
+                    // method is extern abstract
+                    ("abstract", 1..2)
+                }
+                (true, false, true) => {
+                    // method is extern synth
+                    ("synth", 1..2)
+                }
+                (true, false, false) => {
+                    // method is extern, cannot be
+                    ("extern", 0..1)
+                }
+
+                (false, true, true) => {
+                    // method is abstract synth
+                    ("abstract", 0..1)
+                }
+
+                (false, true, false) => {
+                    // method is abstract
+                    ("abstract ", 0..1)
+                }
+
+                (false, false, true) => {
+                    // method is synth
+                    ("synth ", 0..1)
+                }
+
+                (false, false, false) => {
+                    unreachable!()
+                }
             };
             let msg = format!("method defined as {ms} cannot have a body.");
             let hint = format!("remove the `{ms}` modifier");
@@ -596,9 +660,9 @@ impl VelosiAstMethod {
         }
 
         // the method has no body but is not abstract
-        if body.is_none() && !(pt.is_abstract || pt.is_synth) {
-            let msg = "method with no body must be declared abstract or synth.";
-            let hint = "make this an `abstract fn` or `synth fn`";
+        if body.is_none() && !(pt.is_abstract || pt.is_synth || pt.is_extern) {
+            let msg = "method with no body must be declared extern, abstract or synth.";
+            let hint = "make this an `extern fn`, `abstract fn` or `synth fn`";
             let err = VelosiAstErrBuilder::err(msg.to_string())
                 .add_hint(hint.to_string())
                 .add_location(pt.loc.from_self_with_subrange(0..1))
@@ -613,6 +677,32 @@ impl VelosiAstMethod {
             let err = VelosiAstErrBuilder::warn(msg.to_string())
                 .add_hint(hint.to_string())
                 .add_location(pt.loc.from_self_with_subrange(0..1))
+                .build();
+            issues.push(err);
+        }
+
+        if pt.is_extern && pt.is_abstract {
+            let msg = "an extern method cannot be abstract";
+            let hint = "remove the abstract modifier";
+            let err = VelosiAstErrBuilder::err(msg.to_string())
+                .add_hint(hint.to_string())
+                .add_location(pt.loc.from_self_with_subrange(1..2))
+                .build();
+            issues.push(err);
+        }
+
+        if pt.is_extern && pt.is_synth {
+            let msg = "an extern method cannot be synth";
+            let hint = "remove the synth modifier";
+            let range = if pt.is_abstract && pt.is_synth {
+                2..3
+            } else {
+                1..2
+            };
+
+            let err = VelosiAstErrBuilder::err(msg.to_string())
+                .add_hint(hint.to_string())
+                .add_location(pt.loc.from_self_with_subrange(range))
                 .build();
             issues.push(err);
         }
@@ -645,6 +735,8 @@ impl VelosiAstMethod {
             Self::new_abstract(name, rtype, params, requires, body, pt.loc)
         } else if pt.is_synth {
             Self::new_synth(name, rtype, params, requires, body, pt.loc)
+        } else if pt.is_extern {
+            Self::new_extern(name, rtype, params, requires, body, pt.loc)
         } else {
             Self::new(name, rtype, params, requires, body, pt.loc)
         };
@@ -1009,7 +1101,7 @@ impl PartialEq for VelosiAstMethod {
 impl Display for VelosiAstMethod {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         if !self.properties.is_empty() {
-            write!(f, "  #[")?;
+            write!(f, "#[")?;
             for (i, prop) in self.properties.iter().enumerate() {
                 if i > 0 {
                     write!(f, ", ")?;
@@ -1019,7 +1111,9 @@ impl Display for VelosiAstMethod {
             writeln!(f, "]")?;
         }
 
-        write!(f, "  ")?;
+        if self.is_extern {
+            write!(f, "extern ")?;
+        }
         if self.is_abstract {
             write!(f, "abstract ")?;
         }
@@ -1036,21 +1130,22 @@ impl Display for VelosiAstMethod {
         write!(f, ") -> {}", self.rtype)?;
 
         if !self.requires.is_empty() {
-            writeln!(f)?;
             for r in &self.requires {
-                writeln!(f, "    requires {r};")?;
+                write!(f, "\n  requires {r};")?;
             }
         } else {
-            writeln!(f, "\n    requires true;")?;
+            write!(f, "\n  requires true;")?;
         }
 
         if let Some(b) = &self.body {
-            write!(f, "  {{\n    ")?;
-            Display::fmt(b, f)?;
-            write!(f, "\n  }}")
-        } else {
-            write!(f, "  {{ }}")
+            write!(f, "\n{{\n")?;
+            let formatted = format!("{b}");
+            for line in formatted.lines() {
+                writeln!(f, "  {line}")?;
+            }
+            write!(f, "}}")?;
         }
+        Ok(())
     }
 }
 

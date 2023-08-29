@@ -1,0 +1,29 @@
+error: an extern method cannot be abstract
+     --> tests/vrs/methods/methods_err_08_extern_synth_abstract_body.vrs:1:8
+      |
+    1 |  extern abstract fn foo() -> bool
+      |         ^^^^^^^^ remove the abstract modifier
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: an extern method cannot be synth
+     --> tests/vrs/methods/methods_err_08_extern_synth_abstract_body.vrs:4:8
+      |
+    4 |  extern synth fn foo() -> bool
+      |         ^^^^^ remove the synth modifier
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+error: method defined as extern cannot have a body.
+     --> tests/vrs/methods/methods_err_08_extern_synth_abstract_body.vrs:6:1
+      |
+    6 |  extern fn foo() -> bool {
+      |  ^^^^^^ remove the `extern` modifier
+error: could not compile due to 1 previous errors; 0 warnings emitted
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
