@@ -1,14 +1,13 @@
 error: duplicate definitions with name `base`
-     --> tests/vrs/interface/interface_err_00_double_parameter.vrs:1:38
+     --> tests/vrs/interface/interface_err_00_double_parameter.vrs:1:23
       |
     1 |  interface(base: addr, base: addr) {
-      |                           ^^^^^^^^^^ previous definition of `base` was here
+      |            ^^^^^^^^^^ previous definition of `base` was here
    ...
       |
     1 |  interface(base: addr, base: addr) {
-      |                                       ^^^^^^^^^^ duplicate definition
+      |                        ^^^^^^^^^^ duplicate definition
 error: could not compile due to 1 previous errors; 0 warnings emitted
 
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-

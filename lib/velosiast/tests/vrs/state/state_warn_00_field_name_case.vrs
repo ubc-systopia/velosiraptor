@@ -1,20 +1,20 @@
 state() {
     reg Foo [ 8 ]
-};
+}
 
 state() {
     reg FOO [ 8 ]
-};
+}
 
 
 state() {
     reg foo [ 8 ] {
         0 .. 64 BAR
     }
-};
+}
 
 state() {
     reg foo [ 8 ] {
         0 .. 64 Bar
     }
-};
+}

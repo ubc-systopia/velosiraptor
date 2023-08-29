@@ -1,12 +1,12 @@
 error: duplicate definitions with name `base`
-     --> tests/vrs/state/state_err_00_double_param.vrs:1:30
+     --> tests/vrs/state/state_err_00_double_param.vrs:1:19
       |
     1 |  state(base: addr, base: addr) {
-      |                   ^^^^^^^^^^ previous definition of `base` was here
+      |        ^^^^^^^^^^ previous definition of `base` was here
    ...
       |
     1 |  state(base: addr, base: addr) {
-      |                               ^^^^^^^^^^ duplicate definition
+      |                    ^^^^^^^^^^ duplicate definition
 error: could not compile due to 1 previous errors; 0 warnings emitted
 
 

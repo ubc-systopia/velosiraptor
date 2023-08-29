@@ -166,17 +166,17 @@ impl Display for VelosiAstStateMemoryField {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(
             f,
-            "    mem {} [{}, {}, {}]",
+            "mem {} [{}, {}, {}]",
             self.ident, self.base, self.offset, self.size
         )?;
         if !self.layout.is_empty() {
             writeln!(f, " {{")?;
             for slice in &self.layout {
-                write!(f, "      ")?;
+                write!(f, "  ")?;
                 Display::fmt(slice, f)?;
                 writeln!(f, ",")?;
             }
-            write!(f, "    }}")
+            write!(f, "}}")
         } else {
             Ok(())
         }

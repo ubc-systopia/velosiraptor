@@ -3,4 +3,4 @@ interface(base: addr) {
   mem BAR [ base, 0, 8 ],
   mmio FooBar [ base, 8, 8 ],
   reg foo_bar [ 8 ]
-};
+}
