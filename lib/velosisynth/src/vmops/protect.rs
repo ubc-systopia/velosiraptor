@@ -30,15 +30,16 @@ use std::rc::Rc;
 
 use smt2::Term;
 
-use velosiast::ast::{VelosiAstExpr, VelosiAstMethod, VelosiAstUnitSegment};
+use velosiast::ast::{VelosiAstBinOpExpr, VelosiAstExpr, VelosiAstMethod, VelosiAstUnitSegment};
 
 use crate::programs::Program;
+use crate::ProgramsIter;
 
 use crate::z3::{Z3TaskPriority, Z3WorkerPool};
 
 use super::queries::{
-    utils, CompoundBoolExprQueryBuilder, MaybeResult, ProgramBuilder, ProgramVerifier,
-    TranslateQueryBuilder,
+    utils, BoolExprQueryBuilder, CompoundBoolExprQueryBuilder, MaybeResult, ProgramBuilder,
+    ProgramVerifier, TranslateQueryBuilder,
 };
 use super::SynchronousSync;
 
@@ -102,24 +103,41 @@ impl ProtectPrograms {
             &mut partial_programs,
         );
 
-        // temprarily disabbing this, fix in another branch!
-        // if let Some(_staring_prog) = &starting_prog {
-        //     // here we have a starting program, that should have satisfied all the preconditions.
-        //     // we now need to check if the program can be made to work with the memory model as well
-        // } else {
+        let query = if let Some(staring_prog) = &starting_prog {
+            // here we have a starting program, that should have satisfied all the preconditions.
+            // we now need to check if the program can be made to work with the memory model as well
+            if let Some(p) = partial_programs.pop() {
+                let goal_expr = partial_programs.into_iter().fold(p.goal_expr(), |acc, x| {
+                    Rc::new(VelosiAstExpr::BinOp(VelosiAstBinOpExpr::lor(
+                        acc,
+                        x.goal_expr(),
+                    )))
+                });
 
-        // }
+                // we got the goal expression that is now an AND of everything, so we can now
+                // form the boolean expression
 
-        // now we got all the partial programs that we need to verify
-        let query = CompoundBoolExprQueryBuilder::new(unit, m_op.clone())
-            .partial_programs(partial_programs, false)
-            // .assms()
-            .all()
-            .expect("query?");
+                BoolExprQueryBuilder::new(unit, m_op.clone(), goal_expr)
+                    .mem_model(staring_prog.clone())
+                    .build()
+                    .expect("no query?")
+                    .into()
+            } else {
+                // there were no starting programs?
+                ProgramsIter::default().into()
+            }
+        } else {
+            CompoundBoolExprQueryBuilder::new(unit, m_op.clone())
+                .partial_programs(partial_programs, false)
+                // .assms()
+                .all()
+                .expect("query?")
+                .into()
+        };
 
         let query = ProgramVerifier::with_batchsize(
             unit.ident().clone(),
-            query.into(),
+            query,
             batch_size,
             Z3TaskPriority::High,
         );
