@@ -93,6 +93,7 @@ pub fn vrs_type_to_rust_type(ty: &VelosiAstTypeInfo) -> String {
         VelosiAstTypeInfo::State => todo!(),
         VelosiAstTypeInfo::Interface => todo!(),
         VelosiAstTypeInfo::Void => todo!(),
+        VelosiAstTypeInfo::Extern(_) => todo!(),
     }
 }
 

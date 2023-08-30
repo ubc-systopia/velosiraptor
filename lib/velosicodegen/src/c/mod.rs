@@ -141,6 +141,7 @@ impl BackendC {
                     enums::generate(ast, e, &srcdir).expect("code generation failed\n");
                     srcdir.pop();
                 }
+                VelosiAstUnit::OSSpec(_) => todo!(),
             }
         }
 

@@ -335,9 +335,10 @@ fn main() {
                     }
                 }
             }
-            VelosiAstUnit::StaticMap(_s) => {
+            VelosiAstUnit::OSSpec(_) | VelosiAstUnit::StaticMap(_) => {
                 // nothing to synthesize here
             }
+
             VelosiAstUnit::Enum(e) => {
                 // try to differentiate enum variants
                 println!("Checking distinguishability for enum {}", e.ident());

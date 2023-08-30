@@ -293,6 +293,9 @@ impl BackendRust {
                     fs::create_dir_all(&srcdir)?;
                     enums::generate(ast, e, &srcdir).expect("code generation failed\n");
                 }
+                VelosiAstUnit::OSSpec(_) => {
+                    todo!("HANDLE ME!");
+                }
             }
 
             // save the scope
