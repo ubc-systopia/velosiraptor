@@ -166,6 +166,9 @@ fn examples_sanitycheck() {
             VelosiAstUnit::Enum(_) => {
                 // no-op
             }
+            VelosiAstUnit::OSSpec(_) => {
+                // no-op
+            }
         }
     }
 
@@ -206,6 +209,9 @@ fn examples_distinguish() {
                 } else {
                     println!(" ok.  Units are distinguishable.");
                 }
+            }
+            VelosiAstUnit::OSSpec(_) => {
+                // no-op
             }
         }
     }

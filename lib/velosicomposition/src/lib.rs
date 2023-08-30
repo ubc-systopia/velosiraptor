@@ -105,6 +105,7 @@ impl Relations {
                         relations.insert(u.ident().clone(), ast.get_unit(next).unwrap().clone());
                     }
                 }
+                OSSpec(_) => {}
             }
         }
 
@@ -145,6 +146,7 @@ impl Relations {
                 "# "
             }
             Enum(_u) => "",
+            OSSpec(_) => "",
         };
 
         println!(
@@ -189,6 +191,7 @@ impl Relations {
                 }
             },
             Enum(_u) => {}
+            OSSpec(_) => {}
         }
 
         if let Some(children) = self.0.get(root.ident()) {
@@ -251,6 +254,9 @@ pub fn extract_composition(ast: &VelosiAst) {
                     relations.insert(u.ident().clone(), ast.get_unit(next).unwrap().clone());
                     referenced_units.insert(Rc::new(next.to_string()));
                 }
+            }
+            OSSpec(_) => {
+                // nothing to be done here
             }
         }
     }
