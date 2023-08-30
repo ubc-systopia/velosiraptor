@@ -245,6 +245,9 @@ pub fn main() {
             VelosiAstUnit::StaticMap(_s) => {
                 // nothing to synthesize here
             }
+            VelosiAstUnit::OSSpec(_) => {
+                // nothing to synthesize here
+            }
             VelosiAstUnit::Enum(e) => {
                 // try to differentiate enum variants
                 let enum_name = e.ident().clone();
