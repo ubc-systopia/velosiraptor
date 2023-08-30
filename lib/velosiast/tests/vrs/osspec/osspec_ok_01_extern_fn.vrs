@@ -1,0 +1,10 @@
+const FOO : int = 1234;
+
+osspec MyOs {
+    const BAR : int = 1234;
+
+    extern type Capref {}
+
+    extern fn vnode_map(src: Capref, dst: Capref, offset: int) -> bool
+}
+

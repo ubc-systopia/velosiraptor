@@ -1,0 +1,36 @@
+VelosiAst(tests/vrs/osspec/osspec_ok_02_map.vrs)
+--------------------------------------------------------
+
+const FOO : int = 0x4d2;
+
+osspec MyOs () {
+
+  const BAR : int = 0x4d2;
+
+  extern type Capref
+
+  extern type VNode
+
+  extern type Frame
+
+  extern fn get_vnode_for_va(va: vaddr) -> Capref
+    requires true;
+
+  extern fn vnode_map(dest: Capref, src: Capref, va: vaddr, attr: flags, off: addr, sz: size, mapping: Capref) -> bool
+    requires true;
+
+  fn map_vnode(va: vaddr, sz: size, flgs: flags, pa: VNode) -> bool
+    requires true;
+  {
+    vnode_map(get_vnode_for_va(va), pa.cap, va, flgs, 0x0, sz, pa.mapping)
+  }
+
+  fn map_frame(va: vaddr, sz: size, flgs: flags, pa: Frame) -> bool
+    requires true;
+  {
+    vnode_map(get_vnode_for_va(va), pa.cap, va, flgs, 0x0, sz, pa.mapping)
+  }
+
+}
+
+--------------------------------------------------------

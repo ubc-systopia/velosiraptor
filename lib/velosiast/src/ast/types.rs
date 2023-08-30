@@ -28,19 +28,26 @@
 //! This module defines type information nodes of the VelosiAst
 
 // used standard library functionality
+use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 // used parse tree definitions
-use velosiparser::parsetree::{VelosiParseTreeType, VelosiParseTreeTypeInfo};
+use velosiparser::parsetree::{
+    VelosiParseTreeExternType, VelosiParseTreeType, VelosiParseTreeTypeInfo,
+};
 
 // used crate functionality
-use crate::error::VelosiAstIssues;
-use crate::{ast_result_return, utils, AstResult, SymbolTable, VelosiTokenStream};
+use crate::error::{VelosiAstErrDoubleDef, VelosiAstIssues};
+use crate::{
+    ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable, VelosiTokenStream,
+};
 
 // used definitions of references AST nodes
-use crate::ast::VelosiAstIdentifier;
+use crate::ast::{VelosiAstIdentifier, VelosiAstNode};
+
+use super::VelosiAstParam;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Type Information
@@ -67,6 +74,8 @@ pub enum VelosiAstTypeInfo {
     Range,
     /// type referece to user-define type (unit)
     TypeRef(Rc<String>),
+    /// reference to an external type
+    Extern(Rc<String>),
     /// Reference to the state
     State,
     /// Reference to the interface
@@ -79,7 +88,10 @@ impl VelosiAstTypeInfo {
     /// whether or not the type is a built-in type
     pub fn is_builtin(&self) -> bool {
         use VelosiAstTypeInfo::*;
-        !matches!(self, TypeRef(_) | State | Interface)
+        matches!(
+            self,
+            Integer | Bool | GenAddr | VirtAddr | PhysAddr | Size | Flags | Range | Void
+        )
     }
 
     pub fn is_void(&self) -> bool {
@@ -103,7 +115,7 @@ impl VelosiAstTypeInfo {
         matches!(self, VelosiAstTypeInfo::Flags)
     }
 
-    // whether this is an address type
+    /// whether this is an address type
     pub fn is_addr(&self) -> bool {
         use VelosiAstTypeInfo::*;
         matches!(self, GenAddr | VirtAddr | PhysAddr)
@@ -114,14 +126,20 @@ impl VelosiAstTypeInfo {
         matches!(self, Self::PhysAddr)
     }
 
-    // whether this is type refereces of another unit
+    /// whether this is type refereces of another unit
     pub fn is_typeref(&self) -> bool {
         matches!(self, VelosiAstTypeInfo::TypeRef(_))
+    }
+
+    /// wether this type is an externally defined type
+    pub fn is_extern(&self) -> bool {
+        matches!(self, VelosiAstTypeInfo::Extern(_))
     }
 
     pub fn typeref(&self) -> Option<&Rc<String>> {
         match self {
             VelosiAstTypeInfo::TypeRef(name) => Some(name),
+            VelosiAstTypeInfo::Extern(name) => Some(name),
             _ => None,
         }
     }
@@ -133,19 +151,22 @@ impl VelosiAstTypeInfo {
     /// type reference.
     pub fn compatible(&self, other: &Self) -> bool {
         use VelosiAstTypeInfo::*;
-        match self {
-            Integer => other.is_numeric() || other.is_flags(),
-            Bool => other.is_boolean() || other.is_flags(),
-            GenAddr => other.is_numeric(),
-            VirtAddr => other.is_numeric(),
-            PhysAddr => other.is_numeric(),
-            Size => other.is_numeric(),
-            Flags => other.is_boolean() || other.is_numeric() || other.is_flags(),
-            Range => false,
-            TypeRef(_) => other.is_numeric(), //self == other,
-            State => false,
-            Interface => false,
-            Void => *other == Void,
+        match (self, other) {
+            (Integer, other) => other.is_numeric() || other.is_flags(),
+            (Bool, other) => other.is_boolean() || other.is_flags(),
+            (GenAddr, other) => other.is_numeric(),
+            (VirtAddr, other) => other.is_numeric(),
+            (PhysAddr, other) => other.is_numeric(),
+            (Size, other) => other.is_numeric(),
+            (Flags, other) => other.is_boolean() || other.is_numeric() || other.is_flags(),
+            (Range, _other) => false,
+            (TypeRef(a), TypeRef(b)) => a == b,
+            (TypeRef(_), other) => other.is_numeric(), //self == other,
+            (Extern(a), Extern(b)) => a == b,
+            (Extern(_), _) => false,
+            (State, _) => false,
+            (Interface, _) => false,
+            (Void, other) => *other == Void,
         }
     }
 
@@ -162,6 +183,7 @@ impl VelosiAstTypeInfo {
             Flags => "flags",
             Range => "range",
             TypeRef(name) => name,
+            Extern(name) => name,
             State => "state",
             Interface => "interface",
             Void => "()",
@@ -181,6 +203,7 @@ impl VelosiAstTypeInfo {
             Flags => "flags",
             Range => "range",
             TypeRef(name) => name,
+            Extern(name) => name,
             State => "state",
             Interface => "interface",
             Void => "void",
@@ -257,20 +280,34 @@ impl VelosiAstType {
         // obtain the type information
         let typeinfo = VelosiAstTypeInfo::from(pt.typeinfo);
 
-        let res = VelosiAstType {
-            typeinfo,
-            loc: pt.loc,
-        };
-
         // check the type reference
-        if let VelosiAstTypeInfo::TypeRef(tname) = &res.typeinfo {
-            // hacky way for the type check
-            let id = VelosiAstIdentifier::new(tname.to_string(), res.loc.clone());
-            utils::check_type_exists(&mut issues, st, &id);
-            ast_result_return!(res, issues)
-        } else {
-            // no type reference, built-in types are always ok.
-            AstResult::Ok(res)
+        match typeinfo {
+            VelosiAstTypeInfo::TypeRef(tname) => {
+                // hacky way for the type check, and figure out if it's external
+                let id = VelosiAstIdentifier::new(tname.to_string(), pt.loc.clone());
+                let typeinfo = if utils::check_type_exists(&mut issues, st, &id) {
+                    VelosiAstTypeInfo::Extern(tname)
+                } else {
+                    VelosiAstTypeInfo::TypeRef(tname)
+                };
+                ast_result_return!(
+                    VelosiAstType {
+                        typeinfo,
+                        loc: pt.loc,
+                    },
+                    issues
+                )
+            }
+            VelosiAstTypeInfo::Extern(_) => {
+                unreachable!("external types should show up as typerefs")
+            }
+            typeinfo => {
+                // no type reference, built-in types are always ok.
+                AstResult::Ok(VelosiAstType {
+                    typeinfo,
+                    loc: pt.loc,
+                })
+            }
         }
     }
 
@@ -307,6 +344,10 @@ impl VelosiAstType {
     // whether this is type refereces of another unit
     pub fn is_typeref(&self) -> bool {
         self.typeinfo.is_typeref()
+    }
+
+    pub fn is_extern(&self) -> bool {
+        self.typeinfo.is_extern()
     }
 
     pub fn typeref(&self) -> Option<&Rc<String>> {
@@ -375,5 +416,142 @@ impl Display for VelosiAstType {
 impl Debug for VelosiAstType {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
         Display::fmt(&self, format)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Extern Type NOde
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Represents the type information
+#[derive(Eq, Clone)]
+pub struct VelosiAstExternType {
+    /// the identifier of the type
+    pub ident: VelosiAstIdentifier,
+    /// the type information
+    pub fields: Vec<Rc<VelosiAstParam>>,
+    /// the location of the type clause
+    pub loc: VelosiTokenStream,
+}
+
+impl VelosiAstExternType {
+    // converts the parse tree node into an ast node, performing checks
+    pub fn from_parse_tree(
+        pt: VelosiParseTreeExternType,
+        st: &mut SymbolTable,
+    ) -> AstResult<Self, VelosiAstIssues> {
+        let mut issues = VelosiAstIssues::new();
+
+        let ident = VelosiAstIdentifier::from(pt.ident);
+        utils::check_camel_case(&mut issues, &ident);
+
+        let mut fields = Vec::new();
+        for field in pt.fields {
+            fields.push(Rc::new(ast_result_unwrap!(
+                VelosiAstParam::from_parse_tree(field, true, st),
+                issues
+            )));
+        }
+
+        let mut field_map: HashMap<Rc<String>, &VelosiAstParam> = HashMap::new();
+        for field in &fields {
+            // insert into the symbol table
+            if let Some(f) = field_map.get(field.ident()) {
+                let err = VelosiAstErrDoubleDef::new(
+                    field.path().clone(),
+                    field.loc.clone(),
+                    f.loc.clone(),
+                );
+                issues.push(err.into());
+            } else {
+                field_map.insert(field.ident().clone(), field.as_ref());
+            }
+        }
+
+        ast_result_return!(
+            VelosiAstExternType {
+                ident,
+                fields,
+                loc: pt.loc
+            },
+            issues
+        )
+    }
+
+    pub fn populate_symboltable(&self, varname: &str, st: &mut SymbolTable) {
+        for field in &self.fields {
+            let name = Rc::new(format!("{}.{}", varname, field.ident()));
+            if field.ptype.is_extern() {
+                let tname = field
+                    .ptype
+                    .typeref()
+                    .expect("BUG: expected typeref to have a name");
+                let ty = match st.lookup(tname) {
+                    Some(Symbol {
+                        ast_node: VelosiAstNode::ExternType(ty),
+                        ..
+                    }) => Some(ty.clone()),
+                    _ => unreachable!(),
+                };
+                if let Some(t) = ty {
+                    t.populate_symboltable(name.as_str(), st)
+                }
+            }
+
+            let sym = Symbol::new(
+                name,
+                field.ptype.clone(),
+                VelosiAstNode::Param(field.clone()),
+            );
+            st.insert(sym)
+                .expect("conflict while building the symbol table");
+        }
+    }
+}
+
+impl From<Rc<VelosiAstExternType>> for Symbol {
+    fn from(value: Rc<VelosiAstExternType>) -> Self {
+        Symbol {
+            name: value.ident.ident().clone(),
+            typeinfo: VelosiAstType::new(
+                VelosiAstTypeInfo::Extern(value.ident.ident().clone()),
+                value.loc.clone(),
+            ),
+            ast_node: VelosiAstNode::ExternType(value),
+        }
+    }
+}
+
+/// Implementation of trait [Display] for [VelosiAstExternType]
+impl Display for VelosiAstExternType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "extern type {}", self.ident)
+    }
+}
+
+/// Implementation of [Debug] for [VelosiAstExternType]
+impl Debug for VelosiAstExternType {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
+/// Implementation of [PartialEq] for [VelosiAstExternType]
+///
+/// We implement our own variant of partial equality as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl PartialEq for VelosiAstExternType {
+    fn eq(&self, other: &Self) -> bool {
+        self.ident == other.ident
+    }
+}
+
+/// Implementation of [Hash] for [VelosiAstExternType]
+///
+/// We implement our own variant of hash as we do not want to consider the
+/// location of the expression when comparing two expressions.
+impl Hash for VelosiAstExternType {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.ident.hash(state);
     }
 }

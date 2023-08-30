@@ -1,0 +1,11 @@
+error: OS specification does not support abstract methods
+     --> tests/vrs/osspec/osspec_err_00_synth_abstract_fn.vrs:3:5
+      |
+    3 |      abstract fn foo() -> bool
+      |      ^^^^^^^^ remove this method or make it non-abstract
+error: OS specification does not support synth methods
+     --> tests/vrs/osspec/osspec_err_00_synth_abstract_fn.vrs:4:5
+      |
+    4 |      synth fn bar() -> bool
+      |      ^^^^^ remove this method or make it non-abstract
+error: could not compile due to 2 previous errors; 0 warnings emitted

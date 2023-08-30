@@ -210,6 +210,17 @@ impl VelosiAstUnitStaticMap {
                         VelosiAstMethod::from_parse_tree(method, st),
                         issues
                     ));
+
+                    if m.is_extern {
+                        let msg = "staticmap specifications do not allow extern functions";
+                        let hint = "remove this method or make it non-extern";
+                        let err = VelosiAstErrBuilder::err(msg.to_string())
+                            .add_hint(hint.to_string())
+                            .add_location(m.loc.from_self_with_subrange(0..1))
+                            .build();
+                        issues.push(err);
+                    }
+
                     if let Err(e) = st.insert(m.clone().into()) {
                         issues.push(*e);
                     } else {
@@ -340,8 +351,11 @@ impl VelosiAstUnitStaticMap {
             );
         }
 
+        let ident = VelosiAstIdentifier::from(pt.name);
+        utils::check_camel_case(&mut issues, &ident);
+
         let res = Self {
-            ident: VelosiAstIdentifier::from(pt.name),
+            ident,
             params,
             derived,
             inbitwidth,

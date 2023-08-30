@@ -421,6 +421,16 @@ impl VelosiAstUnitSegment {
                         issues
                     ));
 
+                    if m.is_extern {
+                        let msg = "segment specifications do not allow extern functions";
+                        let hint = "remove this method or make it non-extern";
+                        let err = VelosiAstErrBuilder::err(msg.to_string())
+                            .add_hint(hint.to_string())
+                            .add_location(m.loc.from_self_with_subrange(0..1))
+                            .build();
+                        issues.push(err);
+                    }
+
                     if let Some(mderiv) = st.lookup(m.ident().as_str()) {
                         // exists already,
                         if let VelosiAstNode::Method(md) = &mderiv.ast_node {
@@ -622,8 +632,11 @@ impl VelosiAstUnitSegment {
             64
         };
 
+        let ident = VelosiAstIdentifier::from(pt.name);
+        utils::check_camel_case(&mut issues, &ident);
+
         let res = Self {
-            ident: VelosiAstIdentifier::from(pt.name),
+            ident,
             is_abstract: pt.is_abstract,
             params,
             derived,
