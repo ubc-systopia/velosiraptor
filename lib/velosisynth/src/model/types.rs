@@ -199,6 +199,7 @@ pub fn typeinfo_to_smt2(prefix: &str, ty: &VelosiAstTypeInfo) -> String {
             paddr(prefix)
             //unimplemented!("don't know how to handle typerefs yet ({s})"),
         }
+        Extern(_) => panic!("state type not expected here"),
         // Reference to the state
         State => panic!("state type not expected here"),
         // Reference to the interface
