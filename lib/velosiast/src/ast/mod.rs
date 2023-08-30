@@ -88,6 +88,8 @@ use velosiparser::VelosiTokenStream;
 use crate::error::VelosiAstIssues;
 use crate::{ast_result_return, ast_result_unwrap, AstResult, SymbolTable};
 
+use self::types::VelosiAstExternType;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // AST Node
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -109,6 +111,7 @@ pub enum VelosiAstNode {
     InterfaceFieldSlice(Rc<VelosiAstFieldSlice>),
     Flags(Rc<VelosiAstFlags>),
     Flag(Rc<VelosiAstIdentifier>),
+    ExternType(Rc<VelosiAstExternType>),
 }
 
 impl VelosiAstNode {
@@ -127,6 +130,7 @@ impl VelosiAstNode {
             InterfaceFieldSlice(i) => &i.loc,
             Flags(f) => &f.loc,
             Flag(f) => &f.loc,
+            ExternType(t) => &t.loc,
         }
     }
 }

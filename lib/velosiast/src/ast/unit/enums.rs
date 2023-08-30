@@ -454,8 +454,11 @@ impl VelosiAstUnitEnum {
             Rc::new(VelosiAstMethod::default_protect()),
         );
 
+        let ident = VelosiAstIdentifier::from(pt.name);
+        utils::check_camel_case(&mut issues, &ident);
+
         let res = Self {
-            ident: VelosiAstIdentifier::from(pt.name),
+            ident,
             params,
             inbitwidth,
             outbitwidth,

@@ -109,6 +109,9 @@ impl Display for Symbol {
             VelosiAstNode::Flag(_) => {
                 write!(f, "flag|{:?}|{}", self.typeinfo, self.name)
             }
+            VelosiAstNode::ExternType(_) => {
+                write!(f, "extern type|{:?}|{}", self.typeinfo, self.name)
+            }
         }
     }
 }

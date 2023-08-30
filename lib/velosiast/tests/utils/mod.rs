@@ -49,6 +49,9 @@ pub fn check_parse_file_ok_strict(vrs: &Path, exp: Option<&Path>) {
 
     match VelosiAst::from_file(path_str) {
         AstResult::Ok(ast) => {
+            println!(" Ok. Successfully parsed.");
+            println!(">>>>>>\n{ast}\n<<<<<<");
+            println!("  - Checking expected output ...");
             if let Some(exp) = exp {
                 let res = fs::read_to_string(exp).expect("could not read the exected output file");
                 assert_eq!(ast.to_string(), res);
@@ -86,16 +89,18 @@ pub fn check_parse_file_ok(vrs: &Path, exp: Option<&Path>) {
 
     match VelosiAst::from_file(path_str) {
         AstResult::Ok(ast) => {
+            println!(" Ok. Successfully parsed.");
+            println!(">>>>>>\n{ast}\n<<<<<<");
+            println!("  - Checking expected output ...");
             if let Some(exp) = exp {
                 let expected =
                     fs::read_to_string(exp).expect("could not read the exected output file");
                 let output = format!("{ast}\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nOK.");
                 assert_eq!(output, expected);
-                println!(" ok. Successfully parsed. Matches expected output.");
+                println!(" ok. Matches expected output.");
             } else {
-                println!(" ok. Successfully parsed. No comparison file given.");
+                println!(" ok. No comparison file given.");
             }
-            println!(">>>>>>\n{ast}\n<<<<<<");
         }
         AstResult::Issues(ast, err) => {
             if let Some(exp) = exp {
@@ -161,7 +166,7 @@ pub fn check_parse_file_issues(vrs: &Path, exp: Option<&Path>) {
 
 #[cfg(test)]
 #[allow(dead_code)]
-pub fn check_parse_fail(vrs: &Path, exp: Option<&Path>) {
+pub fn check_parse_file_fail(vrs: &Path, exp: Option<&Path>) {
     let path_str = vrs.to_str().unwrap();
     assert!(vrs.is_file(), "{} is not a file", path_str);
 
@@ -184,6 +189,9 @@ pub fn check_parse_fail(vrs: &Path, exp: Option<&Path>) {
             panic!("AST construction should  have triggered errors, but just had issues.");
         }
         AstResult::Err(err) => {
+            println!(" Ok. Successfully parsed (expected errors)");
+            println!(">>>>>>\n{err}\n<<<<<<");
+            println!("  - Checking expected output ...");
             if let Some(exp) = exp {
                 let error_str = strip_color(err.to_string());
                 let res = fs::read_to_string(exp).expect("could not read the exected output file");
@@ -192,7 +200,6 @@ pub fn check_parse_fail(vrs: &Path, exp: Option<&Path>) {
             } else {
                 println!(" ok. Successfully parsed. No comparison file given.");
             }
-            println!(">>>>>>\n{err}\n<<<<<<");
         }
     }
 }

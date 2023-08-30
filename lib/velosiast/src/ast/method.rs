@@ -471,11 +471,15 @@ impl VelosiAstMethod {
 
             // for the flags we need to add the flags to the symbol table
             if param.ptype.is_flags() {
-                let flags = if let Some(f) = st.lookup("flags") {
-                    if let VelosiAstNode::Flags(flags) = &f.ast_node {
-                        // clone the RC
+                let flags = match st.lookup("flags") {
+                    Some(Symbol {
+                        ast_node: VelosiAstNode::Flags(flags),
+                        ..
+                    }) => {
+                        // add the flags to the symbol table
                         Some(flags.clone())
-                    } else {
+                    }
+                    Some(_) => {
                         let msg = "Flags defined as a symbol of different type.";
                         let err = VelosiAstErrBuilder::err(msg.to_string())
                             .add_location(param.loc.clone())
@@ -483,20 +487,45 @@ impl VelosiAstMethod {
                         issues.push(err);
                         None
                     }
-                } else {
-                    let msg = "Undefined type `flags` in method parameter.";
-                    let hint = "Define the unit flags before using them in the method.";
-                    let err = VelosiAstErrBuilder::err(msg.to_string())
-                        .add_hint(hint.to_string())
-                        .add_location(param.loc.clone())
-                        .build();
-                    issues.push(err);
-                    None
+                    _ => unreachable!("should have been caught already!"),
+                    // _ => {
+                    //     let msg = "Undefined type `flags` in method parameter.";
+                    //     let hint = "Define the unit flags before using them in the method.";
+                    //     let err = VelosiAstErrBuilder::err(msg.to_string())
+                    //         .add_hint(hint.to_string())
+                    //         .add_location(param.loc.clone())
+                    //         .build();
+                    //     issues.push(err);
+                    //     None
+                    // }
                 };
+                if let Some(f) = flags {
+                    f.populate_symboltable(param.ident(), st)
+                }
+            }
 
-                if let Some(flags) = flags {
-                    // add the flags to the symbol table
-                    flags.populate_symboltable(param.ident(), st);
+            if param.ptype.is_extern() {
+                let tname = param
+                    .ptype
+                    .typeref()
+                    .expect("BUG: expected typeref to have a name");
+                let ty = match st.lookup(tname) {
+                    Some(Symbol {
+                        ast_node: VelosiAstNode::ExternType(ty),
+                        ..
+                    }) => Some(ty.clone()),
+                    Some(_) => {
+                        let msg = "External type defined as a symbol of different kind.";
+                        let err = VelosiAstErrBuilder::err(msg.to_string())
+                            .add_location(param.loc.clone())
+                            .build();
+                        issues.push(err);
+                        None
+                    }
+                    _ => unreachable!("should have been caught already!"),
+                };
+                if let Some(t) = ty {
+                    t.populate_symboltable(param.ident().as_str(), st);
                 }
             }
 
@@ -511,7 +540,7 @@ impl VelosiAstMethod {
         // obtain the type information, must be a built-in type
         let rtype = if let Some(rtype) = pt.rettype {
             let rtype = ast_result_unwrap!(VelosiAstType::from_parse_tree(rtype, st), issues);
-            if !rtype.is_builtin() || rtype.is_flags() {
+            if (!rtype.is_builtin() || rtype.is_flags()) && !pt.is_extern {
                 let msg = "Unsupported type. Function returns only support of the built-in types.";
                 let hint = "Change this type to one of [`bool`, `int`, `size`, `addr`].";
                 let err = VelosiAstErrBuilder::err(msg.to_string())

@@ -1,0 +1,17 @@
+VelosiAst(tests/vrs/osspec/osspec_ok_01_extern_fn.vrs)
+--------------------------------------------------------
+
+const FOO : int = 0x4d2;
+
+osspec MyOs () {
+
+  const BAR : int = 0x4d2;
+
+  extern type Capref
+
+  extern fn vnode_map(src: Capref, dst: Capref, offset: int) -> bool
+    requires true;
+
+}
+
+--------------------------------------------------------

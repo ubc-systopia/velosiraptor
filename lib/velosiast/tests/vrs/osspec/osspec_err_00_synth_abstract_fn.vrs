@@ -1,0 +1,6 @@
+
+osspec MyOs () {
+    abstract fn foo() -> bool
+    synth fn bar() -> bool
+}
+

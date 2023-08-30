@@ -81,23 +81,67 @@ pub fn check_snake_case(issues: &mut VelosiAstIssues, id: &VelosiAstIdentifier) 
     }
 }
 
+pub fn check_camel_case(issues: &mut VelosiAstIssues, id: &VelosiAstIdentifier) {
+    let name = id.ident();
+
+    let mut has_issue = false;
+    let mut prev_not_alnum = true;
+    let mut camel_case = String::with_capacity(name.len());
+    for (i, char) in name.chars().enumerate() {
+        if i == 0 {
+            has_issue = char.is_ascii_lowercase() || !char.is_alphabetic()
+        }
+
+        if !char.is_alphanumeric() {
+            prev_not_alnum = true;
+            has_issue = true;
+        } else if prev_not_alnum {
+            prev_not_alnum = false;
+            camel_case.push(char.to_ascii_uppercase());
+        } else {
+            camel_case.push(char);
+        }
+    }
+
+    if has_issue {
+        let msg = format!("identifier `{name}` should have a camel case name");
+        let hint = format!(
+            "convert the identifier to lowercase (notice the CamelCase): `{}`",
+            camel_case
+        );
+        let err = VelosiAstErrBuilder::warn(msg)
+            .add_hint(hint)
+            .add_location(id.loc.clone())
+            .build();
+
+        issues.push(err);
+    }
+}
+
 /// checks whether the identifier is in snake_case
-pub fn check_type_exists(issues: &mut VelosiAstIssues, st: &SymbolTable, id: &VelosiAstIdentifier) {
+pub fn check_type_exists(
+    issues: &mut VelosiAstIssues,
+    st: &SymbolTable,
+    id: &VelosiAstIdentifier,
+) -> bool {
     let name = id.path();
     if let Some(s) = st.lookup(name) {
         match s.ast_node {
             // there is a unit with that type, so we're good
-            VelosiAstNode::Unit(_) => (),
+            VelosiAstNode::Unit(_) => false,
+            VelosiAstNode::ExternType(_) => true,
             _ => {
                 // report that there was a mismatching type
                 let err = VelosiAstErrUndef::from_ident_with_other(id, s.loc().clone());
                 issues.push(err.into());
+                false
             }
         }
     } else {
         // there is no such type, still create the node and report the issue
         let err = VelosiAstErrUndef::from_ident(id);
         issues.push(err.into());
+        false
     }
 }
 
