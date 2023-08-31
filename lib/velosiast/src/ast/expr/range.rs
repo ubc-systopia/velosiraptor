@@ -71,12 +71,73 @@ impl VelosiAstRangeExpr {
 
     pub fn from_parse_tree_raw(
         pt: VelosiParseTreeRangeExpr,
-        _st: &mut SymbolTable,
+        st: &mut SymbolTable,
     ) -> AstResult<Self, VelosiAstIssues> {
         let mut issues = VelosiAstIssues::new();
 
+        let start = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(*pt.start, st), issues);
+        // check if this is a constant expression
+        if !start.is_const_expr() {
+            let msg = "Expected a constant expression.";
+            let hint = "Convert the start of the range into a constant expression";
+            let err = VelosiAstErrBuilder::err(msg.to_string())
+                .add_hint(hint.to_string())
+                .add_location(start.loc().clone())
+                .build();
+            issues.push(err);
+        }
+
+        if !start.result_type().is_numeric() {
+            let msg = "mismatched types";
+            let hint = format!(
+                "expected numeric, found `{}`",
+                start.result_type().as_kind_str()
+            );
+            let err = VelosiAstErrBuilder::err(msg.to_string())
+                .add_hint(hint)
+                .add_location(start.loc().clone())
+                .build();
+            issues.push(err);
+        }
+
+        let end = ast_result_unwrap!(VelosiAstExpr::from_parse_tree(*pt.end, st), issues);
+        if !end.is_const_expr() {
+            let msg = "Expected a constant expression.";
+            let hint = "Convert the end of the range into a constant expression";
+            let err = VelosiAstErrBuilder::err(msg.to_string())
+                .add_hint(hint.to_string())
+                .add_location(end.loc().clone())
+                .build();
+            issues.push(err);
+        }
+
+        if !end.result_type().is_numeric() {
+            let msg = "mismatched types";
+            let hint = format!(
+                "expected numeric, found `{}`",
+                start.result_type().as_kind_str()
+            );
+            let err = VelosiAstErrBuilder::err(msg.to_string())
+                .add_hint(hint)
+                .add_location(start.loc().clone())
+                .build();
+            issues.push(err);
+        }
+
+        let start = if let VelosiAstExpr::NumLiteral(e) = start {
+            e.val
+        } else {
+            0
+        };
+
+        let end = if let VelosiAstExpr::NumLiteral(e) = end {
+            e.val
+        } else {
+            1
+        };
+
         // check if we actually have a range
-        if pt.start == pt.end {
+        if start == end {
             let msg = "Empty range.";
             let hint = "Increase the end of the range";
             let err = VelosiAstErrBuilder::warn(msg.to_string())
@@ -87,7 +148,7 @@ impl VelosiAstRangeExpr {
         }
 
         // check if the range makes sense
-        if pt.start > pt.end {
+        if start > end {
             let msg = "Start of range is smaller than the end.";
             let hint = "Adjust the range bounds.";
             let err = VelosiAstErrBuilder::warn(msg.to_string())
@@ -97,7 +158,7 @@ impl VelosiAstRangeExpr {
             issues.push(err);
         }
 
-        ast_result_return!(Self::new(pt.start, pt.end, pt.loc), issues)
+        ast_result_return!(Self::new(start, end, pt.loc), issues)
     }
 
     pub fn is_const(&self) -> bool {

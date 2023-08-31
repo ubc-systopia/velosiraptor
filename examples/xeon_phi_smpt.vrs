@@ -12,6 +12,12 @@
 const SMPT_ENTRY_SIZE : size = 4;
 const SMTP_PAGE_BITS  : size = 34;
 const SMTP_PAGE_SIZE  : size = (1 << SMTP_PAGE_BITS);  // 16 GB
+const SMPT_NUM_ENTRIES : size = 32;
+
+flags {
+    snoop_disabled,
+}
+
 
 // This defines an SMPT Entry
 segment SMPTE(base: addr) {
@@ -19,9 +25,6 @@ segment SMPTE(base: addr) {
     inbitwidth = SMTP_PAGE_BITS;
     outbitwidth = 64;
 
-    flags = {
-        snoop_disabled,
-    };
 
     state() {
         reg entry [ 4 ] {
@@ -36,6 +39,11 @@ segment SMPTE(base: addr) {
     }
 
     #[remap]
+    fn valid() -> bool {
+        true
+    }
+
+
     fn matchflags(flgs : flags) -> bool
     {
         true
@@ -57,5 +65,5 @@ segment SMPTE(base: addr) {
  }
 
 staticmap SMPT(base: addr) {
-    maps [ SMPTE(base + i * SMPT_ENTRY_SIZE) for i in 0..32 ]
+    maps [ SMPTE(base + i * SMPT_ENTRY_SIZE) for i in 0..SMPT_NUM_ENTRIES ]
 }
