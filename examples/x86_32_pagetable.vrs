@@ -48,6 +48,13 @@ const PHYS_ADDR_BITS : size = 32;
 const PHYS_ADDR_MAX  : size = (1 << PHYS_ADDR_BITS);
 
 
+flags {
+    writable,
+    readable,
+    devicemem,
+    usermode
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // x86_32 Page Table
@@ -55,7 +62,7 @@ const PHYS_ADDR_MAX  : size = (1 << PHYS_ADDR_BITS);
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // represents an x86 page table entry
-segment X86_32_PageTableEntry(base : addr) {
+segment X8632PageTableEntry(base : addr) {
 
     // there are there are 4 KiB pages
     inbitwidth = BASE_PAGE_BITS;
@@ -63,12 +70,6 @@ segment X86_32_PageTableEntry(base : addr) {
     // it's a 32-bit machine
     outbitwidth = PHYS_ADDR_BITS;
 
-    flags = {
-        writable,
-        readable,
-        devicemem,
-        usermode
-    };
 
     // the state
     state(base: addr) {
@@ -136,8 +137,8 @@ segment X86_32_PageTableEntry(base : addr) {
 
 
 // represents an x86 page table entry
-staticmap X86_32_PageTable(base : addr) {
-    maps [ X86_32_PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..1024 ]
+staticmap X8632PageTable(base : addr) {
+    maps [ X8632PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..1024 ]
 }
 
 

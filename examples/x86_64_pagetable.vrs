@@ -47,18 +47,9 @@ flags {
 }
 
 
-abstract segment X86_64_PTableDescriptor(base: paddr) {
+abstract segment X8664PTableDescriptor(base: paddr) {
 
     outbitwidth = PHYS_ADDR_BITS;
-
-    flags = {
-        writable,
-        readable,
-        executable,
-        devicemem,
-        usermode,
-        bar
-    };
 
     state(base: paddr) {
         mem entry [ base, 0, 8 ] {
@@ -89,7 +80,6 @@ abstract segment X86_64_PTableDescriptor(base: paddr) {
 
     #[remap]
     fn matchflags(flgs : flags) -> bool
-        requires valid()
     {
         // TODO: make this one here a bit better
         (state.entry.rw == 1)      // always writable
@@ -106,17 +96,8 @@ abstract segment X86_64_PTableDescriptor(base: paddr) {
     }
 }
 
-abstract segment X86_64_PageDescriptor(base: paddr) {
+abstract segment X8664PageDescriptor(base: paddr) {
     outbitwidth = PHYS_ADDR_BITS;
-
-    flags = {
-        writable,
-        readable,
-        executable,
-        devicemem,
-        usermode,
-        bar
-    };
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -126,7 +107,7 @@ abstract segment X86_64_PageDescriptor(base: paddr) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-segment X86_64_PageTableEntry(base: paddr) : X86_64_PageDescriptor {
+segment X8664PageTableEntry(base: paddr) : X8664PageDescriptor {
 
     inbitwidth = 12;
 
@@ -189,24 +170,22 @@ segment X86_64_PageTableEntry(base: paddr) : X86_64_PageDescriptor {
     synth fn unmap(va: vaddr, sz: size);
 }
 
-staticmap X86_64_PageTable(base : paddr) {
-    // should be able to specify the alignment constraints here
-    // maps [ X86_64_PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..PTABLE_ENTRIES
+staticmap X8664PageTable(base : paddr) {
     #[repr(array)]
-    maps [ X86_64_PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..512 ]
+    maps [ X8664PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..PTABLE_ENTRIES ]
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// X86_64__64 Page Directory
+// X8664_64 Page Directory
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-segment X86_64_PDirEntryTable(base : paddr) : X86_64_PTableDescriptor {
+segment X8664PDirEntryTable(base : paddr) : X8664PTableDescriptor {
 
     inbitwidth = LARGE_PAGE_BITS;
 
-    synth fn map(va: vaddr, sz: size, flgs: flags, pa : X86_64_PageTable)
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : X8664PageTable)
         requires va == 0 && sz == LARGE_PAGE_SIZE
         requires (pa & (BASE_PAGE_SIZE - 1) == 0)
 
@@ -215,7 +194,7 @@ segment X86_64_PDirEntryTable(base : paddr) : X86_64_PTableDescriptor {
     synth fn unmap(va: vaddr, sz: size);
 }
 
-segment X86_64_PDirEntryPage(base :paddr) : X86_64_PageDescriptor {
+segment X8664PDirEntryPage(base :paddr) : X8664PageDescriptor {
     inbitwidth = LARGE_PAGE_BITS;
 
     state(base :paddr) {
@@ -280,14 +259,14 @@ segment X86_64_PDirEntryPage(base :paddr) : X86_64_PageDescriptor {
         requires va == 0 && sz == LARGE_PAGE_SIZE
 }
 
-enum X86_64_PDirEntry(base: paddr){
-    X86_64_PDirEntryTable(base),
-    X86_64_PDirEntryPage(base)
+enum X8664PDirEntry(base: paddr){
+    X8664PDirEntryTable(base),
+    X8664PDirEntryPage(base)
 }
 
-staticmap X86_64_PDir(base : paddr) {
+staticmap X8664PDir(base : paddr) {
     #[repr(list)]
-    maps [ X86_64_PDirEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..512 ]
+    maps [ X8664PDirEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..PTABLE_ENTRIES ]
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -296,11 +275,11 @@ staticmap X86_64_PDir(base : paddr) {
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-segment X86_64_PDPTEntryTable(base : paddr) : X86_64_PTableDescriptor {
+segment X8664PDPTEntryTable(base : paddr) : X8664PTableDescriptor {
 
     inbitwidth = HUGE_PAGE_BITS;
 
-    synth fn map(va: vaddr, sz: size, flgs: flags, pa : X86_64_PDir)
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : X8664PDir)
         requires va == 0 && sz == HUGE_PAGE_SIZE
         requires (pa & (BASE_PAGE_SIZE - 1) == 0)
 
@@ -309,7 +288,7 @@ segment X86_64_PDPTEntryTable(base : paddr) : X86_64_PTableDescriptor {
     synth fn unmap(va: vaddr, sz: size);
 }
 
-segment X86_64_PDPTEntryPage(base: paddr) : X86_64_PageDescriptor {
+segment X8664PDPTEntryPage(base: paddr) : X8664PageDescriptor {
 
     inbitwidth = HUGE_PAGE_BITS;
 
@@ -384,14 +363,14 @@ segment X86_64_PDPTEntryPage(base: paddr) : X86_64_PageDescriptor {
 
 }
 
-enum X86_64_PDPTEntry(base: paddr) {
-    X86_64_PDPTEntryTable(base),
-    X86_64_PDPTEntryPage(base)
+enum X8664PDPTEntry(base: paddr) {
+    X8664PDPTEntryTable(base),
+    X8664PDPTEntryPage(base)
 }
 
-staticmap X86_64_PDPT(base: paddr) {
+staticmap X8664PDPT(base: paddr) {
     #[repr(array)]
-    maps [ X86_64_PDPTEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..512 ]
+    maps [ X8664PDPTEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..PTABLE_ENTRIES ]
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -400,11 +379,11 @@ staticmap X86_64_PDPT(base: paddr) {
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-segment X86_64_PML4Entry(base : paddr) : X86_64_PTableDescriptor {
+segment X8664PML4Entry(base : paddr) : X8664PTableDescriptor {
 
     inbitwidth = PML4_PAGE_BITS;
 
-    synth fn map(va: vaddr, sz: size, flgs: flags, pa : X86_64_PDPT)
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : X8664PDPT)
         requires va == 0 && sz == PML4_PAGE_SIZE
         requires (pa & (BASE_PAGE_SIZE - 1) == 0)
 
@@ -413,9 +392,9 @@ segment X86_64_PML4Entry(base : paddr) : X86_64_PTableDescriptor {
     synth fn unmap(va: vaddr, sz: size);
 }
 
-staticmap X86_64_PML4(base : paddr) {
+staticmap X8664PML4(base : paddr) {
     #[repr(array)]
-    maps [ X86_64_PML4Entry(base + i * PTABLE_ENTRY_SIZE) for i in 0..512 ]
+    maps [ X8664PML4Entry(base + i * PTABLE_ENTRY_SIZE) for i in 0..PTABLE_ENTRIES ]
 }
 
 
@@ -427,21 +406,11 @@ staticmap X86_64_PML4(base : paddr) {
 
 
 
-segment X86_MMU(base: paddr) {
+segment X86MMU(base: paddr) {
 
     inbitwidth = VSPACE_BITS;
 
     outbitwidth = PHYS_ADDR_BITS;
-
-
-    flags = {
-        writable,
-        readable,
-        executable,
-        devicemem,
-        usermode,
-        bar
-    };
 
     state(base: paddr) {
         reg cr3 [ 8 ] {
@@ -481,7 +450,7 @@ segment X86_MMU(base: paddr) {
         }
     }
 
-    synth fn map(va: vaddr, sz: size, flgs: flags, pa : X86_64_PML4)
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : X8664PML4)
         requires va == 0 && sz == VSPACE_SIZE
         requires (pa & (BASE_PAGE_SIZE - 1) == 0)
 

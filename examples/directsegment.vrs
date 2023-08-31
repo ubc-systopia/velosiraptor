@@ -13,6 +13,12 @@
  * The translation size is a multiple of 64 bytes.
  */
 
+flags {
+    writable,
+    readable,
+    executable,
+}
+
 // This defines an SMPT Entry
 segment DirectSegment(base : addr) {
 
@@ -21,12 +27,6 @@ segment DirectSegment(base : addr) {
 
     // let's assume the maximum output bit size is 48 bits
     outbitwidth = 48;
-
-    flags = {
-        writable,
-        readable,
-        executable,
-    };
 
     // the state will be two registers:
     state(base: addr) {
