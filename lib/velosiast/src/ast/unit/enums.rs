@@ -566,18 +566,22 @@ impl Display for VelosiAstUnitEnum {
         write!(f, ")")?;
         writeln!(f, " {{")?;
 
+        writeln!(f)?;
         writeln!(f, "  inbitwidth = {};", self.inbitwidth)?;
         writeln!(f, "  outbitwidth = {};\n", self.outbitwidth)?;
 
-        for (e, p) in &self.enums {
-            write!(f, "  {e}(")?;
-            for (i, p) in p.args.iter().enumerate() {
-                if i > 0 {
-                    write!(f, ", ")?;
+        if !self.enums.is_empty() {
+            writeln!(f)?;
+            for (e, p) in &self.enums {
+                write!(f, "  {e}(")?;
+                for (i, p) in p.args.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{p}")?;
                 }
-                write!(f, "{p}")?;
+                writeln!(f, "  ),")?;
             }
-            writeln!(f, "  ),")?;
         }
 
         write!(f, "\n}}")

@@ -766,41 +766,46 @@ impl Display for VelosiAstUnitSegment {
         }
         writeln!(f, " {{")?;
 
-        for c in self.consts.values() {
-            write!(f, "  ")?;
-            Display::fmt(c, f)?;
+        if !self.consts.is_empty() {
             writeln!(f)?;
+            for c in self.consts.values() {
+                let formatted = format!("{c}");
+                for line in formatted.lines() {
+                    writeln!(f, "  {line}")?;
+                }
+            }
         }
 
-        if self.consts.is_empty() {
-            writeln!(f, "  // no constants")?;
-        }
         writeln!(f)?;
-
         writeln!(f, "  inbitwidth = {};", self.inbitwidth)?;
-        writeln!(f, "  outbitwidth = {};\n", self.outbitwidth)?;
+        writeln!(f, "  outbitwidth = {};", self.outbitwidth)?;
 
         if let Some(flags) = &self.flags {
+            writeln!(f)?;
             write!(f, "  flags = ")?;
             Display::fmt(flags, f)?;
-            writeln!(f, ";\n")?;
-        } else {
-            writeln!(f, "  // no flags\n")?;
+            writeln!(f, ";")?;
         }
 
-        Display::fmt(&self.state, f)?;
-        Display::fmt(&self.interface, f)?;
+        writeln!(f)?;
+        let formatted = format!("{}", self.state);
+        for line in formatted.lines() {
+            writeln!(f, "  {line}")?;
+        }
 
-        for (i, m) in self.methods().enumerate() {
-            if i > 0 {
-                writeln!(f, "\n")?;
-            }
-            let formatted = format!("{m}");
-            for (i, l) in formatted.lines().enumerate() {
-                if i > 0 {
-                    writeln!(f)?;
+        writeln!(f)?;
+        let formatted = format!("{}", self.interface);
+        for line in formatted.lines() {
+            writeln!(f, "  {line}")?;
+        }
+
+        if !self.methods.is_empty() {
+            for method in self.methods.values() {
+                let formatted = format!("{method}");
+                writeln!(f)?;
+                for line in formatted.lines() {
+                    writeln!(f, "  {line}")?;
                 }
-                write!(f, "  {l}")?;
             }
         }
 
