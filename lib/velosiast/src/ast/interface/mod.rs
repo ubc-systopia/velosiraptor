@@ -410,11 +410,17 @@ impl Display for VelosiAstInterface {
         writeln!(f, ") {{")?;
 
         for field in self.fields.iter() {
-            Display::fmt(field, f)?;
+            let formatted = format!("{field}");
+            for (i, line) in formatted.lines().enumerate() {
+                if i > 0 {
+                    writeln!(f)?;
+                }
+                write!(f, "  {line}")?;
+            }
             writeln!(f, ",")?;
         }
 
-        write!(f, "  }}")
+        write!(f, "}}")
     }
 }
 

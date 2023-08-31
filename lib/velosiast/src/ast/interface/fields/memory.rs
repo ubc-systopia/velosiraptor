@@ -232,7 +232,7 @@ impl Display for VelosiAstInterfaceMemoryField {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(
             f,
-            "    mem {} [{}, {}, {}]",
+            "mem {} [{}, {}, {}]",
             self.ident, self.base, self.offset, self.size
         )?;
 
@@ -242,38 +242,53 @@ impl Display for VelosiAstInterfaceMemoryField {
         }
 
         if !self.layout.is_empty() {
-            writeln!(f, "      Layout {{")?;
+            writeln!(f, "  Layout {{")?;
             for slice in &self.layout {
-                write!(f, "        ")?;
-                Display::fmt(slice, f)?;
+                let formatted = format!("{slice}");
+                for (i, line) in formatted.lines().enumerate() {
+                    if i > 0 {
+                        writeln!(f)?;
+                    }
+                    write!(f, "    {line}")?;
+                }
                 writeln!(f, ",")?;
             }
-            writeln!(f, "      }},")?;
+            writeln!(f, "  }},")?;
         }
 
         if !self.readactions.is_empty() {
-            writeln!(f, "      ReadActions {{")?;
-            for slice in &self.readactions {
-                write!(f, "        ")?;
-                Display::fmt(slice, f)?;
+            writeln!(f, "  ReadActions {{")?;
+            for action in &self.readactions {
+                let formatted = format!("{action}");
+                for (i, line) in formatted.lines().enumerate() {
+                    if i > 0 {
+                        writeln!(f)?;
+                    }
+                    write!(f, "    {line}")?;
+                }
                 writeln!(f, ";")?;
             }
-            writeln!(f, "      }},")?;
+            writeln!(f, "  }},")?;
         }
 
         if !self.writeactions.is_empty() {
-            writeln!(f, "      WriteActions {{")?;
-            for slice in &self.writeactions {
-                write!(f, "        ")?;
-                Display::fmt(slice, f)?;
+            writeln!(f, "  WriteActions {{")?;
+            for action in &self.writeactions {
+                let formatted = format!("{action}");
+                for (i, line) in formatted.lines().enumerate() {
+                    if i > 0 {
+                        writeln!(f)?;
+                    }
+                    write!(f, "    {line}")?;
+                }
                 writeln!(f, ";")?;
             }
-            writeln!(f, "      }},")?;
+            writeln!(f, "  }},")?;
         }
 
         if !self.layout.is_empty() || !self.readactions.is_empty() || !self.writeactions.is_empty()
         {
-            write!(f, "    }}")
+            write!(f, "}}")
         } else {
             Ok(())
         }

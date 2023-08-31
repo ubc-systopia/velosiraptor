@@ -453,33 +453,33 @@ impl Display for VelosiAstUnitStaticMap {
         }
         writeln!(f, " {{")?;
 
-        for c in self.consts.values() {
-            write!(f, "  ")?;
-            Display::fmt(c, f)?;
+        if !self.consts.is_empty() {
             writeln!(f)?;
+            for c in self.consts.values() {
+                let formatted = format!("{c}");
+                for line in formatted.lines() {
+                    writeln!(f, "  {line}")?;
+                }
+            }
         }
 
-        if self.consts.is_empty() {
-            writeln!(f, "  // no constants")?;
-        }
         writeln!(f)?;
-
         writeln!(f, "  inbitwidth = {};", self.inbitwidth)?;
         writeln!(f, "  outbitwidth = {};\n", self.outbitwidth)?;
 
-        for (i, m) in self.methods.values().enumerate() {
-            if i > 0 {
-                writeln!(f, "\n")?;
-            }
-            Display::fmt(m, f)?;
-        }
-
-        if self.methods.is_empty() {
-            write!(f, "  // no methods")?;
-        }
-
-        write!(f, "\n  map ")?;
+        write!(f, "  map ")?;
         Display::fmt(&self.map, f)?;
+
+        if !self.methods.is_empty() {
+            writeln!(f)?;
+            for method in self.methods.values() {
+                let formatted = format!("{method}");
+                writeln!(f)?;
+                for line in formatted.lines() {
+                    writeln!(f, "  {line}")?;
+                }
+            }
+        }
 
         write!(f, "\n}}")
     }
