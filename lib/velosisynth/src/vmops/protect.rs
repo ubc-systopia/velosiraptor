@@ -51,7 +51,7 @@ impl ProtectPrograms {
     pub fn new(
         unit: &VelosiAstUnitSegment,
         batch_size: usize,
-        starting_prog: Option<Rc<Program>>,
+        _starting_prog: Option<Rc<Program>>,
     ) -> Self {
         log::info!(target : "[synth::protect]", "setting up protect synthesis.");
 
@@ -102,11 +102,13 @@ impl ProtectPrograms {
             &mut partial_programs,
         );
 
-        if let Some(_staring_prog) = &starting_prog {
-            // here we have a starting program, that should have satisfied all the preconditions.
-            // we now need to check if the program can be made to work with the memory model as well
-        } else {
-        }
+        // temprarily disabbing this, fix in another branch!
+        // if let Some(_staring_prog) = &starting_prog {
+        //     // here we have a starting program, that should have satisfied all the preconditions.
+        //     // we now need to check if the program can be made to work with the memory model as well
+        // } else {
+
+        // }
 
         // now we got all the partial programs that we need to verify
         let query = CompoundBoolExprQueryBuilder::new(unit, m_op.clone())
