@@ -1,0 +1,168 @@
+/*
+ * a simple translation table as an example.
+ * the table is 1 MB in size, and has 256k entries of 4 bytes each.
+ * each entry translates a 4 KiB worth of memory. Thus, we can address
+ * 1 GiB of memory here. THe output address size is 32-bit
+ */
+
+const PTABLE_ENTRIES    : size = 256 * 1024;
+const PTABLE_ENTRY_SIZE : size = 4;
+const PTABLE_SIZE       : size = (PTABLE_ENTRIES * PTABLE_ENTRY_SIZE);
+const PTABLE_ALIGNMENT  : size = PTABLE_SIZE;
+
+
+const BASE_PAGE_BITS  : size = 12;
+const BASE_PAGE_SIZE  : size = (1 << BASE_PAGE_BITS); // 4 KiB
+
+const PHYS_ADDR_BITS : size = 32;
+const PHYS_ADDR_MAX  : size = (1 << PHYS_ADDR_BITS);
+
+const VSPACE_ADDR_BITS : size = 30;
+const VSPACE_ADDR_MAX  : size = 1 << VSPACE_ADDR_BITS;
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Page Table
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+flags = {
+    writable,
+    readable,
+    devicemem,
+    usermode
+};
+
+// represents a page table entry
+segment PageTableEntry(base : addr) {
+
+    // there are there are 4 KiB pages
+    inbitwidth = BASE_PAGE_BITS;
+
+    // it's a 32-bit machine
+    outbitwidth = PHYS_ADDR_BITS;
+
+    // the state
+    state = StateDef(base: addr) {
+        mem pte [base, 0, 4] {
+            // the following fields at starting bit, ending bit, name
+            0 ..  1 present,
+            1 ..  2 writable,
+            2 ..  3 usermode,
+            3 ..  4 writethrough,
+            4 ..  5 nocache,
+            5 .. 12 ignored,
+           12 .. 32 base,
+        }
+    };
+
+    interface = InterfaceDef(base : addr) {
+        mem pte [base, 0, 4]
+    };
+
+    #[remap]
+    fn valid() -> bool {
+        state.pte.present == 1
+    }
+
+    #[remap]
+    fn matchflags(flgs : flags) -> bool
+    {
+        (state.pte.writable == flgs.writable)
+         && (state.pte.usermode != flgs.usermode)
+         && if (flgs.devicemem == 1) {
+               (state.pte.nocache == 1 && state.pte.writethrough == 1)
+            } else {
+                (state.pte.nocache == 0 && state.pte.writethrough == 0)
+            }
+    }
+
+    // the translation semantics, adding an option type?
+    fn translate(va: vaddr) -> paddr
+        requires va < BASE_PAGE_SIZE;
+    {
+        va + (state.pte.base << BASE_PAGE_BITS)
+    }
+
+    // unmapping an entry
+    synth fn unmap(va: vaddr, sz: size)
+        requires (va == 0);
+        requires sz == BASE_PAGE_SIZE;
+
+
+    // mapping an entry
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+        requires va == 0;
+        requires sz == BASE_PAGE_SIZE;
+        requires (pa & (BASE_PAGE_SIZE - 1)) == 0;
+
+    // protecting the entry, i.e., change its permission
+    synth fn protect(va: vaddr, sz: size, flgs: flags)
+}
+
+
+// represents an x86 page table entry
+staticmap PageTable(base : addr) {
+    mapdef = [ PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..256 * 1024 ];
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// MMU
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+segment X86_MMU(base: paddr) {
+
+    inbitwidth = VSPACE_ADDR_BITS;
+    outbitwidth = PHYS_ADDR_BITS;
+
+    state = StateDef(base: paddr) {
+        reg ttbr [ 8 ] {
+            0 .. 12 pcid,
+            12 .. 32 address
+        },
+
+        reg ctrl [ 4 ] {
+            31 .. 32 enabled
+        }
+    };
+
+    // making these as an MMIO register so we can access them.
+    interface = InterfaceDef(base: paddr) {
+        mmio cr3 [ base, 0, 4 ],
+        mmio cr4 [ base, 4, 4 ]
+    };
+
+    #[remap]
+    fn valid() -> bool {
+        true
+    }
+
+    #[remap]
+    fn matchflags(flgs:flags) -> bool {
+        true
+    }
+
+    fn translate(va: vaddr) -> paddr
+        requires va < VSPACE_SIZE
+    {
+        if state.cr4.enabled == 1 {
+            va + (state.cr3.address << 12)
+        } else {
+            va
+        }
+    }
+
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : X86_64_PML4)
+        requires va == 0 && sz == VSPACE_SIZE
+        requires (pa & (BASE_PAGE_SIZE - 1) == 0)
+
+    synth fn protect(va: vaddr, sz: size, flgs: flags);
+
+    synth fn unmap(va: vaddr, sz: size);
+}
