@@ -27,12 +27,12 @@ const VSPACE_ADDR_MAX  : size = 1 << VSPACE_ADDR_BITS;
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-flags = {
+flags {
     writable,
     readable,
     devicemem,
     usermode
-};
+}
 
 // represents a page table entry
 segment PageTableEntry(base : addr) {
@@ -104,7 +104,7 @@ segment PageTableEntry(base : addr) {
 
 // represents an x86 page table entry
 staticmap PageTable(base : addr) {
-    mapdef = [ PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..256 * 1024 ];
+    mapdef = [ PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..1024 ];
 }
 
 
@@ -134,8 +134,8 @@ segment X86_MMU(base: paddr) {
 
     // making these as an MMIO register so we can access them.
     interface = InterfaceDef(base: paddr) {
-        mmio cr3 [ base, 0, 4 ],
-        mmio cr4 [ base, 4, 4 ]
+        mmio ttbr [ base, 0, 4 ],
+        mmio ctrl [ base, 4, 4 ]
     };
 
     #[remap]
@@ -149,17 +149,17 @@ segment X86_MMU(base: paddr) {
     }
 
     fn translate(va: vaddr) -> paddr
-        requires va < VSPACE_SIZE
+        requires va < VSPACE_ADDR_MAX
     {
-        if state.cr4.enabled == 1 {
-            va + (state.cr3.address << 12)
+        if state.ctrl.enabled == 1 {
+            va + (state.ttbr.address << 12)
         } else {
             va
         }
     }
 
-    synth fn map(va: vaddr, sz: size, flgs: flags, pa : X86_64_PML4)
-        requires va == 0 && sz == VSPACE_SIZE
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : PageTable)
+        requires va == 0 && sz == VSPACE_ADDR_MAX
         requires (pa & (BASE_PAGE_SIZE - 1) == 0)
 
     synth fn protect(va: vaddr, sz: size, flgs: flags);
