@@ -1,0 +1,73 @@
+* Velosihwgen library
+This library implements hardware generation from a [[../velosiast][velosiast]].
+
+Supported targets:
+
+- ARM FastModels
+- more to come...
+
+** License
+See the LICENSE file
+
+** Authors
+Reto Achermann
+
+
+** Contributing
+Please follow the [[https://doc.rust-lang.org/1.0.0/style/style/naming/README.html][naming and
+formatting conventions]] of Rust.
+
+Run ~cargo fmt~ before committing.
+
+** Building
+
+To build the library
+
+#+BEGIN_SRC
+$ cargo build
+#+END_SRC
+
+To run an example
+
+#+BEGIN_SRC
+$ cargo run ../../examples/x86_64_pagetable.vrs
+#+END_SRC
+
+
+** ARM FastModels
+WIP; folder structure of output is in [[./src/fastmodels/mod.rs][mod.rs]].
+
+
+FastModels lets you wire an ARM processor to interact with your MMU; this wiring is specified in the
+.lisa files and does not need to be changed.
+
+*** Usage
+1. First, generate the MMU files from the .vrs specification. For example: ~cargo run
+   ../../examples/x86_64_pagetable.vrs~
+
+2. ARM FastModels is required to make and run the simulated
+   hardware. [[./src/fastmodels/support/armfm-arm64.Dockerfile][Here is a Dockerfile for a supported
+   environment]]. Once this software is installed and the relevant environment variables are set
+   (mostly ~$PVLIB_HOME~), the unit is compilable.
+
+3. Run ~make~ to compile the generated unit.
+
+4. Finally, ~make run~ will boot [[./src/fastmodels/support/bootimg.bin]] on the ARM chip. This file
+   is the output of [[https://github.com/achreto/arm-fastmodels-boot]] and interacts with the
+   MMU. Any functionality you'd like to test should be compiled into this boot image and run on the
+   ARM chip.
+
+*** Internals
+
+Generated classes inherit from base classes in the
+[[./src/fastmodels/support/fm_translation_framework]["framework."]] This is generally more readable
+than having more C++-generating rust.
+
+The "interface" is currently unused in favour of just interacting with the state. I'm thinking the
+interface might only matter for the top-level component anyway.
+
+Each state field (not state field slice) is currently limited to a size of 64 bits.
+
+*** Todo
+- It might be worth separating the hpp and cpp files. For simplicity of compilation, each sub-unit
+  currently becomes one cpp file that #includes all its mapped-to subunits. slightly gross!
