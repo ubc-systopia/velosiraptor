@@ -13,10 +13,23 @@
 #include <iosfwd>
 
 
+#ifndef TEST_MOCK_FAST_MODELS
 // FastModels include
 #include "pv/DVM.h"
 #include "pv/PVBusAddr.h"
 #include "pv/PVTransaction.h"  // for pv::Tx_Result
+#else
+namespace pv {
+    struct Tx_Result;
+    struct ReadTransaction;
+    struct WriteTransaction;
+}
+namespace DVM {
+    typedef uint32_t error_response_t;
+    struct Message;
+}
+#endif
+
 
 // the types include
 #include "types.hpp"

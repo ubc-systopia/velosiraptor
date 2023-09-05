@@ -20,6 +20,11 @@ CCFLAGS += -I $(PVLIB_HOME)/include
 CCFLAGS += -I $(PVLIB_HOME)/include/fmruntime
 CCFLAGS += -MMD -MP
 
+# add a definition if we are in the test modes
+ifeq ($(TEST_MOCK_FAST_MODELS),1)
+CCFLAGS += -DTEST_MOCK_FAST_MODELS=1
+endif
+
 # archive flags
 AR      := ar
 ARFLAGS := rcs
@@ -45,7 +50,13 @@ TRANSLATION_UNIT_OBJS := $(TRANSLATION_UNIT_SRCS:$(SOURCE_DIR)/%.cpp=$(BUILD_DIR
 # The Translation Unit Library
 TRANSLATION_UNIT_LIB  := $(BUILD_DIR)/lib/libunit.a
 
+# target for building the translation unit library
+unitlib: $(TRANSLATION_UNIT_LIB)
+
 FRAMEWORK_LIB := $(FRAMEWORK_DIR)/build/lib/libframework.a
+
+# target fo rbuilding the framework
+frameworklib: $(FRAMEWORK_LIB)
 
 $(FRAMEWORK_LIB):
 	make -C fm_translation_framework
