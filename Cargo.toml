@@ -37,6 +37,7 @@ colored = "2"
 velosiast = { path = "lib/velosiast" }
 velosisynth = { path = "lib/velosisynth" }
 velosicodegen = { path = "lib/velosicodegen" }
+velosihwgen = { path = "lib/velosihwgen" }
 
 # logging and errors
 log = { version = "0.4.19", features = ["max_level_trace", "release_max_level_warn"] }
