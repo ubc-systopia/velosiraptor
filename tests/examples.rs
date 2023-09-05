@@ -244,7 +244,7 @@ fn examples_hwgen_fastmodels() {
             }
             AstResult::Issues(ast, e) => {
                 println!(" ok  (with issues)");
-                println!(">>>>>>\n{e}\n<<<<<<");
+                // println!(">>>>>>\n{e}\n<<<<<<");
                 ast
             }
             AstResult::Err(e) => {
@@ -254,19 +254,23 @@ fn examples_hwgen_fastmodels() {
             }
         };
 
-        let hwgen = VelosiHwGen::new_fastmodels(Path::new("./out"), name.clone().into());
+        print!("  - generate hardware module ... ");
 
+        let hwgen = VelosiHwGen::new_fastmodels(Path::new("./out"), name.clone().into());
         hwgen
             .prepare()
             .expect("could not prepare the hwgen backend");
 
         if let Err(e) = hwgen.generate(&ast) {
-            log::error!(target: "test", "code generation failed\n{:?}", e);
+            println!(" failed!");
+            println!(">>>>>>\n{e:?}\n<<<<<<");
+        } else {
+            println!(" ok");
         }
 
         hwgen.finalize(&ast).expect("could not finalize");
 
-        print!("  - Compiling module {:40} ...", name);
+        print!("  - Compiling hardware module ... ");
 
         let outpath = Path::new("./out")
             .join(name.to_string())
