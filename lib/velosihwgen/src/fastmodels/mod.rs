@@ -93,16 +93,11 @@ pub fn add_header_comment(scope: &mut C::Scope, unit: &str, comp: &str) {
 
 impl ArmFastModelsModule {
     pub fn new(hwdir: &Path, pkgname: String) -> ArmFastModelsModule {
-        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-
-        let support_dir = Path::new(&manifest_dir)
-            .join("src")
-            .join("fastmodels")
-            .join("support");
+        let support_dir = Path::new(file!()).parent().unwrap().join("support");
 
         ArmFastModelsModule {
             outdir: hwdir.join("fastmodels"),
-            support_dir,
+            support_dir: support_dir.into(),
             pkgname,
         }
     }
