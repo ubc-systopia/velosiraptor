@@ -97,7 +97,7 @@ impl ArmFastModelsModule {
 
         ArmFastModelsModule {
             outdir: hwdir.join("fastmodels"),
-            support_dir: support_dir.into(),
+            support_dir,
             pkgname,
         }
     }
