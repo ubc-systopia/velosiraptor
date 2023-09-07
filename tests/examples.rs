@@ -242,7 +242,7 @@ fn examples_hwgen_fastmodels() {
                 println!(" ok");
                 ast
             }
-            AstResult::Issues(ast, e) => {
+            AstResult::Issues(ast, _e) => {
                 println!(" ok  (with issues)");
                 // println!(">>>>>>\n{e}\n<<<<<<");
                 ast
