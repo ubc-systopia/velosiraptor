@@ -209,33 +209,40 @@ unsigned TranslationUnitBase::handle_remap(pv::RemapRequest &req, unsigned *unpr
         return 1;
     }
 
-    // const pv::TransactionAttributes *attr = req.getTransactionAttributes();
+    const pv::TransactionAttributes *attr = req.getTransactionAttributes();
 
-    // access_mode_t mode;
-    // if (attr->isNormalWorld()) {
-    //     if (attr->isPrivileged()) {
-    //         if (req.isRead()) {
-    //             mode = ACCESS_MODE_NOSEC_READ;
-    //         } else {
-    //             mode = ACCESS_MODE_NOSEC_WRITE;
-    //         }
-    //     } else {
-    //         if (req.isRead()) {
-    //             mode = ACCESS_MODE_USER_READ;
-    //         } else {
-    //             mode = ACCESS_MODE_USER_WRITE;
-    //         }
-    //     }
-    // } else {
-    //     if (req.isRead()) {
-    //         mode = ACCESS_MODE_SEC_READ;
-    //     } else {
-    //         mode = ACCESS_MODE_SEC_WRITE;
-    //     }
-    // }
+    access_mode_t mode;
+    if (attr->isNormalWorld()) {
+        if (attr->isPrivileged()) {
+            if (req.isRead()) {
+                mode = ACCESS_MODE_NOSEC_READ;
+            } else {
+                mode = ACCESS_MODE_NOSEC_WRITE;
+            }
+        } else {
+            if (req.isRead()) {
+                mode = ACCESS_MODE_USER_READ;
+            } else {
+                mode = ACCESS_MODE_USER_WRITE;
+            }
+        }
+    } else {
+        if (req.isRead()) {
+            mode = ACCESS_MODE_SEC_READ;
+        } else {
+            mode = ACCESS_MODE_SEC_WRITE;
+        }
+    }
 
     // set the translation to be valid only once, to get retriggered
     req.setOnceOnly();
+
+    bool r = this->check_permissions(addr, mode);
+    if (!r) {
+        Logging::info("TranslationUnitBase::handle_remap() - permission failure");
+        return 1;
+    }
+
 
     lpaddr_t dst;
     bool     r = this->translate(addr, &dst);
