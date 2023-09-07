@@ -149,25 +149,11 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
     fn prepare(&self) -> Result<(), VelosiHwGenError> {
         fs::create_dir_all(self.outdir.join("src"))?;
         fs::create_dir_all(self.outdir.join("platform"))?;
-        println!("{}{}", file!(), line!());
-        println!(
-            "{} -> {}",
-            self.support_dir.join("bootimg.bin").display(),
-            self.outdir.join("bootimg.bin").display()
-        );
-        println!("{:?}", std::env::current_dir());
-
-        fs::copy(
-            self.support_dir.join("bootimg.bin"),
-            self.outdir.join("bootimg.bin"),
-        )?;
-        println!("{}{}", file!(), line!());
 
         copy_recursive(
             self.support_dir.join("fm_translation_framework"),
             self.outdir.join("fm_translation_framework"),
         )?;
-        println!("{}{}", file!(), line!());
 
         Ok(())
     }

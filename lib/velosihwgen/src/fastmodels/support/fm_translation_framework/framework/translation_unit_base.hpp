@@ -35,6 +35,7 @@ namespace DVM {
 #include "types.hpp"
 #include "interface_base.hpp"
 #include "state_base.hpp"
+#include "logging.hpp"
 
 // forward declaration
 namespace sg {
@@ -71,6 +72,7 @@ public:
         , _inaddr_range_max(range_max)
         , _ttw_pvbus(ptw_pvbus)
     {
+        Logging::info("creating translation unit '%s'", this->_name.c_str());
     }
 
 

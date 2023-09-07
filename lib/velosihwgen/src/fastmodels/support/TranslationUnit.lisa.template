@@ -241,11 +241,8 @@ component /* REPLACE top_class */
         // TODO: register the interrupt stuff
         Logging::init(level);
 
-        unit = /* REPLACE top_class */::create(this, getHierarchicalName(), cadi__,
-                                               ptw_master_control.createRandomContextTransactionGenerator(),
-                                               0x80000000); // todo what should this be? base paddr
-        // unit = TranslationUnit::create(this, getHierarchicalName(), cadi__,
-        //                                ptw_master_control.createRandomContextTransactionGenerator());
+        Logging::warn("Initializing translation unit /* REPLACE top_class */");
+        unit = /* REPLACE top_class */::create(0x00000000, getHierarchicalName(), ptw_master_control.createRandomContextTransactionGenerator());
     }
 
     // reset the unit
