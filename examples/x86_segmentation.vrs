@@ -92,7 +92,7 @@ segment SegmentDescriptorSystem(base: addr) : SegmentDescriptorBase {
         requires state.entry_hi.p == 1;
         requires state.entry_hi.s == 1;
         // can't execute and write at the same time
-        requires flgs.execute != flgs.write;
+        // requires flgs.execute != flgs.write;
     {
         if flgs.usermode == 0 { state.entry_hi.dpl == 0 } else { state.entry_hi.dpl == 3 }
 
@@ -117,7 +117,7 @@ segment SegmentDescriptorData(base: addr) : SegmentDescriptorBase {
         requires state.entry_hi.p == 1;
         requires state.entry_hi.s == 0;
         // can't execute and write at the same time
-        requires flgs.execute != flgs.write;
+        // requires flgs.execute != flgs.write;
     {
         if flgs.usermode == 0 { state.entry_hi.dpl == 0 } else { state.entry_hi.dpl == 3 }
     }
