@@ -241,7 +241,7 @@ fn build_fastmodels(vrs: &Path, outdir: &Path) {
 
 /// builds the boot image
 #[cfg(test)]
-fn build_bootimg(vrs: &Path, outdir: &Path) {
+fn build_bootimg(_vrs: &Path, _outdir: &Path) {
 
     println!("\nBuilding Bootimage");
 
@@ -294,7 +294,6 @@ fn expect_output(p: &mut PtyReplSession, output: &mut String, expected: &str) {
             if s == abort_string {
                 println!("Translation resulted in an excepction.");
                 println!("Recognized abort string: `{}`", abort_string);
-                println!("{o}");
                 true
             } else {
                 false
