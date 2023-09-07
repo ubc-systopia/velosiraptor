@@ -83,7 +83,7 @@ fn generate_unit_struct(scope: &mut CG::Scope, ast: &VelosiAst, unit: &VelosiAst
     }
 
     // op functions
-    for variant in unit.get_unit_names() {
+    for variant in unit.get_next_unit_idents() {
         let variant_unit = ast.get_unit(variant).unwrap();
         add_specific_function(variant_unit, "map", imp);
     }
@@ -173,7 +173,7 @@ fn add_delegate_function(
     }
 
     // check variant and delegate accordingly
-    let variants = &unit.get_unit_names();
+    let variants = &unit.get_next_unit_idents();
     let (first, rest) = variants.split_first().unwrap();
     let first_unit = ast.get_unit(first).unwrap();
 
@@ -215,7 +215,7 @@ fn add_delegate_function(
 fn add_valid_fn(ast: &VelosiAst, unit: &VelosiAstUnitEnum, imp: &mut CG::Impl) {
     let valid = imp.new_fn("valid").vis("pub").arg_ref_self().ret("bool");
     valid.line(
-        unit.get_unit_names()
+        unit.get_next_unit_idents()
             .iter()
             .map(|variant| {
                 let variant_unit = ast.get_unit(variant).unwrap();
@@ -247,7 +247,7 @@ pub fn generate(
     scope.import("crate::utils", "*");
 
     scope.new_comment("include references to the used units");
-    for u in unit.get_unit_names() {
+    for u in unit.get_next_unit_idents() {
         // import the struct itself as well as its' interface
         scope.import("crate", &utils::to_struct_name(u, None));
         scope.import(
