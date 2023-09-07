@@ -237,16 +237,13 @@ unsigned TranslationUnitBase::handle_remap(pv::RemapRequest &req, unsigned *unpr
     // set the translation to be valid only once, to get retriggered
     req.setOnceOnly();
 
-    bool r = this->check_permissions(addr, mode);
-    if (!r) {
+    if (!this->check_permissions(addr, mode)) {
         Logging::info("TranslationUnitBase::handle_remap() - permission failure");
         return 1;
     }
 
-
     lpaddr_t dst;
-    bool     r = this->translate(addr, &dst);
-    if (!r) {
+    if (!this->translate(addr, &dst)) {
         Logging::info("TranslationUnitBase::handle_remap() - translation failed");
         return 1;
     }

@@ -72,7 +72,7 @@ PLATFORM_LISA := platform/Platform.lisa
 
 $(PLATFORM_BIN): $(TRANSLATION_UNIT_LIB) $(PLATFORM_LISA) $(PLATFORM_PROJ) /* REPLACE pkgname */.lisa
 	$(MKDIR) $(@D)
-	BUILD_DIR=$(BUILD_DIR) $(SIMGEN) -v on --num-comps-file 50 --gen-sysgen --warnings-as-errors \
+	BUILD_DIR=$(BUILD_DIR) $(SIMGEN) -v on --num-comps-file 50  --num-build-cpus 8 --gen-sysgen --warnings-as-errors \
 									 -p $(PLATFORM_PROJ) --build-directory $(BUILD_DIR)/plat_example -b
 	ln -s -f $(BUILD_DIR)/plat_example/isim_system $@
 
