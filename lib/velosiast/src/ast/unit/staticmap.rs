@@ -25,7 +25,7 @@
 
 //! # VelosiAst -- Unit Definitions
 //!
-//! This module defines the Constant AST nodes of the langauge
+//! This module defines the Constant AST nodes of the language
 
 // used standard library functionality
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
@@ -400,8 +400,8 @@ impl VelosiAstUnitStaticMap {
         }
     }
 
-    pub fn get_unit_names(&self) -> Vec<&str> {
-        self.map.get_unit_names()
+    pub fn get_next_unit_idents(&self) -> Vec<&Rc<String>> {
+        self.map.get_next_unit_idents()
     }
 }
 

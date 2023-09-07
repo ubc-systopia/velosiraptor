@@ -25,7 +25,7 @@
 
 //! # VelosiAst -- The Ast for the Velosiraptor Language
 //!
-//! This module defines the AST of the langauge with its different AST nodes.
+//! This module defines the AST of the language with its different AST nodes.
 
 // used standard library functionality
 use core::str::Split;

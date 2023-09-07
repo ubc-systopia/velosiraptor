@@ -25,7 +25,7 @@
 
 //! # VelosiAst -- Unit Definitions
 //!
-//! This module defines the Constant AST nodes of the langauge
+//! This module defines the Constant AST nodes of the language
 
 // modules
 mod actions;

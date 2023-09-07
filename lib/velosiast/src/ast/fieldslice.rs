@@ -25,7 +25,7 @@
 
 //! # VelosiAst -- Field Slices
 //!
-//! This module defines the Slice AST nodes of the langauge
+//! This module defines the Slice AST nodes of the language
 //!
 
 // used standard library functionality

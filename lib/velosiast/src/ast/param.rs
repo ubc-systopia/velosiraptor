@@ -25,7 +25,7 @@
 
 //! # VelosiAst -- Parameter Definitions
 //!
-//! This module defines the Parameter AST nodes of the langauge
+//! This module defines the Parameter AST nodes of the language
 
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::hash::{Hash, Hasher};

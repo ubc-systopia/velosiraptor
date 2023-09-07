@@ -25,9 +25,9 @@
 
 //! # VelosiAst -- Static Map Definitions
 //!
-//! This module defines the Constant AST nodes of the langauge
+//! This module defines the Constant AST nodes of the language
 
-// used stadnard library functionality
+// used standard library functionality
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
