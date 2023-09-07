@@ -92,7 +92,7 @@ pub fn generate_register_header(
         }
 
         for r in rs {
-            let c = s.new_class(r.ident().as_str());
+            let c = s.new_class(register_class_name(r.ident().as_str()).as_str());
             c.set_base("RegisterBase", C::Visibility::Public);
 
             let scn = state_class_name(u.ident());

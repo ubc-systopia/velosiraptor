@@ -216,18 +216,23 @@ public:
     ///< base address
     lpaddr_t base;
 
-  private:
 
     /**
      * @param[in] src_addr   the virtual address to be translated
-     * @param[in] size       the size of the translation request
-     * @param[in] mode       access mode of the request
      * @param[out] dst_addr  the translated address
      *
      * @returns true if the translation was successful, false otherwise
      */
     virtual bool translate(lvaddr_t src_addr, lpaddr_t *dst_addr)
         = 0;
+
+    /**
+     * @param[in] src_addr   the virtual address to be translated
+     * @param[in] mode       access mode of the request
+     *
+     * @returns true if the translation would pass successfully, false otherwise
+     */
+    virtual bool check_permissions(lvaddr_t src_addr, access_mode_t mode) = 0;
 
     std::string _name;
 

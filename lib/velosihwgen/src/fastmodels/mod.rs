@@ -93,7 +93,15 @@ pub fn add_header_comment(scope: &mut C::Scope, unit: &str, comp: &str) {
 
 impl ArmFastModelsModule {
     pub fn new(hwdir: &Path, pkgname: String) -> ArmFastModelsModule {
-        let support_dir = Path::new(file!()).parent().unwrap().join("support");
+        // the manifest dir may be different depending on where cargo was run from.
+        // if it ends in the hwgen directory we can just add it otherwise we add the
+        // path to the hwgen directory as well.
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
+        let support_dir = if manifest_dir.ends_with("lib/velosihwgen") {
+            Path::new(&manifest_dir).join("src/fastmodels/support")
+        } else {
+            Path::new(&manifest_dir).join("lib/velosihwgen/src/fastmodels/support")
+        };
 
         ArmFastModelsModule {
             outdir: hwdir.join("fastmodels"),
@@ -141,16 +149,25 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
     fn prepare(&self) -> Result<(), VelosiHwGenError> {
         fs::create_dir_all(self.outdir.join("src"))?;
         fs::create_dir_all(self.outdir.join("platform"))?;
+        println!("{}{}", file!(), line!());
+        println!(
+            "{} -> {}",
+            self.support_dir.join("bootimg.bin").display(),
+            self.outdir.join("bootimg.bin").display()
+        );
+        println!("{:?}", std::env::current_dir());
 
         fs::copy(
             self.support_dir.join("bootimg.bin"),
             self.outdir.join("bootimg.bin"),
         )?;
+        println!("{}{}", file!(), line!());
 
         copy_recursive(
             self.support_dir.join("fm_translation_framework"),
             self.outdir.join("fm_translation_framework"),
         )?;
+        println!("{}{}", file!(), line!());
 
         Ok(())
     }
@@ -202,7 +219,8 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
             if u.is_abstract() {
                 continue;
             }
-            generate_unit_header(u, &self.outdir.join("src"))?;
+
+            generate_unit_header(u, ast, &self.outdir.join("src"))?;
         }
 
         Ok(())

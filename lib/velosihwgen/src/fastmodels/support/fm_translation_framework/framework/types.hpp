@@ -21,6 +21,11 @@ typedef uint64_t lvaddr_t;
  */
 typedef uint64_t lpaddr_t;
 
+/**
+ * defines the local physical addrss of the translation unit (output)
+ */
+typedef uint64_t genaddr_t;
+
 
 ///< stringify a macro
 #define STRINGIFY(x) #x
