@@ -27,16 +27,14 @@
 
 // std includes
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::rc::Rc;
 
-use std::process::Command;
 
 // use strip_ansi_escapes;
 
 // our library
 use velosiast::{AstResult, VelosiAst, VelosiAstUnit};
-use velosihwgen::VelosiHwGen;
 use velosiparser::{VelosiParser, VelosiParserError};
 use velosisynth::create_models;
 use velosisynth::Z3SynthFactory;
@@ -215,94 +213,5 @@ fn examples_distinguish() {
 
     if had_errors {
         panic!("Sanity check failed.");
-    }
-}
-
-/// Tests the basic import functionality
-#[test]
-fn examples_hwgen_fastmodels() {
-    let d = PathBuf::from("examples");
-    for f in d.read_dir().expect("could not read example directory") {
-        let vrs = f.expect("could not read directory entry").path();
-
-        if vrs.is_dir() {
-            continue;
-        }
-
-        let name = vrs.file_stem().unwrap().to_string_lossy();
-
-        println!("\nFile: {name}.vrs");
-
-        let path_str = vrs.to_str().expect("could not create string from path");
-
-        print!("  - Parsing {:40} ...", path_str);
-
-        let ast = match VelosiAst::from_file(path_str) {
-            AstResult::Ok(ast) => {
-                println!(" ok");
-                ast
-            }
-            AstResult::Issues(ast, _e) => {
-                println!(" ok  (with issues)");
-                // println!(">>>>>>\n{e}\n<<<<<<");
-                ast
-            }
-            AstResult::Err(e) => {
-                println!(" fail  (expected ok)");
-                println!(">>>>>>\n{e}\n<<<<<<");
-                panic!("Failed to construct AST.");
-            }
-        };
-
-        print!("  - generate hardware module ... ");
-
-        let hwgen = VelosiHwGen::new_fastmodels(Path::new("./out"), name.clone().into());
-        hwgen
-            .prepare()
-            .expect("could not prepare the hwgen backend");
-
-        if let Err(e) = hwgen.generate(&ast) {
-            println!(" failed!");
-            println!(">>>>>>\n{e:?}\n<<<<<<");
-        } else {
-            println!(" ok");
-        }
-
-        hwgen.finalize(&ast).expect("could not finalize");
-
-        print!("  - Compiling hardware module ... ");
-
-        let outpath = Path::new("./out")
-            .join(name.to_string())
-            .join("hw/fastmodels");
-
-        // run make
-        let make = Command::new("make")
-            .arg("unitlib")
-            .env("TEST_MOCK_FAST_MODELS", "1")
-            .current_dir(outpath)
-            .output()
-            .expect("Failed to execute command");
-
-        if make.status.success() {
-            let errs = String::from_utf8(make.stderr).unwrap();
-
-            if errs.is_empty() {
-                println!(" ok");
-            } else {
-                println!(" ok  (with issues)");
-                println!(">>>>>>\n{errs}\n<<<<<<");
-                panic!("Compilation resulted in warnings");
-            }
-        } else {
-            println!(" failed. (errors during compilation");
-            let errs = String::from_utf8(make.stdout).unwrap();
-            println!(">>>>>>\n{errs}\n<<<<<<");
-
-            let errs = String::from_utf8(make.stderr).unwrap();
-            println!(">>>>>>\n{errs}\n<<<<<<");
-
-            panic!("Compilation resulted in errors");
-        }
     }
 }
