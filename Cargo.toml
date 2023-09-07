@@ -46,5 +46,6 @@ simplelog = { version = "^0.12.0", features = ["paris"] }
 # dependencies for testing
 [dev-dependencies]
 strip-ansi-escapes = "0.1.1"
+rexpect = "0.5"
 velosiparser = { path = "lib/velosiparser" }
 
