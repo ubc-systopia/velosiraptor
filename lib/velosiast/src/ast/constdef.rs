@@ -25,7 +25,7 @@
 
 //! # VelosiAst -- Constant Definitions
 //!
-//! This module defines the Constant AST nodes of the langauge
+//! This module defines the Constant AST nodes of the language
 
 // used standard library functionality
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};

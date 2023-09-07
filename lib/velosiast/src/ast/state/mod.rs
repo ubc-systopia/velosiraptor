@@ -25,7 +25,7 @@
 
 //! # VelosiAst -- State Definitions
 //!
-//! This module defines the State AST nodes of the langauge
+//! This module defines the State AST nodes of the language
 
 // modules
 mod fields;

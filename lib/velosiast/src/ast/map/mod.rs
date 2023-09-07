@@ -37,8 +37,9 @@ pub use element::VelosiAstStaticMapElement;
 pub use explicit::VelosiAstStaticMapExplicit;
 pub use listcomp::VelosiAstStaticMapListComp;
 
-// used stadnard library functionality
+// used standard library functionality
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+use std::rc::Rc;
 
 // used parse tree definitions
 use velosiparser::parsetree::VelosiParseTreeMap;
@@ -89,10 +90,10 @@ impl VelosiAstStaticMap {
         }
     }
 
-    pub fn get_unit_names(&self) -> Vec<&str> {
+    pub fn get_next_unit_idents(&self) -> Vec<&Rc<String>> {
         match self {
-            VelosiAstStaticMap::ListComp(s) => s.get_unit_names(),
-            VelosiAstStaticMap::Explicit(s) => s.get_unit_names(),
+            VelosiAstStaticMap::ListComp(s) => s.get_next_unit_idents(),
+            VelosiAstStaticMap::Explicit(s) => s.get_next_unit_idents(),
             VelosiAstStaticMap::None(_) => vec![],
         }
     }

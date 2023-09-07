@@ -25,7 +25,7 @@
 
 //! # VelosiAst -- Unit Definitions
 //!
-//! This module defines the Constant AST nodes of the langauge
+//! This module defines the Constant AST nodes of the language
 
 // used standard library functionality
 use std::collections::HashMap;
@@ -502,7 +502,7 @@ impl VelosiAstUnitEnum {
         }
     }
 
-    pub fn get_unit_names(&self) -> Vec<&Rc<String>> {
+    pub fn get_next_unit_idents(&self) -> Vec<&Rc<String>> {
         self.enums.keys().collect()
     }
 

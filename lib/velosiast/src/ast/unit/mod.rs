@@ -25,7 +25,7 @@
 
 //! # VelosiAst -- Unit Definitions
 //!
-//! This module defines the Constant AST nodes of the langauge
+//! This module defines the Constant AST nodes of the language
 
 // modules
 mod enums;
@@ -306,6 +306,15 @@ impl VelosiAstUnit {
             Segment(s) => &s.loc,
             StaticMap(s) => &s.loc,
             Enum(e) => &e.loc,
+        }
+    }
+
+    pub fn get_next_unit_idents(&self) -> Vec<&Rc<String>> {
+        use VelosiAstUnit::*;
+        match self {
+            Segment(s) => s.get_next_unit_idents(),
+            StaticMap(s) => s.get_next_unit_idents(),
+            Enum(e) => e.get_next_unit_idents(),
         }
     }
 }

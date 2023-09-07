@@ -25,7 +25,7 @@
 
 //! # VelosiAst -- Method Definitions
 //!
-//! This module defines the Method AST nodes of the langauge
+//! This module defines the Method AST nodes of the language
 
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};

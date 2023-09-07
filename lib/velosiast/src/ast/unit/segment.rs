@@ -25,7 +25,7 @@
 
 //! # VelosiAst -- Unit Definitions
 //!
-//! This module defines the Constant AST nodes of the langauge
+//! This module defines the Constant AST nodes of the language
 
 // used standard library functionality
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
@@ -719,6 +719,15 @@ impl VelosiAstUnitSegment {
 
     pub fn get_state_registers(&self) -> Vec<Rc<VelosiAstStateField>> {
         self.state.get_registers()
+    }
+
+    pub fn get_next_unit_idents(&self) -> Vec<&Rc<String>> {
+        self.methods
+            .get("map")
+            .and_then(|m| m.get_param("pa"))
+            .and_then(|p| p.ptype.typeref())
+            .map(|t| vec![t])
+            .unwrap_or_default()
     }
 }
 

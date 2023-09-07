@@ -25,11 +25,12 @@
 
 //! # VelosiAst -- Static Map Definitions
 //!
-//! This module defines the Constant AST nodes of the langauge
+//! This module defines the Constant AST nodes of the language
 
-// used stadnard library functionality
+// used standard library functionality
 
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+use std::rc::Rc;
 
 // used parse tree definitions
 use velosiparser::parsetree::VelosiParseTreeMapExplicit;
@@ -77,10 +78,10 @@ impl VelosiAstStaticMapExplicit {
         ast_result_return!(VelosiAstStaticMap::Explicit(res), issues)
     }
 
-    pub fn get_unit_names(&self) -> Vec<&str> {
+    pub fn get_next_unit_idents(&self) -> Vec<&Rc<String>> {
         self.entries
             .iter()
-            .map(|e| e.dst.ident().as_str())
+            .map(|e| e.dst.ident())
             .collect::<Vec<_>>()
     }
 }
