@@ -90,7 +90,7 @@ fn add_higher_order_map(
                     op_fn.line("");
 
                     let (has_children, no_children): (Vec<_>, Vec<_>) = e
-                        .get_unit_names()
+                        .get_next_unit_idents()
                         .into_iter()
                         .partition(|variant| relations.0.get(*variant).is_some());
 
@@ -401,7 +401,7 @@ fn add_op_function(
             let dest_unit = ast.get_unit(map.elm.dst.ident().as_str()).unwrap();
             match dest_unit {
                 VelosiAstUnit::Enum(e) if op_name == "map" => {
-                    for variant in e.get_unit_names() {
+                    for variant in e.get_next_unit_idents() {
                         let variant_unit = ast.get_unit(variant).unwrap();
                         let op = variant_unit.get_method(op_name).unwrap();
                         let op_fn = imp
@@ -537,7 +537,7 @@ pub fn generate(
 
     // find all the used other units in the static map
     scope.new_comment("include references to the used units");
-    for u in unit.map.get_unit_names().iter() {
+    for u in unit.map.get_next_unit_idents().iter() {
         scope.import("crate", &utils::to_struct_name(u, None));
 
         let unit = ast.get_unit(u).unwrap();
@@ -549,7 +549,7 @@ pub fn generate(
     if let VelosiAstStaticMap::ListComp(map) = &unit.map {
         let dest_unit = ast.get_unit(map.elm.dst.ident().as_str()).unwrap();
         if let VelosiAstUnit::Enum(e) = dest_unit {
-            for variant in e.get_unit_names() {
+            for variant in e.get_next_unit_idents() {
                 if relations.0.get(variant).is_some() {
                     scope.import("crate", &utils::to_struct_name(variant, None));
                 }

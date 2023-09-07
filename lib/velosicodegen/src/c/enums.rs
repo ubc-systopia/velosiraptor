@@ -95,8 +95,7 @@ fn add_is_function(
     // 1) find the state that defines this
     // 2) back project onto the interface to find out how to obtain the state
     // 3) read the interface such that the translation behavior doesn't change
-
-    for variant in unit.get_unit_names().into_iter() {
+    for variant in unit.get_next_unit_idents().into_iter() {
         // lookup the unit
         let variant_unit = ast.get_unit(variant).expect("unit not found!");
 
@@ -208,7 +207,7 @@ fn add_map_function(
     //  -> create state struct
     //  -> call map()
 
-    for variant in unit.get_unit_names().into_iter() {
+    for variant in unit.get_next_unit_idents().into_iter() {
         // lookup the unit
 
         let variant_unit = ast.get_unit(variant).expect("unit not found!");
@@ -305,7 +304,7 @@ fn add_op_function(
     let mut block = C::Block::new();
     block.fn_call("assert", vec![C::Expr::bfalse()]);
 
-    for variant in unit.get_unit_names().into_iter() {
+    for variant in unit.get_next_unit_idents().into_iter() {
         let variant_unit = ast.get_unit(variant).expect("unit not found!");
         // let variant_op = variant_unit
         //     .get_method("translate")
@@ -395,7 +394,7 @@ fn add_valid_fn(scope: &mut C::Scope, ast: &VelosiAst, unit: &VelosiAstUnitEnum)
         .to_expr();
 
     let expr = unit
-        .get_unit_names()
+        .get_next_unit_idents()
         .iter()
         .map(|variant| {
             let variant_unit = ast.get_unit(variant).unwrap();

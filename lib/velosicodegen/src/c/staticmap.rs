@@ -518,7 +518,7 @@ fn add_higher_order_map(
                     body.assign(original_sz.clone(), sz.clone());
 
                     let (has_children, no_children): (Vec<_>, Vec<_>) = e
-                        .get_unit_names()
+                        .get_next_unit_idents()
                         .into_iter()
                         .partition(|variant| relations.0.get(*variant).is_some());
 
@@ -1099,7 +1099,7 @@ fn add_op_function(
             let dest_unit = ast.get_unit(map.elm.dst.ident().as_str()).unwrap();
             match dest_unit {
                 VelosiAstUnit::Enum(e) if op_name == "map" => {
-                    for variant in e.get_unit_names() {
+                    for variant in e.get_next_unit_idents() {
                         let variant_unit = ast.get_unit(variant).unwrap();
                         let op = variant_unit.get_method(op_name).unwrap();
 
@@ -1261,7 +1261,7 @@ pub fn generate(
 
     // find all the used other units in the static map
     s.new_comment("include refernces to the used units");
-    for u in unit.map.get_unit_names().iter() {
+    for u in unit.map.get_next_unit_idents().iter() {
         let path = format!("../{}/unit.h", u.to_ascii_lowercase());
         s.new_include(&path, false);
     }
