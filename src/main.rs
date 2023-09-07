@@ -83,7 +83,7 @@ struct Cli {
     mem_model: bool,
 }
 
-/// defines the output langauge for the generate code
+/// defines the output language for the generate code
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum OutputLanguage {
     /// emit C code
