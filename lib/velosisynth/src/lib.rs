@@ -435,7 +435,7 @@ impl<'a> Z3SynthEnum<'a> {
         self.z3.reset_with_context(Z3Query::with_model_contexts(
             models
                 .iter()
-                .filter(|(ident, _)| self.unit.get_unit_names().contains(ident))
+                .filter(|(ident, _)| self.unit.get_next_unit_idents().contains(ident))
                 .map(|(_, ctx)| ctx.clone())
                 .collect(),
         ));

@@ -101,7 +101,7 @@ impl Relations {
                     }
                 },
                 Enum(u) => {
-                    for next in &u.get_unit_names() {
+                    for next in &u.get_next_unit_idents() {
                         relations.insert(u.ident().clone(), ast.get_unit(next).unwrap().clone());
                     }
                 }
@@ -247,7 +247,7 @@ pub fn extract_composition(ast: &VelosiAst) {
                 }
             },
             Enum(u) => {
-                for next in &u.get_unit_names() {
+                for next in &u.get_next_unit_idents() {
                     relations.insert(u.ident().clone(), ast.get_unit(next).unwrap().clone());
                     referenced_units.insert(Rc::new(next.to_string()));
                 }
