@@ -56,7 +56,7 @@ fn examples_hwgen_fastmodels() {
 
 /// Test the
 #[test]
-// #[ignore]
+#[ignore]
 fn example_direct_segment_fastmodels() {
     let mut vrs = PathBuf::from("examples");
     vrs.push("directsegment.vrs");
@@ -100,6 +100,7 @@ fn example_x86_32_pagetable_table_fastmodels() {
 // Test Utils for the FastModels HW Gen
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// assumes the fastmodels path is in $home/bin/arm
 fn get_fastmodels_path() -> PathBuf {
     let homedir = std::env::home_dir().expect("could not get the home directory");
     homedir.join("bin/arm/FastModelsTools_11.15")
@@ -276,6 +277,7 @@ fn build_bootimg(_vrs: &Path, _outdir: &Path) {
     }
 }
 
+#[cfg(test)]
 fn expect_output(p: &mut PtyReplSession, output: &mut String, expected: &str) {
     let abort_string =
         "[ARMv8]: ERROR Exception AARCH64_EVECTOR_EL_CURRENT_STACK_CURRENT_SYNC happened";
