@@ -23,15 +23,20 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use std::path::{Path, PathBuf};
 use std::fs;
+use std::path::{Path, PathBuf};
 
 use std::process::Command;
 
-use velosihwgen::VelosiHwGen;
 use velosiast::{AstResult, VelosiAst};
+use velosihwgen::VelosiHwGen;
 
-use rexpect::{process::signal::SIGKILL, reader::{Regex, ReadUntil}, session::PtyReplSession, spawn_bash};
+use rexpect::{
+    process::signal::SIGKILL,
+    reader::{ReadUntil, Regex},
+    session::PtyReplSession,
+    spawn_bash,
+};
 
 /// Test the hardware generation
 #[test]
@@ -91,7 +96,6 @@ fn example_x86_32_pagetable_table_fastmodels() {
     generate_and_check(&vrs, &outdir);
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Test Utils for the FastModels HW Gen
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -150,9 +154,7 @@ fn generate_and_check(vrs: &Path, outdir: &Path) {
 
     print!("  - Compiling hardware module ... ");
 
-    let outpath = outdir
-        .join(name.to_string())
-        .join("hw/fastmodels");
+    let outpath = outdir.join(name.to_string()).join("hw/fastmodels");
 
     // run make
     let make = Command::new("make")
@@ -198,9 +200,7 @@ fn build_fastmodels(vrs: &Path, outdir: &Path) {
 
     let fastmodels_config_file = get_fastmodels_path().join("source_all.sh");
 
-    let outpath = outdir
-        .join(name.to_string())
-        .join("hw/fastmodels");
+    let outpath = outdir.join(name.to_string()).join("hw/fastmodels");
 
     let command_str = format!("source {}; make", fastmodels_config_file.display());
 
@@ -238,11 +238,9 @@ fn build_fastmodels(vrs: &Path, outdir: &Path) {
     }
 }
 
-
 /// builds the boot image
 #[cfg(test)]
 fn build_bootimg(_vrs: &Path, _outdir: &Path) {
-
     println!("\nBuilding Bootimage");
 
     let bootimg_src = Path::new("support/arm-fastmodels-boot");
@@ -276,17 +274,15 @@ fn build_bootimg(_vrs: &Path, _outdir: &Path) {
 
         panic!("Compilation resulted in errors");
     }
-
 }
 
 fn expect_output(p: &mut PtyReplSession, output: &mut String, expected: &str) {
-
-
-    let abort_string = "[ARMv8]: ERROR Exception AARCH64_EVECTOR_EL_CURRENT_STACK_CURRENT_SYNC happened";
+    let abort_string =
+        "[ARMv8]: ERROR Exception AARCH64_EVECTOR_EL_CURRENT_STACK_CURRENT_SYNC happened";
     let r = p.exp_any(vec![
         ReadUntil::String(abort_string.into()),
-        ReadUntil::Regex(Regex::new(expected).unwrap())]
-    );
+        ReadUntil::Regex(Regex::new(expected).unwrap()),
+    ]);
     let has_err = match r {
         Ok((o, s)) => {
             output.push_str(&o);
@@ -299,7 +295,7 @@ fn expect_output(p: &mut PtyReplSession, output: &mut String, expected: &str) {
                 false
             }
         }
-        Err(_e) =>  {
+        Err(_e) => {
             println!("Could not recognize `{expected}`");
             while let Some(c) = p.try_read() {
                 output.push(c);
@@ -329,9 +325,7 @@ fn run_fastmodels(vrs: &Path, outdir: &Path) {
 
     println!("\nRunning FastModels: {path_str}.vrs");
 
-    let outpath = outdir
-        .join(name.to_string())
-        .join("hw/fastmodels");
+    let outpath = outdir.join(name.to_string()).join("hw/fastmodels");
 
     // set in the makefile
     let simprog = outpath.join("build/plat_example_sim");
@@ -347,28 +341,43 @@ fn run_fastmodels(vrs: &Path, outdir: &Path) {
     let fastmodels_config_file = get_fastmodels_path().join("source_all.sh");
 
     // run make
-    let mut p = spawn_bash(Some(5000))
-        .expect("could not spawn bash process");
+    let mut p = spawn_bash(Some(5000)).expect("could not spawn bash process");
 
-    let command_str = format!("source {}; ./{} --data Memory0={}@0x0", fastmodels_config_file.display(), simprog.display(), bootimg.display());
+    let command_str = format!(
+        "source {}; ./{} --data Memory0={}@0x0",
+        fastmodels_config_file.display(),
+        simprog.display(),
+        bootimg.display()
+    );
     // println!("  - cmd: {command_str}");
     p.send_line(command_str.as_str())
         .expect("could not send command to bash");
 
     let mut output = String::new();
 
-    expect_output(&mut p, &mut output, r"\[UNIT\] \[ WARN\] Initializing translation unit");
-    expect_output(&mut p, &mut output, r"\[ARMv8\]: FastModels bootloader starting on ARM Cortex-A53");
+    expect_output(
+        &mut p,
+        &mut output,
+        r"\[UNIT\] \[ WARN\] Initializing translation unit",
+    );
+    expect_output(
+        &mut p,
+        &mut output,
+        r"\[ARMv8\]: FastModels bootloader starting on ARM Cortex-A53",
+    );
 
-    expect_output(&mut p, &mut output, r"\[ARMv8\]: VRS: Velosiraptor tests starting.");
-    expect_output(&mut p, &mut output, r"\[ARMv8\]: Velosiraptor tests completed.");
-
+    expect_output(
+        &mut p,
+        &mut output,
+        r"\[ARMv8\]: VRS: Velosiraptor tests starting.",
+    );
+    expect_output(
+        &mut p,
+        &mut output,
+        r"\[ARMv8\]: Velosiraptor tests completed.",
+    );
 
     let _ = p.send_control('c');
     let _ = p.process.kill(SIGKILL);
     let _ = p.process.wait();
 }
-
-
-
-
