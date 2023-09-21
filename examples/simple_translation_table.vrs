@@ -44,7 +44,7 @@ segment PageTableEntry(base : addr) {
     outbitwidth = PHYS_ADDR_BITS;
 
     // the state
-    state = StateDef(base: addr) {
+    state(base: addr) {
         mem pte [base, 0, 4] {
             // the following fields at starting bit, ending bit, name
             0 ..  1 present,
@@ -55,11 +55,11 @@ segment PageTableEntry(base : addr) {
             5 .. 12 ignored,
            12 .. 32 base,
         }
-    };
+    }
 
-    interface = InterfaceDef(base : addr) {
+    interface(base : addr) {
         mem pte [base, 0, 4]
-    };
+    }
 
     #[remap]
     fn valid() -> bool {
@@ -104,7 +104,7 @@ segment PageTableEntry(base : addr) {
 
 // represents an x86 page table entry
 staticmap PageTable(base : addr) {
-    mapdef = [ PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..1024 ];
+    maps [ PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..1024 ]
 }
 
 
@@ -121,7 +121,7 @@ segment X86_MMU(base: paddr) {
     inbitwidth = VSPACE_ADDR_BITS;
     outbitwidth = PHYS_ADDR_BITS;
 
-    state = StateDef(base: paddr) {
+    state(base: paddr) {
         reg ttbr [ 4 ] {
             0 .. 12 pcid,
             12 .. 32 address
@@ -130,13 +130,13 @@ segment X86_MMU(base: paddr) {
         reg ctrl [ 4 ] {
             31 .. 32 enabled
         }
-    };
+    }
 
     // making these as an MMIO register so we can access them.
-    interface = InterfaceDef(base: paddr) {
+    interface(base: paddr) {
         mmio ttbr [ base, 0, 4 ],
         mmio ctrl [ base, 4, 4 ]
-    };
+    }
 
     #[remap]
     fn valid() -> bool {
