@@ -330,6 +330,7 @@ impl VelosiAstUnit {
             Segment(s) => s.get_next_unit_idents(),
             StaticMap(s) => s.get_next_unit_idents(),
             Enum(e) => e.get_next_unit_idents(),
+            OSSpec(_e) => Vec::new(),
         }
     }
 }
