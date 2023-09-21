@@ -126,7 +126,7 @@ pub fn make_program_builder(
                     buf.clear();
                 }
             } else {
-                unreachable!("shoudl have defined flags!");
+                unreachable!("should have defined flags!");
             }
         } else {
             builder.add_var(v.ident_to_string());

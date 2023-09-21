@@ -52,7 +52,7 @@ impl ProtectPrograms {
     pub fn new(
         unit: &VelosiAstUnitSegment,
         batch_size: usize,
-        _starting_prog: Option<Rc<Program>>,
+        starting_prog: Option<Rc<Program>>,
     ) -> Self {
         log::info!(target : "[synth::protect]", "setting up protect synthesis.");
 
