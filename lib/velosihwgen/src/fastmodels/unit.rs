@@ -101,6 +101,117 @@ fn state_field_access(access: &Vec<&str>, unit: Option<&C::Expr>) -> C::Expr {
     panic!("unhandled!")
 }
 
+/// flattens an if-else expression by combining the branches with the conditional:
+///
+/// if A { 1 } else { 2 }  -> (A, 1), (!A, 2)
+/// if A { if B {1} else {2} } else { if C {3} else {4} } -> (A&&B, 1), (A&&!B, 2), (!A&&C, 3), (!A&&!C, 4)
+///
+/// a + if A { 1 } else { 2 } -> (A, a+1), (!A, a+2)
+fn flatten_if_else_expr(expr: &Rc<VelosiAstExpr>) -> Vec<(Rc<VelosiAstExpr>, Rc<VelosiAstExpr>)> {
+    match expr.as_ref() {
+        VelosiAstExpr::IfElse(VelosiAstIfElseExpr {
+            cond, then, other, ..
+        }) => {
+            let mut res: Vec<_> = flatten_if_else_expr(then)
+                .into_iter()
+                .map(|(c, expr)| {
+                    let cond_new = if let VelosiAstExpr::BoolLiteral(_) = c.as_ref() {
+                        cond.clone()
+                    } else {
+                        VelosiAstExpr::BinOp(VelosiAstBinOpExpr::land(cond.clone(), c)).into()
+                    };
+
+                    (cond_new, expr)
+                })
+                .collect();
+
+            res.extend(
+                flatten_if_else_expr(other)
+                    .into_iter()
+                    .map(|(c, expr)| {
+                        let cond_new = if let VelosiAstExpr::BoolLiteral(_) = c.as_ref() {
+                            VelosiAstUnOpExpr::new_lnot(cond.clone()).into()
+                        } else {
+                            VelosiAstExpr::BinOp(VelosiAstBinOpExpr::land(
+                                VelosiAstUnOpExpr::new_lnot(cond.clone()).into(),
+                                c,
+                            ))
+                            .into()
+                        };
+
+                        (cond_new, expr)
+                    })
+                    .collect::<Vec<_>>(),
+            );
+
+            res
+        }
+        VelosiAstExpr::BinOp(VelosiAstBinOpExpr { lhs, op, rhs, loc }) => {
+            let lhs = flatten_if_else_expr(lhs);
+            let rhs = flatten_if_else_expr(rhs);
+
+            // they should not be empty
+            debug_assert!(!lhs.is_empty());
+            debug_assert!(!rhs.is_empty());
+
+            if lhs.len() == 1 && rhs.len() == 1 {
+                // both branches have a single operand, simply ignore and return the original
+                vec![(
+                    VelosiAstExpr::BoolLiteral(VelosiAstBoolLiteralExpr::btrue()).into(),
+                    expr.clone(),
+                )]
+            } else {
+                // build the cross product of all the two operands,
+                // a + if C { 1 } else { 2 } => [(true, a)]  [ (C, 1), (!C, 2) ] => [(C, a+1), (!C, a+2)]
+                // if A { 1 } else { 2 } + if B { 3 } else { 4 } => [(A, 1), (!A, 2)] [(B, 3), (!B, 4)]
+                // => [(A&&B, 1+3), (A && !B, 1+3), (!A&&B, 2+3), (!A&&!B, 2+3))]
+                let mut res = Vec::with_capacity(lhs.len() * rhs.len());
+                for (c1, e1) in &lhs {
+                    for (c2, e2) in &rhs {
+                        let e = VelosiAstExpr::BinOp(VelosiAstBinOpExpr::new(
+                            e1.clone(),
+                            *op,
+                            e2.clone(),
+                            loc.clone(),
+                        ));
+                        if let VelosiAstExpr::BoolLiteral(_) = c1.as_ref() {
+                            res.push((c2.clone(), e.into()))
+                        } else if let VelosiAstExpr::BoolLiteral(_) = c2.as_ref() {
+                            res.push((c1.clone(), e.into()))
+                        } else {
+                            let c = VelosiAstExpr::BinOp(VelosiAstBinOpExpr::land(
+                                c1.clone(),
+                                c2.clone(),
+                            ));
+                            res.push((c.into(), e.into()));
+                        }
+                    }
+                }
+                res
+            }
+        }
+        VelosiAstExpr::UnOp(VelosiAstUnOpExpr { op: _, expr: _, .. }) => {
+            unimplemented!()
+        }
+        VelosiAstExpr::Quantifier(_) => {
+            unimplemented!()
+        }
+        VelosiAstExpr::FnCall(_) => {
+            unimplemented!()
+        }
+        VelosiAstExpr::Slice(_) => {
+            unimplemented!()
+        }
+        VelosiAstExpr::Range(_) => {
+            unimplemented!()
+        }
+        _ => vec![(
+            VelosiAstExpr::BoolLiteral(VelosiAstBoolLiteralExpr::btrue()).into(),
+            expr.clone(),
+        )],
+    }
+}
+
 fn expr_to_cpp_with_unit(
     expr: &VelosiAstExpr,
     params: &HashSet<&str>,
@@ -325,44 +436,69 @@ fn add_translate_method_segment(
         .to_expr();
 
     if let Some(tbody) = &tm.body {
-        body.assign(base_var.clone(), expr_to_cpp(tbody, &params));
-    } else {
-        body.assign(base_var.clone(), C::Expr::Raw(String::from("PANIC!")));
-    }
+        if let Some(next) = next {
+            // construct the next unit if applicable
 
-    if let Some(next) = next {
-        // construct the next one
-        // PageTable::create()
+            let flattened_body = flatten_if_else_expr(tbody);
+            for (cond, expr) in flattened_body {
+                let ifelse = body.new_ifelse(&expr_to_cpp(&cond, &params));
+                let branch = ifelse.then_branch();
 
-        let next_unit = construct_next_unit(body, next, vec![base_var.clone()]);
+                // we have state references to this indicates we need to go to the next one
+                if expr.has_state_references() {
+                    let next_unit = construct_next_unit(branch, next, vec![base_var.clone()]);
 
-        match next.input_bitwidth() {
-            64 => {
-                body.new_comment("calculate the virtual address: input bitwidth is max");
-            }
-            a => {
-                if a == segment.inbitwidth {
-                    body.new_comment("calculate the virtual address: input bitwidth match! no need to calculate the new VA");
+                    match next.input_bitwidth() {
+                        64 => {
+                            branch.new_comment(
+                                "calculate the virtual address: input bitwidth is max",
+                            );
+                        }
+                        a => {
+                            if a == segment.inbitwidth {
+                                branch.new_comment("calculate the virtual address: input bitwidth match! no need to calculate the new VA");
+                            } else {
+                                let mask = (1 << a) - 1;
+                                branch.assign(
+                                    src_var.clone(),
+                                    C::Expr::binop(src_var.clone(), "&", C::Expr::new_num(mask)),
+                                );
+                            }
+                        }
+                    }
+
+                    branch
+                        .new_comment("call translate on it.")
+                        .return_expr(C::Expr::method_call(
+                            &next_unit,
+                            "translate",
+                            vec![src_var.clone(), dst_addr.clone()],
+                        ));
                 } else {
-                    let mask = (1 << a) - 1;
-                    body.assign(
-                        src_var.clone(),
-                        C::Expr::binop(src_var.clone(), "&", C::Expr::new_num(mask)),
-                    );
+                    // there are no state references, so the expression evaluates to the same
+                    // constant value every time, return this!
+                    // XXX: this is not 100% accurate, as we could construct the next unit
+                    //      with this value. For now, we just use that!
+
+                    // if cond { return expr }
+                    branch
+                        .assign(base_var.clone(), expr_to_cpp(&expr, &params))
+                        .assign(C::Expr::deref(&dst_addr), base_var.clone())
+                        .return_expr(C::Expr::btrue());
                 }
             }
         }
 
-        body.new_comment("call translate on it.");
-        body.return_expr(C::Expr::method_call(
-            &next_unit,
-            "translate",
-            vec![src_var, dst_addr],
-        ));
+        // // no next translation unit, simply set the return value with the expression
+        // body.new_comment("return the result of the translation");
+        // // calculate the value
+        // body.assign(base_var.clone(), expr_to_cpp(tbody, &params));
+        // // assign it to the deref return value
+        // body.assign(C::Expr::deref(&dst_addr), base_var);
+        // // return true
+        // body.return_expr(C::Expr::btrue());
     } else {
-        body.new_comment("return the result of the translation");
-        body.assign(C::Expr::deref(&dst_addr), base_var);
-        body.return_expr(C::Expr::btrue());
+        body.assign(base_var.clone(), C::Expr::Raw(String::from("PANIC!")));
     }
 }
 
@@ -946,6 +1082,7 @@ fn add_unit_class(s: &mut Scope, unit: &VelosiAstUnit, ast: &VelosiAst) {
             c.push_method(translate_method_enum(e, ast));
             c.push_method(check_permission_nop());
         }
+        VelosiAstUnit::OSSpec(_) => (),
     }
 }
 
