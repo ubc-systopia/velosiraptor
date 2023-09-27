@@ -73,6 +73,16 @@ pub struct VelosiAstUnitOSSpec {
 }
 
 impl VelosiAstUnitOSSpec {
+    pub fn empty() -> Self {
+        VelosiAstUnitOSSpec {
+            ident: VelosiAstIdentifier::from("empty"),
+            params: Vec::new(),
+            consts: IndexMap::new(),
+            methods: IndexMap::new(),
+            extern_types: Vec::new(),
+            loc: VelosiTokenStream::default(),
+        }
+    }
     // converts the parse tree node into an ast node, performing checks
     pub fn from_parse_tree(
         pt: VelosiParseTreeUnitDef,

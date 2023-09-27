@@ -139,7 +139,7 @@ impl VelosiAstUnitSegment {
         let mut outbitwidth = None;
         let mut derived_outbitwidth = None;
 
-        let mut flags: Option<Rc<VelosiAstFlags>> = None;
+        let mut flags: Option<Rc<VelosiAstFlags>>;
         let mut derived_flags: Option<Rc<VelosiAstFlags>> = None;
 
         let mut interface: Option<Rc<VelosiAstInterface>> = None;
@@ -198,10 +198,15 @@ impl VelosiAstUnitSegment {
             state = unit.state();
 
             derived_flags = unit.flags();
-            flags = unit.flags()
         }
 
         // add the elements to the symbol table
+        let sym = st.lookup("flags").unwrap();
+        if let VelosiAstNode::Flags(u) = &sym.ast_node {
+            flags = Some(u.clone());
+        } else {
+            unreachable!();
+        };
 
         consts.values().for_each(|c| {
             st.insert(c.clone().into())
@@ -380,7 +385,6 @@ impl VelosiAstUnitSegment {
                         issues.push(err.into());
                     } else {
                         if let Some(d) = derived_state.take() {
-                            println!("derive state\n");
                             state_def.derive_from(&d);
                             state_def.update_symbol_table(st);
                         }
@@ -405,7 +409,6 @@ impl VelosiAstUnitSegment {
                         issues.push(err.into());
                     } else {
                         if let Some(d) = derived_interface.take() {
-                            println!("derive interface\n");
                             iface_def.derive_from(&d);
                             iface_def.update_symbol_table(st);
                         }
