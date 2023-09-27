@@ -66,7 +66,10 @@ pub use operations::{VelosiOpExpr, VelosiOperation};
 pub use param::VelosiAstParam;
 pub use state::{VelosiAstState, VelosiAstStateField};
 pub use types::{VelosiAstType, VelosiAstTypeInfo};
-pub use unit::{VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment, VelosiAstUnitStaticMap};
+pub use unit::{
+    VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitOSSpec, VelosiAstUnitSegment,
+    VelosiAstUnitStaticMap,
+};
 
 // used standard library functionality
 
@@ -297,6 +300,16 @@ impl VelosiAstRoot {
             .collect()
     }
 
+    pub fn osspec(&self) -> Option<&VelosiAstUnitOSSpec> {
+        self.units
+            .iter()
+            .filter_map(|(_k, v)| match v {
+                VelosiAstUnit::OSSpec(e) => Some(e.as_ref()),
+                _ => None,
+            })
+            .next()
+    }
+
     pub fn get_state_registers(&self) -> Vec<Rc<VelosiAstStateField>> {
         let mut regs = Vec::new();
         for u in self.units.values() {
@@ -374,5 +387,11 @@ impl Debug for VelosiAstRoot {
             f,
             "--------------------------------------------------------"
         )
+    }
+}
+
+impl Default for VelosiAstRoot {
+    fn default() -> Self {
+        Self::new("default".to_string())
     }
 }

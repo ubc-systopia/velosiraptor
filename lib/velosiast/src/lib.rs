@@ -55,8 +55,8 @@ pub use crate::ast::{
     VelosiAstInterfaceField, VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField,
     VelosiAstInterfaceRegisterField, VelosiAstMethod, VelosiAstMethodProperty, VelosiAstRoot,
     VelosiAstStateField, VelosiAstStaticMap, VelosiAstStaticMapElement, VelosiAstStaticMapExplicit,
-    VelosiAstStaticMapListComp, VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment,
-    VelosiAstUnitStaticMap,
+    VelosiAstStaticMapListComp, VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitOSSpec,
+    VelosiAstUnitSegment, VelosiAstUnitStaticMap,
 };
 
 // custom error definitions
@@ -151,6 +151,42 @@ impl VelosiAst {
         Self::from_parse_result(VelosiParser::parse_file(filename, true))
     }
 
+    fn validate_os_spec(
+        ast: AstResult<VelosiAst, VelosiAstIssues>,
+    ) -> AstResult<VelosiAst, VelosiAstIssues> {
+        let (ast, mut issues) = match ast {
+            AstResult::Ok(ast) => (ast, VelosiAstIssues::new()),
+            AstResult::Issues(ast, err) => (ast, err),
+            AstResult::Err(err) => return AstResult::Err(err),
+        };
+
+        match ast
+            .root
+            .units()
+            .filter(|u| matches!(u, VelosiAstUnit::OSSpec(_)))
+            .count()
+        {
+            1 => (), // all ok, we expect one unit here
+            n => {
+                let message = format!("Expected a single OS specification, but found {n}");
+                let err = VelosiAstErrBuilder::err(message).build();
+                issues.push(err.into());
+            }
+        }
+
+        ast_result_return!(ast, issues)
+    }
+
+    pub fn osspec_from_string(content: String) -> AstResult<VelosiAst, VelosiAstIssues> {
+        let ast = Self::from_string(content);
+        Self::validate_os_spec(ast)
+    }
+
+    pub fn osspec_from_file(filename: &str) -> AstResult<VelosiAst, VelosiAstIssues> {
+        let ast = Self::from_file(filename);
+        Self::validate_os_spec(ast)
+    }
+
     pub fn consts(&self) -> Values<String, Rc<VelosiAstConst>> {
         self.root.consts()
     }
@@ -191,6 +227,10 @@ impl VelosiAst {
         self.root.get_unit_mut(ident)
     }
 
+    pub fn osspec(&self) -> Option<&VelosiAstUnitOSSpec> {
+        self.root.osspec()
+    }
+
     pub fn segments(&self) -> Vec<&VelosiAstUnitSegment> {
         self.root.segments()
     }
@@ -216,5 +256,13 @@ impl VelosiAst {
 impl Display for VelosiAst {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         Display::fmt(&self.root, f)
+    }
+}
+
+impl Default for VelosiAst {
+    fn default() -> Self {
+        VelosiAst {
+            root: VelosiAstRoot::default(),
+        }
     }
 }
