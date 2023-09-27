@@ -38,7 +38,7 @@ use std::rc::Rc;
 
 use std::collections::{HashMap, HashSet};
 use velosiast::ast::{VelosiAstStaticMap, VelosiAstUnit};
-use velosiast::VelosiAst;
+use velosiast::{VelosiAst, VelosiAstUnitStaticMap};
 
 // public re-exports
 
@@ -58,11 +58,25 @@ use velosiast::VelosiAst;
 //     Frame(pub Frame),
 // }
 
-//pub struct Relation(pub Rc<String>, pub Rc<String>);
-pub struct Relations(pub HashMap<Rc<String>, Vec<VelosiAstUnit>>);
+pub struct Relations {
+    /// relations between the units. unit id -> unit id
+    relations: HashMap<Rc<String>, Vec<Rc<String>>>,
+    /// the root units
+    roots: HashSet<Rc<String>>,
+    /// all units
+    all_units: HashMap<Rc<String>, VelosiAstUnit>,
+    /// units that form a "root" of a group of
+    group_roots: HashSet<Rc<String>>,
+}
+
 impl Relations {
     pub fn new() -> Self {
-        Self(HashMap::new())
+        Relations {
+            relations: HashMap::new(),
+            all_units: HashMap::new(),
+            roots: HashSet::new(),
+            group_roots: HashSet::new(),
+        }
     }
 
     pub fn from_ast(ast: &VelosiAst) -> Self {
@@ -73,71 +87,220 @@ impl Relations {
             if unit.is_abstract() {
                 continue;
             }
-
-            use VelosiAstUnit::*;
             match unit {
-                Segment(u) => {
+                VelosiAstUnit::Segment(u) => {
                     let mmap = u.get_method("map").unwrap();
                     let next = mmap.get_param("pa").unwrap();
                     if next.ptype.is_typeref() {
-                        let f = next.ptype.typeref().unwrap().clone();
-                        relations.insert(u.ident().clone(), ast.get_unit(&f).unwrap().clone());
-                    } else if !next.ptype.is_addr() {
-                        unreachable!();
-                    }
-                }
-                StaticMap(u) => match &u.map {
-                    VelosiAstStaticMap::ListComp(m) => {
-                        relations.insert(
-                            u.ident().clone(),
-                            ast.get_unit(m.elm.dst.ident()).unwrap().clone(),
+                        let next_unit = next.ptype.typeref().unwrap();
+                        relations.do_insert(
+                            unit.clone(),
+                            vec![ast.get_unit(next_unit).unwrap().clone()],
                         );
-                    }
-                    VelosiAstStaticMap::Explicit(_) => {
-                        unimplemented!("handle explicit maps")
-                    }
-                    _ => {
-                        unreachable!();
-                    }
-                },
-                Enum(u) => {
-                    for next in &u.get_next_unit_idents() {
-                        relations.insert(u.ident().clone(), ast.get_unit(next).unwrap().clone());
+                    } else if next.ptype.is_addr() {
+                        // nothing to be done
+                        relations.do_insert(unit.clone(), Vec::new());
+                    } else {
+                        unreachable!()
                     }
                 }
-                OSSpec(_) => {}
+                VelosiAstUnit::StaticMap(u) => {
+                    let next_units = u
+                        .get_next_unit_idents()
+                        .iter()
+                        .map(|u| ast.get_unit(u).unwrap().clone())
+                        .collect();
+                    relations.do_insert(unit.clone(), next_units);
+                }
+                VelosiAstUnit::Enum(u) => {
+                    let next_units = u
+                        .get_next_unit_idents()
+                        .iter()
+                        .map(|u| ast.get_unit(u).unwrap().clone())
+                        .collect();
+                    relations.do_insert(unit.clone(), next_units);
+                }
+                VelosiAstUnit::OSSpec(_) => (),
             }
         }
 
+        relations.update_roots();
+        relations.update_group_roots();
         relations
     }
 
-    // todo: store all unit names (not just parents) within Relations instead of having the ast as a param here
-    //       unfortunately the current field is referred to as "0" and may require some refactoring in /codegen
-    pub fn get_roots(&self, ast: &VelosiAst) -> Vec<Rc<String>> {
-        let all_units: HashSet<Rc<String>> = ast
-            .units()
-            .filter(|u| !u.is_abstract())
-            .map(|u| u.ident())
-            .cloned()
-            .collect();
-
-        let referenced_units: HashSet<Rc<String>> = self
-            .0
-            .values()
-            .flatten()
-            .map(|unit| unit.ident())
-            .cloned()
-            .collect();
-        all_units.sub(&referenced_units).into_iter().collect()
+    /// obtains the root unit identifiers
+    pub fn get_roots(&self) -> &HashSet<Rc<String>> {
+        &self.roots
     }
 
-    pub fn insert(&mut self, key: Rc<String>, value: VelosiAstUnit) {
-        let entry = self.0.entry(key).or_insert_with(Vec::new);
-        entry.push(value);
+    /// obtains the root units from the ast
+    pub fn get_root_units(&self) -> Vec<VelosiAstUnit> {
+        self.roots
+            .iter()
+            .map(|u| self.all_units.get(u).unwrap().clone())
+            .collect()
     }
 
-    fn do_print_unit_hierarchy(&self, root: &VelosiAstUnit, indent: usize) {
+    /// obtains the identifiers for the group units
+    pub fn get_group_roots(&self) -> &HashSet<Rc<String>> {
+        &self.group_roots
+    }
+
+    /// obtains the units of the group roots
+    pub fn get_group_root_units(&self) -> Vec<VelosiAstUnit> {
+        self.group_roots
+            .iter()
+            .map(|u| self.all_units.get(u).unwrap().clone())
+            .collect()
+    }
+
+    fn do_insert(&mut self, parent: VelosiAstUnit, children: Vec<VelosiAstUnit>) {
+        let key = parent.ident().clone();
+        self.all_units.insert(key.clone(), parent.clone());
+        for child in children.iter() {
+            self.all_units.insert(child.ident().clone(), child.clone());
+        }
+        let entry = self.relations.entry(key).or_insert_with(Vec::new);
+        entry.extend(children.iter().map(|u| u.ident().clone()));
+    }
+
+    /// obtains the next root units from the given starting unit
+    fn update_group_roots(&self) {
+        // here we select the
+        let mut res = HashSet::new();
+
+        let mut units: Vec<Rc<String>> = self.roots.iter().map(|u| u.clone()).collect();
+
+        // add the root units here, this covers enums and segments here
+        for unit in &units {
+            res.insert(unit.clone());
+        }
+
+        while let Some(unit_ident) = units.pop() {
+            let mut unit = self.all_units.get(&unit_ident).unwrap();
+            loop {
+                // the next units
+                let empty = Vec::new();
+                let next_idents = self.relations.get(unit.ident()).unwrap_or(&empty);
+                let next_units: Vec<_> = next_idents
+                    .iter()
+                    .map(|unit| self.all_units.get(unit).unwrap())
+                    .collect();
+                match unit {
+                    VelosiAstUnit::Segment(u) => {
+                        // segments indicate a break in the unit hierarchy where they map to
+                        // another unit, there is just one type here
+                        assert!(next_units
+                            .iter()
+                            .all(|u| u.is_segment() || u.is_enum() || u.is_staticmap()));
+                        assert!(next_units.len() <= 1);
+                        if let Some(next) = next_idents.first() {
+                            res.insert(next.clone());
+                            // recurse
+                            units.push(next.clone());
+                        } else {
+                            // we reached the last one
+                        }
+                        break;
+                    }
+                    VelosiAstUnit::StaticMap(u) => {
+                        // a static map is the "root" of the group, so we need to figure out
+                        // the next units that are reachable from that one, there may be multiple
+                        // segments here
+                        assert!(next_units.iter().all(|u| u.is_segment() || u.is_enum()));
+                        if next_units.len() > 1 {
+                            unimplemented!("handle me!");
+                        }
+                        // we just have one type here, add it and return
+                        unit = next_units.first().unwrap().clone();
+                    }
+                    VelosiAstUnit::Enum(u) => {
+                        // enum must map to a segment, there may be multiple segments here
+                        assert!(next_units.iter().all(|u| u.is_segment()));
+                        for u in next_units {
+                            assert!(u.is_segment());
+                            let variant_idents = self.relations.get(u.ident()).unwrap_or(&empty);
+                            let variant_units: Vec<_> = variant_idents
+                                .iter()
+                                .map(|unit| self.all_units.get(unit).unwrap())
+                                .collect();
+
+                            assert!(variant_units
+                                .iter()
+                                .all(|u| u.is_segment() || u.is_enum() || u.is_staticmap()));
+                            assert!(variant_units.len() <= 1);
+                            if let Some(next) = variant_units.first() {
+                                res.insert(next.ident().clone());
+                                units.push(next.ident().clone());
+                            } else {
+                                // we reached the last one
+                            }
+                        }
+                        break;
+                    }
+                    VelosiAstUnit::OSSpec(_) => unreachable!(),
+                }
+            }
+        }
+
+        for v in res {
+            println!("Unit: {v}");
+        }
+    }
+
+    fn update_roots(&mut self) {
+        let all_units: HashSet<Rc<String>> = self.relations.keys().map(|f| f.clone()).collect();
+        let mut referenced_units = HashSet::new();
+
+        for units in self.relations.values() {
+            for unit in units.iter() {
+                referenced_units.insert(unit.clone());
+            }
+        }
+
+        let roots = all_units.sub(&referenced_units);
+
+        // println!("all_units {all_units:?}");
+        // println!("referenced_units {referenced_units:?}");
+        // println!("roots: {roots:?}");
+
+        self.roots = roots
+            .iter()
+            .map(|f| {
+                println!("{}", f);
+                self.all_units.get(f).unwrap().ident().clone()
+            })
+            .collect();
+    }
+
+    pub fn insert(&mut self, parent: VelosiAstUnit, children: Vec<VelosiAstUnit>) {
+        self.do_insert(parent, children);
+        self.update_roots();
+        self.update_group_roots();
+    }
+
+    pub fn get_children(&self, ident: &Rc<String>) -> &[Rc<String>] {
+        if let Some(rels) = self.relations.get(ident) {
+            rels.as_slice()
+        } else {
+            &[]
+        }
+    }
+
+    pub fn get_children_units(&self, ident: &Rc<String>) -> Vec<VelosiAstUnit> {
+        if let Some(rels) = self.relations.get(ident) {
+            rels.iter()
+                .map(|u| self.all_units.get(u).unwrap().clone())
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    fn do_print_unit_hierarchy(&self, rootid: &Rc<String>, indent: usize) {
+        let root = self.all_units.get(rootid).unwrap();
+
         use VelosiAstUnit::*;
         let prefix = match root {
             Segment(_u) => "~ ",
@@ -194,7 +357,7 @@ impl Relations {
             OSSpec(_) => {}
         }
 
-        if let Some(children) = self.0.get(root.ident()) {
+        if let Some(children) = self.relations.get(root.ident()) {
             for c in children.iter().rev() {
                 //let indent = if !c.is_enum() { indent + 2 } else { indent };
                 self.do_print_unit_hierarchy(c, indent + 2);
@@ -203,7 +366,7 @@ impl Relations {
     }
 
     pub fn print_unit_hierarchy(&self, root: &VelosiAstUnit) {
-        self.do_print_unit_hierarchy(root, 0);
+        self.do_print_unit_hierarchy(root.ident(), 0);
     }
 }
 
@@ -228,7 +391,7 @@ pub fn extract_composition(ast: &VelosiAst) {
                 let next = mmap.get_param("pa").unwrap();
                 if next.ptype.is_typeref() {
                     let f = next.ptype.typeref().unwrap().clone();
-                    relations.insert(u.ident().clone(), ast.get_unit(&f).unwrap().clone());
+                    relations.insert(unit.clone(), vec![ast.get_unit(&f).unwrap().clone()]);
                     referenced_units.insert(f.clone());
                 } else if !next.ptype.is_addr() {
                     unreachable!();
@@ -237,8 +400,8 @@ pub fn extract_composition(ast: &VelosiAst) {
             StaticMap(u) => match &u.map {
                 VelosiAstStaticMap::ListComp(m) => {
                     relations.insert(
-                        u.ident().clone(),
-                        ast.get_unit(m.elm.dst.ident()).unwrap().clone(),
+                        unit.clone(),
+                        vec![ast.get_unit(m.elm.dst.ident()).unwrap().clone()],
                     );
                     referenced_units.insert(m.elm.dst.ident().clone());
                 }
@@ -251,7 +414,7 @@ pub fn extract_composition(ast: &VelosiAst) {
             },
             Enum(u) => {
                 for next in &u.get_next_unit_idents() {
-                    relations.insert(u.ident().clone(), ast.get_unit(next).unwrap().clone());
+                    relations.insert(unit.clone(), vec![ast.get_unit(next).unwrap().clone()]);
                     referenced_units.insert(Rc::new(next.to_string()));
                 }
             }
