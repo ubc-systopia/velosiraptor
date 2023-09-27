@@ -46,6 +46,10 @@ struct Cli {
     /// the input file to operate on
     infile: Option<String>,
 
+    /// the target environment
+    #[arg(short, long)]
+    target: Option<String>,
+
     /// output directory where to emit generated files
     #[arg(short, long)]
     outdir: Option<String>,
@@ -211,6 +215,41 @@ fn main() {
         exit(-1);
     };
 
+    let target = cli
+        .target
+        .as_deref()
+        .map(|t| match VelosiAst::from_file(t) {
+            AstResult::Ok(ast) => ast,
+            AstResult::Issues(ast, err) => {
+                if !cli.werror {
+                    ast
+                } else {
+                    eprintln!(
+                        "{}: could not parse the environment spec `{}`.\n",
+                        "error".bold().red(),
+                        t.bold()
+                    );
+                    eprint!(
+                        "{}{}",
+                        "error".bold().red(),
+                        "compilation failed due to errors (Werror)".bold()
+                    );
+                    println!("{err}");
+                    exit(-1);
+                }
+            }
+            AstResult::Err(err) => {
+                eprintln!(
+                    "{}: could not parse the environment spec `{}`.\n",
+                    "error".bold().red(),
+                    t.bold()
+                );
+                println!("{err}");
+                exit(-1);
+            }
+        })
+        .unwrap_or_default();
+
     // ===========================================================================================
     // Step 1: Parse the input file
     // ===========================================================================================
@@ -374,7 +413,7 @@ fn main() {
         OutputLanguage::Rust => VelosiCodeGen::new_rust(&code_path, cli.name.clone()),
     };
 
-    if let Err(_e) = codegen.generate(&ast) {
+    if let Err(_e) = codegen.generate(&ast, &target) {
         eprintln!(
             "{}{}.\n",
             "error".bold().red(),
