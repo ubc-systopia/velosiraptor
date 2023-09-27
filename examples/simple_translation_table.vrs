@@ -35,7 +35,7 @@ flags {
 }
 
 // represents a page table entry
-segment PageTableEntry(base : addr) {
+segment PageTableEntry(base : paddr) {
 
     // there are there are 4 KiB pages
     inbitwidth = BASE_PAGE_BITS;
@@ -44,7 +44,7 @@ segment PageTableEntry(base : addr) {
     outbitwidth = PHYS_ADDR_BITS;
 
     // the state
-    state(base: addr) {
+    state(base: paddr) {
         mem pte [base, 0, 4] {
             // the following fields at starting bit, ending bit, name
             0 ..  1 present,
@@ -57,7 +57,7 @@ segment PageTableEntry(base : addr) {
         }
     }
 
-    interface(base : addr) {
+    interface(base : paddr) {
         mem pte [base, 0, 4]
     }
 
@@ -103,7 +103,7 @@ segment PageTableEntry(base : addr) {
 
 
 // represents an x86 page table entry
-staticmap PageTable(base : addr) {
+staticmap PageTable(base : paddr) {
     maps [ PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..1024 ]
 }
 

@@ -1,0 +1,13 @@
+const FOO : int = 1234;
+
+flags {
+    read, write
+}
+
+osspec MyOs {
+
+    // fn map_table(va: vaddr, sz: size, flgs: flags, pa: VNode) -> bool
+
+    // fn map_frame(va: vaddr, sz: size, flgs: flags, pa: Frame) -> bool
+}
+
