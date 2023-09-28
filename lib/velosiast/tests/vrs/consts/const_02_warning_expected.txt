@@ -2,13 +2,9 @@ VelosiAst(tests/vrs/consts/const_02_warning.vrs)
 --------------------------------------------------------
 
 const FOO : int = 0x4d2;
-
 const BAR : bool = true;
-
 const foo : int = 0x4d2;
-
 const _FOO : int = 0x11d7;
-
 const _foo : int = 0x1a6d;
 --------------------------------------------------------
 

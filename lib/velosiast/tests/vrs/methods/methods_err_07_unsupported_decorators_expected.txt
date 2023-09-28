@@ -1,34 +1,40 @@
-error: unsupported method property
+error: unsupported method property `foo`
      --> tests/vrs/methods/methods_err_07_unsupported_decorators.vrs:2:3
       |
     2 |  #[foo]
-      |    ^^^ supported method properties are `invariant` and `remap`
+      |    ^^^ remove this property. the supported method properties are `invariant` and `remap`
 error: could not compile due to 1 previous errors; 0 warnings emitted
 
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-error: unsupported method property
+error: unsupported method property `bar`
      --> tests/vrs/methods/methods_err_07_unsupported_decorators.vrs:6:3
       |
     6 |  #[bar]
-      |    ^^^ supported method properties are `invariant` and `remap`
+      |    ^^^ remove this property. the supported method properties are `invariant` and `remap`
 error: could not compile due to 1 previous errors; 0 warnings emitted
 
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-error: unsupported method property
+error: unsupported method property `foo`
      --> tests/vrs/methods/methods_err_07_unsupported_decorators.vrs:12:3
       |
    12 |  #[foo, bar(baz)]
-      |    ^^^ supported method properties are `invariant` and `remap`
-error: unsupported method property
+      |    ^^^ remove this property. the supported method properties are `invariant` and `remap`
+error: unsupported method property `bar`
      --> tests/vrs/methods/methods_err_07_unsupported_decorators.vrs:12:8
       |
    12 |  #[foo, bar(baz)]
-      |         ^^^ supported method properties are `invariant` and `remap`
-error: could not compile due to 2 previous errors; 0 warnings emitted
+      |         ^^^^^^^^ remove this property. the supported method properties are `invariant` and `remap`
+warning: ignoring double defined property
+     --> tests/vrs/methods/methods_err_07_unsupported_decorators.vrs:12:8
+      |
+   12 |  #[foo, bar(baz)]
+      |         ^^^^^^^^ remove the duplicate property
+warning: generated 1 warnings
+error: could not compile due to 2 previous errors; 1 warnings emitted
 
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -42,3 +48,4 @@ error: could not compile due to 1 previous errors; 0 warnings emitted
 
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+

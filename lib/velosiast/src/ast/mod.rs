@@ -61,14 +61,14 @@ pub use map::{
     VelosiAstStaticMap, VelosiAstStaticMapElement, VelosiAstStaticMapExplicit,
     VelosiAstStaticMapListComp,
 };
-pub use method::{VelosiAstChildRepr, VelosiAstMethod, VelosiAstMethodProperty};
+pub use method::{VelosiAstMethod, VelosiAstMethodProperty};
 pub use operations::{VelosiOpExpr, VelosiOperation};
 pub use param::VelosiAstParam;
 pub use state::{VelosiAstState, VelosiAstStateField};
-pub use types::{VelosiAstType, VelosiAstTypeInfo};
+pub use types::{VelosiAstType, VelosiAstTypeInfo, VelosiAstTypeProperty};
 pub use unit::{
-    VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitOSSpec, VelosiAstUnitSegment,
-    VelosiAstUnitStaticMap,
+    VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitOSSpec, VelosiAstUnitProperty,
+    VelosiAstUnitSegment, VelosiAstUnitStaticMap,
 };
 
 // used standard library functionality

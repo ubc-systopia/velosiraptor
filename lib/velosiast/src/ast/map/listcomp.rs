@@ -39,15 +39,12 @@ use velosiparser::VelosiTokenStream;
 
 // used crate functionality
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
-use crate::{
-    ast_result_return, ast_result_unwrap, utils, AstResult, SymbolTable, VelosiAstChildRepr,
-    VelosiAstMethodProperty,
-};
+use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, SymbolTable};
 
 // used definitions of references AST nodes
 use crate::ast::{
     VelosiAstNode, VelosiAstParam, VelosiAstRangeExpr, VelosiAstStaticMap,
-    VelosiAstStaticMapElement, VelosiAstTypeInfo,
+    VelosiAstStaticMapElement, VelosiAstTypeInfo, VelosiAstUnitProperty,
 };
 
 #[derive(Eq, Clone)]
@@ -57,7 +54,7 @@ pub struct VelosiAstStaticMapListComp {
     pub var: Rc<VelosiAstParam>,
     pub range: VelosiAstRangeExpr,
     pub loc: VelosiTokenStream,
-    pub properties: HashSet<VelosiAstMethodProperty>,
+    pub properties: HashSet<VelosiAstUnitProperty>,
 }
 
 impl VelosiAstStaticMapListComp {
@@ -67,7 +64,7 @@ impl VelosiAstStaticMapListComp {
         var: Rc<VelosiAstParam>,
         range: VelosiAstRangeExpr,
         loc: VelosiTokenStream,
-        properties: HashSet<VelosiAstMethodProperty>,
+        properties: HashSet<VelosiAstUnitProperty>,
     ) -> Self {
         VelosiAstStaticMapListComp {
             inputsize,
@@ -87,10 +84,10 @@ impl VelosiAstStaticMapListComp {
         let mut issues = VelosiAstIssues::new();
 
         // convert the properties
-        let mut properties: HashSet<VelosiAstMethodProperty> = HashSet::new();
+        let mut properties: HashSet<VelosiAstUnitProperty> = HashSet::new();
         for p in pt.properties.into_iter() {
-            let loc = p.0.loc.clone();
-            let prop = ast_result_unwrap!(VelosiAstMethodProperty::from_parse_tree(p, st), issues);
+            let loc = p.loc.clone();
+            let prop = ast_result_unwrap!(VelosiAstUnitProperty::from_parse_tree(p, st), issues);
 
             if properties.contains(&prop) {
                 let msg = "ignoring double defined property";
@@ -187,8 +184,7 @@ impl VelosiAstStaticMapListComp {
     }
 
     pub fn is_repr_list(&self) -> bool {
-        self.properties
-            .contains(&VelosiAstMethodProperty::Repr(VelosiAstChildRepr::List))
+        self.properties.contains(&VelosiAstUnitProperty::ListRepr)
     }
 }
 

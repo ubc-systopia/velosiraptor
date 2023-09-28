@@ -177,7 +177,7 @@ impl VelosiAstUnitOSSpec {
                 }
                 VelosiParseTreeUnitNode::Method(method) => {
                     let m = Rc::new(ast_result_unwrap!(
-                        VelosiAstMethod::from_parse_tree(method, st),
+                        VelosiAstMethod::from_parse_tree(method, st, true),
                         issues
                     ));
 
@@ -234,6 +234,54 @@ impl VelosiAstUnitOSSpec {
             }
         }
 
+        if methods.contains_key("protect") {
+            let msg = "Incomplete OS specification (missing function)";
+            if !methods.contains_key("unmap") {
+                let hint = "add the unmap() function specification, or remove all map/unmap/protect functions";
+                let e = VelosiAstErrBuilder::err(msg.to_string())
+                    .add_hint(hint.to_string())
+                    .add_location(pt.loc.clone())
+                    .build();
+                issues.push(e);
+            }
+
+            if !(methods.contains_key("map")
+                || methods
+                    .values()
+                    .fold(false, |acc, m| acc | m.ident().starts_with("map_")))
+            {
+                let hint = "add the map() function specification, or remove all map/unmap/protect functions";
+                let e = VelosiAstErrBuilder::err(msg.to_string())
+                    .add_hint(hint.to_string())
+                    .add_location(pt.loc.clone())
+                    .build();
+                issues.push(e);
+            }
+        } else {
+            let msg = "Incomplete OS specification (missing function)";
+            if methods.contains_key("unmap") {
+                let hint = "remove the unmap() function specification, or add all map/unmap/protect functions";
+                let e = VelosiAstErrBuilder::err(msg.to_string())
+                    .add_hint(hint.to_string())
+                    .add_location(pt.loc.clone())
+                    .build();
+                issues.push(e);
+            }
+
+            if methods.contains_key("map")
+                || methods
+                    .values()
+                    .fold(false, |acc, m| acc | m.ident().starts_with("map_"))
+            {
+                let hint = "remove the map() function specification, or add all map/unmap/protect functions";
+                let e = VelosiAstErrBuilder::err(msg.to_string())
+                    .add_hint(hint.to_string())
+                    .add_location(pt.loc.clone())
+                    .build();
+                issues.push(e);
+            }
+        }
+
         let ident = VelosiAstIdentifier::from(pt.name);
         utils::check_camel_case(&mut issues, &ident);
 
@@ -258,6 +306,17 @@ impl VelosiAstUnitOSSpec {
 
     pub fn ident(&self) -> &Rc<String> {
         self.ident.ident()
+    }
+
+    /// checks whether the OSSpec contains definitions of those functions
+    pub fn has_map_protect_unmap(&self) -> bool {
+        self.methods.contains_key("protect")
+            || self.methods.contains_key("unmap")
+            || self.methods.contains_key("map")
+            || self
+                .methods
+                .values()
+                .fold(false, |acc, m| acc | m.ident().starts_with("map_"))
     }
 
     pub fn path_to_string(&self) -> String {

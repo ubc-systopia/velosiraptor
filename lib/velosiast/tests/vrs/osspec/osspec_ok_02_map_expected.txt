@@ -31,6 +31,19 @@ osspec MyOs () {
     vnode_map(get_vnode_for_va(va), pa.cap, va, flgs, 0x0, sz, pa.mapping)
   }
 
+  fn protect(va: vaddr, sz: size, flgs: flags) -> bool
+    requires true;
+  {
+    true
+  }
+
+  fn unmap(va: vaddr, sz: size) -> bool
+    requires true;
+  {
+    true
+  }
+
 }
+
 
 --------------------------------------------------------

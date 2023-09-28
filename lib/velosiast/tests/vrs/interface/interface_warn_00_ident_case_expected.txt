@@ -1,25 +1,25 @@
 interface(base: addr) {
-    reg interface.Foo [8] {
-      Layout {
-        0..64 interface.Foo.val,
-      },
+  reg interface.Foo [8] {
+    Layout {
+      0..64 interface.Foo.val,
     },
-    mem interface.BAR [base, 0, 8] {
-      Layout {
-        0..64 interface.BAR.val,
-      },
+  },
+  mem interface.BAR [base, 0, 8] {
+    Layout {
+      0..64 interface.BAR.val,
     },
-    mmio interface.FooBar [base, 8, 8] {
-      Layout {
-        0..64 interface.FooBar.val,
-      },
+  },
+  mmio interface.FooBar [base, 8, 8] {
+    Layout {
+      0..64 interface.FooBar.val,
     },
-    reg interface.foo_bar [8] {
-      Layout {
-        0..64 interface.foo_bar.val,
-      },
+  },
+  reg interface.foo_bar [8] {
+    Layout {
+      0..64 interface.foo_bar.val,
     },
-  }
+  },
+}
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 warning: identifier `Foo` should have a snake case name
      --> tests/vrs/interface/interface_warn_00_ident_case.vrs:2:7

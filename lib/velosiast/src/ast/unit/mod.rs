@@ -45,11 +45,11 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
 // used parse tree definitions
-use velosiparser::parsetree::VelosiParseTreeUnit;
+use velosiparser::parsetree::{VelosiParseTreeProperty, VelosiParseTreeUnit};
 use velosiparser::VelosiTokenStream;
 
 // used crate functionality
-use crate::error::VelosiAstIssues;
+use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
 use crate::{AstResult, Symbol, SymbolTable};
 
 // used definitions of references AST nodes
@@ -366,6 +366,73 @@ impl Display for VelosiAstUnit {
 
 /// Implementation of [Debug] for [VelosiAstUnit]
 impl Debug for VelosiAstUnit {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Hash)]
+pub enum VelosiAstUnitProperty {
+    ArrayRepr,
+    ListRepr,
+    None,
+}
+
+impl VelosiAstUnitProperty {
+    pub fn from_parse_tree(
+        pt: VelosiParseTreeProperty,
+        _st: &mut SymbolTable,
+    ) -> AstResult<Self, VelosiAstIssues> {
+        match pt.ident.name.as_str() {
+            "repr" => match pt.params.as_slice() {
+                [arg] => match arg.name.as_str() {
+                    "array" => AstResult::Ok(Self::ArrayRepr),
+                    "list" => AstResult::Ok(Self::ListRepr),
+                    _ => {
+                        let msg = "invalid argument";
+                        let hint = "repr property expects either `array` or `list`";
+                        let err = VelosiAstErrBuilder::err(msg.to_string())
+                            .add_hint(hint.to_string())
+                            .add_location(pt.loc)
+                            .build();
+                        AstResult::Err(VelosiAstIssues::from(err))
+                    }
+                },
+                _ => {
+                    let msg = "repr requires one argument. ";
+                    let hint = "repr property expects either `array` or `list`";
+                    let err = VelosiAstErrBuilder::err(msg.to_string())
+                        .add_hint(hint.to_string())
+                        .add_location(pt.loc)
+                        .build();
+                    AstResult::Err(VelosiAstIssues::from(err))
+                }
+            },
+            p => {
+                let msg = format!("unsupported unit property {p}");
+                let hint = "supported method properties are `repr(list|array)`";
+                let err = VelosiAstErrBuilder::err(msg)
+                    .add_hint(hint.to_string())
+                    .add_location(pt.loc)
+                    .build();
+                AstResult::Issues(Self::None, VelosiAstIssues::from(err))
+            }
+        }
+    }
+}
+
+impl Display for VelosiAstUnitProperty {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            Self::ArrayRepr => write!(f, "repr(array)"),
+            Self::ListRepr => write!(f, "repr(list)"),
+            Self::None => Ok(()),
+        }
+    }
+}
+
+/// Implementation of [Debug] for [VelosiAstUnitProperty]
+impl Debug for VelosiAstUnitProperty {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
         Display::fmt(&self, format)
     }

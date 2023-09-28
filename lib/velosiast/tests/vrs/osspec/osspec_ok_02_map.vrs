@@ -33,5 +33,13 @@ osspec MyOs {
     fn map_frame(va: vaddr, sz: size, flgs: flags, pa: Frame) -> bool {
         vnode_map(get_vnode_for_va(va), pa.cap, va, flgs, 0, sz, pa.mapping)
     }
+
+    fn protect(va: vaddr, sz: size, flgs: flags) -> bool {
+        true
+    }
+
+    fn unmap(va:vaddr, sz: size) -> bool {
+        true
+    }
 }
 

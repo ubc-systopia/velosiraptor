@@ -1,19 +1,19 @@
 interface(base: addr) {
-    reg interface.foo [8] {
-      Layout {
-        0..64 interface.foo.val,
-      },
+  reg interface.foo [8] {
+    Layout {
+      0..64 interface.foo.val,
     },
-    mem interface.bar [base, 0, 8] {
-      Layout {
-        0..64 interface.bar.val,
-      },
+  },
+  mem interface.bar [base, 0, 8] {
+    Layout {
+      0..64 interface.bar.val,
     },
-    mmio interface.baz [base, 8, 8] {
-      Layout {
-        0..64 interface.baz.val,
-      },
+  },
+  mmio interface.baz [base, 8, 8] {
+    Layout {
+      0..64 interface.baz.val,
     },
-  }
+  },
+}
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@

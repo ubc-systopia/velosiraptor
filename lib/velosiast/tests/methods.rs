@@ -56,7 +56,7 @@ fn parse_methods_from_file_ok(vrs: &Path, exp: &Path) {
                 let mut st = SymbolTable::new();
                 utils::check_result_expect_ok(
                     &mut output,
-                    &VelosiAstMethod::from_parse_tree(method, &mut st),
+                    &VelosiAstMethod::from_parse_tree(method, &mut st, false),
                 );
             }
             e => {
@@ -90,7 +90,7 @@ fn parse_methods_from_file_err(vrs: &Path, exp: &Path) {
                 let mut st = SymbolTable::new();
                 utils::check_result_expect_errors(
                     &mut output,
-                    &VelosiAstMethod::from_parse_tree(method, &mut st),
+                    &VelosiAstMethod::from_parse_tree(method, &mut st, false),
                 );
             }
             e => {
@@ -124,7 +124,7 @@ fn parse_methods_from_file_issues(vrs: &Path, exp: &Path) {
                 let mut st = SymbolTable::new();
                 utils::check_result_expect_warnings(
                     &mut output,
-                    &VelosiAstMethod::from_parse_tree(method, &mut st),
+                    &VelosiAstMethod::from_parse_tree(method, &mut st, false),
                 );
             }
             e => {

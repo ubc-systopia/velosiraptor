@@ -2,8 +2,6 @@ VelosiAst(tests/vrs/consts/const_00_defs.vrs)
 --------------------------------------------------------
 
 const FOO1 : int = 0x7b;
-
 const FOO2 : int = 0x1234;
-
 const FOO3 : size = 0x12af;
 --------------------------------------------------------
