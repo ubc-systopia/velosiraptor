@@ -38,7 +38,7 @@ use std::rc::Rc;
 
 use std::collections::{HashMap, HashSet};
 use velosiast::ast::{VelosiAstStaticMap, VelosiAstUnit};
-use velosiast::{VelosiAst, VelosiAstUnitStaticMap};
+use velosiast::VelosiAst;
 
 // public re-exports
 
@@ -166,11 +166,14 @@ impl Relations {
     }
 
     /// obtains the next root units from the given starting unit
+    ///
+    /// TODO: maybe here we should do a bit more "analysis" on the current
+    ///       parameter types for the units (e.g., that the state of the underlying
+    ///       units are actually the same.)
     fn update_group_roots(&self) {
-        // here we select the
         let mut res = HashSet::new();
 
-        let mut units: Vec<Rc<String>> = self.roots.iter().map(|u| u.clone()).collect();
+        let mut units: Vec<Rc<String>> = self.roots.iter().cloned().collect();
 
         // add the root units here, this covers enums and segments here
         for unit in &units {
@@ -188,7 +191,7 @@ impl Relations {
                     .map(|unit| self.all_units.get(unit).unwrap())
                     .collect();
                 match unit {
-                    VelosiAstUnit::Segment(u) => {
+                    VelosiAstUnit::Segment(_u) => {
                         // segments indicate a break in the unit hierarchy where they map to
                         // another unit, there is just one type here
                         assert!(next_units
@@ -204,7 +207,7 @@ impl Relations {
                         }
                         break;
                     }
-                    VelosiAstUnit::StaticMap(u) => {
+                    VelosiAstUnit::StaticMap(_u) => {
                         // a static map is the "root" of the group, so we need to figure out
                         // the next units that are reachable from that one, there may be multiple
                         // segments here
@@ -213,9 +216,9 @@ impl Relations {
                             unimplemented!("handle me!");
                         }
                         // we just have one type here, add it and return
-                        unit = next_units.first().unwrap().clone();
+                        unit = next_units.first().unwrap();
                     }
-                    VelosiAstUnit::Enum(u) => {
+                    VelosiAstUnit::Enum(_u) => {
                         // enum must map to a segment, there may be multiple segments here
                         assert!(next_units.iter().all(|u| u.is_segment()));
                         for u in next_units {
@@ -250,7 +253,7 @@ impl Relations {
     }
 
     fn update_roots(&mut self) {
-        let all_units: HashSet<Rc<String>> = self.relations.keys().map(|f| f.clone()).collect();
+        let all_units: HashSet<Rc<String>> = self.relations.keys().cloned().collect();
         let mut referenced_units = HashSet::new();
 
         for units in self.relations.values() {
