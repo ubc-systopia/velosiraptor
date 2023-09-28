@@ -51,12 +51,12 @@ pub use symboltable::{Symbol, SymbolTable};
 use velosiparser::parsetree::VelosiParseTree;
 
 pub use crate::ast::{
-    VelosiAstChildRepr, VelosiAstConst, VelosiAstField, VelosiAstFieldSlice, VelosiAstInterface,
+    VelosiAstConst, VelosiAstField, VelosiAstFieldSlice, VelosiAstInterface,
     VelosiAstInterfaceField, VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField,
     VelosiAstInterfaceRegisterField, VelosiAstMethod, VelosiAstMethodProperty, VelosiAstRoot,
     VelosiAstStateField, VelosiAstStaticMap, VelosiAstStaticMapElement, VelosiAstStaticMapExplicit,
-    VelosiAstStaticMapListComp, VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitOSSpec,
-    VelosiAstUnitSegment, VelosiAstUnitStaticMap,
+    VelosiAstStaticMapListComp, VelosiAstTypeProperty, VelosiAstUnit, VelosiAstUnitEnum,
+    VelosiAstUnitOSSpec, VelosiAstUnitProperty, VelosiAstUnitSegment, VelosiAstUnitStaticMap,
 };
 
 // custom error definitions
@@ -92,7 +92,7 @@ macro_rules! ast_result_return (($res: expr, $issues: expr) => (
 
 /// represents the lexer state
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug, Default)]
 pub struct VelosiAst {
     root: VelosiAstRoot,
 }
@@ -170,7 +170,7 @@ impl VelosiAst {
             n => {
                 let message = format!("Expected a single OS specification, but found {n}");
                 let err = VelosiAstErrBuilder::err(message).build();
-                issues.push(err.into());
+                issues.push(err);
             }
         }
 
@@ -256,13 +256,5 @@ impl VelosiAst {
 impl Display for VelosiAst {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         Display::fmt(&self.root, f)
-    }
-}
-
-impl Default for VelosiAst {
-    fn default() -> Self {
-        VelosiAst {
-            root: VelosiAstRoot::default(),
-        }
     }
 }

@@ -2,14 +2,9 @@ VelosiAst(tests/vrs/consts/const_01_imported.vrs)
 --------------------------------------------------------
 
 const FOO1 : int = 0x7b;
-
 const FOO2 : int = 0x1234;
-
 const FOO3 : size = 0x12af;
-
 const BAR1 : int = 0x4d2;
-
 const BAR2 : int = 0xabcd;
-
 const BAR3 : int = 0x12af;
 --------------------------------------------------------

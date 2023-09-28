@@ -284,7 +284,7 @@ impl Display for VelosiAstInterfaceRegisterField {
 
         if !self.layout.is_empty() || !self.readactions.is_empty() || !self.writeactions.is_empty()
         {
-            write!(f, "    }}")
+            write!(f, "}}")
         } else {
             Ok(())
         }

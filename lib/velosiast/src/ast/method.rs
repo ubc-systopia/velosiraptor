@@ -31,7 +31,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
-use velosiparser::parsetree::{VelosiParseTreeMethod, VelosiParseTreeMethodProperty};
+use velosiparser::parsetree::{VelosiParseTreeMethod, VelosiParseTreeProperty};
 use velosiparser::VelosiTokenStream;
 
 use crate::ast::{
@@ -50,108 +50,6 @@ pub const FN_SIG_UNMAP: &str = "fn unmap(va: vaddr, sz: size)";
 pub const FN_SIG_PROTECT: &str = "fn protect(va: vaddr, sz: size, flgs: flags)";
 
 // const FN_SIG_INIT: &str = "fn init()";
-
-#[derive(PartialEq, Eq, Clone, Hash)]
-pub enum VelosiAstMethodProperty {
-    Invariant,
-    Remap,
-    Unknown(String),
-    Repr(VelosiAstChildRepr),
-}
-
-#[derive(PartialEq, Eq, Clone, Copy, Hash)]
-pub enum VelosiAstChildRepr {
-    Array,
-    List,
-}
-
-impl VelosiAstMethodProperty {
-    pub fn from_parse_tree(
-        pt: VelosiParseTreeMethodProperty,
-        _st: &mut SymbolTable,
-    ) -> AstResult<Self, VelosiAstIssues> {
-        match pt.0.name.as_str() {
-            "invariant" => {
-                if let Some(arg) = pt.1 {
-                    let msg = "method property `invariant` doesn't support arguments";
-                    let hint = "remove these arguments";
-                    let err = VelosiAstErrBuilder::err(msg.to_string())
-                        .add_hint(hint.to_string())
-                        .add_location(arg.loc)
-                        .build();
-                    AstResult::Issues(Self::Invariant, VelosiAstIssues::from(err))
-                } else {
-                    AstResult::Ok(Self::Invariant)
-                }
-            }
-            "remap" => {
-                if let Some(arg) = pt.1 {
-                    let msg = "method property `remap` doesn't support arguments";
-                    let hint = "remove these arguments";
-                    let err = VelosiAstErrBuilder::err(msg.to_string())
-                        .add_hint(hint.to_string())
-                        .add_location(arg.loc)
-                        .build();
-                    AstResult::Issues(Self::Invariant, VelosiAstIssues::from(err))
-                } else {
-                    AstResult::Ok(Self::Remap)
-                }
-            }
-            "repr" => match pt.1 {
-                Some(arg) => match arg.name.as_str() {
-                    "array" => AstResult::Ok(Self::Repr(VelosiAstChildRepr::Array)),
-                    "list" => AstResult::Ok(Self::Repr(VelosiAstChildRepr::List)),
-                    _ => {
-                        let msg = "invalid argument";
-                        let hint = "repr property expects either `array` or `list`";
-                        let err = VelosiAstErrBuilder::err(msg.to_string())
-                            .add_hint(hint.to_string())
-                            .add_location(pt.0.loc)
-                            .build();
-                        AstResult::Err(VelosiAstIssues::from(err))
-                    }
-                },
-                None => {
-                    let msg = "missing argument";
-                    let hint = "repr property expects either `array` or `list`";
-                    let err = VelosiAstErrBuilder::err(msg.to_string())
-                        .add_hint(hint.to_string())
-                        .add_location(pt.0.loc)
-                        .build();
-                    AstResult::Err(VelosiAstIssues::from(err))
-                }
-            },
-            _ => {
-                let msg = "unsupported method property";
-                let hint = "supported method properties are `invariant` and `remap`";
-                let err = VelosiAstErrBuilder::err(msg.to_string())
-                    .add_hint(hint.to_string())
-                    .add_location(pt.0.loc)
-                    .build();
-                AstResult::Issues(Self::Unknown(pt.0.name), VelosiAstIssues::from(err))
-            }
-        }
-    }
-}
-
-impl Display for VelosiAstMethodProperty {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        match self {
-            Self::Invariant => write!(f, "invariant"),
-            Self::Remap => write!(f, "remap"),
-            Self::Unknown(_) => write!(f, "none"),
-            Self::Repr(VelosiAstChildRepr::Array) => write!(f, "repr(array)"),
-            Self::Repr(VelosiAstChildRepr::List) => write!(f, "repr(list)"),
-        }
-    }
-}
-
-/// Implementation of [Debug] for [VelosiAstMethodProperty]
-impl Debug for VelosiAstMethodProperty {
-    fn fmt(&self, format: &mut Formatter) -> FmtResult {
-        Display::fmt(&self, format)
-    }
-}
 
 #[derive(Eq, Clone)]
 pub struct VelosiAstMethod {
@@ -431,6 +329,7 @@ impl VelosiAstMethod {
     pub fn from_parse_tree(
         pt: VelosiParseTreeMethod,
         st: &mut SymbolTable,
+        _osspec: bool,
     ) -> AstResult<Self, VelosiAstIssues> {
         let mut issues = VelosiAstIssues::new();
 
@@ -444,7 +343,7 @@ impl VelosiAstMethod {
         // convert the properties
         let mut properties: HashSet<VelosiAstMethodProperty> = HashSet::new();
         for p in pt.properties.into_iter() {
-            let loc = p.0.loc.clone();
+            let loc = p.loc.clone();
             let prop = ast_result_unwrap!(VelosiAstMethodProperty::from_parse_tree(p, st), issues);
 
             if properties.contains(&prop) {
@@ -975,7 +874,9 @@ impl VelosiAstMethod {
             }
             "map" => {
                 // fn map(va: vaddr, sz: size, flgs: flags, pa: paddr)
-                self.check_rettype(issues, FN_SIG_MAP, VelosiAstTypeInfo::Void);
+                if self.is_synth {
+                    self.check_rettype(issues, FN_SIG_MAP, VelosiAstTypeInfo::Void);
+                }
                 self.check_arguments_exact(
                     issues,
                     FN_SIG_MAP,
@@ -989,7 +890,9 @@ impl VelosiAstMethod {
             }
             "unmap" => {
                 // fn unmap(va: vaddr, sz: size)
-                self.check_rettype(issues, FN_SIG_UNMAP, VelosiAstTypeInfo::Void);
+                if self.is_synth {
+                    self.check_rettype(issues, FN_SIG_UNMAP, VelosiAstTypeInfo::Void);
+                }
                 self.check_arguments_exact(
                     issues,
                     FN_SIG_UNMAP,
@@ -1001,7 +904,9 @@ impl VelosiAstMethod {
             }
             "protect" => {
                 // fn protect(va: vaddr, sz: size, flgs: flags)
-                self.check_rettype(issues, FN_SIG_PROTECT, VelosiAstTypeInfo::Void);
+                if self.is_synth {
+                    self.check_rettype(issues, FN_SIG_PROTECT, VelosiAstTypeInfo::Void);
+                }
                 self.check_arguments_exact(
                     issues,
                     FN_SIG_PROTECT,
@@ -1180,6 +1085,75 @@ impl Display for VelosiAstMethod {
 
 /// Implementation of [Debug] for [VelosiAstMethod]
 impl Debug for VelosiAstMethod {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Hash)]
+pub enum VelosiAstMethodProperty {
+    Invariant,
+    Remap,
+    None,
+}
+
+impl VelosiAstMethodProperty {
+    pub fn from_parse_tree(
+        pt: VelosiParseTreeProperty,
+        _st: &mut SymbolTable,
+    ) -> AstResult<Self, VelosiAstIssues> {
+        match pt.ident.name.as_str() {
+            "invariant" => {
+                if !pt.params.is_empty() {
+                    let msg = "method property `invariant` doesn't support arguments";
+                    let hint = "remove these arguments";
+                    let err = VelosiAstErrBuilder::err(msg.to_string())
+                        .add_hint(hint.to_string())
+                        .add_location(pt.params.first().unwrap().loc.clone())
+                        .build();
+                    AstResult::Issues(Self::Invariant, VelosiAstIssues::from(err))
+                } else {
+                    AstResult::Ok(Self::Invariant)
+                }
+            }
+            "remap" => {
+                if !pt.params.is_empty() {
+                    let msg = "method property `remap` doesn't support arguments";
+                    let hint = "remove these arguments";
+                    let err = VelosiAstErrBuilder::err(msg.to_string())
+                        .add_hint(hint.to_string())
+                        .add_location(pt.params.first().unwrap().loc.clone())
+                        .build();
+                    AstResult::Issues(Self::Invariant, VelosiAstIssues::from(err))
+                } else {
+                    AstResult::Ok(Self::Remap)
+                }
+            }
+            p => {
+                let msg = format!("unsupported method property `{p}`");
+                let hint = "remove this property. the supported method properties are `invariant` and `remap`";
+                let err = VelosiAstErrBuilder::err(msg)
+                    .add_hint(hint.to_string())
+                    .add_location(pt.loc)
+                    .build();
+                AstResult::Issues(Self::None, VelosiAstIssues::from(err))
+            }
+        }
+    }
+}
+
+impl Display for VelosiAstMethodProperty {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            Self::Invariant => write!(f, "invariant"),
+            Self::Remap => write!(f, "remap"),
+            Self::None => Ok(()),
+        }
+    }
+}
+
+/// Implementation of [Debug] for [VelosiAstMethodProperty]
+impl Debug for VelosiAstMethodProperty {
     fn fmt(&self, format: &mut Formatter) -> FmtResult {
         Display::fmt(&self, format)
     }

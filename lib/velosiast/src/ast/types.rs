@@ -28,18 +28,19 @@
 //! This module defines type information nodes of the VelosiAst
 
 // used standard library functionality
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 // used parse tree definitions
 use velosiparser::parsetree::{
-    VelosiParseTreeExternType, VelosiParseTreeType, VelosiParseTreeTypeInfo,
+    VelosiParseTreeExternType, VelosiParseTreeProperty, VelosiParseTreeType,
+    VelosiParseTreeTypeInfo,
 };
 
 // used crate functionality
-use crate::error::{VelosiAstErrDoubleDef, VelosiAstIssues};
+use crate::error::{VelosiAstErrBuilder, VelosiAstErrDoubleDef, VelosiAstIssues};
 use crate::{
     ast_result_return, ast_result_unwrap, utils, AstResult, Symbol, SymbolTable, VelosiTokenStream,
 };
@@ -430,6 +431,8 @@ pub struct VelosiAstExternType {
     pub ident: VelosiAstIdentifier,
     /// the type information
     pub fields: Vec<Rc<VelosiAstParam>>,
+    /// the properties of the type
+    pub properties: HashSet<Rc<VelosiAstTypeProperty>>,
     /// the location of the type clause
     pub loc: VelosiTokenStream,
 }
@@ -467,11 +470,18 @@ impl VelosiAstExternType {
                 field_map.insert(field.ident().clone(), field.as_ref());
             }
         }
-
+        let mut properties = HashSet::new();
+        for property in pt.properties {
+            properties.insert(Rc::new(ast_result_unwrap!(
+                VelosiAstTypeProperty::from_parse_tree(property, st),
+                issues
+            )));
+        }
         ast_result_return!(
             VelosiAstExternType {
                 ident,
                 fields,
+                properties,
                 loc: pt.loc
             },
             issues
@@ -553,5 +563,78 @@ impl PartialEq for VelosiAstExternType {
 impl Hash for VelosiAstExternType {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.ident.hash(state);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Type Properties
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(PartialEq, Eq, Clone, Copy, Hash)]
+pub enum VelosiAstTypeProperty {
+    Frame,
+    Descriptor,
+    None,
+}
+
+impl VelosiAstTypeProperty {
+    pub fn from_parse_tree(
+        pt: VelosiParseTreeProperty,
+        _st: &mut SymbolTable,
+    ) -> AstResult<Self, VelosiAstIssues> {
+        match pt.ident.name.as_str() {
+            "frame" => {
+                if !pt.params.is_empty() {
+                    let msg = "type property `frame` doesn't support arguments";
+                    let hint = "remove these arguments";
+                    let err = VelosiAstErrBuilder::err(msg.to_string())
+                        .add_hint(hint.to_string())
+                        .add_location(pt.params.first().unwrap().loc.clone())
+                        .build();
+                    AstResult::Issues(Self::Frame, VelosiAstIssues::from(err))
+                } else {
+                    AstResult::Ok(Self::Frame)
+                }
+            }
+            "desc" => {
+                if !pt.params.is_empty() {
+                    let msg = "type property `frame` doesn't support arguments";
+                    let hint = "remove these arguments";
+                    let err = VelosiAstErrBuilder::err(msg.to_string())
+                        .add_hint(hint.to_string())
+                        .add_location(pt.params.first().unwrap().loc.clone())
+                        .build();
+                    AstResult::Issues(Self::Descriptor, VelosiAstIssues::from(err))
+                } else {
+                    AstResult::Ok(Self::Descriptor)
+                }
+            }
+            p => {
+                let msg = format!("unsupported typeproperty {p}");
+                let hint = "supported method properties are `invariant` and `remap`";
+                let err = VelosiAstErrBuilder::err(msg)
+                    .add_hint(hint.to_string())
+                    .add_location(pt.loc)
+                    .build();
+                AstResult::Issues(Self::None, VelosiAstIssues::from(err))
+            }
+        }
+    }
+}
+
+impl Display for VelosiAstTypeProperty {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            Self::Frame => write!(f, "frame"),
+            Self::Descriptor => write!(f, "desc"),
+            Self::None => Ok(()),
+        }
+    }
+}
+
+/// Implementation of [Debug] for [VelosiAstTypeProperty]
+impl Debug for VelosiAstTypeProperty {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
     }
 }

@@ -420,7 +420,7 @@ impl VelosiAstUnitSegment {
                 }
                 VelosiParseTreeUnitNode::Method(method) => {
                     let m = Rc::new(ast_result_unwrap!(
-                        VelosiAstMethod::from_parse_tree(method, st),
+                        VelosiAstMethod::from_parse_tree(method, st, false),
                         issues
                     ));
 
