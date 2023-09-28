@@ -330,7 +330,7 @@ fn add_check_permissions_method_segment(c: &mut C::Class, _segment: &VelosiAstUn
     let body = m.body();
 
     // for m in segment.methods() {
-    //     if m.properties.contains(&VelosiAstMethodProperty::Remap) {
+    //     if m.properties.contains(&VelosiAstProperty::Remap) {
     //         // body.new_comment(&format!("TODO: handle {} pre condition\n", m.ident()));
 
     //         body.new_ifelse(&C::Expr::lnot(C::Expr::method_call(
@@ -487,16 +487,17 @@ fn add_translate_method_segment(
                         .return_expr(C::Expr::btrue());
                 }
             }
+        } else {
+            // return the expression
+            // no next translation unit, simply set the return value with the expression
+            body.new_comment("return the result of the translation");
+            // calculate the value
+            body.assign(base_var.clone(), expr_to_cpp(tbody, &params));
+            // assign it to the deref return value
+            body.assign(C::Expr::deref(&dst_addr), base_var);
+            // return true
+            body.return_expr(C::Expr::btrue());
         }
-
-        // // no next translation unit, simply set the return value with the expression
-        // body.new_comment("return the result of the translation");
-        // // calculate the value
-        // body.assign(base_var.clone(), expr_to_cpp(tbody, &params));
-        // // assign it to the deref return value
-        // body.assign(C::Expr::deref(&dst_addr), base_var);
-        // // return true
-        // body.return_expr(C::Expr::btrue());
     } else {
         body.assign(base_var.clone(), C::Expr::Raw(String::from("PANIC!")));
     }

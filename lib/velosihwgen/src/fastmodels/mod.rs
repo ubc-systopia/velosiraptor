@@ -42,6 +42,7 @@ use crate::VelosiHwGenBackend;
 use crate::VelosiHwGenError;
 use crate::COPYRIGHT;
 use velosiast::VelosiAst;
+use velosicomposition::Relations;
 
 // the generators
 mod unit;
@@ -159,7 +160,8 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
     }
 
     fn generate(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
-        let top_files = velosicomposition::Relations::from_ast(ast).get_roots(ast);
+        let relations = Relations::from_ast(ast);
+        let top_files = Vec::from_iter(relations.get_roots().into_iter());
         if top_files.len() != 1 {
             panic!("!= 1 root unit found");
         }
