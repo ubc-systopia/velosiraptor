@@ -23,15 +23,15 @@ Run ~cargo fmt~ before committing.
 
 To build the library
 
-#+BEGIN_SRC
+#+begin_src
 $ cargo build
-#+END_SRC
+#+end_src
 
 To run an example
 
-#+BEGIN_SRC
+#+begin_src
 $ cargo run ../../examples/x86_64_pagetable.vrs
-#+END_SRC
+#+end_src
 
 
 ** ARM FastModels
@@ -52,10 +52,13 @@ FastModels lets you wire an ARM processor to interact with your MMU; this wiring
 
 3. Run ~make~ to compile the generated unit.
 
-4. Finally, ~make run~ will boot [[./src/fastmodels/support/bootimg.bin]] on the ARM chip. This file
-   is the output of [[https://github.com/achreto/arm-fastmodels-boot]] and interacts with the
-   MMU. Any functionality you'd like to test should be compiled into this boot image and run on the
-   ARM chip.
+4. A boot image is required to run the unit (see arm-fastmodels-boot). Then ~make run~
+
+More of a note to self than anything, the following command will run everything assuming the docker
+container is up and running:
+#+begin_src
+cargo run ../../examples/x86_64_pagetable.vrs && make -C out/x86_64_pagetable/hw/fastmodels dockerhw
+#+end_src
 
 *** Internals
 

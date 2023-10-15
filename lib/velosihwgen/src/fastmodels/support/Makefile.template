@@ -4,14 +4,12 @@
 #
 # Copyright (C) 2023, Reto Achermann (The University of British Columbia)
 
-# This file is auto-generated
+# This file is (from) a template, where holes of the form /* REPLACE xyz */ are filled in
 
-# Set the build directory
 BUILD_DIR := $(CURDIR)/build
 SOURCE_DIR := $(CURDIR)/src
 FRAMEWORK_DIR := $(CURDIR)/fm_translation_framework
 
-# compiler flags
 CC      := g++
 CCFLAGS := -Wall -O3 -Werror -std=c++2a -fPIC
 CCFLAGS += -I $(SOURCE_DIR)
@@ -25,11 +23,9 @@ ifeq ($(TEST_MOCK_FAST_MODELS),1)
 CCFLAGS += -DTEST_MOCK_FAST_MODELS=1
 endif
 
-# archive flags
 AR      := ar
 ARFLAGS := rcs
 
-# linker flags
 LD      := g++
 LDFLAGS := -pthread
 
@@ -47,21 +43,18 @@ TRANSLATION_UNIT_SRCS += $(SOURCE_DIR)//* REPLACE pkgname */_registers.hpp
 # Object Files
 TRANSLATION_UNIT_OBJS := $(TRANSLATION_UNIT_SRCS:$(SOURCE_DIR)/%.cpp=$(BUILD_DIR)/objs/%.o)
 
-# The Translation Unit Library
 TRANSLATION_UNIT_LIB  := $(BUILD_DIR)/lib/libunit.a
 
-# target for building the translation unit library
 unitlib: $(TRANSLATION_UNIT_LIB)
 
 FRAMEWORK_LIB := $(FRAMEWORK_DIR)/build/lib/libframework.a
 
-# target fo rbuilding the framework
 frameworklib: $(FRAMEWORK_LIB)
 
 $(FRAMEWORK_LIB):
 	make -C fm_translation_framework
 
-# building the library
+# the main thing
 $(TRANSLATION_UNIT_LIB): $(TRANSLATION_UNIT_OBJS)
 	$(MKDIR) $(@D)
 	$(AR) $(ARFLAGS) -o $@ $^
@@ -79,16 +72,32 @@ $(PLATFORM_BIN): $(TRANSLATION_UNIT_LIB) $(PLATFORM_LISA) $(PLATFORM_PROJ) /* RE
 run: $(PLATFORM_BIN)
 	$(PLATFORM_BIN) --data Memory0=bootimg.bin@0x0
 
-# Targets
 .DEFAULT_GOAL = all
 all: $(FRAMEWORK_LIB) $(TRANSLATION_UNIT_LIB) $(PLATFORM_BIN)
 lib: $(TRANSLATION_UNIT_LIB)
 
-# Compilation Rules
 $(BUILD_DIR)/objs/%.o: $(SOURCE_DIR)/%.cpp
 	$(MKDIR) $(@D)
 	$(CC) $(CCFLAGS) -c -o $@ $<
 
-# clean up
+# A small script to build on an armfm-supported platform
+# Assumes the docker image has been built (see dockerfile) and a container is running
+D_IMG := armfm_img
+D_CON := armfmtest
+D_DIR := /velosihwgen_build
+
+# /bin/bash -i will source .bashrc and set armfm env variables
+dockerhw:
+	docker restart $(D_CON) # prevent dead process accumulation in development
+	docker exec $(D_CON) /bin/bash -c "rm -r $(D_DIR)" || true
+	docker exec $(D_CON) /bin/bash -c "mkdir -p $(D_DIR)"
+	docker cp $(CURDIR)/. $(D_CON):$(D_DIR)
+# bad hack. should move armfm-boot to hwgen support dir instead of the top-level one
+	docker cp $(CURDIR)/../../../../../../support/arm-fastmodels-boot/. $(D_CON):$(D_DIR)/arm-fastmodels-boot
+	docker exec $(D_CON) /bin/bash -i -c "cd $(D_DIR)/arm-fastmodels-boot && make && cp bootimg.bin $(D_DIR)"
+	docker exec $(D_CON) /bin/bash -i -c "cd $(D_DIR) && make clean && make && make run"
+
+.PHONY: all clean dockerhw
+
 clean:
 	rm -rf $(BUILD_DIR)
