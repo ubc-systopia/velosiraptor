@@ -161,7 +161,7 @@ impl Relations {
         for child in children.iter() {
             self.all_units.insert(child.ident().clone(), child.clone());
         }
-        let entry = self.relations.entry(key).or_insert_with(Vec::new);
+        let entry = self.relations.entry(key).or_default();
         entry.extend(children.iter().map(|u| u.ident().clone()));
     }
 
@@ -170,7 +170,7 @@ impl Relations {
     /// TODO: maybe here we should do a bit more "analysis" on the current
     ///       parameter types for the units (e.g., that the state of the underlying
     ///       units are actually the same.)
-    fn update_group_roots(&self) {
+    fn update_group_roots(&mut self) {
         let mut res = HashSet::new();
 
         let mut units: Vec<Rc<String>> = self.roots.iter().cloned().collect();
@@ -246,10 +246,7 @@ impl Relations {
                 }
             }
         }
-
-        for v in res {
-            println!("Unit: {v}");
-        }
+        self.group_roots = res;
     }
 
     fn update_roots(&mut self) {
@@ -270,10 +267,7 @@ impl Relations {
 
         self.roots = roots
             .iter()
-            .map(|f| {
-                println!("{}", f);
-                self.all_units.get(f).unwrap().ident().clone()
-            })
+            .map(|f| self.all_units.get(f).unwrap().ident().clone())
             .collect();
     }
 
@@ -289,6 +283,35 @@ impl Relations {
         } else {
             &[]
         }
+    }
+
+    pub fn get_only_child(&self, ident: &Rc<String>) -> &Rc<String> {
+        if let Some(children) = self.relations.get(ident) {
+            if children.len() != 1 {
+                panic!("unit had {} children, expected 1", children.len());
+            }
+            children.first().unwrap()
+        } else {
+            panic!("unit `{ident}` not fount")
+        }
+    }
+
+    pub fn get_only_child_unit(&self, ident: &Rc<String>) -> &VelosiAstUnit {
+        if let Some(children) = self.relations.get(ident) {
+            if children.len() != 1 {
+                panic!("unit had {} children, expected 1", children.len());
+            }
+            let childident = children.first().unwrap();
+            self.all_units
+                .get(childident)
+                .expect("unit lookup has failed")
+        } else {
+            panic!("unit `{ident}` not fount")
+        }
+    }
+
+    pub fn get_unit(&self, ident: &Rc<String>) -> Option<&VelosiAstUnit> {
+        self.all_units.get(ident)
     }
 
     pub fn get_children_units(&self, ident: &Rc<String>) -> Vec<VelosiAstUnit> {
