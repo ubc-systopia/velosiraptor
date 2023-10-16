@@ -28,6 +28,7 @@
 //! This module defines the Constant AST nodes of the language
 
 // used standard library functionality
+use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
@@ -45,6 +46,7 @@ use velosiparser::VelosiTokenStream;
 use crate::error::{VelosiAstErrBuilder, VelosiAstErrDoubleDef, VelosiAstIssues};
 use crate::{
     ast_result_return, ast_result_unwrap, unit_ignore_node, utils, AstResult, SymbolTable,
+    VelosiAstUnitProperty,
 };
 
 use crate::ast::{
@@ -432,8 +434,21 @@ impl VelosiAstUnitStaticMap {
         }
     }
 
+    /// returns the size of the map in number of elements
+    pub fn map_size(&self) -> usize {
+        self.map.size()
+    }
+
     pub fn get_next_unit_idents(&self) -> Vec<&Rc<String>> {
         self.map.get_next_unit_idents()
+    }
+
+    pub fn properties(&self) -> HashSet<VelosiAstUnitProperty> {
+        self.map.properties()
+    }
+
+    pub fn has_memory_state(&self) -> bool {
+        self.map.has_memory_state()
     }
 }
 

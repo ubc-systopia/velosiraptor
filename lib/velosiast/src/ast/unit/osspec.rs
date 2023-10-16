@@ -43,12 +43,13 @@ use crate::ast::types::VelosiAstExternType;
 // used crate functionality
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
 use crate::{
-    ast_result_return, ast_result_unwrap, unit_ignore_node, utils, AstResult, SymbolTable,
+    ast_result_return, ast_result_unwrap, unit_ignore_node, utils, AstResult, Symbol, SymbolTable,
 };
 
 // used definitions of references AST nodes
 use crate::ast::{
-    VelosiAstConst, VelosiAstIdentifier, VelosiAstMethod, VelosiAstParam, VelosiAstUnit,
+    VelosiAstConst, VelosiAstIdentifier, VelosiAstMethod, VelosiAstParam, VelosiAstTypeProperty,
+    VelosiAstUnit,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,7 +68,7 @@ pub struct VelosiAstUnitOSSpec {
     /// enums defined on the unit
     pub methods: IndexMap<String, Rc<VelosiAstMethod>>,
     /// the extern types defined in this spec
-    pub extern_types: Vec<Rc<VelosiAstExternType>>,
+    pub extern_types: IndexMap<String, Rc<VelosiAstExternType>>,
     /// the location of the enum definition
     pub loc: VelosiTokenStream,
 }
@@ -79,7 +80,7 @@ impl VelosiAstUnitOSSpec {
             params: Vec::new(),
             consts: IndexMap::new(),
             methods: IndexMap::new(),
-            extern_types: Vec::new(),
+            extern_types: IndexMap::new(),
             loc: VelosiTokenStream::default(),
         }
     }
@@ -131,7 +132,7 @@ impl VelosiAstUnitOSSpec {
 
         let mut methods = IndexMap::new();
         let mut consts = IndexMap::new();
-        let mut extern_types = Vec::new();
+        let mut extern_types = IndexMap::new();
         for node in pt.nodes.into_iter() {
             match node {
                 VelosiParseTreeUnitNode::Const(c) => {
@@ -224,11 +225,19 @@ impl VelosiAstUnitOSSpec {
                         issues
                     ));
 
+                    if t.properties.contains(&VelosiAstTypeProperty::Descriptor) {
+                        for field in &t.fields {
+                            let mut sym: Symbol = field.clone().into();
+                            sym.name = Rc::new(format!("self.{}", field.ident()));
+                            let _ = st.insert(sym);
+                        }
+                    }
+
                     // add the type to the symbol tbale
                     if let Err(e) = st.insert(t.clone().into()) {
                         issues.push(*e);
                     } else {
-                        extern_types.push(t);
+                        extern_types.insert(t.ident.to_string(), t);
                     }
                 }
             }
@@ -335,6 +344,31 @@ impl VelosiAstUnitOSSpec {
         self.methods.get(name)
     }
 
+    pub fn get_map_method(&self, dest_type: VelosiAstTypeProperty) -> Option<&Rc<VelosiAstMethod>> {
+        for method in self.methods.values() {
+            if method.ident.as_str().starts_with("map") {
+                let pa = method.params_map.get("pa").unwrap();
+                if let Some(tref) = pa.ptype.typeref() {
+                    if let Some(ty) = self.extern_types.get(tref.as_str()) {
+                        if ty.properties.contains(&dest_type) {
+                            return Some(method);
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    pub fn get_extern_type_with_property(
+        &self,
+        dest_type: VelosiAstTypeProperty,
+    ) -> Option<&Rc<VelosiAstExternType>> {
+        self.extern_types
+            .values()
+            .find(|&ty| ty.properties.contains(&dest_type))
+    }
+
     pub fn consts(&self) -> Box<dyn Iterator<Item = &Rc<VelosiAstConst>> + '_> {
         unimplemented!()
     }
@@ -376,7 +410,7 @@ impl Display for VelosiAstUnitOSSpec {
         }
         // print the types
         if !self.extern_types.is_empty() {
-            for ty in &self.extern_types {
+            for ty in self.extern_types.values() {
                 writeln!(f)?;
                 let formatted = format!("{ty}");
                 for line in formatted.lines() {

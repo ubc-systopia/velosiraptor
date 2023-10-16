@@ -52,6 +52,7 @@ pub struct VelosiAstStaticMapElement {
     pub dst_bitwidth: u64,
     pub offset: Option<VelosiAstExpr>,
     pub loc: VelosiTokenStream,
+    pub has_memory_state: bool,
 }
 
 impl VelosiAstStaticMapElement {
@@ -68,6 +69,7 @@ impl VelosiAstStaticMapElement {
             dst_bitwidth,
             offset,
             loc,
+            has_memory_state: false,
         }
     }
 
@@ -108,11 +110,13 @@ impl VelosiAstStaticMapElement {
             None
         };
 
-        let dest = ast_result_unwrap!(VelosiAstFnCallExpr::from_parse_tree_raw(pt.dst, st), issues);
+        let dst = ast_result_unwrap!(VelosiAstFnCallExpr::from_parse_tree_raw(pt.dst, st), issues);
 
-        // get the destnation unit
-        let bitwidth = if let Some(destsym) = st.lookup(dest.ident()) {
+        // get the destination unit
+        let mut has_memory_state = false;
+        let bitwidth = if let Some(destsym) = st.lookup(dst.ident()) {
             if let VelosiAstNode::Unit(u) = &destsym.ast_node {
+                has_memory_state = u.has_memory_state();
                 u.input_bitwidth()
             } else {
                 64
@@ -130,7 +134,21 @@ impl VelosiAstStaticMapElement {
             None
         };
 
-        ast_result_return!(Self::new(src, dest, bitwidth, offset, pt.loc), issues)
+        ast_result_return!(
+            VelosiAstStaticMapElement {
+                src,
+                dst,
+                dst_bitwidth: bitwidth,
+                offset,
+                loc: pt.loc,
+                has_memory_state
+            },
+            issues
+        )
+    }
+
+    pub fn has_memory_state(&self) -> bool {
+        self.has_memory_state
     }
 }
 

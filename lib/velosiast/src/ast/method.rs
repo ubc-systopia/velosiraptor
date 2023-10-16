@@ -29,6 +29,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+
 use std::rc::Rc;
 
 use velosiparser::parsetree::{VelosiParseTreeMethod, VelosiParseTreeProperty};
@@ -329,7 +330,7 @@ impl VelosiAstMethod {
     pub fn from_parse_tree(
         pt: VelosiParseTreeMethod,
         st: &mut SymbolTable,
-        _osspec: bool,
+        osspec: bool,
     ) -> AstResult<Self, VelosiAstIssues> {
         let mut issues = VelosiAstIssues::new();
 
@@ -362,6 +363,16 @@ impl VelosiAstMethod {
 
         // convert all the unit parameters
         let mut params = Vec::new();
+        if osspec && matches!(name.as_str(), "map" | "unmap" | "protect") {
+            params.push(Rc::new(VelosiAstParam::new(
+                VelosiAstIdentifier::from("self"),
+                VelosiAstType::new(VelosiAstTypeInfo::SelfType, VelosiTokenStream::default()),
+                VelosiTokenStream::default(),
+            )));
+
+            // lookup the type
+        }
+
         for p in pt.params.into_iter() {
             let param = Rc::new(ast_result_unwrap!(
                 VelosiAstParam::from_parse_tree(p, true, st),
@@ -674,7 +685,7 @@ impl VelosiAstMethod {
         }
 
         // perform additional checks for one of the special methods
-        res.check_special_methods(&mut issues);
+        res.check_special_methods(&mut issues, osspec);
 
         ast_result_return!(res, issues)
     }
@@ -845,7 +856,7 @@ impl VelosiAstMethod {
         }
     }
 
-    fn check_special_methods(&self, issues: &mut VelosiAstIssues) {
+    fn check_special_methods(&self, issues: &mut VelosiAstIssues, _osspec: bool) {
         match self.ident().as_str() {
             "valid" => {
                 self.check_rettype(issues, FN_SIG_VALID, VelosiAstTypeInfo::Bool);
@@ -876,46 +887,79 @@ impl VelosiAstMethod {
                 // fn map(va: vaddr, sz: size, flgs: flags, pa: paddr)
                 if self.is_synth {
                     self.check_rettype(issues, FN_SIG_MAP, VelosiAstTypeInfo::Void);
+                    self.check_arguments_exact(
+                        issues,
+                        FN_SIG_MAP,
+                        &[
+                            ("va", false, VelosiAstTypeInfo::VirtAddr),
+                            ("sz", false, VelosiAstTypeInfo::Size),
+                            ("flgs", false, VelosiAstTypeInfo::Flags),
+                            ("pa", true, VelosiAstTypeInfo::PhysAddr),
+                        ],
+                    );
+                } else {
+                    self.check_arguments_exact(
+                        issues,
+                        FN_SIG_MAP,
+                        &[
+                            ("self", false, VelosiAstTypeInfo::SelfType),
+                            ("va", false, VelosiAstTypeInfo::VirtAddr),
+                            ("sz", false, VelosiAstTypeInfo::Size),
+                            ("flgs", false, VelosiAstTypeInfo::Flags),
+                            ("pa", true, VelosiAstTypeInfo::PhysAddr),
+                        ],
+                    );
                 }
-                self.check_arguments_exact(
-                    issues,
-                    FN_SIG_MAP,
-                    &[
-                        ("va", false, VelosiAstTypeInfo::VirtAddr),
-                        ("sz", false, VelosiAstTypeInfo::Size),
-                        ("flgs", false, VelosiAstTypeInfo::Flags),
-                        ("pa", true, VelosiAstTypeInfo::PhysAddr),
-                    ],
-                );
             }
             "unmap" => {
                 // fn unmap(va: vaddr, sz: size)
                 if self.is_synth {
                     self.check_rettype(issues, FN_SIG_UNMAP, VelosiAstTypeInfo::Void);
+                    self.check_arguments_exact(
+                        issues,
+                        FN_SIG_UNMAP,
+                        &[
+                            ("va", false, VelosiAstTypeInfo::VirtAddr),
+                            ("sz", false, VelosiAstTypeInfo::Size),
+                        ],
+                    );
+                } else {
+                    self.check_arguments_exact(
+                        issues,
+                        FN_SIG_UNMAP,
+                        &[
+                            ("self", false, VelosiAstTypeInfo::SelfType),
+                            ("va", false, VelosiAstTypeInfo::VirtAddr),
+                            ("sz", false, VelosiAstTypeInfo::Size),
+                        ],
+                    );
                 }
-                self.check_arguments_exact(
-                    issues,
-                    FN_SIG_UNMAP,
-                    &[
-                        ("va", false, VelosiAstTypeInfo::VirtAddr),
-                        ("sz", false, VelosiAstTypeInfo::Size),
-                    ],
-                );
             }
             "protect" => {
                 // fn protect(va: vaddr, sz: size, flgs: flags)
                 if self.is_synth {
                     self.check_rettype(issues, FN_SIG_PROTECT, VelosiAstTypeInfo::Void);
+                    self.check_arguments_exact(
+                        issues,
+                        FN_SIG_PROTECT,
+                        &[
+                            ("va", false, VelosiAstTypeInfo::VirtAddr),
+                            ("sz", false, VelosiAstTypeInfo::Size),
+                            ("flgs", false, VelosiAstTypeInfo::Flags),
+                        ],
+                    );
+                } else {
+                    self.check_arguments_exact(
+                        issues,
+                        FN_SIG_PROTECT,
+                        &[
+                            ("self", false, VelosiAstTypeInfo::SelfType),
+                            ("va", false, VelosiAstTypeInfo::VirtAddr),
+                            ("sz", false, VelosiAstTypeInfo::Size),
+                            ("flgs", false, VelosiAstTypeInfo::Flags),
+                        ],
+                    );
                 }
-                self.check_arguments_exact(
-                    issues,
-                    FN_SIG_PROTECT,
-                    &[
-                        ("va", false, VelosiAstTypeInfo::VirtAddr),
-                        ("sz", false, VelosiAstTypeInfo::Size),
-                        ("flgs", false, VelosiAstTypeInfo::Flags),
-                    ],
-                );
             }
             _ => {
                 self.check_rettype_non_void(issues);
@@ -1005,6 +1049,22 @@ impl VelosiAstMethod {
                 .properties
                 .contains(&VelosiAstMethodProperty::Invariant)
             || self.properties.contains(&VelosiAstMethodProperty::Remap)
+    }
+
+    pub fn maps_table(&self) -> bool {
+        if let Some(p) = self.params_map.get("pa") {
+            p.ptype.is_typeref()
+        } else {
+            false
+        }
+    }
+
+    pub fn maps_frame(&self) -> bool {
+        if let Some(p) = self.params_map.get("pa") {
+            p.ptype.is_addr()
+        } else {
+            false
+        }
     }
 }
 

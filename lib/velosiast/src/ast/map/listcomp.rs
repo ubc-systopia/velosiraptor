@@ -186,6 +186,15 @@ impl VelosiAstStaticMapListComp {
     pub fn is_repr_list(&self) -> bool {
         self.properties.contains(&VelosiAstUnitProperty::ListRepr)
     }
+
+    // returns the size of the map in elements
+    pub fn size(&self) -> usize {
+        (self.range.end - self.range.start).try_into().unwrap()
+    }
+
+    pub fn has_memory_state(&self) -> bool {
+        self.elm.has_memory_state()
+    }
 }
 
 /// Implementation of [PartialEq] for [VelosiAstStaticMapListComp]

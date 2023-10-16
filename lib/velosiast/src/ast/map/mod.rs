@@ -38,6 +38,7 @@ pub use explicit::VelosiAstStaticMapExplicit;
 pub use listcomp::VelosiAstStaticMapListComp;
 
 // used standard library functionality
+use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
@@ -47,7 +48,7 @@ use velosiparser::VelosiTokenStream;
 
 // used crate functionality
 use crate::error::VelosiAstIssues;
-use crate::{AstResult, SymbolTable};
+use crate::{AstResult, SymbolTable, VelosiAstUnitProperty};
 
 /// Represents a static map definition
 #[derive(PartialEq, Eq, Clone)]
@@ -95,6 +96,31 @@ impl VelosiAstStaticMap {
             VelosiAstStaticMap::ListComp(s) => s.get_next_unit_idents(),
             VelosiAstStaticMap::Explicit(s) => s.get_next_unit_idents(),
             VelosiAstStaticMap::None(_) => vec![],
+        }
+    }
+
+    pub fn properties(&self) -> HashSet<VelosiAstUnitProperty> {
+        match self {
+            VelosiAstStaticMap::ListComp(s) => s.properties.clone(),
+            VelosiAstStaticMap::Explicit(_s) => HashSet::new(),
+            VelosiAstStaticMap::None(_) => HashSet::new(),
+        }
+    }
+
+    // returns the size of the map in elements
+    pub fn size(&self) -> usize {
+        match self {
+            VelosiAstStaticMap::ListComp(s) => s.size(),
+            VelosiAstStaticMap::Explicit(s) => s.size(),
+            VelosiAstStaticMap::None(_) => 0,
+        }
+    }
+
+    pub fn has_memory_state(&self) -> bool {
+        match self {
+            VelosiAstStaticMap::ListComp(s) => s.has_memory_state(),
+            VelosiAstStaticMap::Explicit(s) => s.has_memory_state(),
+            VelosiAstStaticMap::None(_) => false,
         }
     }
 }

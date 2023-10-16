@@ -333,6 +333,16 @@ impl VelosiAstUnit {
             OSSpec(_e) => Vec::new(),
         }
     }
+
+    pub fn has_memory_state(&self) -> bool {
+        use VelosiAstUnit::*;
+        match self {
+            Segment(s) => s.has_memory_state(),
+            StaticMap(s) => s.has_memory_state(),
+            Enum(s) => s.has_memory_state(),
+            OSSpec(_e) => false,
+        }
+    }
 }
 
 /// Implementation fo the [From] trait for [Symbol]

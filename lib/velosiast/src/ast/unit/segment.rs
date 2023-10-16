@@ -740,12 +740,33 @@ impl VelosiAstUnitSegment {
         self.state.get_registers()
     }
 
+    pub fn has_memory_state(&self) -> bool {
+        self.state.has_memory()
+    }
+
     pub fn get_next_unit_idents(&self) -> Vec<&Rc<String>> {
+        vec![self.get_next_unit_ident()]
+    }
+
+    pub fn get_next_unit_ident(&self) -> &Rc<String> {
         self.methods
             .get("map")
             .and_then(|m| m.get_param("pa"))
             .and_then(|p| p.ptype.typeref())
-            .map(|t| vec![t])
+            .unwrap()
+    }
+
+    pub fn maps_table(&self) -> bool {
+        self.methods
+            .get("map")
+            .map(|m| m.maps_table())
+            .unwrap_or_default()
+    }
+
+    pub fn maps_frame(&self) -> bool {
+        self.methods
+            .get("map")
+            .map(|m| m.maps_frame())
             .unwrap_or_default()
     }
 }

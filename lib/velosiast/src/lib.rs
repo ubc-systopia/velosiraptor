@@ -55,8 +55,9 @@ pub use crate::ast::{
     VelosiAstInterfaceField, VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField,
     VelosiAstInterfaceRegisterField, VelosiAstMethod, VelosiAstMethodProperty, VelosiAstRoot,
     VelosiAstStateField, VelosiAstStaticMap, VelosiAstStaticMapElement, VelosiAstStaticMapExplicit,
-    VelosiAstStaticMapListComp, VelosiAstTypeProperty, VelosiAstUnit, VelosiAstUnitEnum,
-    VelosiAstUnitOSSpec, VelosiAstUnitProperty, VelosiAstUnitSegment, VelosiAstUnitStaticMap,
+    VelosiAstStaticMapListComp, VelosiAstTypeInfo, VelosiAstTypeProperty, VelosiAstUnit,
+    VelosiAstUnitEnum, VelosiAstUnitOSSpec, VelosiAstUnitProperty, VelosiAstUnitSegment,
+    VelosiAstUnitStaticMap,
 };
 
 // custom error definitions

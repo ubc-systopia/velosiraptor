@@ -84,6 +84,15 @@ impl VelosiAstStaticMapExplicit {
             .map(|e| e.dst.ident())
             .collect::<Vec<_>>()
     }
+
+    /// the number of entries in the map
+    pub fn size(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn has_memory_state(&self) -> bool {
+        self.entries.iter().any(|e| e.has_memory_state())
+    }
 }
 
 /// Implementation of [PartialEq] for [VelosiAstStaticMapListComp]
