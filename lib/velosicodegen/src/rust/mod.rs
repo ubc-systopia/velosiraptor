@@ -111,7 +111,7 @@ impl BackendRust {
     ///
     /// This will setup the output directories, create the Toml file and
     /// create the `src` directory.
-    pub fn prepare(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
+    pub fn prepare(&self, ast: &VelosiAst, osspec: &VelosiAst) -> Result<(), VelosiCodeGenError> {
         // create the output directory, if needed
 
         // create the package path
@@ -125,7 +125,7 @@ impl BackendRust {
         fs::create_dir_all(srcdir)?;
 
         // generate common utilities across units
-        self.generate_utils(ast)?;
+        self.generate_utils(ast, osspec)?;
 
         // generate common utilities across units
         self.generate_os_utils()?;
@@ -133,7 +133,11 @@ impl BackendRust {
         Ok(())
     }
 
-    pub fn generate_utils(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
+    pub fn generate_utils(
+        &self,
+        ast: &VelosiAst,
+        _osspec: &VelosiAst,
+    ) -> Result<(), VelosiCodeGenError> {
         // get the source directory
         let srcdir = self.outdir.join("src");
 
@@ -206,7 +210,11 @@ impl BackendRust {
     ///
     /// This will produce a file with all the globally defined constant definitions.
     /// The file won't be produced if there are no globally defined constants
-    pub fn generate_globals(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
+    pub fn generate_globals(
+        &self,
+        ast: &VelosiAst,
+        _osspec: &VelosiAst,
+    ) -> Result<(), VelosiCodeGenError> {
         let consts = ast.consts();
 
         // get the source directory
@@ -227,7 +235,11 @@ impl BackendRust {
         save_scope(scope, &srcdir, MOD_CONSTS)
     }
 
-    pub fn generate_interfaces(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
+    pub fn generate_interfaces(
+        &self,
+        ast: &VelosiAst,
+        _osspec: &VelosiAst,
+    ) -> Result<(), VelosiCodeGenError> {
         // get the source dir
         let mut srcdir = self.outdir.join("src");
 
@@ -244,7 +256,11 @@ impl BackendRust {
     }
 
     /// Generates the units
-    pub fn generate_units(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
+    pub fn generate_units(
+        &self,
+        ast: &VelosiAst,
+        _osspec: &VelosiAst,
+    ) -> Result<(), VelosiCodeGenError> {
         // get the source dir
         let mut srcdir = self.outdir.join("src");
         let relations = Relations::from_ast(ast);
@@ -314,7 +330,7 @@ impl BackendRust {
     /// This basically creates a `pub mod` statement for each unit,
     /// and also for for the constant definitions. It then also re-exports
     /// the defined constants and unit types using `pub use` statements.
-    pub fn finalize(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
+    pub fn finalize(&self, ast: &VelosiAst, _osspec: &VelosiAst) -> Result<(), VelosiCodeGenError> {
         // construct the source directory
         let srcdir = self.outdir.join("src");
 
@@ -354,5 +370,9 @@ impl BackendRust {
 
         // save the scope
         save_scope(scope, &srcdir, "lib")
+    }
+
+    pub fn test_compile(&self, ast: &VelosiAst, osspec: &VelosiAst) -> Result<(), String> {
+        Ok(())
     }
 }

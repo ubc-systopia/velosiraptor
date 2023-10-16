@@ -86,7 +86,7 @@ fn add_higher_order_map(
                     let (has_children, no_children): (Vec<_>, Vec<_>) = e
                         .get_next_unit_idents()
                         .into_iter()
-                        .partition(|variant| relations.0.get(*variant).is_some());
+                        .partition(|variant| !relations.get_children(variant).is_empty());
 
                     // TODO: doesn't handle multiple no_children variants
                     if let Some(variant) = no_children.first() {
@@ -137,7 +137,7 @@ fn add_higher_order_map(
                     }
 
                     for variant in &has_children {
-                        let children = relations.0.get(*variant).unwrap();
+                        let children = relations.get_children_units(variant);
                         let child = &children[0];
                         let variant_unit = ast.get_unit(variant).unwrap();
 
@@ -328,15 +328,16 @@ fn add_higher_order_fn(
 }
 
 fn base_inbitwidth(relations: &Relations, ident: &Rc<String>, inbitwidth: u64) -> u64 {
-    if let Some(units) = relations.0.get(ident) {
-        units
+    let children = relations.get_children_units(ident);
+    if children.is_empty() {
+        inbitwidth
+    } else {
+        children
             .iter()
             .map(|u| base_inbitwidth(relations, u.ident(), u.input_bitwidth()))
             .chain(std::iter::once(inbitwidth))
             .min()
             .unwrap()
-    } else {
-        inbitwidth
     }
 }
 
@@ -645,7 +646,7 @@ pub fn generate(
         let dest_unit = ast.get_unit(map.elm.dst.ident().as_str()).unwrap();
         if let VelosiAstUnit::Enum(e) = dest_unit {
             for variant in e.get_next_unit_idents() {
-                if relations.0.get(variant).is_some() {
+                if !relations.get_children(variant).is_empty() {
                     scope.import("crate", &utils::to_struct_name(variant, None));
                 }
 

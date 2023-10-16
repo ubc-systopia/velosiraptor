@@ -31,7 +31,8 @@ use std::path::{Path, PathBuf};
 use crustal as C;
 
 use velosiast::{
-    VelosiAst, VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField, VelosiAstUnit,
+    VelosiAst, VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField, VelosiAstTypeProperty,
+    VelosiAstUnit,
 };
 
 use super::{
@@ -53,7 +54,9 @@ fn generate_read_slice_fn(
     // create the function
     let mut f = C::Function::with_string(
         slice.to_rd_fn(unit, field),
-        C::Type::new_uint(field.nbits()),
+        <&VelosiAstFieldSlice as SliceUtils<&VelosiAstUnit, &dyn VelosiAstField>>::to_c_type(
+            &slice,
+        ),
     );
     f.set_static().set_inline();
     f.push_doc_str(&format!(
@@ -101,7 +104,12 @@ fn generate_write_slice_fn(
     // add the unit and value parameters
     let unit_param = f.new_param("unit", C::Type::to_ptr(&unit.to_ctype()));
     let unit_var = unit_param.to_expr();
-    let val_param = f.new_param("val", C::Type::new_uint(slice.nbits()));
+    let val_param = f.new_param(
+        "val",
+        <&VelosiAstFieldSlice as SliceUtils<&VelosiAstUnit, &dyn VelosiAstField>>::to_c_type(
+            &slice,
+        ),
+    );
     let val_var = val_param.to_expr();
 
     // declare the local variable for the field
@@ -209,15 +217,38 @@ fn generate_interface_field_accessors(
     Ok(())
 }
 
-fn generate_unit_struct(scope: &mut C::Scope, unit: &VelosiAstUnit) {
-    let fields = unit
-        .params_as_slice()
-        .iter()
-        .map(|x| {
-            let n = format!("_{}", x.ident());
-            C::Field::with_string(n, C::Type::new_uintptr())
-        })
-        .collect();
+fn generate_unit_struct(scope: &mut C::Scope, unit: &VelosiAstUnit, osspec: &VelosiAst) {
+    let env = osspec.osspec().unwrap();
+
+    let fields = if env.has_map_protect_unmap() {
+        let mut fields = Vec::new();
+        for etype in env.extern_types.values() {
+            if etype
+                .properties
+                .contains(&VelosiAstTypeProperty::Descriptor)
+            {
+                for field in &etype.fields {
+                    fields.push(C::Field::with_string(
+                        field.ident_to_string(),
+                        unit.ptype_to_ctype(&field.ptype.typeinfo, false),
+                    ));
+                }
+                break;
+            }
+        }
+
+        fields.push(C::Field::with_string(
+            "child".to_string(),
+            C::Type::new_struct("TODO_child_type").to_ptr(),
+        ));
+
+        fields
+    } else {
+        unit.params_as_slice()
+            .iter()
+            .map(|x| C::Field::with_string(x.ident().to_string(), C::Type::new_uintptr()))
+            .collect()
+    };
 
     let sn = unit.to_struct_name();
     let mut s = C::Struct::with_fields(&sn, fields);
@@ -236,7 +267,13 @@ fn generate_unit_struct(scope: &mut C::Scope, unit: &VelosiAstUnit) {
 }
 
 /// generates the interface for a segment unit
-fn generate_segment(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), VelosiCodeGenError> {
+fn generate_segment(
+    unit: &VelosiAstUnit,
+    osspec: &VelosiAst,
+    outdir: &Path,
+) -> Result<(), VelosiCodeGenError> {
+    let env = osspec.osspec().unwrap();
+
     let mut scope = unit.new_scope("Interface");
 
     // add the header guard
@@ -244,41 +281,51 @@ fn generate_segment(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), VelosiCod
     let guard = scope.new_ifdef(&hdrguard);
     let s = guard.guard().then_scope();
 
-    // generate the interface
-    if let Some(interface) = unit.interface() {
-        // include all the field headers
-        for f in interface.fields() {
-            let fieldname = format!("fields/{}_field.h", f.ident());
-            s.new_include(&fieldname, false);
-        }
-
-        // add the OS support includes
-        s.new_include("os/mmio.h", true);
-        s.new_include("os/registers.h", true);
-        s.new_include("os/memory.h", true);
-
-        // generate the field accessors
-        for f in interface.fields() {
-            generate_interface_field_accessors(s, unit, f).expect("generation failed");
-        }
+    if env.has_map_protect_unmap() {
+        s.new_comment("Interface through OS provided API.");
     } else {
-        s.new_comment("No interface defined for this unit.");
+        // generate the unit struct
+        generate_unit_struct(s, unit, osspec);
+
+        // generate the interface
+        if let Some(interface) = unit.interface() {
+            // include all the field headers
+            for f in interface.fields() {
+                let fieldname = format!(
+                    "{}/{}_field.h",
+                    unit.ident().to_ascii_lowercase(),
+                    f.ident()
+                );
+                s.new_include(&fieldname, false);
+            }
+
+            // add the OS support includes
+            s.new_include("os_mmio.h", true);
+            s.new_include("os_registers.h", true);
+            s.new_include("os_memory.h", true);
+
+            // generate the field accessors
+            for f in interface.fields() {
+                generate_interface_field_accessors(s, unit, f).expect("generation failed");
+            }
+        } else {
+            s.new_comment("No interface defined for this unit.");
+        }
     }
 
-    // generate the unit struct
-    generate_unit_struct(s, unit);
-
     // save the file
-    scope.set_filename("interface.h");
+    let filename = format!("{}_interface.h", unit.ident().to_ascii_lowercase());
+    scope.set_filename(&filename);
     scope.to_file(outdir, true)?;
 
     // generate the interface fields
-
-    if let Some(interface) = unit.interface() {
-        let fieldspath = outdir.join("fields");
-        fs::create_dir_all(&fieldspath)?;
-        for f in interface.fields() {
-            field::generate(unit, f, &fieldspath).expect("generation failed");
+    if !env.has_map_protect_unmap() {
+        if let Some(interface) = unit.interface() {
+            let fieldspath = outdir.join(unit.ident().to_ascii_lowercase());
+            fs::create_dir_all(&fieldspath)?;
+            for f in interface.fields() {
+                field::generate(unit, f, &fieldspath).expect("generation failed");
+            }
         }
     }
 
@@ -286,22 +333,21 @@ fn generate_segment(unit: &VelosiAstUnit, outdir: &Path) -> Result<(), VelosiCod
 }
 
 /// starts the interface code generation
-pub fn generate(ast: &VelosiAst, mut outdir: PathBuf) -> Result<(), VelosiCodeGenError> {
-    for unit in ast.units() {
-        // create the unit dir
-        let dirname = unit.ident().to_lowercase();
-        outdir.push(dirname);
+pub fn generate(
+    unit: &VelosiAstUnit,
+    osspec: &VelosiAst,
+    outdir: &mut PathBuf,
+) -> Result<(), VelosiCodeGenError> {
+    // create the unit dir
+    let dirname = unit.ident().to_lowercase();
 
-        // create the directory
-        fs::create_dir_all(&outdir)?;
+    // create the directory
+    fs::create_dir_all(&outdir)?;
 
-        if matches!(unit, VelosiAstUnit::Segment(_)) {
-            generate_segment(unit, &outdir)?;
-        } else {
-            // the other unit types don't have an interface
-        }
-
-        outdir.pop();
+    if matches!(unit, VelosiAstUnit::Segment(_)) {
+        generate_segment(unit, osspec, outdir)?;
+    } else {
+        // the other unit types don't have an interface
     }
 
     Ok(())

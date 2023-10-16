@@ -72,46 +72,65 @@ impl VelosiCodeGen {
         VelosiCodeGen::C(BackendC::new(pkg, path.as_path()))
     }
 
-    pub fn prepare(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
+    pub fn prepare(&self, ast: &VelosiAst, osspec: &VelosiAst) -> Result<(), VelosiCodeGenError> {
         match self {
-            VelosiCodeGen::Rust(b) => b.prepare(ast),
-            VelosiCodeGen::C(b) => b.prepare(),
+            VelosiCodeGen::Rust(b) => b.prepare(ast, osspec),
+            VelosiCodeGen::C(b) => b.prepare(osspec),
         }
     }
 
-    pub fn generate_globals(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
+    pub fn generate_globals(
+        &self,
+        ast: &VelosiAst,
+        osspec: &VelosiAst,
+    ) -> Result<(), VelosiCodeGenError> {
         match self {
-            VelosiCodeGen::Rust(b) => b.generate_globals(ast),
-            VelosiCodeGen::C(b) => b.generate_globals(ast),
+            VelosiCodeGen::Rust(b) => b.generate_globals(ast, osspec),
+            VelosiCodeGen::C(b) => b.generate_globals(ast, osspec),
         }
     }
 
-    pub fn generate_interface(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
+    pub fn generate_interface(
+        &self,
+        ast: &VelosiAst,
+        osspec: &VelosiAst,
+    ) -> Result<(), VelosiCodeGenError> {
         match self {
-            VelosiCodeGen::Rust(b) => b.generate_interfaces(ast),
-            VelosiCodeGen::C(b) => b.generate_interfaces(ast),
+            VelosiCodeGen::Rust(b) => b.generate_interfaces(ast, osspec),
+            VelosiCodeGen::C(b) => b.generate_interfaces(ast, osspec),
         }
     }
 
-    pub fn generate_units(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
+    pub fn generate_units(
+        &self,
+        ast: &VelosiAst,
+        osspec: &VelosiAst,
+    ) -> Result<(), VelosiCodeGenError> {
         match self {
-            VelosiCodeGen::Rust(b) => b.generate_units(ast),
-            VelosiCodeGen::C(b) => b.generate_units(ast),
+            VelosiCodeGen::Rust(b) => b.generate_units(ast, osspec),
+            VelosiCodeGen::C(b) => b.generate_units(ast, osspec),
         }
     }
 
-    pub fn finalize(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
+    pub fn finalize(&self, ast: &VelosiAst, osspec: &VelosiAst) -> Result<(), VelosiCodeGenError> {
         match self {
-            VelosiCodeGen::Rust(b) => b.finalize(ast),
-            VelosiCodeGen::C(b) => b.finalize(ast),
+            VelosiCodeGen::Rust(b) => b.finalize(ast, osspec),
+            VelosiCodeGen::C(b) => b.finalize(ast, osspec),
         }
     }
 
-    pub fn generate(&self, ast: &VelosiAst) -> Result<(), VelosiCodeGenError> {
-        self.prepare(ast)?;
-        self.generate_globals(ast)?;
-        self.generate_interface(ast)?;
-        self.generate_units(ast)?;
-        self.finalize(ast)
+    pub fn generate(&self, ast: &VelosiAst, osspec: &VelosiAst) -> Result<(), VelosiCodeGenError> {
+        self.prepare(ast, osspec)?;
+        self.generate_globals(ast, osspec)?;
+        self.generate_interface(ast, osspec)?;
+        self.generate_units(ast, osspec)?;
+        self.finalize(ast, osspec)
+    }
+
+    pub fn test_compile(&self, ast: &VelosiAst, osspec: &VelosiAst) -> Result<(), String> {
+        match self {
+            VelosiCodeGen::Rust(b) => b.test_compile(ast, osspec),
+            VelosiCodeGen::C(b) => b.test_compile(ast, osspec),
+        }
     }
 }

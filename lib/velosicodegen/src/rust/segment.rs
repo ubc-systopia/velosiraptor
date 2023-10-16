@@ -75,13 +75,10 @@ fn add_segment_struct(
     let iface_name = utils::to_struct_name(&struct_name, Some("Interface"));
     st.field("interface", &iface_name);
 
-    let child = relations
-        .0
-        .get(unit.ident())
-        .filter(|children| !children.is_empty())
-        .map(|children| &children[0]);
-    let has_child = child.is_some();
-    child.iter().for_each(|child| {
+    let children = relations.get_children_units(unit.ident());
+
+    let has_child = !children.is_empty();
+    children.iter().for_each(|child| {
         // add child to struct
         st.field(
             "child",
@@ -153,7 +150,7 @@ fn add_segment_struct(
     // valid function
     add_valid_fn(unit, imp);
 
-    child.iter().for_each(|child| {
+    children.iter().for_each(|child| {
         // higher-order unmap and protect
         let op = unit.methods.get("unmap").expect("unmap method not found!");
         add_higher_order_fn(op, imp);
