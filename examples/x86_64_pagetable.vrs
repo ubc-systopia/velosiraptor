@@ -241,13 +241,13 @@ segment X8664PDirEntryPage(base :paddr) : X8664PageDescriptor {
          && if flgs.executable == 1 {state.entry.xd == 0} else { state.entry.xd == 1}
     }
 
-        fn translate(va: vaddr) -> paddr
-            requires state.entry.ps == 1
-            requires va < LARGE_PAGE_SIZE
+    fn translate(va: vaddr) -> paddr
+        requires state.entry.ps == 1
+        requires va < LARGE_PAGE_SIZE
 
-        {
-            va + (state.entry.address << LARGE_PAGE_BITS)
-        }
+    {
+        va + (state.entry.address << LARGE_PAGE_BITS)
+    }
 
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
         requires va == 0 && sz == LARGE_PAGE_SIZE

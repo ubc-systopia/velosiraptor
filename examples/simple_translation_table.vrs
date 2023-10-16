@@ -104,6 +104,7 @@ segment PageTableEntry(base : paddr) {
 
 // represents an x86 page table entry
 staticmap PageTable(base : paddr) {
+    #[repr(array)]
     maps [ PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..1024 ]
 }
 

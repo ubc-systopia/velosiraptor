@@ -62,7 +62,7 @@ flags {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // represents an x86 page table entry
-segment X8632PageTableEntry(base : addr) {
+segment X8632PageTableEntry(base : paddr) {
 
     // there are there are 4 KiB pages
     inbitwidth = BASE_PAGE_BITS;
@@ -72,7 +72,7 @@ segment X8632PageTableEntry(base : addr) {
 
 
     // the state
-    state(base: addr) {
+    state(base: paddr) {
         mem pte [base, 0, 4] {
             // the following fields at starting bit, ending bit, name
             0 ..  1 present,
@@ -89,7 +89,7 @@ segment X8632PageTableEntry(base : addr) {
         }
     }
 
-    interface(base : addr) {
+    interface(base : paddr) {
         mem pte [base, 0, 4]
     }
 
@@ -137,7 +137,7 @@ segment X8632PageTableEntry(base : addr) {
 
 
 // represents an x86 page table entry
-staticmap X8632PageTable(base : addr) {
+staticmap X8632PageTable(base : paddr) {
     maps [ X8632PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..1024 ]
 }
 
@@ -147,3 +147,143 @@ staticmap X8632PageTable(base : addr) {
 // x86_32 Page Directory
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// represents an x86 page table entry
+segment X8632PageDirectoryEntryFrame(base : paddr) {
+
+    inbitwidth = LARGE_PAGE_BITS;
+
+     outbitwidth = PHYS_ADDR_BITS;
+
+    state(base :paddr) {
+        mem entry [ base, 0, 8] {
+            0 ..  1 present,
+            1 ..  2 rw,  // Read/write; if 0, writes may not be allowed to the page
+            2 ..  3 us,  // if 0, user-mode accesses are not allowed to the page
+            3 ..  4 pwt, // Page-level write-through;
+            4 ..  5 pcd, // Page-level cache disable
+            5 ..  6 a,   // Accessed;
+            6 ..  7 d,   // dirty
+            7 ..  8 ps,  // page size
+            8 ..  9 g,   // global
+            9 .. 12 ign_0,
+            12 .. 13 pat,
+            13 .. 21 res0_0,
+            21 .. 32 address,
+        }
+    }
+
+    interface(base: paddr) {
+        mem entry [ base, 0, 8 ]
+    }
+
+    #[remap]
+    fn valid() -> bool {
+        state.entry.present == 1
+    }
+
+    #[remap]
+    fn matchflags(flgs : flags) -> bool
+    {
+        (state.entry.rw == flgs.writable)
+         && if (flgs.devicemem == 1) {
+                (state.entry.pcd == 1 && state.entry.pwt == 1)
+            } else {
+                (state.entry.pcd == 0 && state.entry.pwt == 0)
+            }
+         && (state.entry.us == flgs.usermode)
+    }
+
+    fn translate(va: vaddr) -> paddr
+        requires state.entry.ps == 1
+        requires va < LARGE_PAGE_SIZE
+
+    {
+        va + (state.entry.address << LARGE_PAGE_BITS)
+    }
+
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+        requires va == 0 && sz == LARGE_PAGE_SIZE
+        requires (pa & (LARGE_PAGE_SIZE - 1) == 0)
+
+    synth fn protect(va: vaddr, sz: size, flgs: flags);
+
+    synth fn unmap(va: vaddr, sz: size)
+        requires va == 0 && sz == LARGE_PAGE_SIZE
+
+}
+
+segment X8632PageDirectoryEntryTable(base : paddr) {
+
+    // there are there are 4 KiB pages
+    inbitwidth = LARGE_PAGE_BITS;
+
+    // it's a 32-bit machine
+    outbitwidth = PHYS_ADDR_BITS;
+
+    state(base: paddr) {
+        mem entry [ base, 0, 8 ] {
+            0 ..  1 present,  // whether this entry is valid
+            1 ..  2 rw,       // Read/write; if 0, writes may not be allowed to the 512-GByte region controlled by this entry
+            2 ..  3 us,       // if 0, user-mode accesses are not allowed to the 512-GByte region controlled by this entry
+            3 ..  4 pwt,      // Page-level write-through;
+            4 ..  5 pcd,      // Page-level cache disable
+            5 ..  6 a,        // Accessed;
+            6 ..  7 ignored0,
+            7 ..  8 ps,
+            8 .. 12 ignored1,
+            12 .. 32 address,
+        }
+    }
+
+    interface(base: paddr) {
+        mem entry [ base, 0, 8 ]
+    }
+
+    #[remap]
+    fn valid() -> bool {
+        state.entry.present == 1
+    }
+
+    #[remap]
+    fn matchflags(flgs : flags) -> bool
+    {
+        // TODO: make this one here a bit better
+        (state.entry.rw == 1)      // always writable
+         && (state.entry.us == 1)  // allow user access
+         && (state.entry.pwt == 0) // don't do write back
+         && (state.entry.pcd == 0) // don't disable cches
+    }
+
+    fn translate(va: vaddr) -> paddr
+        requires state.entry.ps == 0
+    {
+        va + (state.entry.address << 12)
+    }
+
+    // unmapping an entry
+    synth fn unmap(va: vaddr, sz: size)
+        requires (va == 0);
+        requires sz == BASE_PAGE_SIZE;
+
+
+    // mapping an entry
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : X8632PageTable)
+        requires va == 0;
+        requires sz == BASE_PAGE_SIZE;
+        requires (pa & (BASE_PAGE_SIZE - 1)) == 0;
+
+    // protecting the entry, i.e., change its permission
+    synth fn protect(va: vaddr, sz: size, flgs: flags)
+
+}
+
+enum X8632PageDirectoryEntry(base: paddr){
+    X8632PageDirectoryEntryFrame(base),
+    X8632PageDirectoryEntryTable(base)
+}
+
+// represents an x86 page directory entry
+staticmap X8632PageDirectory(base : paddr) {
+    maps [ X8632PageDirectoryEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..1024 ]
+}
