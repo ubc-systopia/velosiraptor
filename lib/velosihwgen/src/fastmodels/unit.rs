@@ -717,6 +717,7 @@ fn ast_type_to_c_type(t: &VelosiAstType) -> C::Type {
         VelosiAstTypeInfo::State => C::Type::new_uint(64),
         VelosiAstTypeInfo::Interface => C::Type::new_uint(64),
         VelosiAstTypeInfo::Void => C::Type::new_uint(64),
+        VelosiAstTypeInfo::SelfType => C::Type::new_uint(64),
     }
 }
 
