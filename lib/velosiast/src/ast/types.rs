@@ -83,6 +83,8 @@ pub enum VelosiAstTypeInfo {
     Interface,
     /// No type
     Void,
+    ///
+    SelfType,
 }
 
 impl VelosiAstTypeInfo {
@@ -129,7 +131,10 @@ impl VelosiAstTypeInfo {
 
     /// whether this is type refereces of another unit
     pub fn is_typeref(&self) -> bool {
-        matches!(self, VelosiAstTypeInfo::TypeRef(_))
+        matches!(
+            self,
+            VelosiAstTypeInfo::TypeRef(_) | VelosiAstTypeInfo::SelfType
+        )
     }
 
     /// wether this type is an externally defined type
@@ -167,6 +172,8 @@ impl VelosiAstTypeInfo {
             (Extern(_), _) => false,
             (State, _) => false,
             (Interface, _) => false,
+            (SelfType, SelfType) => true,
+            (SelfType, _) => false,
             (Void, other) => *other == Void,
         }
     }
@@ -188,6 +195,7 @@ impl VelosiAstTypeInfo {
             State => "state",
             Interface => "interface",
             Void => "()",
+            SelfType => "Self",
         }
     }
 
@@ -208,6 +216,7 @@ impl VelosiAstTypeInfo {
             State => "state",
             Interface => "interface",
             Void => "void",
+            SelfType => "self",
             _ => unreachable!(),
         }
     }
@@ -477,6 +486,7 @@ impl VelosiAstExternType {
                 issues
             )));
         }
+
         ast_result_return!(
             VelosiAstExternType {
                 ident,

@@ -349,6 +349,12 @@ impl VelosiAstState {
     pub fn fields(&self) -> &[Rc<VelosiAstStateField>] {
         self.fields.as_slice()
     }
+
+    pub fn has_memory(&self) -> bool {
+        self.fields
+            .iter()
+            .any(|f| matches!(f.as_ref(), VelosiAstStateField::Memory(_)))
+    }
 }
 
 impl PartialEq for VelosiAstState {
