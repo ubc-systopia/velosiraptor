@@ -48,6 +48,7 @@ simplelog = { version = "^0.12.0", features = ["paris"] }
 strip-ansi-escapes = "0.1.1"
 rexpect = "0.5"
 velosiparser = { path = "lib/velosiraptor-parser" }
+velosicomposition = {path = "lib/velosicomposition" }
 
 # enable optimizations for the tests
 [profile.test]

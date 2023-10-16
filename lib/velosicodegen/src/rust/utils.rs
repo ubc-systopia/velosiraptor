@@ -94,6 +94,7 @@ pub fn vrs_type_to_rust_type(ty: &VelosiAstTypeInfo) -> String {
         VelosiAstTypeInfo::Interface => todo!(),
         VelosiAstTypeInfo::Void => todo!(),
         VelosiAstTypeInfo::Extern(_) => todo!(),
+        VelosiAstTypeInfo::SelfType => todo!(),
     }
 }
 
@@ -103,6 +104,8 @@ pub fn astexpr_to_rust_expr(expr: &VelosiAstExpr, ident_ctx: Option<&VelosiAst>)
         VelosiAstExpr::IdentLiteral(i) => {
             if let Some(ast) = ident_ctx {
                 if let VelosiAstTypeInfo::TypeRef(ty) = &i.etype {
+                    println!("tye: {ty:?}");
+                    println!("params: {:?}", ast.get_unit(ty).unwrap().params_as_slice());
                     let field = ast
                         .get_unit(ty)
                         .unwrap()

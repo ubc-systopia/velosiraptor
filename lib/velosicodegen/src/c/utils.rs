@@ -30,15 +30,26 @@ use std::collections::HashMap;
 // get the code generator
 use crustal as C;
 
-use velosiast::ast::{
-    VelosiAstBinOp, VelosiAstConst, VelosiAstExpr, VelosiAstField, VelosiAstFieldSlice,
-    VelosiAstInterfaceField, VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField,
-    VelosiAstInterfaceRegisterField, VelosiAstMethod, VelosiAstTypeInfo, VelosiAstUnOp,
-    VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment, VelosiAstUnitStaticMap, VelosiOpExpr,
-    VelosiOperation,
+use velosiast::{
+    ast::{
+        VelosiAstBinOp, VelosiAstConst, VelosiAstExpr, VelosiAstField, VelosiAstFieldSlice,
+        VelosiAstInterfaceField, VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField,
+        VelosiAstInterfaceRegisterField, VelosiAstMethod, VelosiAstTypeInfo, VelosiAstUnOp,
+        VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment, VelosiAstUnitStaticMap,
+        VelosiOpExpr, VelosiOperation,
+    },
+    VelosiAstUnitOSSpec,
 };
 
 use crate::COPYRIGHT;
+
+pub const FLAGS_NAME: &str = "flags";
+pub const FLAGS_TYPE: &str = "flags_t";
+
+pub const PADDR_TYPE: &str = "paddr_t";
+pub const VADDR_TYPE: &str = "vaddr_t";
+pub const GENADDR_TYPE: &str = "genaddr_t";
+pub const SIZE_TYPE: &str = "size_t";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Unit Utilities
@@ -46,10 +57,6 @@ use crate::COPYRIGHT;
 
 pub fn unit_type_str(ident: &str) -> String {
     format!("{}__t", ident.to_ascii_lowercase())
-}
-
-pub fn flags_type_str(unit: &str) -> String {
-    format!("{}_flags__t", unit.to_ascii_lowercase())
 }
 
 pub trait UnitUtils {
@@ -61,8 +68,28 @@ pub trait UnitUtils {
         unit_type_str(self.my_ident())
     }
 
+    fn to_child_kind_name(&self) -> String {
+        format!("{}_child_kind", self.my_ident().to_ascii_lowercase())
+    }
+
+    fn to_child_union_name(&self) -> String {
+        format!("{}_child_union", self.my_ident().to_ascii_lowercase())
+    }
+
+    fn to_child_struct_name(&self) -> String {
+        format!("{}_child", self.my_ident().to_ascii_lowercase())
+    }
+
+    fn to_child_type_name(&self) -> String {
+        format!("{}_children__t", self.my_ident().to_ascii_lowercase())
+    }
+
     fn to_ctype(&self) -> C::Type {
         C::Type::new_typedef(&self.to_type_name())
+    }
+
+    fn to_ctype_ptr(&self) -> C::Type {
+        C::Type::new_typedef(&self.to_type_name()).to_ptr()
     }
 
     /// returns the struct name of the unit `myunit`
@@ -72,7 +99,7 @@ pub trait UnitUtils {
 
     /// returns the type name for the unit's flags `myunit_flags_t`
     fn to_flags_type(&self) -> String {
-        flags_type_str(self.my_ident())
+        FLAGS_TYPE.to_string()
     }
 
     fn to_flags_struct_name(&self) -> String {
@@ -80,6 +107,30 @@ pub trait UnitUtils {
     }
 
     fn to_op_fn_name(&self, op: &VelosiAstMethod) -> String {
+        if let Some(p) = op.params_map.get("pa") {
+            if p.ptype.is_addr() {
+                format!(
+                    "__{}_do_{}_frame",
+                    self.my_ident().to_ascii_lowercase(),
+                    op.ident()
+                )
+            } else {
+                format!(
+                    "__{}_do_{}_table",
+                    self.my_ident().to_ascii_lowercase(),
+                    op.ident()
+                )
+            }
+        } else {
+            format!(
+                "__{}_do_{}",
+                self.my_ident().to_ascii_lowercase(),
+                op.ident()
+            )
+        }
+    }
+
+    fn to_hl_op_fn_name(&self, op: &VelosiAstMethod) -> String {
         format!("{}_{}", self.my_ident().to_ascii_lowercase(), op.ident())
     }
 
@@ -99,6 +150,14 @@ pub trait UnitUtils {
         )
     }
 
+    fn to_allocate_fn_name(&self) -> String {
+        format!("{}_alloc", self.my_ident().to_ascii_lowercase(),)
+    }
+
+    fn to_free_fn_name(&self) -> String {
+        format!("{}_free", self.my_ident().to_ascii_lowercase(),)
+    }
+
     fn to_op_fn_name_on_unit(&self, op: &VelosiAstMethod, variant_unit: &VelosiAstUnit) -> String {
         format!(
             "{}_{}_{}",
@@ -109,11 +168,27 @@ pub trait UnitUtils {
     }
 
     fn translate_fn_name(&self) -> String {
-        format!("{}_translate", self.my_ident().to_ascii_lowercase())
+        format!("{}_do_translate", self.my_ident().to_ascii_lowercase())
     }
 
     fn valid_fn_name(&self) -> String {
-        format!("{}_valid", self.my_ident().to_ascii_lowercase())
+        format!("{}_is_valid", self.my_ident().to_ascii_lowercase())
+    }
+
+    fn get_child_fn_name(&self) -> String {
+        format!("{}_get_child", self.my_ident().to_ascii_lowercase())
+    }
+
+    fn get_next_child_fn_name(&self) -> String {
+        format!("{}_get_next_child", self.my_ident().to_ascii_lowercase())
+    }
+
+    fn set_child_fn_name(&self) -> String {
+        format!("{}_set_child", self.my_ident().to_ascii_lowercase())
+    }
+
+    fn clear_child_fn_name(&self) -> String {
+        format!("{}_clear_child", self.my_ident().to_ascii_lowercase())
     }
 
     fn resolve_fn_name(&self) -> String {
@@ -135,19 +210,24 @@ pub trait UnitUtils {
         scope
     }
 
-    fn ptype_to_ctype(&self, ptype: &VelosiAstTypeInfo) -> C::Type {
+    fn ptype_to_ctype(&self, ptype: &VelosiAstTypeInfo, type_refs_as_ptr: bool) -> C::Type {
         match ptype {
             VelosiAstTypeInfo::Integer => C::Type::new_uint64(),
             VelosiAstTypeInfo::Bool => C::Type::new_bool(),
-            VelosiAstTypeInfo::GenAddr => C::Type::new_typedef("genaddr_t"),
-            VelosiAstTypeInfo::VirtAddr => C::Type::new_typedef("vaddr_t"),
-            VelosiAstTypeInfo::PhysAddr => C::Type::new_typedef("paddr_t"),
-            VelosiAstTypeInfo::Size => C::Type::new_typedef("size_t"),
+            VelosiAstTypeInfo::GenAddr => C::Type::new_typedef(GENADDR_TYPE),
+            VelosiAstTypeInfo::VirtAddr => C::Type::new_typedef(VADDR_TYPE),
+            VelosiAstTypeInfo::PhysAddr => C::Type::new_typedef(PADDR_TYPE),
+            VelosiAstTypeInfo::Size => C::Type::new_typedef(SIZE_TYPE),
             VelosiAstTypeInfo::Flags => C::Type::new_typedef(&self.to_flags_type()),
             VelosiAstTypeInfo::TypeRef(s) => {
                 let name = unit_type_str(s.as_str());
-                C::Type::new_typedef(&name)
+                if type_refs_as_ptr {
+                    C::Type::new_typedef(&name).to_ptr()
+                } else {
+                    C::Type::new_typedef(&name)
+                }
             }
+            VelosiAstTypeInfo::Extern(s) => C::Type::new_typedef(s),
             _ => todo!(),
         }
     }
@@ -158,6 +238,10 @@ pub trait UnitUtils {
             IdentLiteral(i) => {
                 if let Some(e) = var_mappings.get(i.ident().as_str()) {
                     return e.clone();
+                }
+
+                if i.etype.is_typeref() {
+                    return C::Expr::new_num(0);
                 }
 
                 let mut parts = i.ident().as_str().split('.');
@@ -172,9 +256,23 @@ pub trait UnitUtils {
                         let param = var_mappings.get("$unit").unwrap();
                         C::Expr::fn_call(&fname, vec![param.clone()])
                     }
+                    (Some("self"), Some(field), None) => C::Expr::field_access(
+                        &C::Expr::new_var("unit", self.to_ctype().to_ptr()),
+                        field,
+                    ),
+                    (Some(a), Some(b), None) => {
+                        if let Some(v) = var_mappings.get(a) {
+                            C::Expr::field_access(v, b)
+                        } else {
+                            C::Expr::new_var(
+                                i.ident().as_str(),
+                                self.ptype_to_ctype(expr.result_type(), false),
+                            )
+                        }
+                    }
                     _ => C::Expr::new_var(
                         i.ident().as_str(),
-                        self.ptype_to_ctype(expr.result_type()),
+                        self.ptype_to_ctype(expr.result_type(), false),
                     ),
                 }
             }
@@ -288,7 +386,14 @@ pub trait UnitUtils {
                 VelosiAstUnOp::LNot => C::Expr::uop("!", self.expr_to_cpp(var_mappings, &i.expr)),
             },
             Quantifier(_i) => panic!("don't know how to handle quantifier"),
-            FnCall(i) => C::Expr::fn_call(i.ident(), vec![]),
+            FnCall(i) => {
+                let args = i
+                    .args
+                    .iter()
+                    .map(|arg| self.expr_to_cpp(var_mappings, arg))
+                    .collect();
+                C::Expr::fn_call(i.ident(), args)
+            }
             IfElse(i) => C::Expr::ternary(
                 self.expr_to_cpp(var_mappings, &i.cond),
                 self.expr_to_cpp(var_mappings, &i.then),
@@ -319,6 +424,12 @@ impl UnitUtils for &VelosiAstUnitStaticMap {
 }
 
 impl UnitUtils for &VelosiAstUnitEnum {
+    fn my_ident(&self) -> &str {
+        self.ident()
+    }
+}
+
+impl UnitUtils for &VelosiAstUnitOSSpec {
     fn my_ident(&self) -> &str {
         self.ident()
     }
@@ -452,9 +563,9 @@ where
 
     fn base(&self) -> Option<(&str, u64)> {
         match self {
-            VelosiAstInterfaceField::Memory(mem) => Some((mem.ident().as_str(), mem.offset)),
+            VelosiAstInterfaceField::Memory(mem) => Some((mem.base.as_str(), mem.offset)),
             VelosiAstInterfaceField::Register(_reg) => None,
-            VelosiAstInterfaceField::Mmio(mmio) => Some((mmio.ident().as_str(), mmio.offset)),
+            VelosiAstInterfaceField::Mmio(mmio) => Some((mmio.base.as_str(), mmio.offset)),
         }
     }
 
@@ -503,9 +614,9 @@ where
     fn base(&self) -> Option<(&str, u64)> {
         if let Some(field) = self.as_any().downcast_ref::<VelosiAstInterfaceField>() {
             match field {
-                VelosiAstInterfaceField::Memory(mem) => Some((mem.ident().as_str(), mem.offset)),
+                VelosiAstInterfaceField::Memory(mem) => Some((mem.base.as_str(), mem.offset)),
                 VelosiAstInterfaceField::Register(_reg) => None,
-                VelosiAstInterfaceField::Mmio(mmio) => Some((mmio.ident().as_str(), mmio.offset)),
+                VelosiAstInterfaceField::Mmio(mmio) => Some((mmio.base.as_str(), mmio.offset)),
             }
         } else {
             None
@@ -657,6 +768,8 @@ where
         let extract_fn = self.to_extract_fn(unit, field);
         C::Expr::fn_call(&extract_fn, vec![field_var])
     }
+
+    fn to_c_type(&self) -> C::Type;
 }
 
 impl<U, F> SliceUtils<U, F> for &VelosiAstFieldSlice
@@ -666,6 +779,21 @@ where
 {
     fn my_ident(&self) -> &str {
         self.ident()
+    }
+
+    fn to_c_type(&self) -> C::Type {
+        let nbits = self.nbits();
+        if nbits <= 8 {
+            C::Type::new_uint8()
+        } else if nbits <= 16 {
+            C::Type::new_uint16()
+        } else if nbits <= 32 {
+            C::Type::new_uint32()
+        } else if nbits <= 64 {
+            C::Type::new_uint64()
+        } else {
+            unreachable!()
+        }
     }
 }
 
@@ -751,7 +879,7 @@ fn os_memory_write_fn_name(field: &VelosiAstInterfaceMemoryField) -> String {
 // Others
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// creates a strng reprsenting the mask value
+/// creates a string representing the mask value
 pub fn to_mask_str(m: u64, len: u64) -> String {
     match len {
         0..=8 => format!("0x{:02x}", (m & 0xff) as u8),
@@ -852,7 +980,7 @@ pub fn op_to_c_expr(
     unit: &str,
     c: &mut C::Block,
     op: &VelosiOperation,
-    vars: &HashMap<String, C::Expr>,
+    vars: &HashMap<&str, C::Expr>,
 ) {
     match op {
         VelosiOperation::InsertSlice(field, slice, arg) => {

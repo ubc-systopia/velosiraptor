@@ -25,41 +25,42 @@
 
 //! MMIO Support Library for the C-Code generation
 
-#ifndef OS_SUPPORT_MMIO_ACCESS_H_
-#define OS_SUPPORT_MMIO_ACCESS_H_ 1
+#ifndef OS_SUPPORT_MEMORY_ACCESS_H_
+#define  OS_SUPPORT_MEMORY_ACCESS_H_ 1
+
 
 #include <stdint.h>
 
-static inline void mmio_register_write_8(uintptr_t addr, uintptr_t offset, uint8_t value) {
+static inline void os_memory_write_8(uintptr_t addr, uintptr_t offset, uint8_t value) {
     *(volatile uint8_t *)(addr + offset) = (uint8_t)value;
 }
 
-static inline void mmio_register_write_16(uintptr_t addr, uintptr_t offset, uint16_t value) {
+static inline void os_memory_write_16(uintptr_t addr, uintptr_t offset, uint16_t value) {
     *(volatile uint16_t *)(addr + offset) = (uint16_t)value;
 }
 
-static inline void mmio_register_write_32(uintptr_t addr, uintptr_t offset, uint32_t value) {
+static inline void os_memory_write_32(uintptr_t addr, uintptr_t offset, uint32_t value) {
     *(volatile uint32_t *)(addr + offset) = (uint32_t)value;
 }
 
-static inline void mmio_register_write_64(uintptr_t addr, uintptr_t offset, uint64_t value) {
+static inline void os_memory_write_64(uintptr_t addr, uintptr_t offset, uint64_t value) {
     *(volatile uint64_t *)(addr + offset) = (uint64_t)value;
 }
 
-static inline uint8_t mmio_register_read_8(uintptr_t addr, uintptr_t offset) {
+static inline uint8_t os_memory_read_8(uintptr_t addr, uintptr_t offset) {
     return *(volatile uint8_t *)(addr + offset);
 }
 
-static inline uint16_t mmio_register_read_16(uintptr_t addr, uintptr_t offset) {
+static inline uint16_t os_memory_read_16(uintptr_t addr, uintptr_t offset) {
     return *(volatile uint16_t *)(addr + offset);
 }
 
-static inline uint32_t mmio_register_read_32(uintptr_t addr, uintptr_t offset) {
+static inline uint32_t os_memory_read_32(uintptr_t addr, uintptr_t offset) {
     return *(volatile uint32_t *)(addr + offset);
 }
 
-static inline uint64_t mmio_register_read_64(uintptr_t addr, uintptr_t offset) {
+static inline uint64_t os_memory_read_64(uintptr_t addr, uintptr_t offset) {
     return *(volatile uint64_t *)(addr + offset);
 }
 
-#endif // OS_SUPPORT_MMIO_ACCESS_H_
+#endif // OS_SUPPORT_MEMORY_ACCESS_H_

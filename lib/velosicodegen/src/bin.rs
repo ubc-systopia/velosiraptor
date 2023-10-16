@@ -57,6 +57,7 @@ pub fn main() {
         .arg(arg!(-o --output <VALUE>).default_value("out"))
         .arg(arg!(-l --lang <VALUE>).default_value("c"))
         .arg(arg!(-p --pkg <VALUE>).default_value("myunit"))
+        .arg(arg!(-t --target <VALUE>).default_value("none"))
         .arg(arg!(
             -m --"mem-model" "Synthesize using the abstract memory model"
         ))
@@ -144,6 +145,27 @@ pub fn main() {
         }
     };
 
+    let target = match matches.get_one::<&str>("target") {
+        None | Some(&"none") => VelosiAst::default(),
+        Some(f) => {
+            match VelosiAst::from_file(f) {
+                AstResult::Ok(ast) => {
+                    // println!("{}", ast);
+                    ast
+                }
+                AstResult::Issues(ast, err) => {
+                    // println!("{}", ast);
+                    println!("{}", err);
+                    ast
+                }
+                AstResult::Err(err) => {
+                    println!("{}", err);
+                    return;
+                }
+            }
+        }
+    };
+
     if !no_synth {
         let mut synthfactory = Z3SynthFactory::new();
         synthfactory.num_workers(ncores).default_log_dir();
@@ -212,11 +234,14 @@ pub fn main() {
                         Err(e) => log::error!(target: "main", "Distinguishing failed:\n{}", e),
                     }
                 }
+                VelosiAstUnit::OSSpec(_) => {
+                    // nothing here
+                }
             }
         }
     }
 
-    if let Err(e) = codegen.generate(&ast) {
+    if let Err(e) = codegen.generate(&ast, &target) {
         log::error!(target: "main", "code generation failed\n{:?}", e);
     }
 }

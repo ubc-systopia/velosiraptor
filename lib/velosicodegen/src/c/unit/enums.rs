@@ -33,19 +33,59 @@ use velosiast::{VelosiAst, VelosiAstMethod, VelosiAstUnitEnum};
 
 use super::utils::{self, UnitUtils};
 use crate::VelosiCodeGenError;
+use velosicomposition::Relations;
 
-fn generate_unit_struct(scope: &mut C::Scope, unit: &VelosiAstUnitEnum) {
-    let fields = unit
-        .params
-        .iter()
-        .map(|x| C::Field::with_string(x.ident().to_string(), C::Type::new_uintptr()))
-        .collect();
+fn generate_unit_struct(
+    scope: &mut C::Scope,
+    unit: &VelosiAstUnitEnum,
+    relations: &Relations,
+    osspec: &VelosiAst,
+) {
+    let env = osspec.osspec().unwrap();
 
-    let mut s = C::Struct::with_fields(&unit.to_struct_name(), fields);
+    let s = if env.has_map_protect_unmap() {
+        let children = relations.get_children_units(unit.ident());
 
-    s.push_doc_str(&format!("Unit Type `{}`", unit.ident()));
-    s.push_doc_str("");
-    s.push_doc_str(&format!("@loc: {}", unit.loc.loc()));
+        let mut children_enum = C::Enum::new(&unit.to_child_kind_name());
+        let mut children_union = C::Union::new(&unit.to_child_union_name());
+
+        for child in &children {
+            // add the type for the children
+            children_enum.new_variant(&child.ident().to_ascii_uppercase());
+            children_union.new_field(
+                &child.ident().to_ascii_lowercase(),
+                C::Type::new_typedef(&child.to_type_name()),
+            );
+        }
+
+        let mut s = C::Struct::new(&unit.to_struct_name());
+        s.push_doc_str(&format!("Unit Type `{}`", unit.ident()));
+        s.push_doc_str("");
+        s.push_doc_str(&format!("@loc: {}", unit.loc.loc()));
+
+        s.new_field("kind", children_enum.to_type());
+        s.new_field("variants", children_union.to_type().to_ptr());
+
+        scope.push_enum(children_enum);
+        scope.push_union(children_union);
+
+        // here we don't do anything fancy
+        unimplemented!("TODO: handle me!");
+    } else {
+        let fields = unit
+            .params
+            .iter()
+            .map(|x| C::Field::with_string(x.ident().to_string(), C::Type::new_uintptr()))
+            .collect();
+
+        let mut s = C::Struct::with_fields(&unit.to_struct_name(), fields);
+
+        s.push_doc_str(&format!("Unit Type `{}`", unit.ident()));
+        s.push_doc_str("");
+        s.push_doc_str(&format!("@loc: {}", unit.loc.loc()));
+
+        s
+    };
 
     let stype = s.to_type();
 
@@ -229,7 +269,7 @@ fn add_map_function(
         let v_expr = v.to_expr();
 
         for f in variant_op.params.iter() {
-            let _p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo));
+            let _p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo, false));
         }
 
         let body = fun.body();
@@ -255,7 +295,7 @@ fn add_map_function(
         for f in variant_op.params.iter() {
             args.push(C::Expr::new_var(
                 f.ident().as_str(),
-                variant_unit.ptype_to_ctype(&f.ptype.typeinfo),
+                variant_unit.ptype_to_ctype(&f.ptype.typeinfo, false),
             ));
         }
         let mapexpr = C::Expr::fn_call(&variant_unit.to_op_fn_name(variant_op), args);
@@ -286,7 +326,7 @@ fn add_op_function(
 
     let mut call_exprs = Vec::new();
     for f in op.params.iter() {
-        let p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo));
+        let p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo, false));
         call_exprs.push(p.to_expr());
     }
 
@@ -418,8 +458,9 @@ fn add_valid_fn(scope: &mut C::Scope, ast: &VelosiAst, unit: &VelosiAstUnitEnum)
 }
 
 pub fn generate(
-    ast: &VelosiAst,
     unit: &VelosiAstUnitEnum,
+    relations: &Relations,
+    osspec: &VelosiAst,
     outdir: &Path,
 ) -> Result<(), VelosiCodeGenError> {
     log::info!("Generating enum unit {}", unit.ident());
@@ -434,22 +475,81 @@ pub fn generate(
     let guard = scope.new_ifdef(&hdrguard);
     let s = guard.guard().then_scope();
 
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    // Includes
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
     // add systems include
     s.new_include("stddef.h", true);
     s.new_include("assert.h", true);
 
-    generate_unit_struct(s, unit);
+    s.new_include("types.h", false);
+    s.new_include("consts.h", false);
+
+    // adding the OS spec header here
+    {
+        let env = osspec.osspec().unwrap();
+        s.new_include(&format!("{}.h", env.ident().to_lowercase()), true);
+    }
+
+    // adding includes for each of the children
+    {
+        let env = osspec.osspec().unwrap();
+        if env.has_map_protect_unmap() {
+            let group_roots = relations.get_group_roots();
+            let mut children = relations.get_children(unit.ident()).to_vec();
+            while let Some(child) = children.pop() {
+                if group_roots.contains(&child) {
+                    s.new_include(&format!("{}_unit.h", child.to_lowercase()), false);
+                } else {
+                    children.extend(relations.get_children(&child).iter().cloned());
+                }
+            }
+        } else {
+            for child in relations.get_children(unit.ident()) {
+                s.new_include(&format!("{}_unit.h", child.to_lowercase()), false);
+            }
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    // Unit Constants and Constructor
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    s.new_comment(" --------------------------- Constants / Constructor -------------------------");
+
+    generate_unit_struct(s, unit, relations, osspec);
     add_constructor_function(s, unit);
-    add_is_function(s, ast, unit)?;
-    add_map_function(s, ast, unit)?;
-    add_unmap_function(s, ast, unit)?;
-    add_protect_function(s, ast, unit)?;
-    add_translate_function(s, ast, unit)?;
-    add_valid_fn(s, ast, unit);
+
+    s.new_comment(" ----------------------------- Address Translation  --------------------------");
+
+    s.new_comment(" ---------------------------- Map / Protect/ Unmap ---------------------------");
+
+    // add_do_map_function(s, unit, relations, osspec);
+    // add_do_unmap_function(s, unit, relations, osspec);
+    // add_do_protect_function(s, unit, relations, osspec);
+
+    // add_translate_function(s, unit);
+
+    s.new_comment(" ----------------------------- Allocate and free ----------------------------");
+
+    // add_allocate_free_function(s, unit, relations, osspec);
+
+    s.new_comment(" --------------------------- Higher Order Functions --------------------------");
+
+    // add_map_function(s, unit, relations, osspec);
+    // add_protect_function(s, unit, relations, osspec);
+    // add_unmap_function(s, unit, relations, osspec);
+
+    // add_higher_order_functions(s, unit, relations, osspec);
+
+    // resolve function
+    // add_resolve_function(s, unit, relations, osspec);
 
     // save the scope
     log::debug!("saving the scope!");
-    scope.set_filename("unit.h");
+    let filename = format!("{}_unit.h", unit.ident().to_ascii_lowercase());
+    scope.set_filename(&filename);
     scope.to_file(outdir, true)?;
     Ok(())
 }
