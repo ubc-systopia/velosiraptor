@@ -61,6 +61,8 @@ use velosiast::VelosiAst;
 pub struct Relations {
     /// relations between the units. unit id -> unit id
     relations: HashMap<Rc<String>, Vec<Rc<String>>>,
+    /// the parent of a unit
+    parent_relations: HashMap<Rc<String>, Rc<String>>,
     /// the root units
     roots: HashSet<Rc<String>>,
     /// all units
@@ -73,6 +75,7 @@ impl Relations {
     pub fn new() -> Self {
         Relations {
             relations: HashMap::new(),
+            parent_relations: HashMap::new(),
             all_units: HashMap::new(),
             roots: HashSet::new(),
             group_roots: HashSet::new(),
@@ -160,6 +163,8 @@ impl Relations {
         self.all_units.insert(key.clone(), parent.clone());
         for child in children.iter() {
             self.all_units.insert(child.ident().clone(), child.clone());
+            self.parent_relations
+                .insert(child.ident().clone(), key.clone());
         }
         let entry = self.relations.entry(key).or_default();
         entry.extend(children.iter().map(|u| u.ident().clone()));
@@ -275,6 +280,24 @@ impl Relations {
         self.do_insert(parent, children);
         self.update_roots();
         self.update_group_roots();
+    }
+
+    pub fn get_parent(&self, ident: &Rc<String>) -> Option<&Rc<String>> {
+        if let Some(u) = self.parent_relations.get(ident) {
+            Some(u)
+        } else {
+            assert!(self.roots.contains(ident));
+            None
+        }
+    }
+
+    pub fn get_parent_unit(&self, ident: &Rc<String>) -> Option<&VelosiAstUnit> {
+        if let Some(u) = self.parent_relations.get(ident) {
+            self.all_units.get(u)
+        } else {
+            assert!(self.roots.contains(ident));
+            None
+        }
     }
 
     pub fn get_children(&self, ident: &Rc<String>) -> &[Rc<String>] {
