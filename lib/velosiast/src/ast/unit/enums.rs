@@ -50,7 +50,7 @@ use crate::{
 // used definitions of references AST nodes
 use crate::ast::{
     VelosiAstExpr, VelosiAstIdentifier, VelosiAstMethod, VelosiAstNode, VelosiAstParam,
-    VelosiAstUnit,
+    VelosiAstTypeInfo, VelosiAstUnit,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -559,6 +559,18 @@ impl VelosiAstUnitEnum {
 
     pub fn has_memory_state(&self) -> bool {
         self.enums.values().any(|v| v.has_memory_state)
+    }
+
+    pub fn get_method_with_signature(
+        &self,
+        params: &[VelosiAstTypeInfo],
+        rtype: &VelosiAstTypeInfo,
+    ) -> Vec<Rc<VelosiAstMethod>> {
+        self.methods
+            .values()
+            .filter(|m| m.matches_signature(params, rtype))
+            .cloned()
+            .collect()
     }
 }
 

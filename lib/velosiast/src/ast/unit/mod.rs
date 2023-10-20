@@ -252,6 +252,20 @@ impl VelosiAstUnit {
         }
     }
 
+    pub fn get_method_with_signature(
+        &self,
+        params: &[VelosiAstTypeInfo],
+        rtype: &VelosiAstTypeInfo,
+    ) -> Vec<Rc<VelosiAstMethod>> {
+        use VelosiAstUnit::*;
+        match self {
+            StaticMap(staticmap) => staticmap.get_method_with_signature(params, rtype),
+            Segment(segment) => segment.get_method_with_signature(params, rtype),
+            Enum(e) => e.get_method_with_signature(params, rtype),
+            OSSpec(o) => o.get_method_with_signature(params, rtype),
+        }
+    }
+
     pub fn consts(&self) -> Box<dyn Iterator<Item = &Rc<VelosiAstConst>> + '_> {
         use VelosiAstUnit::*;
         match self {

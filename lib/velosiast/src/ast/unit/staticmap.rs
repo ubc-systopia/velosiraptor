@@ -51,7 +51,7 @@ use crate::{
 
 use crate::ast::{
     VelosiAstConst, VelosiAstExpr, VelosiAstIdentifier, VelosiAstMethod, VelosiAstParam,
-    VelosiAstStaticMap, VelosiAstUnit,
+    VelosiAstStaticMap, VelosiAstTypeInfo, VelosiAstUnit,
 };
 
 #[derive(PartialEq, Eq, Clone)]
@@ -449,6 +449,18 @@ impl VelosiAstUnitStaticMap {
 
     pub fn has_memory_state(&self) -> bool {
         self.map.has_memory_state()
+    }
+
+    pub fn get_method_with_signature(
+        &self,
+        params: &[VelosiAstTypeInfo],
+        rtype: &VelosiAstTypeInfo,
+    ) -> Vec<Rc<VelosiAstMethod>> {
+        self.methods
+            .values()
+            .filter(|m| m.matches_signature(params, rtype))
+            .cloned()
+            .collect()
     }
 }
 

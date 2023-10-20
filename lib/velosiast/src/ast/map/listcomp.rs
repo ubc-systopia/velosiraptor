@@ -187,6 +187,10 @@ impl VelosiAstStaticMapListComp {
         self.properties.contains(&VelosiAstUnitProperty::ListRepr)
     }
 
+    pub fn is_repr_array(&self) -> bool {
+        self.properties.contains(&VelosiAstUnitProperty::ArrayRepr)
+    }
+
     // returns the size of the map in elements
     pub fn size(&self) -> usize {
         (self.range.end - self.range.start).try_into().unwrap()

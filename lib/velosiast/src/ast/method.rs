@@ -345,7 +345,10 @@ impl VelosiAstMethod {
         let mut properties: HashSet<VelosiAstMethodProperty> = HashSet::new();
         for p in pt.properties.into_iter() {
             let loc = p.loc.clone();
-            let prop = ast_result_unwrap!(VelosiAstMethodProperty::from_parse_tree(p, st), issues);
+            let prop = ast_result_unwrap!(
+                VelosiAstMethodProperty::from_parse_tree(p, st, osspec),
+                issues
+            );
 
             if properties.contains(&prop) {
                 let msg = "ignoring double defined property";
@@ -647,7 +650,7 @@ impl VelosiAstMethod {
         }
 
         // check a few things regarding the properties
-        if !properties.is_empty() && !rtype.is_boolean() {
+        if !properties.is_empty() && !rtype.is_boolean() && !osspec {
             let msg = "methods with properties must have a boolean return type.";
             let hint = "change this to `fn -> bool`";
             let err = VelosiAstErrBuilder::warn(msg.to_string())
@@ -962,7 +965,9 @@ impl VelosiAstMethod {
                 }
             }
             _ => {
-                self.check_rettype_non_void(issues);
+                if !self.is_extern {
+                    self.check_rettype_non_void(issues);
+                }
             }
         }
     }
@@ -1066,6 +1071,20 @@ impl VelosiAstMethod {
             false
         }
     }
+
+    pub fn matches_signature(
+        &self,
+        params: &[VelosiAstTypeInfo],
+        rtype: &VelosiAstTypeInfo,
+    ) -> bool {
+        self.rtype.typeinfo.compatible(rtype)
+            && self.params.len() == params.len()
+            && self
+                .params
+                .iter()
+                .enumerate()
+                .all(|(i, p)| p.ptype.typeinfo.compatible(&params[i]))
+    }
 }
 
 /// Implementation fo the [From] trait for [Symbol]
@@ -1154,6 +1173,8 @@ impl Debug for VelosiAstMethod {
 pub enum VelosiAstMethodProperty {
     Invariant,
     Remap,
+    MAlloc,
+    MFree,
     None,
 }
 
@@ -1161,9 +1182,20 @@ impl VelosiAstMethodProperty {
     pub fn from_parse_tree(
         pt: VelosiParseTreeProperty,
         _st: &mut SymbolTable,
+        osspec: bool,
     ) -> AstResult<Self, VelosiAstIssues> {
         match pt.ident.name.as_str() {
             "invariant" => {
+                if osspec {
+                    let msg =
+                        "unsupported method property `invariant` in OSSpec context".to_string();
+                    let hint = "remove this property.";
+                    let err = VelosiAstErrBuilder::err(msg)
+                        .add_hint(hint.to_string())
+                        .add_location(pt.loc)
+                        .build();
+                    return AstResult::Issues(Self::None, VelosiAstIssues::from(err));
+                }
                 if !pt.params.is_empty() {
                     let msg = "method property `invariant` doesn't support arguments";
                     let hint = "remove these arguments";
@@ -1177,6 +1209,15 @@ impl VelosiAstMethodProperty {
                 }
             }
             "remap" => {
+                if osspec {
+                    let msg = "unsupported method property `remap` in OSSpec context".to_string();
+                    let hint = "remove this property.";
+                    let err = VelosiAstErrBuilder::err(msg)
+                        .add_hint(hint.to_string())
+                        .add_location(pt.loc)
+                        .build();
+                    return AstResult::Issues(Self::None, VelosiAstIssues::from(err));
+                }
                 if !pt.params.is_empty() {
                     let msg = "method property `remap` doesn't support arguments";
                     let hint = "remove these arguments";
@@ -1184,9 +1225,55 @@ impl VelosiAstMethodProperty {
                         .add_hint(hint.to_string())
                         .add_location(pt.params.first().unwrap().loc.clone())
                         .build();
-                    AstResult::Issues(Self::Invariant, VelosiAstIssues::from(err))
+                    AstResult::Issues(Self::Remap, VelosiAstIssues::from(err))
                 } else {
                     AstResult::Ok(Self::Remap)
+                }
+            }
+            "malloc" => {
+                if !osspec {
+                    let msg =
+                        "unsupported method property `malloc` in non-OSSpec context".to_string();
+                    let hint = "remove this property.";
+                    let err = VelosiAstErrBuilder::err(msg)
+                        .add_hint(hint.to_string())
+                        .add_location(pt.loc)
+                        .build();
+                    return AstResult::Issues(Self::None, VelosiAstIssues::from(err));
+                }
+                if !pt.params.is_empty() {
+                    let msg = "method property `malloc` doesn't support arguments";
+                    let hint = "remove these arguments";
+                    let err = VelosiAstErrBuilder::err(msg.to_string())
+                        .add_hint(hint.to_string())
+                        .add_location(pt.params.first().unwrap().loc.clone())
+                        .build();
+                    AstResult::Issues(Self::MAlloc, VelosiAstIssues::from(err))
+                } else {
+                    AstResult::Ok(Self::MAlloc)
+                }
+            }
+            "mfree" => {
+                if !osspec {
+                    let msg =
+                        "unsupported method property `mfree` in non-OSSpec context".to_string();
+                    let hint = "remove this property.";
+                    let err = VelosiAstErrBuilder::err(msg)
+                        .add_hint(hint.to_string())
+                        .add_location(pt.loc)
+                        .build();
+                    return AstResult::Issues(Self::None, VelosiAstIssues::from(err));
+                }
+                if !pt.params.is_empty() {
+                    let msg = "method property `mfree` doesn't support arguments";
+                    let hint = "remove these arguments";
+                    let err = VelosiAstErrBuilder::err(msg.to_string())
+                        .add_hint(hint.to_string())
+                        .add_location(pt.params.first().unwrap().loc.clone())
+                        .build();
+                    AstResult::Issues(Self::MFree, VelosiAstIssues::from(err))
+                } else {
+                    AstResult::Ok(Self::MFree)
                 }
             }
             p => {
@@ -1207,6 +1294,8 @@ impl Display for VelosiAstMethodProperty {
         match self {
             Self::Invariant => write!(f, "invariant"),
             Self::Remap => write!(f, "remap"),
+            Self::MAlloc => write!(f, "malloc"),
+            Self::MFree => write!(f, "mfree"),
             Self::None => Ok(()),
         }
     }
