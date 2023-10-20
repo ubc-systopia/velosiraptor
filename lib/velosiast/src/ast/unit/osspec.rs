@@ -48,8 +48,8 @@ use crate::{
 
 // used definitions of references AST nodes
 use crate::ast::{
-    VelosiAstConst, VelosiAstIdentifier, VelosiAstMethod, VelosiAstParam, VelosiAstTypeProperty,
-    VelosiAstUnit,
+    VelosiAstConst, VelosiAstIdentifier, VelosiAstMethod, VelosiAstParam, VelosiAstTypeInfo,
+    VelosiAstTypeProperty, VelosiAstUnit,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -383,6 +383,29 @@ impl VelosiAstUnitOSSpec {
 
     pub fn params_as_slice(&self) -> &[Rc<VelosiAstParam>] {
         unimplemented!()
+    }
+
+    pub fn get_method_with_signature(
+        &self,
+        params: &[VelosiAstTypeInfo],
+        rtype: &VelosiAstTypeInfo,
+    ) -> Vec<Rc<VelosiAstMethod>> {
+        self.methods
+            .values()
+            .filter(|m| m.matches_signature(params, rtype))
+            .cloned()
+            .collect()
+    }
+
+    pub fn get_phys_alloc_fn(&self) -> Vec<Rc<VelosiAstMethod>> {
+        self.get_method_with_signature(
+            &[VelosiAstTypeInfo::Size, VelosiAstTypeInfo::PhysAddr],
+            &VelosiAstTypeInfo::PhysAddr,
+        )
+    }
+
+    pub fn get_virt_alloc_fn(&self) -> Vec<Rc<VelosiAstMethod>> {
+        self.get_method_with_signature(&[VelosiAstTypeInfo::Size], &VelosiAstTypeInfo::VirtAddr)
     }
 }
 

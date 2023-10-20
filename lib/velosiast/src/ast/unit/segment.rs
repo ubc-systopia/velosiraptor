@@ -56,7 +56,7 @@ use crate::ast::{
     },
     VelosiAstConst, VelosiAstExpr, VelosiAstFlags, VelosiAstIdentifier, VelosiAstInterface,
     VelosiAstMethod, VelosiAstNode, VelosiAstParam, VelosiAstState, VelosiAstStateField,
-    VelosiAstUnit, VelosiOperation,
+    VelosiAstTypeInfo, VelosiAstUnit, VelosiOperation,
 };
 
 #[derive(PartialEq, Eq, Clone)]
@@ -768,6 +768,18 @@ impl VelosiAstUnitSegment {
             .get("map")
             .map(|m| m.maps_frame())
             .unwrap_or_default()
+    }
+
+    pub fn get_method_with_signature(
+        &self,
+        params: &[VelosiAstTypeInfo],
+        rtype: &VelosiAstTypeInfo,
+    ) -> Vec<Rc<VelosiAstMethod>> {
+        self.methods
+            .values()
+            .filter(|m| m.matches_signature(params, rtype))
+            .cloned()
+            .collect()
     }
 }
 
