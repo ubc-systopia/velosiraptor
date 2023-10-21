@@ -44,6 +44,7 @@ use crate::ast::types::VelosiAstExternType;
 use crate::error::{VelosiAstErrBuilder, VelosiAstIssues};
 use crate::{
     ast_result_return, ast_result_unwrap, unit_ignore_node, utils, AstResult, Symbol, SymbolTable,
+    VelosiAstMethodProperty,
 };
 
 // used definitions of references AST nodes
@@ -397,15 +398,79 @@ impl VelosiAstUnitOSSpec {
             .collect()
     }
 
+    fn get_methods_with_property_and_signature(
+        &self,
+        prop: &VelosiAstMethodProperty,
+        params: &[VelosiAstTypeInfo],
+        rtype: &VelosiAstTypeInfo,
+    ) -> Vec<Rc<VelosiAstMethod>> {
+        // try to get all methods with the alloc property first, the match the signature
+        let methods: Vec<_> = self
+            .get_method_with_property(prop)
+            .iter()
+            .filter(|m| m.matches_signature(params, rtype))
+            .cloned()
+            .collect();
+        if !methods.is_empty() {
+            return methods;
+        }
+        // look for other methods that may match the signature
+        self.get_method_with_signature(params, rtype)
+    }
+
     pub fn get_phys_alloc_fn(&self) -> Vec<Rc<VelosiAstMethod>> {
-        self.get_method_with_signature(
-            &[VelosiAstTypeInfo::Size, VelosiAstTypeInfo::PhysAddr],
-            &VelosiAstTypeInfo::PhysAddr,
+        let rtype = VelosiAstTypeInfo::PhysAddr;
+        let params = [VelosiAstTypeInfo::Size, VelosiAstTypeInfo::PhysAddr];
+
+        self.get_methods_with_property_and_signature(
+            &VelosiAstMethodProperty::MAlloc,
+            &params,
+            &rtype,
         )
     }
 
     pub fn get_virt_alloc_fn(&self) -> Vec<Rc<VelosiAstMethod>> {
-        self.get_method_with_signature(&[VelosiAstTypeInfo::Size], &VelosiAstTypeInfo::VirtAddr)
+        let rtype = VelosiAstTypeInfo::VirtAddr;
+        let params = [VelosiAstTypeInfo::Size];
+
+        self.get_methods_with_property_and_signature(
+            &VelosiAstMethodProperty::MAlloc,
+            &params,
+            &rtype,
+        )
+    }
+
+    pub fn get_phys_mem_free_fn(&self) -> Vec<Rc<VelosiAstMethod>> {
+        let rtype = VelosiAstTypeInfo::Void;
+        let params = [VelosiAstTypeInfo::PhysAddr, VelosiAstTypeInfo::Size];
+
+        self.get_methods_with_property_and_signature(
+            &VelosiAstMethodProperty::MFree,
+            &params,
+            &rtype,
+        )
+    }
+
+    pub fn get_virt_mem_free_fn(&self) -> Vec<Rc<VelosiAstMethod>> {
+        let rtype = VelosiAstTypeInfo::Void;
+        let params = [VelosiAstTypeInfo::VirtAddr, VelosiAstTypeInfo::Size];
+
+        self.get_methods_with_property_and_signature(
+            &VelosiAstMethodProperty::MFree,
+            &params,
+            &rtype,
+        )
+    }
+
+    pub fn get_method_with_property(
+        &self,
+        property: &VelosiAstMethodProperty,
+    ) -> Vec<Rc<VelosiAstMethod>> {
+        self.methods
+            .values()
+            .filter(|m| m.properties.contains(property))
+            .cloned()
+            .collect()
     }
 }
 

@@ -93,6 +93,10 @@ impl VelosiAstStaticMapExplicit {
     pub fn has_memory_state(&self) -> bool {
         self.entries.iter().any(|e| e.has_memory_state())
     }
+
+    pub fn memory_state_size(&self) -> usize {
+        unimplemented!()
+    }
 }
 
 /// Implementation of [PartialEq] for [VelosiAstStaticMapListComp]

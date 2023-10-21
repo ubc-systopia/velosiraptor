@@ -116,6 +116,14 @@ impl VelosiAstStaticMap {
         }
     }
 
+    pub fn memory_state_size(&self) -> usize {
+        match self {
+            VelosiAstStaticMap::ListComp(s) => s.memory_state_size(),
+            VelosiAstStaticMap::Explicit(s) => s.memory_state_size(),
+            VelosiAstStaticMap::None(_) => 0,
+        }
+    }
+
     pub fn has_memory_state(&self) -> bool {
         match self {
             VelosiAstStaticMap::ListComp(s) => s.has_memory_state(),

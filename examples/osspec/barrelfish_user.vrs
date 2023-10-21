@@ -24,6 +24,7 @@ osspec MyOs {
     }
 
     // extern fn get_vnode_for_va(va: vaddr) -> vnode
+    extern fn frame_to_paddr(pa: Frame) -> paddr
     extern fn get_vnode_for_va(va: vaddr) -> Capref
     extern fn get_mapping_for_va(va: vaddr) -> Capref
 

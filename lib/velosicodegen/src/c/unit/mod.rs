@@ -25,7 +25,7 @@
 
 //! Unit Generation (C)
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 mod enums;
 mod segment;
@@ -42,7 +42,7 @@ pub fn generate(
     unit: &VelosiAstUnit,
     osspec: &VelosiAst,
     relations: &Relations,
-    outdir: &mut PathBuf,
+    outdir: &mut Path,
 ) -> Result<(), VelosiCodeGenError> {
     match unit {
         VelosiAstUnit::Segment(segment) => {

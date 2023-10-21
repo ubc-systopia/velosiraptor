@@ -33,12 +33,87 @@ use crustal as C;
 use velosiast::{
     VelosiAst, VelosiAstMethod, VelosiAstStaticMap, VelosiAstStaticMapExplicit,
     VelosiAstStaticMapListComp, VelosiAstTypeInfo, VelosiAstTypeProperty, VelosiAstUnit,
-    VelosiAstUnitProperty, VelosiAstUnitSegment, VelosiAstUnitStaticMap,
+    VelosiAstUnitStaticMap,
 };
 use velosicomposition::Relations;
 
 use super::utils::{self, UnitUtils};
 use crate::VelosiCodeGenError;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn calculate_next_va(va: &C::Expr, bits: u64) -> C::Expr {
+    let mask = if bits == 64 {
+        0xffff_ffff_ffff_ffff
+    } else {
+        (1 << bits) - 1
+    };
+    C::Expr::binop(va.clone(), "&", C::Expr::new_num(mask))
+}
+
+fn add_fn_params<'a>(
+    fun: &mut C::Function,
+    unit: &VelosiAstUnitStaticMap,
+    op: &'a VelosiAstMethod,
+    osspec: &VelosiAst,
+) -> (
+    HashMap<&'a str, C::Expr>,
+    HashMap<&'a str, VelosiAstTypeInfo>,
+) {
+    let env = osspec.osspec().unwrap();
+
+    let mut param_exprs = HashMap::new();
+    let mut param_types = HashMap::new();
+
+    let unit_param = fun
+        .new_param("unit", C::Type::to_ptr(&unit.to_ctype()))
+        .to_expr();
+    param_exprs.insert("$unit", unit_param.clone());
+    param_types.insert(
+        "$unit",
+        VelosiAstTypeInfo::TypeRef(Rc::new(unit.to_type_name())),
+    );
+
+    for f in op.params.iter() {
+        let p = if f.ident().as_str() == "pa" {
+            if let Some(ty) = env.get_extern_type_with_property(VelosiAstTypeProperty::Frame) {
+                param_types.insert(
+                    f.ident().as_str(),
+                    VelosiAstTypeInfo::Extern(ty.ident.ident.clone()),
+                );
+                fun.new_param(f.ident(), C::Type::new_typedef(ty.ident.as_str()))
+            } else {
+                param_types.insert(f.ident().as_str(), f.ptype.typeinfo.clone());
+                fun.new_param(
+                    f.ident(),
+                    unit.ptype_to_ctype(&VelosiAstTypeInfo::PhysAddr, true),
+                )
+            }
+        } else {
+            param_types.insert(f.ident().as_str(), f.ptype.typeinfo.clone());
+            fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo, true))
+        };
+        param_exprs.insert(f.ident().as_str(), p.to_expr());
+    }
+
+    (param_exprs, param_types)
+}
+
+fn base_inbitwidth(relations: &Relations, ident: &Rc<String>, inbitwidth: u64) -> u64 {
+    let children = relations.get_children_units(ident);
+    if children.is_empty() {
+        inbitwidth
+    } else {
+        children
+            .iter()
+            .map(|u| base_inbitwidth(relations, u.ident(), u.input_bitwidth()))
+            .chain(std::iter::once(inbitwidth))
+            .min()
+            .unwrap()
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Constants
@@ -69,7 +144,7 @@ fn next_unit_type(
 ) -> C::Type {
     let env = osspec.osspec().unwrap();
 
-    let root_units = relations.get_roots();
+    let _root_units = relations.get_roots();
 
     match relations.get_children_units(unit.ident()).as_slice() {
         [VelosiAstUnit::Enum(e)] => {
@@ -127,7 +202,7 @@ fn generate_child_struct(
         [VelosiAstUnit::Enum(e)] => {
             let children = relations.get_children_units(e.ident());
 
-            let roots = relations.get_group_roots();
+            let _roots = relations.get_group_roots();
 
             let mut children_union = C::Union::new(&unit.to_child_union_name());
             let mut children_enum = C::Enum::new(&unit.to_child_kind_name());
@@ -176,7 +251,30 @@ fn generate_child_struct(
             children_struct.new_field("kind", children_enum_ty);
             children_struct.new_field("variants", children_union_ty);
         }
-        [VelosiAstUnit::Segment(e)] => {}
+        [VelosiAstUnit::Segment(e)] => {
+            if e.maps_table() {
+                if let Some(frametype) =
+                    env.get_extern_type_with_property(VelosiAstTypeProperty::Descriptor)
+                {
+                    children_struct
+                        .new_field("table", C::Type::new_typedef(frametype.ident.as_str()));
+                } else {
+                    children_struct.new_field("dummy", C::Type::new_int32());
+                }
+            } else if e.maps_frame() {
+                // this one just maps a frame
+                if let Some(frametype) =
+                    env.get_extern_type_with_property(VelosiAstTypeProperty::Frame)
+                {
+                    children_struct
+                        .new_field("frame", C::Type::new_typedef(frametype.ident.as_str()));
+                } else {
+                    children_struct.new_field("dummy", C::Type::new_int32());
+                }
+            } else {
+                unreachable!()
+            }
+        }
         _ => unreachable!(),
     }
 
@@ -195,13 +293,13 @@ fn generate_unit_struct(
 
     let children = relations.get_children_units(unit.ident());
     assert!(children.len() == 1);
-    let child = &children[0];
+    let _child = &children[0];
 
     let child_type = next_unit_type(unit, relations, osspec);
 
     let env = osspec.osspec().unwrap();
 
-    let mut fields = if env.has_map_protect_unmap() {
+    let fields = if env.has_map_protect_unmap() {
         let mut fields = Vec::new();
         for etype in env.extern_types.values() {
             if etype
@@ -218,25 +316,25 @@ fn generate_unit_struct(
             }
         }
 
-        let properties = unit.properties();
-        if properties.contains(&VelosiAstUnitProperty::ArrayRepr) {
-            // array representation
-            fields.push(C::Field::with_string(
-                "child".to_string(),
-                child_type.to_ptr().to_array(unit.map_size()),
-            ));
-        } else if properties.contains(&VelosiAstUnitProperty::ListRepr) {
-            fields.push(C::Field::with_string(
-                "child".to_string(),
-                child_type.to_ptr(),
-            ));
-        } else {
-            fields.push(C::Field::with_string(
-                "child".to_string(),
-                child_type.to_ptr(),
-            ));
+        match &unit.map {
+            VelosiAstStaticMap::Explicit(_) => unimplemented!(),
+            VelosiAstStaticMap::ListComp(lc) => {
+                if lc.is_repr_list() {
+                    fields.push(C::Field::with_string(
+                        "children".to_string(),
+                        child_type.to_ptr(),
+                    ));
+                } else {
+                    //  if lc.is_repr_list() {
+                    // array representation
+                    fields.push(C::Field::with_string(
+                        "children".to_string(),
+                        child_type.to_ptr().to_array(unit.map_size()),
+                    ));
+                }
+            }
+            VelosiAstStaticMap::None(_) => unreachable!(),
         }
-
         fields
     } else {
         unit.params
@@ -321,9 +419,9 @@ fn add_constructor_function(
         body.fn_call(
             "memset",
             vec![
-                C::Expr::field_access(&unit_expr, "child"),
+                C::Expr::field_access(&unit_expr, "children"),
                 C::Expr::new_num(0),
-                C::Expr::size_of(&C::Expr::field_access(&unit_expr, "child")),
+                C::Expr::size_of(&C::Expr::field_access(&unit_expr, "children")),
             ],
         );
     }
@@ -331,45 +429,6 @@ fn add_constructor_function(
     fun.push_doc_str("constructor of the unit type");
 
     scope.push_function(fun);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Map/Unmap/Protect Functions
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn add_fn_params<'a>(
-    fun: &mut C::Function,
-    unit: &VelosiAstUnitStaticMap,
-    op: &'a VelosiAstMethod,
-    osspec: &VelosiAst,
-) -> HashMap<&'a str, C::Expr> {
-    let env = osspec.osspec().unwrap();
-
-    let mut param_exprs = HashMap::new();
-
-    let unit_param = fun
-        .new_param("unit", C::Type::to_ptr(&unit.to_ctype()))
-        .to_expr();
-    param_exprs.insert("$unit", unit_param.clone());
-
-    for f in op.params.iter() {
-        let p = if f.ident().as_str() == "pa" {
-            if let Some(ty) = env.get_extern_type_with_property(VelosiAstTypeProperty::Frame) {
-                fun.new_param(f.ident(), C::Type::new_typedef(ty.ident.as_str()))
-            } else {
-                fun.new_param(
-                    f.ident(),
-                    unit.ptype_to_ctype(&VelosiAstTypeInfo::PhysAddr, true),
-                )
-            }
-        } else {
-            fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo, true))
-        };
-
-        param_exprs.insert(f.ident().as_str(), p.to_expr());
-    }
-
-    param_exprs
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -592,7 +651,9 @@ fn add_op_fn_list_comp(
         // so we can call the map functions accordingly!
     } else if let VelosiAstUnit::Segment(child) = child {
         if child.maps_frame() {
+            println!("HANDLE ME!");
         } else if child.maps_table() {
+            println!("HANDLE ME! 2");
         } else {
             unreachable!()
         }
@@ -685,22 +746,8 @@ fn add_do_protect_function(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Utility functions
+// Higher-Order Functions with Loops
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn base_inbitwidth(relations: &Relations, ident: &Rc<String>, inbitwidth: u64) -> u64 {
-    let children = relations.get_children_units(ident);
-    if children.is_empty() {
-        inbitwidth
-    } else {
-        children
-            .iter()
-            .map(|u| base_inbitwidth(relations, u.ident(), u.input_bitwidth()))
-            .chain(std::iter::once(inbitwidth))
-            .min()
-            .unwrap()
-    }
-}
 
 fn add_higher_order_map(
     scope: &mut C::Scope,
@@ -1244,144 +1291,342 @@ fn add_higher_order_functions(
     add_higher_order_function(scope, unit, relations, "protect", osspec);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Higher-Order Functions mapping a single page
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct OpConfig<'a> {
     unit: &'a VelosiAstUnitStaticMap,
     lc: &'a VelosiAstStaticMapListComp,
     relations: &'a Relations,
     osspec: &'a VelosiAst,
     param_exprs: HashMap<&'a str, C::Expr>,
+    param_types: HashMap<&'a str, VelosiAstTypeInfo>,
     op: &'a VelosiAstMethod,
 }
 
 fn add_op_fn_body_listcomp<'a>(body: &'a mut C::Block, ctxt: OpConfig<'a>) {
     let env = ctxt.osspec.osspec().unwrap();
 
-    body.return_expr(C::Expr::new_num(0));
+    let child = ctxt.relations.get_only_child_unit(ctxt.unit.ident());
+    //let page_size = 1 << ctxt.lc.inputsize;
 
-    return;
+    if env.has_map_protect_unmap() {
+        // -----------------------------------------------------------------------------------------
+        // Function Body: Implementation for OS Spec
+        // -----------------------------------------------------------------------------------------
 
-    let children = ctxt.relations.get_children_units(ctxt.unit.ident());
-    assert!(children.len() == 1);
-    let child = &children[0];
+        body.new_comment("resolve through OS spec");
 
-    let page_size = 1 << ctxt.lc.inputsize;
+        let child_type = next_unit_type(ctxt.unit, ctxt.relations, ctxt.osspec).to_ptr();
+        let v_child = body.new_variable("child", child_type).to_expr();
+        body.assign(
+            v_child.clone(),
+            C::Expr::fn_call(
+                &ctxt.unit.get_child_fn_name(),
+                vec![
+                    ctxt.param_exprs["$unit"].clone(),
+                    ctxt.param_exprs["va"].clone(),
+                ],
+            ),
+        );
 
-    // we need to differentiate based on the type of the next unit, which can be a Segment or an Enum
-    match child {
-        VelosiAstUnit::Enum(_) => {
-            if env.has_map_protect_unmap() {
+        let is_map = ctxt.op.ident().as_str() == "map";
+        let is_unmap = ctxt.op.ident().as_str() == "unmap";
+
+        let page_size = 1 << child.input_bitwidth();
+
+        let has_mapping_check =
+            body.new_ifelse(&C::Expr::binop(v_child.clone(), "==", C::Expr::null()));
+        match child {
+            VelosiAstUnit::Enum(en) => {
                 // we have something defined in the operating systems spec, so use this one!
-                println!("TODO: Implement me!");
-                return;
-            } else {
-                // nothing defined in the OS spec, we just change the things directly
-                println!("TODO: Implement me!");
-                return;
+                // unimplemented!();
+                let env_fn = if is_map {
+                    env.get_map_method(VelosiAstTypeProperty::Frame)
+                        .expect("function not found")
+                } else {
+                    env.get_method(ctxt.op.ident().as_str())
+                        .expect("function not found")
+                };
+
+                let body = if is_map {
+                    has_mapping_check
+                        .other_branch()
+                        .new_comment("tried to map an already mapped frame!")
+                        .return_expr(C::Expr::new_num(0));
+                    has_mapping_check.then_branch()
+                } else if is_unmap {
+                    has_mapping_check
+                        .then_branch()
+                        .new_comment("already unmapped, just return")
+                        .return_expr(C::Expr::new_num(page_size));
+                    body
+                } else {
+                    has_mapping_check
+                        .then_branch()
+                        .return_expr(C::Expr::new_num(0));
+                    body
+                };
+
+                if is_map {
+                    body.new_comment("TODO: figure out which enum to create!");
+
+                    let mut var_mappings = HashMap::new();
+
+                    let ty = ctxt.param_types["pa"].clone();
+                    if !ty.is_addr() {
+                        let frame_to_pa =
+                            env.get_method_with_signature(&[ty], &VelosiAstTypeInfo::PhysAddr);
+                        match frame_to_pa.as_slice() {
+                            [] => panic!("requires setting function!"),
+                            [m] => {
+                                var_mappings.insert(
+                                    "pa",
+                                    C::Expr::fn_call(
+                                        m.ident().as_str(),
+                                        vec![C::Expr::new_var("pa", C::Type::new_void())],
+                                    ),
+                                );
+                            }
+                            _ => panic!("too many things returned"),
+                        }
+                    }
+
+                    let mut variants = ctxt.relations.get_children_units(en.ident());
+                    variants.sort_by(|a, b| match (a, b) {
+                        (VelosiAstUnit::Segment(a), VelosiAstUnit::Segment(b)) => {
+                            if a.maps_frame() && b.maps_table() {
+                                std::cmp::Ordering::Less
+                            } else if a.maps_table() && b.maps_frame() {
+                                std::cmp::Ordering::Greater
+                            } else {
+                                std::cmp::Ordering::Equal
+                            }
+                        }
+                        _ => unreachable!(),
+                    });
+
+                    for variant in variants {
+                        let variant = if let VelosiAstUnit::Segment(a) = variant {
+                            a
+                        } else {
+                            unreachable!()
+                        };
+                        let mfn = variant.get_method("map").unwrap();
+
+                        if let Some(r0) = mfn.requires.first() {
+                            let r0 = ctxt.unit.expr_to_cpp(&var_mappings, r0);
+                            let cond = mfn.requires.iter().skip(1).fold(r0, |acc, f| {
+                                C::Expr::land(acc, ctxt.unit.expr_to_cpp(&var_mappings, f))
+                            });
+                            let c = body.new_ifelse(&cond).then_branch();
+
+                            let mut var_mappings = HashMap::new();
+                            if variant.maps_frame() {
+                                c.new_comment("variant mapping a frame");
+
+                                let env_fn_body =
+                                    env_fn.body.as_ref().expect("env fn doesn't have a body");
+                                let map_cond = c
+                                    .new_ifelse(&ctxt.unit.expr_to_cpp(&var_mappings, env_fn_body));
+
+                                map_cond
+                                    .then_branch()
+                                    .new_comment("TODO: ALLOCATE FRAME MAPPING");
+                                map_cond
+                                    .then_branch()
+                                    .new_comment("TODO: INSERT INTO CHILDREN");
+                                map_cond
+                                    .then_branch()
+                                    .return_expr(C::Expr::new_num(page_size));
+                                map_cond.other_branch().return_expr(C::Expr::new_num(0));
+                            } else if variant.maps_table() {
+                                c.new_comment("variant mapping a table!");
+
+                                c.new_comment("allocate a new table");
+
+                                c.new_comment("map it");
+
+                                c.new_comment("recurse");
+                            } else {
+                                unreachable!()
+                            }
+                        }
+                    }
+                    body.return_expr(C::Expr::new_num(0));
+                } else {
+                    let switch = body.new_switch(&C::Expr::field_access(&v_child, "kind"));
+                    for variant in ctxt.relations.get_children_units(en.ident()) {
+                        let b = switch.new_case(C::Expr::new_var(
+                            &variant.ident().to_ascii_uppercase(),
+                            C::Type::new_enum(&ctxt.unit.to_child_kind_name()),
+                        ));
+
+                        if let VelosiAstUnit::Segment(seg) = &variant {
+                            if seg.maps_frame() {
+                                let var_mappings = HashMap::new();
+                                let env_fn_body =
+                                    env_fn.body.as_ref().expect("env fn doesn't have a body");
+                                let map_cond = b
+                                    .new_ifelse(&ctxt.unit.expr_to_cpp(&var_mappings, env_fn_body));
+
+                                if is_map {
+                                    // mapping
+                                    map_cond
+                                        .then_branch()
+                                        .new_comment("TODO: ALLOCATE FRAME MAPPING");
+                                    map_cond
+                                        .then_branch()
+                                        .new_comment("TODO: INSERT INTO CHILDREN");
+                                } else if is_unmap {
+                                    // unmapping
+                                    map_cond
+                                        .then_branch()
+                                        .new_comment("TODO: REMOVE FROM CHILDREN");
+                                    map_cond
+                                        .then_branch()
+                                        .new_comment("TODO: FREE FRAME MAPPING");
+                                } else {
+                                    // protecting -- nothing to be done here
+                                }
+                                map_cond
+                                    .then_branch()
+                                    .return_expr(C::Expr::new_num(page_size));
+                                map_cond.other_branch().return_expr(C::Expr::new_num(0));
+                            } else if seg.maps_table() {
+                                let next = ctxt.relations.get_only_child_unit(seg.ident());
+                                let variant_field = C::Expr::field_access(&v_child, "variants");
+                                let child_variant = C::Expr::field_access(
+                                    &variant_field,
+                                    &variant.ident().to_ascii_lowercase(),
+                                );
+
+                                let mut args = vec![C::Expr::addr_of(&child_variant)];
+
+                                args.extend(
+                                    ctxt.op
+                                        .params
+                                        .iter()
+                                        .map(|p| ctxt.param_exprs[p.ident().as_str()].clone()),
+                                );
+
+                                b.return_expr(C::Expr::fn_call(
+                                    &next.to_hl_op_fn_name(ctxt.op),
+                                    args,
+                                ));
+                            } else {
+                                unreachable!();
+                            }
+                        } else {
+                            unreachable!()
+                        }
+                    }
+                }
             }
-        }
-        // -----------------------------------------------------------------------------------------
-        // Segments
-        // -----------------------------------------------------------------------------------------
-        VelosiAstUnit::Segment(seg) => {
-            // The next unit type is a segment. There can be two instances of a segment here, one that
-            // maps a Frame or one that maps a table.
-
-            if env.has_map_protect_unmap() {
-                let sz = &ctxt.param_exprs["sz"];
-                let va = &ctxt.param_exprs["va"];
-
-                // create the child variable
-                let child_var = body
-                    .new_variable("child", C::Type::new_struct("TODO_child_type").to_ptr())
-                    .to_expr();
-                body.assign(
-                    child_var.clone(),
-                    C::Expr::fn_call(
-                        ctxt.unit.get_child_fn_name().as_str(),
-                        vec![ctxt.param_exprs["$unit"].clone(), va.clone(), sz.clone()],
-                    ),
-                );
-
-                let mut wloop = C::WhileLoop::new(&C::Expr::binop(
-                    sz.clone(),
-                    ">=",
-                    C::Expr::new_num(page_size),
-                ));
-
-                let loop_body = wloop.body();
-
+            VelosiAstUnit::Segment(seg) => {
                 if seg.maps_frame() {
-                    // This entry maps a Frame. We need to perform the operation here on the entry
-                    // that maps this table. We can do this by invoking the full function here.
-
-                    let method = if ctxt.op.ident().as_str() == "map" {
+                    // body.new_comment("Entry: Segment mapping a frame (with interface)");
+                    let env_fn = if is_map {
                         env.get_map_method(VelosiAstTypeProperty::Frame)
-                            .expect("map method not found?")
+                            .expect("function not found")
                     } else {
-                        env.get_method(ctxt.op.ident.as_str())
-                            .expect("didn't find the method")
+                        env.get_method(ctxt.op.ident().as_str())
+                            .expect("function not found")
                     };
 
-                    let spec_body = method
-                        .body
-                        .as_ref()
-                        .expect("map method didn't have a body?");
+                    let body = if is_map {
+                        has_mapping_check
+                            .other_branch()
+                            .new_comment("tried to map an already mapped frame!")
+                            .return_expr(C::Expr::new_num(0));
+                        has_mapping_check.then_branch()
+                    } else if is_unmap {
+                        has_mapping_check
+                            .then_branch()
+                            .new_comment("already unmapped, just return")
+                            .return_expr(C::Expr::new_num(page_size));
+                        body
+                    } else {
+                        has_mapping_check
+                            .then_branch()
+                            .return_expr(C::Expr::new_num(0));
+                        body
+                    };
 
-                    let child_cond = loop_body.new_ifelse(&C::Expr::binop(
-                        child_var.clone(),
-                        "!=",
-                        C::Expr::null(),
-                    ));
+                    let var_mappings = HashMap::new();
+                    let env_fn_body = env_fn.body.as_ref().expect("env fn doesn't have a body");
+                    let map_cond =
+                        body.new_ifelse(&ctxt.unit.expr_to_cpp(&var_mappings, env_fn_body));
 
-                    let op_cond = child_cond.then_branch().new_ifelse(&C::Expr::lnot(
-                        ctxt.unit.expr_to_cpp(&ctxt.param_exprs, spec_body),
-                    ));
+                    if is_map {
+                        // mapping
+                        map_cond
+                            .then_branch()
+                            .new_comment("TODO: ALLOCATE FRAME MAPPING");
+                        map_cond
+                            .then_branch()
+                            .new_comment("TODO: INSERT INTO CHILDREN");
+                    } else if is_unmap {
+                        // unmapping
+                        map_cond
+                            .then_branch()
+                            .new_comment("TODO: REMOVE FROM CHILDREN");
+                        map_cond
+                            .then_branch()
+                            .new_comment("TODO: FREE FRAME MAPPING");
+                    } else {
+                        // protecting -- nothing to be done here
+                    }
+                    map_cond
+                        .then_branch()
+                        .return_expr(C::Expr::new_num(page_size));
+                    map_cond.other_branch().return_expr(C::Expr::new_num(0));
 
-                    op_cond.then_branch().return_expr(C::Expr::new_num(123));
-
-                    loop_body
-                        .assign(
-                            va.clone(),
-                            C::Expr::binop(va.clone(), "+", C::Expr::new_num(123)),
-                        )
-                        .assign(
-                            sz.clone(),
-                            C::Expr::binop(sz.clone(), "-", C::Expr::new_num(123)),
-                        )
-                        .assign(
-                            child_var.clone(),
-                            C::Expr::fn_call(
-                                ctxt.unit.get_next_child_fn_name().as_str(),
-                                vec![ctxt.param_exprs["$unit"].clone(), va.clone(), sz.clone()],
-                            ),
-                        );
-
-                    body.new_comment("Entry: Segment mapping a frame (with OS Spec)");
-                    body.while_loop(wloop);
+                    // perform the operation
                 } else if seg.maps_table() {
-                    // This entry maps a table. We need to make sure the entry has a valid table
-                    // mapping before we can continue with the operation
-                    unimplemented!("TODO: implement me!");
-                    body.new_comment("Entry: Segment mapping a table. (with OS Spec)");
-
-                    let _map = env.get_map_method(VelosiAstTypeProperty::Descriptor);
+                    // perform the mapping
+                    body.new_comment("Entry: Segment mapping a descriptor (with interface)");
+                    let next = ctxt.relations.get_only_child_unit(seg.ident());
+                    body.return_expr(C::Expr::fn_call(&next.to_hl_op_fn_name(ctxt.op), vec![]));
                 } else {
-                    unreachable!()
+                    unreachable!();
                 }
-            } else if seg.maps_frame() {
-                // This entry maps a Frame. We need to perform the operation here on the entry
-                // that maps this table.
-                body.new_comment("Entry: Segment mapping a frame (direct access)");
-            } else if seg.maps_table() {
-                // This entry maps a table. We need to make sure the entry has a valid table
-                // mapping before we can continue with the operation
-                unimplemented!("TODO: implement me!");
-                body.new_comment("Entry: Segment mapping a table.  (direct access)");
-            } else {
-                unreachable!()
             }
+            _ => unreachable!(),
         }
-        _ => unreachable!(),
+    } else {
+        // -----------------------------------------------------------------------------------------
+        // Function Body: Direct Implementation
+        // -----------------------------------------------------------------------------------------
+        body.new_comment("Entry: Segment mapping a frame (direct access)");
+
+        body.new_comment("Get the child unit (i.e., the map entry)");
+        let v_child = body.new_variable("child", child.to_ctype()).to_expr();
+        body.assign(
+            v_child.clone(),
+            C::Expr::fn_call(
+                &ctxt.unit.get_child_fn_name(),
+                vec![
+                    ctxt.param_exprs["$unit"].clone(),
+                    ctxt.param_exprs["va"].clone(),
+                ],
+            ),
+        );
+
+        body.new_comment("Recurse on child unit");
+        let mut args = vec![C::Expr::addr_of(&v_child)];
+        args.extend(ctxt.op.params.iter().map(|p| {
+            if p.ident().as_str() == "va" {
+                calculate_next_va(
+                    &ctxt.param_exprs[p.ident().as_str()],
+                    child.input_bitwidth(),
+                )
+            } else {
+                ctxt.param_exprs[p.ident().as_str()].clone()
+            }
+        }));
+        body.return_expr(C::Expr::fn_call(&child.to_hl_op_fn_name(ctxt.op), args));
     }
 }
 
@@ -1399,7 +1644,7 @@ fn add_map_function(
 
     let fun = scope.new_function(unit.to_hl_op_fn_name(op).as_str(), C::Type::new_size());
     fun.set_static().set_inline();
-    let param_exprs = add_fn_params(fun, unit, op, osspec);
+    let (param_exprs, param_types) = add_fn_params(fun, unit, op, osspec);
 
     // ---------------------------------------------------------------------------------------------
     // Function Body
@@ -1408,7 +1653,7 @@ fn add_map_function(
     let body = fun.body();
     match &unit.map {
         VelosiAstStaticMap::Explicit(_) => {
-            unimplemented!("Handling of explicit maps unimplemented");
+            unimplemented!("");
         }
         VelosiAstStaticMap::ListComp(lc) => {
             let ctxt = OpConfig {
@@ -1417,6 +1662,7 @@ fn add_map_function(
                 relations,
                 osspec,
                 param_exprs,
+                param_types,
                 op,
             };
             add_op_fn_body_listcomp(body, ctxt);
@@ -1441,7 +1687,7 @@ fn add_unmap_function(
 
     let fun = scope.new_function(unit.to_hl_op_fn_name(op).as_str(), C::Type::new_size());
     fun.set_static().set_inline();
-    let param_exprs = add_fn_params(fun, unit, op, osspec);
+    let (param_exprs, param_types) = add_fn_params(fun, unit, op, osspec);
 
     // ---------------------------------------------------------------------------------------------
     // Function Body
@@ -1461,6 +1707,7 @@ fn add_unmap_function(
                 relations,
                 osspec,
                 param_exprs,
+                param_types,
                 op,
             };
             add_op_fn_body_listcomp(body, ctxt);
@@ -1485,7 +1732,7 @@ fn add_protect_function(
 
     let fun = scope.new_function(unit.to_hl_op_fn_name(op).as_str(), C::Type::new_size());
     fun.set_static().set_inline();
-    let param_exprs = add_fn_params(fun, unit, op, osspec);
+    let (param_exprs, param_types) = add_fn_params(fun, unit, op, osspec);
 
     // ---------------------------------------------------------------------------------------------
     // Function Body
@@ -1504,6 +1751,7 @@ fn add_protect_function(
                 relations,
                 osspec,
                 param_exprs,
+                param_types,
                 op,
             };
             add_op_fn_body_listcomp(body, ctxt);
@@ -1545,59 +1793,120 @@ fn add_resolve_function(
 
     let paddr_param = fun.new_param("pa", rtype.to_ptr()).to_expr();
 
-    // ---------------------------------------------------------------------------------------------
-    // Function Body: Implementation
-    // ---------------------------------------------------------------------------------------------
+    if env.has_map_protect_unmap() {
+        // -----------------------------------------------------------------------------------------
+        // Function Body: Implementation for OS Spec
+        // -----------------------------------------------------------------------------------------
+        let body = fun.body();
+        body.new_comment("resolve through OS spec");
 
-    let body = fun.body();
+        let child_type = next_unit_type(unit, relations, osspec).to_ptr();
+        let v_child = body.new_variable("child", child_type).to_expr();
+        body.assign(
+            v_child.clone(),
+            C::Expr::fn_call(
+                &unit.get_child_fn_name(),
+                vec![unit_param.clone(), vaddr_param.clone()],
+            ),
+        );
 
-    fun.body().return_expr(C::Expr::bfalse());
+        body.new_ifelse(&C::Expr::binop(v_child.clone(), "==", C::Expr::null()))
+            .then_branch()
+            .return_expr(C::Expr::bfalse());
 
-    // let cond = body.new_ifelse(&C::Expr::lnot(C::Expr::fn_call(
-    //     &unit.valid_fn_name(),
-    //     vec![unit_param.clone()],
-    // )));
-    // cond.then_branch().return_expr(C::Expr::bfalse());
+        match relations.get_only_child_unit(unit.ident()) {
+            VelosiAstUnit::Enum(en) => {
+                let switch = body.new_switch(&C::Expr::field_access(&v_child, "kind"));
+                for child in relations.get_children_units(en.ident()) {
+                    let b = switch.new_case(C::Expr::new_var(
+                        &child.ident().to_ascii_uppercase(),
+                        C::Type::new_enum(&unit.to_child_kind_name()),
+                    ));
+                    let variant_field = C::Expr::field_access(&v_child, "variants");
+                    let child_variant =
+                        C::Expr::field_access(&variant_field, &child.ident().to_ascii_lowercase());
+                    if let VelosiAstUnit::Segment(seg) = &child {
+                        if seg.maps_frame() {
+                            b.new_comment("entry maps an enum -> segment mapping a frame");
+                            // just return it
 
-    // if let Some(child) = child {
-    //     if env.has_map_protect_unmap() {
-    //         body.return_expr(C::Expr::fn_call(
-    //             &child.resolve_fn_name(),
-    //             vec![C::Expr::field_access(&unit_param, "child"), vaddr_param],
-    //         ));
-    //     } else {
-    //         let v_next_unit = body.new_variable("next_unit", child.to_ctype()).to_expr();
-    //         body.assign(
-    //             v_next_unit.clone(),
-    //             C::Expr::fn_call(
-    //                 &child.get_child_fn_name(),
-    //                 vec![
-    //                     unit_param.clone(),  // unit ptr
-    //                     C::Expr::new_num(0), // VA: should be 0
-    //                 ],
-    //             ),
-    //         )
-    //         .return_expr(C::Expr::fn_call(
-    //             &unit.resolve_fn_name(),
-    //             vec![unit_param, vaddr_param, paddr_param],
-    //         ));
-    //     }
-    // } else {
-    //     // no child here, so we're directly doing the thing here!
-    //     if env.has_map_protect_unmap() {
-    //         body.assign(
-    //             C::Expr::deref(&paddr_param),
-    //             C::Expr::field_access(&unit_param, "frame"),
-    //         )
-    //         .return_expr(C::Expr::btrue());
-    //     } else {
-    //         body.assign(
-    //             C::Expr::deref(&paddr_param),
-    //             C::Expr::fn_call(&unit.translate_fn_name(), vec![unit_param, vaddr_param]),
-    //         )
-    //         .return_expr(C::Expr::btrue());
-    //     }
-    // }
+                            let frame_field = C::Expr::field_access(&child_variant, "frame");
+
+                            b.assign(C::Expr::deref(&paddr_param), C::Expr::addr_of(&frame_field));
+                            b.return_expr(C::Expr::btrue());
+                        } else if seg.maps_table() {
+                            b.new_comment("entry maps an enum -> segment mapping a table");
+
+                            b.new_comment("segment maps a table, recurse to next unit");
+
+                            let next_unit = relations.get_only_child_unit(seg.ident());
+
+                            b.return_expr(C::Expr::fn_call(
+                                &next_unit.resolve_fn_name(),
+                                vec![
+                                    C::Expr::addr_of(&child_variant),
+                                    vaddr_param.clone(),
+                                    paddr_param.clone(),
+                                ],
+                            ));
+                        } else {
+                            unreachable!()
+                        }
+                    } else {
+                        unreachable!()
+                    }
+                }
+            }
+            VelosiAstUnit::Segment(seg) => {
+                if seg.maps_frame() {
+                    body.new_comment("segment maps a frame, return it!");
+
+                    body.assign(
+                        C::Expr::deref(&paddr_param),
+                        C::Expr::addr_of(&C::Expr::field_access(&v_child, "frame")),
+                    );
+
+                    body.return_expr(C::Expr::btrue());
+                } else if seg.maps_table() {
+                    body.new_comment("segment maps a table, recurse to next unit");
+                    body.return_expr(C::Expr::fn_call(
+                        &seg.as_ref().resolve_fn_name(),
+                        vec![C::Expr::addr_of(&v_child), vaddr_param, paddr_param],
+                    ));
+                } else {
+                    unreachable!()
+                }
+            }
+            _ => unreachable!(),
+        }
+    } else {
+        // -----------------------------------------------------------------------------------------
+        // Function Body: Direct Implementation
+        // -----------------------------------------------------------------------------------------
+        let body = fun.body();
+        body.new_comment("resolve directly");
+
+        let child = relations.get_only_child_unit(unit.ident());
+
+        body.new_comment("get the child unit");
+        let v_child = body.new_variable("child", child.to_ctype()).to_expr();
+        body.assign(
+            v_child.clone(),
+            C::Expr::fn_call(
+                &unit.get_child_fn_name(),
+                vec![unit_param.clone(), vaddr_param.clone()],
+            ),
+        );
+        body.new_comment("recurse on next unit");
+        body.return_expr(C::Expr::fn_call(
+            &child.resolve_fn_name(),
+            vec![
+                C::Expr::addr_of(&v_child),
+                calculate_next_va(&vaddr_param, child.input_bitwidth()),
+                paddr_param,
+            ],
+        ));
+    }
 
     scope.push_function(fun);
 }
@@ -1630,7 +1939,25 @@ fn add_free_function(
     };
 
     let fun = scope.new_function(&unit.to_free_fn_name(), C::Type::new_void());
+    fun.set_inline().set_static();
+
+    // function parameters
     let _unit_param = fun.new_param("unit", ptype).to_expr();
+
+    let body = fun.body();
+
+    body.new_comment("TODO: IMPLEMENT ME");
+    println!("TODO: IMPLEMENT  FREE FUNCTION FOR STATIC MAPS");
+    body.return_none();
+
+    let os_free = env.get_method_with_signature(
+        &[VelosiAstTypeInfo::PhysAddr, VelosiAstTypeInfo::Size],
+        &VelosiAstTypeInfo::Void,
+    );
+
+    if os_free.is_empty() {}
+
+    if os_free.len() > 1 {}
 }
 
 fn add_allocate_function(
@@ -1639,6 +1966,8 @@ fn add_allocate_function(
     relations: &Relations,
     osspec: &VelosiAst,
 ) {
+    let env = osspec.osspec().unwrap();
+
     if !relations.get_group_roots().contains(unit.ident()) {
         scope.new_comment("not a group root, cannot allocate");
         return;
@@ -1649,15 +1978,86 @@ fn add_allocate_function(
         return;
     }
 
-    let env = osspec.osspec().unwrap();
-
-    let rtype = if env.has_map_protect_unmap() {
-        unit.to_ctype().to_ptr()
+    let ptype = if env.has_map_protect_unmap() {
+        unit.to_ctype().to_ptr().to_ptr()
     } else {
-        unit.to_ctype()
+        unit.to_ctype().to_ptr()
     };
 
-    let _fun = scope.new_function(&unit.to_allocate_fn_name(), rtype);
+    let fun = scope.new_function(&unit.to_allocate_fn_name(), C::Type::new_bool());
+    fun.set_inline().set_static();
+
+    // function parameters
+    let unit_param = fun.new_param("unit", ptype).to_expr();
+
+    if env.has_map_protect_unmap() {
+        fun.push_doc_str("allocates memory to hold the user-level tracking structures");
+
+        let fun_body = fun.body();
+
+        println!("TODO: handle me -- allocations for static maps with osspec");
+        fun_body.new_comment("Allocate function not yet implemented!");
+        fun_body.return_expr(C::Expr::bfalse());
+    } else {
+        fun.push_doc_str("allocates memory to hold the page table");
+
+        let fun_body = fun.body();
+
+        let mut os_alloc = env.get_phys_alloc_fn();
+        if os_alloc.is_empty() {
+            fun_body.new_comment("OSSpec doesn't define an allocation function.");
+            fun_body.return_expr(C::Expr::bfalse());
+            return;
+        }
+
+        if os_alloc.len() > 1 {
+            unreachable!("OSSpec defines multiple allocator functions?!?");
+        }
+
+        let os_alloc_fn = os_alloc.pop().unwrap();
+
+        let memory_state_size = unit.memory_state_size() as u64;
+
+        for p in &unit.params {
+            match &p.ptype.typeinfo {
+                VelosiAstTypeInfo::PhysAddr => {
+                    let args = os_alloc_fn
+                        .params
+                        .iter()
+                        .map(|p| match p.ptype.typeinfo {
+                            VelosiAstTypeInfo::Size => {
+                                /* size */
+                                C::Expr::new_num(memory_state_size)
+                            }
+                            VelosiAstTypeInfo::PhysAddr => {
+                                /* alignment */
+
+                                // TODO: find alignment constraints from parent unit!
+
+                                C::Expr::new_num(memory_state_size)
+                            }
+                            _ => unreachable!(),
+                        })
+                        .collect();
+
+                    fun_body.assign(
+                        C::Expr::field_access(&unit_param, "base"),
+                        C::Expr::fn_call(os_alloc_fn.ident().as_str(), args),
+                    );
+                    fun_body
+                        .new_ifelse(&C::Expr::binop(
+                            C::Expr::field_access(&unit_param, "base"),
+                            "==",
+                            C::Expr::new_num(0),
+                        ))
+                        .then_branch()
+                        .return_expr(C::Expr::bfalse());
+                }
+                _ => unreachable!(),
+            }
+        }
+        fun_body.return_expr(C::Expr::btrue());
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1678,7 +2078,7 @@ fn add_set_child_fn(
     if env.has_map_protect_unmap() {
         let rtype = match children.as_slice() {
             [] => C::Type::new_void(),
-            [child] => child.to_ctype_ptr(),
+            [child] => C::Type::new_typedef(&unit.to_child_type_name()).to_ptr(),
             _ => unreachable!(),
         };
 
@@ -1694,6 +2094,8 @@ fn add_set_child_fn(
             )
             .to_expr();
         let _child_param = fun.new_param("dst", rtype);
+
+        fun.body().return_none();
     } else {
         scope.new_comment("No set-child function needed as no environment spec available.");
     }
@@ -1741,60 +2143,129 @@ fn add_get_child_fn(
         _ => unreachable!(),
     };
 
+    // obtain the return type
     let rtype = if env.has_map_protect_unmap() {
-        child.to_ctype_ptr()
+        C::Type::new_typedef(&unit.to_child_type_name()).to_ptr()
     } else {
         child.to_ctype()
     };
 
+    //
+    // Define the function
+    // ---------------------------------------------------------------------------------------------
     let fun = scope.new_function(unit.get_child_fn_name().as_str(), rtype);
     fun.set_static().set_inline();
     fun.push_doc_str("Gets the child pointer of the unit");
 
-    // params
-
+    // function parameters
     let v_param_unit = fun.new_param("unit", unit.to_ctype_ptr()).to_expr();
-    let _v_param_va = fun
+    let v_param_va = fun
         .new_param(
             "va",
             unit.ptype_to_ctype(&VelosiAstTypeInfo::VirtAddr, false),
         )
         .to_expr();
 
-    // body
-    // let body = fun.body();
-    // if env.has_map_protect_unmap() {
-    //     body.return_expr(C::Expr::field_access(&v_param_unit, "child"));
-    // } else {
-    //     // body.fn_call(
-    //     //     "assert",
-    //     //     vec![C::Expr::fn_call(
-    //     //         unit.valid_fn_name().as_str(),
-    //     //         vec![v_param_unit.clone()],
-    //     //     )],
-    //     // );
+    //
+    // Function Body
+    // ---------------------------------------------------------------------------------------------
 
-    //     body.new_comment("get the address of the next table by calling translate");
-    //     let v_next_base = body
-    //         .new_variable(
-    //             "next_base",
-    //             unit.ptype_to_ctype(&VelosiAstTypeInfo::PhysAddr, false),
-    //         )
-    //         .to_expr();
-    //     body.assign(
-    //         v_next_base.clone(),
-    //         C::Expr::fn_call(&unit.translate_fn_name(), vec![v_param_unit]),
-    //     );
+    let body = fun.body();
+    body.fn_call(
+        "assert",
+        vec![C::Expr::binop(
+            v_param_va.clone(),
+            "<",
+            C::Expr::new_num(1 << unit.inbitwidth),
+        )],
+    );
 
-    //     body.new_comment("construct the new unit");
-    //     let v_next_unit = body.new_variable("next_unit", child.to_ctype()).to_expr();
-    //     body.fn_call(
-    //         &child.constructor_fn_name(),
-    //         vec![C::Expr::addr_of(&v_next_unit), v_next_base],
-    //     );
+    if env.has_map_protect_unmap() {
+        body.new_comment("has OS interface, use the data structure instead!");
+        match &unit.map {
+            VelosiAstStaticMap::Explicit(_) => {
+                unimplemented!();
+            }
+            VelosiAstStaticMap::ListComp(lc) => {
+                if lc.elm.offset.is_some() {
+                    unimplemented!()
+                }
+                if lc.is_repr_list() {
+                    // find the right child unit for the VA mapping
+                } else {
+                    // if lc.is_repr_array() {
+                    // here we have elements that are easily accessible
+                    let v_idx = body.new_variable("idx", C::Type::new_size()).to_expr();
+                    body.assign(
+                        v_idx.clone(),
+                        C::Expr::binop(
+                            v_param_va.clone(),
+                            ">>",
+                            C::Expr::new_num(child.input_bitwidth()),
+                        ),
+                    );
 
-    //     body.return_expr(v_next_unit);
-    // }
+                    body.return_expr(C::Expr::array_access(
+                        &C::Expr::field_access(&v_param_unit, "children"),
+                        &v_idx,
+                    ));
+                }
+            }
+            VelosiAstStaticMap::None(_) => unreachable!(),
+        }
+    } else {
+        match &unit.map {
+            VelosiAstStaticMap::Explicit(_) => {
+                unimplemented!();
+            }
+            VelosiAstStaticMap::ListComp(lc) => {
+                if let Some(_x) = &lc.elm.src {
+                    // specific source ranges not yet supported
+                    unimplemented!();
+                } else {
+                    if lc.elm.offset.is_some() {
+                        unimplemented!()
+                    }
+
+                    // here we have elements that are easily accessible
+                    let v_idx = body.new_variable("idx", C::Type::new_size()).to_expr();
+                    body.assign(
+                        v_idx.clone(),
+                        C::Expr::binop(
+                            v_param_va.clone(),
+                            ">>",
+                            C::Expr::new_num(child.input_bitwidth()),
+                        ),
+                    );
+
+                    let v_child_unit = body.new_variable("child_unit", child.to_ctype()).to_expr();
+
+                    let mut mappings = HashMap::new();
+                    mappings.insert(lc.var.ident().as_str(), v_idx.clone());
+                    for param in &unit.params {
+                        mappings.insert(
+                            param.ident().as_str(),
+                            C::Expr::field_access(&v_param_unit, param.ident().as_str()),
+                        );
+                    }
+
+                    let mut args = vec![C::Expr::addr_of(&v_child_unit)];
+
+                    args.extend(
+                        lc.elm
+                            .dst
+                            .args
+                            .iter()
+                            .map(|f| unit.expr_to_cpp(&mappings, f)),
+                    );
+
+                    body.fn_call(&child.constructor_fn_name(), args);
+                    body.return_expr(v_child_unit);
+                }
+            }
+            VelosiAstStaticMap::None(_) => unreachable!(),
+        };
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1875,11 +2346,11 @@ pub fn generate(
     add_allocate_function(s, unit, relations, osspec);
     add_free_function(s, unit, relations, osspec);
 
-    s.new_comment(" ----------------------------- Address Translation  --------------------------");
+    s.new_comment(" ----------------------------- Accessing Children  --------------------------");
 
-    // add_set_child_fn(s, unit, relations, osspec);
-    // add_clear_child_fn(s, unit, relations, osspec);
-    // add_get_child_fn(s, unit, relations, osspec);
+    add_set_child_fn(s, unit, relations, osspec);
+    add_clear_child_fn(s, unit, relations, osspec);
+    add_get_child_fn(s, unit, relations, osspec);
 
     s.new_comment(" ---------------------------- Map / Protect/ Unmap ---------------------------");
 

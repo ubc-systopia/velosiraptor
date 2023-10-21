@@ -25,17 +25,12 @@
 
 //! C Code Generation Backend
 //!
-use std::collections::{HashMap, HashSet};
+
 use std::path::Path;
 
 use crustal as C;
 
-use velosiast::ast::{VelosiAstMethod, VelosiAstTypeInfo, VelosiAstUnitSegment};
-use velosiast::{VelosiAst, VelosiAstTypeProperty, VelosiAstUnit};
-use velosicomposition::Relations;
-
-use super::utils::{self, FieldUtils, UnitUtils};
-use crate::VelosiCodeGenError;
+use super::utils::{self, UnitUtils};
 
 use velosiast::VelosiAstUnitOSSpec;
 
@@ -68,7 +63,23 @@ pub fn generate(osspec: &VelosiAstUnitOSSpec, outdir: &Path) {
         s.new_typedef(etype.ident.as_str(), ty);
     }
 
-    for method in &osspec.methods {}
+    for method in osspec.methods.values() {
+        if !method.is_extern {
+            continue;
+        }
+
+        let fun = s.new_function(
+            method.ident().as_str(),
+            osspec.ptype_to_ctype(&method.rtype.typeinfo, false),
+        );
+        fun.set_extern();
+        for param in &method.params {
+            fun.new_param(
+                param.ident().as_str(),
+                osspec.ptype_to_ctype(&param.ptype.typeinfo, false),
+            );
+        }
+    }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // Saving the file
@@ -80,5 +91,5 @@ pub fn generate(osspec: &VelosiAstUnitOSSpec, outdir: &Path) {
     let filename = format!("{}.h", osspec.ident().to_ascii_lowercase());
 
     scope.set_filename(&filename);
-    scope.to_file(outdir, true);
+    scope.to_file(outdir, true).expect("saving file failed!");
 }

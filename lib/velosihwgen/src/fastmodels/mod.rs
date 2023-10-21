@@ -161,7 +161,7 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
 
     fn generate(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
         let relations = Relations::from_ast(ast);
-        let top_files = Vec::from_iter(relations.get_roots().into_iter());
+        let top_files = Vec::from_iter(relations.get_roots());
         if top_files.len() != 1 {
             panic!("!= 1 root unit found");
         }
