@@ -372,7 +372,7 @@ impl BackendRust {
         save_scope(scope, &srcdir, "lib")
     }
 
-    pub fn test_compile(&self, ast: &VelosiAst, osspec: &VelosiAst) -> Result<(), String> {
+    pub fn test_compile(&self, _ast: &VelosiAst, _osspec: &VelosiAst) -> Result<(), String> {
         Ok(())
     }
 }

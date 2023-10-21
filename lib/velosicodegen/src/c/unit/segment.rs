@@ -31,7 +31,7 @@ use std::rc::Rc;
 
 use crustal as C;
 
-use velosiast::ast::{VelosiAstExpr, VelosiAstMethod, VelosiAstTypeInfo, VelosiAstUnitSegment};
+use velosiast::ast::{VelosiAstMethod, VelosiAstTypeInfo, VelosiAstUnitSegment};
 use velosiast::{VelosiAst, VelosiAstTypeProperty, VelosiAstUnit};
 use velosicomposition::Relations;
 
@@ -559,7 +559,7 @@ fn add_translate_fn(
     translate_body.get_state_references(&mut state_refs);
 
     for r in translate_fn.requires.iter() {
-        let mut state_refs_new: HashSet<Rc<String>> = HashSet::new();
+        let state_refs_new: HashSet<Rc<String>> = HashSet::new();
         r.get_state_references(&mut state_refs);
         state_refs.extend(state_refs_new)
     }
@@ -606,8 +606,6 @@ fn add_translate_fn(
     // ---------------------------------------------------------------------------------------------
     // Function Body: Implementation
     // ---------------------------------------------------------------------------------------------
-
-    body.new_comment("! TODO!");
 
     body.return_expr(unit.expr_to_cpp(&vars, translate_body));
 
@@ -702,9 +700,12 @@ fn add_map_function(
 
             let do_alloc_branch = cond.then_branch();
             do_alloc_branch.new_comment("Allocate the next-level structure");
-            do_alloc_branch.assign(
-                C::Expr::field_access(v_unit_param, "child"),
-                C::Expr::fn_call(&child.to_allocate_fn_name(), Vec::new()),
+            do_alloc_branch.fn_call(
+                &child.to_allocate_fn_name(),
+                vec![C::Expr::addr_of(&C::Expr::field_access(
+                    v_unit_param,
+                    "child",
+                ))],
             );
             do_alloc_branch
                 .new_ifelse(&C::Expr::binop(
@@ -765,9 +766,9 @@ fn add_map_function(
             valid_check
                 .then_branch()
                 .new_comment("Allocate the next-level structure")
-                .assign(
-                    v_next_unit.clone(),
-                    C::Expr::fn_call(&child.to_allocate_fn_name(), Vec::new()),
+                .fn_call(
+                    &child.to_allocate_fn_name(),
+                    vec![C::Expr::addr_of(&v_next_unit)],
                 )
                 .new_comment("TODO: Check whether allocation has succeeded!")
                 .fn_call(

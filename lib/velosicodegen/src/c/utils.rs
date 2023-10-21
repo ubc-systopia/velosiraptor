@@ -81,7 +81,7 @@ pub trait UnitUtils {
     }
 
     fn to_child_type_name(&self) -> String {
-        format!("{}_children__t", self.my_ident().to_ascii_lowercase())
+        format!("{}_child__t", self.my_ident().to_ascii_lowercase())
     }
 
     fn to_ctype(&self) -> C::Type {
@@ -228,7 +228,10 @@ pub trait UnitUtils {
                 }
             }
             VelosiAstTypeInfo::Extern(s) => C::Type::new_typedef(s),
-            _ => todo!(),
+            VelosiAstTypeInfo::Void => C::Type::new_void(),
+            e => {
+                unimplemented!("handling of type {e} is not implemented yet.")
+            }
         }
     }
 

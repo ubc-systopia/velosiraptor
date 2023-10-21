@@ -5,6 +5,11 @@ flags {
 }
 
 osspec MyOs {
+    // functions to allocate and free memory
+    #[malloc]
+    extern fn memory_alloc(sz: size, align: paddr) -> paddr
+    #[mfree]
+    extern fn memory_free(pa: paddr, sz: size)
 
     // fn map_table(va: vaddr, sz: size, flgs: flags, pa: VNode) -> bool
 

@@ -339,7 +339,7 @@ pub fn generate(
     outdir: &mut PathBuf,
 ) -> Result<(), VelosiCodeGenError> {
     // create the unit dir
-    let dirname = unit.ident().to_lowercase();
+    let _dirname = unit.ident().to_lowercase();
 
     // create the directory
     fs::create_dir_all(&outdir)?;

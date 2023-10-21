@@ -439,6 +439,10 @@ impl VelosiAstUnitStaticMap {
         self.map.size()
     }
 
+    pub fn memory_state_size(&self) -> usize {
+        self.map.memory_state_size()
+    }
+
     pub fn get_next_unit_idents(&self) -> Vec<&Rc<String>> {
         self.map.get_next_unit_idents()
     }

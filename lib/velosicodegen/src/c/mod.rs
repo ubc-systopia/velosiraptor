@@ -96,7 +96,7 @@ impl BackendC {
     fn generate_types(
         &self,
         ast: &VelosiAst,
-        osspec: &VelosiAst,
+        _osspec: &VelosiAst,
     ) -> Result<(), VelosiCodeGenError> {
         // the code generation scope
         let mut scope = C::Scope::new();
@@ -115,7 +115,7 @@ impl BackendC {
         // Types
         ////////////////////////////////////////////////////////////////////////////////////////////
 
-        let relations = Relations::from_ast(&ast);
+        let relations = Relations::from_ast(ast);
         let roots = relations.get_root_units();
         if roots.len() != 1 {
             panic!("assumed one root unit!");
@@ -176,7 +176,6 @@ impl BackendC {
 
         scope.set_filename("types.h");
         scope.to_file(&self.outdir, true)?;
-
         Ok(())
     }
 
@@ -228,7 +227,6 @@ impl BackendC {
 
         scope.set_filename("consts.h");
         scope.to_file(&self.outdir, true)?;
-
         Ok(())
     }
 
@@ -241,8 +239,10 @@ impl BackendC {
         ast: &VelosiAst,
         osspec: &VelosiAst,
     ) -> Result<(), VelosiCodeGenError> {
-        self.generate_consts(ast, osspec);
-        self.generate_types(ast, osspec);
+        self.generate_consts(ast, osspec)
+            .expect("generating consts failed");
+        self.generate_types(ast, osspec)
+            .expect("generating types failed");
 
         Ok(())
     }
@@ -294,7 +294,11 @@ impl BackendC {
 
         Ok(())
     }
-    pub fn finalize(&self, ast: &VelosiAst, osspec: &VelosiAst) -> Result<(), VelosiCodeGenError> {
+    pub fn finalize(
+        &self,
+        _ast: &VelosiAst,
+        _osspec: &VelosiAst,
+    ) -> Result<(), VelosiCodeGenError> {
         let src = self.supportdir.join("mmio.h");
         let dst = self.outdir.join("os_mmio.h");
         std::fs::copy(src, dst)?;
@@ -311,7 +315,7 @@ impl BackendC {
     }
 
     pub fn test_compile(&self, ast: &VelosiAst, osspec: &VelosiAst) -> Result<(), String> {
-        let relations = Relations::from_ast(&ast);
+        let relations = Relations::from_ast(ast);
 
         let env = osspec.osspec().unwrap();
 
@@ -351,7 +355,7 @@ impl BackendC {
 
         if !res.status.success() {
             let res = String::from_utf8(res.stderr).unwrap();
-            return Err(format!("{res}"));
+            return Err(res);
         }
 
         Ok(())
