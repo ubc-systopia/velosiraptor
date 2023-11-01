@@ -192,7 +192,7 @@ impl VelosiAstUnOpExpr {
         use VelosiAstUnOp::*;
         match (self.op, self.expr.as_ref()) {
             // arithmetic operators
-            (Not, NumLiteral(l)) => NumLiteral(VelosiAstNumLiteralExpr::new(!l.val, self.loc)),
+            (Not, NumLiteral(l)) => NumLiteral(VelosiAstNumLiteralExpr::with_loc(!l.val, self.loc)),
             // boolean operators
             (LNot, BoolLiteral(l)) => BoolLiteral(VelosiAstBoolLiteralExpr::new(!l.val, self.loc)),
             _ => UnOp(self),

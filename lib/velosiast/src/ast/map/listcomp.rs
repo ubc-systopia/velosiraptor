@@ -29,7 +29,7 @@
 
 // used standard library functionality
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
@@ -43,8 +43,9 @@ use crate::{ast_result_return, ast_result_unwrap, utils, AstResult, SymbolTable}
 
 // used definitions of references AST nodes
 use crate::ast::{
-    VelosiAstNode, VelosiAstParam, VelosiAstRangeExpr, VelosiAstStaticMap,
-    VelosiAstStaticMapElement, VelosiAstTypeInfo, VelosiAstUnitProperty,
+    VelosiAstExpr, VelosiAstNode, VelosiAstNumLiteralExpr, VelosiAstParam, VelosiAstRangeExpr,
+    VelosiAstStaticMap, VelosiAstStaticMapElement, VelosiAstTypeInfo, VelosiAstUnit,
+    VelosiAstUnitProperty,
 };
 
 #[derive(Eq, Clone)]
@@ -200,8 +201,43 @@ impl VelosiAstStaticMapListComp {
         self.elm.has_memory_state()
     }
 
-    pub fn memory_state_size(&self) -> usize {
-        unimplemented!()
+    pub fn in_memory_state_size(&self, units: &HashMap<Rc<String>, VelosiAstUnit>) -> u64 {
+        let dst_unit = units.get(self.elm.dst.ident()).unwrap();
+
+        if self.elm.src.is_some() {
+            unimplemented!("cannot handle source ranges yet!");
+        }
+
+        // create a dummy symbol table.
+        let mut st = SymbolTable::new();
+
+        let dst_state_size = dst_unit.in_memory_state_size(units);
+
+        let mut common_vals = HashMap::new();
+        for p in dst_unit.params_as_slice() {
+            let var_val = VelosiAstExpr::NumLiteral(VelosiAstNumLiteralExpr::new(0));
+            common_vals.insert(p.ident().clone(), var_val);
+        }
+
+        let mut max_val = 0;
+        for i in self.range.start..self.range.end {
+            let mut vals = HashMap::new();
+            vals.extend(common_vals.iter().map(|(k, v)| (k.clone(), v)));
+            let var_val = VelosiAstExpr::NumLiteral(VelosiAstNumLiteralExpr::new(i));
+            vals.insert(self.var.ident().clone(), &var_val);
+
+            for val in &self.elm.dst.args {
+                let val_new = val.as_ref().clone().flatten(&mut st, &vals);
+                if let VelosiAstExpr::NumLiteral(lit) = &val_new {
+                    max_val = max_val.max(lit.val + dst_state_size);
+                } else {
+                    println!("val: {}", val_new);
+                    unimplemented!()
+                }
+            }
+        }
+
+        max_val
     }
 }
 

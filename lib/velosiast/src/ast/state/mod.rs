@@ -355,6 +355,18 @@ impl VelosiAstState {
             .iter()
             .any(|f| matches!(f.as_ref(), VelosiAstStateField::Memory(_)))
     }
+
+    /// calculates the size of the memory required to hold the in-memory state fields
+    pub fn in_memory_size(&self) -> u64 {
+        self.fields
+            .iter()
+            .map(|f| match f.as_ref() {
+                VelosiAstStateField::Memory(f) => f.offset + f.size,
+                VelosiAstStateField::Register(_) => 0,
+            })
+            .max()
+            .unwrap_or_default()
+    }
 }
 
 impl PartialEq for VelosiAstState {

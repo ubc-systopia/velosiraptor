@@ -299,7 +299,11 @@ pub struct VelosiAstNumLiteralExpr {
 }
 
 impl VelosiAstNumLiteralExpr {
-    pub fn new(val: u64, loc: VelosiTokenStream) -> Self {
+    pub fn new(val: u64) -> Self {
+        Self::with_loc(val, VelosiTokenStream::default())
+    }
+
+    pub fn with_loc(val: u64, loc: VelosiTokenStream) -> Self {
         VelosiAstNumLiteralExpr { val, loc }
     }
 
@@ -308,7 +312,7 @@ impl VelosiAstNumLiteralExpr {
         _st: &mut SymbolTable,
     ) -> AstResult<VelosiAstExpr, VelosiAstIssues> {
         // we can just convert the literal, as all values should be fine
-        let e = VelosiAstNumLiteralExpr::new(p.value, p.loc);
+        let e = VelosiAstNumLiteralExpr::with_loc(p.value, p.loc);
         AstResult::Ok(VelosiAstExpr::NumLiteral(e))
     }
 
@@ -366,7 +370,7 @@ impl Display for VelosiAstNumLiteralExpr {
 
 impl From<u64> for VelosiAstNumLiteralExpr {
     fn from(val: u64) -> Self {
-        Self::new(val, VelosiTokenStream::default())
+        Self::new(val)
     }
 }
 

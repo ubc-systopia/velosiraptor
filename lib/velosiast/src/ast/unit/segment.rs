@@ -28,6 +28,7 @@
 //! This module defines the Constant AST nodes of the language
 
 // used standard library functionality
+use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
@@ -780,6 +781,10 @@ impl VelosiAstUnitSegment {
             .filter(|m| m.matches_signature(params, rtype))
             .cloned()
             .collect()
+    }
+
+    pub fn in_memory_state_size(&self, _units: &HashMap<Rc<String>, VelosiAstUnit>) -> u64 {
+        self.state.in_memory_size()
     }
 }
 

@@ -343,7 +343,6 @@ impl VelosiAstInterface {
                 VelosiAstBinOp::RShift,
                 Rc::new(VelosiAstExpr::NumLiteral(VelosiAstNumLiteralExpr::new(
                     bits.start,
-                    Default::default(),
                 ))),
                 Default::default(),
             );
@@ -353,7 +352,6 @@ impl VelosiAstInterface {
                 VelosiAstBinOp::And,
                 Rc::new(VelosiAstExpr::NumLiteral(VelosiAstNumLiteralExpr::new(
                     mask,
-                    Default::default(),
                 ))),
                 Default::default(),
             );

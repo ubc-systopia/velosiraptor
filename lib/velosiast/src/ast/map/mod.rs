@@ -38,7 +38,7 @@ pub use explicit::VelosiAstStaticMapExplicit;
 pub use listcomp::VelosiAstStaticMapListComp;
 
 // used standard library functionality
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
@@ -47,6 +47,7 @@ use velosiparser::parsetree::VelosiParseTreeMap;
 use velosiparser::VelosiTokenStream;
 
 // used crate functionality
+use crate::ast::VelosiAstUnit;
 use crate::error::VelosiAstIssues;
 use crate::{AstResult, SymbolTable, VelosiAstUnitProperty};
 
@@ -116,10 +117,10 @@ impl VelosiAstStaticMap {
         }
     }
 
-    pub fn memory_state_size(&self) -> usize {
+    pub fn in_memory_state_size(&self, child_units: &HashMap<Rc<String>, VelosiAstUnit>) -> u64 {
         match self {
-            VelosiAstStaticMap::ListComp(s) => s.memory_state_size(),
-            VelosiAstStaticMap::Explicit(s) => s.memory_state_size(),
+            VelosiAstStaticMap::ListComp(s) => s.in_memory_state_size(child_units),
+            VelosiAstStaticMap::Explicit(s) => s.in_memory_state_size(),
             VelosiAstStaticMap::None(_) => 0,
         }
     }
