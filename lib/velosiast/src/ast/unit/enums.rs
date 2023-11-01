@@ -561,6 +561,16 @@ impl VelosiAstUnitEnum {
         self.enums.values().any(|v| v.has_memory_state)
     }
 
+    pub fn in_memory_state_size(&self, units: &HashMap<Rc<String>, VelosiAstUnit>) -> u64 {
+        if let Some(unit) = self.enums.first() {
+            // XXX: assuming all units have the same state here
+            let dst = units.get(unit.0).unwrap();
+            dst.in_memory_state_size(units)
+        } else {
+            0
+        }
+    }
+
     pub fn get_method_with_signature(
         &self,
         params: &[VelosiAstTypeInfo],

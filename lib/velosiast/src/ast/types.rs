@@ -542,6 +542,29 @@ impl From<Rc<VelosiAstExternType>> for Symbol {
     }
 }
 
+impl From<Rc<VelosiAstExternType>> for VelosiAstTypeInfo {
+    fn from(value: Rc<VelosiAstExternType>) -> Self {
+        VelosiAstTypeInfo::Extern(value.ident.ident().clone())
+    }
+}
+
+impl From<&VelosiAstExternType> for VelosiAstTypeInfo {
+    fn from(value: &VelosiAstExternType) -> Self {
+        VelosiAstTypeInfo::Extern(value.ident.ident().clone())
+    }
+}
+
+impl From<&str> for VelosiAstExternType {
+    fn from(value: &str) -> Self {
+        Self {
+            ident: value.into(),
+            fields: Vec::new(),
+            properties: HashSet::new(),
+            loc: VelosiTokenStream::default(),
+        }
+    }
+}
+
 /// Implementation of trait [Display] for [VelosiAstExternType]
 impl Display for VelosiAstExternType {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {

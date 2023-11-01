@@ -28,7 +28,7 @@
 //! This module defines the Constant AST nodes of the language
 
 // used standard library functionality
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
@@ -439,10 +439,6 @@ impl VelosiAstUnitStaticMap {
         self.map.size()
     }
 
-    pub fn memory_state_size(&self) -> usize {
-        self.map.memory_state_size()
-    }
-
     pub fn get_next_unit_idents(&self) -> Vec<&Rc<String>> {
         self.map.get_next_unit_idents()
     }
@@ -453,6 +449,10 @@ impl VelosiAstUnitStaticMap {
 
     pub fn has_memory_state(&self) -> bool {
         self.map.has_memory_state()
+    }
+
+    pub fn in_memory_state_size(&self, units: &HashMap<Rc<String>, VelosiAstUnit>) -> u64 {
+        self.map.in_memory_state_size(units)
     }
 
     pub fn get_method_with_signature(

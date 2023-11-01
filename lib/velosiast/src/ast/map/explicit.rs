@@ -94,7 +94,7 @@ impl VelosiAstStaticMapExplicit {
         self.entries.iter().any(|e| e.has_memory_state())
     }
 
-    pub fn memory_state_size(&self) -> usize {
+    pub fn in_memory_state_size(&self) -> u64 {
         unimplemented!()
     }
 }

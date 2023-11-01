@@ -550,43 +550,43 @@ impl VelosiAstBinOpExpr {
             // arithmetic operators
             (NumLiteral(l), Plus, NumLiteral(r)) => {
                 // TODO: check for overflow!
-                NumLiteral(VelosiAstNumLiteralExpr::new(l.val + r.val, self.loc))
+                NumLiteral(VelosiAstNumLiteralExpr::with_loc(l.val + r.val, self.loc))
             }
             (NumLiteral(l), Minus, NumLiteral(r)) => {
                 // TODO: check for underflow!
-                NumLiteral(VelosiAstNumLiteralExpr::new(l.val - r.val, self.loc))
+                NumLiteral(VelosiAstNumLiteralExpr::with_loc(l.val - r.val, self.loc))
             }
             (NumLiteral(l), Multiply, NumLiteral(r)) => {
                 // TODO: check for overflow
-                NumLiteral(VelosiAstNumLiteralExpr::new(l.val * r.val, self.loc))
+                NumLiteral(VelosiAstNumLiteralExpr::with_loc(l.val * r.val, self.loc))
             }
             (NumLiteral(l), Divide, NumLiteral(r)) => {
                 // TODO: check for division by 0
-                NumLiteral(VelosiAstNumLiteralExpr::new(l.val / r.val, self.loc))
+                NumLiteral(VelosiAstNumLiteralExpr::with_loc(l.val / r.val, self.loc))
             }
             (NumLiteral(l), Modulo, NumLiteral(r)) => {
                 // TODO: check for division by 0!
-                NumLiteral(VelosiAstNumLiteralExpr::new(l.val % r.val, self.loc))
+                NumLiteral(VelosiAstNumLiteralExpr::with_loc(l.val % r.val, self.loc))
             }
             (NumLiteral(l), LShift, NumLiteral(r)) => {
                 // TODO: check for shift amount
-                NumLiteral(VelosiAstNumLiteralExpr::new(l.val << r.val, self.loc))
+                NumLiteral(VelosiAstNumLiteralExpr::with_loc(l.val << r.val, self.loc))
             }
             (NumLiteral(l), RShift, NumLiteral(r)) => {
                 // TODO: check for shift amount!
-                NumLiteral(VelosiAstNumLiteralExpr::new(l.val >> r.val, self.loc))
+                NumLiteral(VelosiAstNumLiteralExpr::with_loc(l.val >> r.val, self.loc))
             }
             (NumLiteral(l), And, NumLiteral(r)) => {
                 // TODO: check for shift amount!
-                NumLiteral(VelosiAstNumLiteralExpr::new(l.val & r.val, self.loc))
+                NumLiteral(VelosiAstNumLiteralExpr::with_loc(l.val & r.val, self.loc))
             }
             (NumLiteral(l), Or, NumLiteral(r)) => {
                 // TODO: check for shift amount!
-                NumLiteral(VelosiAstNumLiteralExpr::new(l.val | r.val, self.loc))
+                NumLiteral(VelosiAstNumLiteralExpr::with_loc(l.val | r.val, self.loc))
             }
             (NumLiteral(l), Xor, NumLiteral(r)) => {
                 // TODO: check for shift amount!
-                NumLiteral(VelosiAstNumLiteralExpr::new(l.val ^ r.val, self.loc))
+                NumLiteral(VelosiAstNumLiteralExpr::with_loc(l.val ^ r.val, self.loc))
             }
             // equality operators
             (NumLiteral(l), Eq, NumLiteral(r)) => {

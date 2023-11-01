@@ -85,6 +85,7 @@ impl VelosiAstUnitOSSpec {
             loc: VelosiTokenStream::default(),
         }
     }
+
     // converts the parse tree node into an ast node, performing checks
     pub fn from_parse_tree(
         pt: VelosiParseTreeUnitDef,
@@ -94,6 +95,10 @@ impl VelosiAstUnitOSSpec {
 
         // create a new context in the symbol table
         st.create_context("unit".to_string());
+
+        // adding special types
+        let et = Rc::new(VelosiAstExternType::from("UnitType"));
+        let _ = st.insert(et.into());
 
         // convert all the unit parameters
         let mut params = Vec::new();

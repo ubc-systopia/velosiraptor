@@ -41,6 +41,7 @@ pub use staticmap::VelosiAstUnitStaticMap;
 
 // used standard library functionality
 
+use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
@@ -355,6 +356,16 @@ impl VelosiAstUnit {
             StaticMap(s) => s.has_memory_state(),
             Enum(s) => s.has_memory_state(),
             OSSpec(_e) => false,
+        }
+    }
+
+    pub fn in_memory_state_size(&self, units: &HashMap<Rc<String>, VelosiAstUnit>) -> u64 {
+        use VelosiAstUnit::*;
+        match self {
+            Segment(s) => s.in_memory_state_size(units),
+            StaticMap(s) => s.in_memory_state_size(units),
+            Enum(s) => s.in_memory_state_size(units),
+            OSSpec(_e) => 0,
         }
     }
 }
