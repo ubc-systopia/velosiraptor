@@ -137,6 +137,10 @@ impl Relations {
         &self.roots
     }
 
+    pub fn get_units(&self) -> &HashMap<Rc<String>, VelosiAstUnit> {
+        &self.all_units
+    }
+
     /// obtains the root units from the ast
     pub fn get_root_units(&self) -> Vec<VelosiAstUnit> {
         self.roots
