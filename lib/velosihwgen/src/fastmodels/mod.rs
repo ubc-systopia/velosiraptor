@@ -166,8 +166,8 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
             panic!("!= 1 root unit found");
         }
 
-        let top_file = unit_header_file(&top_files[0]); // e.g. X86_MMU_unit.hpp
-        let top_class = unit_class_name(&top_files[0]); // e.g. X86_MMU
+        let top_file = unit_header_file(top_files[0]); // e.g. X86_MMU_unit.hpp
+        let top_class = unit_class_name(top_files[0]); // e.g. X86_MMU
 
         fill_template(
             self.support_dir.join("TranslationUnit.lisa.template"),
