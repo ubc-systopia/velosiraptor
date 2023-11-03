@@ -368,11 +368,11 @@ impl VelosiAstUnitOSSpec {
 
     pub fn get_extern_type_with_property(
         &self,
-        dest_type: VelosiAstTypeProperty,
+        dest_type: &VelosiAstTypeProperty,
     ) -> Option<&Rc<VelosiAstExternType>> {
         self.extern_types
             .values()
-            .find(|&ty| ty.properties.contains(&dest_type))
+            .find(|&ty| ty.properties.contains(dest_type))
     }
 
     pub fn consts(&self) -> Box<dyn Iterator<Item = &Rc<VelosiAstConst>> + '_> {
