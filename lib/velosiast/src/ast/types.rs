@@ -124,9 +124,18 @@ impl VelosiAstTypeInfo {
         matches!(self, GenAddr | VirtAddr | PhysAddr)
     }
 
+    pub fn is_size(&self) -> bool {
+        use VelosiAstTypeInfo::*;
+        matches!(self, Size)
+    }
+
     // whether this is a physical address type
     pub fn is_paddr(&self) -> bool {
         matches!(self, Self::PhysAddr)
+    }
+
+    pub fn is_vaddr(&self) -> bool {
+        matches!(self, Self::VirtAddr)
     }
 
     /// whether this is type refereces of another unit
@@ -349,6 +358,18 @@ impl VelosiAstType {
     // whether this is an address type
     pub fn is_addr(&self) -> bool {
         self.typeinfo.is_addr()
+    }
+
+    pub fn is_size(&self) -> bool {
+        self.typeinfo.is_size()
+    }
+
+    pub fn is_paddr(&self) -> bool {
+        self.typeinfo.is_paddr()
+    }
+
+    pub fn is_vaddr(&self) -> bool {
+        self.typeinfo.is_vaddr()
     }
 
     // whether this is type refereces of another unit
