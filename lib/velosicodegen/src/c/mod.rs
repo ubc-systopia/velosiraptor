@@ -39,7 +39,7 @@ use velosicomposition::Relations;
 
 use crate::VelosiCodeGenError;
 
-use utils::{add_const_def, add_header};
+use utils::{add_const_def, add_header, UnitUtils};
 
 mod field;
 mod interface;
@@ -171,8 +171,18 @@ impl BackendC {
 
         s.new_typedef(utils::FLAGS_TYPE, C::Type::new_struct(utils::FLAGS_NAME));
 
-        let m = scope.new_macro("DEFAULT_FLAGS");
+        let m = s.new_macro("DEFAULT_FLAGS");
         m.set_value("(flags_t) { 0 }");
+
+        s.new_comment("All defined root group units");
+
+        let mut e = C::Enum::new(utils::UNIT_TYPE);
+        for u in &relations.get_group_root_units() {
+            e.new_variant(&u.to_type_enum_name());
+        }
+        let et = e.to_type();
+        s.push_enum(e);
+        s.new_typedef(utils::UNIT_TYPE, et);
 
         scope.set_filename("types.h");
         scope.to_file(&self.outdir, true)?;
@@ -349,6 +359,7 @@ impl BackendC {
             .arg("-fsyntax-only")
             .arg("-I")
             .arg(".")
+            .arg("-Wno-int-to-pointer-cast")
             .arg("driver.c")
             .output()
             .expect("failed to execute gcc!");

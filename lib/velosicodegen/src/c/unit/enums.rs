@@ -346,7 +346,7 @@ fn add_fn_params<'a>(
 
     for f in op.params.iter() {
         let p = if f.ident().as_str() == "pa" {
-            if let Some(ty) = env.get_extern_type_with_property(VelosiAstTypeProperty::Frame) {
+            if let Some(ty) = env.get_extern_type_with_property(&VelosiAstTypeProperty::Frame) {
                 fun.new_param(f.ident(), C::Type::new_typedef(ty.ident.as_str()))
             } else {
                 fun.new_param(
@@ -789,7 +789,7 @@ fn add_resolve_function(
 ) {
     let env = osspec.osspec().unwrap();
 
-    let rtype = if let Some(ty) = env.get_extern_type_with_property(VelosiAstTypeProperty::Frame) {
+    let rtype = if let Some(ty) = env.get_extern_type_with_property(&VelosiAstTypeProperty::Frame) {
         C::Type::new_typedef(ty.ident.as_str()).to_ptr()
     } else {
         unit.ptype_to_ctype(&VelosiAstTypeInfo::PhysAddr, false)

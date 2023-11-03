@@ -50,6 +50,7 @@ pub const PADDR_TYPE: &str = "paddr_t";
 pub const VADDR_TYPE: &str = "vaddr_t";
 pub const GENADDR_TYPE: &str = "genaddr_t";
 pub const SIZE_TYPE: &str = "size_t";
+pub const UNIT_TYPE: &str = "UnitType";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Unit Utilities
@@ -66,6 +67,10 @@ pub trait UnitUtils {
     /// returns the type name of the unit `myunit_t`
     fn to_type_name(&self) -> String {
         unit_type_str(self.my_ident())
+    }
+
+    fn to_type_enum_name(&self) -> String {
+        format!("UnitType_{}", self.my_ident())
     }
 
     fn to_child_kind_name(&self) -> String {
@@ -260,7 +265,10 @@ pub trait UnitUtils {
                         C::Expr::fn_call(&fname, vec![param.clone()])
                     }
                     (Some("self"), Some(field), None) => C::Expr::field_access(
-                        &C::Expr::new_var("unit", self.to_ctype().to_ptr()),
+                        &C::Expr::field_access(
+                            &C::Expr::new_var("unit", self.to_ctype().to_ptr()),
+                            "vnode",
+                        ),
                         field,
                     ),
                     (Some(a), Some(b), None) => {
