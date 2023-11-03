@@ -23,6 +23,21 @@ osspec MyOs {
         mapping: Capref,
     }
 
+    // functions to allocate and free memory
+    #[malloc]
+    extern fn os_virt_alloc(sz: size) -> vaddr
+
+    #[mfree]
+    extern fn os_virt_free(va: vaddr, sz:size)
+
+    #[malloc]
+    extern fn os_vnode_alloc(ty: UnitType) -> VNode
+
+    #[mfree]
+    extern fn os_vnode_free(vnode: VNode)
+
+    extern fn vnode_is_valid(vnode: VNode) -> bool
+
     // extern fn get_vnode_for_va(va: vaddr) -> vnode
     extern fn frame_to_paddr(pa: Frame) -> paddr
     extern fn get_vnode_for_va(va: vaddr) -> Capref
