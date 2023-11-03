@@ -23,48 +23,28 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! Unit Generation (C)
+//! StaticMap Generation (C)
 
 use std::path::Path;
 
-mod enums;
-mod segment;
-mod staticmap;
+use crustal as C;
 
-use velosiast::{VelosiAst, VelosiAstUnit};
+use velosiast::{VelosiAst, VelosiAstStaticMapExplicit, VelosiAstUnitStaticMap};
 use velosicomposition::Relations;
 
-use super::utils;
-use crate::VelosiCodeGenError;
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Generators
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// starts the interface code generation
+/// generates the staticmap definitions
 pub fn generate(
-    unit: &VelosiAstUnit,
-    osspec: &VelosiAst,
-    relations: &Relations,
-    outdir: &mut Path,
-) -> Result<(), VelosiCodeGenError> {
-    match unit {
-        VelosiAstUnit::Segment(segment) => {
-            // outdir.push(segment.ident().to_lowercase());
-            segment::generate(segment.as_ref(), relations, osspec, outdir)
-                .expect("code generation failed\n");
-            // outdir.pop();
-        }
-        VelosiAstUnit::StaticMap(staticmap) => {
-            // outdir.push(staticmap.ident().to_lowercase());
-            staticmap::generate(staticmap.as_ref(), relations, osspec, outdir)
-                .expect("code generation failed\n");
-            // outdir.pop();
-        }
-        VelosiAstUnit::Enum(e) => {
-            // outdir.push(e.ident().to_lowercase());
-            enums::generate(e.as_ref(), relations, osspec, outdir)
-                .expect("code generation failed\n");
-            // outdir.pop();
-        }
-        VelosiAstUnit::OSSpec(_) => panic!("osspec in module"),
-    }
-
-    Ok(())
+    _scope: &mut C::Scope,
+    unit: &VelosiAstUnitStaticMap,
+    _map: &VelosiAstStaticMapExplicit,
+    _relations: &Relations,
+    _osspec: &VelosiAst,
+    _outdir: &Path,
+) {
+    log::info!("Generating staticmap unit {}", unit.ident());
+    unimplemented!()
 }
