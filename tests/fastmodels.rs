@@ -59,7 +59,7 @@ fn examples_hwgen_fastmodels() {
 #[ignore]
 fn example_direct_segment_fastmodels() {
     let mut vrs = PathBuf::from("examples");
-    vrs.push("directsegment.vrs");
+    vrs.push("singlesegment.vrs");
     assert!(vrs.is_file());
 
     let outdir = Path::new("out/example_direct_segment_fastmodels");
