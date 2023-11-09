@@ -813,11 +813,11 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn os_mmio_read_fn_name(field: &VelosiAstInterfaceMmioField) -> String {
-    format!("os_mmio_read_{}", field.nbits())
+    format!("os_mmio_register_read_{}", field.nbits())
 }
 
 fn os_mmio_write_fn_name(field: &VelosiAstInterfaceMmioField) -> String {
-    format!("os_mmio_write_{}", field.nbits())
+    format!("os_mmio_register_write_{}", field.nbits())
 }
 
 fn os_register_read_fn_name(field: &VelosiAstInterfaceRegisterField) -> String {

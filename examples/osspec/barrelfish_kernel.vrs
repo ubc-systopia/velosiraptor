@@ -7,24 +7,5 @@ flags {
 osspec MyOs {
     const BAR : int = 1234;
 
-    extern type Capref {}
-
-    extern type VNode {
-        cap: Capref,
-        mapping: Capref,
-    }
-
-    extern type Frame {
-        cap: Capref,
-        mapping: Capref,
-    }
-
-    // extern fn get_vnode_for_va(va: vaddr) -> vnode
-    extern fn get_vnode_for_va(va: vaddr) -> Capref
-
-    extern fn vnode_map(dest: Capref, src: Capref, va: vaddr,
-          attr: flags, off: addr, sz: size,
-          mapping: Capref) -> bool
-
 }
 
