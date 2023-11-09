@@ -46,6 +46,8 @@ pub fn generate(osspec: &VelosiAstUnitOSSpec, outdir: &Path) {
     let guard = scope.new_ifdef(&hdrguard);
     let s = guard.guard().then_scope();
 
+    s.new_include("types.h", false);
+
     for etype in osspec.extern_types.values() {
         let mut struct_def = C::Struct::new(etype.ident.as_str());
         if etype.fields.is_empty() {

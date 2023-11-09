@@ -39,6 +39,58 @@ use super::utils::{self, FieldUtils, UnitUtils};
 use crate::VelosiCodeGenError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn add_fn_params<'a>(
+    fun: &mut C::Function,
+    unit: &VelosiAstUnitSegment,
+    op: &'a VelosiAstMethod,
+    osspec: &VelosiAst,
+) -> (
+    HashMap<&'a str, C::Expr>,
+    HashMap<&'a str, VelosiAstTypeInfo>,
+) {
+    let env = osspec.osspec().unwrap();
+
+    let mut param_exprs = HashMap::new();
+    let mut param_types = HashMap::new();
+
+    let unit_param = fun
+        .new_param("unit", C::Type::to_ptr(&unit.to_ctype()))
+        .to_expr();
+    param_exprs.insert("$unit", unit_param.clone());
+    param_types.insert(
+        "$unit",
+        VelosiAstTypeInfo::TypeRef(Rc::new(unit.to_type_name())),
+    );
+
+    for f in op.params.iter() {
+        let p = if f.ident().as_str() == "pa" {
+            if let Some(ty) = env.get_extern_type_with_property(&VelosiAstTypeProperty::Frame) {
+                param_types.insert(
+                    f.ident().as_str(),
+                    VelosiAstTypeInfo::Extern(ty.ident.ident.clone()),
+                );
+                fun.new_param(f.ident(), C::Type::new_typedef(ty.ident.as_str()))
+            } else {
+                param_types.insert(f.ident().as_str(), f.ptype.typeinfo.clone());
+                fun.new_param(
+                    f.ident(),
+                    unit.ptype_to_ctype(&VelosiAstTypeInfo::PhysAddr, true),
+                )
+            }
+        } else {
+            param_types.insert(f.ident().as_str(), f.ptype.typeinfo.clone());
+            fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo, true))
+        };
+        param_exprs.insert(f.ident().as_str(), p.to_expr());
+    }
+
+    (param_exprs, param_types)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // Constants
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -59,6 +111,59 @@ fn add_unit_constants(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
 // Constructors
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+fn add_unit_struct(
+    scope: &mut C::Scope,
+    unit: &VelosiAstUnitSegment,
+    relations: &Relations,
+    osspec: &VelosiAst,
+) {
+    let env = osspec.osspec().unwrap();
+
+    if !env.has_map_protect_unmap() {
+        // handled elsewhere!
+        return;
+    }
+
+    let mut s = C::Struct::new(&unit.to_struct_name());
+    s.push_doc_str(&format!("Unit Type `{}`", unit.ident()));
+    s.push_doc_str("");
+    s.push_doc_str(&format!("@loc: {}", unit.loc.loc()));
+
+    let stype = s.to_type();
+
+    if unit.maps_frame() {
+        // Add a field for the VNode type as this is a translation table
+        if let Some(etype) = env.get_extern_type_with_property(&VelosiAstTypeProperty::Descriptor) {
+            let f = C::Field::with_string(
+                String::from("vnode"),
+                unit.ptype_to_ctype(&etype.as_ref().into(), false),
+            );
+            s.push_field(f);
+        } else {
+            unimplemented!("expected a frame type!");
+        }
+
+        if let Some(etype) = env.get_extern_type_with_property(&VelosiAstTypeProperty::Frame) {
+            let f = C::Field::with_string(
+                String::from("frame"),
+                unit.ptype_to_ctype(&etype.as_ref().into(), false),
+            );
+            s.push_field(f);
+        } else {
+            unimplemented!("expected a frame type!");
+        }
+    } else if unit.maps_table() {
+        // here we just have a pointer to the next field
+        unimplemented!("TODO: handle me!");
+    } else {
+        unreachable!()
+    }
+
+    // add the struct to the scope and adding a typedef
+    scope.push_struct(s);
+    scope.new_typedef(&unit.to_type_name(), stype);
+}
+
 fn add_constructor_function(scope: &mut C::Scope, unit: &VelosiAstUnitSegment, osspec: &VelosiAst) {
     let env = osspec.osspec().unwrap();
 
@@ -73,18 +178,31 @@ fn add_constructor_function(scope: &mut C::Scope, unit: &VelosiAstUnitSegment, o
     // add the function parameter
     let params = if env.has_map_protect_unmap() {
         let mut params = Vec::new();
-        for etype in env.extern_types.values() {
-            if etype
-                .properties
-                .contains(&VelosiAstTypeProperty::Descriptor)
-            {
-                for field in &etype.fields {
-                    let ty = unit.ptype_to_ctype(&field.ptype.typeinfo, false);
-                    let param = fun.new_param(field.ident(), ty).to_expr();
-                    params.push((field.ident(), param));
-                }
-                break;
+        if unit.maps_frame() {
+            if let Some(etype) = env.get_extern_type_with_property(&VelosiAstTypeProperty::Frame) {
+                let ty = unit.ptype_to_ctype(&etype.as_ref().into(), false);
+
+                let param = fun.new_param("frame", ty).to_expr();
+                params.push(("frame", param));
+            } else {
+                unimplemented!("expected a frame type!");
             }
+        } else if unit.maps_table() {
+            for etype in env.extern_types.values() {
+                if etype
+                    .properties
+                    .contains(&VelosiAstTypeProperty::Descriptor)
+                {
+                    for field in &etype.fields {
+                        let ty = unit.ptype_to_ctype(&field.ptype.typeinfo, false);
+                        let param = fun.new_param(field.ident().as_str(), ty).to_expr();
+                        params.push((field.ident().as_str(), param));
+                    }
+                    break;
+                }
+            }
+        } else {
+            unreachable!()
         }
         params
     } else {
@@ -92,8 +210,8 @@ fn add_constructor_function(scope: &mut C::Scope, unit: &VelosiAstUnitSegment, o
             .iter()
             .map(|p| {
                 let ty = unit.ptype_to_ctype(&p.ptype.typeinfo, false);
-                let param = fun.new_param(p.ident(), ty).to_expr();
-                (p.ident(), param)
+                let param = fun.new_param(p.ident().as_str(), ty).to_expr();
+                (p.ident().as_str(), param)
             })
             .collect()
     };
@@ -105,7 +223,7 @@ fn add_constructor_function(scope: &mut C::Scope, unit: &VelosiAstUnitSegment, o
         body.assign(C::Expr::field_access(&unit_expr, name), p);
     }
 
-    if env.has_map_protect_unmap() {
+    if env.has_map_protect_unmap() && unit.maps_table() {
         body.assign(C::Expr::field_access(&unit_expr, "child"), C::Expr::null());
     }
 
@@ -139,16 +257,7 @@ fn add_op_fn(
     // Parameters
     // ---------------------------------------------------------------------------------------------
 
-    let mut param_vars = HashMap::new();
-
-    let v = fun.new_param("unit", C::Type::to_ptr(&unit.to_ctype()));
-    param_vars.insert("unit", v.to_expr());
-
-    for f in op.params.iter() {
-        let ty = unit.ptype_to_ctype(&f.ptype.typeinfo, true);
-        let p = fun.new_param(f.ident(), ty);
-        param_vars.insert(f.ident().as_str(), p.to_expr());
-    }
+    let (mut param_vars, param_types) = add_fn_params(&mut fun, unit, op, osspec);
 
     // ---------------------------------------------------------------------------------------------
     // Body: Requires clauses
@@ -156,10 +265,19 @@ fn add_op_fn(
 
     let body = fun.body();
 
+    let mut vars = HashMap::new();
+    for (p, ty) in &param_types {
+        if ty.is_extern() && *p == "pa" {
+            let m = env.get_method_with_signature(&[ty.clone()], &VelosiAstTypeInfo::PhysAddr);
+            if let Some(m) = m.first() {
+                vars.insert(*p, C::Expr::fn_call(m.ident(), vec![param_vars[p].clone()]));
+            }
+        }
+    }
+
     // requires clauses
     for r in op.requires.iter() {
         // add asserts!
-        let vars = HashMap::new();
         body.new_comment(&format!("requires {}", r));
         body.new_ifelse(&C::Expr::lnot(unit.expr_to_cpp(&vars, r)))
             .then_branch()
@@ -207,7 +325,7 @@ fn add_op_fn(
             ifelse.then_branch().fn_call(
                 &unit.set_child_fn_name(),
                 vec![
-                    param_vars["unit"].clone(),
+                    param_vars["$unit"].clone(),
                     param_vars["va"].clone(),
                     param_vars["pa"].clone(),
                 ],
@@ -216,7 +334,7 @@ fn add_op_fn(
         if op.ident().as_str() == "unmap" {
             ifelse.then_branch().fn_call(
                 &unit.clear_child_fn_name(),
-                vec![param_vars["unit"].clone(), param_vars["va"].clone()],
+                vec![param_vars["$unit"].clone(), param_vars["va"].clone()],
             );
         }
         ifelse.then_branch().return_expr(param_vars["sz"].clone());
@@ -327,11 +445,33 @@ fn add_valid_fn(scope: &mut C::Scope, unit: &VelosiAstUnitSegment, osspec: &Velo
     if env.has_map_protect_unmap() {
         // here we have a indirect way to set the things, we keep track of of the child pointer
         // in the function
-        body.return_expr(C::Expr::binop(
-            C::Expr::field_access(&unit_param, "child"),
-            "!=",
-            C::Expr::null(),
-        ));
+        if unit.maps_frame() {
+            if let Some(etype) = env.get_extern_type_with_property(&VelosiAstTypeProperty::Frame) {
+                let m = env.get_method_with_signature(
+                    &[VelosiAstTypeInfo::Extern(etype.ident.ident.clone())],
+                    &VelosiAstTypeInfo::PhysAddr,
+                );
+                if m.is_empty() {
+                    unimplemented!("should have some fn frame -> paddr defined");
+                }
+                let fname = m.first().unwrap().ident();
+                body.return_expr(C::Expr::binop(
+                    C::Expr::fn_call(fname, vec![C::Expr::field_access(&unit_param, "frame")]),
+                    "!=",
+                    C::Expr::new_num(0),
+                ));
+            } else {
+                unreachable!();
+            }
+        } else if unit.maps_table() {
+            body.return_expr(C::Expr::binop(
+                C::Expr::field_access(&unit_param, "child"),
+                "!=",
+                C::Expr::null(),
+            ));
+        } else {
+            unreachable!();
+        }
     } else {
         let op = unit.methods.get("valid").expect("valid method not found!");
         let valid_body = op.body.as_ref().unwrap();
@@ -379,24 +519,46 @@ fn add_set_child_fn(
     let children = relations.get_children_units(unit.ident());
 
     if env.has_map_protect_unmap() {
-        let rtype = match children.as_slice() {
-            [] => C::Type::new_void(),
-            [child] => child.to_ctype_ptr(),
-            _ => unreachable!(),
-        };
-
         let fun = scope.new_function(unit.set_child_fn_name().as_str(), C::Type::new_void());
         fun.set_static().set_inline();
         fun.push_doc_str("Sets the child pointer of the unit");
 
-        let _unit_param = fun.new_param("unit", unit.to_ctype_ptr()).to_expr();
+        let unit_param = fun.new_param("unit", unit.to_ctype_ptr()).to_expr();
         let _va_param = fun
             .new_param(
                 "va",
                 unit.ptype_to_ctype(&VelosiAstTypeInfo::VirtAddr, false),
             )
             .to_expr();
-        let _child_param = fun.new_param("dst", rtype);
+
+        if unit.maps_frame() {
+            if let Some(etype) = env.get_extern_type_with_property(&VelosiAstTypeProperty::Frame) {
+                let child_param = fun
+                    .new_param(
+                        "dst",
+                        unit.ptype_to_ctype(
+                            &VelosiAstTypeInfo::Extern(etype.ident.ident.clone()),
+                            false,
+                        ),
+                    )
+                    .to_expr();
+                fun.body()
+                    .assign(unit_param.field_access("frame"), child_param);
+            } else {
+                unreachable!()
+            }
+        } else if unit.maps_table() {
+            let rtype = match children.as_slice() {
+                [] => C::Type::new_void(),
+                [child] => child.to_ctype_ptr(),
+                _ => unreachable!(),
+            };
+
+            let _child_param = fun.new_param("dst", rtype);
+            unimplemented!("TODO: implement me!");
+        } else {
+            unreachable!()
+        }
     } else {
         scope.new_comment("No set-child function needed as no environment spec available.");
     }
@@ -421,10 +583,32 @@ fn add_clear_child_fn(
                 unit.ptype_to_ctype(&VelosiAstTypeInfo::VirtAddr, false),
             )
             .to_expr();
-        fun.body().fn_call(
-            unit.set_child_fn_name().as_str(),
-            vec![unit_param, va_param, C::Expr::null()],
-        );
+
+        if unit.maps_frame() {
+            if let Some(etype) = env.get_extern_type_with_property(&VelosiAstTypeProperty::Frame) {
+                let v = C::Variable::new("frame", C::Type::new_typedef(etype.ident.ident()));
+                let v_expr = v.to_expr();
+                fun.body()
+                    .variable(v)
+                    .fn_call(
+                        "memset",
+                        vec![v_expr.addr_of(), C::Expr::new_num(0), v_expr.size_of()],
+                    )
+                    .fn_call(
+                        unit.set_child_fn_name().as_str(),
+                        vec![unit_param, va_param, v_expr],
+                    );
+            } else {
+                unreachable!()
+            }
+        } else if unit.maps_table() {
+            fun.body().fn_call(
+                unit.set_child_fn_name().as_str(),
+                vec![unit_param, va_param, C::Expr::null()],
+            );
+        } else {
+            unreachable!();
+        }
     }
 }
 
@@ -616,41 +800,6 @@ fn add_translate_fn(
 // Higher-Order Functions
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn add_fn_params<'a>(
-    fun: &mut C::Function,
-    unit: &VelosiAstUnitSegment,
-    op: &'a VelosiAstMethod,
-    osspec: &VelosiAst,
-) -> HashMap<&'a str, C::Expr> {
-    let env = osspec.osspec().unwrap();
-
-    let mut param_exprs = HashMap::new();
-
-    let unit_param = fun
-        .new_param("unit", C::Type::to_ptr(&unit.to_ctype()))
-        .to_expr();
-    param_exprs.insert("$unit", unit_param.clone());
-
-    for f in op.params.iter() {
-        let p = if f.ident().as_str() == "pa" {
-            if let Some(ty) = env.get_extern_type_with_property(&VelosiAstTypeProperty::Frame) {
-                fun.new_param(f.ident(), C::Type::new_typedef(ty.ident.as_str()))
-            } else {
-                fun.new_param(
-                    f.ident(),
-                    unit.ptype_to_ctype(&VelosiAstTypeInfo::PhysAddr, false),
-                )
-            }
-        } else {
-            fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo, false))
-        };
-
-        param_exprs.insert(f.ident().as_str(), p.to_expr());
-    }
-
-    param_exprs
-}
-
 fn params_to_fn_arguments(
     op: &VelosiAstMethod,
     unit: C::Expr,
@@ -677,7 +826,7 @@ fn add_map_function(
     fun.set_static().set_inline();
     fun.push_doc_str(&format!("Higher-order {} function", m_fn.ident()));
 
-    let param_exprs = add_fn_params(fun, unit, m_fn, osspec);
+    let (param_exprs, _) = add_fn_params(fun, unit, m_fn, osspec);
 
     let env = osspec.osspec().unwrap();
     let body = fun.body();
@@ -804,7 +953,23 @@ fn add_map_function(
         assert!(!unit.maps_table());
 
         if env.has_map_protect_unmap() {
-            unimplemented!("TODO: Implement me!");
+            let _map = env.get_map_method(VelosiAstTypeProperty::Frame);
+
+            let cond = body.new_ifelse(&C::Expr::fn_call(
+                &unit.valid_fn_name(),
+                vec![v_unit_param.clone()],
+            ));
+            cond.then_branch().return_expr(C::Expr::new_num(0));
+
+            let mut args = vec![param_exprs["$unit"].clone()];
+            args.extend(
+                m_fn.params
+                    .iter()
+                    .map(|p| param_exprs.get(p.ident().as_str()).unwrap())
+                    .cloned(),
+            );
+
+            body.return_expr(C::Expr::fn_call(&unit.to_op_fn_name(m_fn), args));
         } else {
             body.new_comment("this is just calling the operation on the unit directy");
 
@@ -835,7 +1000,7 @@ fn add_unmap_protect_function_common(
     fun.set_static().set_inline();
     fun.push_doc_str(&format!("Higher-order {} function", m_fn.ident()));
 
-    let param_exprs = add_fn_params(fun, unit, m_fn, osspec);
+    let (mut param_exprs, _) = add_fn_params(fun, unit, m_fn, osspec);
 
     let env = osspec.osspec().unwrap();
     let body = fun.body();
@@ -880,7 +1045,30 @@ fn add_unmap_protect_function_common(
         assert!(!unit.maps_table());
 
         if env.has_map_protect_unmap() {
-            unimplemented!("TODO: Implement me!");
+            body.new_comment("TODO: Implement me!");
+
+            let cond = body.new_ifelse(&C::Expr::lnot(C::Expr::fn_call(
+                &unit.valid_fn_name(),
+                vec![v_unit_param.clone()],
+            )));
+
+            let mut args = vec![param_exprs["$unit"].clone()];
+            args.extend(
+                m_fn.params
+                    .iter()
+                    .map(|p| param_exprs.get(p.ident().as_str()).unwrap())
+                    .cloned(),
+            );
+
+            if m_fn.ident().as_str() == "unmap" {
+                cond.then_branch().return_expr(param_exprs["sz"].clone());
+                cond.other_branch()
+                    .return_expr(C::Expr::fn_call(&unit.to_op_fn_name(m_fn), args));
+            } else if m_fn.ident().as_str() == "protect" {
+                cond.then_branch().return_expr(C::Expr::new_num(0));
+                cond.other_branch()
+                    .return_expr(C::Expr::fn_call(&unit.to_op_fn_name(m_fn), args));
+            }
         } else {
             body.new_comment("this is just calling the operation on the unit directy");
 
@@ -961,6 +1149,7 @@ fn add_resolve_function(
     cond.then_branch().return_expr(C::Expr::bfalse());
 
     if let Some(child) = child {
+        assert!(unit.maps_table());
         if env.has_map_protect_unmap() {
             body.return_expr(C::Expr::fn_call(
                 &child.resolve_fn_name(),
@@ -984,11 +1173,12 @@ fn add_resolve_function(
             ));
         }
     } else {
+        assert!(unit.maps_frame());
         // no child here, so we're directly doing the thing here!
         if env.has_map_protect_unmap() {
             body.assign(
                 C::Expr::deref(&paddr_param),
-                C::Expr::field_access(&unit_param, "frame"),
+                unit_param.field_access("frame").addr_of(),
             )
             .return_expr(C::Expr::btrue());
         } else {
@@ -1075,6 +1265,8 @@ pub fn generate(
 ) -> Result<(), VelosiCodeGenError> {
     log::info!("Generating segment unit {}", unit.ident());
 
+    let env = osspec.osspec().unwrap();
+
     // the code generation scope
     let mut scope = C::Scope::new();
 
@@ -1093,12 +1285,10 @@ pub fn generate(
     // add the header comments
     s.new_include("stddef.h", true);
     s.new_include("assert.h", true);
+    s.new_include("string.h", true);
 
     // adding the OS spec header here
-    {
-        let env = osspec.osspec().unwrap();
-        s.new_include(&format!("{}.h", env.ident().to_lowercase()), true);
-    }
+    s.new_include(&format!("{}.h", env.ident().to_lowercase()), true);
 
     // adding includes for each of the children
     for child in relations.get_children(unit.ident()) {
@@ -1106,10 +1296,12 @@ pub fn generate(
     }
 
     // the interface and global constants
-    s.new_include(
-        &format!("{}_interface.h", unit.ident().to_lowercase()),
-        false,
-    );
+    if !env.has_map_protect_unmap() {
+        s.new_include(
+            &format!("{}_interface.h", unit.ident().to_lowercase()),
+            false,
+        );
+    }
 
     s.new_include("consts.h", false);
     s.new_include("types.h", false);
@@ -1121,6 +1313,7 @@ pub fn generate(
     s.new_comment(" --------------------------- Constants / Constructor -------------------------");
 
     add_unit_constants(s, unit);
+    add_unit_struct(s, unit, relations, osspec);
     add_constructor_function(s, unit, osspec);
 
     s.new_comment(" ----------------------------- Allocate and free ----------------------------");

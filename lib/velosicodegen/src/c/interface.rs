@@ -284,6 +284,12 @@ fn generate_segment(
     if env.has_map_protect_unmap() {
         s.new_comment("Interface through OS provided API.");
     } else {
+        s.new_include("types.h", false);
+        // add the OS support includes
+        s.new_include("os_mmio.h", true);
+        s.new_include("os_registers.h", true);
+        s.new_include("os_memory.h", true);
+
         // generate the unit struct
         generate_unit_struct(s, unit, osspec);
 
@@ -298,11 +304,6 @@ fn generate_segment(
                 );
                 s.new_include(&fieldname, false);
             }
-
-            // add the OS support includes
-            s.new_include("os_mmio.h", true);
-            s.new_include("os_registers.h", true);
-            s.new_include("os_memory.h", true);
 
             // generate the field accessors
             for f in interface.fields() {
@@ -340,6 +341,11 @@ pub fn generate(
 ) -> Result<(), VelosiCodeGenError> {
     // create the unit dir
     let _dirname = unit.ident().to_lowercase();
+
+    // no need to create the file if we are using the OSSpec
+    if osspec.osspec().unwrap().has_map_protect_unmap() {
+        return Ok(());
+    }
 
     // create the directory
     fs::create_dir_all(&outdir)?;
