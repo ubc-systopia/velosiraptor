@@ -136,194 +136,194 @@ fn is_fn_name(unit: &VelosiAstUnitEnum, variant_unit: &VelosiAstUnit) -> String 
     fn_name
 }
 
-fn add_do_map_function(
-    scope: &mut C::Scope,
-    ast: &VelosiAst,
-    unit: &VelosiAstUnitEnum,
-) -> Result<(), VelosiCodeGenError> {
-    // forall variants, generate one function. that's basically a pass-through!
-    // map_page() map_ptable()
-    //  -> create state struct
-    //  -> call map()
+// fn add_do_map_function(
+//     scope: &mut C::Scope,
+//     ast: &VelosiAst,
+//     unit: &VelosiAstUnitEnum,
+// ) -> Result<(), VelosiCodeGenError> {
+//     // forall variants, generate one function. that's basically a pass-through!
+//     // map_page() map_ptable()
+//     //  -> create state struct
+//     //  -> call map()
 
-    for variant in unit.get_next_unit_idents().into_iter() {
-        // lookup the unit
+//     for variant in unit.get_next_unit_idents().into_iter() {
+//         // lookup the unit
 
-        let variant_unit = ast.get_unit(variant).expect("unit not found!");
-        let variant_op = variant_unit
-            .get_method("map")
-            .expect("map method not found!");
+//         let variant_unit = ast.get_unit(variant).expect("unit not found!");
+//         let variant_op = variant_unit
+//             .get_method("map")
+//             .expect("map method not found!");
 
-        // here we probably want to generate something else
+//         // here we probably want to generate something else
 
-        // declare the function
+//         // declare the function
 
-        let fn_name = unit.to_op_fn_name_on_unit(variant_op, variant_unit);
+//         let fn_name = unit.to_op_fn_name_on_unit(variant_op, variant_unit);
 
-        let mut fun = C::Function::with_string(fn_name, C::Type::new_size());
-        fun.set_static().set_inline();
+//         let mut fun = C::Function::with_string(fn_name, C::Type::new_size());
+//         fun.set_static().set_inline();
 
-        // add the parameters
-        let v = fun.new_param("unit", C::Type::to_ptr(&unit.to_ctype()));
-        let v_expr = v.to_expr();
+//         // add the parameters
+//         let v = fun.new_param("unit", C::Type::to_ptr(&unit.to_ctype()));
+//         let v_expr = v.to_expr();
 
-        for f in variant_op.params.iter() {
-            let _p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo, false));
-        }
+//         for f in variant_op.params.iter() {
+//             let _p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo, false));
+//         }
 
-        let body = fun.body();
+//         let body = fun.body();
 
-        // call the constructor function of the other type
-        // create local variable for next state
-        let tunit = body
-            .new_variable("targetunit", variant_unit.to_ctype())
-            .to_expr();
-        // st = variant_unit.constructor_fn_name()
-        let args = variant_unit
-            .params_as_slice()
-            .iter()
-            .map(|p| C::Expr::field_access(&v_expr, p.ident().as_str()))
-            .collect();
+//         // call the constructor function of the other type
+//         // create local variable for next state
+//         let tunit = body
+//             .new_variable("targetunit", variant_unit.to_ctype())
+//             .to_expr();
+//         // st = variant_unit.constructor_fn_name()
+//         let args = variant_unit
+//             .params_as_slice()
+//             .iter()
+//             .map(|p| C::Expr::field_access(&v_expr, p.ident().as_str()))
+//             .collect();
 
-        body.assign(
-            tunit.clone(),
-            C::Expr::fn_call(&variant_unit.constructor_fn_name(), args),
-        );
+//         body.assign(
+//             tunit.clone(),
+//             C::Expr::fn_call(&variant_unit.constructor_fn_name(), args),
+//         );
 
-        let mut args = vec![C::Expr::addr_of(&tunit)];
-        for f in variant_op.params.iter() {
-            args.push(C::Expr::new_var(
-                f.ident().as_str(),
-                variant_unit.ptype_to_ctype(&f.ptype.typeinfo, false),
-            ));
-        }
-        let mapexpr = C::Expr::fn_call(&variant_unit.to_op_fn_name(variant_op), args);
-        body.return_expr(mapexpr);
+//         let mut args = vec![C::Expr::addr_of(&tunit)];
+//         for f in variant_op.params.iter() {
+//             args.push(C::Expr::new_var(
+//                 f.ident().as_str(),
+//                 variant_unit.ptype_to_ctype(&f.ptype.typeinfo, false),
+//             ));
+//         }
+//         let mapexpr = C::Expr::fn_call(&variant_unit.to_op_fn_name(variant_op), args);
+//         body.return_expr(mapexpr);
 
-        scope.push_function(fun);
-    }
+//         scope.push_function(fun);
+//     }
 
-    Ok(())
-}
+//     Ok(())
+// }
 
-fn add_do_op_function(
-    scope: &mut C::Scope,
-    ast: &VelosiAst,
-    unit: &VelosiAstUnitEnum,
-    op: &VelosiAstMethod,
-) -> Result<(), VelosiCodeGenError> {
-    // forall variants, generate one function. that's basically a pass-through!
-    // map_page() map_ptable()
-    //  -> create state struct
-    //  -> call map()
-    let mut fun = C::Function::with_string(unit.to_op_fn_name(op), C::Type::new_size());
-    fun.set_static().set_inline();
+// fn add_do_op_function(
+//     scope: &mut C::Scope,
+//     ast: &VelosiAst,
+//     unit: &VelosiAstUnitEnum,
+//     op: &VelosiAstMethod,
+// ) -> Result<(), VelosiCodeGenError> {
+//     // forall variants, generate one function. that's basically a pass-through!
+//     // map_page() map_ptable()
+//     //  -> create state struct
+//     //  -> call map()
+//     let mut fun = C::Function::with_string(unit.to_op_fn_name(op), C::Type::new_size());
+//     fun.set_static().set_inline();
 
-    let v = fun
-        .new_param("unit", C::Type::to_ptr(&unit.to_ctype()))
-        .to_expr();
+//     let v = fun
+//         .new_param("unit", C::Type::to_ptr(&unit.to_ctype()))
+//         .to_expr();
 
-    let mut call_exprs = Vec::new();
-    for f in op.params.iter() {
-        let p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo, false));
-        call_exprs.push(p.to_expr());
-    }
+//     let mut call_exprs = Vec::new();
+//     for f in op.params.iter() {
+//         let p = fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo, false));
+//         call_exprs.push(p.to_expr());
+//     }
 
-    // adding asserts
-    if op.requires.is_empty() {
-        fun.body().new_comment("no requires clauses");
-    } else {
-        fun.body().new_comment("asserts for the requires clauses");
-    }
-    // for r in op.requires.iter() {
-    //     // add asserts!
-    //     fun.body()
-    //         .fn_call("assert", vec![utils::expr_to_cpp(unit, r)]);
-    // }
-    let mut block = C::Block::new();
-    block.fn_call("assert", vec![C::Expr::bfalse()]);
+//     // adding asserts
+//     if op.requires.is_empty() {
+//         fun.body().new_comment("no requires clauses");
+//     } else {
+//         fun.body().new_comment("asserts for the requires clauses");
+//     }
+//     // for r in op.requires.iter() {
+//     //     // add asserts!
+//     //     fun.body()
+//     //         .fn_call("assert", vec![utils::expr_to_cpp(unit, r)]);
+//     // }
+//     let mut block = C::Block::new();
+//     block.fn_call("assert", vec![C::Expr::bfalse()]);
 
-    for variant in unit.get_next_unit_idents().into_iter() {
-        let variant_unit = ast.get_unit(variant).expect("unit not found!");
-        // let variant_op = variant_unit
-        //     .get_method("translate")
-        //     .expect("map method not found!");
+//     for variant in unit.get_next_unit_idents().into_iter() {
+//         let variant_unit = ast.get_unit(variant).expect("unit not found!");
+//         // let variant_op = variant_unit
+//         //     .get_method("translate")
+//         //     .expect("map method not found!");
 
-        let mut fn_name = unit.to_struct_name();
-        fn_name.push_str("_is_");
-        fn_name.push_str(
-            &variant_unit
-                .ident()
-                .replace(unit.ident().as_str(), "")
-                .to_ascii_lowercase(),
-        );
+//         let mut fn_name = unit.to_struct_name();
+//         fn_name.push_str("_is_");
+//         fn_name.push_str(
+//             &variant_unit
+//                 .ident()
+//                 .replace(unit.ident().as_str(), "")
+//                 .to_ascii_lowercase(),
+//         );
 
-        let mut then = C::Block::new();
-        let tunit = then
-            .new_variable("targetunit", variant_unit.to_ctype())
-            .to_expr();
+//         let mut then = C::Block::new();
+//         let tunit = then
+//             .new_variable("targetunit", variant_unit.to_ctype())
+//             .to_expr();
 
-        // st = variant_unit.constructor_fn_name()
-        let args = variant_unit
-            .params_as_slice()
-            .iter()
-            .map(|p| C::Expr::field_access(&v, p.ident().as_str()))
-            .collect();
+//         // st = variant_unit.constructor_fn_name()
+//         let args = variant_unit
+//             .params_as_slice()
+//             .iter()
+//             .map(|p| C::Expr::field_access(&v, p.ident().as_str()))
+//             .collect();
 
-        then.assign(
-            tunit.clone(),
-            C::Expr::fn_call(&variant_unit.constructor_fn_name(), args),
-        );
+//         then.assign(
+//             tunit.clone(),
+//             C::Expr::fn_call(&variant_unit.constructor_fn_name(), args),
+//         );
 
-        let mut args = Vec::new();
-        args.push(C::Expr::addr_of(&tunit));
-        args.extend(call_exprs.clone());
+//         let mut args = Vec::new();
+//         args.push(C::Expr::addr_of(&tunit));
+//         args.extend(call_exprs.clone());
 
-        then.fn_call(&variant_unit.to_op_fn_name(op), args);
+//         then.fn_call(&variant_unit.to_op_fn_name(op), args);
 
-        let cond = C::Expr::fn_call(fn_name.as_str(), vec![v.clone()]);
-        let mut ifelse = C::IfElse::new(&cond);
-        ifelse.set_then(then).set_other(block);
+//         let cond = C::Expr::fn_call(fn_name.as_str(), vec![v.clone()]);
+//         let mut ifelse = C::IfElse::new(&cond);
+//         ifelse.set_then(then).set_other(block);
 
-        let mut block_new = C::Block::new();
-        block_new.ifelse(ifelse);
-        block = block_new;
-    }
+//         let mut block_new = C::Block::new();
+//         block_new.ifelse(ifelse);
+//         block = block_new;
+//     }
 
-    fun.set_body(block);
+//     fun.set_body(block);
 
-    scope.push_function(fun);
-    Ok(())
-}
+//     scope.push_function(fun);
+//     Ok(())
+// }
 
-fn add_do_unmap_function(
-    scope: &mut C::Scope,
-    ast: &VelosiAst,
-    unit: &VelosiAstUnitEnum,
-) -> Result<(), VelosiCodeGenError> {
-    let op = unit.methods.get("unmap").expect("unmap method not found!");
-    add_do_op_function(scope, ast, unit, op)
-}
+// fn add_do_unmap_function(
+//     scope: &mut C::Scope,
+//     ast: &VelosiAst,
+//     unit: &VelosiAstUnitEnum,
+// ) -> Result<(), VelosiCodeGenError> {
+//     let op = unit.methods.get("unmap").expect("unmap method not found!");
+//     add_do_op_function(scope, ast, unit, op)
+// }
 
-fn add_do_protect_function(
-    scope: &mut C::Scope,
-    ast: &VelosiAst,
-    unit: &VelosiAstUnitEnum,
-) -> Result<(), VelosiCodeGenError> {
-    let op = unit
-        .methods
-        .get("protect")
-        .expect("protect method not found!");
-    add_do_op_function(scope, ast, unit, op)
-}
+// fn add_do_protect_function(
+//     scope: &mut C::Scope,
+//     ast: &VelosiAst,
+//     unit: &VelosiAstUnitEnum,
+// ) -> Result<(), VelosiCodeGenError> {
+//     let op = unit
+//         .methods
+//         .get("protect")
+//         .expect("protect method not found!");
+//     add_do_op_function(scope, ast, unit, op)
+// }
 
-fn add_translate_function(
-    _scope: &mut C::Scope,
-    _ast: &VelosiAst,
-    _unit: &VelosiAstUnitEnum,
-) -> Result<(), VelosiCodeGenError> {
-    Ok(())
-}
+// fn add_translate_function(
+//     _scope: &mut C::Scope,
+//     _ast: &VelosiAst,
+//     _unit: &VelosiAstUnitEnum,
+// ) -> Result<(), VelosiCodeGenError> {
+//     Ok(())
+// }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers

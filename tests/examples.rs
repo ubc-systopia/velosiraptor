@@ -451,8 +451,10 @@ fn examples_codegen(lang: &str, new_codegen_fn: CodeGenConstructor) {
             continue;
         }
 
-        if ! matches!(vrs.display().to_string().as_str(),
-            "examples/singlesegment.vrs" | "examples/multisegment.vrs") {
+        if !matches!(
+            vrs.display().to_string().as_str(),
+            "examples/singlesegment.vrs" | "examples/multisegment.vrs"
+        ) {
             continue;
         }
 

@@ -114,7 +114,7 @@ fn add_unit_constants(scope: &mut C::Scope, unit: &VelosiAstUnitSegment) {
 fn add_unit_struct(
     scope: &mut C::Scope,
     unit: &VelosiAstUnitSegment,
-    relations: &Relations,
+    _relations: &Relations,
     osspec: &VelosiAst,
 ) {
     let env = osspec.osspec().unwrap();
@@ -1000,7 +1000,7 @@ fn add_unmap_protect_function_common(
     fun.set_static().set_inline();
     fun.push_doc_str(&format!("Higher-order {} function", m_fn.ident()));
 
-    let (mut param_exprs, _) = add_fn_params(fun, unit, m_fn, osspec);
+    let (param_exprs, _) = add_fn_params(fun, unit, m_fn, osspec);
 
     let env = osspec.osspec().unwrap();
     let body = fun.body();
