@@ -265,7 +265,7 @@ enum X8664PDirEntry(base: paddr){
 }
 
 staticmap X8664PDir(base : paddr) {
-    #[repr(list)]
+    #[repr(array)]
     maps [ X8664PDirEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..PTABLE_ENTRIES ]
 }
 

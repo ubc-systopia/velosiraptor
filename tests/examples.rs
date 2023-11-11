@@ -453,7 +453,7 @@ fn examples_codegen(lang: &str, new_codegen_fn: CodeGenConstructor) {
 
         if !matches!(
             vrs.display().to_string().as_str(),
-            "examples/singlesegment.vrs" | "examples/multisegment.vrs"
+            "examples/x86_64_pagetable.vrs" | "examples/x86_32_pagetable.vrs"
         ) {
             continue;
         }

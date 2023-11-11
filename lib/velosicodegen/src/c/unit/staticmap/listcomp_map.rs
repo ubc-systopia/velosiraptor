@@ -149,17 +149,14 @@ fn next_unit_type(
 fn generate_child_struct_fields_segment(
     cstruct: &mut C::Struct,
     s: &VelosiAstUnitSegment,
+    relations: &Relations,
     env: &VelosiAstUnitOSSpec,
 ) {
     if s.maps_table() {
         cstruct.push_doc_str("segment mapping a descriptor");
-        if let Some(frametype) =
-            env.get_extern_type_with_property(&VelosiAstTypeProperty::Descriptor)
-        {
-            cstruct.new_field("table", C::Type::new_typedef(frametype.ident.as_str()));
-        } else {
-            cstruct.new_field("dummy", C::Type::new_int32());
-        }
+
+        let child = relations.get_only_child_unit(s.ident());
+        cstruct.new_field("table", child.to_ctype());
     } else if s.maps_frame() {
         cstruct.push_doc_str("segment mapping a frame");
         // this one just maps a frame
@@ -252,7 +249,7 @@ fn generate_child_struct(
             generate_child_struct_fields_enum(scope, &mut children_struct, unit, e, relations, env);
         }
         VelosiAstUnit::Segment(s) => {
-            generate_child_struct_fields_segment(&mut children_struct, s, env);
+            generate_child_struct_fields_segment(&mut children_struct, s, relations, env);
         }
         _ => unreachable!(),
     }
@@ -1390,9 +1387,16 @@ fn add_op_function_segment(
         // recurse
         let body = fun.body();
 
+        let mut args = vec![v_child.field_access("table").addr_of()];
+        args.extend(
+            op.params
+                .iter()
+                .map(|p| param_exprs[p.ident().as_str()].clone()),
+        );
+
         let next = relations.get_only_child_unit(next_unit.ident());
-        body.return_expr(C::Expr::fn_call(&next.to_hl_op_fn_name(op), vec![]));
-        unimplemented!("TODO: handle the static map with mapping table");
+        body.return_expr(C::Expr::fn_call(&next.to_hl_op_fn_name(op), args));
+        //unimplemented!("TODO: handle the static map with mapping table");
     } else {
         unreachable!();
     }
@@ -2011,10 +2015,15 @@ fn add_resolve_function(
 
                     body.return_expr(C::Expr::btrue());
                 } else if seg.maps_table() {
+                    let child = relations.get_only_child_unit(seg.ident());
                     body.new_comment("segment maps a table, recurse to next unit");
                     body.return_expr(C::Expr::fn_call(
-                        &seg.as_ref().resolve_fn_name(),
-                        vec![C::Expr::addr_of(&v_child), vaddr_param, paddr_param],
+                        &child.resolve_fn_name(),
+                        vec![
+                            v_child.field_access("table").addr_of(),
+                            vaddr_param,
+                            paddr_param,
+                        ],
                     ));
                 } else {
                     unreachable!()
@@ -2430,7 +2439,11 @@ fn add_set_child_fn(
     }
     if map.is_repr_list() {
         // find the right child unit for the VA mapping
-        unimplemented!("TODO - handling of list representation not done");
+        // unimplemented!("TODO - handling of list representation not done");
+        println!(
+            "TODO: implement me! handling of list representation not done {}",
+            line!()
+        );
     } else if map.is_repr_array() {
         // here we have elements that are easily accessible
         let v_idx = fun_body.new_variable("idx", C::Type::new_size()).to_expr();
@@ -2555,7 +2568,10 @@ fn add_get_child_fn(
         }
         if map.is_repr_list() {
             // find the right child unit for the VA mapping
-            unimplemented!("TODO - handling of list representation not done");
+            println!(
+                "TODO: implement me! handling of list representation not done {}",
+                line!()
+            );
         } else if map.is_repr_array() {
             // here we have elements that are easily accessible
             let v_idx = body.new_variable("idx", C::Type::new_size()).to_expr();
