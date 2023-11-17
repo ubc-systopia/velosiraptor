@@ -86,15 +86,25 @@ D_IMG := armfm_img
 D_CON := armfmtest
 D_DIR := /velosihwgen_build
 
+ifdef RUN_TEST
+	RUN_TEST_REL:=../test/$(notdir $(RUN_TEST))
+endif
+
 # /bin/bash -i will source .bashrc and set armfm env variables
 dockerhw:
 	docker restart $(D_CON) # prevent dead process accumulation in development
 	docker exec $(D_CON) /bin/bash -c "rm -r $(D_DIR)" || true
 	docker exec $(D_CON) /bin/bash -c "mkdir -p $(D_DIR)"
 	docker cp $(CURDIR)/. $(D_CON):$(D_DIR)
+
 # bad hack. should move armfm-boot to hwgen support dir instead of the top-level one
 	docker cp $(CURDIR)/../../../../../../support/arm-fastmodels-boot/. $(D_CON):$(D_DIR)/arm-fastmodels-boot
-	docker exec $(D_CON) /bin/bash -i -c "cd $(D_DIR)/arm-fastmodels-boot && make && cp bootimg.bin $(D_DIR)"
+
+# this makefile can be called with RUN_TEST="t.c" with t.c in test dir
+ifdef RUN_TEST
+	docker cp $(CURDIR)/../../../../src/fastmodels/test/. $(D_CON):$(D_DIR)/test
+endif
+	docker exec $(D_CON) /bin/bash -i -c "cd $(D_DIR)/arm-fastmodels-boot && make VRS_TEST=\"$(RUN_TEST_REL)\" && cp bootimg.bin $(D_DIR)"
 	docker exec $(D_CON) /bin/bash -i -c "cd $(D_DIR) && make clean && make && make run"
 
 .PHONY: all clean dockerhw
