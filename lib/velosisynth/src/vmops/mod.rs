@@ -34,8 +34,8 @@ mod unmap;
 use std::rc::Rc;
 
 // re-export the sanity checks
-pub use queries::resultparser;
-pub use queries::utils;
+// pub use queries::resultparser;
+// pub use queries::utils;
 
 // reexport the program synthesis wrappers
 pub use map::MapPrograms;
@@ -45,8 +45,8 @@ pub use unmap::UnmapPrograms;
 /// re-export the query builder stuff
 pub use queries::{
     BoolExprQuery, BoolExprQueryBuilder, CompoundBoolExprQueryBuilder, CompoundQueryAll,
-    CompoundQueryAny, MaybeResult, ProgramBuilder, ProgramSimplifier, ProgramVerifier,
-    TranslateQuery, TranslateQueryBuilder, DEFAULT_BATCH_SIZE,
+    CompoundQueryAny, MaybeResult, ProgramBuilder, ProgramVerifier, TranslateQuery,
+    TranslateQueryBuilder, DEFAULT_BATCH_SIZE,
 };
 
 use velosiast::ast::VelosiAstUnitSegment;

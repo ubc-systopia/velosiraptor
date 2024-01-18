@@ -171,7 +171,7 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
 
         fill_template(
             self.support_dir.join("TranslationUnit.lisa.template"),
-            &self.outdir.join(format!("{}.lisa", self.pkgname)),
+            self.outdir.join(format!("{}.lisa", self.pkgname)),
             HashMap::from([
                 (&"/* REPLACE top_class */".to_string(), &top_class),
                 (&"/* REPLACE top_file */".to_string(), &top_file),
@@ -180,19 +180,19 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
 
         fill_template(
             self.support_dir.join("Platform.lisa.template"),
-            &self.outdir.join("platform/Platform.lisa"),
+            self.outdir.join("platform/Platform.lisa"),
             HashMap::from([(&"/* REPLACE top_class */".to_string(), &top_class)]),
         )?;
 
         fill_template(
             self.support_dir.join("Platform.sgproj.template"),
-            &self.outdir.join("platform/Platform.sgproj"),
+            self.outdir.join("platform/Platform.sgproj"),
             HashMap::from([(&"/* REPLACE pkgname */".to_string(), &self.pkgname)]),
         )?;
 
         fill_template(
             self.support_dir.join("Makefile.template"),
-            &self.outdir.join("Makefile"),
+            self.outdir.join("Makefile"),
             HashMap::from([
                 (&"/* REPLACE top_file */".to_string(), &top_file),
                 (&"/* REPLACE pkgname */".to_string(), &self.pkgname),
