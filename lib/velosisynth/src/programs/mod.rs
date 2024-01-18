@@ -46,7 +46,7 @@ mod symvars;
 use statevars::StateVars;
 
 // public re-exports
-pub use builder::{MultiDimIterator, ProgramsBuilder, ProgramsIter};
+pub use builder::{ProgramsBuilder, ProgramsIter};
 pub use symvars::SymbolicVars;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -833,7 +833,7 @@ impl Program {
 
         // the smt definitinos
         let mut defs = Vec::new();
-        for (_i, (f, a)) in smtops.drain(..).enumerate() {
+        for (f, a) in smtops.drain(..) {
             // the model var term for smt2
             let m = Term::ident(stvar.current());
 

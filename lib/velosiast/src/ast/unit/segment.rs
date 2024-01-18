@@ -746,15 +746,18 @@ impl VelosiAstUnitSegment {
     }
 
     pub fn get_next_unit_idents(&self) -> Vec<&Rc<String>> {
-        vec![self.get_next_unit_ident()]
+        if let Some(next) = self.get_next_unit_ident() {
+            vec![next]
+        } else {
+            vec![]
+        }
     }
 
-    pub fn get_next_unit_ident(&self) -> &Rc<String> {
+    pub fn get_next_unit_ident(&self) -> Option<&Rc<String>> {
         self.methods
             .get("map")
             .and_then(|m| m.get_param("pa"))
             .and_then(|p| p.ptype.typeref())
-            .unwrap()
     }
 
     pub fn maps_table(&self) -> bool {

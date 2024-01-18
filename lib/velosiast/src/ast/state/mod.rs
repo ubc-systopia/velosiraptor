@@ -31,7 +31,7 @@
 mod fields;
 
 // re-exports
-pub use fields::{VelosiAstStateField, VelosiAstStateMemoryField, VelosiAstStateRegisterField};
+pub use fields::VelosiAstStateField;
 
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
