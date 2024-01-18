@@ -47,6 +47,9 @@ const LARGE_PAGE_SIZE : size = (1 << LARGE_PAGE_BITS); // 4 MiB
 const PHYS_ADDR_BITS : size = 32;
 const PHYS_ADDR_MAX  : size = (1 << PHYS_ADDR_BITS);
 
+const VIRT_ADDR_BITS : size = 32;
+const VIRT_ADDR_MAX  : size = (1 << PHYS_ADDR_BITS);
+
 
 flags {
     writable,
@@ -73,7 +76,7 @@ segment X8632PageTableEntry(base : paddr) {
 
     // the state
     state(base: paddr) {
-        mem pte [base, 0, 4] {
+        mem entry [base, 0, 4] {
             // the following fields at starting bit, ending bit, name
             0 ..  1 present,
             1 ..  2 writable,
@@ -90,33 +93,50 @@ segment X8632PageTableEntry(base : paddr) {
     }
 
     interface(base : paddr) {
-        mem pte [base, 0, 4]
+        mem entry [base, 0, 4]
     }
 
+    #[remap]
     fn valid() -> bool {
-        state.pte.present == 1
+        state.entry.present == 1
+    }
+
+    #[remap]
+    fn is_writable(flgs: flags) -> bool {
+        state.entry.writable == flgs.writable
+    }
+
+    #[remap]
+    fn is_usermode(flgs: flags) -> bool {
+        state.entry.usermode == flgs.usermode
+    }
+
+    #[remap]
+    fn not_global() -> bool {
+        state.entry.global == 0
+    }
+
+    #[remap]
+    fn is_young() -> bool {
+        state.entry.accessed == 0 && state.entry.dirty == 0
     }
 
     // matches a translation flags,
+    #[remap]
     fn matchflags(flgs : flags) -> bool
     {
-        (state.pte.writable == flgs.writable)
-         && (state.pte.usermode != flgs.usermode)
-         && if (flgs.devicemem == 1) {
-               (state.pte.nocache == 1 && state.pte.writethrough == 1)
-            } else {
-                (state.pte.nocache == 0 && state.pte.writethrough == 0)
-            }
-         && (state.pte.accessed == 1)
-         && (state.pte.global == 0)
-         && (state.pte.dirty == 0)
+        if (flgs.devicemem == 1) {
+            (state.entry.nocache == 1 && state.entry.writethrough == 1)
+        } else {
+            (state.entry.nocache == 0 && state.entry.writethrough == 0)
+        }
     }
 
     // the translation semantics, adding an option type?
     fn translate(va: vaddr) -> paddr
         requires va < BASE_PAGE_SIZE;
     {
-        va + (state.pte.base << BASE_PAGE_BITS)
+        va + (state.entry.base << BASE_PAGE_BITS)
     }
 
     // unmapping an entry
@@ -153,22 +173,22 @@ segment X8632PageDirectoryEntryFrame(base : paddr) {
 
     inbitwidth = LARGE_PAGE_BITS;
 
-     outbitwidth = PHYS_ADDR_BITS;
+    outbitwidth = PHYS_ADDR_BITS;
 
     state(base :paddr) {
         mem entry [ base, 0, 8] {
-            0 ..  1 present,
-            1 ..  2 rw,  // Read/write; if 0, writes may not be allowed to the page
-            2 ..  3 us,  // if 0, user-mode accesses are not allowed to the page
-            3 ..  4 pwt, // Page-level write-through;
-            4 ..  5 pcd, // Page-level cache disable
-            5 ..  6 a,   // Accessed;
-            6 ..  7 d,   // dirty
-            7 ..  8 ps,  // page size
-            8 ..  9 g,   // global
-            9 .. 12 ign_0,
+             0 ..  1 present,
+             1 ..  2 writable,
+             2 ..  3 usermode,
+             3 ..  4 writethrough,
+             4 ..  5 cachedisabled,
+             5 ..  6 accessed,
+             6 ..  7 dirty,
+             7 ..  8 pagesize,
+             8 ..  9 global,
+             9 .. 12 _ignored,
             12 .. 13 pat,
-            13 .. 21 res0_0,
+            13 .. 21 _res0_0,
             21 .. 32 address,
         }
     }
@@ -183,21 +203,43 @@ segment X8632PageDirectoryEntryFrame(base : paddr) {
     }
 
     #[remap]
+    fn is_writable(flgs : flags) -> bool {
+        (state.entry.writable == flgs.writable)
+    }
+
+    #[remap]
+    fn is_user(flgs : flags) -> bool {
+        (state.entry.usermode == flgs.usermode)
+    }
+
+    #[remap]
+    fn is_young() -> bool {
+        state.entry.accessed == 0 && state.entry.dirty == 0
+    }
+
+    #[remap]
+    fn not_global() -> bool {
+        state.entry.global == 0
+    }
+
+    #[remap]
+    fn mbz() -> bool {
+        state.entry._res0_0 == 0
+    }
+
+    #[remap]
     fn matchflags(flgs : flags) -> bool
     {
-        (state.entry.rw == flgs.writable)
-         && if (flgs.devicemem == 1) {
-                (state.entry.pcd == 1 && state.entry.pwt == 1)
-            } else {
-                (state.entry.pcd == 0 && state.entry.pwt == 0)
-            }
-         && (state.entry.us == flgs.usermode)
+        if (flgs.devicemem == 1) {
+            (state.entry.cachedisabled == 1 && state.entry.writethrough == 1)
+        } else {
+            (state.entry.cachedisabled == 0 && state.entry.writethrough == 0)
+        }
     }
 
     fn translate(va: vaddr) -> paddr
-        requires state.entry.ps == 1
+        requires state.entry.pagesize == 1
         requires va < LARGE_PAGE_SIZE
-
     {
         va + (state.entry.address << LARGE_PAGE_BITS)
     }
@@ -224,14 +266,14 @@ segment X8632PageDirectoryEntryTable(base : paddr) {
     state(base: paddr) {
         mem entry [ base, 0, 8 ] {
             0 ..  1 present,  // whether this entry is valid
-            1 ..  2 rw,       // Read/write; if 0, writes may not be allowed to the 512-GByte region controlled by this entry
-            2 ..  3 us,       // if 0, user-mode accesses are not allowed to the 512-GByte region controlled by this entry
-            3 ..  4 pwt,      // Page-level write-through;
-            4 ..  5 pcd,      // Page-level cache disable
-            5 ..  6 a,        // Accessed;
-            6 ..  7 ignored0,
-            7 ..  8 ps,
-            8 .. 12 ignored1,
+            1 ..  2 writable,       // Read/write; if 0, writes may not be allowed to the 512-GByte region controlled by this entry
+            2 ..  3 usermode,       // if 0, user-mode accesses are not allowed to the 512-GByte region controlled by this entry
+            3 ..  4 writethrough,      // Page-level write-through;
+            4 ..  5 cachedisabled,      // Page-level cache disable
+            5 ..  6 accessed,        // Accessed;
+            6 ..  7 _ign0,
+            7 ..  8 pagesize,
+            8 .. 12 _ign1,
             12 .. 32 address,
         }
     }
@@ -246,24 +288,31 @@ segment X8632PageDirectoryEntryTable(base : paddr) {
     }
 
     #[remap]
+    fn is_writable() -> bool {
+        state.entry.writable == 1      // always writable
+    }
+
+    #[remap]
+    fn is_user() -> bool {
+        state.entry.usermode == 1  // allow user access
+    }
+
+    #[remap]
     fn matchflags(flgs : flags) -> bool
     {
-        // TODO: make this one here a bit better
-        (state.entry.rw == 1)      // always writable
-         && (state.entry.us == 1)  // allow user access
-         && (state.entry.pwt == 0) // don't do write back
-         && (state.entry.pcd == 0) // don't disable cches
+         (state.entry.writethrough == 0)    // don't do write back
+         && (state.entry.cachedisabled == 0) // don't disable cches
     }
 
     fn translate(va: vaddr) -> paddr
-        requires state.entry.ps == 0
+        requires state.entry.pagesize == 0
     {
         va + (state.entry.address << 12)
     }
 
     // unmapping an entry
     synth fn unmap(va: vaddr, sz: size)
-        requires (va == 0);
+        requires va == 0;
         requires sz == BASE_PAGE_SIZE;
 
 
@@ -286,4 +335,53 @@ enum X8632PageDirectoryEntry(base: paddr){
 // represents an x86 page directory entry
 staticmap X8632PageDirectory(base : paddr) {
     maps [ X8632PageDirectoryEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..1024 ]
+}
+
+segment X86MMU(base: paddr) {
+    // that's the full 32-bit address space
+    inbitwidth = VIRT_ADDR_BITS;
+
+    // that's the full 32-bit address space
+    outbitwidth = VIRT_ADDR_BITS;
+
+    state(base: paddr) {
+        reg cr3 [ 8 ] {
+             0 .. 12 ignored1,
+            12 .. 32 address,
+        },
+        reg cr4 [ 4 ] {
+             0 .. 31 _ignored,
+            31 .. 32 enabled
+        }
+    }
+
+    // making these as an MMIO register so we can access them.
+    interface(base: paddr) {
+        mmio cr3 [ base, 0, 8 ],
+        mmio cr4 [ base, 8, 4 ]
+    }
+
+    #[remap]
+    fn valid() -> bool { true }
+
+    #[remap]
+    fn matchflags(flgs:flags) -> bool { true }
+
+    fn translate(va: vaddr) -> paddr
+    {
+        if state.cr4.enabled == 1 {
+            va + (state.cr3.address << 12)
+        } else {
+            va
+        }
+    }
+
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : X8632PageDirectory)
+        requires va == 0 && sz == VIRT_ADDR_MAX
+        requires (pa & (BASE_PAGE_SIZE - 1) == 0)
+
+    synth fn protect(va: vaddr, sz: size, flgs: flags);
+
+    synth fn unmap(va: vaddr, sz: size);
+
 }
