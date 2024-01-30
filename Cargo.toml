@@ -54,3 +54,9 @@ velosicomposition = {path = "lib/velosicomposition" }
 [profile.test]
 opt-level = 3
 
+
+# benchmarking
+
+[[bench]]
+name = "synth"
+harness = false
