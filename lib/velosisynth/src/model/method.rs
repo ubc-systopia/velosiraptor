@@ -71,6 +71,22 @@ pub fn translate_range_name(idx: Option<usize>) -> String {
     }
 }
 
+pub fn translate_range_name_check(idx: Option<usize>) -> String {
+    if let Some(i) = idx {
+        format!("translate.range.check.{i}")
+    } else {
+        "translate.range.check".to_string()
+    }
+}
+
+pub fn translate_range_name_protect(idx: Option<usize>) -> String {
+    if let Some(i) = idx {
+        format!("translate.range.protect.{i}")
+    } else {
+        "translate.range.protect".to_string()
+    }
+}
+
 pub fn translate_map_result_name(idx: Option<usize>) -> String {
     if let Some(i) = idx {
         format!("translate.map.result.{i}")
@@ -533,21 +549,21 @@ pub fn add_translate_range_checks(smt: &mut Smt2Context, prefix: &str, method: &
             )
         };
 
-        let mut f = Function::new(translate_range_name(Some(i)), types::boolean());
-        f.add_comment("Checking the translate range".to_string());
+        let mut f = Function::new(translate_range_name_check(Some(i)), types::boolean());
+        f.add_comment("Checking the translate range for a specific var".to_string());
         f.add_comment(comment.to_string());
 
         f.add_arg(String::from("st!0"), types::model(prefix));
         f.add_arg(String::from("va"), types::vaddr(prefix));
         f.add_arg(String::from("va!"), types::vaddr(prefix));
         f.add_arg(String::from("sz"), types::size(prefix));
-        f.add_arg(String::from("flgs"), types::flags(prefix));
-        f.add_arg(String::from("pa!"), types::paddr(prefix));
+        // f.add_arg(String::from("flgs"), types::flags(prefix));
+        // f.add_arg(String::from("pa!"), types::paddr(prefix));
 
-        // let forallvars = vec![SortedVar::new(varstr.clone(), types::vaddr())];
+        // let forallvars = vec![SortedVar::new(varstr.clone(), types::vaddr(prefix))];
 
         // let varconstraints = Term::fn_apply(
-        //     "VAddr_t.assms".to_string(),
+        //     format!("{}.VAddr_t.assms", prefix),
         //     vec![Term::ident(varstr.clone())],
         // );
 
@@ -555,6 +571,55 @@ pub fn add_translate_range_checks(smt: &mut Smt2Context, prefix: &str, method: &
         // f.add_body(body);
         f.add_body(expr);
 
+        smt.function(f);
+
+        let mut f = Function::new(translate_range_name(Some(i)), types::boolean());
+        f.add_comment("Checking the translate range for a specific var".to_string());
+        f.add_comment(comment.to_string());
+        f.add_arg(String::from("st!0"), types::model(prefix));
+        f.add_arg(String::from("va!"), types::vaddr(prefix));
+        f.add_arg(String::from("sz"), types::size(prefix));
+
+        let expr = Term::fn_apply(
+            translate_range_name_check(Some(i)),
+            vec![
+                Term::Identifier(String::from("st!0")),
+                Term::Identifier(String::from("va")),
+                Term::Identifier(String::from("va!")),
+                Term::Identifier(String::from("sz")),
+            ],
+        );
+
+        let forallvars = vec![SortedVar::new(varstr.clone(), types::vaddr(prefix))];
+        let varconstraints = Term::fn_apply(
+            format!("{}.VAddr_t.assms", prefix),
+            vec![Term::ident(varstr.clone())],
+        );
+
+        let body = Term::forall(forallvars, varconstraints.implies(expr));
+        f.add_body(body);
+        smt.function(f);
+
+        //
+        let mut f = Function::new(translate_range_name_protect(Some(i)), types::boolean());
+        f.add_comment("Checking the translate range for a specific var".to_string());
+        f.add_comment(comment.to_string());
+        f.add_arg(String::from("st!0"), types::model(prefix));
+        f.add_arg(String::from("st"), types::model(prefix));
+        f.add_arg(String::from("va!"), types::vaddr(prefix));
+        f.add_arg(String::from("sz"), types::size(prefix));
+
+        let expr =
+            expr::expr_to_smt2(prefix, pre, "st!0").eq(expr::expr_to_smt2(prefix, pre, "st"));
+
+        let forallvars = vec![SortedVar::new(varstr.clone(), types::vaddr(prefix))];
+        let varconstraints = Term::fn_apply(
+            format!("{}.VAddr_t.assms", prefix),
+            vec![Term::ident(varstr.clone())],
+        );
+
+        let body = Term::forall(forallvars, varconstraints.implies(expr));
+        f.add_body(body);
         smt.function(f);
 
         conds.push(pre);
@@ -573,11 +638,10 @@ pub fn add_translate_range_checks(smt: &mut Smt2Context, prefix: &str, method: &
     ));
 
     f.add_arg(String::from("st!0"), types::model(prefix));
-    f.add_arg(String::from("va"), types::vaddr(prefix));
     f.add_arg(String::from("va!"), types::vaddr(prefix));
     f.add_arg(String::from("sz"), types::size(prefix));
-    f.add_arg(String::from("flgs"), types::flags(prefix));
-    f.add_arg(String::from("pa!"), types::paddr(prefix));
+    // f.add_arg(String::from("flgs"), types::flags(prefix));
+    // f.add_arg(String::from("pa!"), types::paddr(prefix));
 
     let expr = Term::Binary(true);
 

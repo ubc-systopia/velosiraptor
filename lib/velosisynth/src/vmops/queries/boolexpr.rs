@@ -26,13 +26,15 @@
 //! Boolean Expressions
 
 // std imports
+use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
 // library imports
 use smt2::Term;
 use velosiast::ast::{
-    VelosiAstExpr, VelosiAstMethod, VelosiAstUnOp, VelosiAstUnOpExpr, VelosiAstUnitSegment,
+    VelosiAstBinOp, VelosiAstBinOpExpr, VelosiAstExpr, VelosiAstMethod, VelosiAstUnOp,
+    VelosiAstUnOpExpr, VelosiAstUnitSegment,
 };
 
 // crate imports
@@ -64,6 +66,8 @@ pub struct BoolExprQueryBuilder<'a> {
     mem_model: Option<Rc<Program>>,
     /// whether or not to allow variable references
     variable_references: Option<bool>,
+    /// additional state refs
+    state_refs: Option<HashSet<Rc<String>>>,
     /// programs generator
     programs: Option<Box<dyn ProgramBuilder>>,
 }
@@ -83,6 +87,7 @@ impl<'a> BoolExprQueryBuilder<'a> {
             negate: false,
             mem_model: None,
             variable_references: None,
+            state_refs: None,
             programs: None,
         }
     }
@@ -111,6 +116,11 @@ impl<'a> BoolExprQueryBuilder<'a> {
         self
     }
 
+    pub fn additional_state_refs(mut self, state_refs: HashSet<Rc<String>>) -> Self {
+        self.state_refs = Some(state_refs);
+        self
+    }
+
     pub fn programs(mut self, programs: Box<dyn ProgramBuilder>) -> Self {
         self.programs = Some(programs);
         self
@@ -119,7 +129,9 @@ impl<'a> BoolExprQueryBuilder<'a> {
     /// builds the bool expr query or returns None if there are no queries to be run
     pub fn build(self) -> Option<BoolExprQuery> {
         // if the expression doesn't have state references, then nothing to be done.
-        if !self.goal_expr.has_state_references() && self.mem_model.is_none() {
+        let has_state_refs = self.goal_expr.has_state_references() || self.goal_expr.is_fncall();
+
+        if !has_state_refs && self.mem_model.is_none() {
             log::info!("No state references in the expression");
             return None;
         }
@@ -145,9 +157,13 @@ impl<'a> BoolExprQueryBuilder<'a> {
             Box::new(utils::make_program_iter_mem(&prog))
         } else {
             // construct the program builder
-            let programs =
-                utils::make_program_builder(self.unit, self.m_op.as_ref(), &self.goal_expr)
-                    .into_iter();
+            let programs = utils::make_program_builder(
+                self.unit,
+                self.m_op.as_ref(),
+                &self.goal_expr,
+                self.state_refs.unwrap_or_default(),
+            )
+            .into_iter();
             if !programs.has_programs() {
                 return None;
             }

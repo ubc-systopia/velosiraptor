@@ -145,9 +145,6 @@ impl<'a> Z3SynthSegment<'a> {
     ) -> Self {
         let batch_size = std::cmp::max(DEFAULT_BATCH_SIZE, z3.num_workers());
 
-        let ctx = model::create(unit, false);
-        z3.reset_with_context(Z3Query::from(ctx));
-
         // XXX: move this to the the syntheisze() step.
         let map_queries = MapPrograms::new(unit, batch_size, None);
         let unmap_queries = UnmapPrograms::new(unit, batch_size, None);
