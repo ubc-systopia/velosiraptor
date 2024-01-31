@@ -273,7 +273,9 @@ impl VelosiAstFnCallExpr {
     }
 
     pub fn get_var_references(&self) -> HashSet<&VelosiAstIdentLiteralExpr> {
-        unimplemented!();
+        HashSet::new()
+
+        // unimplemented!();
     }
 }
 

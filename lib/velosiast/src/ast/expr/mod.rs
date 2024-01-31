@@ -193,6 +193,10 @@ impl VelosiAstExpr {
         }
     }
 
+    pub fn is_fncall(&self) -> bool {
+        matches!(self, VelosiAstExpr::FnCall(_))
+    }
+
     pub fn has_state_references(&self) -> bool {
         use VelosiAstExpr::*;
         match self {
