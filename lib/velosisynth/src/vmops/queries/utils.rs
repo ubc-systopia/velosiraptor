@@ -36,7 +36,7 @@ use velosiast::ast::{
 
 use crate::{
     model::{
-        method::{method_precond_i_name, translate_range_name},
+        method::{method_precond_i_name, translate_range_name, translate_range_name_protect},
         types,
         velosimodel::{model_get_fn_name, WBUFFER_PREFIX},
     },
@@ -52,10 +52,11 @@ use crate::z3::Z3TaskPriority;
 pub fn make_program_builder_no_params(
     unit: &VelosiAstUnitSegment,
     pre: &VelosiAstExpr,
+    additional_state: HashSet<Rc<String>>,
 ) -> ProgramsBuilder {
     log::info!(target: "[vmops::utils]", "constructing programs for {pre}");
     // obtain the state references in the pre-condition
-    let mut state_syms = HashSet::new();
+    let mut state_syms = additional_state;
     pre.get_state_references(&mut state_syms);
 
     // obtain the state bits that are referenced in the pre-condition
@@ -94,8 +95,9 @@ pub fn make_program_builder(
     unit: &VelosiAstUnitSegment,
     m_goal: &VelosiAstMethod,
     pre: &VelosiAstExpr,
+    additional_state: HashSet<Rc<String>>,
 ) -> ProgramsBuilder {
-    let mut builder = make_program_builder_no_params(unit, pre);
+    let mut builder = make_program_builder_no_params(unit, pre, additional_state);
 
     let mut vars = HashSet::new();
     for id in pre.get_var_references().iter() {
@@ -347,8 +349,76 @@ pub fn add_method_preconds(
             continue;
         }
 
+        if e.has_var_references(&params) && m_op.ident().as_str() == "protect" {
+            // special case here as we want to make sure the results stays the same here...
+
+            // we don't use the builder here, as we just want an "empty" program that gets
+            // passed through the synthesis tree to ensure that the translation produces
+            // the same output address as before changing the permission bits
+            let programs = ProgramsIter {
+                programs: vec![Program::new()],
+                stat_num_programs: 1,
+            };
+
+            let mut args = vec![
+                Rc::new(VelosiAstExpr::IdentLiteral(
+                    VelosiAstIdentLiteralExpr::with_name(
+                        "st!0".to_string(),
+                        VelosiAstTypeInfo::VirtAddr,
+                    ),
+                )),
+                Rc::new(VelosiAstExpr::IdentLiteral(
+                    VelosiAstIdentLiteralExpr::with_name(
+                        "va".to_string(),
+                        VelosiAstTypeInfo::VirtAddr,
+                    ),
+                )),
+                Rc::new(VelosiAstExpr::IdentLiteral(
+                    VelosiAstIdentLiteralExpr::with_name(
+                        "sz".to_string(),
+                        VelosiAstTypeInfo::VirtAddr,
+                    ),
+                )),
+            ];
+
+            // args.extend(m_op.params.iter().map(|p| Rc::new(p.as_ref().into())));
+
+            let ident = VelosiAstIdentifier::from(translate_range_name_protect(Some(i)).as_str());
+
+            let mut fn_call = VelosiAstFnCallExpr::new(ident, VelosiAstTypeInfo::Bool);
+            fn_call.add_args(args);
+
+            let query = BoolExprQueryBuilder::new(
+                unit,
+                m_op.clone(),
+                Rc::new(VelosiAstExpr::FnCall(fn_call)),
+            )
+            // .assms(m.assms.clone())
+            // .variable_references(true)
+            .negate(negate) // we negate the expression here
+            .programs(Box::new(programs))
+            .build()
+            .map(|e| e.into());
+
+            if let Some(query) = query {
+                partial_programs.push(
+                    ProgramVerifier::with_batchsize(
+                        unit.ident().clone(),
+                        query,
+                        batch_size,
+                        Z3TaskPriority::Low,
+                    )
+                    .into(),
+                );
+            } else {
+                panic!("no query!");
+            }
+
+            continue;
+        }
+
         // check if we have avariable references here
-        let (ident, var_refs, args) = if e.has_var_references(&params) {
+        let (ident, has_var_refs, args) = if e.has_var_references(&params) {
             (
                 VelosiAstIdentifier::from(translate_range_name(Some(i)).as_str()),
                 true,
@@ -373,10 +443,14 @@ pub fn add_method_preconds(
         let mut fn_call = VelosiAstFnCallExpr::new(ident, VelosiAstTypeInfo::Bool);
         fn_call.add_args(args);
 
+        let mut staterefs = HashSet::new();
+        e.get_state_references(&mut staterefs);
+
         let query =
             BoolExprQueryBuilder::new(unit, m_op.clone(), Rc::new(VelosiAstExpr::FnCall(fn_call)))
                 // .assms(m.assms.clone())
-                .variable_references(var_refs)
+                .variable_references(has_var_refs && !negate)
+                .additional_state_refs(staterefs)
                 .negate(negate) // we negate the expression here
                 .build()
                 .map(|e| e.into());

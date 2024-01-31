@@ -26,6 +26,7 @@
 //! Handles Conjunctive Normal Form
 
 // std imports
+use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
@@ -82,7 +83,8 @@ impl<'a> TranslateQueryBuilder<'a> {
         let (programs, ident, mut args) = match self.m_op.ident().as_str() {
             "map" => {
                 let body = self.m_translate.body.as_ref().unwrap();
-                let mut builder = utils::make_program_builder_no_params(self.unit, body);
+                let mut builder =
+                    utils::make_program_builder_no_params(self.unit, body, HashSet::new());
 
                 // translate is a bit special here, for map we want the following two variables
                 builder.add_var(String::from("va"));
@@ -103,7 +105,7 @@ impl<'a> TranslateQueryBuilder<'a> {
                     stat_num_programs: 1,
                 };
 
-                // add an additional argument that holds the previoius state
+                // add an additional argument that holds the previous state
                 let args = vec![Rc::new(VelosiAstExpr::IdentLiteral(
                     VelosiAstIdentLiteralExpr::with_name(
                         "st!0".to_string(),
