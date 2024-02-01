@@ -29,7 +29,8 @@ use std::rc::Rc;
 
 use smt2::{Attribute, Function, Smt2Context, Sort, SortedVar, Term};
 use velosiast::ast::{
-    VelosiAstFieldSlice, VelosiAstIdentifier, VelosiAstInterfaceField, VelosiAstStateField,
+    VelosiAstField, VelosiAstFieldSlice, VelosiAstIdentifier, VelosiAstInterfaceField,
+    VelosiAstStateField,
 };
 
 use super::velosimodel::{IFACE_PREFIX, STATE_PREFIX};
@@ -190,17 +191,18 @@ fn add_field_common(
 pub fn add_iface_field(smt: &mut Smt2Context, prefix: &str, field: &VelosiAstInterfaceField) {
     use VelosiAstInterfaceField::*;
     match field {
-        Memory(f) => add_field_common(smt, prefix, &f.ident, f.layout.as_slice()),
-        Register(f) => add_field_common(smt, prefix, &f.ident, f.layout.as_slice()),
-        Mmio(f) => add_field_common(smt, prefix, &f.ident, f.layout.as_slice()),
+        Memory(f) => add_field_common(smt, prefix, &f.ident, f.layout()),
+        Register(f) => add_field_common(smt, prefix, &f.ident, f.layout()),
+        Mmio(f) => add_field_common(smt, prefix, &f.ident, f.layout()),
+        Instruction(f) => add_field_common(smt, prefix, &f.ident, f.layout()),
     }
 }
 
 pub fn add_state_field(smt: &mut Smt2Context, prefix: &str, field: &VelosiAstStateField) {
     use VelosiAstStateField::*;
     match field {
-        Memory(f) => add_field_common(smt, prefix, &f.ident, f.layout.as_slice()),
-        Register(f) => add_field_common(smt, prefix, &f.ident, f.layout.as_slice()),
+        Memory(f) => add_field_common(smt, prefix, &f.ident, f.layout()),
+        Register(f) => add_field_common(smt, prefix, &f.ident, f.layout()),
     }
 }
 
@@ -270,16 +272,17 @@ pub fn add_iface_field_accessors(
 ) {
     use VelosiAstInterfaceField::*;
     match field {
-        Memory(f) => add_field_accessors_common(smt, prefix, &f.ident, f.layout.as_slice()),
-        Register(f) => add_field_accessors_common(smt, prefix, &f.ident, f.layout.as_slice()),
-        Mmio(f) => add_field_accessors_common(smt, prefix, &f.ident, f.layout.as_slice()),
+        Memory(f) => add_field_accessors_common(smt, prefix, &f.ident, f.layout()),
+        Register(f) => add_field_accessors_common(smt, prefix, &f.ident, f.layout()),
+        Mmio(f) => add_field_accessors_common(smt, prefix, &f.ident, f.layout()),
+        Instruction(f) => add_field_accessors_common(smt, prefix, &f.ident, f.layout()),
     }
 }
 
 pub fn add_state_field_accessors(smt: &mut Smt2Context, prefix: &str, field: &VelosiAstStateField) {
     use VelosiAstStateField::*;
     match field {
-        Memory(f) => add_field_accessors_common(smt, prefix, &f.ident, f.layout.as_slice()),
-        Register(f) => add_field_accessors_common(smt, prefix, &f.ident, f.layout.as_slice()),
+        Memory(f) => add_field_accessors_common(smt, prefix, &f.ident, f.layout()),
+        Register(f) => add_field_accessors_common(smt, prefix, &f.ident, f.layout()),
     }
 }

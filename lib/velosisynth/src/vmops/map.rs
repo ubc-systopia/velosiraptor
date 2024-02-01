@@ -70,8 +70,7 @@ impl MapPrograms {
         // handle the translate function
         if let Some(m) = unit.get_method("translate") {
             // obtain the translate query
-            let query = TranslateQueryBuilder::new(unit, m_op.clone(), m.clone())
-                .build();
+            let query = TranslateQueryBuilder::new(unit, m_op.clone(), m.clone()).build();
 
             if let Some(query) = query {
                 partial_programs.push(
@@ -84,7 +83,6 @@ impl MapPrograms {
                     .into(),
                 );
             }
-
 
             // add the pre-conditions for the translate
             utils::add_method_preconds(

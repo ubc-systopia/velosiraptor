@@ -111,7 +111,7 @@ fn generate_read_field(f: &Rc<VelosiAstInterfaceField>, imp: &mut CG::Impl) {
                 ))
                 .line("unsafe { *ptr }");
         }
-        VelosiAstInterfaceField::Register(_) => {
+        VelosiAstInterfaceField::Register(_) | VelosiAstInterfaceField::Instruction(_) => {
             read_fn.line("// TODO: read register").line("todo!()");
         }
     }
@@ -141,7 +141,7 @@ fn generate_write_field(f: &Rc<VelosiAstInterfaceField>, imp: &mut CG::Impl) {
                 ))
                 .line("unsafe { *ptr = val }");
         }
-        VelosiAstInterfaceField::Register(_) => {
+        VelosiAstInterfaceField::Register(_) | VelosiAstInterfaceField::Instruction(_) => {
             write_fn.line("// TODO: write register").line("todo!()");
         }
     }

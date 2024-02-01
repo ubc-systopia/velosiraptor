@@ -55,7 +55,8 @@ pub use flags::VelosiAstFlags;
 pub use identifier::VelosiAstIdentifier;
 pub use interface::{
     VelosiAstInterface, VelosiAstInterfaceAction, VelosiAstInterfaceField,
-    VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField, VelosiAstInterfaceRegisterField,
+    VelosiAstInterfaceInstructionField, VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField,
+    VelosiAstInterfaceRegisterField,
 };
 pub use map::{
     VelosiAstStaticMap, VelosiAstStaticMapElement, VelosiAstStaticMapExplicit,

@@ -61,6 +61,7 @@ pub fn register_map<T>(
             VelosiAstInterfaceField::Memory(_) => None,
             VelosiAstInterfaceField::Register(_) => None,
             VelosiAstInterfaceField::Mmio(_) => Some(func(f.deref())),
+            VelosiAstInterfaceField::Instruction(_) => None,
         })
         .collect();
 }
@@ -159,6 +160,7 @@ pub fn generate_register_impl(
                 VelosiAstInterfaceField::Memory(m) => m.offset,
                 VelosiAstInterfaceField::Register(_) => 0,
                 VelosiAstInterfaceField::Mmio(m) => m.offset,
+                VelosiAstInterfaceField::Instruction(_) => 0,
             };
 
             cons.push_parent_initializer(C::Expr::fn_call(
