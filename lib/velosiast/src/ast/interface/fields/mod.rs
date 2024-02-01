@@ -153,6 +153,12 @@ impl VelosiAstInterfaceField {
         for action in self.write_actions_as_ref() {
             res.extend(action.get_iface_refs_for_state_update(state_syms, state_bits, if_bits));
         }
+
+        let key = format!("interface.{}", self.ident());
+        if !res.is_empty() && res.iter().all(|r| !r.starts_with(&key)) {
+            res.insert(Rc::new(format!("{key}.val")));
+        }
+
         res
     }
 
