@@ -144,7 +144,11 @@ fn method_precond_sat_results(
     let toks = conflicts[1..conflicts.len() - 1]
         .split(' ')
         .map(|s| {
-            let i = s[5..].parse::<usize>().unwrap();
+            let i = if s.starts_with("pre-") {
+                s[4..].parse::<usize>().unwrap()
+            } else {
+                s[5..].parse::<usize>().unwrap()
+            };
             exprs[i]
         })
         .collect::<Vec<_>>();

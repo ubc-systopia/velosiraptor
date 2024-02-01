@@ -71,18 +71,20 @@ impl MapPrograms {
         if let Some(m) = unit.get_method("translate") {
             // obtain the translate query
             let query = TranslateQueryBuilder::new(unit, m_op.clone(), m.clone())
-                .build()
-                .expect("no query?");
+                .build();
 
-            partial_programs.push(
-                ProgramVerifier::with_batchsize(
-                    unit.ident().clone(),
-                    query.into(),
-                    batch_size,
-                    Z3TaskPriority::Low,
-                )
-                .into(),
-            );
+            if let Some(query) = query {
+                partial_programs.push(
+                    ProgramVerifier::with_batchsize(
+                        unit.ident().clone(),
+                        query.into(),
+                        batch_size,
+                        Z3TaskPriority::Low,
+                    )
+                    .into(),
+                );
+            }
+
 
             // add the pre-conditions for the translate
             utils::add_method_preconds(
