@@ -28,11 +28,13 @@
 //! This module contains the definition of the interface fields.
 
 // modules
+mod instruction;
 mod memory;
 mod mmio;
 mod register;
 
 // re-exports
+pub use instruction::VelosiAstInterfaceInstructionField;
 pub use memory::VelosiAstInterfaceMemoryField;
 pub use mmio::VelosiAstInterfaceMmioField;
 pub use register::VelosiAstInterfaceRegisterField;
@@ -67,14 +69,16 @@ pub enum VelosiAstInterfaceField {
     Memory(VelosiAstInterfaceMemoryField),
     Register(VelosiAstInterfaceRegisterField),
     Mmio(VelosiAstInterfaceMmioField),
+    Instruction(VelosiAstInterfaceInstructionField),
 }
 
 impl VelosiAstInterfaceField {
     pub fn layout_as_slice(&self) -> &[Rc<VelosiAstFieldSlice>] {
         match self {
-            VelosiAstInterfaceField::Memory(field) => field.layout.as_slice(),
-            VelosiAstInterfaceField::Register(field) => field.layout.as_slice(),
-            VelosiAstInterfaceField::Mmio(field) => field.layout.as_slice(),
+            VelosiAstInterfaceField::Memory(field) => field.layout(),
+            VelosiAstInterfaceField::Register(field) => field.layout(),
+            VelosiAstInterfaceField::Mmio(field) => field.layout(),
+            VelosiAstInterfaceField::Instruction(field) => field.layout(),
         }
     }
 
@@ -89,6 +93,7 @@ impl VelosiAstInterfaceField {
             VelosiAstInterfaceField::Mmio(field) => {
                 field.layout_map.get(ident).map(|rc| rc.as_ref())
             }
+            VelosiAstInterfaceField::Instruction(_field) => None,
         }
     }
 
@@ -97,6 +102,7 @@ impl VelosiAstInterfaceField {
             VelosiAstInterfaceField::Memory(field) => field.size,
             VelosiAstInterfaceField::Register(field) => field.size,
             VelosiAstInterfaceField::Mmio(field) => field.size,
+            VelosiAstInterfaceField::Instruction(_field) => 0,
         }
     }
 
@@ -105,6 +111,7 @@ impl VelosiAstInterfaceField {
             VelosiAstInterfaceField::Memory(field) => field.nbits(),
             VelosiAstInterfaceField::Register(field) => field.nbits(),
             VelosiAstInterfaceField::Mmio(field) => field.nbits(),
+            VelosiAstInterfaceField::Instruction(_field) => 0,
         }
     }
 
@@ -113,6 +120,7 @@ impl VelosiAstInterfaceField {
             VelosiAstInterfaceField::Memory(field) => field.mask(),
             VelosiAstInterfaceField::Register(field) => field.mask(),
             VelosiAstInterfaceField::Mmio(field) => field.mask(),
+            VelosiAstInterfaceField::Instruction(_field) => 0,
         }
     }
 
@@ -128,6 +136,7 @@ impl VelosiAstInterfaceField {
             VelosiAstInterfaceField::Memory(field) => field.writeactions.as_slice(),
             VelosiAstInterfaceField::Register(field) => field.writeactions.as_slice(),
             VelosiAstInterfaceField::Mmio(field) => field.writeactions.as_slice(),
+            VelosiAstInterfaceField::Instruction(field) => field.writeactions.as_slice(),
         }
     }
 
@@ -136,6 +145,7 @@ impl VelosiAstInterfaceField {
             VelosiAstInterfaceField::Memory(field) => field.readactions.as_slice(),
             VelosiAstInterfaceField::Register(field) => field.readactions.as_slice(),
             VelosiAstInterfaceField::Mmio(field) => field.readactions.as_slice(),
+            VelosiAstInterfaceField::Instruction(field) => field.readactions.as_slice(),
         }
     }
 
@@ -167,6 +177,7 @@ impl VelosiAstInterfaceField {
             VelosiAstInterfaceField::Memory(field) => &field.loc,
             VelosiAstInterfaceField::Register(field) => &field.loc,
             VelosiAstInterfaceField::Mmio(field) => &field.loc,
+            VelosiAstInterfaceField::Instruction(field) => &field.loc,
         }
     }
 
@@ -179,6 +190,7 @@ impl VelosiAstInterfaceField {
             Memory(pt) => VelosiAstInterfaceMemoryField::from_parse_tree(pt, st),
             Register(pt) => VelosiAstInterfaceRegisterField::from_parse_tree(pt, st),
             Mmio(pt) => VelosiAstInterfaceMmioField::from_parse_tree(pt, st),
+            Instruction(pt) => VelosiAstInterfaceInstructionField::from_parse_tree(pt, st),
         }
     }
 
@@ -193,6 +205,10 @@ impl VelosiAstInterfaceField {
             (VelosiAstInterfaceField::Mmio(f1), VelosiAstInterfaceField::Mmio(f2)) => {
                 f1.compare(f2)
             }
+            (
+                VelosiAstInterfaceField::Instruction(f1),
+                VelosiAstInterfaceField::Instruction(f2),
+            ) => f1.compare(f2),
             _ => false,
         }
     }
@@ -205,6 +221,7 @@ impl VelosiAstField for VelosiAstInterfaceField {
             VelosiAstInterfaceField::Memory(field) => field.ident(),
             VelosiAstInterfaceField::Register(field) => field.ident(),
             VelosiAstInterfaceField::Mmio(field) => field.ident(),
+            VelosiAstInterfaceField::Instruction(field) => field.ident(),
         }
     }
 
@@ -214,6 +231,7 @@ impl VelosiAstField for VelosiAstInterfaceField {
             VelosiAstInterfaceField::Memory(field) => field.ident_to_string(),
             VelosiAstInterfaceField::Register(field) => field.ident_to_string(),
             VelosiAstInterfaceField::Mmio(field) => field.ident_to_string(),
+            VelosiAstInterfaceField::Instruction(field) => field.ident_to_string(),
         }
     }
 
@@ -223,6 +241,7 @@ impl VelosiAstField for VelosiAstInterfaceField {
             VelosiAstInterfaceField::Memory(field) => field.path(),
             VelosiAstInterfaceField::Register(field) => field.path(),
             VelosiAstInterfaceField::Mmio(field) => field.path(),
+            VelosiAstInterfaceField::Instruction(field) => field.path(),
         }
     }
 
@@ -232,6 +251,7 @@ impl VelosiAstField for VelosiAstInterfaceField {
             VelosiAstInterfaceField::Memory(field) => field.path_to_string(),
             VelosiAstInterfaceField::Register(field) => field.path_to_string(),
             VelosiAstInterfaceField::Mmio(field) => field.path_to_string(),
+            VelosiAstInterfaceField::Instruction(field) => field.path_to_string(),
         }
     }
 
@@ -241,6 +261,7 @@ impl VelosiAstField for VelosiAstInterfaceField {
             VelosiAstInterfaceField::Memory(field) => field.layout.as_slice(),
             VelosiAstInterfaceField::Register(field) => field.layout.as_slice(),
             VelosiAstInterfaceField::Mmio(field) => field.layout.as_slice(),
+            VelosiAstInterfaceField::Instruction(_field) => &[],
         }
     }
 
@@ -250,6 +271,7 @@ impl VelosiAstField for VelosiAstInterfaceField {
             VelosiAstInterfaceField::Memory(field) => field.nbits(),
             VelosiAstInterfaceField::Register(field) => field.nbits(),
             VelosiAstInterfaceField::Mmio(field) => field.nbits(),
+            VelosiAstInterfaceField::Instruction(_field) => 0,
         }
     }
 
@@ -266,6 +288,7 @@ impl Display for VelosiAstInterfaceField {
             Memory(m) => Display::fmt(m, f),
             Register(r) => Display::fmt(r, f),
             Mmio(m) => Display::fmt(m, f),
+            Instruction(i) => Display::fmt(i, f),
         }
     }
 }

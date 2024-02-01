@@ -33,10 +33,10 @@ use crustal as C;
 use velosiast::{
     ast::{
         VelosiAstBinOp, VelosiAstConst, VelosiAstExpr, VelosiAstField, VelosiAstFieldSlice,
-        VelosiAstInterfaceField, VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField,
-        VelosiAstInterfaceRegisterField, VelosiAstMethod, VelosiAstTypeInfo, VelosiAstUnOp,
-        VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment, VelosiAstUnitStaticMap,
-        VelosiOpExpr, VelosiOperation,
+        VelosiAstInterfaceField, VelosiAstInterfaceInstructionField, VelosiAstInterfaceMemoryField,
+        VelosiAstInterfaceMmioField, VelosiAstInterfaceRegisterField, VelosiAstMethod,
+        VelosiAstTypeInfo, VelosiAstUnOp, VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment,
+        VelosiAstUnitStaticMap, VelosiOpExpr, VelosiOperation,
     },
     VelosiAstUnitOSSpec,
 };
@@ -577,6 +577,7 @@ where
             VelosiAstInterfaceField::Memory(mem) => Some((mem.base.as_str(), mem.offset)),
             VelosiAstInterfaceField::Register(_reg) => None,
             VelosiAstInterfaceField::Mmio(mmio) => Some((mmio.base.as_str(), mmio.offset)),
+            VelosiAstInterfaceField::Instruction(_instr) => None,
         }
     }
 
@@ -585,6 +586,7 @@ where
             VelosiAstInterfaceField::Memory(mem) => os_memory_write_fn_name(mem),
             VelosiAstInterfaceField::Register(reg) => os_register_write_fn_name(reg),
             VelosiAstInterfaceField::Mmio(mmio) => os_mmio_write_fn_name(mmio),
+            VelosiAstInterfaceField::Instruction(instr) => os_instr_fn_name(instr),
         }
     }
 
@@ -593,6 +595,7 @@ where
             VelosiAstInterfaceField::Memory(mem) => os_memory_read_fn_name(mem),
             VelosiAstInterfaceField::Register(reg) => os_register_read_fn_name(reg),
             VelosiAstInterfaceField::Mmio(mmio) => os_mmio_read_fn_name(mmio),
+            VelosiAstInterfaceField::Instruction(instr) => os_instr_fn_name(instr),
         }
     }
 }
@@ -628,6 +631,7 @@ where
                 VelosiAstInterfaceField::Memory(mem) => Some((mem.base.as_str(), mem.offset)),
                 VelosiAstInterfaceField::Register(_reg) => None,
                 VelosiAstInterfaceField::Mmio(mmio) => Some((mmio.base.as_str(), mmio.offset)),
+                VelosiAstInterfaceField::Instruction(_instr) => None,
             }
         } else {
             None
@@ -640,6 +644,7 @@ where
                 VelosiAstInterfaceField::Memory(mem) => os_memory_write_fn_name(mem),
                 VelosiAstInterfaceField::Register(reg) => os_register_write_fn_name(reg),
                 VelosiAstInterfaceField::Mmio(mmio) => os_mmio_write_fn_name(mmio),
+                VelosiAstInterfaceField::Instruction(instr) => os_instr_fn_name(instr),
             }
         } else {
             unreachable!();
@@ -652,6 +657,7 @@ where
                 VelosiAstInterfaceField::Memory(mem) => os_memory_read_fn_name(mem),
                 VelosiAstInterfaceField::Register(reg) => os_register_read_fn_name(reg),
                 VelosiAstInterfaceField::Mmio(mmio) => os_mmio_read_fn_name(mmio),
+                VelosiAstInterfaceField::Instruction(instr) => os_instr_fn_name(instr),
             }
         } else {
             unreachable!();
@@ -818,6 +824,10 @@ fn os_mmio_read_fn_name(field: &VelosiAstInterfaceMmioField) -> String {
 
 fn os_mmio_write_fn_name(field: &VelosiAstInterfaceMmioField) -> String {
     format!("os_mmio_register_write_{}", field.nbits())
+}
+
+fn os_instr_fn_name(field: &VelosiAstInterfaceInstructionField) -> String {
+    format!("os_instruction_{}", field.ident())
 }
 
 fn os_register_read_fn_name(field: &VelosiAstInterfaceRegisterField) -> String {

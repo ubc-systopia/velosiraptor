@@ -360,7 +360,7 @@ pub fn add_method_preconds(
                 stat_num_programs: 1,
             };
 
-            let mut args = vec![
+            let args = vec![
                 Rc::new(VelosiAstExpr::IdentLiteral(
                     VelosiAstIdentLiteralExpr::with_name(
                         "st!0".to_string(),

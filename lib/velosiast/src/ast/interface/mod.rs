@@ -34,8 +34,8 @@ mod fields;
 // re-exports
 pub use actions::VelosiAstInterfaceAction;
 pub use fields::{
-    VelosiAstInterfaceField, VelosiAstInterfaceMemoryField, VelosiAstInterfaceMmioField,
-    VelosiAstInterfaceRegisterField,
+    VelosiAstInterfaceField, VelosiAstInterfaceInstructionField, VelosiAstInterfaceMemoryField,
+    VelosiAstInterfaceMmioField, VelosiAstInterfaceRegisterField,
 };
 
 use std::collections::{HashMap, HashSet};

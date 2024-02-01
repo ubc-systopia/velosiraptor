@@ -33,8 +33,7 @@ use std::rc::Rc;
 // library imports
 use smt2::Term;
 use velosiast::ast::{
-    VelosiAstBinOp, VelosiAstBinOpExpr, VelosiAstExpr, VelosiAstMethod, VelosiAstUnOp,
-    VelosiAstUnOpExpr, VelosiAstUnitSegment,
+    VelosiAstExpr, VelosiAstMethod, VelosiAstUnOp, VelosiAstUnOpExpr, VelosiAstUnitSegment,
 };
 
 // crate imports
