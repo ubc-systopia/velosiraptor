@@ -167,7 +167,7 @@ impl VelosiAstTypeInfo {
     pub fn compatible(&self, other: &Self) -> bool {
         use VelosiAstTypeInfo::*;
         match (self, other) {
-            (Integer, other) => other.is_numeric() || other.is_flags(),
+            (Integer, other) => other.is_numeric() || other.is_flags() || other.is_typeref(),
             (Bool, other) => other.is_boolean() || other.is_flags(),
             (GenAddr, other) => other.is_numeric(),
             (VirtAddr, other) => other.is_numeric(),
