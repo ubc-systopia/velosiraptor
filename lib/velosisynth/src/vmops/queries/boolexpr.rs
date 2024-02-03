@@ -37,6 +37,7 @@ use velosiast::ast::{
 };
 
 // crate imports
+use crate::Z3TaskPriority;
 use crate::{z3::Z3WorkerPool, Program};
 
 //use super::queryhelper::{MaybeResult, ProgramBuilder, QueryBuilder};
@@ -156,7 +157,7 @@ impl<'a> BoolExprQueryBuilder<'a> {
             Box::new(utils::make_program_iter_mem(&prog))
         } else {
             // construct the program builder
-            let programs = utils::make_program_builder(
+            let mut programs = utils::make_program_builder(
                 self.unit,
                 self.m_op.as_ref(),
                 &self.goal_expr,
@@ -242,6 +243,10 @@ impl ProgramBuilder for BoolExprQuery {
 
     fn mem_model(&self) -> bool {
         self.mem_model
+    }
+
+    fn set_priority(&mut self, priority: Z3TaskPriority) {
+        self.programs.set_priority(priority);
     }
 
     fn do_fmt(&self, f: &mut Formatter<'_>, indent: usize, debug: bool) -> FmtResult {

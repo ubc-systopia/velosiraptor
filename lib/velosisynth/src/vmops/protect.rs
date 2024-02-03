@@ -76,7 +76,7 @@ impl ProtectPrograms {
                     unit.ident().clone(),
                     query.into(),
                     batch_size,
-                    Z3TaskPriority::Low,
+                    Z3TaskPriority::lowest(),
                 )
                 .into(),
             );
@@ -127,7 +127,7 @@ impl ProtectPrograms {
                 ProgramsIter::default().into()
             }
         } else {
-            CompoundBoolExprQueryBuilder::new(unit, m_op.clone())
+            CompoundBoolExprQueryBuilder::new(unit, m_op.clone(), Z3TaskPriority::highest().lower())
                 .partial_programs(partial_programs, false)
                 // .assms()
                 .all()
@@ -135,12 +135,14 @@ impl ProtectPrograms {
                 .into()
         };
 
-        let query = ProgramVerifier::with_batchsize(
+        let mut query = ProgramVerifier::with_batchsize(
             unit.ident().clone(),
             query,
             batch_size,
-            Z3TaskPriority::High,
+            Z3TaskPriority::highest(),
         );
+
+        query.set_priority(Z3TaskPriority::highest());
 
         Self {
             candidate_programs: Box::new(query),
@@ -165,6 +167,10 @@ impl ProgramBuilder for ProtectPrograms {
     /// the expression that the program needs to establish
     fn goal_expr(&self) -> Rc<VelosiAstExpr> {
         unimplemented!()
+    }
+
+    fn set_priority(&mut self, priority: Z3TaskPriority) {
+        self.candidate_programs.set_priority(priority);
     }
 
     fn do_fmt(&self, f: &mut Formatter<'_>, indent: usize, debug: bool) -> FmtResult {

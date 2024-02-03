@@ -219,7 +219,7 @@ fn submit_edge_query(
     smtctx.level(smt);
 
     let ticket = z3
-        .submit_query(Box::new(Z3Query::from(smtctx)), Z3TaskPriority::Medium)
+        .submit_query(Box::new(Z3Query::from(smtctx)), Z3TaskPriority::new(0))
         .expect("failed to submit query");
     let mut result = None;
     while result.is_none() {

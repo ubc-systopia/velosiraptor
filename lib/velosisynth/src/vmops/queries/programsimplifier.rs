@@ -32,6 +32,7 @@ use std::rc::Rc;
 use smt2::Term;
 use velosiast::ast::{VelosiAstExpr, VelosiAstMethod};
 
+use crate::Z3TaskPriority;
 use crate::{z3::Z3WorkerPool, Program};
 
 //use super::queryhelper::{MaybeResult, ProgramBuilder, QueryBuilder};
@@ -95,6 +96,10 @@ impl ProgramBuilder for ProgramSimplifier {
     /// the expression that the program needs to establish
     fn goal_expr(&self) -> Rc<VelosiAstExpr> {
         self.programs.goal_expr()
+    }
+
+    fn set_priority(&mut self, priority: Z3TaskPriority) {
+        self.programs.set_priority(priority);
     }
 
     fn do_fmt(&self, f: &mut Formatter<'_>, indent: usize, debug: bool) -> FmtResult {

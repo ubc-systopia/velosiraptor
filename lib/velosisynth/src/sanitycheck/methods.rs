@@ -98,7 +98,7 @@ fn method_precond_sat_query(z3: &mut Z3WorkerPool, prefix: &str, m: &VelosiAstMe
     smtctx.level(smt);
 
     let q = Box::new(Z3Query::from(smtctx));
-    z3.submit_query(q, Z3TaskPriority::Medium)
+    z3.submit_query(q, Z3TaskPriority::new(0))
         .expect("failed to submit query")
 }
 

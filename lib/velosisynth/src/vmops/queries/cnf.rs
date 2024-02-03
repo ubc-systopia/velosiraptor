@@ -82,10 +82,13 @@ impl ProgramBuilder for ProgramsIter {
         writeln!(
             f,
             "{i}  + ProgramsIter (num: {} / {})",
-            self.stat_num_programs - self.programs.len(),
-            self.stat_num_programs
+            self.stat_num_programs, self.stat_max_programs
         )?;
         Ok(())
+    }
+
+    fn set_priority(&mut self, _priority: Z3TaskPriority) {
+        // no-op
     }
 }
 
@@ -130,7 +133,11 @@ pub struct CompoundBoolExprQueryBuilder<'a> {
 }
 
 impl<'a> CompoundBoolExprQueryBuilder<'a> {
-    pub fn new(unit: &'a VelosiAstUnitSegment, m_op: Rc<VelosiAstMethod>) -> Self {
+    pub fn new(
+        unit: &'a VelosiAstUnitSegment,
+        m_op: Rc<VelosiAstMethod>,
+        max_prio: Z3TaskPriority,
+    ) -> Self {
         Self {
             unit,
             m_op,
@@ -140,7 +147,7 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
             partial_programs: PartialPrograms::None,
             order_preserving: false,
             batchsize: DEFAULT_BATCH_SIZE,
-            priority: Z3TaskPriority::Medium,
+            priority: max_prio,
         }
     }
 
@@ -209,13 +216,17 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
         match self.partial_programs {
             PartialPrograms::All(pb) => {
                 let batch_size = self.batchsize;
-                let priority = self.priority;
                 candidate_programs = pb
                     .into_iter()
                     .map(|p| {
                         exprs.push(p.goal_expr());
-                        ProgramVerifier::with_batchsize(prefix.clone(), p, batch_size, priority)
-                            .into()
+                        ProgramVerifier::with_batchsize(
+                            prefix.clone(),
+                            p,
+                            batch_size,
+                            Z3TaskPriority::lowest(),
+                        )
+                        .into()
                     })
                     .collect();
             }
@@ -236,7 +247,7 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
                                 prefix.clone(),
                                 Box::new(bool_expr_query),
                                 self.batchsize,
-                                self.priority,
+                                Z3TaskPriority::lowest(),
                             )
                             .into(),
                         );
@@ -325,7 +336,11 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
 
             let _batch_size = self.batchsize;
 
+            let mut priority = Z3TaskPriority::lowest().higher();
+
             loop {
+                priority = priority.higher();
+
                 let mut queries_new = Vec::with_capacity(queries.len() / DEFAULT_CHUNK_SIZE + 1);
                 if queries.len() == 1 {
                     break;
@@ -342,7 +357,6 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
                     let exprs = queries.iter().map(|e| e.goal_expr()).collect();
 
                     let batch_size = self.batchsize;
-                    let priority = self.priority;
 
                     let candidate_programs = queries
                         .into_iter()
@@ -371,6 +385,8 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
 
                     queries_new.push(CompoundBoolExprQuery::All(compound_query));
                     queries = cp;
+
+                    priority = priority.lower();
                 }
 
                 let done = queries.iter().map(|_| false).collect();
@@ -379,7 +395,6 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
                 let exprs = queries.iter().map(|e| e.goal_expr()).collect();
 
                 let batch_size = self.batchsize;
-                let priority = self.priority;
 
                 let candidate_programs = queries
                     .into_iter()
@@ -438,13 +453,17 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
         match self.partial_programs {
             PartialPrograms::All(pb) => {
                 let batch_size = self.batchsize;
-                let priority = self.priority;
                 candidate_programs = pb
                     .into_iter()
                     .map(|p| {
                         exprs.push(p.goal_expr());
-                        ProgramVerifier::with_batchsize(prefix.clone(), p, batch_size, priority)
-                            .into()
+                        ProgramVerifier::with_batchsize(
+                            prefix.clone(),
+                            p,
+                            batch_size,
+                            Z3TaskPriority::lowest(),
+                        )
+                        .into()
                     })
                     .collect();
             }
@@ -465,7 +484,7 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
                                 prefix.clone(),
                                 Box::new(bool_expr_query),
                                 self.batchsize,
-                                self.priority,
+                                Z3TaskPriority::lowest(),
                             )
                             .into(),
                         );
@@ -565,6 +584,13 @@ impl ProgramBuilder for CompoundBoolExprQuery {
         match self {
             Self::Any(q) => q.do_fmt(f, indent, debug),
             Self::All(q) => q.do_fmt(f, indent, debug),
+        }
+    }
+
+    fn set_priority(&mut self, priority: Z3TaskPriority) {
+        match self {
+            Self::Any(q) => q.set_priority(priority),
+            Self::All(q) => q.set_priority(priority),
         }
     }
 }
@@ -726,6 +752,12 @@ impl ProgramBuilder for CompoundQueryAny {
             }
             Ok(())
         }
+    }
+
+    fn set_priority(&mut self, priority: Z3TaskPriority) {
+        self.candidate_programs
+            .iter_mut()
+            .for_each(|p| p.set_priority(priority));
     }
 }
 
@@ -967,6 +999,12 @@ impl ProgramBuilder for CompoundQueryAll {
                 expr
             }
         }
+    }
+
+    fn set_priority(&mut self, priority: Z3TaskPriority) {
+        self.candidate_programs
+            .iter_mut()
+            .for_each(|p| p.set_priority(priority));
     }
 
     fn do_fmt(&self, f: &mut Formatter<'_>, indent: usize, debug: bool) -> FmtResult {
