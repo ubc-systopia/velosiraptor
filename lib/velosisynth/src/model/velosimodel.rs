@@ -35,6 +35,7 @@ use velosiast::ast::{
     VelosiAstExpr, VelosiAstField, VelosiAstIdentLiteralExpr, VelosiAstInterface,
     VelosiAstInterfaceAction, VelosiAstState, VelosiAstTypeInfo, VelosiAstUnitSegment,
 };
+use velosiast::VelosiAstInterfaceField;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Constants
@@ -476,6 +477,18 @@ fn add_actions(smt: &mut Smt2Context, prefix: &str, iface: &VelosiAstInterface, 
     for f in iface.fields() {
         let fieldname = f.ident();
         smt.subsection(format!("interface field: {fieldname}"));
+
+        if matches!(f.as_ref(), VelosiAstInterfaceField::Instruction(_)) {
+            add_field_action(
+                smt,
+                prefix,
+                f.write_actions_as_ref(),
+                IFACE_PREFIX,
+                fieldname,
+                "exec",
+                0,
+            );
+        }
 
         if mem_model {
             let store_action = VelosiAstInterfaceAction::new(

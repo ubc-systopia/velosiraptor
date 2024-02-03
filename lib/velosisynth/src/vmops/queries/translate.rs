@@ -101,10 +101,7 @@ impl<'a> TranslateQueryBuilder<'a> {
                 // we don't use the builder here, as we just want an "empty" program that gets
                 // passed through the synthesis tree to ensure that the translation produces
                 // the same output address as before changing the permission bits
-                let programs = ProgramsIter {
-                    programs: vec![Program::new()],
-                    stat_num_programs: 1,
-                };
+                let programs = ProgramsIter::new_noop();
 
                 // add an additional argument that holds the previous state
                 let args = vec![Rc::new(VelosiAstExpr::IdentLiteral(

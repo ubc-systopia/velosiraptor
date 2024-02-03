@@ -60,7 +60,7 @@ use super::ProgramBuilder;
 use crate::ProgramsIter;
 impl ProgramBuilder for ProgramsIter {
     fn next(&mut self, _z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
-        self.programs.pop().into()
+        self.next_program().into()
     }
 
     fn m_op(&self) -> &VelosiAstMethod {
