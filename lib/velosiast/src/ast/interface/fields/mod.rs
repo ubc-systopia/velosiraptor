@@ -454,6 +454,41 @@ fn handle_nodes(
 
     match (is_memory, sym.as_ref()) {
         (true, VelosiAstStateField::Memory(sf)) => {
+
+            if nodes.layout.is_empty() || nodes.layout == sf.layout {
+                let stident = VelosiAstIdentifier::new(sf.path().to_string(), sf.loc.clone());
+
+                let stexpr = Rc::new(VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
+                    vec![stident],
+                    VelosiAstTypeInfo::Integer,
+                    VelosiTokenStream::default(),
+                )));
+
+                let sifdent =
+                    VelosiAstIdentifier::new(sf.path().replace("state", "interface"), sf.loc.clone());
+                let ifexpr = Rc::new(VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
+                    vec![sifdent],
+                    VelosiAstTypeInfo::Integer,
+                    VelosiTokenStream::default(),
+                )));
+
+                if nodes.writeactions.is_empty() {
+                    nodes.writeactions = vec![VelosiAstInterfaceAction::new(
+                        ifexpr.clone(),
+                        stexpr.clone(),
+                        VelosiTokenStream::default(),
+                    )];
+                }
+
+                if nodes.readactions.is_empty() {
+                    nodes.readactions = vec![VelosiAstInterfaceAction::new(
+                        stexpr,
+                        ifexpr,
+                        VelosiTokenStream::default(),
+                    )];
+                }
+            }
+
             if nodes.layout.is_empty() {
                 if sf.size == size {
                     // copy over the layout from the state field, replace state with interface
@@ -480,37 +515,7 @@ fn handle_nodes(
                 }
             }
 
-            let stident = VelosiAstIdentifier::new(sf.path().to_string(), sf.loc.clone());
 
-            let stexpr = Rc::new(VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
-                vec![stident],
-                VelosiAstTypeInfo::Integer,
-                VelosiTokenStream::default(),
-            )));
-
-            let sifdent =
-                VelosiAstIdentifier::new(sf.path().replace("state", "interface"), sf.loc.clone());
-            let ifexpr = Rc::new(VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
-                vec![sifdent],
-                VelosiAstTypeInfo::Integer,
-                VelosiTokenStream::default(),
-            )));
-
-            if nodes.writeactions.is_empty() {
-                nodes.writeactions = vec![VelosiAstInterfaceAction::new(
-                    ifexpr.clone(),
-                    stexpr.clone(),
-                    VelosiTokenStream::default(),
-                )];
-            }
-
-            if nodes.readactions.is_empty() {
-                nodes.readactions = vec![VelosiAstInterfaceAction::new(
-                    stexpr,
-                    ifexpr,
-                    VelosiTokenStream::default(),
-                )];
-            }
         }
         (false, VelosiAstStateField::Memory(sf)) => {
             // statefield with the same name exists, but is of a different type
@@ -526,6 +531,41 @@ fn handle_nodes(
         }
 
         (false, VelosiAstStateField::Register(sf)) => {
+
+            if nodes.layout.is_empty() || nodes.layout == sf.layout {
+                let stident = VelosiAstIdentifier::new(sf.path().to_string(), sf.loc.clone());
+
+                let stexpr = Rc::new(VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
+                    vec![stident],
+                    VelosiAstTypeInfo::Integer,
+                    VelosiTokenStream::default(),
+                )));
+
+                let sifdent =
+                    VelosiAstIdentifier::new(sf.path().replace("state", "interface"), sf.loc.clone());
+                let ifexpr = Rc::new(VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
+                    vec![sifdent],
+                    VelosiAstTypeInfo::Integer,
+                    VelosiTokenStream::default(),
+                )));
+
+
+                if nodes.writeactions.is_empty() {
+                    nodes.writeactions = vec![VelosiAstInterfaceAction::new(
+                        ifexpr.clone(),
+                        stexpr.clone(),
+                        VelosiTokenStream::default(),
+                    )];
+                }
+
+                if nodes.readactions.is_empty() {
+                    nodes.readactions = vec![VelosiAstInterfaceAction::new(
+                        stexpr,
+                        ifexpr,
+                        VelosiTokenStream::default(),
+                    )];
+                }
+            }
             if nodes.layout.is_empty() {
                 if sf.size == size {
                     // copy over the layout from the state field, replace state with interface
@@ -552,37 +592,8 @@ fn handle_nodes(
                 }
             }
 
-            let stident = VelosiAstIdentifier::new(sf.path().to_string(), sf.loc.clone());
 
-            let stexpr = Rc::new(VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
-                vec![stident],
-                VelosiAstTypeInfo::Integer,
-                VelosiTokenStream::default(),
-            )));
 
-            let sifdent =
-                VelosiAstIdentifier::new(sf.path().replace("state", "interface"), sf.loc.clone());
-            let ifexpr = Rc::new(VelosiAstExpr::IdentLiteral(VelosiAstIdentLiteralExpr::new(
-                vec![sifdent],
-                VelosiAstTypeInfo::Integer,
-                VelosiTokenStream::default(),
-            )));
-
-            if nodes.writeactions.is_empty() {
-                nodes.writeactions = vec![VelosiAstInterfaceAction::new(
-                    ifexpr.clone(),
-                    stexpr.clone(),
-                    VelosiTokenStream::default(),
-                )];
-            }
-
-            if nodes.readactions.is_empty() {
-                nodes.readactions = vec![VelosiAstInterfaceAction::new(
-                    stexpr,
-                    ifexpr,
-                    VelosiTokenStream::default(),
-                )];
-            }
         }
         (true, VelosiAstStateField::Register(sf)) => {
             // statefield with the same name exists, but is of a different type

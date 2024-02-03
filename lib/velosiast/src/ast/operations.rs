@@ -71,6 +71,7 @@ pub enum VelosiOperation {
     InsertField(Rc<String>, VelosiOpExpr),
     WriteAction(Rc<String>),
     ReadAction(Rc<String>),
+    Instruction(Rc<String>),
     GlobalBarrier,
     Return,
 }
@@ -84,6 +85,7 @@ impl VelosiOperation {
             VelosiOperation::WriteAction(s) => s,
             VelosiOperation::ReadAction(s) => s,
             VelosiOperation::GlobalBarrier => "",
+            VelosiOperation::Instruction(s) => s,
             VelosiOperation::Return => "",
         }
     }
