@@ -33,10 +33,14 @@ use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    mpsc::{self, Receiver, Sender, TryRecvError},
-    Arc, Mutex,
+    // mpsc::{self, Receiver, Sender, TryRecvError},
+    Arc,
+    Mutex,
 };
 use std::thread;
+
+use crossbeam::channel::{self, Receiver, Sender, TryRecvError};
+use crossbeam::utils::CachePadded;
 
 // own create imports
 use super::query::{Z3Query, Z3Result, Z3Ticket, Z3TimeStamp};
@@ -62,11 +66,11 @@ pub struct Z3Worker {
     /// the context of the worker
     context: Arc<Mutex<Z3Context>>,
     /// whether the worker is currently running
-    running: Arc<AtomicBool>,
+    running: Arc<CachePadded<AtomicBool>>,
     /// reset
-    reset: Arc<AtomicBool>,
+    reset: Arc<CachePadded<AtomicBool>>,
     /// whether to restart the current atomic bool
-    restart: Arc<AtomicBool>,
+    restart: Arc<CachePadded<AtomicBool>>,
 }
 
 impl Z3Worker {
@@ -87,13 +91,13 @@ impl Z3Worker {
         start_context: Arc<Z3Query>,
     ) -> Self {
         // create the running flag
-        let running = Arc::new(AtomicBool::new(true));
+        let running = Arc::new(CachePadded::new(AtomicBool::new(true)));
         let running_clone = running.clone();
 
-        let reset = Arc::new(AtomicBool::new(false));
+        let reset = Arc::new(CachePadded::new(AtomicBool::new(false)));
         let reset_clone = reset.clone();
 
-        let restart = Arc::new(AtomicBool::new(false));
+        let restart = Arc::new(CachePadded::new(AtomicBool::new(false)));
         let restart_clone = reset.clone();
 
         let context = Arc::new(Mutex::new(Z3Context::None));
@@ -162,7 +166,7 @@ impl Z3Worker {
                         continue;
                     }
 
-                    if let Some((ticket, mut query)) = tasks.pop() {
+                    if let Some((ticket, mut query)) = tasks.pop(wid) {
                         num_queries += 1;
 
                         // run the query
@@ -341,10 +345,10 @@ impl Z3WorkerPool {
         );
 
         // create the task and results
-        let taskq = TaskQ::new();
+        let taskq = TaskQ::new(num_workers);
         //let taskq = Arc::new(Mutex::new(VecDeque::<(Z3Ticket, Z3Query)>::new()));
 
-        let (results_tx, resultq) = mpsc::channel::<(Z3Ticket, Z3Result)>();
+        let (results_tx, resultq) = channel::unbounded(); //mpsc::channel::<(Z3Ticket, Z3Result)>();
 
         //
         let results = HashMap::new();
@@ -434,7 +438,8 @@ impl Z3WorkerPool {
     fn drain_resultq(&mut self) {
         // log::trace!(target : "[Z3WorkerPool]", "draining result queue");
         // XXX: that one here just makes sure there are no new tasks...
-        loop {
+        for _ in 0..4 {
+            // loop {
             match self.resultq.try_recv() {
                 Ok((_id, mut result)) => {
                     // nothing
