@@ -78,7 +78,7 @@ impl MapPrograms {
                         unit.ident().clone(),
                         query.into(),
                         batch_size,
-                        Z3TaskPriority::Low,
+                        Z3TaskPriority::lowest().higher(),
                     )
                     .into(),
                 );
@@ -130,11 +130,15 @@ impl MapPrograms {
             }
         } else {
             // construct a new compound query builder
-            CompoundBoolExprQueryBuilder::new(unit, m_op.clone())
-                .partial_programs(partial_programs, false)
-                // .assms()
-                .all()
-                .map(|e| e.into())
+            CompoundBoolExprQueryBuilder::new(
+                unit,
+                m_op.clone(),
+                Z3TaskPriority::highest().lower().lower(),
+            )
+            .partial_programs(partial_programs, false)
+            // .assms()
+            .all()
+            .map(|e| e.into())
         };
 
         if let Some(query) = query {
@@ -142,15 +146,17 @@ impl MapPrograms {
                 unit.ident().clone(),
                 query,
                 batch_size,
-                Z3TaskPriority::High,
+                Z3TaskPriority::highest().lower(),
             );
 
-            let query = ProgramVerifier::with_batchsize(
+            let mut query = ProgramVerifier::with_batchsize(
                 unit.ident().clone(),
                 ProgramSimplifier::new(query.into()).into(),
                 batch_size,
-                Z3TaskPriority::High,
+                Z3TaskPriority::highest(),
             );
+
+            query.set_priority(Z3TaskPriority::highest());
 
             Self {
                 candidate_programs: query.into(),
@@ -182,6 +188,10 @@ impl ProgramBuilder for MapPrograms {
     /// the expression that the program needs to establish
     fn goal_expr(&self) -> Rc<VelosiAstExpr> {
         unimplemented!()
+    }
+
+    fn set_priority(&mut self, priority: Z3TaskPriority) {
+        self.candidate_programs.set_priority(priority);
     }
 
     fn do_fmt(&self, f: &mut Formatter<'_>, indent: usize, debug: bool) -> FmtResult {

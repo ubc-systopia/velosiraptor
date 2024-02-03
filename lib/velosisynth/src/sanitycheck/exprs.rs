@@ -97,7 +97,7 @@ fn expr_query(z3: &mut Z3WorkerPool, prefix: &str, e: &VelosiAstExpr, i1: usize)
     smtctx.level(smt);
 
     let q = Box::new(Z3Query::from(smtctx));
-    z3.submit_query(q, Z3TaskPriority::Medium)
+    z3.submit_query(q, Z3TaskPriority::new(0))
         .expect("failed to submit query")
 }
 
@@ -201,7 +201,7 @@ fn expr_pair_query(
     smtctx.level(smt);
 
     let q = Box::new(Z3Query::from(smtctx));
-    z3.submit_query(q, Z3TaskPriority::Medium)
+    z3.submit_query(q, Z3TaskPriority::new(0))
         .expect("failed to submit query")
 }
 
@@ -304,7 +304,7 @@ fn all_expr_query(z3: &mut Z3WorkerPool, prefix: &str, exprs: &[&VelosiAstExpr])
     smtctx.level(smt);
 
     let q = Box::new(Z3Query::from(smtctx));
-    z3.submit_query(q, Z3TaskPriority::Medium)
+    z3.submit_query(q, Z3TaskPriority::new(0))
         .expect("failed to submit query")
 }
 

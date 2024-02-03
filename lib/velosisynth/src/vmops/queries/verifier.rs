@@ -344,10 +344,15 @@ impl ProgramBuilder for ProgramVerifier {
         let i = " ".repeat(indent);
         writeln!(
             f,
-            "{i} ? ProgramVerifier ({} / {})",
-            self.stat_num_sat, self.stat_num_queries
+            "{i} ? ProgramVerifier ({} / {}) prio: {}, batch: {}",
+            self.stat_num_sat, self.stat_num_queries, self.priority, self.batch_size
         )?;
         self.programs.do_fmt(f, indent + 2, debug)
+    }
+
+    fn set_priority(&mut self, priority: Z3TaskPriority) {
+        self.priority = priority;
+        self.programs.set_priority(priority.lower());
     }
 }
 

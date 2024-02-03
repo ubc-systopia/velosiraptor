@@ -135,7 +135,7 @@ impl UnmapPrograms {
             }
         } else {
             // now we've got all the partial programs and we can start verifying
-            CompoundBoolExprQueryBuilder::new(unit, m_op.clone())
+            CompoundBoolExprQueryBuilder::new(unit, m_op.clone(), Z3TaskPriority::highest().lower())
                 .partial_programs(partial_programs, false)
                 .order_preserving() // set it to be order preserving
                 // .assms()
@@ -143,16 +143,17 @@ impl UnmapPrograms {
                 .into()
         };
 
-        let candidate_programs = ProgramVerifier::with_batchsize(
+        let mut candidate_programs = ProgramVerifier::with_batchsize(
             unit.ident().clone(),
             query,
             batch_size,
-            Z3TaskPriority::High,
-        )
-        .into();
+            Z3TaskPriority::highest(),
+        );
+
+        candidate_programs.set_priority(Z3TaskPriority::highest());
 
         UnmapPrograms {
-            candidate_programs,
+            candidate_programs: candidate_programs.into(),
             m_fn: m_op.clone(),
             // goal_exprs: Vec::new(),
             // starting_prog,
@@ -184,6 +185,10 @@ impl ProgramBuilder for UnmapPrograms {
         let i = " ".repeat(indent);
         writeln!(f, "{i} @ UnmapPrograms",)?;
         self.candidate_programs.do_fmt(f, indent + 4, debug)
+    }
+
+    fn set_priority(&mut self, priority: Z3TaskPriority) {
+        self.candidate_programs.set_priority(priority);
     }
 }
 

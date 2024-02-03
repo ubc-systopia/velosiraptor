@@ -36,6 +36,7 @@ use velosiast::ast::{
     VelosiAstMethod, VelosiAstTypeInfo, VelosiAstUnitSegment,
 };
 
+use crate::Z3TaskPriority;
 use crate::{
     model::method::{translate_map_result_name, translate_protect_result_name},
     z3::Z3WorkerPool,
@@ -80,7 +81,7 @@ impl<'a> TranslateQueryBuilder<'a> {
     }
 
     pub fn build(self) -> Option<TranslateQuery> {
-        let (programs, ident, mut args) = match self.m_op.ident().as_str() {
+        let (mut programs, ident, mut args) = match self.m_op.ident().as_str() {
             "map" => {
                 let body = self.m_translate.body.as_ref().unwrap();
                 let mut builder =
@@ -175,6 +176,10 @@ impl ProgramBuilder for TranslateQuery {
     /// the expression that the program needs to establish
     fn goal_expr(&self) -> Rc<VelosiAstExpr> {
         self.goal.clone()
+    }
+
+    fn set_priority(&mut self, priority: Z3TaskPriority) {
+        self.programs.set_priority(priority);
     }
 
     fn do_fmt(&self, f: &mut Formatter<'_>, indent: usize, debug: bool) -> FmtResult {

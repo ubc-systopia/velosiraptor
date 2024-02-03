@@ -49,6 +49,7 @@ use velosiast::ast::{VelosiAstExpr, VelosiAstMethod};
 // crate imports
 use crate::programs::Program;
 use crate::z3::Z3WorkerPool;
+use crate::Z3TaskPriority;
 
 // re-exports
 pub use boolexpr::{BoolExprQuery, BoolExprQueryBuilder};
@@ -144,6 +145,8 @@ pub trait ProgramBuilder {
     fn mem_model(&self) -> bool {
         false
     }
+
+    fn set_priority(&mut self, priority: Z3TaskPriority);
 
     /// formats the program builder object for debugging
     fn do_fmt(&self, f: &mut Formatter<'_>, indent: usize, debug: bool) -> FmtResult;

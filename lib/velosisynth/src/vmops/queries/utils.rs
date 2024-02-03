@@ -29,9 +29,12 @@ use std::collections::HashSet;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use velosiast::ast::{
-    VelosiAstExpr, VelosiAstFnCallExpr, VelosiAstIdentLiteralExpr, VelosiAstIdentifier,
-    VelosiAstMethod, VelosiAstMethodProperty, VelosiAstTypeInfo, VelosiAstUnitSegment,
+use velosiast::{
+    ast::{
+        VelosiAstExpr, VelosiAstFnCallExpr, VelosiAstIdentLiteralExpr, VelosiAstIdentifier,
+        VelosiAstMethod, VelosiAstMethodProperty, VelosiAstTypeInfo, VelosiAstUnitSegment,
+    },
+    VelosiAstInterfaceField,
 };
 
 use crate::{
@@ -140,10 +143,12 @@ pub fn make_program_builder(
 
 pub fn make_program_iter_mem(prog: &Program) -> ProgramsIter {
     let programs = prog.generate_possible_barriers();
-    let stat_num_programs = programs.len();
+    let stat_max_programs = programs.len();
+
     ProgramsIter {
         programs,
-        stat_num_programs,
+        stat_num_programs: 0,
+        stat_max_programs,
     }
 }
 
@@ -290,12 +295,16 @@ pub fn add_methods_tagged_with_remap(
                 log::debug!(target : "[synth::utils]", "handling {} with multiple expr body (CNF)", r_fn.ident());
 
                 // handle all the expressions
-                CompoundBoolExprQueryBuilder::new(unit, m_op.clone())
-                    .exprs(exprs)
-                    // .assms(): No assumptions, as they will be added by the map.assms()
-                    .negate(negate) // !(A && B && C), we convert this to !A || !B || !C
-                    .all()
-                    .map(|e| e.into())
+                CompoundBoolExprQueryBuilder::new(
+                    unit,
+                    m_op.clone(),
+                    Z3TaskPriority::highest().lower().lower(),
+                )
+                .exprs(exprs)
+                // .assms(): No assumptions, as they will be added by the map.assms()
+                .negate(negate) // !(A && B && C), we convert this to !A || !B || !C
+                .all()
+                .map(|e| e.into())
             }
         };
 
@@ -307,7 +316,7 @@ pub fn add_methods_tagged_with_remap(
                     unit.ident().clone(),
                     query,
                     batch_size,
-                    Z3TaskPriority::Low,
+                    Z3TaskPriority::lowest(),
                 )
                 .into(),
             );
@@ -406,7 +415,7 @@ pub fn add_method_preconds(
                         unit.ident().clone(),
                         query,
                         batch_size,
-                        Z3TaskPriority::Low,
+                        Z3TaskPriority::lowest(),
                     )
                     .into(),
                 );
@@ -461,7 +470,7 @@ pub fn add_method_preconds(
                     unit.ident().clone(),
                     query,
                     batch_size,
-                    Z3TaskPriority::Low,
+                    Z3TaskPriority::lowest(),
                 )
                 .into(),
             );
