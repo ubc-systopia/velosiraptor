@@ -83,7 +83,10 @@ pub fn make_program_builder_no_params(
             .interface
             .field(fieldname)
             .expect("didn't find the field");
-        if let Some(slicename) = parts.next() {
+
+        if let VelosiAstInterfaceField::Instruction(_f) = field {
+            builder.add_instruction(fieldname.to_string());
+        } else if let Some(slicename) = parts.next() {
             let slice = field.slice(slicename).expect("didn't find the slice");
             builder.add_field_slice(fieldname, slicename, slice.nbits() as usize);
         } else {
@@ -364,10 +367,7 @@ pub fn add_method_preconds(
             // we don't use the builder here, as we just want an "empty" program that gets
             // passed through the synthesis tree to ensure that the translation produces
             // the same output address as before changing the permission bits
-            let programs = ProgramsIter {
-                programs: vec![Program::new()],
-                stat_num_programs: 1,
-            };
+            let programs = ProgramsIter::new_noop();
 
             let args = vec![
                 Rc::new(VelosiAstExpr::IdentLiteral(

@@ -25,10 +25,15 @@
 
 //! Synthesis Module: Operations
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+use std::iter::Peekable;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::vec::IntoIter;
+
+use itertools::Itertools;
+use itertools::MultiProduct;
 
 use smt2::{Function, Smt2Context, Term, VarBinding};
 
@@ -564,9 +569,11 @@ impl FieldOp {
 
 /// Program Actions -- A sequence of operations on the program
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-enum ProgramActions {
+pub enum ProgramActions {
     GlobalBarrier,
+    Instruction(Arc<String>),
     FieldActions(Arc<FieldActions>),
+    Noop,
 }
 
 impl ProgramActions {
@@ -586,6 +593,12 @@ impl ProgramActions {
                 }
             }
             ProgramActions::FieldActions(f) => f.to_smt2_term(smtops, symvars, prefix, mem_model),
+            ProgramActions::Instruction(instr) => {
+                // field actions always end with a write action
+                let fname = format!("{prefix}.{MODEL_PREFIX}.{IFACE_PREFIX}.{instr}.execaction! ");
+                smtops.push((fname, None));
+            }
+            ProgramActions::Noop => (),
         }
     }
 }
@@ -597,6 +610,10 @@ impl From<&ProgramActions> for Vec<VelosiOperation> {
             ProgramActions::FieldActions(f) => {
                 <&FieldActions as std::convert::Into<Vec<VelosiOperation>>>::into(f)
             }
+            ProgramActions::Instruction(instr) => {
+                vec![VelosiOperation::Instruction(Rc::new(instr.as_str().into()))]
+            }
+            ProgramActions::Noop => unreachable!(),
         }
     }
 }
@@ -606,6 +623,8 @@ impl Display for ProgramActions {
         match self {
             Self::GlobalBarrier => write!(f, "\n  global_barrier()",)?,
             Self::FieldActions(a) => write!(f, "{}", a)?,
+            Self::Instruction(i) => write!(f, "{i}()")?,
+            Self::Noop => (),
         }
         Ok(())
     }
@@ -617,7 +636,7 @@ impl Display for ProgramActions {
 
 /// Field Actions -- A sequence of field operations on a field
 #[derive(PartialEq, Eq, Clone, Hash)]
-struct FieldActions(Arc<String>, Vec<FieldOp>);
+pub struct FieldActions(Arc<String>, Vec<FieldOp>);
 
 impl FieldActions {
     /// Rewrites the [FieldActions] by replacing symbolic variables with their concrete values
@@ -723,6 +742,7 @@ impl From<&FieldActions> for Vec<VelosiOperation> {
 
 impl Display for FieldActions {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        // write!(f, "{}", self.0)?;
         let mut newline = true;
         for a in self.1.iter() {
             if newline {
@@ -755,10 +775,11 @@ impl Display for FieldActions {
 
 impl Debug for FieldActions {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "{:?} [ ", self.0)?;
         for a in self.1.iter() {
-            write!(f, "{}.{:?}; ", self.0, a)?;
+            write!(f, "{:?}; ", a)?;
         }
-        Ok(())
+        write!(f, " ]")
     }
 }
 
@@ -787,6 +808,8 @@ impl Program {
             .iter_mut()
             .filter_map(|f| match f {
                 ProgramActions::GlobalBarrier => None,
+                ProgramActions::Instruction(_) => None,
+                ProgramActions::Noop => None,
                 ProgramActions::FieldActions(a) => Some(a),
             })
             .for_each(|a| *a = Arc::new(a.replace_symbolic_values(vals)));
@@ -873,17 +896,44 @@ impl Program {
     /// XXX: this doesn't account for two independent actions on the same field that
     ///      need to be taken.
     pub fn merge(mut self, other: &Self) -> Self {
-        // merge the two programs by combining the field actions
-        let mut field_operations: HashMap<Arc<String>, Vec<FieldOp>> = HashMap::new();
-
         log::debug!("MERGE:");
         log::debug!("  {:?}", self);
         log::debug!("  {:?}", other);
 
+        // -----------------------------------------------------------------------------------------
+        // Step 1: collect all special instructions of the two programs
+        // -----------------------------------------------------------------------------------------
+
+        let mut instructions: HashSet<Arc<String>> = HashSet::new();
+
+        instructions.extend(self.0.iter().filter_map(|f| {
+            if let ProgramActions::Instruction(a) = f {
+                Some(a.clone())
+            } else {
+                None
+            }
+        }));
+
+        instructions.extend(other.0.iter().filter_map(|f| {
+            if let ProgramActions::Instruction(a) = f {
+                Some(a.clone())
+            } else {
+                None
+            }
+        }));
+
+        // -----------------------------------------------------------------------------------------
+        // Step 2: Collect all field operations of the program
+        // -----------------------------------------------------------------------------------------
+
+        // merge the two programs by combining the field actions
+        let mut field_operations: HashMap<Arc<String>, Vec<FieldOp>> = HashMap::new();
+
         // struct FieldActions(Arc<String>, Vec<Arc<FieldOp>>);
+        // collect all program actions of the own program
         for op in self.0.iter().filter_map(|f| match f {
-            ProgramActions::GlobalBarrier => None,
             ProgramActions::FieldActions(a) => Some(a),
+            _ => None,
         }) {
             if let Some(x) = field_operations.get_mut(&op.0) {
                 // insert the field actions into the map by extending the current one
@@ -894,9 +944,10 @@ impl Program {
             }
         }
 
+        // collect all program actions of the other program
         for op in other.0.iter().filter_map(|f| match f {
-            ProgramActions::GlobalBarrier => None,
             ProgramActions::FieldActions(a) => Some(a),
+            _ => None,
         }) {
             if let Some(existing_ops) = field_operations.get_mut(&op.0) {
                 // merge the field actions, for all other actions just insert the ones that
@@ -926,45 +977,94 @@ impl Program {
             }
         }
 
+        // -----------------------------------------------------------------------------------------
+        // Step 3: See whether we can merge the two programs together
+        // -----------------------------------------------------------------------------------------
+
+        // now we have all the field operations together and we should
+        // see whether we can merge them together in a good way.
+
         // by now we should have all field programs ready
 
-        for fop in self.0.iter_mut().filter_map(|f| match f {
-            ProgramActions::GlobalBarrier => None,
-            ProgramActions::FieldActions(a) => Some(a),
-        }) {
-            let fld = fop.0.clone();
-            let ops = field_operations.remove(&fld).unwrap();
-            *fop = Arc::new(FieldActions(fld.clone(), ops))
-        }
-
-        for fop in other.0.iter().filter_map(|f| match f {
-            ProgramActions::GlobalBarrier => None,
-            ProgramActions::FieldActions(a) => Some(a),
-        }) {
-            if let Some(ops) = field_operations.remove(&fop.0) {
-                let fld = fop.0.clone();
-                self.0
-                    .push(ProgramActions::FieldActions(Arc::new(FieldActions(
-                        fld, ops,
-                    ))))
+        for prog_action in self.0.iter_mut() {
+            match prog_action {
+                ProgramActions::GlobalBarrier => (),
+                ProgramActions::Noop => (),
+                ProgramActions::FieldActions(a) => {
+                    let field = a.0.clone();
+                    let ops = field_operations.remove(&field).unwrap();
+                    /* replace the ops here */
+                    *prog_action = ProgramActions::FieldActions(Arc::new(FieldActions(field, ops)))
+                }
+                ProgramActions::Instruction(a) => {
+                    instructions.remove(a);
+                }
             }
         }
+
+        let mut remainder = Vec::new();
+
+        for prog_action in other.0.iter() {
+            match prog_action {
+                ProgramActions::GlobalBarrier => (),
+                ProgramActions::Noop => (),
+                ProgramActions::FieldActions(a) => {
+                    let field = a.0.clone();
+                    if let Some(ops) = field_operations.remove(&field) {
+                        remainder.push(ProgramActions::FieldActions(Arc::new(FieldActions(
+                            field, ops,
+                        ))))
+                    }
+                }
+                ProgramActions::Instruction(a) => {
+                    /* no-op */
+                    if instructions.contains(a) {
+                        // this means we haven't seen the instruction yet, so add all other field
+                        // actions here. followed by the  instruction
+                        remainder.push(ProgramActions::Instruction(a.clone()));
+                        self.0.append(&mut remainder);
+                    } else if !remainder.is_empty() {
+                        // here we have an instruction that has already been executed.
+                        // ideally, find the instruction and put the remainder before that.
+                        // We don't do that yet...
+                        let mut new_program = Vec::with_capacity(self.0.len() + remainder.len());
+
+                        self.0.into_iter().for_each(|p| {
+                            if let ProgramActions::Instruction(x) = &p {
+                                if x.as_ref() == a.as_ref() {
+                                    new_program.append(&mut remainder);
+                                }
+                            }
+                            new_program.push(p);
+                        });
+                        self.0 = new_program;
+                    }
+                }
+            }
+        }
+
+        self.0.append(&mut remainder);
 
         log::debug!("  {:?}", self);
         self
     }
 
-    pub fn generate_possible_barriers(&self) -> Vec<Program> {
-        let mut possibilities = vec![self.clone()];
+    pub fn generate_possible_barriers(
+        &self,
+    ) -> Vec<Peekable<MultiProduct<IntoIter<ProgramActions>>>> {
+        let mut possibilities = vec![self.0.clone()];
         let len = self.0.len();
 
         for i in 1..=len {
-            let mut new_prog = self.clone();
-            new_prog.0.insert(i, ProgramActions::GlobalBarrier);
+            let mut new_prog = self.clone().0;
+            new_prog.insert(i, ProgramActions::GlobalBarrier);
             possibilities.push(new_prog);
         }
 
-        possibilities
+        vec![possibilities
+            .into_iter()
+            .multi_cartesian_product()
+            .peekable()]
     }
 
     pub fn simplify(mut self) -> Self {
@@ -976,6 +1076,8 @@ impl Program {
                 ProgramActions::FieldActions(x) => {
                     ProgramActions::FieldActions(x.simplify().into())
                 }
+                ProgramActions::Instruction(x) => ProgramActions::Instruction(x.clone()),
+                ProgramActions::Noop => ProgramActions::Noop,
             })
             .collect();
 
@@ -1012,9 +1114,14 @@ impl Display for Program {
 
 impl Debug for Program {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        for a in self.0.iter() {
-            write!(f, "{a}")?;
+        if self.0.is_empty() {
+            writeln!(f, "<no-op>")?;
+        } else {
+            for a in self.0.iter() {
+                writeln!(f, "{a}")?;
+            }
         }
-        writeln!(f)
+
+        Ok(())
     }
 }
