@@ -39,7 +39,7 @@ use velosiast::{AstResult, VelosiAst, VelosiAstUnit};
 use velosisynth::create_models;
 use velosisynth::Z3SynthFactory;
 
-const BATCH_SIZE: usize = 2;
+const BATCH_SIZE: usize = 8;
 
 pub fn main() {
     // get the command line argumentts
