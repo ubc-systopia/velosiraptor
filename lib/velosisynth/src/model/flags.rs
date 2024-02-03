@@ -67,7 +67,7 @@ pub fn add_flags(smt: &mut Smt2Context, ctxt: &str, flags: &VelosiAstFlags) {
         );
         let attrs = vec![Attribute::with_value(
             "pattern".to_string(),
-            format!("({f_get_fn_name} flgs@)"),
+            format!("(({f_get_fn_name} flgs@))"),
         )];
 
         let e = Term::attributed(e, attrs);
