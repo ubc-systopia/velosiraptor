@@ -133,7 +133,7 @@ fn add_field_common(
         );
         let attrs = vec![Attribute::with_value(
             "pattern".to_string(),
-            format!("({s_get_fn_name} x@)"),
+            format!("(({s_get_fn_name} x@))"),
         )];
 
         let e = Term::attributed(e, attrs);
@@ -174,7 +174,7 @@ fn add_field_common(
         );
         let attrs = vec![Attribute::with_value(
             "pattern".to_string(),
-            format!("({s_set_fn_name} x@ v@)"),
+            format!("(({s_set_fn_name} x@ v@))"),
         )];
 
         let e = Term::attributed(e, attrs);
