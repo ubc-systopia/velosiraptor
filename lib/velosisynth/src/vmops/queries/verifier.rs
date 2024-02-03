@@ -52,7 +52,7 @@ use super::utils;
 use super::ProgramBuilder;
 
 /// the default batch size for submitting the queries to Z3
-pub const DEFAULT_BATCH_SIZE: usize = 2;
+pub const DEFAULT_BATCH_SIZE: usize = 8;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Program Verifier
