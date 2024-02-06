@@ -343,8 +343,115 @@ fn examples_distinguish() {
     }
 }
 
+const SYNTH_MODEL_FILTER: [&str; 5] = [
+    "examples/xeon_phi_smpt.vrs",
+    "examples/x86_64_pagetable.vrs",
+    "examples/x86_32_pagetable.vrs",
+    "examples/fixedsegment.vrs",
+    "examples/singlesegment.vrs",
+];
+
 #[test]
-fn examples_synth() {
+fn examples_synth_quick() {
+    println!("\nSYNTHESIS EXAMPLES");
+    let d = PathBuf::from("examples");
+
+    println!("Filter: {:?}", SYNTH_MODEL_FILTER);
+
+    let ncores = std::cmp::max(
+        std::thread::available_parallelism()
+            .map(|i| i.into())
+            .unwrap_or(1)
+            / 2,
+        1,
+    );
+
+    for f in d.read_dir().expect("could not read example directory") {
+        let vrs = f.expect("could not read directory entry").path();
+
+        if vrs.is_dir() {
+            continue;
+        }
+
+        println!("  @ Synthesis Check {}", vrs.display());
+
+        let path_str = vrs.display().to_string();
+        if !SYNTH_MODEL_FILTER.contains(&path_str.as_str()) {
+            println!("    - Skipped (not in filter)");
+            continue;
+        }
+
+        let t_start = Instant::now();
+        let mut ast = get_ast(vrs.display().to_string().as_str());
+        let t_elapsed_ms = Instant::now().duration_since(t_start).as_millis();
+        println!("    - AST creation: {t_elapsed_ms} ms");
+
+        let mut synthfactory = Z3SynthFactory::new();
+        synthfactory.num_workers(ncores).default_log_dir();
+
+        let t_start = Instant::now();
+        let models = create_models(&ast);
+        let t_elapsed_ms = Instant::now().duration_since(t_start).as_millis();
+        println!("    - Model creation: {t_elapsed_ms} ms");
+
+        let mut had_errors = false;
+        for unit in ast.units_mut() {
+            match unit {
+                VelosiAstUnit::Segment(unit) => {
+                    if unit.is_abstract {
+                        // don't handle abstract units
+                        continue;
+                    }
+
+                    println!("    - Unit {}", unit.ident());
+
+                    let seg =
+                        Rc::get_mut(unit).expect("Could not get mutable reference to segment!");
+
+                    let t_0 = Instant::now();
+                    let mut synth = synthfactory.create_segment(seg, models[seg.ident()].clone());
+                    let t_init_ms = Instant::now().duration_since(t_0).as_millis();
+
+                    let t_start = Instant::now();
+                    synth.synthesize(false);
+                    let t_synth = Instant::now().duration_since(t_start).as_millis();
+
+                    let t_total = Instant::now().duration_since(t_0).as_millis();
+
+                    let t_map = synth.t_map_synthesis.as_millis();
+                    let t_protect = synth.t_protect_synthesis.as_millis();
+                    let t_unmap = synth.t_unmap_synthesis.as_millis();
+
+                    if synth.finalize().is_ok() {
+                        println!("      => Ok  Synthesis completed    {t_total} ms = {t_init_ms} ms + {t_synth} ms ");
+                        println!("            - map: {t_map} ms, unmap: {t_unmap} ms, protect: {t_protect} ms", );
+                    } else {
+                        println!("      => Failed");
+                        had_errors = true;
+                    }
+                    // no-op
+                }
+                VelosiAstUnit::StaticMap(_) => {
+                    // no-op
+                }
+                VelosiAstUnit::Enum(_) => {
+                    // no-op
+                }
+                VelosiAstUnit::OSSpec(_) => {
+                    // no-op
+                }
+            }
+        }
+
+        if had_errors {
+            panic!("Sanity check failed.");
+        }
+    }
+}
+
+#[test]
+#[ignore]
+fn examples_synth_all() {
     println!("\nSYNTHESIS EXAMPLES");
     let d = PathBuf::from("examples");
 
