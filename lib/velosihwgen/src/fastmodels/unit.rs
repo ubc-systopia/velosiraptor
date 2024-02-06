@@ -792,35 +792,27 @@ fn add_create(c: &mut C::Class, unit: &VelosiAstUnit) {
     // let mut arg0_type = C::Type::new_class("sg::ComponentBase");
     // arg0_type.pointer();
 
+    let mut args = Vec::new();
+    unit.params_as_slice().iter().for_each(|p| {
+        args.push(
+            m.new_param(p.ident().as_str(), ast_type_to_c_type(&p.ptype))
+                .to_expr(),
+        );
+    });
+
+    // argument for a name
     let mut arg1_type = C::Type::new_std_string();
     arg1_type.constant().reference();
+    args.push(m.new_param("name", arg1_type).to_expr());
 
-    // let mut arg2_type = C::Type::new_class("sg::CADIBase ");
-    // arg2_type.pointer();
-
+    // pointer to the page table walker
     let mut arg3_type = C::Type::new_class("pv::RandomContextTransactionGenerator");
     arg3_type.pointer();
-
-    let arg4_type = C::Type::new_typedef("lpaddr_t");
-
-    // arguments
-
-    m.new_param("base", arg4_type);
-    let name_var = m.new_param("name", arg1_type).to_expr();
-    let ptw_pvbus_var = m.new_param("ptw_pvbus", arg3_type).to_expr();
+    args.push(m.new_param("ptw_pvbus", arg3_type).to_expr());
 
     let unitvar = C::Expr::new_var("t", unit_ptr_type.clone());
-
     let statevar = C::Expr::field_access(&unitvar, "state");
     let ifvar = C::Expr::field_access(&unitvar, "interface");
-
-    let mut args: Vec<C::Expr> = unit
-        .params_as_slice()
-        .iter()
-        .map(|p| C::Expr::new_var(p.ident().as_str(), ast_type_to_c_type(&p.ptype)))
-        .collect();
-    args.push(name_var);
-    args.push(ptw_pvbus_var);
 
     //  TranslationUnit *t;
     m.body()
