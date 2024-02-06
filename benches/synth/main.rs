@@ -7,14 +7,17 @@ use velosiast::{
 };
 use velosisynth::Z3SynthFactory;
 
-const SPECS: [&str; 3] = [
+const SPECS: [&str; 6] = [
     "examples/x86_32_pagetable.vrs",
     "examples/x86_64_pagetable.vrs",
-    "examples/doesn_exists.vrs",
+    "examples/xeon_phi_smpt.vrs",
+    "examples/singlesegment.vrs",
+    "examples/medium.vrs",
+    "examples/fixedsegment.vrs",
+    "examples/r4700_fixed_page_size.vrs",
 ];
 
 const ITERATIONS: usize = 10;
-
 
 struct Stats {
     pub min: u128,
@@ -46,7 +49,8 @@ impl From<&[u128]> for Stats {
             }
         } else {
             data.sort();
-            let var = data.iter().map(|x| (x - avg) * (x - avg)).sum::<u128>() as u128 / num as u128;
+            let var =
+                data.iter().map(|x| (x - avg) * (x - avg)).sum::<u128>() as u128 / num as u128;
             let std = (var as f64).sqrt() as u128;
             Self {
                 min: *data.first().unwrap(),
@@ -94,7 +98,7 @@ impl BenchResults {
         }
     }
 
-    pub fn merge(&mut self, other: &Self){
+    pub fn merge(&mut self, other: &Self) {
         assert_eq!(self.tag, other.tag);
         self.t_parse.extend(other.t_parse.iter());
         self.t_model.extend(other.t_model.iter());
@@ -136,7 +140,6 @@ impl BenchResults {
 
 impl std::fmt::Display for BenchResults {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-
         let tt = Stats::from(self.t_total.as_slice());
         let tc = Stats::from(self.t_check.as_slice());
         let ts = Stats::from(self.t_synth.as_slice());
@@ -147,7 +150,6 @@ impl std::fmt::Display for BenchResults {
         Ok(())
     }
 }
-
 
 fn run_synthesis(vrs_file: &str) -> Option<BenchResults> {
     let mut results = BenchResults::new(vrs_file.to_string());
@@ -259,7 +261,9 @@ fn run_synthesis(vrs_file: &str) -> Option<BenchResults> {
 
     results.t_synth.push(t_synth);
     results.t_check.push(t_sanity_check);
-    results.t_total.push(Instant::now().duration_since(t_start).as_millis());
+    results
+        .t_total
+        .push(Instant::now().duration_since(t_start).as_millis());
     results.num_enums = num_enums;
     results.num_staticmaps = num_staticmaps;
     results.num_segments = num_segments;
