@@ -17,6 +17,7 @@ flags {
     writable,
     readable,
     executable,
+    user
 }
 
 segment SingleSegment(base : addr) {
@@ -30,13 +31,30 @@ segment SingleSegment(base : addr) {
     // the state will be two registers:
     state(base: addr) {
         reg address [ 8 ] {
-            0 .. 48 val,
+            0 .. 4  res0,
+            4 .. 48 val,
         },
         reg length [ 8 ] {
+            0 .. 4  res0,
+            4 .. 48 bytes,
+        },
+        reg permissions [ 8 ] {
             0 ..  1 present,
             1 ..  2 rw,
             2 ..  3 exec,
-            4 .. 48 bytes,
+            3 ..  8 res0,
+            8 .. 48 ign,
+            48 .. 49 usr,
+        },
+        reg stats [ 8 ] {
+             0 ..  8 stat0,
+             8 .. 16 stat1,
+            16 .. 24 stat2,
+            24 .. 32 stat3,
+            32 .. 40 stat4,
+            40 .. 48 stat5,
+            48 .. 56 stat6,
+            56 .. 64 stat7,
         }
     }
 
@@ -44,12 +62,21 @@ segment SingleSegment(base : addr) {
     interface(base: addr) {
         mmio address [ base, 0, 8 ],
         mmio length [ base, 8, 8 ],
+        mmio permissions [ base, 16, 8 ],
+        mmio stats [ base, 24, 8 ],
     }
 
     // add the valid bit
     #[remap]
     fn valid() -> bool {
-        state.length.present == 1
+        state.permissions.present == 1
+    }
+
+    #[remap]
+    fn res0(va: vaddr) -> bool {
+        state.address.res0 == 0
+        && state.length.res0 == 0
+        && state.permissions.res0 == 0
     }
 
     // #[remap]
@@ -61,14 +88,15 @@ segment SingleSegment(base : addr) {
     #[remap]
     fn matchflags(flgs : flags) -> bool
     {
-        flgs.writable == state.length.rw && flgs.executable == state.length.exec
+        flgs.writable == state.permissions.rw && flgs.executable == state.permissions.exec
+        && flgs.user == state.permissions.usr
     }
 
     // to calculate the new address, we just add the base address here, if within range
     fn translate(va: vaddr) -> paddr
         requires va < (state.length.bytes << 4)
     {
-        va + state.address.val
+        va + (state.address.val << 4)
     }
 
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)

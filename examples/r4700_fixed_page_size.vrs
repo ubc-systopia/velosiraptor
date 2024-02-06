@@ -1,0 +1,338 @@
+/*
+ * This describes the TLB of an MIPS R4700 TLB.
+ *
+ *  Page -> static map -> [ frame, frame]
+ *
+ */
+
+const CAPACITY: size = 48;
+
+const PAGE_SIZE_4K   : size = 0b000000000000;
+const PAGE_SIZE_16K  : size = 0b000000000011;
+const PAGE_SIZE_64K  : size = 0b000000001111;
+const PAGE_SIZE_256K : size = 0b000000111111;
+const PAGE_SIZE_1M   : size = 0b000011111111;
+const PAGE_SIZE_4M   : size = 0b001111111111;
+const PAGE_SIZE_16M  : size = 0b111111111111;
+
+flags {
+    writable,
+    readable,
+    executable,
+    global,
+}
+
+segment EntryLo(which: int) {
+    inbitwidth= 12;
+    outbitwidth = 34;
+
+    state() {
+        reg entry_lo [ 8 ] {
+            0 ..  1 mbz0,
+            1 ..  2 valid,
+            2 ..  3 dirty,
+            3 ..  6 coherency,
+            6 .. 30 pfn,
+           31 .. 64 mbz1,
+        },
+        reg mask [ 8 ] {
+            12 .. 25 mask,
+        },
+    }
+
+    interface() {
+        reg entry_lo [ 8 ] {
+            Layout {
+                 0 ..  1 global,
+                 1 ..  2 valid,
+                 2 ..  3 dirty,
+                 3 ..  6 coherency,
+                 6 .. 30 pfn,
+                30 .. 64 mbz
+            }
+        },
+        reg mask [ 8 ],
+        instr tlbwr {
+            WriteActions {
+                interface.entry_lo.valid -> state.entry_lo.valid;
+                interface.entry_lo.dirty -> state.entry_lo.dirty;
+                interface.entry_lo.coherency -> state.entry_lo.coherency;
+                interface.entry_lo.pfn -> state.entry_lo.pfn;
+                interface.entry_lo.mbz -> state.entry_lo.mbz1;
+                0 -> state.entry_lo.mbz0;
+            }
+        },
+
+        instr tlbr {
+            ReadActions {
+
+            }
+        }
+    }
+
+    #[remap]
+    fn valid() -> bool {
+        state.entry_lo.valid == 1
+    }
+
+    #[remap]
+    fn mask() -> bool {
+        state.mask.mask == 0
+    }
+
+    #[remap]
+    fn mbz() -> bool {
+        state.entry_lo.mbz0 == 0 && state.entry_lo.mbz1 == 0
+    }
+
+    #[remap]
+    fn coherency() -> bool {
+        state.entry_lo.coherency == 0
+    }
+
+    #[remap]
+    fn matchflags(flgs : flags) -> bool {
+        flgs.writable == state.entry_lo.dirty
+    }
+
+    fn translate(va: vaddr) -> paddr
+        requires va < 4096
+    {
+        va + state.entry_lo.pfn << 12
+    }
+
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+        requires va == 0
+        requires (pa & 0xFFF) == 0
+        requires sz == 4096
+
+    synth fn protect(va: vaddr, sz: size, flgs: flags)
+        requires va == 0 && sz == 4096
+
+    synth fn unmap(va: vaddr, sz: size)
+        requires va == 0 && sz == 4096
+}
+
+staticmap FramePair() {
+    #[repr(array)]
+    maps [ EntryLo(i) for i in 0..1 ]
+}
+
+segment EntryHi() {
+    inbitwidth= 48;
+    outbitwidth = 40;
+
+    state() {
+        reg entry_hi [ 8 ] {
+             0 ..  8 asid,
+             8 .. 12 mbz0,
+            12 .. 13 global,
+            13 .. 40 vpn2,
+            40 .. 62 mbz1,
+            62 .. 64 region
+        },
+        reg mask [ 8 ] {
+            12 .. 25 mask,
+        },
+    }
+
+    interface() {
+        reg entry_hi [ 8 ] {
+            Layout {
+                 0 ..  8 asid,
+                 8 .. 13 mbz0,
+                13 .. 40 vpn2,
+                40 .. 62 mbz1,
+                62 .. 64 region,
+            },
+        },
+        reg mask [8],
+
+        instr tlbwr {
+            WriteActions {
+                interface.entry_hi.asid -> state.entry_hi.asid;
+                interface.entry_hi.mbz0 -> state.entry_hi.mbz0;
+                interface.entry_hi.vpn2 -> state.entry_hi.vpn2;
+                interface.entry_hi.mbz1 -> state.entry_hi.mbz1;
+                interface.entry_hi.region -> state.entry_hi.region;
+            }
+        },
+
+        instr tlbr {
+            ReadActions {
+
+            }
+        }
+    }
+
+    #[remap]
+    fn valid() -> bool {
+        true
+    }
+
+    #[remap]
+    fn mask() -> bool {
+        state.mask.mask == 0
+    }
+
+    #[remap]
+    fn mbz() -> bool {
+        state.entry_hi.mbz0 == 0 && state.entry_hi.mbz1 == 0
+    }
+
+    #[remap]
+    fn region -> bool {
+        state.entry_hi.region == 0
+    }
+
+    #[remap]
+    fn matchflags(flgs : flags) -> bool {
+        // flgs.global == state.entry_hi.global
+        true
+    }
+
+    fn translate(va: vaddr) -> paddr
+        requires va >= state.entry_hi.vpn2 << 13
+        // requires va < ((state.entry_hi.vpn2 << 13) + 8192)
+    {
+        0
+    }
+
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : FramePair)
+        requires va & 0x1FFF == 0 && va < 1 << 40
+        requires pa == 0
+        requires sz == 8192
+
+    // can't protec/unmap in the entry hi
+    synth fn protect(va: vaddr, sz: size, flgs: flags);
+    synth fn unmap(va: vaddr, sz: size);
+}
+
+
+/*
+// maps to a physical frame
+segment Entry {
+    inbitwidth= 40;
+    outbitwidth = 40;
+
+    state() {
+        reg mask [ 8 ] {
+            12 .. 25 mask,
+        },
+        reg entry_hi [ 8 ] {
+             0 ..  8 asid,
+             8 .. 12 mbz0,
+            12 .. 13 global,
+            13 .. 40 vpn2,
+            40 .. 62 mbz1,
+            62 .. 64 region
+        },
+        reg entry_lo0 [ 8 ] {
+             0 ..  1 mbz0,
+             1 ..  2 valid,
+             2 ..  3 dirty,
+             3 ..  6 coherency,
+             6 .. 30 pfn,
+            31 .. 64 mbz1,
+        },
+        reg entry_lo1 [ 8 ] {
+             0 ..  1 mbz0,
+             1 ..  2 valid,
+             2 ..  3 dirty,
+             3 ..  6 coherency,
+             6 .. 30 pfn,
+            31 .. 64 mbz1,
+        }
+    }
+
+    interface() {
+        reg entry_lo0 [ 8 ] {
+            Layout {
+                 0 ..  1 global,
+                 1 ..  2 valid,
+                 2 ..  3 dirty,
+                 3 ..  6 coherency,
+                 6 .. 30 pfn,
+                30 .. 64 mbz
+            }
+        },
+        reg entry_lo1 [ 8 ] {
+            Layout {
+                 0 ..  1 global,
+                 1 ..  2 valid,
+                 2 ..  3 dirty,
+                 3 ..  6 coherency,
+                 6 .. 30 pfn,
+                30 .. 64 mbz
+            }
+        },
+        reg entry_hi [ 8 ] {
+            Layout {
+                 0 ..  8 asid,
+                 8 .. 13 mbz0,
+                13 .. 40 vpn2,
+                40 .. 62 mbz1,
+                62 .. 64 region,
+            }
+        },
+        reg mask [ 4 ] {
+            Layout {
+                 0 .. 13 mbz0,
+                13 .. 25 mask,
+                25 .. 32 mbz1,
+            }
+        },
+        reg index [4] {
+            Layout {
+                 0 ..  6 index,
+                 6 .. 31 mbz,
+                31 .. 32 probefailure,
+            }
+        },
+        reg random [4] {
+            Layout {
+                0 .. 6 index,
+                6 .. 32 mbz,
+            }
+        },
+        reg wired [4],
+
+        // instructions
+
+        // Write Random TLB Entry
+        reg ins_tlbwr [ 1 ] {
+            // just using the write actions here
+            WriteActions {
+
+            }
+        },
+
+        // Write Indexed TLB Entry
+        reg ins_tlbwri [ 1 ] {
+            // just using the write actions here
+            WriteActions {
+
+            }
+        },
+
+        // TLBR Read Indexed TLB Entry
+        reg ins_tlbr [ 1 ] {
+            // just using the write actions here
+            WriteActions {
+                interface.entry_hi.asid <- state.entry_hi.asid;
+                interface.entry_hi.mbz0 <- 0;
+                interface.entry_hi.vpn2 <- state.entry_hi.vpn2;
+                interface.entry_hi.region <- state.entry_hi.region;
+            }
+        }
+    }
+
+
+    fn translate(va: vaddr) -> paddr
+        requires
+    {
+
+    }
+
+}
+*/

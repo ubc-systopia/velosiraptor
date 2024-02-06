@@ -1,0 +1,160 @@
+/**
+ * Intel 64 and IA-32 Architectures Software Developer's Manual
+ * ============================================================
+ *
+ * Volume 3 - Chapter 3: Protected Mode Memory Management
+ * 3.4.5 Segment Descriptors
+ */
+
+
+const TYPE_EXECUTE_MASK : size = (0b1000);
+const TYPE_WRITE_MASK : size = (0b0010);
+const TYPE_READ_MASK  : size = (0b0010);
+const TYPE_ACCESSED_MASK : size = (0b0001);
+
+const SEGMENT_GRANULARITY_SIZE : size = 4096;
+
+const SEGMENT_SIZE_MAX_LARGE : size = 0xffff_ffff;
+const SEGMENT_SIZE_MAX_SMALL : size = 0xfffff;
+
+const OUT_ADDR_MAX : size = 0xffff_ffff;
+const IN_ADDR_MAX : size = 0xffff_ffff;
+
+
+flags {
+    execute,
+    read,
+    write,
+    usermode
+}
+
+// This defines an SMPT Entry
+abstract segment SegmentDescriptorBase(base: addr) {
+
+    inbitwidth = 32;
+    outbitwidth = 32;
+
+
+    state(base: addr) {
+        mem entry_lo [ base, 0, 4 ] {
+            0  .. 16 limit0,  // segment limit [15:0]
+            16 .. 32 base0,   // base[15:0]
+        },
+        mem entry_hi [ base, 4, 4 ] {
+             0 ..  8  base1,  // base[16:23]
+             8 ..  9  typ_code,
+             9 .. 10  typ_ec,
+            10 .. 11  typ_rw,
+            11 .. 12  typ_a,
+            12 .. 13  s,      // system or data/code
+            13 .. 15  dpl,    // privilege level (ring)
+            15 .. 16  p,      // present
+            16 .. 20  limit1, // limit[16:19]
+            20 .. 21  avl,    // available for use by system software
+            21 .. 22  l,      // 64-bit long mode
+            22 .. 23  db,     // default operation size, 0 == 16 bit, 1 = 32 bit
+            23 .. 24  g,      // granularity, if limit is in 4 KiB increments
+            24 .. 32  base2,  // base[32..24]
+        }
+    }
+
+    interface(base: addr) {
+        mem entry_lo [ base, 0, 4 ],
+        mem entry_hi [ base, 4, 4 ],
+    }
+
+    #[remap]
+    fn valid() -> bool {
+        state.entry_hi.p == 1
+    }
+
+    #[remap]
+    fn opsize32() -> bool {
+        state.entry_hi.db == 1 // only consider 32-bit segments
+    }
+
+    #[remap]
+    fn dtype() -> bool {
+        state.entry_hi.s == 1
+    }
+
+    #[remap]
+    fn longmode() -> bool {
+        state.entry_hi.l == 0
+    }
+
+    #[remap]
+    fn matchflags(flgs : flags) -> bool {
+      (flgs.usermode == state.entry_hi.dpl)
+      && flgs.execute == state.entry_hi.typ_code
+      && flgs.write == state.entry_hi.typ_rw
+    }
+
+    #[remap]
+    abstract fn granularity() -> bool;
+
+    abstract fn limit() -> size
+
+    fn baseaddr() -> paddr {
+        state.entry_lo.base0
+         + (state.entry_hi.base1 << 16)
+         + (state.entry_hi.base2 << 24)
+    }
+
+    // fn translate(va: vaddr) -> paddr
+    //     requires va <  limit()
+    // {
+    //     va + baseaddr()
+    // }
+}
+
+
+segment SegmentDescriptorSmall(base: addr) : SegmentDescriptorBase {
+    #[remap]
+    fn granularity() -> bool {
+        state.entry_hi.g == 0
+    }
+
+    fn limit() -> size {
+        state.entry_lo.limit0
+         +  (state.entry_hi.limit1 << 16)
+    }
+
+    fn translate(va: vaddr) -> paddr
+        requires va <  (state.entry_lo.limit0 +  (state.entry_hi.limit1 << 16))
+    {
+        va + baseaddr()
+    }
+
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+        requires va == 0
+        requires pa + sz <= OUT_ADDR_MAX
+        requires sz <= SEGMENT_SIZE_MAX_SMALL
+
+    // can't protec/unmap in the entry hi
+    synth fn protect(va: vaddr, sz: size, flgs: flags);
+    synth fn unmap(va: vaddr, sz: size);
+}
+
+// segment SegmentDescriptorLarge(base: addr) : SegmentDescriptorBase {
+//    #[remap]
+//     fn granularity() -> bool {
+//         state.entry_hi.g == 1
+//     }
+//
+//     fn limit() -> size {
+//         (state.entry_hi.limit1 << 16 + state.entry_lo.limit0) * SEGMENT_GRANULARITY_SIZE
+//     }
+//
+//     synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+//         requires va + sz <= IN_ADDR_MAX
+//         requires pa + sz <= OUT_ADDR_MAX
+//         requires sz < SEGMENT_SIZE_MAX_LARGE
+//         requires (sz & (SEGMENT_GRANULARITY_SIZE - 1)) == 0
+//
+//     // can't protec/unmap in the entry hi
+//     synth fn protect(va: vaddr, sz: size, flgs: flags);
+//
+// }
+
+
