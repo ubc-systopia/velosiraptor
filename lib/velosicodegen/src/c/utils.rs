@@ -826,8 +826,12 @@ fn os_mmio_write_fn_name(field: &VelosiAstInterfaceMmioField) -> String {
     format!("os_mmio_register_write_{}", field.nbits())
 }
 
+fn os_instr_fn_name_str(instr: &str) -> String {
+    format!("os_instruction_{}", instr)
+}
+
 fn os_instr_fn_name(field: &VelosiAstInterfaceInstructionField) -> String {
-    format!("os_instruction_{}", field.ident())
+    os_instr_fn_name_str(field.ident().as_str())
 }
 
 fn os_register_read_fn_name(field: &VelosiAstInterfaceRegisterField) -> String {
@@ -1040,6 +1044,10 @@ pub fn op_to_c_expr(
         }
         VelosiOperation::GlobalBarrier => {
             c.fn_call("__sync_synchronize", Vec::new());
+        }
+        VelosiOperation::Instruction(instr) => {
+            let fname = os_instr_fn_name_str(instr);
+            c.fn_call(&fname, Vec::new());
         }
         VelosiOperation::Return => (),
     }

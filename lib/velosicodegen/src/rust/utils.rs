@@ -286,6 +286,7 @@ pub fn op_to_rust_expr(
             format!("let {field} = self.interface.read_{field}()")
         }
         VelosiOperation::GlobalBarrier => "atomic::fence(Ordering::SeqCst);".to_string(),
+        VelosiOperation::Instruction(_) => todo!(),
         VelosiOperation::Return => String::new(),
     }
 }
