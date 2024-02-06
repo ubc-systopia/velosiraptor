@@ -36,6 +36,7 @@ segment DirectSegment(base : addr) {
     state(base: addr) {
         reg address [ 8 ] {
             0 .. 48 val,
+            48 .. 49 enabled,
         }
     }
 
@@ -46,7 +47,7 @@ segment DirectSegment(base : addr) {
 
     // add the valid bit, we can't unmap here
     fn valid() -> bool {
-        true
+        state.address.enabled == 1
     }
 
     // define the permission flags
