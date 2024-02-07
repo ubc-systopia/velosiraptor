@@ -40,7 +40,6 @@ use std::sync::{
 use std::thread;
 
 use crossbeam::channel::{self, Receiver, Sender, TryRecvError};
-use crossbeam::utils::CachePadded;
 
 // own create imports
 use super::query::{Z3Query, Z3Result, Z3Ticket, Z3TimeStamp};
@@ -66,11 +65,11 @@ pub struct Z3Worker {
     /// the context of the worker
     context: Arc<Mutex<Z3Context>>,
     /// whether the worker is currently running
-    running: Arc<CachePadded<AtomicBool>>,
+    running: Arc<AtomicBool>,
     /// reset
-    reset: Arc<CachePadded<AtomicBool>>,
+    reset: Arc<AtomicBool>,
     /// whether to restart the current atomic bool
-    restart: Arc<CachePadded<AtomicBool>>,
+    restart: Arc<AtomicBool>,
 }
 
 impl Z3Worker {
@@ -91,13 +90,13 @@ impl Z3Worker {
         start_context: Arc<Z3Query>,
     ) -> Self {
         // create the running flag
-        let running = Arc::new(CachePadded::new(AtomicBool::new(true)));
+        let running = Arc::new(AtomicBool::new(true));
         let running_clone = running.clone();
 
-        let reset = Arc::new(CachePadded::new(AtomicBool::new(false)));
+        let reset = Arc::new(AtomicBool::new(false));
         let reset_clone = reset.clone();
 
-        let restart = Arc::new(CachePadded::new(AtomicBool::new(false)));
+        let restart = Arc::new(AtomicBool::new(false));
         let restart_clone = reset.clone();
 
         let context = Arc::new(Mutex::new(Z3Context::None));
@@ -171,17 +170,45 @@ impl Z3Worker {
 
                         // run the query
                         query.timestamp(Z3TimeStamp::Dispatch);
-                        let result = z3.exec(ticket, &mut query);
 
-                        match result {
-                            Ok(mut result) => {
-                                result.set_query(query);
-                                results.send((ticket, result)).unwrap();
+                        let mut query_tok = z3.exec_async(ticket, &mut query)
+                                                .expect("failed to submit query");
+
+                        loop {
+                            // if we need to stop running, simply break out of the loop.
+                            if !running_clone.load(Ordering::Relaxed) {
+                                // println!("stopping running query.");
+                                break;
                             }
-                            Err(x) => {
-                                panic!("handle me: {:?}", x);
+
+                            // if we are running a query and we need to do a reset, then
+                            // we restart the solver
+                            if reset_clone.load(Ordering::Relaxed) {
+                                // println!("reset while running query, restarting solver.");
+                                z3.restart();
+                                break;
                             }
+                            query_tok = match z3.exec_done(query_tok) {
+                                Ok(mut result) => {
+                                    result.set_query(query);
+                                    results.send((ticket, result)).unwrap();
+                                    break;
+                                }
+                                Err(tok) => tok,
+                            };
                         }
+
+                        // let result = z3.exec(ticket, &mut query);
+
+                        // match result {
+                        //     Ok(mut result) => {
+                        //         result.set_query(query);
+                        //         results.send((ticket, result)).unwrap();
+                        //     }
+                        //     Err(x) => {
+                        //         panic!("handle me: {:?}", x);
+                        //     }
+                        // }
                     }
                 }
 
@@ -220,9 +247,11 @@ impl Z3Worker {
     }
 
     /// performs a reset of the z3 worker's Z3 instance
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self, wait: bool) {
         self.do_reset();
-        self.wait_reset_done();
+        if wait {
+            self.wait_reset_done();
+        }
     }
 
     fn do_reset(&mut self) {
@@ -438,7 +467,7 @@ impl Z3WorkerPool {
     fn drain_resultq(&mut self) {
         // log::trace!(target : "[Z3WorkerPool]", "draining result queue");
         // XXX: that one here just makes sure there are no new tasks...
-        for _ in 0..4 {
+        for _ in 0..2 {
             // loop {
             match self.resultq.try_recv() {
                 Ok((_id, mut result)) => {
@@ -455,7 +484,7 @@ impl Z3WorkerPool {
 
                     match self.query_cache.get_mut(query) {
                         Some(Ok(_r)) => {
-                            unreachable!("should not happen!");
+                            // unreachable!("should not happen!");
                         }
                         Some(Err(v)) => {
                             for qid in v {
@@ -463,7 +492,7 @@ impl Z3WorkerPool {
                             }
                         }
                         None => {
-                            unreachable!("should not happen!");
+                            // unreachable!("should not happen!");
                         }
                     }
 
@@ -496,12 +525,12 @@ impl Z3WorkerPool {
         self.results.remove(&id)
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self, wait: bool) {
         log::info!(target : "[Z3WorkerPool]", "performing reset of worker pool");
 
         self.drain_taskq();
         for worker in self.workers.iter_mut() {
-            worker.reset();
+            worker.reset(wait);
         }
 
         self.drain_resultq();
@@ -509,7 +538,7 @@ impl Z3WorkerPool {
         self.query_cache.clear();
     }
 
-    pub fn reset_with_context(&mut self, ctx: Z3Query) {
+    pub fn reset_with_context(&mut self, ctx: Z3Query, wait: bool) {
         log::info!(target : "[Z3WorkerPool]", "performing reset of worker pool with context");
 
         let query = Arc::new(ctx);
@@ -519,9 +548,12 @@ impl Z3WorkerPool {
             worker.reset_with_context(query.clone());
         }
 
-        for worker in self.workers.iter_mut() {
-            worker.wait_reset_done();
+        if wait {
+            for worker in self.workers.iter_mut() {
+                worker.wait_reset_done();
+            }
         }
+
         self.drain_resultq();
         self.results.clear();
         self.query_cache.clear();
@@ -533,6 +565,20 @@ impl Z3WorkerPool {
         self.drain_taskq();
         for worker in self.workers.iter_mut() {
             worker.terminate();
+        }
+        self.drain_resultq();
+        self.results.clear();
+        self.query_cache.clear();
+
+        log::info!(target : "[Z3WorkerPool]", "terminated.");
+    }
+
+    pub fn restart(&mut self) {
+        log::info!(target : "[Z3WorkerPool]", "Restarting worker pool...");
+
+        self.drain_taskq();
+        for worker in self.workers.iter_mut() {
+            worker.restart();
         }
         self.drain_resultq();
         self.results.clear();
