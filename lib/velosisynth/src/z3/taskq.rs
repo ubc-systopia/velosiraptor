@@ -37,7 +37,7 @@ type QueryQueue = ArrayQueue<(Z3Ticket, Box<Z3Query>)>;
 
 const TASKQ_CAPACITY: usize = 1024;
 
-const TASK_PRIO_MAX: usize = 8;
+const TASK_PRIO_MAX: usize = 4;
 
 #[derive(Clone, Copy)]
 pub struct Z3TaskPriority(usize);
