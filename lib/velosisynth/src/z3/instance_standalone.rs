@@ -24,10 +24,13 @@
 // SOFTWARE.
 
 use std::fs::File;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
+use std::os::fd::AsRawFd;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::time::Instant;
+
+// use nonblock::NonBlockingReader;
 
 use super::query::{Z3Query, Z3Result, Z3Ticket, Z3TimeStamp};
 use super::Z3Error;
@@ -39,10 +42,49 @@ const CONFIG_RESET_IS_RESTART: bool = false;
 // Z3 Instance
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// https://stackoverflow.com/questions/34611742/how-do-i-read-the-output-of-a-child-process-without-blocking-in-rust
+
+use libc::{fcntl, F_GETFL, F_SETFL, O_NONBLOCK};
+
+fn set_nonblocking<H>(handle: &H, nonblocking: bool) -> std::io::Result<()>
+where
+    H: Read + AsRawFd,
+{
+    let fd = handle.as_raw_fd();
+    let flags = unsafe { fcntl(fd, F_GETFL, 0) };
+    if flags < 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    let flags = if nonblocking {
+        flags | O_NONBLOCK
+    } else {
+        flags & !O_NONBLOCK
+    };
+    let res = unsafe { fcntl(fd, F_SETFL, flags) };
+    if res != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    Ok(())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Z3 Instance
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct Z3Async<'a> {
+    t_start: Instant,
+    t_prepare: Instant,
+    ticket: Z3Ticket,
+    query: &'a mut Z3Query,
+    result: String,
+}
+
 /// represents a Z3 instance that that runs queries
 pub struct Z3Instance {
     /// the identifier of this instance
     id: usize,
+    /// whether we're currently executing a query
+    is_executing: bool,
     /// the z3 process instance
     z3_proc: Child,
     /// the path to where the logfiles are stored
@@ -58,6 +100,7 @@ impl Z3Instance {
 
         Z3Instance {
             id,
+            is_executing: false,
             z3_proc: Self::spawn_z3(),
             logfile: None,
             stats: Z3InstanceStats::new(),
@@ -83,6 +126,7 @@ impl Z3Instance {
 
         Z3Instance {
             id,
+            is_executing: false,
             z3_proc: Self::spawn_z3(),
             logfile,
             stats: Z3InstanceStats::new(),
@@ -91,13 +135,20 @@ impl Z3Instance {
 
     /// spawns a new z3 process
     fn spawn_z3() -> Child {
-        Command::new("z3")
+        let mut proc = Command::new("z3")
             .arg("-in")
             .arg("-smt2")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()
-            .expect("Failed to spawn z3 process, is z3 installed?")
+            .expect("Failed to spawn z3 process, is z3 installed?");
+
+        if let Some(z3_stdout) = proc.stdout.as_mut() {
+            // create a buffer reader for the z3_stdout
+            set_nonblocking(z3_stdout, true).expect("huh");
+        }
+
+        proc
     }
 
     /// terminates the z3 instance
@@ -114,6 +165,7 @@ impl Z3Instance {
     pub fn restart(&mut self) {
         self.stats.reset();
         self.terminate();
+        self.is_executing = false;
         self.z3_proc = Self::spawn_z3();
     }
 
@@ -134,9 +186,18 @@ impl Z3Instance {
         }
     }
 
-    ///executes the query
-    pub fn exec(&mut self, ticket: Z3Ticket, query: &mut Z3Query) -> Result<Z3Result, Z3Error> {
+    pub fn exec_async<'a>(
+        &mut self,
+        ticket: Z3Ticket,
+        query: &'a mut Z3Query,
+    ) -> Result<Z3Async<'a>, Z3Error> {
         log::debug!(target : "[Z3Instance]", "{} executing query", self.id);
+
+        if self.is_executing {
+            return Err(Z3Error::WorkerBusy);
+        }
+
+        self.is_executing = true;
 
         let t_start = Instant::now();
 
@@ -173,31 +234,50 @@ impl Z3Instance {
                         .expect("writing the smt query failed.");
                 }
             }
+            let t_prepare = Instant::now();
+            Ok(Z3Async {
+                t_start,
+                t_prepare,
+                ticket,
+                query,
+                result: String::with_capacity(256),
+            })
         } else {
-            return Err(Z3Error::QueryExecution);
+            Err(Z3Error::QueryExecution)
         }
+    }
 
-        let t_prepare = Instant::now();
+    pub fn exec_done<'a>(&mut self, asynctok: Z3Async<'a>) -> Result<Z3Result, Z3Async<'a>> {
+        let Z3Async {
+            t_start,
+            t_prepare,
+            ticket,
+            query,
+            mut result,
+        } = asynctok;
 
         // read back the results from stdout
         log::trace!(target : "[Z3Instance]", "{} obtaining query results", self.id);
 
         let result = if let Some(z3_stdout) = self.z3_proc.stdout.as_mut() {
-            // create a buffer reader for the z3_stdout
             let mut z3_buf_reader = BufReader::new(z3_stdout);
-            // store the result here
-            let mut result = String::with_capacity(1024);
-
-            // loop over the result
             loop {
                 let mut line = String::with_capacity(256);
-                z3_buf_reader.read_line(&mut line).unwrap();
-
-                // if it's our magic string, then we're done
-                if line.as_str() == "!remove\n" {
-                    break;
+                if let Ok(_sz) = z3_buf_reader.read_line(&mut line) {
+                    // if it's our magic string, then we're done
+                    if line.as_str() == "!remove\n" {
+                        break;
+                    }
+                    result.push_str(&line);
+                } else {
+                    return Err(Z3Async {
+                        t_start,
+                        t_prepare,
+                        ticket,
+                        query,
+                        result,
+                    });
                 }
-                result.push_str(&line);
             }
             result
         } else {
@@ -211,8 +291,23 @@ impl Z3Instance {
 
         self.stats.add(ticket.0, t_prepare, t_query);
 
+        self.is_executing = false;
+
         log::trace!(target : "[Z3Instance]", "{} query result is '{}'", self.id, result);
         Ok(Z3Result::new(result))
+    }
+
+    ///executes the query
+    pub fn exec(&mut self, ticket: Z3Ticket, query: &mut Z3Query) -> Result<Z3Result, Z3Error> {
+        match self.exec_async(ticket, query) {
+            Ok(mut tok) => loop {
+                tok = match self.exec_done(tok) {
+                    Ok(res) => return Ok(res),
+                    Err(tok) => tok,
+                };
+            },
+            Err(e) => Err(e),
+        }
     }
 
     ///executes the query
@@ -261,13 +356,13 @@ impl Z3Instance {
             // loop over the result
             loop {
                 let mut line = String::with_capacity(256);
-                z3_buf_reader.read_line(&mut line).unwrap();
-
-                // if it's our magic string, then we're done
-                if line.as_str() == "!remove\n" {
-                    break;
+                if let Ok(_sz) = z3_buf_reader.read_line(&mut line) {
+                    // if it's our magic string, then we're done
+                    if line.as_str() == "!remove\n" {
+                        break;
+                    }
+                    result.push_str(&line);
                 }
-                result.push_str(&line);
             }
             result
         } else {
