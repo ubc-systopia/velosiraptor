@@ -112,7 +112,7 @@ impl Display for SynthResult {
 }
 
 pub struct Z3SynthSegment<'a> {
-    z3: Z3WorkerPool,
+    z3: &'a mut Z3WorkerPool,
     // unit: Option<Rc<VelosiAstUnitSegment>>,
     unit: &'a mut VelosiAstUnitSegment,
     map_queries: MapPrograms,
@@ -138,8 +138,8 @@ pub struct Z3SynthSegment<'a> {
 
 impl<'a> Z3SynthSegment<'a> {
     /// creates a new synthesis handle with the given worker poopl and the unit
-    pub(crate) fn new(
-        mut z3: Z3WorkerPool,
+    pub fn new(
+        z3: &'a mut Z3WorkerPool,
         unit: &'a mut VelosiAstUnitSegment,
         model: Arc<Smt2Context>,
     ) -> Self {
@@ -150,7 +150,7 @@ impl<'a> Z3SynthSegment<'a> {
         let unmap_queries = UnmapPrograms::new(unit, batch_size, None);
         let protect_queries = ProtectPrograms::new(unit, batch_size, None);
 
-        z3.reset_with_context(Z3Query::with_model_contexts(vec![model]));
+        z3.reset_with_context(Z3Query::with_model_contexts(vec![model]), true);
 
         Self {
             z3,
@@ -185,14 +185,14 @@ impl<'a> Z3SynthSegment<'a> {
         let _issues = VelosiSynthIssues::new();
 
         // first make sure the methods themselves are sane
-        let issues = sanitycheck::check_methods(&mut self.z3, self.unit);
+        let issues = sanitycheck::check_methods(self.z3, self.unit);
         if !issues.is_ok() {
             self.t_sanity_check = Instant::now() - t_start;
             return synth_result_return!((), issues);
         }
 
         // now make sure the unit is sane
-        let issues = sanitycheck::check_unit(&mut self.z3, self.unit);
+        let issues = sanitycheck::check_unit(self.z3, self.unit);
         self.t_sanity_check = Instant::now() - t_start;
 
         synth_result_return!((), issues)
@@ -266,7 +266,7 @@ impl<'a> Z3SynthSegment<'a> {
         let mut all_done = true;
 
         if self.map_program.is_none() {
-            match self.map_queries.next(&mut self.z3) {
+            match self.map_queries.next(self.z3) {
                 MaybeResult::Some(mp) => {
                     all_done &= true;
                     self.map_program = Some(mp);
@@ -283,7 +283,7 @@ impl<'a> Z3SynthSegment<'a> {
         }
 
         if self.unmap_program.is_none() {
-            match self.unmap_queries.next(&mut self.z3) {
+            match self.unmap_queries.next(self.z3) {
                 MaybeResult::Some(mp) => {
                     all_done &= true;
                     self.unmap_program = Some(mp);
@@ -300,7 +300,7 @@ impl<'a> Z3SynthSegment<'a> {
         }
 
         if self.protect_program.is_none() {
-            match self.protect_queries.next(&mut self.z3) {
+            match self.protect_queries.next(self.z3) {
                 MaybeResult::Some(mp) => {
                     all_done &= true;
                     self.protect_program = Some(mp);
@@ -331,7 +331,7 @@ impl<'a> Z3SynthSegment<'a> {
 
             // generate the new z3 model, taking into account the memory model
             let ctx = model::create(self.unit, true);
-            self.z3.reset_with_context(Z3Query::from(ctx));
+            self.z3.reset_with_context(Z3Query::from(ctx), false);
 
             let unit = &self.unit;
             let batch_size = std::cmp::max(DEFAULT_BATCH_SIZE, self.z3.num_workers());
@@ -355,7 +355,7 @@ impl<'a> Z3SynthSegment<'a> {
         self.done = true;
 
         let mut p = MapPrograms::new(self.unit, batch_size, None);
-        p.synthesize(&mut self.z3, self.unit, batch_size, mem_model)
+        p.synthesize(self.z3, self.unit, batch_size, mem_model)
     }
 
     pub fn synthesize_unmap(&mut self, batch_size: usize, mem_model: bool) -> Option<Program> {
@@ -365,7 +365,7 @@ impl<'a> Z3SynthSegment<'a> {
             batch_size,
             self.unmap_program.take().map(Rc::new),
         );
-        p.synthesize(&mut self.z3, self.unit, batch_size, mem_model)
+        p.synthesize(self.z3, self.unit, batch_size, mem_model)
     }
 
     pub fn synthesize_protect(&mut self, batch_size: usize, mem_model: bool) -> Option<Program> {
@@ -376,7 +376,7 @@ impl<'a> Z3SynthSegment<'a> {
             self.protect_program.take().map(Rc::new),
         );
 
-        p.synthesize(&mut self.z3, self.unit, batch_size, mem_model)
+        p.synthesize(self.z3, self.unit, batch_size, mem_model)
     }
 
     /// terminates the worker pool
@@ -416,12 +416,12 @@ impl<'a> Display for Z3SynthSegment<'a> {
 }
 
 pub struct Z3SynthEnum<'a> {
-    z3: Z3WorkerPool,
+    z3: &'a mut Z3WorkerPool,
     unit: &'a mut VelosiAstUnitEnum,
 }
 
 impl<'a> Z3SynthEnum<'a> {
-    pub fn new(z3: Z3WorkerPool, unit: &'a mut VelosiAstUnitEnum) -> Self {
+    pub fn new(z3: &'a mut Z3WorkerPool, unit: &'a mut VelosiAstUnitEnum) -> Self {
         Self { z3, unit }
     }
 
@@ -429,14 +429,17 @@ impl<'a> Z3SynthEnum<'a> {
         &mut self,
         models: &HashMap<Rc<String>, Arc<Smt2Context>>,
     ) -> Result<(), VelosiSynthIssues> {
-        self.z3.reset_with_context(Z3Query::with_model_contexts(
-            models
-                .iter()
-                .filter(|(ident, _)| self.unit.get_next_unit_idents().contains(ident))
-                .map(|(_, ctx)| ctx.clone())
-                .collect(),
-        ));
-        enums::distinguish(&mut self.z3, self.unit)
+        self.z3.reset_with_context(
+            Z3Query::with_model_contexts(
+                models
+                    .iter()
+                    .filter(|(ident, _)| self.unit.get_next_unit_idents().contains(ident))
+                    .map(|(_, ctx)| ctx.clone())
+                    .collect(),
+            ),
+            true,
+        );
+        enums::distinguish(self.z3, self.unit)
     }
 
     pub fn worker_pool_stats(&self) -> &Z3WorkerPoolStats {
@@ -496,18 +499,10 @@ impl Z3SynthFactory {
         self
     }
 
-    pub fn create_segment<'a>(
-        &self,
-        unit: &'a mut VelosiAstUnitSegment,
-        model: Arc<Smt2Context>,
-    ) -> Z3SynthSegment<'a> {
-        if unit.is_abstract {
-            panic!("Cannot synthesize abstract units");
-        }
-
+    pub fn create_pool(&self) -> Z3WorkerPool {
         let logpath = if let Some(logdir) = &self.logdir {
             if self.logging {
-                Some(Arc::new(logdir.join(unit.ident().as_str())))
+                Some(logdir.clone())
             } else {
                 None
             }
@@ -515,23 +510,7 @@ impl Z3SynthFactory {
             None
         };
 
-        let z3 = Z3WorkerPool::with_num_workers(self.num_workers, logpath);
-        Z3SynthSegment::new(z3, unit, model)
-    }
-
-    pub fn create_enum<'a>(&self, unit: &'a mut VelosiAstUnitEnum) -> Z3SynthEnum<'a> {
-        let logpath = if let Some(logdir) = &self.logdir {
-            if self.logging {
-                Some(Arc::new(logdir.join(unit.ident().as_str())))
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let z3 = Z3WorkerPool::with_num_workers(self.num_workers, logpath);
-        Z3SynthEnum::new(z3, unit)
+        Z3WorkerPool::with_num_workers(self.num_workers, logpath)
     }
 }
 

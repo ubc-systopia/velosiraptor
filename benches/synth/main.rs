@@ -5,9 +5,9 @@ use std::time::Instant;
 use velosiast::{
     AstResult, VelosiAst, VelosiAstField, VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment,
 };
-use velosisynth::Z3SynthFactory;
+use velosisynth::{Z3SynthEnum, Z3SynthSegment, Z3WorkerPool};
 
-const SPECS: [&str; 6] = [
+const SPECS: [&str; 7] = [
     "examples/x86_32_pagetable.vrs",
     "examples/x86_64_pagetable.vrs",
     "examples/xeon_phi_smpt.vrs",
@@ -17,6 +17,7 @@ const SPECS: [&str; 6] = [
     "examples/r4700_fixed_page_size.vrs",
 ];
 
+const NUM_WORKERS: usize = 13;
 const ITERATIONS: usize = 10;
 
 struct Stats {
@@ -71,6 +72,7 @@ struct BenchResults {
     pub t_model: Vec<u128>,
     pub t_check: Vec<u128>,
     pub t_synth: Vec<u128>,
+    pub t_finalize: Vec<u128>,
     pub t_total: Vec<u128>,
     pub num_segments: usize,
     pub num_staticmaps: usize,
@@ -89,6 +91,7 @@ impl BenchResults {
             t_check: Vec::new(),
             t_synth: Vec::new(),
             t_total: Vec::new(),
+            t_finalize: Vec::new(),
             num_segments: 0,
             num_staticmaps: 0,
             num_enums: 0,
@@ -105,6 +108,7 @@ impl BenchResults {
         self.t_check.extend(other.t_check.iter());
         self.t_synth.extend(other.t_synth.iter());
         self.t_total.extend(other.t_total.iter());
+        self.t_finalize.extend(other.t_finalize.iter());
         if self.num_segments == 0 {
             self.num_segments = other.num_segments;
         } else {
@@ -143,15 +147,18 @@ impl std::fmt::Display for BenchResults {
         let tt = Stats::from(self.t_total.as_slice());
         let tc = Stats::from(self.t_check.as_slice());
         let ts = Stats::from(self.t_synth.as_slice());
+        let tp = Stats::from(self.t_parse.as_slice());
 
-        write!(f, "{:<30} {:2}+{:2}  {:4}    {:10}ms (+/- {:4})  synth: {:10}ms (+/- {:4})  check:  {:10}ms (+/- {:4})",
-            self.tag, self.num_fields, self.num_slices, ts.num, tt.avg, tt.std, ts.avg, ts.std, tc.avg, tc.std)?;
+        write!(f, "{:<30} {:2}+{:2}+{:2}  {:4}    {:10}ms (+/- {:4})  synth: {:10}ms (+/- {:4})  check:  {:4}ms (+/- {:2})  parse:  {:4}ms (+/- {:2})",
+            self.tag, self.num_units, self.num_fields, self.num_slices, ts.num, tt.avg, tt.std, ts.avg, ts.std, tc.avg, tc.std,
+            tp.avg, tp.std
+        )?;
 
         Ok(())
     }
 }
 
-fn run_synthesis(vrs_file: &str) -> Option<BenchResults> {
+fn run_synthesis(z3_workers: &mut Z3WorkerPool, vrs_file: &str) -> Option<BenchResults> {
     let mut results = BenchResults::new(vrs_file.to_string());
 
     // start of the benchmark
@@ -176,10 +183,6 @@ fn run_synthesis(vrs_file: &str) -> Option<BenchResults> {
     let t_1 = Instant::now();
     results.t_model.push(t_1.duration_since(t_0).as_millis());
 
-    // create synth factory and run synthesis on the segments
-    let mut synthfactory = Z3SynthFactory::new();
-    synthfactory.default_log_dir();
-
     let mut num_segments = 0;
     let mut num_staticmaps = 0;
     let mut num_enums = 0;
@@ -187,6 +190,7 @@ fn run_synthesis(vrs_file: &str) -> Option<BenchResults> {
     let mut total_slices = 0;
     let mut t_sanity_check = 0;
     let mut t_synth = 0;
+    let mut t_finalize = 0;
 
     for unit in ast.units_mut() {
         if unit.is_abstract() {
@@ -211,9 +215,10 @@ fn run_synthesis(vrs_file: &str) -> Option<BenchResults> {
                 let seg: &mut VelosiAstUnitSegment =
                     Rc::get_mut(u).expect("could not get mut ref!");
 
-                // create the synthesizer from the factory
-                let mut synth = synthfactory.create_segment(seg, models[seg.ident()].clone());
+                // z3_workers.reset();
 
+                // create the synthesizer from the factory
+                let mut synth = Z3SynthSegment::new(z3_workers, seg, models[seg.ident()].clone());
                 // run sanity check
                 let sanity_check = synth.sanity_check();
                 if let Err(_e) = sanity_check {
@@ -227,10 +232,20 @@ fn run_synthesis(vrs_file: &str) -> Option<BenchResults> {
                 synth.synthesize(false);
                 let t_1 = Instant::now();
                 t_synth += t_1.duration_since(t_0).as_millis();
-                if let Err(_e) = synth.finalize() {
-                    println!("   - ERROR: Synthesis failed {}", seg.ident());
-                    return None;
+                let t_0 = t_1;
+
+                match synth.finalize() {
+                    Ok(_r) => {
+                        // println!("{}{r}", seg.ident());
+                    }
+                    Err(_e) => {
+                        println!("   - ERROR: Synthesis failed {}", seg.ident());
+                        return None;
+                    }
                 }
+
+                let t_1 = Instant::now();
+                t_finalize += t_1.duration_since(t_0).as_millis();
             }
             VelosiAstUnit::StaticMap(_s) => {
                 num_staticmaps += 1;
@@ -241,8 +256,9 @@ fn run_synthesis(vrs_file: &str) -> Option<BenchResults> {
                 let e: &mut VelosiAstUnitEnum = Rc::get_mut(e).expect("could not get mut ref!");
 
                 let t_0 = Instant::now();
+
                 // create the synthesizer from the factory
-                let mut synth = synthfactory.create_enum(e);
+                let mut synth = Z3SynthEnum::new(z3_workers, e);
 
                 if synth.distinguish(&models).is_err() {
                     println!(
@@ -259,11 +275,11 @@ fn run_synthesis(vrs_file: &str) -> Option<BenchResults> {
         }
     }
 
+    let t_total = Instant::now().duration_since(t_start).as_millis();
     results.t_synth.push(t_synth);
     results.t_check.push(t_sanity_check);
-    results
-        .t_total
-        .push(Instant::now().duration_since(t_start).as_millis());
+    results.t_total.push(t_total);
+    results.t_finalize.push(t_finalize);
     results.num_enums = num_enums;
     results.num_staticmaps = num_staticmaps;
     results.num_segments = num_segments;
@@ -290,12 +306,16 @@ fn main() {
         let mut results = BenchResults::new(vrs_file.clone());
         let mut had_errors = false;
         for _ in 0..ITERATIONS {
-            if let Some(res) = run_synthesis(vrs_file.as_str()) {
+            // create synth factory and run synthesis on the segments
+            let mut z3_workers = Z3WorkerPool::with_num_workers(NUM_WORKERS, None);
+            if let Some(res) = run_synthesis(&mut z3_workers, vrs_file.as_str()) {
                 results.merge(&res);
             } else {
                 had_errors = true;
                 break;
             }
+
+            z3_workers.terminate();
         }
 
         if had_errors {
@@ -304,4 +324,6 @@ fn main() {
 
         println!("{results}");
     }
+
+    println!("# Completed");
 }

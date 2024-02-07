@@ -38,7 +38,7 @@ use std::process::exit;
 // get the parser module
 use velosiast::{AstResult, VelosiAst, VelosiAstUnit};
 use velosicodegen::VelosiCodeGen;
-use velosisynth::{create_models, Z3SynthFactory};
+use velosisynth::{create_models, Z3SynthEnum, Z3SynthFactory, Z3SynthSegment};
 
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
@@ -348,7 +348,10 @@ fn main() {
                 }
 
                 let seg = seg.unwrap();
-                let mut synth = synthfactory.create_segment(seg, models[seg.ident()].clone());
+                let mut z3_workers = synthfactory.create_pool();
+
+                let mut synth =
+                    Z3SynthSegment::new(&mut z3_workers, seg, models[seg.ident()].clone());
 
                 if let Err(_e) = synth.sanity_check() {
                     eprintln!(
@@ -389,7 +392,9 @@ fn main() {
                 }
                 let e = e.unwrap();
 
-                let mut synth = synthfactory.create_enum(e);
+                let mut z3_workers = synthfactory.create_pool();
+
+                let mut synth = Z3SynthEnum::new(&mut z3_workers, e);
                 match synth.distinguish(&models) {
                     Ok(()) => {
                         log::info!(target: "main", "the variants of {} are distinguishable", e.ident())
@@ -433,7 +438,7 @@ fn main() {
     //             s.bold()
     //         );
     //         abort(infile, issues);
-    //         return;
+    //         return;Z3SynthSegment;
     //     }
     // };
 

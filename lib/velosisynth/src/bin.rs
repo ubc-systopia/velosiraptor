@@ -37,7 +37,7 @@ use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, LevelPadding, TermLogge
 
 use velosiast::{AstResult, VelosiAst, VelosiAstUnit};
 use velosisynth::create_models;
-use velosisynth::Z3SynthFactory;
+use velosisynth::{Z3SynthEnum, Z3SynthFactory, Z3SynthSegment};
 
 const BATCH_SIZE: usize = 8;
 
@@ -130,6 +130,8 @@ pub fn main() {
     let models = create_models(&ast);
     let t_model_end = Instant::now();
 
+    let mut z3 = synthfactory.create_pool();
+
     let mut t_synth = Vec::new();
     for unit in ast.units_mut() {
         use std::rc::Rc;
@@ -139,6 +141,8 @@ pub fn main() {
                 continue;
             }
         }
+
+        z3.reset(true);
 
         match unit {
             VelosiAstUnit::Segment(u) => {
@@ -160,7 +164,7 @@ pub fn main() {
 
                 t_synth_segment.push(("start", Instant::now()));
 
-                let mut synth = synthfactory.create_segment(seg, models[seg.ident()].clone());
+                let mut synth = Z3SynthSegment::new(&mut z3, seg, models[seg.ident()].clone());
 
                 t_synth_segment.push(("init", Instant::now()));
 
@@ -265,7 +269,7 @@ pub fn main() {
 
                 t_synth_enum.push(("start", Instant::now()));
 
-                let mut synth = synthfactory.create_enum(e);
+                let mut synth = Z3SynthEnum::new(&mut z3, e);
 
                 t_synth_enum.push(("init", Instant::now()));
 
