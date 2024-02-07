@@ -55,4 +55,5 @@ pub use worker::{Z3Worker, Z3WorkerPool, Z3WorkerPoolStats};
 pub enum Z3Error {
     #[cfg(feature = "z3-standalone")]
     QueryExecution,
+    WorkerBusy,
 }
