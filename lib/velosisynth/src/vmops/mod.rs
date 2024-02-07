@@ -74,13 +74,13 @@ pub trait SynchronousSync<T: ProgramBuilder = Self>: ProgramBuilder {
         mem_model: bool,
     ) -> Option<Program> {
         let ctx = model::create(unit, false);
-        z3.reset_with_context(Z3Query::from(ctx));
+        z3.reset_with_context(Z3Query::from(ctx), false);
 
         // let mut programs = MapPrograms::new(unit, batch_size, None);
         if let Some(prog) = self.do_synthesize(z3) {
             if mem_model {
                 let ctx = model::create(unit, false);
-                z3.reset_with_context(Z3Query::from(ctx));
+                z3.reset_with_context(Z3Query::from(ctx), false);
 
                 let mut programs = MapPrograms::new(unit, batch_size, Some(Rc::new(prog)));
                 programs.do_synthesize(z3)

@@ -40,8 +40,7 @@ use velosiast::{AstResult, VelosiAst, VelosiAstUnit};
 use velosicodegen::VelosiCodeGen;
 use velosicomposition::Relations;
 use velosiparser::{VelosiParser, VelosiParserError};
-use velosisynth::create_models;
-use velosisynth::Z3SynthFactory;
+use velosisynth::{create_models, Z3SynthEnum, Z3SynthFactory, Z3SynthSegment};
 
 fn get_ast(vrs: &str) -> VelosiAst {
     match VelosiAst::from_file(vrs) {
@@ -233,7 +232,9 @@ fn examples_sanitycheck() {
 
                     let seg = Rc::get_mut(u).expect("could not get mut ref!");
 
-                    let mut synth = synthfactory.create_segment(seg, models[seg.ident()].clone());
+                    let mut z3_workers = synthfactory.create_pool();
+                    let mut synth =
+                        Z3SynthSegment::new(&mut z3_workers, seg, models[seg.ident()].clone());
 
                     let t_start = Instant::now();
                     let sanity_check = synth.sanity_check();
@@ -311,7 +312,8 @@ fn examples_distinguish() {
 
                     let e = Rc::get_mut(e).expect("could not get mut ref!");
 
-                    let mut synth = synthfactory.create_enum(e);
+                    let mut z3_workers = synthfactory.create_pool();
+                    let mut synth = Z3SynthEnum::new(&mut z3_workers, e);
 
                     let t_start = Instant::now();
                     let dist = synth.distinguish(&models);
@@ -409,7 +411,9 @@ fn examples_synth_quick() {
                         Rc::get_mut(unit).expect("Could not get mutable reference to segment!");
 
                     let t_0 = Instant::now();
-                    let mut synth = synthfactory.create_segment(seg, models[seg.ident()].clone());
+                    let mut z3_workers = synthfactory.create_pool();
+                    let mut synth =
+                        Z3SynthSegment::new(&mut z3_workers, seg, models[seg.ident()].clone());
                     let t_init_ms = Instant::now().duration_since(t_0).as_millis();
 
                     let t_start = Instant::now();
@@ -500,7 +504,10 @@ fn examples_synth_all() {
                         Rc::get_mut(unit).expect("Could not get mutable reference to segment!");
 
                     let t_0 = Instant::now();
-                    let mut synth = synthfactory.create_segment(seg, models[seg.ident()].clone());
+                    let mut z3_workers = synthfactory.create_pool();
+                    let mut synth =
+                        Z3SynthSegment::new(&mut z3_workers, seg, models[seg.ident()].clone());
+
                     let t_init_ms = Instant::now().duration_since(t_0).as_millis();
 
                     let t_start = Instant::now();
