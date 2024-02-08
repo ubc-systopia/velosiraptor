@@ -327,6 +327,8 @@ pub struct Z3WorkerPool {
     stats: Z3WorkerPoolStats,
     /// a query cache for avoiding running the same query twice
     query_cache: HashMap<Z3Query, Result<Z3Result, Vec<Z3Ticket>>>,
+    /// whether or not the query cache is disabled
+    opt_query_cache_disabled: bool,
     /// tasks that haven't been dispatched to the client
     taskq: TaskQ,
     /// the result queue
@@ -416,8 +418,13 @@ impl Z3WorkerPool {
             taskq,
             results,
             query_cache,
+            opt_query_cache_disabled: false,
             stats: Z3WorkerPoolStats::new(),
         }
+    }
+
+    pub fn disable_query_cache(&mut self, opt: bool) {
+        self.opt_query_cache_disabled = opt;
     }
 
     pub fn submit_query(
@@ -433,25 +440,29 @@ impl Z3WorkerPool {
         self.next_query_id += 1;
         let id = Z3Ticket(self.next_query_id);
 
-        // see if we can the cached result
-        match self.query_cache.get_mut(&task) {
-            Some(Ok(r)) => {
-                // we've already computed this query and it's results are ready
-                log::debug!(target : "[Z3WorkerPool]", "not sending task, cached result for {}", id);
-                self.stats.add_cached(&task);
-                self.results.insert(id, r.clone_with_query(task));
-            }
-            Some(Err(v)) => {
-                // we've submited but it's pending, push it back and continue
-                log::trace!(target : "[Z3WorkerPool]", "not sending task, pending result for {}", id);
-                v.push(id);
-            }
-            None => {
-                log::trace!(target : "[Z3WorkerPool]", " sending task for {}", id);
-                // we haven't seen this query before, add it to the cache
-                self.query_cache
-                    .insert(task.clone_without_timestamps(), Err(vec![id]));
-                self.taskq.push(priority, id, task);
+        if self.opt_query_cache_disabled {
+            self.taskq.push(priority, id, task);
+        } else {
+            // see if we can the cached result
+            match self.query_cache.get_mut(&task) {
+                Some(Ok(r)) => {
+                    // we've already computed this query and it's results are ready
+                    log::debug!(target : "[Z3WorkerPool]", "not sending task, cached result for {}", id);
+                    self.stats.add_cached(&task);
+                    self.results.insert(id, r.clone_with_query(task));
+                }
+                Some(Err(v)) => {
+                    // we've submited but it's pending, push it back and continue
+                    log::trace!(target : "[Z3WorkerPool]", "not sending task, pending result for {}", id);
+                    v.push(id);
+                }
+                None => {
+                    log::trace!(target : "[Z3WorkerPool]", " sending task for {}", id);
+                    // we haven't seen this query before, add it to the cache
+                    self.query_cache
+                        .insert(task.clone_without_timestamps(), Err(vec![id]));
+                    self.taskq.push(priority, id, task);
+                }
             }
         }
 
@@ -470,7 +481,7 @@ impl Z3WorkerPool {
         for _ in 0..2 {
             // loop {
             match self.resultq.try_recv() {
-                Ok((_id, mut result)) => {
+                Ok((id, mut result)) => {
                     // nothing
                     {
                         let query = result.query_mut();
@@ -482,24 +493,28 @@ impl Z3WorkerPool {
                     // TODO: update stats!
                     self.stats.add_query(query);
 
-                    match self.query_cache.get_mut(query) {
-                        Some(Ok(_r)) => {
-                            // unreachable!("should not happen!");
-                        }
-                        Some(Err(v)) => {
-                            for qid in v {
-                                self.results.insert(*qid, result.clone());
+                    if self.opt_query_cache_disabled {
+                        self.results.insert(id, result);
+                    } else {
+                        match self.query_cache.get_mut(query) {
+                            Some(Ok(_r)) => {
+                                // unreachable!("should not happen!");
+                            }
+                            Some(Err(v)) => {
+                                for qid in v {
+                                    self.results.insert(*qid, result.clone());
+                                }
+                            }
+                            None => {
+                                // unreachable!("should not happen!");
                             }
                         }
-                        None => {
-                            // unreachable!("should not happen!");
-                        }
-                    }
 
-                    self.query_cache.insert(
-                        query.clone_without_timestamps(),
-                        Ok(Z3Result::new(smtresult)),
-                    );
+                        self.query_cache.insert(
+                            query.clone_without_timestamps(),
+                            Ok(Z3Result::new(smtresult)),
+                        );
+                    }
                 }
                 Err(TryRecvError::Empty) => {
                     break;
