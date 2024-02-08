@@ -149,7 +149,7 @@ impl std::fmt::Display for BenchResults {
         let ts = Stats::from(self.t_synth.as_slice());
         let tp = Stats::from(self.t_parse.as_slice());
 
-        write!(f, "{:<30} {:2}+{:2}+{:2}  {:4}    {:10}ms (+/- {:4})  synth: {:10}ms (+/- {:4})  check:  {:4}ms (+/- {:2})  parse:  {:4}ms (+/- {:2})",
+        write!(f, "{:<30} {:2}U+{:2}F+{:2}S  {:4}    {:10}ms (+/- {:4})  synth: {:10}ms (+/- {:4})  check:  {:4}ms (+/- {:2})  parse:  {:4}ms (+/- {:2})",
             self.tag, self.num_units, self.num_fields, self.num_slices, ts.num, tt.avg, tt.std, ts.avg, ts.std, tc.avg, tc.std,
             tp.avg, tp.std
         )?;
