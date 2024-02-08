@@ -226,6 +226,21 @@ impl VelosiAstInterface {
         hs
     }
 
+    pub fn field_idents(&self) -> HashSet<Rc<String>> {
+        self.fields
+            .iter()
+            .map(|f| f.path().clone())
+            .collect::<HashSet<Rc<String>>>()
+    }
+
+    pub fn bit_slice_idents(&self) -> HashSet<Rc<String>> {
+        self.fields
+            .iter()
+            .map(|f| f.layout().iter().map(|f| f.path().clone()))
+            .flatten()
+            .collect()
+    }
+
     pub fn compare(&self, other: &Self) -> bool {
         if self.params.len() != other.params.len() {
             return false;

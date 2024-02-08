@@ -41,7 +41,7 @@ pub use staticmap::VelosiAstUnitStaticMap;
 
 // used standard library functionality
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
@@ -315,6 +315,46 @@ impl VelosiAstUnit {
             Segment(segment) => Some(segment.state.clone()),
             Enum(_) => None,
             OSSpec(_) => None,
+        }
+    }
+
+    pub fn state_field_idents(&self) -> HashSet<Rc<String>> {
+        use VelosiAstUnit::*;
+        match self {
+            Segment(s) => s.state_field_idents(),
+            StaticMap(_s) => HashSet::new(),
+            Enum(_s) => HashSet::new(),
+            OSSpec(_e) => HashSet::new(),
+        }
+    }
+
+    pub fn state_bit_slice_idents(&self) -> HashSet<Rc<String>> {
+        use VelosiAstUnit::*;
+        match self {
+            Segment(s) => s.state_bit_slice_idents(),
+            StaticMap(_s) => HashSet::new(),
+            Enum(_s) => HashSet::new(),
+            OSSpec(_e) => HashSet::new(),
+        }
+    }
+
+    pub fn iface_field_idents(&self) -> HashSet<Rc<String>> {
+        use VelosiAstUnit::*;
+        match self {
+            Segment(s) => s.iface_field_idents(),
+            StaticMap(_s) => HashSet::new(),
+            Enum(_s) => HashSet::new(),
+            OSSpec(_e) => HashSet::new(),
+        }
+    }
+
+    pub fn iface_bit_slice_idents(&self) -> HashSet<Rc<String>> {
+        use VelosiAstUnit::*;
+        match self {
+            Segment(s) => s.iface_bit_slice_idents(),
+            StaticMap(_s) => HashSet::new(),
+            Enum(_s) => HashSet::new(),
+            OSSpec(_e) => HashSet::new(),
         }
     }
 
