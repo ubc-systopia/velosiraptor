@@ -367,6 +367,20 @@ impl VelosiAstState {
             .max()
             .unwrap_or_default()
     }
+
+    pub fn field_idents(&self) -> HashSet<Rc<String>> {
+        let mut res = HashSet::new();
+        res.extend(self.fields.iter().map(|f| f.path().clone()));
+        res
+    }
+
+    pub fn bit_slice_idents(&self) -> HashSet<Rc<String>> {
+        let mut res = HashSet::new();
+        for f in &self.fields {
+            res.extend(f.bit_slice_idents());
+        }
+        res
+    }
 }
 
 impl PartialEq for VelosiAstState {

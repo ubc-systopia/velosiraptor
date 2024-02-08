@@ -28,7 +28,7 @@
 //! This module defines the Constant AST nodes of the language
 
 // used standard library functionality
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::rc::Rc;
 
@@ -743,6 +743,22 @@ impl VelosiAstUnitSegment {
 
     pub fn has_memory_state(&self) -> bool {
         self.state.has_memory()
+    }
+
+    pub fn state_field_idents(&self) -> HashSet<Rc<String>> {
+        self.state.field_idents()
+    }
+
+    pub fn state_bit_slice_idents(&self) -> HashSet<Rc<String>> {
+        self.state.bit_slice_idents()
+    }
+
+    pub fn iface_field_idents(&self) -> HashSet<Rc<String>> {
+        self.interface.field_idents()
+    }
+
+    pub fn iface_bit_slice_idents(&self) -> HashSet<Rc<String>> {
+        self.interface.bit_slice_idents()
     }
 
     pub fn get_next_unit_idents(&self) -> Vec<&Rc<String>> {
