@@ -31,7 +31,6 @@ flags {
     writable,
     readable,
     devicemem,
-    usermode
 }
 
 // represents a page table entry
@@ -49,10 +48,8 @@ segment PageTableEntry(base : paddr) {
             // the following fields at starting bit, ending bit, name
             0 ..  1 present,
             1 ..  2 writable,
-            2 ..  3 usermode,
-            3 ..  4 writethrough,
-            4 ..  5 nocache,
-            5 .. 12 ignored,
+            2 ..  3 nocache,
+            3 .. 12 _ign,
            12 .. 32 base,
         }
     }
@@ -67,15 +64,15 @@ segment PageTableEntry(base : paddr) {
     }
 
     #[remap]
+    fn writeperms(flgs : flags) -> bool
+    {
+        state.pte.writable == flgs.writable
+    }
+
+    #[remap]
     fn matchflags(flgs : flags) -> bool
     {
-        (state.pte.writable == flgs.writable)
-         && (state.pte.usermode != flgs.usermode)
-         && if (flgs.devicemem == 1) {
-               (state.pte.nocache == 1 && state.pte.writethrough == 1)
-            } else {
-                (state.pte.nocache == 0 && state.pte.writethrough == 0)
-            }
+        flgs.devicemem == state.pte.nocache
     }
 
     // the translation semantics, adding an option type?
@@ -99,10 +96,12 @@ segment PageTableEntry(base : paddr) {
 
     // protecting the entry, i.e., change its permission
     synth fn protect(va: vaddr, sz: size, flgs: flags)
+        requires va == 0;
+        requires sz == BASE_PAGE_SIZE;
 }
 
 
-// represents an x86 page table entry
+// represents a simple table in memory
 staticmap PageTable(base : paddr) {
     #[repr(array)]
     maps [ PageTableEntry(base + i * PTABLE_ENTRY_SIZE) for i in 0..1024 ]
@@ -127,16 +126,11 @@ segment X86_MMU(base: paddr) {
             0 .. 12 pcid,
             12 .. 32 address
         },
-
-        reg ctrl [ 4 ] {
-            31 .. 32 enabled
-        }
     }
 
     // making these as an MMIO register so we can access them.
     interface(base: paddr) {
         mmio ttbr [ base, 0, 4 ],
-        mmio ctrl [ base, 4, 4 ]
     }
 
     #[remap]
@@ -152,11 +146,7 @@ segment X86_MMU(base: paddr) {
     fn translate(va: vaddr) -> paddr
         requires va < VSPACE_ADDR_MAX
     {
-        if state.ctrl.enabled == 1 {
-            va + (state.ttbr.address << 12)
-        } else {
-            va
-        }
+        va + (state.ttbr.address << 12)
     }
 
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : PageTable)

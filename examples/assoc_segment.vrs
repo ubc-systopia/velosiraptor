@@ -19,17 +19,20 @@ flags {
     executable,
 }
 
-segment SingleSegment(base : addr) {
+segment AssocSegment(base : addr) {
 
     // let's assume the maximum size of the segment is 40 bits.
-    inbitwidth= 48;
+    inbitwidth= 47;
 
     // let's assume the maximum output bit size is 64 bits
     outbitwidth = 48;
 
     // the state will be two registers:
     state(base: addr) {
-        reg address [ 8 ] {
+        reg dst [ 8 ] {
+            0 .. 48 val,
+        },
+        reg src [ 8 ] {
             0 .. 48 val,
         },
         reg length [ 8 ] {
@@ -42,8 +45,9 @@ segment SingleSegment(base : addr) {
 
     // just expose the entire state as MMIO interface
     interface(base: addr) {
-        mmio address [ base, 0, 8 ],
-        mmio length [ base, 8, 8 ],
+        mmio dst [ base, 0, 8 ],
+        mmio src [ base, 8, 8 ],
+        mmio length [ base, 16, 8 ],
     }
 
     // add the valid bit
@@ -66,18 +70,14 @@ segment SingleSegment(base : addr) {
 
     // to calculate the new address, we just add the base address here, if within range
     fn translate(va: vaddr) -> paddr
-        requires va < (state.length.bytes << 4)
+        requires state.src.val <= va && va < state.src.val + (state.length.bytes << 4)
     {
-        va + state.address.val
+        (va - state.src.val) + state.dst.val
     }
 
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
-        // requires sz < (1 << 40)
-        requires sz > 0
-        requires (sz & 0xf) == 0
-        requires va == 0
-        requires pa + sz < (1 << 48)
-        requires (pa & 0xf == 0)
+        requires (sz & 0xf) == 0 && (va & 0xf) == 0 && (pa & 0xf == 0)
+        requires (pa + sz < (1 << 48)) && (va + sz < (1 << 48))
 
     synth fn protect(va: vaddr, sz: size, flgs: flags);
 

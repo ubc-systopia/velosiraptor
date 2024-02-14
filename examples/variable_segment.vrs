@@ -19,53 +19,63 @@ flags {
     executable,
 }
 
-// This defines an SMPT Entry
-segment DirectSegment(base : addr) {
+segment SingleSegment(base : addr) {
 
-    const SEG_SIZE : size = 1 << 20;
+    // let's assume the maximum size of the segment is 40 bits.
+    inbitwidth= 48;
 
-    // let's assume the maximum size of the segment is 20 bits.
-    inbitwidth= 20;
-
-    // let's assume the maximum output bit size is 48 bits
+    // let's assume the maximum output bit size is 64 bits
     outbitwidth = 48;
-
-
 
     // the state will be two registers:
     state(base: addr) {
         reg address [ 8 ] {
             0 .. 48 val,
-            48 .. 49 enabled,
+        },
+        reg length [ 8 ] {
+            0 ..  1 present,
+            1 ..  2 rw,
+            2 ..  3 exec,
+            4 .. 48 bytes,
         }
     }
 
     // just expose the entire state as MMIO interface
     interface(base: addr) {
         mmio address [ base, 0, 8 ],
+        mmio length [ base, 8, 8 ],
     }
 
-    // add the valid bit, we can't unmap here
+    // add the valid bit
+    #[remap]
     fn valid() -> bool {
-        state.address.enabled == 1
+        state.length.present == 1
     }
+
+    // #[remap]
+    // fn range(va: vaddr) -> bool {
+    //     va < (state.length.bytes << 4)
+    // }
 
     // define the permission flags
+    #[remap]
     fn matchflags(flgs : flags) -> bool
     {
-        true
+        flgs.writable == state.length.rw && flgs.executable == state.length.exec
     }
 
     // to calculate the new address, we just add the base address here, if within range
     fn translate(va: vaddr) -> paddr
-        requires va < SEG_SIZE
+        requires va < (state.length.bytes << 4)
     {
         va + state.address.val
     }
 
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
-        requires sz == SEG_SIZE
+        requires (sz & 0xf) == 0
         requires va == 0
+        requires pa + sz < (1 << 48)
+        requires (pa & 0xf == 0)
 
     synth fn protect(va: vaddr, sz: size, flgs: flags);
 
