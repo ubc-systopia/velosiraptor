@@ -236,8 +236,7 @@ impl VelosiAstInterface {
     pub fn bit_slice_idents(&self) -> HashSet<Rc<String>> {
         self.fields
             .iter()
-            .map(|f| f.layout().iter().map(|f| f.path().clone()))
-            .flatten()
+            .flat_map(|f| f.layout().iter().map(|f| f.path().clone()))
             .collect()
     }
 
