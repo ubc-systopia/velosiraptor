@@ -26,7 +26,7 @@
 //! # SynthOpts -- Synthesis Options
 
 /// the default batch size for submitting the queries to the solver
-pub const DEFAULT_BATCH_SIZE: usize = 8;
+pub const DEFAULT_BATCH_SIZE: usize = 2;
 
 /// Options for controlling synthesis
 #[derive(Debug, Clone)]
@@ -38,6 +38,7 @@ pub struct SynthOpts {
     pub disable_expr_opt: bool,
     pub disable_tree_opt: bool,
     pub disable_cache_opt: bool,
+    pub disable_program_generation: bool,
 }
 
 impl SynthOpts {
@@ -63,6 +64,7 @@ impl Default for SynthOpts {
             disable_expr_opt: false,
             disable_tree_opt: false,
             disable_cache_opt: false,
+            disable_program_generation: false,
         }
     }
 }
