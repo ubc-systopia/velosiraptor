@@ -51,8 +51,7 @@ use super::MaybeResult;
 use super::utils;
 use super::ProgramBuilder;
 
-/// the default batch size for submitting the queries to Z3
-pub const DEFAULT_BATCH_SIZE: usize = 8;
+use crate::DEFAULT_BATCH_SIZE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Program Verifier
@@ -326,6 +325,11 @@ impl ProgramBuilder for ProgramVerifier {
         } else {
             MaybeResult::Pending
         }
+    }
+
+    /// returns an estimate of the number of programs
+    fn size_hint(&self) -> (u128, Option<u128>) {
+        self.programs.size_hint()
     }
 
     fn m_op(&self) -> &VelosiAstMethod {

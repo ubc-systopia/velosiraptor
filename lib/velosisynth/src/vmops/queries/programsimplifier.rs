@@ -84,6 +84,11 @@ impl ProgramBuilder for ProgramSimplifier {
         }
     }
 
+    /// returns an estimate of the number of programs
+    fn size_hint(&self) -> (u128, Option<u128>) {
+        self.programs.size_hint()
+    }
+
     fn m_op(&self) -> &VelosiAstMethod {
         self.programs.m_op()
     }

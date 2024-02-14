@@ -46,9 +46,9 @@ use crate::{
 
 //use super::queryhelper::{MaybeResult, ProgramBuilder, QueryBuilder};
 use super::MaybeResult;
-use super::{BoolExprQueryBuilder, ProgramVerifier, DEFAULT_BATCH_SIZE};
-
 use super::ProgramBuilder;
+use super::{BoolExprQueryBuilder, ProgramVerifier};
+use crate::{SynthOpts, DEFAULT_BATCH_SIZE};
 
 // use crate::ProgramsIter;
 
@@ -61,6 +61,11 @@ use crate::ProgramsIter;
 impl ProgramBuilder for ProgramsIter {
     fn next(&mut self, _z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
         self.next_program().into()
+    }
+
+    /// returns an estimate of the number of programs
+    fn size_hint(&self) -> (u128, Option<u128>) {
+        (self.stat_num_programs, Some(self.stat_max_programs))
     }
 
     fn m_op(&self) -> &VelosiAstMethod {
@@ -206,7 +211,7 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
     }
 
     /// sets the base query to be all (i.e., A && B && C)
-    pub fn all(self) -> Option<CompoundBoolExprQuery> {
+    pub fn all(self, opts: &SynthOpts) -> Option<CompoundBoolExprQuery> {
         let assms = Rc::new(self.assms);
         let prefix = self.unit.ident();
 
@@ -240,7 +245,7 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
                         BoolExprQueryBuilder::new(self.unit, self.m_op.clone(), expr.clone())
                             .assms(assms.clone())
                             .negate(self.negate)
-                            .build();
+                            .build(opts);
                     if let Some(bool_expr_query) = bool_expr_query {
                         candidate_programs.push(
                             ProgramVerifier::with_batchsize(
@@ -286,6 +291,26 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
             Some(CompoundBoolExprQuery::Any(compound_query))
         } else {
             // this is A && B && C, keep it that way
+
+            // if we disable the tree optimization, we construct a single flat compounds
+            if opts.disable_tree_opt {
+                let partial_program_idx = candidate_programs.iter().map(|_| 0).collect();
+                let partial_programs = candidate_programs.iter().map(|_| Vec::new()).collect();
+                let done = candidate_programs.iter().map(|_| false).collect();
+                let compound_query = CompoundQueryAll {
+                    m_op: self.m_op,
+                    exprs,
+                    assms: assms.clone(),
+                    candidate_programs,
+                    partial_programs,
+                    partial_program_idx,
+                    done,
+                    partial_program_counter: 0,
+                    all_done: false,
+                };
+
+                return Some(CompoundBoolExprQuery::All(compound_query));
+            }
 
             const DEFAULT_CHUNK_SIZE: usize = 2;
             let mut queries = Vec::with_capacity(exprs.len() / DEFAULT_CHUNK_SIZE + 1);
@@ -443,7 +468,7 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
     }
 
     /// sets the base query to be any (i.e., A || B || C)
-    pub fn any(self) -> CompoundBoolExprQuery {
+    pub fn any(self, opts: &SynthOpts) -> CompoundBoolExprQuery {
         let assms = Rc::new(self.assms);
         let prefix = self.unit.ident();
 
@@ -477,7 +502,7 @@ impl<'a> CompoundBoolExprQueryBuilder<'a> {
                         BoolExprQueryBuilder::new(self.unit, self.m_op.clone(), expr.clone())
                             .assms(assms.clone())
                             .negate(self.negate)
-                            .build();
+                            .build(opts);
                     if let Some(bool_expr_query) = bool_expr_query {
                         candidate_programs.push(
                             ProgramVerifier::with_batchsize(
@@ -550,6 +575,13 @@ impl ProgramBuilder for CompoundBoolExprQuery {
         match self {
             Self::Any(q) => q.next(z3),
             Self::All(q) => q.next(z3),
+        }
+    }
+
+    fn size_hint(&self) -> (u128, Option<u128>) {
+        match self {
+            Self::Any(q) => q.size_hint(),
+            Self::All(q) => q.size_hint(),
         }
     }
     fn assms(&self) -> Rc<Vec<Term>> {
@@ -692,6 +724,17 @@ impl ProgramBuilder for CompoundQueryAny {
             self.all_done = true;
             MaybeResult::None
         }
+    }
+
+    fn size_hint(&self) -> (u128, Option<u128>) {
+        let mut min = 0;
+        let mut max = 0;
+        for p in self.candidate_programs.iter() {
+            let (pmin, pmax) = p.size_hint();
+            min += pmin;
+            max += pmax.unwrap_or(pmin);
+        }
+        (min, Some(max))
     }
 
     fn assms(&self) -> Rc<Vec<Term>> {
@@ -952,6 +995,18 @@ impl ProgramBuilder for CompoundQueryAll {
             });
 
         MaybeResult::Some(prog)
+    }
+
+    /// returns an estimate of the number of programs
+    fn size_hint(&self) -> (u128, Option<u128>) {
+        let mut min = 1;
+        let mut max = 1;
+        for p in self.candidate_programs.iter() {
+            let (pmin, pmax) = p.size_hint();
+            min *= pmin;
+            max *= pmax.unwrap_or(pmin);
+        }
+        (min, Some(max))
     }
 
     fn m_op(&self) -> &VelosiAstMethod {

@@ -37,9 +37,10 @@ use velosiast::{
     VelosiAstInterfaceField,
 };
 
+use crate::opts::SynthOpts;
 use crate::{
     model::{
-        method::{method_precond_i_name, translate_range_name, translate_range_name_protect},
+        method::{translate_range_name, translate_range_name_protect},
         types,
         velosimodel::{model_get_fn_name, WBUFFER_PREFIX},
     },
@@ -54,21 +55,34 @@ use crate::z3::Z3TaskPriority;
 
 pub fn make_program_builder_no_params(
     unit: &VelosiAstUnitSegment,
-    pre: &VelosiAstExpr,
+    expr: &VelosiAstExpr,
     additional_state: HashSet<Rc<String>>,
+    opts: &SynthOpts,
 ) -> ProgramsBuilder {
-    log::info!(target: "[vmops::utils]", "constructing programs for {pre}");
+    log::info!(target: "[vmops::utils]", "constructing programs for {expr}");
     // obtain the state references in the pre-condition
     let mut state_syms = additional_state;
-    pre.get_state_references(&mut state_syms);
 
-    // obtain the state bits that are referenced in the pre-condition
+    // if the state optimization is disabled, then we take the entire state as being relevant for
+    // this expression, other wise we only take the parts of the state that actually appears in the
+    // expression.
+    if opts.disable_state_opt {
+        state_syms.extend(unit.state_bit_slice_idents());
+    } else {
+        expr.get_state_references(&mut state_syms);
+    }
+
+    // obtain the bits of the state that are relevant based on the state references
     let state_bits = unit.state.get_field_slice_refs(&state_syms);
 
-    // finally obtain the fields that matter using back-projection
-    let st_access_fields = unit
-        .interface
-        .fields_accessing_state(&state_syms, &state_bits);
+    // if the interface optimization is disabled we simply take the entire interface as being
+    // relevant otherwise, we perform a back projection to obtain the relevant interface fields.
+    let st_access_fields = if opts.disable_iface_opt {
+        unit.interface.bit_slice_idents()
+    } else {
+        unit.interface
+            .fields_accessing_state(&state_syms, &state_bits)
+    };
 
     // construct the program builder
     let mut builder = ProgramsBuilder::new();
@@ -100,13 +114,14 @@ pub fn make_program_builder_no_params(
 pub fn make_program_builder(
     unit: &VelosiAstUnitSegment,
     m_goal: &VelosiAstMethod,
-    pre: &VelosiAstExpr,
+    expr: &VelosiAstExpr,
     additional_state: HashSet<Rc<String>>,
+    opts: &SynthOpts,
 ) -> ProgramsBuilder {
-    let mut builder = make_program_builder_no_params(unit, pre, additional_state);
+    let mut builder = make_program_builder_no_params(unit, expr, additional_state, opts);
 
     let mut vars = HashSet::new();
-    for id in pre.get_var_references().iter() {
+    for id in expr.get_var_references().iter() {
         let mut parts = id.ident().as_str().split('.');
         if let Some(part) = parts.next() {
             vars.insert(part);
@@ -146,7 +161,7 @@ pub fn make_program_builder(
 
 pub fn make_program_iter_mem(prog: &Program) -> ProgramsIter {
     let programs = prog.generate_possible_barriers();
-    let stat_max_programs = programs.len();
+    let stat_max_programs = programs.len() as u128;
 
     ProgramsIter {
         programs,
@@ -239,7 +254,7 @@ pub fn add_empty_wbuffer_precond(prefix: &str, pre: Term) -> Term {
 pub fn add_methods_tagged_with_remap(
     unit: &VelosiAstUnitSegment,
     m_op: &Rc<VelosiAstMethod>,
-    batch_size: usize,
+    opts: &SynthOpts,
     negate: bool,
     var_refs: Option<bool>,
     partial_programs: &mut Vec<Box<dyn ProgramBuilder>>,
@@ -291,7 +306,7 @@ pub fn add_methods_tagged_with_remap(
                 BoolExprQueryBuilder::new(unit, m_op.clone(), exp.clone())
                     // .assms(): No assumptions, as they will be added by the map.assms()
                     .negate(negate)
-                    .build()
+                    .build(opts)
                     .map(|e| e.into())
             }
             _ => {
@@ -306,7 +321,7 @@ pub fn add_methods_tagged_with_remap(
                 .exprs(exprs)
                 // .assms(): No assumptions, as they will be added by the map.assms()
                 .negate(negate) // !(A && B && C), we convert this to !A || !B || !C
-                .all()
+                .all(opts)
                 .map(|e| e.into())
             }
         };
@@ -318,7 +333,7 @@ pub fn add_methods_tagged_with_remap(
                 ProgramVerifier::with_batchsize(
                     unit.ident().clone(),
                     query,
-                    batch_size,
+                    opts.batch_size,
                     Z3TaskPriority::lowest(),
                 )
                 .into(),
@@ -341,7 +356,7 @@ pub fn add_method_preconds(
     unit: &VelosiAstUnitSegment,
     m_op: &Rc<VelosiAstMethod>,
     m: &Rc<VelosiAstMethod>,
-    batch_size: usize,
+    opts: &SynthOpts,
     negate: bool,
     var_refs: Option<bool>,
     partial_programs: &mut Vec<Box<dyn ProgramBuilder>>,
@@ -406,7 +421,7 @@ pub fn add_method_preconds(
             // .variable_references(true)
             .negate(negate) // we negate the expression here
             .programs(Box::new(programs))
-            .build()
+            .build(opts)
             .map(|e| e.into());
 
             if let Some(query) = query {
@@ -414,7 +429,7 @@ pub fn add_method_preconds(
                     ProgramVerifier::with_batchsize(
                         unit.ident().clone(),
                         query,
-                        batch_size,
+                        opts.batch_size,
                         Z3TaskPriority::lowest(),
                     )
                     .into(),
@@ -426,50 +441,47 @@ pub fn add_method_preconds(
             continue;
         }
 
-        // check if we have avariable references here
-        let (ident, has_var_refs, args) = if e.has_var_references(&params) {
-            (
-                VelosiAstIdentifier::from(translate_range_name(Some(i)).as_str()),
-                true,
-                vec![
-                    Rc::new(m.params[0].as_ref().into()),
-                    Rc::new(VelosiAstExpr::IdentLiteral(
-                        VelosiAstIdentLiteralExpr::with_name(
-                            String::from("sz"),
-                            VelosiAstTypeInfo::Size,
-                        ),
-                    )),
-                ],
-            )
-        } else {
-            (
-                VelosiAstIdentifier::from(method_precond_i_name("translate", i).as_str()),
-                false,
-                vec![Rc::new(m.params[0].as_ref().into())],
-            )
-        };
+        let query = if e.has_var_references(&params) {
+            let ident = VelosiAstIdentifier::from(translate_range_name(Some(i)).as_str());
+            let args = vec![
+                Rc::new(m.params[0].as_ref().into()),
+                Rc::new(VelosiAstExpr::IdentLiteral(
+                    VelosiAstIdentLiteralExpr::with_name(
+                        String::from("sz"),
+                        VelosiAstTypeInfo::Size,
+                    ),
+                )),
+            ];
 
-        let mut fn_call = VelosiAstFnCallExpr::new(ident, VelosiAstTypeInfo::Bool);
-        fn_call.add_args(args);
+            let mut fn_call = VelosiAstFnCallExpr::new(ident, VelosiAstTypeInfo::Bool);
+            fn_call.add_args(args);
 
-        let mut staterefs = HashSet::new();
-        e.get_state_references(&mut staterefs);
+            let mut staterefs = HashSet::new();
+            e.get_state_references(&mut staterefs);
 
-        let query =
             BoolExprQueryBuilder::new(unit, m_op.clone(), Rc::new(VelosiAstExpr::FnCall(fn_call)))
                 // .assms(m.assms.clone())
-                .variable_references(has_var_refs && !negate)
+                .variable_references(!negate)
                 .additional_state_refs(staterefs)
                 .negate(negate) // we negate the expression here
-                .build()
-                .map(|e| e.into());
+                .build(opts)
+                .map(|e| e.into())
+        } else if !negate {
+            BoolExprQueryBuilder::new(unit, m_op.clone(), e.clone())
+                // .assms(m.assms.clone())
+                // .negate(negate) // we negate the expression here
+                .build(opts)
+                .map(|e| e.into())
+        } else {
+            None
+        };
 
         if let Some(query) = query {
             partial_programs.push(
                 ProgramVerifier::with_batchsize(
                     unit.ident().clone(),
                     query,
-                    batch_size,
+                    opts.batch_size,
                     Z3TaskPriority::lowest(),
                 )
                 .into(),
