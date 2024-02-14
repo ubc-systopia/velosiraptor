@@ -32,6 +32,7 @@ use std::vec::IntoIter;
 
 use itertools::{Itertools, MultiProduct};
 
+use crate::opts::SynthOpts;
 use crate::programs::ProgramActions;
 
 use super::{Expression, FieldActions, FieldOp, FieldSliceOp, Literal, Program};
@@ -41,8 +42,8 @@ pub struct ProgramsIter {
     // ///
     // expr: Vec<Arc<Expression>>,
     pub programs: Vec<Peekable<MultiProduct<IntoIter<ProgramActions>>>>,
-    pub stat_max_programs: usize,
-    pub stat_num_programs: usize,
+    pub stat_max_programs: u128,
+    pub stat_num_programs: u128,
 }
 
 impl ProgramsIter {
@@ -146,7 +147,7 @@ impl ProgramsBuilder {
     }
 
     /// Constructs all possible expressions with the literals
-    fn construct_expressions(&self) -> Vec<Arc<Expression>> {
+    fn construct_expressions(&self, _opts: &SynthOpts) -> Vec<Arc<Expression>> {
         // TODO: probably should filter this based on size...
 
         // macro to generate terminal parsers for operator tokens.
@@ -188,12 +189,14 @@ impl ProgramsBuilder {
         let vals = vec![Literal::Num];
 
         // binary expressions
-        //expr_combinator2!(expr, Expression::RShift, vars, vals);
-        // expr_combinator2!(expr, Expression::LShift, vars, vals);
         // expr_combinator2!(expr, Expression::Add, vars, vals);
-        expr_combinator2!(expr, Expression::Sub, vars, vals);
         expr_combinator2!(expr, Expression::And, vars, vals);
         expr_combinator2!(expr, Expression::Or, vars, vals);
+        expr_combinator2!(expr, Expression::Sub, vars, vals);
+
+        // no need to shifts here, as we use the shiftmask below
+        // expr_combinator2!(expr, Expression::RShift, vars, vals);
+        // expr_combinator2!(expr, Expression::LShift, vars, vals);
 
         // the shiftmask operators
         for val1 in &vals {
@@ -230,9 +233,9 @@ impl ProgramsBuilder {
     }
 
     /// constructs new programs
-    pub fn into_iter(&mut self) -> ProgramsIter {
+    pub fn into_iter(&mut self, opts: &SynthOpts) -> ProgramsIter {
         // get all the expression possibilities;
-        let exprs = self.construct_expressions();
+        let exprs = self.construct_expressions(opts);
 
         log::info!(
             target : "[ProgramsBuilder]", "Build programs: {} fields, {} slices, {} vars, {} flags, {} expr",
@@ -331,6 +334,7 @@ impl ProgramsBuilder {
         let init_read = FieldOp::ReadAction;
 
         let mut field_programs = HashMap::new();
+        let mut field_programs_stat = HashMap::new();
         for (field, slices) in self.fields.iter_mut() {
             // sort the slices
             slices.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
@@ -349,6 +353,7 @@ impl ProgramsBuilder {
                         vec![init_zero.clone(), expr],
                     )));
                 }
+                field_programs_stat.insert(field.clone(), field_ops.len() as u128);
                 field_programs.insert(field.clone(), field_ops);
                 continue;
             }
@@ -356,14 +361,15 @@ impl ProgramsBuilder {
             field_programs.insert(field.clone(), Vec::new());
 
             // construct the powerset of all possible field operations
-            for slices_list in slices.iter().powerset() {
+            for slices_list in &[slices] {
+                // slices.iter().powerset() {
                 let slice_exprs: Vec<_> = slices_list
                     .iter()
                     .filter_map(|slice| {
                         let slice_expr: Vec<_> = exprs
                             .iter()
                             .filter_map(|expr| {
-                                if !expr.skip_for_bits(slice.1) {
+                                if !expr.skip_for_bits(slice.1) || opts.disable_expr_opt {
                                     Some(FieldSliceOp(slice.0.clone(), expr.clone()))
                                 } else {
                                     None
@@ -379,19 +385,29 @@ impl ProgramsBuilder {
                     })
                     .collect();
 
+                let num = 2 * slice_exprs
+                    .iter()
+                    .map(|l| l.len() as u128)
+                    .product::<u128>();
+                field_programs_stat.insert(field.clone(), num);
+
+                if opts.disable_program_generation {
+                    continue;
+                }
+
                 let mut field_ops =
                     Vec::with_capacity(slice_exprs.iter().map(|s| s.len()).sum::<usize>());
                 for slice_expr in slice_exprs.into_iter().multi_cartesian_product() {
                     field_ops.push(Arc::new(FieldActions(
                         field.clone(),
                         vec![
-                            init_read.clone(),
+                            init_zero.clone(),
                             FieldOp::InsertFieldSlices(slice_expr.clone()),
                         ],
                     )));
                     field_ops.push(Arc::new(FieldActions(
                         field.clone(),
-                        vec![init_zero.clone(), FieldOp::InsertFieldSlices(slice_expr)],
+                        vec![init_read.clone(), FieldOp::InsertFieldSlices(slice_expr)],
                     )));
                 }
                 field_programs.get_mut(field).unwrap().extend(field_ops);
@@ -405,20 +421,30 @@ impl ProgramsBuilder {
         for big_step_program in big_step_programs {
             // get
             // convert into iterators.
-            let program_parts: Vec<_> = big_step_program
-                .into_iter()
+            stat_max_programs += big_step_program
+                .iter()
                 .map(|program_actions| match program_actions {
-                    ProgramActions::FieldActions(f) => field_programs
-                        .get(&f.0)
-                        .unwrap()
-                        .iter()
-                        .map(|p| ProgramActions::FieldActions(p.clone()))
-                        .collect(),
-                    p => vec![p],
+                    ProgramActions::FieldActions(f) => *field_programs_stat.get(&f.0).unwrap(),
+                    _p => 1u128,
                 })
-                .collect();
+                .product::<u128>();
 
-            stat_max_programs += program_parts.iter().map(|p| p.len()).product::<usize>();
+            let program_parts: Vec<_> = if opts.disable_program_generation {
+                vec![vec![ProgramActions::Noop]]
+            } else {
+                big_step_program
+                    .into_iter()
+                    .map(|program_actions| match program_actions {
+                        ProgramActions::FieldActions(f) => field_programs
+                            .get(&f.0)
+                            .unwrap()
+                            .iter()
+                            .map(|p| ProgramActions::FieldActions(p.clone()))
+                            .collect(),
+                        p => vec![p],
+                    })
+                    .collect()
+            };
 
             programs.push(
                 program_parts

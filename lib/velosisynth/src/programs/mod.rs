@@ -561,6 +561,15 @@ impl FieldOp {
               // }
         }
     }
+
+    pub fn len(&self) -> usize {
+        use FieldOp::*;
+        match self {
+            InsertField(_) => 1,
+            InsertFieldSlices(ops) => ops.len(),
+            ReadAction => 1,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -599,6 +608,15 @@ impl ProgramActions {
                 smtops.push((fname, None));
             }
             ProgramActions::Noop => (),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            ProgramActions::GlobalBarrier => 1,
+            ProgramActions::FieldActions(f) => f.len(),
+            ProgramActions::Instruction(_) => 1,
+            ProgramActions::Noop => 0,
         }
     }
 }
@@ -725,6 +743,10 @@ impl FieldActions {
             .collect();
 
         FieldActions(field.clone(), ops)
+    }
+
+    pub fn len(&self) -> usize {
+        self.1.iter().map(|p| p.len()).sum::<usize>() + 1
     }
 }
 
@@ -1082,6 +1104,14 @@ impl Program {
             .collect();
 
         Program(actions)
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.iter().map(|a| a.len()).sum()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
 
