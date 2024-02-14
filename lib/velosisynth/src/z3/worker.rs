@@ -427,6 +427,10 @@ impl Z3WorkerPool {
         self.opt_query_cache_disabled = opt;
     }
 
+    fn do_push_query(&mut self, id: Z3Ticket, task: Box<Z3Query>, priority: Z3TaskPriority) {
+        self.taskq.push(priority, id, task);
+    }
+
     pub fn submit_query(
         &mut self,
         mut task: Box<Z3Query>,
@@ -441,7 +445,7 @@ impl Z3WorkerPool {
         let id = Z3Ticket(self.next_query_id);
 
         if self.opt_query_cache_disabled {
-            self.taskq.push(priority, id, task);
+            self.do_push_query(id, task, priority);
         } else {
             // see if we can the cached result
             match self.query_cache.get_mut(&task) {
@@ -461,7 +465,7 @@ impl Z3WorkerPool {
                     // we haven't seen this query before, add it to the cache
                     self.query_cache
                         .insert(task.clone_without_timestamps(), Err(vec![id]));
-                    self.taskq.push(priority, id, task);
+                    self.do_push_query(id, task, priority);
                 }
             }
         }
@@ -498,7 +502,7 @@ impl Z3WorkerPool {
                     } else {
                         match self.query_cache.get_mut(query) {
                             Some(Ok(_r)) => {
-                                // unreachable!("should not happen!");
+                                // we already have a result, so we can just discard it here.
                             }
                             Some(Err(v)) => {
                                 for qid in v {
