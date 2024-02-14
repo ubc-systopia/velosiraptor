@@ -46,12 +46,13 @@ pub use unmap::UnmapPrograms;
 pub use queries::{
     BoolExprQuery, BoolExprQueryBuilder, CompoundBoolExprQueryBuilder, CompoundQueryAll,
     CompoundQueryAny, MaybeResult, ProgramBuilder, ProgramVerifier, TranslateQuery,
-    TranslateQueryBuilder, DEFAULT_BATCH_SIZE,
+    TranslateQueryBuilder,
 };
 
 use velosiast::ast::VelosiAstUnitSegment;
 
 use crate::model;
+use crate::opts::SynthOpts;
 use crate::z3::{Z3Query, Z3WorkerPool};
 use crate::Program;
 
@@ -82,7 +83,11 @@ pub trait SynchronousSync<T: ProgramBuilder = Self>: ProgramBuilder {
                 let ctx = model::create(unit, false);
                 z3.reset_with_context(Z3Query::from(ctx), false);
 
-                let mut programs = MapPrograms::new(unit, batch_size, Some(Rc::new(prog)));
+                let mut programs = MapPrograms::with_opts(
+                    unit,
+                    SynthOpts::with_batchsize(batch_size),
+                    Some(Rc::new(prog)),
+                );
                 programs.do_synthesize(z3)
             } else {
                 Some(prog)

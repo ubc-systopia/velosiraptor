@@ -34,6 +34,7 @@ use velosiast::ast::{VelosiAstBinOpExpr, VelosiAstExpr, VelosiAstMethod, VelosiA
 
 use crate::programs::Program;
 
+use crate::opts::SynthOpts;
 use crate::z3::{Z3TaskPriority, Z3WorkerPool};
 
 use super::queries::{
@@ -53,9 +54,13 @@ pub struct MapPrograms {
 }
 
 impl MapPrograms {
-    pub fn new(
+    pub fn new(unit: &VelosiAstUnitSegment, starting_prog: Option<Rc<Program>>) -> Self {
+        Self::with_opts(unit, SynthOpts::default(), starting_prog)
+    }
+
+    pub fn with_opts(
         unit: &VelosiAstUnitSegment,
-        batch_size: usize,
+        opts: SynthOpts,
         starting_prog: Option<Rc<Program>>,
     ) -> Self {
         log::info!(target : "[synth::map]", "setting up map synthesis.");
@@ -70,14 +75,14 @@ impl MapPrograms {
         // handle the translate function
         if let Some(m) = unit.get_method("translate") {
             // obtain the translate query
-            let query = TranslateQueryBuilder::new(unit, m_op.clone(), m.clone()).build();
+            let query = TranslateQueryBuilder::new(unit, m_op.clone(), m.clone()).build(&opts);
 
             if let Some(query) = query {
                 partial_programs.push(
                     ProgramVerifier::with_batchsize(
                         unit.ident().clone(),
                         query.into(),
-                        batch_size,
+                        opts.batch_size,
                         Z3TaskPriority::lowest().higher(),
                     )
                     .into(),
@@ -85,26 +90,11 @@ impl MapPrograms {
             }
 
             // add the pre-conditions for the translate
-            utils::add_method_preconds(
-                unit,
-                m_op,
-                m,
-                batch_size,
-                false,
-                None,
-                &mut partial_programs,
-            );
+            utils::add_method_preconds(unit, m_op, m, &opts, false, None, &mut partial_programs);
         }
 
         // add the methods that must be true
-        utils::add_methods_tagged_with_remap(
-            unit,
-            m_op,
-            batch_size,
-            false,
-            None,
-            &mut partial_programs,
-        );
+        utils::add_methods_tagged_with_remap(unit, m_op, &opts, false, None, &mut partial_programs);
 
         // we now have all the partial programs ready
         let query = if let Some(starting_prog) = &starting_prog {
@@ -123,7 +113,7 @@ impl MapPrograms {
 
                 BoolExprQueryBuilder::new(unit, m_op.clone(), goal_expr)
                     .mem_model(starting_prog.clone())
-                    .build()
+                    .build(&opts)
                     .map(|e| e.into())
             } else {
                 None
@@ -137,7 +127,7 @@ impl MapPrograms {
             )
             .partial_programs(partial_programs, false)
             // .assms()
-            .all()
+            .all(&opts)
             .map(|e| e.into())
         };
 
@@ -145,14 +135,14 @@ impl MapPrograms {
             let query = ProgramVerifier::with_batchsize(
                 unit.ident().clone(),
                 query,
-                batch_size,
+                opts.batch_size,
                 Z3TaskPriority::highest().lower(),
             );
 
             let mut query = ProgramVerifier::with_batchsize(
                 unit.ident().clone(),
                 ProgramSimplifier::new(query.into()).into(),
-                batch_size,
+                opts.batch_size,
                 Z3TaskPriority::highest(),
             );
 
@@ -174,6 +164,11 @@ impl MapPrograms {
 impl ProgramBuilder for MapPrograms {
     fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
         self.candidate_programs.next(z3)
+    }
+
+    /// returns an estimate of the number of elements in this iterator
+    fn size_hint(&self) -> (u128, Option<u128>) {
+        self.candidate_programs.size_hint()
     }
 
     fn m_op(&self) -> &VelosiAstMethod {
