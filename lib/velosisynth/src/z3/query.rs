@@ -110,9 +110,9 @@ impl Display for Z3TimeStamp {
 #[derive(Clone)]
 pub struct Z3Query {
     /// the operations of this query for bookkeeping purposes
-    prog: Option<Program>,
+    prog: Option<Arc<Program>>,
     /// the goal of the program
-    goal: Option<String>,
+    goal: Option<Arc<String>>,
     /// the statements to be executed
     smt: Vec<Arc<Smt2Context>>,
     /// time durations for tracing
@@ -182,12 +182,12 @@ impl Z3Query {
 
     /// sets the operations field of the query (book keeping purpose)
     pub fn set_program(&mut self, p: Program) -> &mut Self {
-        self.prog = Some(p);
+        self.prog = Some(Arc::new(p));
         self
     }
 
     pub fn set_goal(&mut self, goal: String) -> &mut Self {
-        self.goal = Some(goal);
+        self.goal = Some(Arc::new(goal));
         self
     }
 
@@ -204,15 +204,11 @@ impl Z3Query {
 
     /// obtains a reference to the operations of this query
     pub fn program(&self) -> Option<&Program> {
-        self.prog.as_ref()
+        self.prog.as_ref().map(|f| f.as_ref())
     }
 
     pub fn take_program(&mut self) -> Option<Program> {
-        self.prog.take()
-    }
-
-    pub fn program_mut(&mut self) -> &mut Program {
-        self.prog.as_mut().unwrap()
+        self.prog.take().map(|f| f.as_ref().to_owned())
     }
 
     /// records a timestamp for tracing
