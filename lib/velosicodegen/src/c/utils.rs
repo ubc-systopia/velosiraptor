@@ -1032,13 +1032,13 @@ pub fn op_to_c_expr(
         }
         VelosiOperation::WriteAction(field) => {
             let fname = field_wr_fn_name_str(unit, field);
-            let u = vars.get("unit").unwrap();
+            let u = vars.get("$unit").unwrap();
             let f = vars.get(field.as_str()).unwrap();
             c.fn_call(&fname, vec![u.clone(), f.clone()]);
         }
         VelosiOperation::ReadAction(field) => {
             let fname = field_rd_fn_name_str(unit, field);
-            let u = vars.get("unit").unwrap();
+            let u = vars.get("$unit").unwrap();
             let f = vars.get(field.as_str()).unwrap();
             c.assign(f.clone(), C::Expr::fn_call(&fname, vec![u.clone()]));
         }

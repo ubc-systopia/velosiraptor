@@ -39,7 +39,7 @@ use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, LevelPadding, TermLogge
 use velosiast::{AstResult, VelosiAst, VelosiAstUnit};
 use velosicodegen::VelosiCodeGen;
 use velosisynth::create_models;
-use velosisynth::Z3SynthFactory;
+use velosisynth::{Z3SynthEnum, Z3SynthFactory, Z3SynthSegment};
 
 pub fn main() {
     // get the command line argumentts
@@ -57,7 +57,7 @@ pub fn main() {
         .arg(arg!(-o --output <VALUE>).default_value("out"))
         .arg(arg!(-l --lang <VALUE>).default_value("c"))
         .arg(arg!(-p --pkg <VALUE>).default_value("myunit"))
-        .arg(arg!(-t --target <VALUE>).default_value("none"))
+        .arg(arg!(-t --target <VALUE>))
         .arg(arg!(
             -m --"mem-model" "Synthesize using the abstract memory model"
         ))
@@ -145,8 +145,11 @@ pub fn main() {
         }
     };
 
-    let target = match matches.get_one::<&str>("target") {
-        None | Some(&"none") => VelosiAst::default(),
+    let target = match matches.get_one::<String>("target").map(|s| s.as_str()) {
+        None | Some("none") => {
+            log::error!(target: "main", "need to supply an OS specification with --target");
+            return;
+        }
         Some(f) => {
             match VelosiAst::from_file(f) {
                 AstResult::Ok(ast) => {
@@ -171,7 +174,10 @@ pub fn main() {
         synthfactory.num_workers(ncores).default_log_dir();
         let models = create_models(&ast);
 
+        let mut z3 = synthfactory.create_pool();
+
         for unit in ast.units_mut() {
+            z3.reset(true);
             use std::rc::Rc;
             match unit {
                 VelosiAstUnit::Segment(u) => {
@@ -193,7 +199,7 @@ pub fn main() {
 
                     t_synth_segment.push(("start", Instant::now()));
 
-                    let mut synth = synthfactory.create_segment(seg, models[seg.ident()].clone());
+                    let mut synth = Z3SynthSegment::new(&mut z3, seg, models[seg.ident()].clone());
 
                     let sanity_check = synth.sanity_check();
 
@@ -226,7 +232,7 @@ pub fn main() {
                     }
                     let e = e.unwrap();
 
-                    let mut synth = synthfactory.create_enum(e);
+                    let mut synth = Z3SynthEnum::new(&mut z3, e);
                     match synth.distinguish(&models) {
                         Ok(()) => {
                             log::info!(target: "main", "the variants of {} are distinguishable", e.ident())
