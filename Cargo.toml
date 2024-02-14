@@ -60,3 +60,7 @@ opt-level = 3
 [[bench]]
 name = "synth"
 harness = false
+
+[[bench]]
+name = "opt"
+harness = false

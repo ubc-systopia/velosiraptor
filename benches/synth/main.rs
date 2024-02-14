@@ -7,159 +7,24 @@ use velosiast::{
 };
 use velosisynth::{Z3SynthEnum, Z3SynthSegment, Z3WorkerPool};
 
-const SPECS: [&str; 7] = [
-    "examples/x86_32_pagetable.vrs",
-    "examples/x86_64_pagetable.vrs",
-    "examples/xeon_phi_smpt.vrs",
-    "examples/singlesegment.vrs",
-    "examples/medium.vrs",
-    "examples/fixedsegment.vrs",
-    "examples/r4700_fixed_page_size.vrs",
+mod bench;
+use bench::*;
+
+const SPECS: [(&str, &str); 10] = [
+    ("examples/simple_translation_table.vrs", "Simple Page Table"),
+    ("examples/x86_32_pagetable.vrs", "x86\\_32 Page Table"),
+    ("examples/x86_64_pagetable.vrs", "x86\\_64 Page Table"),
+    ("examples/xeon_phi_smpt.vrs", "Xeon Phi SMPT"),
+    ("examples/simple_segment.vrs", "Simple Segment"),
+    ("examples/variable_segment.vrs", "Variable Segment"),
+    ("examples/medium.vrs", "Medium Segment"),
+    ("examples/x86_segmentation.vrs", "x86 Segmentation"),
+    ("examples/assoc_segment.vrs", "Assoc Segment"),
+    ("examples/r4700_fixed_page_size.vrs", "R4700 TLB"),
 ];
 
-const NUM_WORKERS: usize = 13;
-const ITERATIONS: usize = 10;
-
-struct Stats {
-    pub min: u128,
-    pub med: u128,
-    pub avg: u128,
-    pub max: u128,
-    pub var: u128,
-    pub std: u128,
-    pub num: usize,
-}
-
-impl From<&[u128]> for Stats {
-    fn from(stats: &[u128]) -> Self {
-        let mut data = stats.to_vec();
-
-        let sum = data.iter().sum::<u128>() as u128;
-        let num = data.len();
-        let avg = sum / num as u128;
-
-        if num == 0 {
-            Self {
-                min: 0,
-                med: 0,
-                avg: 0,
-                max: 0,
-                var: 0,
-                std: 0,
-                num: 0,
-            }
-        } else {
-            data.sort();
-            let var =
-                data.iter().map(|x| (x - avg) * (x - avg)).sum::<u128>() as u128 / num as u128;
-            let std = (var as f64).sqrt() as u128;
-            Self {
-                min: *data.first().unwrap(),
-                med: data[num / 2],
-                avg,
-                max: *data.last().unwrap(),
-                var,
-                std,
-                num,
-            }
-        }
-    }
-}
-
-struct BenchResults {
-    pub tag: String,
-    pub t_parse: Vec<u128>,
-    pub t_model: Vec<u128>,
-    pub t_check: Vec<u128>,
-    pub t_synth: Vec<u128>,
-    pub t_finalize: Vec<u128>,
-    pub t_total: Vec<u128>,
-    pub num_segments: usize,
-    pub num_staticmaps: usize,
-    pub num_enums: usize,
-    pub num_units: usize,
-    pub num_fields: usize,
-    pub num_slices: usize,
-}
-
-impl BenchResults {
-    pub fn new(tag: String) -> Self {
-        Self {
-            tag,
-            t_parse: Vec::new(),
-            t_model: Vec::new(),
-            t_check: Vec::new(),
-            t_synth: Vec::new(),
-            t_total: Vec::new(),
-            t_finalize: Vec::new(),
-            num_segments: 0,
-            num_staticmaps: 0,
-            num_enums: 0,
-            num_units: 0,
-            num_fields: 0,
-            num_slices: 0,
-        }
-    }
-
-    pub fn merge(&mut self, other: &Self) {
-        assert_eq!(self.tag, other.tag);
-        self.t_parse.extend(other.t_parse.iter());
-        self.t_model.extend(other.t_model.iter());
-        self.t_check.extend(other.t_check.iter());
-        self.t_synth.extend(other.t_synth.iter());
-        self.t_total.extend(other.t_total.iter());
-        self.t_finalize.extend(other.t_finalize.iter());
-        if self.num_segments == 0 {
-            self.num_segments = other.num_segments;
-        } else {
-            assert_eq!(self.num_segments, other.num_segments);
-        }
-        if self.num_staticmaps == 0 {
-            self.num_staticmaps = other.num_staticmaps;
-        } else {
-            assert_eq!(self.num_staticmaps, other.num_staticmaps);
-        }
-        if self.num_enums == 0 {
-            self.num_enums = other.num_enums;
-        } else {
-            assert_eq!(self.num_enums, other.num_enums);
-        }
-        if self.num_units == 0 {
-            self.num_units = other.num_units;
-        } else {
-            assert_eq!(self.num_units, other.num_units);
-        }
-        if self.num_fields == 0 {
-            self.num_fields = other.num_fields;
-        } else {
-            assert_eq!(self.num_fields, other.num_fields);
-        }
-        if self.num_slices == 0 {
-            self.num_slices = other.num_slices;
-        } else {
-            assert_eq!(self.num_slices, other.num_slices);
-        }
-    }
-}
-
-impl std::fmt::Display for BenchResults {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let tt = Stats::from(self.t_total.as_slice());
-        let tc = Stats::from(self.t_check.as_slice());
-        let ts = Stats::from(self.t_synth.as_slice());
-        let tp = Stats::from(self.t_parse.as_slice());
-
-        write!(f, "{:<30} {:2}U+{:2}F+{:2}S  {:4}    {:10}ms (+/- {:4})  synth: {:10}ms (+/- {:4})  check:  {:4}ms (+/- {:2})  parse:  {:4}ms (+/- {:2})",
-            self.tag, self.num_units, self.num_fields, self.num_slices, ts.num, tt.avg, tt.std, ts.avg, ts.std, tc.avg, tc.std,
-            tp.avg, tp.std
-        )?;
-
-        Ok(())
-    }
-}
-
-fn run_synthesis(z3_workers: &mut Z3WorkerPool, vrs_file: &str) -> Option<BenchResults> {
-    let mut results = BenchResults::new(vrs_file.to_string());
+fn run_synthesis(z3_workers: &mut Z3WorkerPool, vrs_file: &str, tag: &str) -> Option<BenchResults> {
+    let mut results = BenchResults::new(tag.to_string());
 
     // start of the benchmark
     let t_start = Instant::now();
@@ -169,8 +34,8 @@ fn run_synthesis(z3_workers: &mut Z3WorkerPool, vrs_file: &str) -> Option<BenchR
     let mut ast = match VelosiAst::from_file(vrs_file) {
         AstResult::Ok(ast) => ast,
         AstResult::Issues(ast, _e) => ast,
-        AstResult::Err(_e) => {
-            println!("   - ERROR: Spec had errors {vrs_file}");
+        AstResult::Err(e) => {
+            println!("   - ERROR: Spec had errors {vrs_file}\n {e}");
             return None;
         }
     };
@@ -191,6 +56,11 @@ fn run_synthesis(z3_workers: &mut Z3WorkerPool, vrs_file: &str) -> Option<BenchR
     let mut t_sanity_check = 0;
     let mut t_synth = 0;
     let mut t_finalize = 0;
+    let mut n_queries = 0;
+    let mut n_cached_queries = 0;
+    let mut map_len = 0;
+    let mut unmap_len = 0;
+    let mut protect_len = 0;
 
     for unit in ast.units_mut() {
         if unit.is_abstract() {
@@ -234,9 +104,17 @@ fn run_synthesis(z3_workers: &mut Z3WorkerPool, vrs_file: &str) -> Option<BenchR
                 t_synth += t_1.duration_since(t_0).as_millis();
                 let t_0 = t_1;
 
+                let stats = synth.worker_pool_stats();
+
+                n_queries += stats.n_queries;
+                n_cached_queries += stats.n_cached;
+
                 match synth.finalize() {
-                    Ok(_r) => {
-                        // println!("{}{r}", seg.ident());
+                    Ok(r) => {
+                        // println!("progs: {r} {} {} {}", r.map_len(), r.protect_len(), r.unmap_len());
+                        map_len += r.map_len();
+                        unmap_len += r.unmap_len();
+                        protect_len += r.protect_len();
                     }
                     Err(_e) => {
                         println!("   - ERROR: Synthesis failed {}", seg.ident());
@@ -268,6 +146,11 @@ fn run_synthesis(z3_workers: &mut Z3WorkerPool, vrs_file: &str) -> Option<BenchR
                     return None;
                 }
 
+                let stats = synth.worker_pool_stats();
+
+                n_queries += stats.n_queries;
+                n_cached_queries += stats.n_cached;
+
                 let t_1 = Instant::now();
                 t_sanity_check += t_1.duration_since(t_0).as_millis();
             }
@@ -280,12 +163,17 @@ fn run_synthesis(z3_workers: &mut Z3WorkerPool, vrs_file: &str) -> Option<BenchR
     results.t_check.push(t_sanity_check);
     results.t_total.push(t_total);
     results.t_finalize.push(t_finalize);
+    results.n_cached.push(n_cached_queries.try_into().unwrap());
+    results.n_queries.push(n_queries.try_into().unwrap());
     results.num_enums = num_enums;
     results.num_staticmaps = num_staticmaps;
     results.num_segments = num_segments;
     results.num_units = num_enums + num_staticmaps + num_segments;
     results.num_fields = total_fields;
     results.num_slices = total_slices;
+    results.map_len = map_len;
+    results.unmap_len = unmap_len;
+    results.protect_len = protect_len;
 
     Some(results)
 }
@@ -293,7 +181,9 @@ fn run_synthesis(z3_workers: &mut Z3WorkerPool, vrs_file: &str) -> Option<BenchR
 fn main() {
     println!("# Running Benchmark: Synthesis times");
 
-    for spec in SPECS.iter() {
+    let mut latex_results = String::new();
+
+    for (spec, name) in SPECS.iter() {
         println!(" @ Spec: {spec}");
 
         let vrs = PathBuf::from(spec);
@@ -303,12 +193,12 @@ fn main() {
             continue;
         }
 
-        let mut results = BenchResults::new(vrs_file.clone());
+        let mut results = BenchResults::new(name.to_string());
         let mut had_errors = false;
         for _ in 0..ITERATIONS {
             // create synth factory and run synthesis on the segments
             let mut z3_workers = Z3WorkerPool::with_num_workers(NUM_WORKERS, None);
-            if let Some(res) = run_synthesis(&mut z3_workers, vrs_file.as_str()) {
+            if let Some(res) = run_synthesis(&mut z3_workers, vrs_file.as_str(), name) {
                 results.merge(&res);
             } else {
                 had_errors = true;
@@ -323,7 +213,10 @@ fn main() {
         }
 
         println!("{results}");
+        latex_results.push_str(results.to_latex().as_str());
     }
 
     println!("# Completed");
+
+    println!("% latex table\n{latex_results}");
 }
