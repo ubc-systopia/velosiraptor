@@ -43,6 +43,7 @@ use std::time::{Duration, Instant};
 // crate modules
 mod error;
 mod model;
+mod opts;
 mod programs;
 mod sanitycheck;
 mod vmops;
@@ -56,9 +57,10 @@ use crate::vmops::SynchronousSync;
 pub use crate::vmops::{
     enums, BoolExprQuery, BoolExprQueryBuilder, CompoundBoolExprQueryBuilder, CompoundQueryAll,
     CompoundQueryAny, MapPrograms, MaybeResult, ProgramBuilder, ProgramVerifier, ProtectPrograms,
-    TranslateQuery, TranslateQueryBuilder, UnmapPrograms, DEFAULT_BATCH_SIZE,
+    TranslateQuery, TranslateQueryBuilder, UnmapPrograms,
 };
 pub use error::{VelosiSynthError, VelosiSynthIssues};
+pub use opts::{SynthOpts, DEFAULT_BATCH_SIZE};
 pub use programs::{Program, ProgramsBuilder, ProgramsIter};
 pub use z3::{Z3Query, Z3TaskPriority, Z3Ticket, Z3Worker, Z3WorkerPool, Z3WorkerPoolStats};
 
@@ -86,6 +88,28 @@ pub struct SynthResult {
     map: Option<Program>,
     unmap: Option<Program>,
     protect: Option<Program>,
+}
+
+impl SynthResult {
+    pub fn prog_lenghts(&self) -> (usize, usize, usize) {
+        (
+            self.map.as_ref().map(|p| p.len()).unwrap_or(0),
+            self.unmap.as_ref().map(|p| p.len()).unwrap_or(0),
+            self.protect.as_ref().map(|p| p.len()).unwrap_or(0),
+        )
+    }
+
+    pub fn map_len(&self) -> usize {
+        self.map.as_ref().map(|p| p.len()).unwrap_or(0)
+    }
+
+    pub fn unmap_len(&self) -> usize {
+        self.unmap.as_ref().map(|p| p.len()).unwrap_or(0)
+    }
+
+    pub fn protect_len(&self) -> usize {
+        self.protect.as_ref().map(|p| p.len()).unwrap_or(0)
+    }
 }
 
 impl Display for SynthResult {
@@ -137,18 +161,16 @@ pub struct Z3SynthSegment<'a> {
 }
 
 impl<'a> Z3SynthSegment<'a> {
-    /// creates a new synthesis handle with the given worker poopl and the unit
-    pub fn new(
-        z3: &'a mut Z3WorkerPool,
+    pub fn with_opts(
         unit: &'a mut VelosiAstUnitSegment,
         model: Arc<Smt2Context>,
+        opts: SynthOpts,
+        z3: &'a mut Z3WorkerPool,
     ) -> Self {
-        let batch_size = std::cmp::max(DEFAULT_BATCH_SIZE, z3.num_workers());
-
         // XXX: move this to the the syntheisze() step.
-        let map_queries = MapPrograms::new(unit, batch_size, None);
-        let unmap_queries = UnmapPrograms::new(unit, batch_size, None);
-        let protect_queries = ProtectPrograms::new(unit, batch_size, None);
+        let map_queries = MapPrograms::with_opts(unit, opts.clone(), None);
+        let unmap_queries = UnmapPrograms::with_opts(unit, opts.clone(), None);
+        let protect_queries = ProtectPrograms::with_opts(unit, opts, None);
 
         z3.reset_with_context(Z3Query::with_model_contexts(vec![model]), true);
 
@@ -168,6 +190,16 @@ impl<'a> Z3SynthSegment<'a> {
             t_protect_synthesis: Duration::from_secs(0),
             t_synth_start: None,
         }
+    }
+
+    /// creates a new synthesis handle with the given worker poopl and the unit
+    pub fn new(
+        z3: &'a mut Z3WorkerPool,
+        unit: &'a mut VelosiAstUnitSegment,
+        model: Arc<Smt2Context>,
+    ) -> Self {
+        let batch_size = std::cmp::max(DEFAULT_BATCH_SIZE, z3.num_workers());
+        Self::with_opts(unit, model, SynthOpts::with_batchsize(batch_size), z3)
     }
 
     fn destroy(self) -> &'a mut VelosiAstUnitSegment {
@@ -334,15 +366,23 @@ impl<'a> Z3SynthSegment<'a> {
             self.z3.reset_with_context(Z3Query::from(ctx), false);
 
             let unit = &self.unit;
-            let batch_size = std::cmp::max(DEFAULT_BATCH_SIZE, self.z3.num_workers());
 
             // use the previously generated programs as a starting point
-            self.map_queries =
-                MapPrograms::new(unit, batch_size, self.map_program.take().map(Rc::new));
-            self.unmap_queries =
-                UnmapPrograms::new(unit, batch_size, self.unmap_program.take().map(Rc::new));
-            self.protect_queries =
-                ProtectPrograms::new(unit, batch_size, self.protect_program.take().map(Rc::new));
+            self.map_queries = MapPrograms::with_opts(
+                unit,
+                SynthOpts::default(),
+                self.map_program.take().map(Rc::new),
+            );
+            self.unmap_queries = UnmapPrograms::with_opts(
+                unit,
+                SynthOpts::default(),
+                self.unmap_program.take().map(Rc::new),
+            );
+            self.protect_queries = ProtectPrograms::with_opts(
+                unit,
+                SynthOpts::default(),
+                self.protect_program.take().map(Rc::new),
+            );
 
             // do the synthesis step again
             while !self.is_done() {
@@ -354,15 +394,15 @@ impl<'a> Z3SynthSegment<'a> {
     pub fn synthesize_map(&mut self, batch_size: usize, mem_model: bool) -> Option<Program> {
         self.done = true;
 
-        let mut p = MapPrograms::new(self.unit, batch_size, None);
+        let mut p = MapPrograms::with_opts(self.unit, SynthOpts::with_batchsize(batch_size), None);
         p.synthesize(self.z3, self.unit, batch_size, mem_model)
     }
 
     pub fn synthesize_unmap(&mut self, batch_size: usize, mem_model: bool) -> Option<Program> {
         self.done = true;
-        let mut p = UnmapPrograms::new(
+        let mut p = UnmapPrograms::with_opts(
             self.unit,
-            batch_size,
+            SynthOpts::with_batchsize(batch_size),
             self.unmap_program.take().map(Rc::new),
         );
         p.synthesize(self.z3, self.unit, batch_size, mem_model)
@@ -370,9 +410,9 @@ impl<'a> Z3SynthSegment<'a> {
 
     pub fn synthesize_protect(&mut self, batch_size: usize, mem_model: bool) -> Option<Program> {
         self.done = true;
-        let mut p = ProtectPrograms::new(
+        let mut p = ProtectPrograms::with_opts(
             self.unit,
-            batch_size,
+            SynthOpts::with_batchsize(batch_size),
             self.protect_program.take().map(Rc::new),
         );
 
@@ -386,6 +426,26 @@ impl<'a> Z3SynthSegment<'a> {
 
     pub fn worker_pool_stats(&self) -> &Z3WorkerPoolStats {
         self.z3.stats()
+    }
+
+    pub fn num_programs(&self) -> (u128, Option<u128>) {
+        let (n_map, n_map_max) = self.map_queries.size_hint();
+        let (n_protect, n_protect_max) = self.protect_queries.size_hint();
+        let (n_unmap, n_unmap_max) = self.unmap_queries.size_hint();
+
+        let lower = n_map + n_protect + n_unmap;
+        if n_map_max.is_none() && n_protect_max.is_none() && n_unmap_max.is_none() {
+            (lower, None)
+        } else {
+            (
+                lower,
+                Some(
+                    n_map_max.unwrap_or_default()
+                        + n_protect_max.unwrap_or_default()
+                        + n_unmap_max.unwrap_or_default(),
+                ),
+            )
+        }
     }
 }
 

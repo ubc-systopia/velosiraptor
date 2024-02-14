@@ -35,6 +35,7 @@ use velosiast::ast::{VelosiAstBinOpExpr, VelosiAstExpr, VelosiAstMethod, VelosiA
 use crate::programs::Program;
 use crate::ProgramsIter;
 
+use crate::opts::SynthOpts;
 use crate::z3::{Z3TaskPriority, Z3WorkerPool};
 
 use super::queries::{
@@ -49,9 +50,13 @@ pub struct ProtectPrograms {
 }
 
 impl ProtectPrograms {
-    pub fn new(
+    pub fn new(unit: &VelosiAstUnitSegment, starting_prog: Option<Rc<Program>>) -> Self {
+        Self::with_opts(unit, SynthOpts::default(), starting_prog)
+    }
+
+    pub fn with_opts(
         unit: &VelosiAstUnitSegment,
-        batch_size: usize,
+        opts: SynthOpts,
         starting_prog: Option<Rc<Program>>,
     ) -> Self {
         log::info!(target : "[synth::protect]", "setting up protect synthesis.");
@@ -68,14 +73,14 @@ impl ProtectPrograms {
             // obtain the translate query
             let query = TranslateQueryBuilder::new(unit, m_op.clone(), m.clone())
                 .no_change()
-                .build()
+                .build(&opts)
                 .expect("no query?");
 
             partial_programs.push(
                 ProgramVerifier::with_batchsize(
                     unit.ident().clone(),
                     query.into(),
-                    batch_size,
+                    opts.batch_size,
                     Z3TaskPriority::lowest(),
                 )
                 .into(),
@@ -86,7 +91,7 @@ impl ProtectPrograms {
                 unit,
                 m_op,
                 m,
-                batch_size,
+                &opts,
                 false,
                 Some(true),
                 &mut partial_programs,
@@ -97,7 +102,7 @@ impl ProtectPrograms {
         utils::add_methods_tagged_with_remap(
             unit,
             m_op,
-            batch_size,
+            &opts,
             false,
             Some(true),
             &mut partial_programs,
@@ -119,7 +124,7 @@ impl ProtectPrograms {
 
                 BoolExprQueryBuilder::new(unit, m_op.clone(), goal_expr)
                     .mem_model(staring_prog.clone())
-                    .build()
+                    .build(&opts)
                     .expect("no query?")
                     .into()
             } else {
@@ -130,7 +135,7 @@ impl ProtectPrograms {
             CompoundBoolExprQueryBuilder::new(unit, m_op.clone(), Z3TaskPriority::highest().lower())
                 .partial_programs(partial_programs, false)
                 // .assms()
-                .all()
+                .all(&opts)
                 .expect("query?")
                 .into()
         };
@@ -138,7 +143,7 @@ impl ProtectPrograms {
         let mut query = ProgramVerifier::with_batchsize(
             unit.ident().clone(),
             query,
-            batch_size,
+            opts.batch_size,
             Z3TaskPriority::highest(),
         );
 
@@ -153,6 +158,11 @@ impl ProtectPrograms {
 impl ProgramBuilder for ProtectPrograms {
     fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
         self.candidate_programs.next(z3)
+    }
+
+    /// returns an estimate of the number of elements in this iterator
+    fn size_hint(&self) -> (u128, Option<u128>) {
+        self.candidate_programs.size_hint()
     }
 
     fn m_op(&self) -> &VelosiAstMethod {

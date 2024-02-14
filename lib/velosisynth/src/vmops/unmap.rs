@@ -35,6 +35,7 @@ use velosiast::ast::{VelosiAstBinOpExpr, VelosiAstExpr, VelosiAstMethod, VelosiA
 use crate::programs::Program;
 use crate::ProgramsIter;
 
+use crate::opts::SynthOpts;
 use crate::z3::{Z3TaskPriority, Z3WorkerPool};
 
 use super::queries::{
@@ -53,9 +54,13 @@ pub struct UnmapPrograms {
 }
 
 impl UnmapPrograms {
-    pub fn new(
+    pub fn new(unit: &VelosiAstUnitSegment, starting_prog: Option<Rc<Program>>) -> Self {
+        Self::with_opts(unit, SynthOpts::default(), starting_prog)
+    }
+
+    pub fn with_opts(
         unit: &VelosiAstUnitSegment,
-        batch_size: usize,
+        opts: SynthOpts,
         starting_prog: Option<Rc<Program>>,
     ) -> Self {
         log::info!(target : "[synth::unmap]", "setting up unmap synthesis.");
@@ -78,7 +83,7 @@ impl UnmapPrograms {
                         // .assms(): No assumptions, as they will be added by the map.assms()
                         .variable_references(false)
                         .negate(true) // we negate the expression here
-                        .build()
+                        .build(&opts)
                         .map(|e| e.into());
                     if let Some(query) = query {
                         partial_programs.push(query);
@@ -88,27 +93,12 @@ impl UnmapPrograms {
         }
 
         // next we add the methods
-        utils::add_methods_tagged_with_remap(
-            unit,
-            m_op,
-            batch_size,
-            true,
-            None,
-            &mut partial_programs,
-        );
+        utils::add_methods_tagged_with_remap(unit, m_op, &opts, true, None, &mut partial_programs);
 
         // if none of them can be invalidated we see whether there are pre-conditions in the
         // translate function that we may select from
         if let Some(m) = unit.get_method("translate") {
-            utils::add_method_preconds(
-                unit,
-                m_op,
-                m,
-                batch_size,
-                true,
-                None,
-                &mut partial_programs,
-            );
+            utils::add_method_preconds(unit, m_op, m, &opts, true, None, &mut partial_programs);
         }
 
         let query = if let Some(starting_prog) = &starting_prog {
@@ -127,7 +117,7 @@ impl UnmapPrograms {
 
                 BoolExprQueryBuilder::new(unit, m_op.clone(), goal_expr)
                     .mem_model(starting_prog.clone())
-                    .build()
+                    .build(&opts)
                     .expect("no query?")
                     .into()
             } else {
@@ -139,14 +129,14 @@ impl UnmapPrograms {
                 .partial_programs(partial_programs, false)
                 .order_preserving() // set it to be order preserving
                 // .assms()
-                .any()
+                .any(&opts)
                 .into()
         };
 
         let mut candidate_programs = ProgramVerifier::with_batchsize(
             unit.ident().clone(),
             query,
-            batch_size,
+            opts.batch_size,
             Z3TaskPriority::highest(),
         );
 
@@ -165,6 +155,11 @@ impl UnmapPrograms {
 impl ProgramBuilder for UnmapPrograms {
     fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
         self.candidate_programs.next(z3)
+    }
+
+    /// returns an estimate of the number of elements in this iterator
+    fn size_hint(&self) -> (u128, Option<u128>) {
+        self.candidate_programs.size_hint()
     }
 
     fn m_op(&self) -> &VelosiAstMethod {
