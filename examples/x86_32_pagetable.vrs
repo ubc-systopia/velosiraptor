@@ -204,12 +204,12 @@ segment X8632PageDirectoryEntryFrame(base : paddr) {
 
     #[remap]
     fn is_writable(flgs : flags) -> bool {
-        (state.entry.writable == flgs.writable)
+        state.entry.writable == flgs.writable
     }
 
     #[remap]
     fn is_user(flgs : flags) -> bool {
-        (state.entry.usermode == flgs.usermode)
+        state.entry.usermode == flgs.usermode
     }
 
     #[remap]
@@ -248,7 +248,9 @@ segment X8632PageDirectoryEntryFrame(base : paddr) {
         requires va == 0 && sz == LARGE_PAGE_SIZE
         requires (pa & (LARGE_PAGE_SIZE - 1) == 0)
 
-    synth fn protect(va: vaddr, sz: size, flgs: flags);
+    synth fn protect(va: vaddr, sz: size, flgs: flags)
+        requires va == 0 && sz == LARGE_PAGE_SIZE
+
 
     synth fn unmap(va: vaddr, sz: size)
         requires va == 0 && sz == LARGE_PAGE_SIZE

@@ -1,0 +1,75 @@
+/*
+ * This specification expresses a hypothetical direct segment. This is a single, contiguous
+ * region of memory that is translated using a segment-like approach.
+ *
+ * The segment has a given maximum size, but the actual size can be configured.
+ * Moreover, the translation functionality can be disabled.
+ *
+ * The state is given by two registers:
+ *   base: that defines the base address and the permissions
+ *   size: the active size of the segment
+ *
+ * The minimum translation size is 64 bytes.
+ * The translation size is a multiple of 64 bytes.
+ */
+
+flags {
+    writable,
+    readable,
+    executable,
+}
+
+// This defines an SMPT Entry
+segment DirectSegment(base : addr) {
+
+    const SEG_SIZE : size = 1 << 20;
+
+    // let's assume the maximum size of the segment is 20 bits.
+    inbitwidth= 20;
+
+    // let's assume the maximum output bit size is 48 bits
+    outbitwidth = 48;
+
+
+
+    // the state will be two registers:
+    state(base: addr) {
+        reg address [ 8 ] {
+            0 .. 48 val,
+            48 .. 49 enabled,
+        }
+    }
+
+    // just expose the entire state as MMIO interface
+    interface(base: addr) {
+        mmio address [ base, 0, 8 ],
+    }
+
+    // add the valid bit, we can't unmap here
+    #[remap]
+    fn valid() -> bool {
+        state.address.enabled == 1
+    }
+
+    // define the permission flags
+    #[remap]
+    fn matchflags(flgs : flags) -> bool
+    {
+        true
+    }
+
+    // to calculate the new address, we just add the base address here, if within range
+    fn translate(va: vaddr) -> paddr
+        requires va < SEG_SIZE
+    {
+        va + state.address.val
+    }
+
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+        requires sz == SEG_SIZE
+        requires va == 0
+
+    synth fn protect(va: vaddr, sz: size, flgs: flags);
+
+    synth fn unmap(va: vaddr, sz: size);
+ }

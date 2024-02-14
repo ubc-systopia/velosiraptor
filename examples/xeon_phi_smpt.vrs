@@ -49,6 +49,7 @@ segment SMPTE(base: addr) {
     }
 
     fn translate(va: vaddr) -> paddr
+        requires state.entry.snoop_disabled == 0;
         requires va < SMTP_PAGE_SIZE;
     {
         va + (state.entry.host_address << 34)
