@@ -36,12 +36,12 @@ use velosiast::ast::{
     VelosiAstMethod, VelosiAstTypeInfo, VelosiAstUnitSegment,
 };
 
-use crate::Z3TaskPriority;
 use crate::{
     model::method::{translate_map_result_name, translate_protect_result_name},
     z3::Z3WorkerPool,
     Program, ProgramsIter,
 };
+use crate::{SynthOpts, Z3TaskPriority};
 
 //use super::queryhelper::{MaybeResult, ProgramBuilder, QueryBuilder};
 use super::MaybeResult;
@@ -80,19 +80,20 @@ impl<'a> TranslateQueryBuilder<'a> {
         self
     }
 
-    pub fn build(self) -> Option<TranslateQuery> {
+    pub fn build(self, opts: &SynthOpts) -> Option<TranslateQuery> {
         let (mut programs, ident, mut args) = match self.m_op.ident().as_str() {
             "map" => {
-                let body = self.m_translate.body.as_ref().unwrap();
+                let expr = self.m_translate.body.as_ref().unwrap();
+                let additional_state = HashSet::new();
                 let mut builder =
-                    utils::make_program_builder_no_params(self.unit, body, HashSet::new());
+                    utils::make_program_builder_no_params(self.unit, expr, additional_state, opts);
 
                 // translate is a bit special here, for map we want the following two variables
                 builder.add_var(String::from("va"));
                 builder.add_var(String::from("pa"));
 
                 (
-                    builder.into_iter(),
+                    builder.into_iter(opts),
                     VelosiAstIdentifier::from(translate_map_result_name(None).as_str()),
                     Vec::new(),
                 )
@@ -117,7 +118,13 @@ impl<'a> TranslateQueryBuilder<'a> {
                     args,
                 )
             }
-            m => unreachable!("Why was this function called for method {}", m),
+            m => {
+                log::error!(
+                    "only map & protect targets supported for this function {}",
+                    m
+                );
+                return None;
+            }
         };
 
         if programs.has_programs() {
@@ -159,6 +166,11 @@ impl TranslateQuery {}
 impl ProgramBuilder for TranslateQuery {
     fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
         self.programs.next(z3)
+    }
+
+    /// returns an estimate of the number of programs
+    fn size_hint(&self) -> (u128, Option<u128>) {
+        self.programs.size_hint()
     }
 
     fn m_op(&self) -> &VelosiAstMethod {

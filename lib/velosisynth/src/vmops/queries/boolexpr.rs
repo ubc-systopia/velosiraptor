@@ -37,6 +37,7 @@ use velosiast::ast::{
 };
 
 // crate imports
+use crate::opts::SynthOpts;
 use crate::Z3TaskPriority;
 use crate::{z3::Z3WorkerPool, Program};
 
@@ -127,10 +128,13 @@ impl<'a> BoolExprQueryBuilder<'a> {
     }
 
     /// builds the bool expr query or returns None if there are no queries to be run
-    pub fn build(self) -> Option<BoolExprQuery> {
-        // if the expression doesn't have state references, then nothing to be done.
-        let has_state_refs = self.goal_expr.has_state_references() || self.goal_expr.is_fncall();
+    pub fn build(self, opts: &SynthOpts) -> Option<BoolExprQuery> {
+        let additional_state_refs = self.state_refs.unwrap_or_default();
 
+        // if the expression doesn't have state references, then nothing to be done.
+        let has_state_refs = self.goal_expr.has_state_references()
+            || !additional_state_refs.is_empty()
+            || self.goal_expr.is_fncall();
         if !has_state_refs && self.mem_model.is_none() {
             log::info!("No state references in the expression");
             return None;
@@ -161,9 +165,10 @@ impl<'a> BoolExprQueryBuilder<'a> {
                 self.unit,
                 self.m_op.as_ref(),
                 &self.goal_expr,
-                self.state_refs.unwrap_or_default(),
+                additional_state_refs,
+                opts,
             )
-            .into_iter();
+            .into_iter(opts);
             if !programs.has_programs() {
                 return None;
             }
@@ -225,6 +230,11 @@ pub struct BoolExprQuery {
 impl ProgramBuilder for BoolExprQuery {
     fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program> {
         self.programs.next(z3)
+    }
+
+    /// returns an estimate of the number of elements in this iterator
+    fn size_hint(&self) -> (u128, Option<u128>) {
+        self.programs.size_hint()
     }
 
     fn m_op(&self) -> &VelosiAstMethod {

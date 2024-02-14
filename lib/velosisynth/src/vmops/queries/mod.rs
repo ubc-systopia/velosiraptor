@@ -56,7 +56,7 @@ pub use boolexpr::{BoolExprQuery, BoolExprQueryBuilder};
 pub use cnf::{CompoundBoolExprQueryBuilder, CompoundQueryAll, CompoundQueryAny};
 pub use programsimplifier::ProgramSimplifier;
 pub use translate::{TranslateQuery, TranslateQueryBuilder};
-pub use verifier::{ProgramVerifier, DEFAULT_BATCH_SIZE};
+pub use verifier::ProgramVerifier;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tri-State Result
@@ -121,6 +121,9 @@ impl<T> From<Option<T>> for MaybeResult<T> {
 pub trait ProgramBuilder {
     /// returns the next query to be submitted, or None if all have been submitted
     fn next(&mut self, z3: &mut Z3WorkerPool) -> MaybeResult<Program>;
+
+    /// returns an estimate of the number of programs
+    fn size_hint(&self) -> (u128, Option<u128>);
 
     /// obtains the reference to the method that is being synthesized (map, protect, unmap)
     fn m_op(&self) -> &VelosiAstMethod;
