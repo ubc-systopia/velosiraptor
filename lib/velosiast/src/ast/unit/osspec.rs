@@ -423,6 +423,10 @@ impl VelosiAstUnitOSSpec {
         self.get_method_with_signature(params, rtype)
     }
 
+    pub fn has_phys_alloc_fn(&self) -> bool {
+        !self.get_phys_alloc_fn().is_empty()
+    }
+
     pub fn get_phys_alloc_fn(&self) -> Vec<Rc<VelosiAstMethod>> {
         let rtype = VelosiAstTypeInfo::PhysAddr;
         let params = [VelosiAstTypeInfo::Size, VelosiAstTypeInfo::PhysAddr];
