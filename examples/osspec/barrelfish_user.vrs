@@ -7,20 +7,20 @@ flags {
 osspec MyOs {
     const BAR : int = 1234;
 
-    extern type Errval { }
+    extern type MyErrval { }
 
-    extern type Capref {}
+    extern type MyCapref {}
 
     #[desc]
-    extern type VNode {
-        cap: Capref,
-        mapping: Capref,
+    extern type MyVNode {
+        cap: MyCapref,
+        mapping: MyCapref,
     }
 
     #[frame]
-    extern type Frame {
-        cap: Capref,
-        mapping: Capref,
+    extern type MyFrame {
+        cap: MyCapref,
+        mapping: MyCapref,
     }
 
     // functions to allocate and free memory
@@ -31,42 +31,42 @@ osspec MyOs {
     extern fn os_virt_free(va: vaddr, sz:size)
 
     #[malloc]
-    extern fn os_vnode_alloc(ty: UnitType) -> VNode
+    extern fn os_vnode_alloc(ty: UnitType) -> MyVNode
 
     #[mfree]
-    extern fn os_vnode_free(vnode: VNode)
+    extern fn os_vnode_free(vnode: MyVNode)
 
-    extern fn vnode_is_valid(vnode: VNode) -> bool
+    extern fn vnode_is_valid(vnode: MyVNode) -> bool
 
     // extern fn get_vnode_for_va(va: vaddr) -> vnode
-    extern fn frame_to_paddr(pa: Frame) -> paddr
-    extern fn get_vnode_for_va(va: vaddr) -> Capref
-    extern fn get_mapping_for_va(va: vaddr) -> Capref
+    extern fn frame_to_paddr(pa: MyFrame) -> paddr
+    extern fn get_vnode_for_va(va: vaddr) -> MyCapref
+    extern fn get_mapping_for_va(va: vaddr) -> MyCapref
 
-    extern fn errval_to_bool(err: Errval) -> bool
+    extern fn errval_to_bool(err: MyErrval) -> bool
 
-    extern fn vnode_map(dest: Capref, src: Capref, va: vaddr,
+    extern fn my_vnode_map(dest: MyCapref, src: MyCapref, va: vaddr,
                         attr: flags, off: addr, sz: size,
-                        mapping: Capref) -> Errval
+                        mapping: MyCapref) -> MyErrval
 
-    extern fn vnode_unmap(table: Capref, mapping: Capref) -> Errval
+    extern fn my_vnode_unmap(table: MyCapref, mapping: MyCapref) -> MyErrval
 
-    extern fn vnode_modify_flags(table: Capref, va: vaddr, sz: size, attr: flags) -> Errval;
+    extern fn my_vnode_modify_flags(table: MyCapref, va: vaddr, sz: size, attr: flags) -> MyErrval;
 
-    fn map_vnode(va: vaddr, sz: size, flgs: flags, pa: VNode) -> bool {
-        errval_to_bool(vnode_map(self.cap, pa.cap, va, flgs, 0, sz, pa.mapping))
+    fn map_vnode(va: vaddr, sz: size, flgs: flags, pa: MyVNode) -> bool {
+        errval_to_bool(my_vnode_map(self.cap, pa.cap, va, flgs, 0, sz, pa.mapping))
     }
 
-    fn map_frame(va: vaddr, sz: size, flgs: flags, pa: Frame) -> bool {
-        errval_to_bool(vnode_map(self.cap, pa.cap, va, flgs, 0, sz, pa.mapping))
+    fn map_frame(va: vaddr, sz: size, flgs: flags, pa: MyFrame) -> bool {
+        errval_to_bool(my_vnode_map(self.cap, pa.cap, va, flgs, 0, sz, pa.mapping))
     }
 
     fn protect(va: vaddr, sz: size, flgs: flags) -> bool {
-        errval_to_bool(vnode_modify_flags(self.cap, va, sz, flgs))
+        errval_to_bool(my_vnode_modify_flags(self.cap, va, sz, flgs))
     }
 
     fn unmap(va: vaddr, sz: size) -> bool {
-        errval_to_bool(vnode_unmap(self.cap, get_mapping_for_va(va)))
+        errval_to_bool(my_vnode_unmap(self.cap, get_mapping_for_va(va)))
     }
 }
 
