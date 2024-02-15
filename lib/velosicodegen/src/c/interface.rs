@@ -31,8 +31,7 @@ use std::path::{Path, PathBuf};
 use crustal as C;
 
 use velosiast::{
-    VelosiAst, VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField, VelosiAstTypeProperty,
-    VelosiAstUnit,
+    VelosiAst, VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField, VelosiAstTypeInfo, VelosiAstTypeProperty, VelosiAstUnit
 };
 
 use super::{
@@ -142,7 +141,16 @@ fn generate_write_slice_fn(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Generates the method to read the entire field
-fn generate_read_field(scope: &mut C::Scope, unit: &VelosiAstUnit, field: &dyn VelosiAstField) {
+fn generate_read_field(scope: &mut C::Scope, unit: &VelosiAstUnit, field: &dyn VelosiAstField, osspec: &VelosiAst) {
+
+    let env = osspec.osspec().unwrap();
+
+    let phys_to_virt_fns = env.get_method_with_signature(&[VelosiAstTypeInfo::PhysAddr], &VelosiAstTypeInfo::VirtAddr);
+    let phys_to_virt_fn = phys_to_virt_fns.first();
+
+
+
+
     // define the function sigature
     let fieldtype = C::Type::new_typedef(&field.to_type_name(unit));
     let mut f = C::Function::with_string(field.to_rd_fn(unit), fieldtype.clone());
@@ -158,7 +166,7 @@ fn generate_read_field(scope: &mut C::Scope, unit: &VelosiAstUnit, field: &dyn V
     let field_var = field_var_decl.to_expr();
 
     // assign to the declared variable
-    let reg_read_fn = field.to_os_rd_fn(unit, &unit_var);
+    let reg_read_fn = field.to_os_rd_fn(unit, phys_to_virt_fn, &unit_var);
     f.body().assign(
         field_var.clone(),
         field.to_set_val_fn_call(unit, reg_read_fn),
@@ -172,7 +180,13 @@ fn generate_read_field(scope: &mut C::Scope, unit: &VelosiAstUnit, field: &dyn V
 }
 
 /// Generates the write method for the entire field
-fn generate_write_field(scope: &mut C::Scope, unit: &VelosiAstUnit, field: &dyn VelosiAstField) {
+fn generate_write_field(scope: &mut C::Scope, unit: &VelosiAstUnit, field: &dyn VelosiAstField, osspec: &VelosiAst) {
+
+    let env = osspec.osspec().unwrap();
+
+    let phys_to_virt_fns = env.get_method_with_signature(&[VelosiAstTypeInfo::PhysAddr], &VelosiAstTypeInfo::VirtAddr);
+    let phys_to_virt_fn = phys_to_virt_fns.first();
+
     // adding the set value function
     let mut f = C::Function::with_string(field.to_wr_fn(unit), C::Type::new_void());
     f.set_static().set_inline();
@@ -185,7 +199,8 @@ fn generate_write_field(scope: &mut C::Scope, unit: &VelosiAstUnit, field: &dyn 
     let val_var = val_param.to_expr();
 
     // call the write function
-    let reg_write_fn = field.to_os_wr_fn(unit, &unit_var, &field.to_get_val_fn_call(unit, val_var));
+    let reg_write_fn = field.to_os_wr_fn(unit, phys_to_virt_fn, &unit_var, &field.to_get_val_fn_call(unit, val_var));
+
     f.body().raw_expr(reg_write_fn);
 
     // add the function to the scope
@@ -201,15 +216,16 @@ fn generate_interface_field_accessors(
     scope: &mut C::Scope,
     unit: &VelosiAstUnit,
     field: &VelosiAstInterfaceField,
+    osspec: &VelosiAst,
 ) -> Result<(), VelosiCodeGenError> {
     scope.new_comment("Reading interface fields");
-    generate_read_field(scope, unit, field);
+    generate_read_field(scope, unit, field, osspec);
     for slice in field.layout() {
         generate_read_slice_fn(scope, unit, field, slice);
     }
 
     scope.new_comment("Writing interface fields");
-    generate_write_field(scope, unit, field);
+    generate_write_field(scope, unit, field, osspec);
     for slice in field.layout() {
         generate_write_slice_fn(scope, unit, field, slice);
     }
@@ -307,7 +323,7 @@ fn generate_segment(
 
             // generate the field accessors
             for f in interface.fields() {
-                generate_interface_field_accessors(s, unit, f).expect("generation failed");
+                generate_interface_field_accessors(s, unit, f, osspec).expect("generation failed");
             }
         } else {
             s.new_comment("No interface defined for this unit.");
@@ -325,7 +341,7 @@ fn generate_segment(
             let fieldspath = outdir.join(unit.ident().to_ascii_lowercase());
             fs::create_dir_all(&fieldspath)?;
             for f in interface.fields() {
-                field::generate(unit, f, &fieldspath).expect("generation failed");
+                field::generate(unit, f, &fieldspath, osspec).expect("generation failed");
             }
         }
     }

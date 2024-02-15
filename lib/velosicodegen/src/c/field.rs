@@ -31,7 +31,7 @@ use std::path::Path;
 // get the code generator
 use crustal as C;
 
-use velosiast::{VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField, VelosiAstUnit};
+use velosiast::{VelosiAstField, VelosiAst, VelosiAstFieldSlice, VelosiAstInterfaceField, VelosiAstUnit};
 
 // library internal includes
 use super::utils::{self, FieldUtils, SliceUtils};
@@ -225,6 +225,7 @@ pub fn generate(
     unit: &VelosiAstUnit,
     field: &VelosiAstInterfaceField,
     outdir: &Path,
+    _osspec: &VelosiAst,
 ) -> Result<(), VelosiCodeGenError> {
     // the code generation scope
     let mut scope = C::Scope::new();

@@ -708,7 +708,7 @@ fn add_map_function(
     // ---------------------------------------------------------------------------------------------
 
     let fun_body = fun.body();
-    for variant in &relations.get_children_units(unit.ident()) {
+    for variant in &variants {
         let (maps_frame, maps_table) = if let VelosiAstUnit::Segment(a) = variant {
             (a.maps_frame(), a.maps_table())
         } else {
