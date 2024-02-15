@@ -1580,9 +1580,9 @@ fn add_op_function_enum(
         .collect();
     variants.sort_by(|a, b| {
         if a.maps_frame() && b.maps_table() {
-            std::cmp::Ordering::Less
-        } else if a.maps_table() && b.maps_frame() {
             std::cmp::Ordering::Greater
+        } else if a.maps_table() && b.maps_frame() {
+            std::cmp::Ordering::Less
         } else {
             std::cmp::Ordering::Equal
         }

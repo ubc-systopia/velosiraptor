@@ -11,6 +11,10 @@ osspec MyOs {
     #[mfree]
     extern fn memory_free(pa: paddr, sz: size)
 
+    // conversion functions for physical to virtual address translation
+    extern fn local_phys_to_mem(pa: paddr) -> vaddr;
+    extern fn mem_to_local_phys(va: vaddr) -> paddr;
+
     // fn map_table(va: vaddr, sz: size, flgs: flags, pa: VNode) -> bool
 
     // fn map_frame(va: vaddr, sz: size, flgs: flags, pa: Frame) -> bool
