@@ -38,6 +38,8 @@ pub fn generate(osspec: &VelosiAstUnitOSSpec, outdir: &Path) {
     // the code generation scope
     let mut scope = C::Scope::new();
 
+    println!("generating OSSPEC: {}", outdir.display());
+
     // constant definitions
     let title = format!("OSSPEC Definitions for `{}`", osspec.ident());
     utils::add_header(&mut scope, &title);

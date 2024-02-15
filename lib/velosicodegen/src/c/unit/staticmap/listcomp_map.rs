@@ -56,6 +56,7 @@ fn add_fn_params<'a>(
     fun: &mut C::Function,
     unit: &VelosiAstUnitStaticMap,
     op: &'a VelosiAstMethod,
+    pa_type: VelosiAstTypeInfo,
     osspec: &VelosiAst,
 ) -> (
     HashMap<&'a str, C::Expr>,
@@ -85,10 +86,7 @@ fn add_fn_params<'a>(
                 fun.new_param(f.ident(), C::Type::new_typedef(ty.ident.as_str()))
             } else {
                 param_types.insert(f.ident().as_str(), f.ptype.typeinfo.clone());
-                fun.new_param(
-                    f.ident(),
-                    unit.ptype_to_ctype(&VelosiAstTypeInfo::PhysAddr, true),
-                )
+                fun.new_param(f.ident(), unit.ptype_to_ctype(&pa_type, true))
             }
         } else {
             param_types.insert(f.ident().as_str(), f.ptype.typeinfo.clone());
@@ -195,13 +193,21 @@ fn generate_child_struct_fields_enum(
         if let VelosiAstUnit::Segment(s) = child {
             if s.maps_frame() {
                 // here we map a frame, we create a wrapper struct for the Frame type
-                let mut child_struct = C::Struct::new(&child.to_struct_name());
-                child_struct.new_field("frame", frame_type.clone());
+                if let Some(frametype) =
+                    env.get_extern_type_with_property(&VelosiAstTypeProperty::Frame)
+                {
+                    scope
+                        .new_macro(&child.to_type_name())
+                        .set_value(frametype.ident.as_str());
+                } else {
+                    let mut child_struct = C::Struct::new(&child.to_struct_name());
+                    child_struct.new_field("frame", frame_type.clone());
 
-                // add the child struct to the scope and add a typedef
-                let child_ty = child_struct.to_type();
-                scope.push_struct(child_struct);
-                scope.new_typedef(&child.to_type_name(), child_ty);
+                    // add the child struct to the scope and add a typedef
+                    let child_ty = child_struct.to_type();
+                    scope.push_struct(child_struct);
+                    scope.new_typedef(&child.to_type_name(), child_ty);
+                }
 
                 // add the entry in the child union
                 children_union.new_field(
@@ -243,35 +249,90 @@ fn generate_child_struct(
     let mut children_struct = C::Struct::new(&unit.to_child_struct_name());
     let children_struct_ty = children_struct.to_type();
 
-    // add the specific types for the children depending on whether they are
-    match relations.get_only_child_unit(unit.ident()) {
-        VelosiAstUnit::Enum(e) => {
-            generate_child_struct_fields_enum(scope, &mut children_struct, unit, e, relations, env);
-        }
-        VelosiAstUnit::Segment(s) => {
-            generate_child_struct_fields_segment(&mut children_struct, s, relations, env);
-        }
-        _ => unreachable!(),
-    }
+    let next_unit = relations.get_only_child_unit(unit.ident());
 
     // add the book keeping information, depending on the data structure representation
     if map.is_repr_list() {
+        // add the specific types for the children depending on whether they are
+        match next_unit {
+            VelosiAstUnit::Enum(e) => {
+                generate_child_struct_fields_enum(
+                    scope,
+                    &mut children_struct,
+                    unit,
+                    e,
+                    relations,
+                    env,
+                );
+            }
+            VelosiAstUnit::Segment(s) => {
+                generate_child_struct_fields_segment(&mut children_struct, s, relations, env);
+            }
+            _ => unreachable!(),
+        }
+
         children_struct.push_doc_str("list element");
         children_struct.new_field("next", C::Type::new_typedef_ptr(&unit.to_child_type_name()));
         children_struct.new_field(
             "va",
             unit.ptype_to_ctype(&VelosiAstTypeInfo::VirtAddr, false),
         );
+
+        // finally add the struct to the scope
+        scope
+            .push_struct(children_struct)
+            .new_typedef(&unit.to_child_type_name(), children_struct_ty);
     } else if map.is_repr_array() {
-        children_struct.push_doc_str("array element");
+        // add the specific types for the children depending on whether they are
+        match next_unit {
+            VelosiAstUnit::Enum(e) => {
+                generate_child_struct_fields_enum(
+                    scope,
+                    &mut children_struct,
+                    unit,
+                    e,
+                    relations,
+                    env,
+                );
+                children_struct.push_doc_str("array element");
+                // finally add the struct to the scope
+                scope
+                    .push_struct(children_struct)
+                    .new_typedef(&unit.to_child_type_name(), children_struct_ty);
+            }
+            VelosiAstUnit::Segment(s) => {
+                if s.maps_frame() {
+                    if let Some(frametype) =
+                        env.get_extern_type_with_property(&VelosiAstTypeProperty::Frame)
+                    {
+                        scope
+                            .new_macro(&unit.to_child_type_name())
+                            .set_value(frametype.ident.as_str());
+                    } else {
+                        generate_child_struct_fields_segment(
+                            &mut children_struct,
+                            s,
+                            relations,
+                            env,
+                        );
+                        scope
+                            .push_struct(children_struct)
+                            .new_typedef(&unit.to_child_type_name(), children_struct_ty);
+                    };
+                } else if s.maps_table() {
+                    let next_table = relations.get_only_child_unit(s.ident());
+                    scope
+                        .new_macro(&unit.to_child_type_name())
+                        .set_value(&next_table.to_type_name());
+                } else {
+                    unreachable!()
+                }
+            }
+            _ => unreachable!(),
+        }
     } else {
         unreachable!();
     }
-
-    // finally add the struct to the scope
-    scope
-        .push_struct(children_struct)
-        .new_typedef(&unit.to_child_type_name(), children_struct_ty);
 }
 
 fn generate_unit_struct(
@@ -316,9 +377,24 @@ fn generate_unit_struct(
             let f = C::Field::with_string(children_name, child_type.to_ptr());
             s.push_field(f);
         } else if map.is_repr_array() {
-            // array representation
+            let _next_unit = relations.get_only_child_unit(unit.ident());
             let f =
                 C::Field::with_string(children_name, child_type.to_ptr().to_array(unit.map_size()));
+
+            // match next_unit {
+            //     VelosiAstUnit::Enum(e) => {
+            //         C::Field::with_string(children_name, child_type.to_array(unit.map_size()));
+            //     }
+            //     VelosiAstUnit::Segment(s) => {
+            //         if s.maps_frame() {
+            //             C::Field::with_string(children_name, child_type.to_array(unit.map_size()))
+            //         } else {
+            //             C::Field::with_string(children_name, child_type.to_ptr().to_array(unit.map_size()))
+            //         }
+
+            //     }
+            //     _ => unreachable!()
+            // };
             s.push_field(f);
         } else {
             unreachable!()
@@ -1173,6 +1249,10 @@ fn add_constructor_function(
 // Higher-Order Functions mapping a single page
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Higher-Order Functions mapping a single page
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn op_fn_decl<'a>(
     unit: &VelosiAstUnitStaticMap,
     op: &'a VelosiAstMethod,
@@ -1184,7 +1264,8 @@ fn op_fn_decl<'a>(
 ) {
     let mut fun = C::Function::new(unit.to_hl_op_fn_name(op).as_str(), C::Type::new_size());
     fun.set_static().set_inline();
-    let (param_exprs, param_types) = add_fn_params(&mut fun, unit, op, osspec);
+    let (param_exprs, param_types) =
+        add_fn_params(&mut fun, unit, op, VelosiAstTypeInfo::PhysAddr, osspec);
 
     (fun, param_exprs, param_types)
 }
@@ -1204,6 +1285,14 @@ fn add_op_function_segment(
     // -----------------------------------------------------------------------------------------
     let (mut fun, param_exprs, _param_types) = op_fn_decl(unit, op, osspec);
 
+    let child_type = next_unit_type(unit, relations, osspec).to_ptr();
+
+    let page_size = if next_unit.inbitwidth < 64 {
+        1 << next_unit.inbitwidth
+    } else {
+        0xffff_ffff_ffff_ffff
+    };
+
     // -----------------------------------------------------------------------------------------
     // Function Body
     // -----------------------------------------------------------------------------------------
@@ -1211,8 +1300,8 @@ fn add_op_function_segment(
     let v_child = {
         let body = fun.body();
         body.new_comment("get the current unit");
-        let child_type = next_unit_type(unit, relations, osspec).to_ptr();
-        let v_child = body.new_variable("child", child_type).to_expr();
+
+        let v_child = body.new_variable("child", child_type.clone()).to_expr();
         body.assign(
             v_child.clone(),
             C::Expr::fn_call(
@@ -1222,14 +1311,6 @@ fn add_op_function_segment(
         );
         v_child
     };
-
-    let page_size = if next_unit.inbitwidth < 64 {
-        1 << next_unit.inbitwidth
-    } else {
-        0xffff_ffff_ffff_ffff
-    };
-
-    let child_type = C::Type::new_typedef(&unit.to_child_type_name()).to_ptr();
 
     if next_unit.maps_frame() {
         // -----------------------------------------------------------------------------------------
@@ -1283,36 +1364,16 @@ fn add_op_function_segment(
                     var,
                 )
             }
-            "unmap" => {
-                let mcheck =
-                    fun.body()
-                        .new_ifelse(&C::Expr::binop(v_child.clone(), "==", C::Expr::null()));
-                mcheck
-                    .then_branch()
-                    .new_comment("no mapping here. just return with the size to be unmapped!")
-                    .return_expr(C::Expr::new_num(page_size));
-
-                (
-                    env.get_method(op.ident().as_str())
-                        .expect("function not found"),
-                    C::Expr::null(),
-                )
-            }
-            "protect" => {
-                let mcheck =
-                    fun.body()
-                        .new_ifelse(&C::Expr::binop(v_child.clone(), "==", C::Expr::null()));
-                mcheck
-                    .then_branch()
-                    .new_comment("no mapping here. this is an error, return 0")
-                    .return_expr(C::Expr::new_num(0));
-
-                (
-                    env.get_method(op.ident().as_str())
-                        .expect("function not found"),
-                    C::Expr::null(),
-                )
-            }
+            "unmap" => (
+                env.get_method(op.ident().as_str())
+                    .expect("function not found"),
+                C::Expr::null(),
+            ),
+            "protect" => (
+                env.get_method(op.ident().as_str())
+                    .expect("function not found"),
+                C::Expr::null(),
+            ),
             _ => unreachable!(),
         };
 
@@ -1326,7 +1387,7 @@ fn add_op_function_segment(
             "map" => {
                 let block = map_cond.then_branch();
                 block.new_comment("mapping successful: add to bookkeeping");
-                block.assign(mapping.field_access("frame"), param_exprs["pa"].clone());
+                block.assign(mapping.deref(), param_exprs["pa"].clone());
                 block.fn_call(
                     &unit.set_child_fn_name(),
                     vec![
@@ -1366,7 +1427,25 @@ fn add_op_function_segment(
                     vec![param_exprs["$unit"].clone(), param_exprs["va"].clone()],
                 );
                 block.new_comment("free bookkeeping structure");
-                block.fn_call("os_free_fn", vec![v_child]);
+
+                let os_free_fns = env.get_virt_mem_free_fn();
+                let os_free_fn = os_free_fns.first().unwrap();
+
+                let args = os_free_fn
+                    .params
+                    .iter()
+                    .map(|p| {
+                        if p.ptype.is_size() {
+                            v_child.deref().size_of()
+                        } else if p.ptype.is_vaddr() {
+                            v_child.cast_to(C::Type::new_uintptr())
+                        } else {
+                            C::Expr::Raw(String::from("HUUUU"))
+                        }
+                    })
+                    .collect();
+
+                block.fn_call(os_free_fn.ident().as_str(), args);
             }
             "protect" => {
                 /* no-op */
@@ -1382,21 +1461,94 @@ fn add_op_function_segment(
             .return_expr(C::Expr::new_num(page_size));
         map_cond.other_branch().return_expr(C::Expr::new_num(0));
     } else if next_unit.maps_table() {
-        // allocate a table
+        match op.ident().as_str() {
+            "map" => {
+                let mcheck =
+                    fun.body()
+                        .new_ifelse(&C::Expr::binop(v_child.clone(), "==", C::Expr::null()));
+                let next_table = relations.get_only_child_unit(next_unit.ident());
+                {
+                    let block = mcheck.then_branch();
+                    block.new_comment("no mapping, allocate a new table");
+
+                    let tvar = block
+                        .new_variable("new_table", next_table.to_ctype_ptr())
+                        .to_expr();
+
+                    let vnode_alloc = block.new_ifelse(&C::Expr::lnot(C::Expr::fn_call(
+                        &next_table.to_allocate_fn_name(),
+                        vec![tvar.addr_of()],
+                    )));
+
+                    vnode_alloc
+                        .then_branch()
+                        .new_comment("couldn't allocate any memory, cannot map!")
+                        .return_expr(C::Expr::new_num(0));
+
+                    // now we have a table, let's map it.
+
+                    let env_fn = env
+                        .get_map_method(VelosiAstTypeProperty::Descriptor)
+                        .expect("function not found");
+
+                    let mut var_mappings = HashMap::new();
+                    var_mappings.insert("pa", tvar.clone().field_access("vnode"));
+                    var_mappings.insert("sz", C::Expr::new_num(page_size));
+                    let env_fn_body = env_fn.body.as_ref().expect("env fn doesn't have a body");
+                    let map_cond = block
+                        .new_ifelse(&C::Expr::lnot(unit.expr_to_cpp(&var_mappings, env_fn_body)));
+
+                    map_cond
+                        .then_branch()
+                        .new_comment("mapping failed, clean up allocation")
+                        .fn_call(&next_table.to_free_fn_name(), vec![tvar.clone()])
+                        .return_expr(C::Expr::new_num(0));
+
+                    block.fn_call(
+                        &unit.set_child_fn_name(),
+                        vec![
+                            param_exprs["$unit"].clone(),
+                            param_exprs["va"].clone(),
+                            tvar.clone(),
+                        ],
+                    );
+                    block.assign(v_child.clone(), tvar);
+                }
+            }
+            "protect" => {
+                let mcheck =
+                    fun.body()
+                        .new_ifelse(&C::Expr::binop(v_child.clone(), "==", C::Expr::null()));
+                mcheck
+                    .then_branch()
+                    .new_comment("no mapping here. we can't protect. this is an error")
+                    .return_expr(C::Expr::new_num(0));
+            }
+            "unmap" => {
+                let mcheck =
+                    fun.body()
+                        .new_ifelse(&C::Expr::binop(v_child.clone(), "==", C::Expr::null()));
+                mcheck
+                    .then_branch()
+                    .new_comment("no mapping here. just return with the size to be unmapped!")
+                    .return_expr(param_exprs["sz"].clone());
+            }
+            _ => unreachable!(),
+        }
+
+        let next_table = relations.get_only_child_unit(next_unit.ident());
+        let mask = next_table.vaddr_max();
+        let mut args = vec![v_child.clone()];
+        args.extend(op.params.iter().map(|p| {
+            if p.ident().as_str() == "va" {
+                C::Expr::binop(param_exprs["va"].clone(), "&", C::Expr::new_num(mask))
+            } else {
+                param_exprs[p.ident().as_str()].clone()
+            }
+        }));
         fun.push_doc_str("Entry: Segment mapping a descriptor (with OSSpec)");
-        // recurse
-        let body = fun.body();
-
-        let mut args = vec![v_child.field_access("table").addr_of()];
-        args.extend(
-            op.params
-                .iter()
-                .map(|p| param_exprs[p.ident().as_str()].clone()),
-        );
-
-        let next = relations.get_only_child_unit(next_unit.ident());
-        body.return_expr(C::Expr::fn_call(&next.to_hl_op_fn_name(op), args));
-        //unimplemented!("TODO: handle the static map with mapping table");
+        fun.body()
+            .return_expr(C::Expr::fn_call(&next_table.to_hl_op_fn_name(op), args));
     } else {
         unreachable!();
     }
@@ -1568,8 +1720,7 @@ fn add_op_function_enum(
                         )
                         .assign(
                             var.field_access("variants")
-                                .field_access(&variant.ident().to_ascii_lowercase())
-                                .field_access("frame"),
+                                .field_access(&variant.ident().to_ascii_lowercase()),
                             param_exprs["pa"].clone(),
                         )
                         .fn_call(
@@ -1872,6 +2023,80 @@ fn add_op_function(
     }
 }
 
+fn add_do_map_function(
+    scope: &mut C::Scope,
+    unit: &VelosiAstUnitStaticMap,
+    child: &VelosiAstUnitSegment,
+    _map: &VelosiAstStaticMapListComp,
+    relations: &Relations,
+    osspec: &VelosiAst,
+) {
+    let op = unit.get_method("map").unwrap();
+    let mut idx = 0;
+
+    let mut child_chars = child.ident().chars();
+    let mut unit_chars = unit.ident().chars();
+
+    while child_chars.next() == unit_chars.next() {
+        idx += 1;
+    }
+
+    let variant_name = &child.ident()[idx..].to_ascii_lowercase();
+    let mut fun = C::Function::new(
+        unit.to_hl_op_fn_name_child(op, variant_name.as_str())
+            .as_str(),
+        C::Type::new_size(),
+    );
+    fun.set_static().set_inline();
+
+    let variant = relations.get_only_child_unit(unit.ident());
+
+    let pa_type = if child.maps_table() {
+        VelosiAstTypeInfo::TypeRef(child.get_next_unit_ident().unwrap().clone())
+    } else {
+        VelosiAstTypeInfo::PhysAddr
+    };
+
+    let (param_exprs, _param_types) = add_fn_params(&mut fun, unit, op, pa_type, osspec);
+
+    let body = fun.body();
+    body.new_comment("Entry: Segment mapping a frame (direct access)");
+
+    body.new_comment("Get the child unit (i.e., the map entry)");
+    // let child = relations.get_only_child_unit(unit.ident());
+    let v_child = body.new_variable("child", variant.to_ctype()).to_expr();
+    body.assign(
+        v_child.clone(),
+        C::Expr::fn_call(
+            &unit.get_child_fn_name(),
+            vec![param_exprs["$unit"].clone(), param_exprs["va"].clone()],
+        ),
+    );
+
+    body.new_comment("Recurse on child unit");
+    let mut args = vec![C::Expr::addr_of(&v_child)];
+    args.extend(op.params.iter().map(|p| {
+        if p.ident().as_str() == "va" {
+            calculate_next_va(&param_exprs[p.ident().as_str()], variant.input_bitwidth())
+        } else {
+            param_exprs[p.ident().as_str()].clone()
+        }
+    }));
+
+    if variant.ident() == child.ident() {
+        body.return_expr(C::Expr::fn_call(&child.to_op_fn_name(op), args));
+    } else {
+        body.return_expr(C::Expr::fn_call(
+            &variant.to_hl_op_fn_name_variant(op, child),
+            args,
+        ));
+    }
+
+    println!("fun: {fun}");
+
+    scope.push_function(fun);
+}
+
 fn add_map_function(
     scope: &mut C::Scope,
     unit: &VelosiAstUnitStaticMap,
@@ -1879,8 +2104,37 @@ fn add_map_function(
     relations: &Relations,
     osspec: &VelosiAst,
 ) {
-    let op = unit.get_method("map").unwrap();
-    add_op_function(scope, unit, map, op, relations, osspec);
+    let env = osspec.osspec().unwrap();
+
+    if !env.has_map_protect_unmap() {
+        // get the child unit and see what we have here
+        let child_unit = relations.get_only_child_unit(unit.ident());
+
+        if let VelosiAstUnit::Segment(s) = child_unit {
+            if s.maps_table() {
+                // here we may map a table, add the do-map here
+                add_do_map_function(scope, unit, s, map, relations, osspec);
+            }
+        } else {
+            assert!(child_unit.is_enum());
+            let children_units = relations.get_children_units(child_unit.ident());
+            for child_unit in children_units {
+                if let VelosiAstUnit::Segment(s) = child_unit {
+                    // here we may map a table, add the do-map here
+                    add_do_map_function(scope, unit, &s, map, relations, osspec);
+                } else {
+                    unreachable!()
+                }
+            }
+        }
+    }
+
+    // get the next group roots (i.e., the next level tables)
+    let next_group_roots = relations.get_next_group_roots(unit.ident());
+    if next_group_roots.is_empty() || env.has_phys_alloc_fn() || env.has_map_protect_unmap() {
+        let op = unit.get_method("map").unwrap();
+        add_op_function(scope, unit, map, op, relations, osspec);
+    }
 }
 
 fn add_unmap_function(
@@ -1977,7 +2231,7 @@ fn add_resolve_function(
                             b.new_comment("entry maps an enum -> segment mapping a frame");
                             // just return it
 
-                            let frame_field = C::Expr::field_access(&child_variant, "frame");
+                            let frame_field = child_variant;
 
                             b.assign(C::Expr::deref(&paddr_param), C::Expr::addr_of(&frame_field));
                             b.return_expr(C::Expr::btrue());
@@ -2008,10 +2262,7 @@ fn add_resolve_function(
                 if seg.maps_frame() {
                     body.new_comment("segment maps a frame, return it!");
 
-                    body.assign(
-                        C::Expr::deref(&paddr_param),
-                        C::Expr::addr_of(&C::Expr::field_access(&v_child, "frame")),
-                    );
+                    body.assign(C::Expr::deref(&paddr_param), v_child);
 
                     body.return_expr(C::Expr::btrue());
                 } else if seg.maps_table() {
@@ -2019,11 +2270,7 @@ fn add_resolve_function(
                     body.new_comment("segment maps a table, recurse to next unit");
                     body.return_expr(C::Expr::fn_call(
                         &child.resolve_fn_name(),
-                        vec![
-                            v_child.field_access("table").addr_of(),
-                            vaddr_param,
-                            paddr_param,
-                        ],
+                        vec![v_child, vaddr_param, paddr_param],
                     ));
                 } else {
                     unreachable!()
@@ -2407,14 +2654,8 @@ fn add_set_child_fn(
     }
 
     // get the child unit
-    let children = relations.get_children_units(unit.ident());
-    let (child, rtype) = match children.as_slice() {
-        [child] => (
-            child,
-            C::Type::new_typedef(&unit.to_child_type_name()).to_ptr(),
-        ),
-        _ => unreachable!(),
-    };
+    let child = relations.get_only_child_unit(unit.ident());
+    let rtype = C::Type::new_typedef(&unit.to_child_type_name()).to_ptr();
 
     // define the function
     let fun = scope.new_function(unit.set_child_fn_name().as_str(), C::Type::new_void());
@@ -2499,6 +2740,7 @@ fn add_clear_child_fn(
                 unit.ptype_to_ctype(&VelosiAstTypeInfo::VirtAddr, false),
             )
             .to_expr();
+
         fun.body().fn_call(
             unit.set_child_fn_name().as_str(),
             vec![unit_param, va_param, C::Expr::null()],

@@ -30,7 +30,9 @@ use std::path::Path;
 use crustal as C;
 
 use velosiast::ast::{VelosiAstTypeInfo, VelosiAstTypeProperty};
-use velosiast::{VelosiAst, VelosiAstMethod, VelosiAstUnit, VelosiAstUnitEnum};
+use velosiast::{
+    VelosiAst, VelosiAstMethod, VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment,
+};
 
 use super::utils::{self, UnitUtils};
 use crate::VelosiCodeGenError;
@@ -333,6 +335,7 @@ fn add_fn_params<'a>(
     fun: &mut C::Function,
     unit: &VelosiAstUnitEnum,
     op: &'a VelosiAstMethod,
+    pa_type: VelosiAstTypeInfo,
     osspec: &VelosiAst,
 ) -> HashMap<&'a str, C::Expr> {
     let env = osspec.osspec().unwrap();
@@ -349,10 +352,7 @@ fn add_fn_params<'a>(
             if let Some(ty) = env.get_extern_type_with_property(&VelosiAstTypeProperty::Frame) {
                 fun.new_param(f.ident(), C::Type::new_typedef(ty.ident.as_str()))
             } else {
-                fun.new_param(
-                    f.ident(),
-                    unit.ptype_to_ctype(&VelosiAstTypeInfo::PhysAddr, false),
-                )
+                fun.new_param(f.ident(), unit.ptype_to_ctype(&pa_type, true))
             }
         } else {
             fun.new_param(f.ident(), unit.ptype_to_ctype(&f.ptype.typeinfo, false))
@@ -613,6 +613,64 @@ fn add_is_function(
 // Higher Order Functions
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+fn add_do_map_function(
+    scope: &mut C::Scope,
+    unit: &VelosiAstUnitEnum,
+    child: &VelosiAstUnitSegment,
+    relations: &Relations,
+    osspec: &VelosiAst,
+) {
+    let env = osspec.osspec().unwrap();
+
+    let op = child.get_method("map").unwrap();
+    let fun = scope.new_function(
+        unit.to_hl_op_fn_name_variant(op, child).as_str(),
+        C::Type::new_size(),
+    );
+    fun.set_static().set_inline();
+
+    let pa_type = if child.maps_table() {
+        VelosiAstTypeInfo::TypeRef(child.get_next_unit_ident().unwrap().clone())
+    } else {
+        VelosiAstTypeInfo::PhysAddr
+    };
+
+    let param_exprs = add_fn_params(fun, unit, op, pa_type, osspec);
+
+    let variant = relations.get_unit(child.ident()).unwrap();
+
+    let body = fun.body();
+    if child.maps_frame() {
+        body.new_comment(&format!("Variant: {} mapping frame", child.ident()));
+        if env.has_map_protect_unmap() {
+            unimplemented!();
+        } else {
+            body.new_comment("TODO: check if there is already a valid mapping in there");
+            let v_next = construct_next_unit(body, unit, &param_exprs["$unit"], variant, "entry");
+            body.return_expr(C::Expr::fn_call(
+                &child.to_hl_op_fn_name(op),
+                params_to_fn_arguments(op, C::Expr::addr_of(&v_next), &param_exprs),
+            ));
+        }
+    } else if child.maps_table() {
+        body.new_comment(&format!("Variant: {} mapping table", child.ident()));
+
+        if env.has_map_protect_unmap() {
+            unimplemented!();
+        } else {
+            body.new_comment("TODO: check if there is already a valid mapping in there");
+            let v_next = construct_next_unit(body, unit, &param_exprs["$unit"], variant, "entry");
+            let _next = relations.get_only_child_unit(child.ident());
+            body.return_expr(C::Expr::fn_call(
+                &child.to_op_fn_name(op),
+                params_to_fn_arguments(op, C::Expr::addr_of(&v_next), &param_exprs),
+            ));
+        }
+    } else {
+        unreachable!()
+    }
+}
+
 fn add_map_function(
     scope: &mut C::Scope,
     unit: &VelosiAstUnitEnum,
@@ -623,7 +681,19 @@ fn add_map_function(
 
     let mut variants = relations.get_children_units(unit.ident());
     sort_variants(&mut variants);
+
+    for variant in &variants {
+        if let VelosiAstUnit::Segment(child) = variant {
+            add_do_map_function(scope, unit, child, relations, osspec);
+        }
+    }
+
+    let next_group_roots = relations.get_next_group_roots(unit.ident());
+
     let op = variants.first().unwrap().get_method("map").unwrap();
+    if !(next_group_roots.is_empty() || env.has_phys_alloc_fn() || env.has_map_protect_unmap()) {
+        return;
+    }
 
     // ---------------------------------------------------------------------------------------------
     // Function Declaration with Parameters
@@ -631,7 +701,7 @@ fn add_map_function(
 
     let fun = scope.new_function(unit.to_hl_op_fn_name(op).as_str(), C::Type::new_size());
     fun.set_static().set_inline();
-    let param_exprs = add_fn_params(fun, unit, op, osspec);
+    let param_exprs = add_fn_params(fun, unit, op, VelosiAstTypeInfo::PhysAddr, osspec);
 
     // ---------------------------------------------------------------------------------------------
     // Function Body
@@ -727,7 +797,7 @@ fn add_unmap_protect_common(
 
     let fun = scope.new_function(unit.to_hl_op_fn_name(op).as_str(), C::Type::new_size());
     fun.set_static().set_inline();
-    let param_exprs = add_fn_params(fun, unit, op, osspec);
+    let param_exprs = add_fn_params(fun, unit, op, VelosiAstTypeInfo::PhysAddr, osspec);
 
     let fun_body = fun.body();
     if env.has_map_protect_unmap() {
