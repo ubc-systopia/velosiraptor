@@ -149,6 +149,23 @@ impl Relations {
             .collect()
     }
 
+    pub fn get_next_group_roots(&self, group_root: &Rc<String>) -> Vec<Rc<String>> {
+        let mut children = self.get_children(group_root).to_vec();
+        if children.is_empty() {
+            return Vec::new();
+        }
+
+        let mut results = Vec::new();
+        while let Some(child) = children.pop() {
+            if self.group_roots.contains(&child) {
+                results.push(child);
+            } else {
+                children.extend(self.get_children(&child).iter().cloned());
+            }
+        }
+        results
+    }
+
     /// obtains the identifiers for the group units
     pub fn get_group_roots(&self) -> &HashSet<Rc<String>> {
         &self.group_roots
