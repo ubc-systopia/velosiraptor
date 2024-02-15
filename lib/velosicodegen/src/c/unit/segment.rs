@@ -272,13 +272,28 @@ fn add_op_fn(
 
     let mut vars = HashMap::new();
     for (p, ty) in &param_types {
+        print!("{} -> {} extern: {}", p, ty, ty.is_extern());
         if ty.is_extern() && *p == "pa" {
             let m = env.get_method_with_signature(&[ty.clone()], &VelosiAstTypeInfo::PhysAddr);
             if let Some(m) = m.first() {
                 vars.insert(*p, C::Expr::fn_call(m.ident(), vec![param_vars[p].clone()]));
+            } else {
+                panic!("{} -> {}() var: {} {}", unit.ident(), op.ident(), p, ty);
             }
+        } else if ty.is_typeref() && *p != "$unit" {
+            // here we have atype ref so we need something here
+            param_vars.insert(*p, C::Expr::field_access(&param_vars[p], "base"));
         }
     }
+
+    // if unit.ident().as_str() == "X8664PML4Entry" {
+    //     println!("{:?}", vars);
+    //     println!("-----");
+    //     println!("{:?}", param_vars["pa"]);
+    //     println!("-----");
+    //     println!("{:?}", param_types);
+    //     panic!("fofofo");
+    // }
 
     // requires clauses
     for r in op.requires.iter() {
@@ -832,6 +847,11 @@ fn add_map_function(
     child: Option<&VelosiAstUnit>,
 ) {
     let m_fn = unit.get_method("map").unwrap();
+    let env = osspec.osspec().unwrap();
+
+    if unit.maps_table() && !(env.has_map_protect_unmap() || env.has_phys_alloc_fn()) {
+        return;
+    }
 
     // ---------------------------------------------------------------------------------------------
     // Function Declaration
@@ -843,7 +863,6 @@ fn add_map_function(
 
     let (param_exprs, _) = add_fn_params(fun, unit, m_fn, osspec, true);
 
-    let env = osspec.osspec().unwrap();
     let body = fun.body();
 
     // ---------------------------------------------------------------------------------------------

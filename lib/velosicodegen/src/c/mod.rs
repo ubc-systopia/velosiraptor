@@ -302,6 +302,8 @@ impl BackendC {
             unit::generate(&unit, osspec, &relations, &mut srcdir)?;
         }
 
+        // osspec::generate(env, self.outdir.as_path());
+
         Ok(())
     }
     pub fn finalize(

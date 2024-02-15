@@ -112,31 +112,74 @@ pub trait UnitUtils {
     }
 
     fn to_op_fn_name(&self, op: &VelosiAstMethod) -> String {
-        if let Some(p) = op.params_map.get("pa") {
-            if p.ptype.is_addr() {
-                format!(
-                    "__{}_do_{}_frame",
-                    self.my_ident().to_ascii_lowercase(),
-                    op.ident()
-                )
-            } else {
-                format!(
-                    "__{}_do_{}_table",
-                    self.my_ident().to_ascii_lowercase(),
-                    op.ident()
-                )
-            }
-        } else {
-            format!(
-                "__{}_do_{}",
-                self.my_ident().to_ascii_lowercase(),
-                op.ident()
-            )
-        }
+        // if let Some(p) = op.params_map.get("pa") {
+        //     if p.ptype.is_addr() {
+        //         format!(
+        //             "__{}_do_{}_frame",
+        //             self.my_ident().to_ascii_lowercase(),
+        //             op.ident()
+        //         )
+        //     } else {
+        //         format!(
+        //             "__{}_do_{}_table",
+        //             self.my_ident().to_ascii_lowercase(),
+        //             op.ident()
+        //         )
+        //     }
+        // } else {
+        format!(
+            "__{}_do_{}",
+            self.my_ident().to_ascii_lowercase(),
+            op.ident()
+        )
+        // }
     }
 
     fn to_hl_op_fn_name(&self, op: &VelosiAstMethod) -> String {
         format!("{}_{}", self.my_ident().to_ascii_lowercase(), op.ident())
+    }
+
+    fn to_hl_op_fn_name_variant(
+        &self,
+        op: &VelosiAstMethod,
+        variant: &VelosiAstUnitSegment,
+    ) -> String {
+        let variant_chars = variant.ident().chars();
+        let mut unit_chars = self.my_ident().chars();
+
+        let mut idx = 0;
+
+        for next in variant_chars {
+            if Some(next) != unit_chars.next() {
+                break;
+            }
+            idx += 1;
+        }
+        let variant_name = &variant.ident()[idx..].to_ascii_lowercase();
+
+        format!(
+            "{}_{}_{}",
+            self.my_ident().to_ascii_lowercase(),
+            op.ident(),
+            variant_name
+        )
+    }
+
+    fn to_hl_op_fn_name_child(&self, op: &VelosiAstMethod, variant: &str) -> String {
+        format!(
+            "{}_{}_{}",
+            self.my_ident().to_ascii_lowercase(),
+            op.ident(),
+            variant,
+        )
+    }
+
+    fn to_op_fn_name_frame(&self, op: &VelosiAstMethod) -> String {
+        format!(
+            "{}_{}_frame",
+            self.my_ident().to_ascii_lowercase(),
+            op.ident()
+        )
     }
 
     fn to_op_fn_name_table(&self, op: &VelosiAstMethod) -> String {
@@ -943,57 +986,63 @@ pub fn add_const_def(scope: &mut C::Scope, c: &VelosiAstConst) {
     scope.push_macro(m);
 }
 
-fn oparg_to_rust_expr(op: &VelosiOpExpr) -> Option<C::Expr> {
+fn oparg_to_rust_expr(op: &VelosiOpExpr, vars: &HashMap<&str, C::Expr>) -> Option<C::Expr> {
     match op {
         VelosiOpExpr::None => None,
         VelosiOpExpr::Num(x) => Some(C::Expr::new_num(*x)),
-        VelosiOpExpr::Var(x) => Some(C::Expr::new_var(x, C::Type::new_int(64))),
+        VelosiOpExpr::Var(x) => {
+            if let Some(v) = vars.get(x.as_str()) {
+                Some(v.clone())
+            } else {
+                Some(C::Expr::new_var(x, C::Type::new_int(64)))
+            }
+        }
         VelosiOpExpr::Shl(x, y) => Some(C::Expr::binop(
-            oparg_to_rust_expr(x).unwrap(),
+            oparg_to_rust_expr(x, vars).unwrap(),
             "<<",
-            oparg_to_rust_expr(y).unwrap(),
+            oparg_to_rust_expr(y, vars).unwrap(),
         )),
         VelosiOpExpr::Shr(x, y) => Some(C::Expr::binop(
-            oparg_to_rust_expr(x).unwrap(),
+            oparg_to_rust_expr(x, vars).unwrap(),
             ">>",
-            oparg_to_rust_expr(y).unwrap(),
+            oparg_to_rust_expr(y, vars).unwrap(),
         )),
         VelosiOpExpr::And(x, y) => Some(C::Expr::binop(
-            oparg_to_rust_expr(x).unwrap(),
+            oparg_to_rust_expr(x, vars).unwrap(),
             "&",
-            oparg_to_rust_expr(y).unwrap(),
+            oparg_to_rust_expr(y, vars).unwrap(),
         )),
         VelosiOpExpr::Or(x, y) => Some(C::Expr::binop(
-            oparg_to_rust_expr(x).unwrap(),
+            oparg_to_rust_expr(x, vars).unwrap(),
             "|",
-            oparg_to_rust_expr(y).unwrap(),
+            oparg_to_rust_expr(y, vars).unwrap(),
         )),
         VelosiOpExpr::Add(x, y) => Some(C::Expr::binop(
-            oparg_to_rust_expr(x).unwrap(),
+            oparg_to_rust_expr(x, vars).unwrap(),
             "+",
-            oparg_to_rust_expr(y).unwrap(),
+            oparg_to_rust_expr(y, vars).unwrap(),
         )),
         VelosiOpExpr::Sub(x, y) => Some(C::Expr::binop(
-            oparg_to_rust_expr(x).unwrap(),
+            oparg_to_rust_expr(x, vars).unwrap(),
             "-",
-            oparg_to_rust_expr(y).unwrap(),
+            oparg_to_rust_expr(y, vars).unwrap(),
         )),
         VelosiOpExpr::Mul(x, y) => Some(C::Expr::binop(
-            oparg_to_rust_expr(x).unwrap(),
+            oparg_to_rust_expr(x, vars).unwrap(),
             "*",
-            oparg_to_rust_expr(y).unwrap(),
+            oparg_to_rust_expr(y, vars).unwrap(),
         )),
         VelosiOpExpr::Div(x, y) => Some(C::Expr::binop(
-            oparg_to_rust_expr(x).unwrap(),
+            oparg_to_rust_expr(x, vars).unwrap(),
             "/",
-            oparg_to_rust_expr(y).unwrap(),
+            oparg_to_rust_expr(y, vars).unwrap(),
         )),
         VelosiOpExpr::Mod(x, y) => Some(C::Expr::binop(
-            oparg_to_rust_expr(x).unwrap(),
+            oparg_to_rust_expr(x, vars).unwrap(),
             "%",
-            oparg_to_rust_expr(y).unwrap(),
+            oparg_to_rust_expr(y, vars).unwrap(),
         )),
-        VelosiOpExpr::Not(x) => Some(C::Expr::uop("!", oparg_to_rust_expr(x).unwrap())),
+        VelosiOpExpr::Not(x) => Some(C::Expr::uop("!", oparg_to_rust_expr(x, vars).unwrap())),
         VelosiOpExpr::Flags(v, f) => Some(C::Expr::field_access(
             &C::Expr::new_var(v, C::Type::new_typedef("dummy")),
             f,
@@ -1012,7 +1061,7 @@ pub fn op_to_c_expr(
             let fname = slice_insert_fn_name_str(unit, field, slice);
             let v = vars.get(field.as_str()).unwrap();
             let mut args = vec![v.clone()];
-            if let Some(a) = oparg_to_rust_expr(arg) {
+            if let Some(a) = oparg_to_rust_expr(arg, vars) {
                 args.push(a);
             }
             c.assign(v.clone(), C::Expr::fn_call(&fname, args));
@@ -1021,7 +1070,7 @@ pub fn op_to_c_expr(
             let fname = field_set_raw_fn_name_str(unit, field);
             let v = vars.get(field.as_str()).unwrap();
             let mut args = Vec::new();
-            if let Some(a) = oparg_to_rust_expr(arg) {
+            if let Some(a) = oparg_to_rust_expr(arg, vars) {
                 args.push(a);
             }
             c.assign(v.clone(), C::Expr::fn_call(&fname, args));
