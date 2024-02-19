@@ -42,18 +42,18 @@ void StateFieldBase::print_field(void)
 bool StateFieldBase::add_slice(const std::string &name, uint8_t start, uint8_t end)
 {
     if (this->_slices.contains(name)) {
-        Logging::error("StateFieldBase::add_slice: slice %s already exists\n", name);
+        Logging::error("StateFieldBase::add_slice: (%s) already exists\n", name);
         return false;
     }
 
     if (start > end) {
-        Logging::error("StateFieldBase::add_slice: start > end\n");
+        Logging::error("StateFieldBase::add_slice: (%s) start > end\n", name);
         return false;
     }
 
     // taking >= here, as the end bit is (N-1) for a bitwidth of N
     if (end >= this->bitwidth) {
-        Logging::error("StateFieldBase::add_slice: end (%d) > bitwidth (%d)\n", end, this->bitwidth);
+        Logging::error("StateFieldBase::add_slice: (%s) end (%d) > bitwidth (%d)\n", name, end, this->bitwidth);
         return false;
     }
 
@@ -61,14 +61,14 @@ bool StateFieldBase::add_slice(const std::string &name, uint8_t start, uint8_t e
     for (auto it = this->_slices.begin(); it != this->_slices.end(); it++) {
         // case 1: end is smaller than the start bit, no overlap
         if (it->second.first <= start && start <= it->second.second) {
-            Logging::error("StateFieldBase::add_slice: start overlaps with existing slice "
-                           "(start)\n");
+            Logging::error("StateFieldBase::add_slice: (%s) start overlaps with existing slice"
+                           "(start)\n", name);
             return false;
         }
 
         if (it->second.first <= end && end <= it->second.second) {
-            Logging::error("StateFieldBase::add_slice: start overlaps with existing slice "
-                           "(end)\n");
+            Logging::error("StateFieldBase::add_slice: (%s) start overlaps with existing slice "
+                           "(end)\n", name);
             return false;
         }
     }

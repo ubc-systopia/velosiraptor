@@ -487,6 +487,8 @@ fn add_translate_method_segment(
                         .return_expr(C::Expr::btrue());
                 }
             }
+
+            body.return_expr(C::Expr::bfalse());
         } else {
             // return the expression
             // no next translation unit, simply set the return value with the expression
@@ -897,7 +899,8 @@ fn add_state_classes(s: &mut Scope, unit: &VelosiAstUnit) {
                         vec![
                             C::Expr::new_str(sl.ident()),
                             C::Expr::new_num(sl.start),
-                            C::Expr::new_num(sl.end),
+                            // C++ side uses inclusive-inclusive bounds (todo: change)
+                            C::Expr::new_num(sl.end - 1),
                         ],
                     );
                 }
