@@ -176,9 +176,8 @@ pub fn generate_register_impl(
             ))
             .push_param(cparam);
 
-            let mut field_access_expr =
-                C::Expr::method_call(&stvar, &format!("{}_field", r.ident()), vec![]);
-            field_access_expr.set_ptr();
+            let field_access_expr =
+                C::Expr::field_access(&stvar, r.ident());
 
             let m = c
                 .new_method("do_read", C::Type::new_uint(64))

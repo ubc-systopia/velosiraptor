@@ -7,12 +7,11 @@
 # This file is (from) a template, where holes of the form /* REPLACE xyz */ are filled in
 
 BUILD_DIR := $(CURDIR)/build
-SOURCE_DIR := $(CURDIR)/src
 FRAMEWORK_DIR := $(CURDIR)/fm_translation_framework
 
 CC      := g++
 CCFLAGS := -Wall -O3 -Werror -std=c++2a -fPIC
-CCFLAGS += -I $(SOURCE_DIR)
+CCFLAGS += -I .
 CCFLAGS += -I $(FRAMEWORK_DIR)
 CCFLAGS += -I $(PVLIB_HOME)/include
 CCFLAGS += -I $(PVLIB_HOME)/include/fmruntime
@@ -31,12 +30,12 @@ MKDIR := mkdir -p
 SIMGEN := simgen
 
 # Source Files
-TRANSLATION_UNIT_SRCS := $(SOURCE_DIR)//* REPLACE top_file */
-# TRANSLATION_UNIT_SRCS := $(SOURCE_DIR)/unit.cpp
-TRANSLATION_UNIT_SRCS += $(SOURCE_DIR)//* REPLACE pkgname */_registers.hpp
+TRANSLATION_UNIT_SRCS := /* REPLACE unit_srcs */
+# TRANSLATION_UNIT_SRCS := unit.cpp ...
+TRANSLATION_UNIT_SRCS += /* REPLACE pkgname */_registers.cpp
 
 # Object Files
-TRANSLATION_UNIT_OBJS := $(TRANSLATION_UNIT_SRCS:$(SOURCE_DIR)/%.cpp=$(BUILD_DIR)/objs/%.o)
+TRANSLATION_UNIT_OBJS := $(TRANSLATION_UNIT_SRCS:%.cpp=$(BUILD_DIR)/objs/%.o)
 
 TRANSLATION_UNIT_LIB  := $(BUILD_DIR)/lib/libunit.a
 
@@ -71,7 +70,7 @@ run: $(PLATFORM_BIN)
 all: $(FRAMEWORK_LIB) $(TRANSLATION_UNIT_LIB) $(PLATFORM_BIN)
 lib: $(TRANSLATION_UNIT_LIB)
 
-$(BUILD_DIR)/objs/%.o: $(SOURCE_DIR)/%.cpp
+$(BUILD_DIR)/objs/%.o: %.cpp
 	$(MKDIR) $(@D)
 	$(CC) $(CCFLAGS) -c -o $@ $<
 
@@ -96,13 +95,13 @@ dockerhw:
 	docker cp $(CURDIR)/../../../../../../support/arm-fastmodels-boot/. $(D_CON):$(D_DIR)/arm-fastmodels-boot
 
 # this makefile can be called with RUN_TEST="t.c" with t.c in test dir
-ifdef RUN_TEST
+# ifdef RUN_TEST
 	docker cp $(CURDIR)/../../../../src/fastmodels/test/. $(D_CON):$(D_DIR)/test
-endif
+# endif
 	docker exec $(D_CON) /bin/bash -i -c "cd $(D_DIR)/arm-fastmodels-boot && make VRS_TEST=\"$(RUN_TEST_REL)\" && cp bootimg.bin $(D_DIR)"
 	docker exec $(D_CON) /bin/bash -i -c "cd $(D_DIR) && make clean && make && make run"
 
-.PHONY: all clean dockerhw
+.PHONY: all clean dockerhw run
 
 clean:
 	rm -rf $(BUILD_DIR)
