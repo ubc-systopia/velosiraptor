@@ -25,14 +25,9 @@ endif
 
 AR      := ar
 ARFLAGS := rcs
-
 LD      := g++
 LDFLAGS := -pthread
-
-# creating directories
 MKDIR := mkdir -p
-
-# the simgen tool
 SIMGEN := simgen
 
 # Source Files
