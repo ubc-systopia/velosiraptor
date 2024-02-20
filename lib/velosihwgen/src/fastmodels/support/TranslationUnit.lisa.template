@@ -19,9 +19,9 @@ component /* REPLACE top_class */
     // include directives of the C++ headers used by this component.
     includes
     {
-        #include<framework/logging.hpp>
+        #include <framework/logging.hpp>
 
-        #include</* REPLACE top_file */>
+        #include </* REPLACE top_file */>
         // #include <unit.hpp>
     }
 
