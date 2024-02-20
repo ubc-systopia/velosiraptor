@@ -4,7 +4,7 @@ int vrs_test() {
     MSG("VRS: Velosiraptor tests starting.\n");
 
     void *translation_unit_data = (void*)0xC0000000UL;
-    void *translation_unit_control = (void *)0x1C0000000UL;
+    void *translation_unit_control = (void *)0x100000000UL;
 
     uint32_t *data32 = (uint32_t *)translation_unit_data;
 
