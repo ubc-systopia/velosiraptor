@@ -70,7 +70,3 @@ The "interface" is currently unused in favour of just interacting with the state
 interface might only matter for the top-level component anyway.
 
 Each state field (not state field slice) is currently limited to a size of 64 bits.
-
-*** Todo
-- It might be worth separating the hpp and cpp files. For simplicity of compilation, each sub-unit
-  currently becomes one cpp file that #includes all its mapped-to subunits. slightly gross!
