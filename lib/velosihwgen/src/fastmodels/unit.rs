@@ -391,7 +391,7 @@ fn construct_next_unit(
     next_unit
 }
 
-// virtual bool translate(lvaddr_t src_addr, lpaddr_t *dst_addr) set_override;
+// virtual bool MMU::translate(lvaddr_t src_addr, lpaddr_t *dst_addr) set_override;
 fn add_translate_method_segment(
     c: &mut C::Class,
     segment: &VelosiAstUnitSegment,
@@ -446,7 +446,10 @@ fn add_translate_method_segment(
                 let branch = ifelse.then_branch();
 
                 // we have state references to this indicates we need to go to the next one
+                // shouldn't we be looking at the parameters of map() instead?
                 if expr.has_state_references() {
+                    // calculate physical base of next unit
+                    branch.assign(base_var.clone(), expr_to_cpp(&expr, &params));
                     let next_unit = construct_next_unit(branch, next, vec![base_var.clone()]);
 
                     match next.input_bitwidth() {
