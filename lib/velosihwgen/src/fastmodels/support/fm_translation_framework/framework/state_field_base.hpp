@@ -11,7 +11,7 @@
 
 #include <map>
 #include <string>
-
+#include "fm_util.hpp"
 
 /**
  * @brief Represents a state field
@@ -28,7 +28,7 @@ public:
     /**
      * @brief constructs a default state field
      */
-    StateFieldBase(std::string name, uint8_t nbits = 64, uint64_t init_val = 0);
+    StateFieldBase(std::string name, uint64_t offset, lpaddr_t base, pv::RandomContextTransactionGenerator *ptw_pvbus, uint8_t nbits, uint64_t init_val);
 
 
     /**
@@ -90,6 +90,7 @@ public:
         return this->value;
     }
 
+    void refresh_value(void);
 
     /*
      * -------------------------------------------------------------------------------------------
@@ -132,6 +133,9 @@ public:
     ///< the name of the field
     std::string name;
 
+    ///< base of the parent state
+    lpaddr_t base;
+
     ///< offset relative to the base address of the state
     uint64_t offset;
 
@@ -146,6 +150,9 @@ public:
 
     ///< the mask for this filed
     uint64_t mask;
+
+    ///< access to simulated memory
+    pv::RandomContextTransactionGenerator *ptw_pvbus;
 
 private:
     ///< represents the slice map: slice name -> [start, end]

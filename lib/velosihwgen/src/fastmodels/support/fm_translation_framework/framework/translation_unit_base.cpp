@@ -10,7 +10,6 @@
 #include "pv/PVAccessWidth.h"
 
 #include "translation_unit_base.hpp"
-#include "interface_base.hpp"
 #include "logging.hpp"
 #include <streambuf>
 
@@ -22,7 +21,7 @@
 
 void TranslationUnitBase::reset(void)
 {
-    Logging::info("resetting translation unit '%s'", this->_name.c_str());
+    Logging::info("resetting translation unit '%s'", this->name.c_str());
     this->get_state()->reset();
     this->get_interface()->reset();
     Logging::info("reset completed");
@@ -259,62 +258,4 @@ unsigned TranslationUnitBase::handle_remap(pv::RemapRequest &req, unsigned *unpr
 DVM::error_response_t TranslationUnitBase::handle_dvm_msg(DVM::Message *msg, bool ptw)
 {
     return DVM::error_response_t(DVM::error_response_t::ok);
-}
-
-
-/*
- * -------------------------------------------------------------------------------------------
- * Translation table walk
- * -------------------------------------------------------------------------------------------
- */
-
-
-bool TranslationUnitBase::read_paddr(lpaddr_t paddr, uint8_t width, uint64_t *data)
-{
-    pv::AccessWidth access_width;
-
-    Logging::debug("TranslationUnitBase::translation_table_walk(0x%lx, %u)", paddr, width);
-    if (this->_ttw_pvbus == nullptr) {
-        Logging::error("TranslationUnitBase::translation_table_walk - no page walker set!");
-        return false;
-    }
-
-    if (width == 64) {
-        access_width = pv::ACCESS_64_BITS;
-    } else if (width == 32) {
-        access_width = pv::ACCESS_32_BITS;
-    } else {
-        return false;
-    }
-
-    // setup the buffer descriptor
-    pv::RandomContextTransactionGenerator::buffer_t bt
-        = pv::RandomContextTransactionGenerator::buffer_t(access_width, data, 1);
-
-    // setup the transaction attributes
-    pv::TransactionAttributes ta = pv::TransactionAttributes();
-    ta.setPTW(true);
-
-    // a new ACE request
-    pv::ACERequest req = pv::ACERequest();
-
-    // do the translation
-    pv::Tx_Result res = this->_ttw_pvbus->read(&ta, &req, (pv::bus_addr_t)paddr, &bt);
-
-    // return success
-    return res.isOK();
-}
-
-// A bit of a hack. We need read_paddr to do this.
-// State should be declared in the same place as the unit.
-
-void TranslationUnitBase::populate_state() {
-    StateBase *state = this->get_state();
-    uint64_t temp;
-
-    for (auto it = state->fields.begin(); it != state->fields.end(); it++) {
-        auto f = it->second;
-        read_paddr(this->base + f->offset, f->bitwidth, &temp);
-        f->set_value(temp);
-    }
 }

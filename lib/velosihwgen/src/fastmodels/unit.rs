@@ -33,7 +33,10 @@ use velosiast::ast::{
     VelosiAstNumLiteralExpr, VelosiAstStaticMap, VelosiAstType, VelosiAstTypeInfo,
     VelosiAstUnOpExpr, VelosiAstUnit, VelosiAstUnitSegment,
 };
-use velosiast::{VelosiAst, VelosiAstUnitEnum, VelosiAstUnitStaticMap};
+use velosiast::{
+    VelosiAst, VelosiAstInterface, VelosiAstInterfaceField, VelosiAstInterfaceMemoryField,
+    VelosiAstInterfaceMmioField, VelosiAstStateField, VelosiAstUnitEnum, VelosiAstUnitStaticMap,
+};
 use C::Scope;
 
 use crate::fastmodels::add_header_comment;
@@ -381,8 +384,8 @@ fn construct_next_unit(
         )
         .to_expr();
 
-    args.push(C::Expr::field_access(&C::Expr::this(), "_name"));
-    args.push(C::Expr::field_access(&C::Expr::this(), "_ttw_pvbus"));
+    args.push(C::Expr::field_access(&C::Expr::this(), "name"));
+    args.push(C::Expr::field_access(&C::Expr::this(), "ptw_pvbus"));
 
     block.assign(
         next_unit.clone(),
@@ -744,7 +747,16 @@ fn add_constructor(c: &mut C::Class, unit: &VelosiAstUnit, ifn: &str, scn: &str)
             C::Expr::new_var("ptw_pvbus", arg1_type.clone()),
         ],
     ))
-    .push_initializer("state", C::Expr::fn_call(scn, vec![]))
+    .push_initializer(
+        "state",
+        C::Expr::fn_call(
+            scn,
+            vec![
+                C::Expr::new_var("base", C::Type::new_typedef("lpaddr_t")),
+                C::Expr::new_var("ptw_pvbus", arg1_type.clone()),
+            ],
+        ),
+    )
     .push_initializer(
         "interface",
         C::Expr::fn_call(
@@ -772,7 +784,7 @@ fn add_constructor(c: &mut C::Class, unit: &VelosiAstUnit, ifn: &str, scn: &str)
         None => (),
         Some(_) => {
             let mut ctor_body = C::Block::new();
-            ctor_body.method_call(C::Expr::Raw("this".to_string()), "populate_state", vec![]);
+            ctor_body.fn_call("this->state.populate_state", vec![]);
             ctor.set_body(ctor_body);
         }
     }
@@ -816,7 +828,7 @@ fn add_create(c: &mut C::Class, unit: &VelosiAstUnit) {
 
     let unitvar = C::Expr::new_var("t", unit_ptr_type.clone());
     let statevar = C::Expr::field_access(&unitvar, "state");
-    let ifvar = C::Expr::field_access(&unitvar, "interface");
+    let _ifvar = C::Expr::field_access(&unitvar, "interface");
 
     //  TranslationUnit *t;
     m.body()
@@ -830,7 +842,7 @@ fn add_create(c: &mut C::Class, unit: &VelosiAstUnit) {
         // t->state.print_state_fields();
         .method_call(statevar, "print_state_fields", vec![])
         // t->interface.debug_print_interface();
-        .method_call(ifvar, "debug_print_interface", vec![])
+        // .method_call(ifvar, "debug_print_interface", vec![])
         // return t;
         .return_expr(unitvar);
 }
@@ -868,97 +880,151 @@ fn add_method_maybe(c: &mut C::Class, tm: &VelosiAstMethod, params: &HashSet<&st
 
 fn add_state_classes(s: &mut Scope, unit: &VelosiAstUnit) {
     let scn = state_class_name(unit.ident());
-    match unit.state() {
-        None => {
-            s.new_class(&scn) //empty state
-                .set_base("StateBase", C::Visibility::Public);
-        }
 
-        Some(state) => {
-            // one class for each field
-            for f in state.fields() {
-                let rcn = state_field_class_name(unit.ident(), f.ident());
-                let f_c = s
-                    .new_class(&rcn)
-                    .set_base("StateFieldBase", C::Visibility::Public);
+    let state_fields: Vec<Rc<VelosiAstStateField>> = match unit.state() {
+        Some(s) => s.fields().to_vec(),
+        None => Vec::<Rc<VelosiAstStateField>>::new(),
+    };
 
-                let cons = f_c.new_constructor();
-                cons.push_parent_initializer(C::Expr::fn_call(
-                    "StateFieldBase",
-                    vec![
-                        C::Expr::new_str(f.ident()),
-                        C::Expr::new_num(f.size() * 8),
-                        C::Expr::new_num(0),
-                    ],
-                ));
+    for f in state_fields.clone() {
+        let sfcn = state_field_class_name(unit.ident(), f.ident());
+        let f_c = s
+            .new_class(&sfcn)
+            .set_base("StateFieldBase", C::Visibility::Public);
 
-                for sl in &f.layout_as_slice().to_vec() {
-                    cons.body().method_call(
-                        C::Expr::this(),
-                        "add_slice",
-                        vec![
-                            C::Expr::new_str(sl.ident()),
-                            C::Expr::new_num(sl.start),
-                            // C++ side uses inclusive-inclusive bounds (todo: change)
-                            C::Expr::new_num(sl.end - 1),
-                        ],
-                    );
-                }
+        let sf_offset = unit
+            .interface()
+            .and_then(|i: Rc<VelosiAstInterface>| i.fields_map.get(&f.ident_to_string()).cloned())
+            .and_then(|i_f| match i_f.as_ref() {
+                VelosiAstInterfaceField::Mmio(VelosiAstInterfaceMmioField { offset, .. })
+                | VelosiAstInterfaceField::Memory(VelosiAstInterfaceMemoryField {
+                    offset, ..
+                }) => Some(offset.clone() * 8),
+                _ => Some(0),
+            });
 
-                let var = C::Expr::new_var("data", C::Type::new_uint(64));
-
-                // TODO: The per-slice getters and setters may or may not be helpful.
-                // Keeping them for now, but I don't plan to call them
-                for sl in &f.layout_as_slice().to_vec() {
-                    let sl_getter_f = format!("get_{}_val", sl.ident());
-                    let m = f_c
-                        .new_method(&sl_getter_f, C::Type::new_uint(64))
-                        .set_public();
-
-                    m.body().return_expr(C::Expr::method_call(
-                        &C::Expr::this(),
-                        "get_slice_value",
-                        vec![C::Expr::new_str(sl.ident())],
-                    ));
-                    let sl_setter_f = format!("set_{}_val", sl.ident());
-                    let m = f_c
-                        .new_method(&sl_setter_f, C::Type::new_void())
-                        .set_public();
-                    m.new_param("data", C::Type::new_int(64));
-                    m.body().method_call(
-                        C::Expr::this(),
-                        "set_slice_value",
-                        vec![C::Expr::new_str(sl.ident()), var.clone()],
-                    );
-                }
-            }
-
-            // one class for state containing all fields
-            let c = s.new_class(&scn);
-            c.set_base("StateBase", C::Visibility::Public);
-            let state_cons = c.new_constructor();
-
-            for f in state.fields() {
-                let fieldname = f.ident();
-                let fieldclass = state_field_class_name(unit.ident(), f.ident());
-                state_cons
-                    .push_initializer(fieldname.as_str(), C::Expr::fn_call(&fieldclass, vec![]));
-
-                let this = C::Expr::this();
-                let field = C::Expr::field_access(&this, fieldname);
-                state_cons.body().method_call(
-                    C::Expr::this(),
-                    "add_field",
-                    vec![C::Expr::addr_of(&field)],
+        let offset = match sf_offset {
+            Some(o) => o,
+            None => {
+                println!(
+                    "Warning: no memory or MMIO interface found for field {}",
+                    f.ident()
                 );
+                0
             }
+        };
 
-            for f in state.fields() {
-                let ty = C::BaseType::Class(state_field_class_name(unit.ident(), f.ident()));
-                c.new_attribute(f.ident(), C::Type::new(ty))
-                    .set_visibility(C::Visibility::Public);
-            }
+        let cons = f_c.new_constructor();
+        cons.push_param(C::MethodParam::new(
+            "base",
+            C::Type::new_typedef("lpaddr_t"),
+        ));
+        cons.push_param(C::MethodParam::new(
+            "ptw_pvbus",
+            C::Type::new_class("pv::RandomContextTransactionGenerator *"),
+        ));
+
+        cons.push_parent_initializer(C::Expr::fn_call(
+            "StateFieldBase",
+            vec![
+                C::Expr::new_str(f.ident()),
+                C::Expr::new_num(offset),
+                C::Expr::Raw(String::from("base")),
+                C::Expr::Raw(String::from("ptw_pvbus")),
+                C::Expr::new_num(f.size() * 8),
+                C::Expr::new_num(0),
+            ],
+        ));
+
+        for sl in &f.layout_as_slice().to_vec() {
+            cons.body().method_call(
+                C::Expr::this(),
+                "add_slice",
+                vec![
+                    C::Expr::new_str(sl.ident()),
+                    C::Expr::new_num(sl.start),
+                    // C++ side uses inclusive-inclusive bounds (todo: change)
+                    C::Expr::new_num(sl.end - 1),
+                ],
+            );
         }
+
+        let var = C::Expr::new_var("data", C::Type::new_uint(64));
+
+        // TODO: The per-slice getters and setters may or may not be helpful.
+        // Keeping them for now, but I don't plan to call them
+        for sl in &f.layout_as_slice().to_vec() {
+            let sl_getter_f = format!("get_{}_val", sl.ident());
+            let m = f_c
+                .new_method(&sl_getter_f, C::Type::new_uint(64))
+                .set_public();
+
+            m.body().return_expr(C::Expr::method_call(
+                &C::Expr::this(),
+                "get_slice_value",
+                vec![C::Expr::new_str(sl.ident())],
+            ));
+            let sl_setter_f = format!("set_{}_val", sl.ident());
+            let m = f_c
+                .new_method(&sl_setter_f, C::Type::new_void())
+                .set_public();
+            m.new_param("data", C::Type::new_int(64));
+            m.body().method_call(
+                C::Expr::this(),
+                "set_slice_value",
+                vec![C::Expr::new_str(sl.ident()), var.clone()],
+            );
+        }
+    }
+
+    // one class for state containing all fields
+    let state_class = s.new_class(&scn);
+    state_class.set_base("StateBase", C::Visibility::Public);
+    let state_cons = state_class.new_constructor();
+
+    state_cons.push_param(C::MethodParam::new(
+        "base",
+        C::Type::new_typedef("lpaddr_t"),
+    ));
+    state_cons.push_param(C::MethodParam::new(
+        "ptw_pvbus",
+        C::Type::new_class("pv::RandomContextTransactionGenerator *"),
+    ));
+
+    state_cons.push_parent_initializer(C::Expr::fn_call(
+        "StateBase",
+        vec![
+            C::Expr::Raw(String::from("base")),
+            C::Expr::Raw(String::from("ptw_pvbus"))
+        ],
+    ));
+
+    for f in state_fields.clone() {
+        let fieldname = f.ident();
+        let fieldclass = state_field_class_name(unit.ident(), f.ident());
+        state_cons.push_initializer(
+            fieldname.as_str(),
+            C::Expr::fn_call(
+                &fieldclass,
+                vec![
+                    C::Expr::Raw(String::from("base")),
+                    C::Expr::Raw(String::from("ptw_pvbus")),
+                ],
+            ),
+        );
+
+        let this = C::Expr::this();
+        let field = C::Expr::field_access(&this, fieldname);
+        state_cons
+            .body()
+            .method_call(C::Expr::this(), "add_field", vec![C::Expr::addr_of(&field)]);
+    }
+
+    for f in state_fields {
+        let ty = C::BaseType::Class(state_field_class_name(unit.ident(), f.ident()));
+        state_class
+            .new_attribute(f.ident(), C::Type::new(ty))
+            .set_visibility(C::Visibility::Public);
     }
 }
 

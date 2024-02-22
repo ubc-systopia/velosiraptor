@@ -12,8 +12,9 @@
 #include "types.hpp"
 #include "state_field_base.hpp"
 
+// todo: the error logging messages might need name.c_str() rather than name
 
-StateFieldBase::StateFieldBase(std::string name, uint8_t nbits, uint64_t init_val)
+StateFieldBase::StateFieldBase(std::string name, uint64_t offset, uint64_t base, pv::RandomContextTransactionGenerator *ptw_pvbus, uint8_t nbits = 64, uint64_t init_val = 0)
 {
     if (nbits < 64) {
         this->bitwidth = nbits;
@@ -26,8 +27,13 @@ StateFieldBase::StateFieldBase(std::string name, uint8_t nbits, uint64_t init_va
         this->mask     = ~(0ULL);
     }
     this->name        = name;
+    this->offset      = offset;
+    this->base        = base;
+    this->ptw_pvbus   = ptw_pvbus;
     this->reset_value = init_val & this->mask;
     this->value       = init_val & this->mask;
+    // NOTE: this->offset not initialized by default. If using MMIO regs, assign
+    // it in the generated code.
 
     this->_slices = std::map<std::string, std::pair<uint8_t, uint8_t>>();
 }
@@ -80,6 +86,14 @@ bool StateFieldBase::add_slice(const std::string &name, uint8_t start, uint8_t e
     return true;
 }
 
+// refresh all slices
+void StateFieldBase::refresh_value(void) {
+    uint64_t temp;
+    read_paddr(this->ptw_pvbus, this->base, this->bitwidth, &temp);
+    Logging::debug("    Refreshing state field %s at base addr %p, width %d, value %lx",
+                   this->name.c_str(), this->base, this->bitwidth, temp);
+    this->set_value(temp);
+}
 
 uint64_t StateFieldBase::get_slice_value(const std::string &name)
 {
@@ -88,7 +102,6 @@ uint64_t StateFieldBase::get_slice_value(const std::string &name)
         return false;
     }
 
-    // get the slice
     auto slice = this->_slices[name];
 
     // need to handle the 64-bit case (second = 63, first = 0)
@@ -111,7 +124,6 @@ bool StateFieldBase::set_slice_value(const std::string &name, uint64_t value)
         return false;
     }
 
-    // get the slice
     auto slice = this->_slices[name];
 
     // need to handle the 64-bit case (second = 63, first = 0)
@@ -122,9 +134,8 @@ bool StateFieldBase::set_slice_value(const std::string &name, uint64_t value)
         assert(nbits < 64);
         uint64_t slice_mask = (1ULL << nbits) - 1;
 
-        // update the slice value
         this->value = (this->value & ~(slice_mask << slice.first))
-                       | ((value & slice_mask) << slice.first);
+            | ((value & slice_mask) << slice.first);
     }
 
     return true;

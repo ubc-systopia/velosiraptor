@@ -25,9 +25,6 @@ void write_paddr(volatile void *pa, word data) {
     volatile addr pa2 = pa + CONTROL_BASE;
     MSG("Writing phys addr 0x%p (control addr 0x%p): value 0x%lx\n", pa, pa2,
         data);
-    /* addr huh = 0x100000000; */
-    /* *huh = data; */
-    /* MSG("TEST: %p, %p\n", pa2, huh); */
     *pa2 = data;
 }
 
@@ -46,16 +43,16 @@ void print_test(volatile void *va, volatile void *pa) {
 }
 
 int vrs_test() {
-    /* volatile uint64_t *a1 = 0xC0000000; */
-    /* *a1 = 0xaaaa; */
-    /* volatile uint64_t *a2 = 0x100000000; */
-    /* MSG("%lx\n", *a1); */
-    /* MSG("%lx\n", *a2); */
 
-    addr ****pml4_table = (addr ****)0x0000UL;
-    addr ***pdpt_table = (addr ***)0x1000UL;
-    addr **pdir_table = (addr **)0x2000UL;
-    addr *page_table = (addr *)0x3000UL;
+    /* TODO: We may want to put memory-mapped registers in a different piece of
+     * memory (Platform.lisa.template) */
+    addr *****mmu_state = (addr ****)0x0000UL;
+
+    /* Physical addresses of various units. */
+    addr ****pml4_table = (addr ****)0x1000UL;
+    addr ***pdpt_table = (addr ***)0x2000UL;
+    addr **pdir_table = (addr **)0x3000UL;
+    addr *page_table = (addr *)0x4000UL;
 
     addr va = (addr)0x34567890;
     addr pa = (addr)0x4000;
