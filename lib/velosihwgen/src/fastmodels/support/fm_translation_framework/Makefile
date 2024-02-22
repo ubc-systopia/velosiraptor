@@ -31,6 +31,7 @@ FRAMEWORK_SRCS += $(SOURCE_DIR)/state_field_base.cpp
 FRAMEWORK_SRCS += $(SOURCE_DIR)/interface_base.cpp
 FRAMEWORK_SRCS += $(SOURCE_DIR)/register_base.cpp
 FRAMEWORK_SRCS += $(SOURCE_DIR)/logging.cpp
+FRAMEWORK_SRCS += $(SOURCE_DIR)/fm_util.cpp
 
 # Include Files
 FRAMEWORK_HDRS := $(SOURCE_DIR)/include/accessmode.hpp
@@ -41,6 +42,7 @@ FRAMEWORK_HDRS += $(SOURCE_DIR)/include/interface_base.hpp
 FRAMEWORK_HDRS += $(SOURCE_DIR)/include/register_base.hpp
 FRAMEWORK_HDRS += $(SOURCE_DIR)/include/state_field_base.hpp
 FRAMEWORK_HDRS += $(SOURCE_DIR)/include/types.hpp
+FRAMEWORK_HDRS += $(SOURCE_DIR)/include/fm_util.hpp
 
 
 # Object Files

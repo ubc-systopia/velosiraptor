@@ -30,8 +30,6 @@ namespace DVM {
 }
 #endif
 
-
-// the types include
 #include "types.hpp"
 #include "interface_base.hpp"
 #include "state_base.hpp"
@@ -67,12 +65,12 @@ public:
                         lvaddr_t                               range_min = DEFAULT_RANGE_MIN,
                         lvaddr_t                               range_max = DEFAULT_RANGE_MAX)
         : base(base)
-        , _name(name)
+        , name(name)
         , _inaddr_range_min(range_min)
         , _inaddr_range_max(range_max)
-        , _ttw_pvbus(ptw_pvbus)
+        , ptw_pvbus(ptw_pvbus)
     {
-        Logging::info("creating translation unit '%s'", this->_name.c_str());
+        Logging::info("creating translation unit '%s'", this->name.c_str());
     }
 
 
@@ -236,7 +234,7 @@ public:
      */
     virtual bool check_permissions(lvaddr_t src_addr, access_mode_t mode) = 0;
 
-    std::string _name;
+    std::string name;
 
     ///< the minimum address supported by this translation unit
     lvaddr_t _inaddr_range_min;
@@ -245,7 +243,7 @@ public:
     lvaddr_t _inaddr_range_max;
 
     ///< the page table walker
-    pv::RandomContextTransactionGenerator *_ttw_pvbus;
+    pv::RandomContextTransactionGenerator *ptw_pvbus;
 };
 
 #endif /* _TRANSLATION_UNIT_BASE_H_ */
