@@ -62,6 +62,7 @@ StateFieldBase *StateBase::lookup_field_by_name(const std::string &name)
 bool StateBase::get_field_value(const std::string &name, uint64_t *value)
 {
     if (this->fields.contains(name)) {
+        this->populate_state();
         auto field = this->fields.at(name);
         *value     = field->get_value();
         return true;

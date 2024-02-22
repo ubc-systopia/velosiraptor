@@ -384,7 +384,7 @@ fn construct_next_unit(
         )
         .to_expr();
 
-    args.push(C::Expr::field_access(&C::Expr::this(), "name"));
+    args.push(C::Expr::new_str(next_class_name.as_str()));
     args.push(C::Expr::field_access(&C::Expr::this(), "ptw_pvbus"));
 
     block.assign(
@@ -425,7 +425,7 @@ fn add_translate_method_segment(
         .push_param(dst_addr_param);
 
     m.body().raw(format!(
-        "Logging::debug(\"TranslationUnit::translate(%lx)\", {})",
+        "Logging::debug(\"TranslationUnit::translate(0x%lx)\", {})",
         &tm.params[0].ident.ident
     ));
 
@@ -590,6 +590,7 @@ fn translate_method_staticmap(s: &VelosiAstUnitStaticMap, ast: &VelosiAst) -> C:
 
     match &s.map {
         VelosiAstStaticMap::Explicit(map) => {
+            panic!("Unhandled. Need to call read_paddr.");
             let mut start_address = 0;
             for entry in &map.entries {
                 if let Some(_src) = &entry.src {
@@ -694,6 +695,14 @@ fn translate_method_staticmap(s: &VelosiAstUnitStaticMap, ast: &VelosiAst) -> C:
                     C::Expr::binop(idx_var.clone(), "*", C::Expr::new_num(element_size)),
                 ),
             );
+
+            // body.new_variable("next_base", C::Type::new_typedef("lpaddr_t"));
+            // body.assign(C::Expr::Raw("next_base".to_string()), C::Expr::fn_call("read_paddr", vec![
+            //     C::Expr::Raw("ptw_pvbus".to_string()),
+            //     C::Expr::Raw("".to_string()),
+            //     C::Expr::new_num(element_size),
+            //     C::Expr::Raw("next_base".to_string())
+            // ]));
 
             body.return_expr(C::Expr::method_call(
                 &next_var,
@@ -997,7 +1006,7 @@ fn add_state_classes(s: &mut Scope, unit: &VelosiAstUnit) {
         "StateBase",
         vec![
             C::Expr::Raw(String::from("base")),
-            C::Expr::Raw(String::from("ptw_pvbus"))
+            C::Expr::Raw(String::from("ptw_pvbus")),
         ],
     ));
 
@@ -1173,6 +1182,7 @@ pub fn generate_unit_cpp(
     hs.new_include("framework/interface_base.hpp", false);
     hs.new_include("framework/translation_unit_base.hpp", false);
     hs.new_include("framework/logging.hpp", false);
+    hs.new_include("framework/fm_util.hpp", false);
 
     for u in unit.get_next_unit_idents() {
         hs.new_comment("translation unit specific includes");
