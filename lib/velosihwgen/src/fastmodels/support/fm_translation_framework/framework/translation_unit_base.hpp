@@ -70,7 +70,7 @@ public:
         , _inaddr_range_max(range_max)
         , ptw_pvbus(ptw_pvbus)
     {
-        Logging::info("creating translation unit '%s'", this->name.c_str());
+        Logging::info("creating translation unit '%s' at base %p", this->name.c_str(), base);
     }
 
 
@@ -196,27 +196,6 @@ public:
      * -------------------------------------------------------------------------------------------
      */
 
-
-    /**
-     * @brief reads from physical memory
-     *
-     * @param[in]  addr   the address to read from
-     * @param[in]  width  the amount of bits to read
-     * @param[out] data   returns the read data
-     */
-    bool read_paddr(lpaddr_t addr, uint8_t width, uint64_t *data);
-
-    /**
-     * @brief Fills the state given a base address
-     *
-     * @param[in]  base   the address to read from
-     */
-    void populate_state();
-
-    ///< base address
-    lpaddr_t base;
-
-
     /**
      * @param[in] src_addr   the virtual address to be translated
      * @param[out] dst_addr  the translated address
@@ -233,6 +212,9 @@ public:
      * @returns true if the translation would pass successfully, false otherwise
      */
     virtual bool check_permissions(lvaddr_t src_addr, access_mode_t mode) = 0;
+
+    ///< base address
+    lpaddr_t base;
 
     std::string name;
 

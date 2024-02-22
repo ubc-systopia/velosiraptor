@@ -89,9 +89,9 @@ bool StateFieldBase::add_slice(const std::string &name, uint8_t start, uint8_t e
 // refresh all slices
 void StateFieldBase::refresh_value(void) {
     uint64_t temp;
-    read_paddr(this->ptw_pvbus, this->base, this->bitwidth, &temp);
-    Logging::debug("    Refreshing state field %s at base addr %p, width %d, value %lx",
-                   this->name.c_str(), this->base, this->bitwidth, temp);
+    read_paddr(this->ptw_pvbus, this->base + (this->offset / 8), this->bitwidth, &temp);
+    Logging::debug("    Refreshing state field %s at base addr %p, width %d, old %lx, new %lx",
+                   this->name.c_str(), this->base + (this->offset / 8), this->bitwidth, this->value, temp);
     this->set_value(temp);
 }
 
@@ -101,6 +101,8 @@ uint64_t StateFieldBase::get_slice_value(const std::string &name)
         Logging::error("StateFieldBase::get_slice_value: slice %s does not exist\n", name);
         return false;
     }
+
+    this->refresh_value();
 
     auto slice = this->_slices[name];
 

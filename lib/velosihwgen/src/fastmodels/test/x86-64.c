@@ -43,10 +43,9 @@ void print_test(volatile void *va, volatile void *pa) {
 }
 
 int vrs_test() {
-
-    /* TODO: We may want to put memory-mapped registers in a different piece of
-     * memory (Platform.lisa.template) */
-    addr *****mmu_state = (addr ****)0x0000UL;
+    for (word *i = 0; i < 0x3fffffff; i+= 0x1000 / 8) {
+        write_paddr(i, 0xda7ada7a00000000 | (word)i);
+    }
 
     /* Physical addresses of various units. */
     addr ****pml4_table = (addr ****)0x1000UL;
@@ -65,6 +64,15 @@ int vrs_test() {
     /* MSG("pdpt_i: %p\n", pdpt_i); */
     /* MSG("pdir_i: %p\n", pdir_i); */
     /* MSG("page_i: %p\n", page_i); */
+
+    /* TODO: We may want to put memory-mapped registers in a different piece of
+     * memory (Platform.lisa.template) */
+    addr *****mmu_state = (addr ****)0x0000UL;
+
+    write_paddr(mmu_state, pml4_table); // put pml4 in cr3
+    write_paddr(mmu_state + 1, 1 << 31); // enable paging in cr4
+    MSG("TEST: CR3: %lx\n", read_paddr(mmu_state));
+    MSG("TEST: CR4: %lx\n", read_paddr(mmu_state + 1));
 
     // selectively filling entries to point va to an example pa
     write_paddr(pml4_table + pml4_i, (word)pdpt_table);

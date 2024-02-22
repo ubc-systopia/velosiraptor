@@ -3,7 +3,7 @@
 bool read_paddr(pv::RandomContextTransactionGenerator *ptw_pvbus, lpaddr_t paddr, uint8_t width, uint64_t *data) {
     pv::AccessWidth access_width;
 
-    Logging::debug("TranslationUnitBase::read_paddr(0x%lx, width %u)", paddr, width);
+    Logging::debug("read_paddr(0x%lx, width %u)", paddr, width);
 
     if (ptw_pvbus == nullptr) {
         Logging::error("TranslationUnitBase::read_paddr - no page walker set!");

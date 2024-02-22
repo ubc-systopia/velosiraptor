@@ -40,6 +40,8 @@ component ExamplePlatform
         // main system bus
         BusDecoder0.pvbus_m_range[0x00000000..0x0fffffff] => Memory0.pvbus;
         BusDecoder0.pvbus_m_range[0x1C090000..0x1C090fff] => pl011_uart.pvbus;
+
+        // I think this was originally for registers?
         BusDecoder0.pvbus_m_range[0x1D000000..0x1dffffff] => /* REPLACE top_class */.control;
         BusDecoder0.pvbus_m_range[0x80000000..0xbfffffff] => DRAM0.pvbus;
 

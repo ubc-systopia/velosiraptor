@@ -242,7 +242,7 @@ component /* REPLACE top_class */
         Logging::init(level);
 
         Logging::warn("Initializing translation unit /* REPLACE top_class */");
-        unit = /* REPLACE top_class */::create(0x00000000, getHierarchicalName(), ptw_master_control.createRandomContextTransactionGenerator());
+        unit = /* REPLACE top_class */::create(0x100000000, getHierarchicalName(), ptw_master_control.createRandomContextTransactionGenerator());
     }
 
     // reset the unit
