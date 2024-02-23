@@ -1,5 +1,5 @@
 pub const NUM_WORKERS: usize = 14;
-pub const ITERATIONS: usize = 100;
+pub const ITERATIONS: usize = 500;
 
 pub struct Stats {
     pub min: u128,
@@ -13,13 +13,11 @@ pub struct Stats {
 
 impl From<&[u128]> for Stats {
     fn from(stats: &[u128]) -> Self {
-        let mut data = stats.to_vec();
+        let mut datapoints = stats.to_vec();
+        datapoints.sort();
+        let num_datapoints = datapoints.len();
 
-        let sum = data.iter().sum::<u128>() as u128;
-        let num = data.len();
-        let avg = sum / num as u128;
-
-        if num == 0 {
+        if num_datapoints == 0 {
             Self {
                 min: 0,
                 med: 0,
@@ -30,7 +28,28 @@ impl From<&[u128]> for Stats {
                 num: 0,
             }
         } else {
-            data.sort();
+            // detect outliers
+            let med = datapoints[num_datapoints / 2];
+            let q1  = datapoints[num_datapoints / 4];
+            let q3  = datapoints[num_datapoints / 4 * 3];
+            let iqr = q3 - q1;
+            let iqr_delta = iqr + (iqr >> 1); // 1.5 * iqr;
+            let upper_fence = q3 + iqr_delta;  // q3 + 1.5 * iqr
+            let lower_fence = if q1 < iqr_delta {
+                0
+            } else {
+                q1 - iqr_delta   // q1 - 1.5 * iqr
+            };
+            let data = if datapoints.len() > 10 {
+                datapoints.into_iter().filter(|x| *x < upper_fence && *x > lower_fence).collect::<Vec<u128>>()
+            } else {
+                datapoints
+            };
+
+            let num = data.len();
+            let sum = data.iter().sum::<u128>() as u128;
+            let avg = sum / num as u128;
+
             let var =
                 data.iter().map(|x| (x - avg) * (x - avg)).sum::<u128>() as u128 / num as u128;
             let std = (var as f64).sqrt() as u128;

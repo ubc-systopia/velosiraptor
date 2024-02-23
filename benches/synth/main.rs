@@ -5,7 +5,8 @@ use std::time::Instant;
 use velosiast::{
     AstResult, VelosiAst, VelosiAstField, VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment,
 };
-use velosisynth::{Z3SynthEnum, Z3SynthSegment, Z3WorkerPool};
+use velosisynth::{Z3SynthEnum, SynthOpts, Z3SynthSegment, Z3WorkerPool};
+
 
 mod bench;
 use bench::*;
@@ -23,7 +24,7 @@ const SPECS: [(&str, &str); 10] = [
     ("examples/r4700_fixed_page_size.vrs", "R4700 TLB"),
 ];
 
-fn run_synthesis(z3_workers: &mut Z3WorkerPool, vrs_file: &str, tag: &str) -> Option<BenchResults> {
+fn run_synthesis(z3_workers: &mut Z3WorkerPool, vrs_file: &str, tag: &str, no_tree: bool) -> Option<BenchResults> {
     let mut results = BenchResults::new(tag.to_string());
 
     // start of the benchmark
@@ -79,7 +80,7 @@ fn run_synthesis(z3_workers: &mut Z3WorkerPool, vrs_file: &str, tag: &str) -> Op
                     .map(|f| f.layout().len())
                     .sum::<usize>();
 
-                let t_0 = Instant::now();
+
 
                 // obtain the mutable reference to the segment
                 let seg: &mut VelosiAstUnitSegment =
@@ -87,8 +88,12 @@ fn run_synthesis(z3_workers: &mut Z3WorkerPool, vrs_file: &str, tag: &str) -> Op
 
                 // z3_workers.reset();
 
-                // create the synthesizer from the factory
-                let mut synth = Z3SynthSegment::new(z3_workers, seg, models[seg.ident()].clone());
+                let mut opts = SynthOpts::new();
+                opts.disable_tree_opt = no_tree;
+
+                let mut synth =  Z3SynthSegment::with_opts(seg, models[seg.ident()].clone(), opts, z3_workers);
+
+                let t_0 = Instant::now();
                 // run sanity check
                 let sanity_check = synth.sanity_check();
                 if let Err(_e) = sanity_check {
@@ -193,27 +198,35 @@ fn main() {
             continue;
         }
 
-        let mut results = BenchResults::new(name.to_string());
-        let mut had_errors = false;
-        for _ in 0..ITERATIONS {
-            // create synth factory and run synthesis on the segments
-            let mut z3_workers = Z3WorkerPool::with_num_workers(NUM_WORKERS, None);
-            if let Some(res) = run_synthesis(&mut z3_workers, vrs_file.as_str(), name) {
-                results.merge(&res);
+        for no_tree in &[true, false] {
+            let name = if *no_tree {
+                format!("{name} (no tree)")
             } else {
-                had_errors = true;
+                name.to_string()
+            };
+            let mut results = BenchResults::new(name.to_string());
+            let mut had_errors = false;
+            for _ in 0..ITERATIONS {
+                // create synth factory and run synthesis on the segments
+                let mut z3_workers = Z3WorkerPool::with_num_workers(NUM_WORKERS, None);
+                if let Some(res) = run_synthesis(&mut z3_workers, vrs_file.as_str(), name.as_str(), *no_tree) {
+                    results.merge(&res);
+                } else {
+                    had_errors = true;
+                    break;
+                }
+
+                z3_workers.terminate();
+            }
+
+            if had_errors {
                 break;
             }
 
-            z3_workers.terminate();
-        }
+            println!("{results}");
+            latex_results.push_str(results.to_latex().as_str());
 
-        if had_errors {
-            break;
         }
-
-        println!("{results}");
-        latex_results.push_str(results.to_latex().as_str());
     }
 
     println!("# Completed");
