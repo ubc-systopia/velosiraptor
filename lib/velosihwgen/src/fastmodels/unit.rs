@@ -498,11 +498,27 @@ fn add_translate_method_segment(
 
             body.return_expr(C::Expr::bfalse());
         } else {
+            let offset_mask = body
+                .new_variable("offset_mask", C::Type::new_uint64())
+                .to_expr();
+            body.assign(
+                offset_mask.clone(),
+                C::Expr::Raw(format!("((uint64_t)1 << {:#x}) - 1", segment.inbitwidth)),
+            );
+
+            // should always be dealing with paddrs
             // return the expression
             // no next translation unit, simply set the return value with the expression
             body.new_comment("return the result of the translation");
             // calculate the value
-            body.assign(base_var.clone(), expr_to_cpp(tbody, &params));
+            body.assign(
+                base_var.clone(),
+                C::Expr::binop(
+                    expr_to_cpp(tbody, &params),
+                    "+",
+                    C::Expr::binop(src_var, "&", offset_mask),
+                ),
+            );
             // assign it to the deref return value
             body.assign(C::Expr::deref(&dst_addr), base_var);
             // return true
