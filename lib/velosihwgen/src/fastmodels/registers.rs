@@ -25,12 +25,14 @@
 
 use crate::fastmodels::add_header_comment;
 use crate::fastmodels::unit::state_class_name;
-use crate::fastmodels::unit::unit_header_file;
+
 use crate::VelosiHwGenError;
 use crustal as C;
 use std::ops::Deref;
 use std::path::Path;
 use velosiast::{VelosiAst, VelosiAstField, VelosiAstInterfaceField, VelosiAstUnit};
+
+use super::unit::state_header_file;
 
 pub fn registers_header_file(name: &str) -> String {
     format!("{}_registers.hpp", name)
@@ -88,7 +90,7 @@ pub fn generate_register_header(
         let rs = register_map(|r| r.clone(), u);
 
         if !rs.is_empty() {
-            let state_h = unit_header_file(&u.ident_to_string());
+            let state_h = state_header_file(u.ident().as_str());
             s.new_include(&state_h, false);
         }
 
@@ -176,8 +178,7 @@ pub fn generate_register_impl(
             ))
             .push_param(cparam);
 
-            let field_access_expr =
-                C::Expr::field_access(&stvar, r.ident());
+            let field_access_expr = C::Expr::field_access(&stvar, r.ident());
 
             let m = c
                 .new_method("do_read", C::Type::new_uint(64))
@@ -185,7 +186,7 @@ pub fn generate_register_impl(
             m.body()
                 .fn_call(
                     "Logging::debug",
-                    vec![C::Expr::new_str("Register::do_read()")],
+                    vec![C::Expr::new_str(&format!("{rcn}::do_read()"))],
                 )
                 .raw(format!(
                     "auto st = static_cast<{} *>(this->get_state())",
@@ -202,7 +203,7 @@ pub fn generate_register_impl(
             m.body()
                 .fn_call(
                     "Logging::debug",
-                    vec![C::Expr::new_str("Register::do_write()")],
+                    vec![C::Expr::new_str(&format!("{rcn}::do_write()"))],
                 )
                 .raw(format!(
                     "auto st = static_cast<{} *>(this->get_state())",
