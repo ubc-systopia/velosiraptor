@@ -5,8 +5,7 @@ use std::time::Instant;
 use velosiast::{
     AstResult, VelosiAst, VelosiAstField, VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment,
 };
-use velosisynth::{Z3SynthEnum, SynthOpts, Z3SynthSegment, Z3WorkerPool};
-
+use velosisynth::{SynthOpts, Z3SynthEnum, Z3SynthSegment, Z3WorkerPool};
 
 mod bench;
 use bench::*;
@@ -24,7 +23,12 @@ const SPECS: [(&str, &str); 10] = [
     ("examples/r4700_fixed_page_size.vrs", "R4700 TLB"),
 ];
 
-fn run_synthesis(z3_workers: &mut Z3WorkerPool, vrs_file: &str, tag: &str, no_tree: bool) -> Option<BenchResults> {
+fn run_synthesis(
+    z3_workers: &mut Z3WorkerPool,
+    vrs_file: &str,
+    tag: &str,
+    no_tree: bool,
+) -> Option<BenchResults> {
     let mut results = BenchResults::new(tag.to_string());
 
     // start of the benchmark
@@ -80,8 +84,6 @@ fn run_synthesis(z3_workers: &mut Z3WorkerPool, vrs_file: &str, tag: &str, no_tr
                     .map(|f| f.layout().len())
                     .sum::<usize>();
 
-
-
                 // obtain the mutable reference to the segment
                 let seg: &mut VelosiAstUnitSegment =
                     Rc::get_mut(u).expect("could not get mut ref!");
@@ -91,7 +93,8 @@ fn run_synthesis(z3_workers: &mut Z3WorkerPool, vrs_file: &str, tag: &str, no_tr
                 let mut opts = SynthOpts::new();
                 opts.disable_tree_opt = no_tree;
 
-                let mut synth =  Z3SynthSegment::with_opts(seg, models[seg.ident()].clone(), opts, z3_workers);
+                let mut synth =
+                    Z3SynthSegment::with_opts(seg, models[seg.ident()].clone(), opts, z3_workers);
 
                 let t_0 = Instant::now();
                 // run sanity check
@@ -209,7 +212,9 @@ fn main() {
             for _ in 0..ITERATIONS {
                 // create synth factory and run synthesis on the segments
                 let mut z3_workers = Z3WorkerPool::with_num_workers(NUM_WORKERS, None);
-                if let Some(res) = run_synthesis(&mut z3_workers, vrs_file.as_str(), name.as_str(), *no_tree) {
+                if let Some(res) =
+                    run_synthesis(&mut z3_workers, vrs_file.as_str(), name.as_str(), *no_tree)
+                {
                     results.merge(&res);
                 } else {
                     had_errors = true;
@@ -225,7 +230,6 @@ fn main() {
 
             println!("{results}");
             latex_results.push_str(results.to_latex().as_str());
-
         }
     }
 
