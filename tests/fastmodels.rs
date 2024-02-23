@@ -116,7 +116,7 @@ fn run_fast_models_platforms() {
 #[ignore]
 fn example_direct_segment_fastmodels() {
     let mut vrs = PathBuf::from("examples");
-    vrs.push("singlesegment.vrs");
+    vrs.push("simple_segment.vrs");
     assert!(vrs.is_file());
 
     let outdir = Path::new("out/example_direct_segment_fastmodels");
