@@ -40,7 +40,10 @@ use velosiast::{
 use C::Scope;
 
 use crate::fastmodels::add_header_comment;
+use crate::fastmodels::registers::register_class_name;
 use crate::VelosiHwGenError;
+
+use super::registers::registers_header_file;
 
 pub fn unit_header_file(name: &str) -> String {
     format!("{}_unit.hpp", name)
@@ -60,6 +63,10 @@ pub fn interface_class_name(name: &str) -> String {
 
 pub fn state_class_name(name: &str) -> String {
     format!("{}State", unit_class_name(name))
+}
+
+pub fn state_header_file(name: &str) -> String {
+    format!("{}_state.hpp", name)
 }
 
 pub fn state_field_class_name(unit: &str, name: &str) -> String {
@@ -498,12 +505,17 @@ fn add_translate_method_segment(
 
             body.return_expr(C::Expr::bfalse());
         } else {
-            let offset_mask = body
-                .new_variable("offset_mask", C::Type::new_uint64())
-                .to_expr();
             body.assign(
-                offset_mask.clone(),
-                C::Expr::Raw(format!("((uint64_t)1 << {:#x}) - 1", segment.inbitwidth)),
+                src_var.clone(),
+                C::Expr::binop(
+                    src_var.clone(),
+                    "&",
+                    C::Expr::new_num(if segment.inbitwidth == 64 {
+                        0xffffffffffffffff
+                    } else {
+                        (1 << segment.inbitwidth) - 1
+                    }),
+                ),
             );
 
             // should always be dealing with paddrs
@@ -511,14 +523,7 @@ fn add_translate_method_segment(
             // no next translation unit, simply set the return value with the expression
             body.new_comment("return the result of the translation");
             // calculate the value
-            body.assign(
-                base_var.clone(),
-                C::Expr::binop(
-                    expr_to_cpp(tbody, &params),
-                    "+",
-                    C::Expr::binop(src_var, "&", offset_mask),
-                ),
-            );
+            body.assign(base_var.clone(), expr_to_cpp(tbody, &params));
             // assign it to the deref return value
             body.assign(C::Expr::deref(&dst_addr), base_var);
             // return true
@@ -916,6 +921,30 @@ fn add_method_maybe(c: &mut C::Class, tm: &VelosiAstMethod, params: &HashSet<&st
     }
 }
 
+fn add_state_header(unit: &VelosiAstUnit, _pkgname: &str, outdir: &Path) {
+    let mut scope = C::Scope::new();
+
+    let header_guard = format!("{}_STATE_HPP_", unit.ident().to_uppercase());
+    let guard = scope.new_ifdef(&header_guard);
+    let s = guard.guard().then_scope();
+
+    add_header_comment(s, unit.ident(), "generated implementation");
+
+    s.new_comment("system includes");
+    s.new_include("string.h", true);
+    s.new_include("stddef.h", true);
+    s.new_include("assert.h", true);
+    s.new_comment("framework includes");
+    s.new_include("framework/types.hpp", false);
+    s.new_include("framework/state_base.hpp", false);
+    s.new_include("framework/state_field_base.hpp", false);
+
+    add_state_classes(s, unit);
+
+    scope.set_filename(&state_header_file(unit.ident()));
+    scope.to_file(outdir, true).expect("failed to write file");
+}
+
 fn add_state_classes(s: &mut Scope, unit: &VelosiAstUnit) {
     let scn = state_class_name(unit.ident());
 
@@ -924,21 +953,25 @@ fn add_state_classes(s: &mut Scope, unit: &VelosiAstUnit) {
         None => Vec::<Rc<VelosiAstStateField>>::new(),
     };
 
-    for f in state_fields.clone() {
+    for f in &state_fields {
         let sfcn = state_field_class_name(unit.ident(), f.ident());
-        let f_c = s
-            .new_class(&sfcn)
-            .set_base("StateFieldBase", C::Visibility::Public);
+
+        let (base, add_ptw_bus) = match f.as_ref() {
+            VelosiAstStateField::Memory(_) => ("MemoryStateFieldBase", true),
+            VelosiAstStateField::Register(_) => ("RegisterStateFieldBase", false),
+        };
+
+        let f_c = s.new_class(&sfcn).set_base(base, C::Visibility::Public);
 
         let sf_offset = unit
             .interface()
             .and_then(|i: Rc<VelosiAstInterface>| i.fields_map.get(&f.ident_to_string()).cloned())
-            .and_then(|i_f| match i_f.as_ref() {
+            .map(|i_f| match i_f.as_ref() {
                 VelosiAstInterfaceField::Mmio(VelosiAstInterfaceMmioField { offset, .. })
                 | VelosiAstInterfaceField::Memory(VelosiAstInterfaceMemoryField {
                     offset, ..
-                }) => Some(offset.clone() * 8),
-                _ => Some(0),
+                }) => *offset * 8,
+                _ => 0,
             });
 
         let offset = match sf_offset {
@@ -962,17 +995,17 @@ fn add_state_classes(s: &mut Scope, unit: &VelosiAstUnit) {
             C::Type::new_class("pv::RandomContextTransactionGenerator *"),
         ));
 
-        cons.push_parent_initializer(C::Expr::fn_call(
-            "StateFieldBase",
-            vec![
-                C::Expr::new_str(f.ident()),
-                C::Expr::new_num(offset),
-                C::Expr::Raw(String::from("base")),
-                C::Expr::Raw(String::from("ptw_pvbus")),
-                C::Expr::new_num(f.size() * 8),
-                C::Expr::new_num(0),
-            ],
-        ));
+        let mut init_args = vec![
+            C::Expr::new_str(f.ident()),
+            C::Expr::new_num(offset),
+            C::Expr::Raw(String::from("base")),
+            C::Expr::new_num(f.size() * 8),
+            C::Expr::new_num(0),
+        ];
+        if add_ptw_bus {
+            init_args.push(C::Expr::Raw(String::from("ptw_pvbus")));
+        }
+        cons.push_parent_initializer(C::Expr::fn_call(base, init_args));
 
         for sl in &f.layout_as_slice().to_vec() {
             cons.body().method_call(
@@ -1078,6 +1111,23 @@ fn add_interface_class(s: &mut Scope, unit: &VelosiAstUnit) {
 
     c.new_attribute("_state", state_ptr_type.clone());
 
+    // adding the registers here
+    if let Some(iface) = unit.interface() {
+        for f in iface.fields().iter() {
+            match f.as_ref() {
+                VelosiAstInterfaceField::Memory(_field) => (), /* no-op */
+                VelosiAstInterfaceField::Register(_field) => unimplemented!(), /* can't handle this */
+                VelosiAstInterfaceField::Mmio(field) => {
+                    let rcn = register_class_name(field.ident());
+                    let fieldname = format!("_{}", &field.ident());
+                    let ty = C::Type::new_class(&rcn);
+                    c.new_attribute(&fieldname, ty);
+                }
+                VelosiAstInterfaceField::Instruction(_field) => unimplemented!(), /* can't handle this */
+            }
+        }
+    }
+
     let cons = c.new_constructor();
 
     let m = cons.new_param("state", state_ptr_type);
@@ -1085,7 +1135,33 @@ fn add_interface_class(s: &mut Scope, unit: &VelosiAstUnit) {
     let pa = C::Expr::from_method_param(m);
 
     cons.push_parent_initializer(C::Expr::fn_call("InterfaceBase", vec![pa.clone()]));
-    cons.push_initializer("_state", pa);
+    cons.push_initializer("_state", pa.clone());
+
+    if let Some(iface) = unit.interface() {
+        for f in iface.fields().iter() {
+            match f.as_ref() {
+                VelosiAstInterfaceField::Memory(_field) => (), /* no-op */
+                VelosiAstInterfaceField::Register(_field) => unimplemented!(), /* can't handle this */
+                VelosiAstInterfaceField::Mmio(field) => {
+                    let fieldname = format!("_{}", field.ident());
+                    let rcn = register_class_name(field.ident());
+                    cons.push_initializer(
+                        fieldname.as_str(),
+                        C::Expr::fn_call(&rcn, vec![pa.clone()]),
+                    );
+
+                    let this = C::Expr::this();
+                    let field = C::Expr::field_access(&this, &fieldname);
+                    cons.body().method_call(
+                        C::Expr::this(),
+                        "add_register",
+                        vec![C::Expr::addr_of(&field)],
+                    );
+                }
+                VelosiAstInterfaceField::Instruction(_field) => unimplemented!(), /* can't handle this */
+            }
+        }
+    }
 }
 
 fn add_unit_class(s: &mut Scope, unit: &VelosiAstUnit, ast: &VelosiAst) {
@@ -1188,15 +1264,16 @@ fn add_unit_class(s: &mut Scope, unit: &VelosiAstUnit, ast: &VelosiAst) {
 pub fn generate_unit_cpp(
     unit: &VelosiAstUnit,
     ast: &VelosiAst,
+    pkgname: &str,
     outdir: &Path,
 ) -> Result<(), VelosiHwGenError> {
-    let mut hs = C::Scope::new();
+    let mut scope = C::Scope::new();
 
     let header_guard = format!("{}_UNIT_HPP_", unit.ident().to_uppercase());
-    let guard = hs.new_ifdef(&header_guard);
-    hs = guard.guard().then_scope().clone();
+    let guard = scope.new_ifdef(&header_guard);
+    let hs = guard.guard().then_scope();
 
-    add_header_comment(&mut hs, unit.ident(), "generated implementation");
+    add_header_comment(hs, unit.ident(), "generated implementation");
 
     hs.new_comment("system includes");
     hs.new_include("string.h", true);
@@ -1215,13 +1292,16 @@ pub fn generate_unit_cpp(
         hs.new_comment("translation unit specific includes");
         hs.new_include(&unit_header_file(&u.to_string()), false);
     }
+    hs.new_include(&state_header_file(unit.ident().as_str()), false);
+    hs.new_include(&registers_header_file(pkgname), false);
 
-    add_state_classes(&mut hs, unit);
-    add_interface_class(&mut hs, unit);
-    add_unit_class(&mut hs, unit, ast);
+    add_state_header(unit, pkgname, outdir);
+    // add_state_classes(&mut hs, unit);
+    add_interface_class(hs, unit);
+    add_unit_class(hs, unit, ast);
 
-    hs.set_filename(&unit_header_file(unit.ident()));
-    hs.to_file(outdir, true)?;
+    scope.set_filename(&unit_header_file(unit.ident()));
+    scope.to_file(outdir, true)?;
 
     let mut is = C::Scope::new();
     is.new_include(&unit_header_file(unit.ident()), false);
