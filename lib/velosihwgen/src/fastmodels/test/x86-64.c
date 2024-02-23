@@ -43,9 +43,9 @@ void print_test(volatile void *va, volatile void *pa) {
 }
 
 int vrs_test() {
-    for (word *i = 0; i < 0x3fffffff; i+= 0x1000 / 8) {
-        write_paddr(i, 0xda7ada7a00000000 | (word)i);
-    }
+    /* for (word *i = 0; i < 0x3fffffff; i+= 0x1000 / 8) { */
+    /*     write_paddr(i, 0xda7ada7a00000000 | (word)i); */
+    /* } */
 
     /* Physical addresses of various units. */
     addr ****pml4_table = (addr ****)0x1000UL;
@@ -54,16 +54,15 @@ int vrs_test() {
     addr *page_table = (addr *)0x4000UL;
 
     addr va = (addr)0x34567890;
-    addr pa = (addr)0x4000;
+    volatile void *pp = (addr)0x5000;
 
     word pml4_i = ((word)va >> 39) & 0x1ff;
     word pdpt_i = ((word)va >> 30) & 0x1ff;
     word pdir_i = ((word)va >> 21) & 0x1ff;
     word page_i = ((word)va >> 12) & 0x1ff;
-    /* MSG("pml4_i: %p\n", pml4_i); */
-    /* MSG("pdpt_i: %p\n", pdpt_i); */
-    /* MSG("pdir_i: %p\n", pdir_i); */
-    /* MSG("page_i: %p\n", page_i); */
+    word offset = (word)va & 0xfff;
+
+    addr pa = pp + offset;
 
     /* TODO: We may want to put memory-mapped registers in a different piece of
      * memory (Platform.lisa.template) */

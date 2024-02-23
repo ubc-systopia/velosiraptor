@@ -425,7 +425,8 @@ fn add_translate_method_segment(
         .push_param(dst_addr_param);
 
     m.body().raw(format!(
-        "Logging::debug(\"TranslationUnit::translate(0x%lx)\", {})",
+        "Logging::debug(\"{}::translate(0x%lx)\", {})",
+        segment.ident(),
         &tm.params[0].ident.ident
     ));
 
@@ -588,7 +589,6 @@ fn translate_method_staticmap(s: &VelosiAstUnitStaticMap, ast: &VelosiAst) -> C:
 
     match &s.map {
         VelosiAstStaticMap::Explicit(map) => {
-            panic!("Unhandled. Need to call read_paddr.");
             let mut start_address = 0;
             for entry in &map.entries {
                 if let Some(_src) = &entry.src {
@@ -656,26 +656,47 @@ fn translate_method_staticmap(s: &VelosiAstUnitStaticMap, ast: &VelosiAst) -> C:
                 panic!("TODO: handle me!");
             }
 
-            let element_size = 1 << map.elm.dst_bitwidth;
+            // let element_size = 1 << map.elm.dst_bitwidth;
+            let indexbits = map.range.end.trailing_zeros(); // 9 in x86
+            if map.range.end - (1 << indexbits) != 0 {
+                panic!("TODO: handle odd page size")
+            }
 
-            // let idx = va / element_size;
+            // mask = ((1 << indexbits) - 1) << bitwidth
+            let idx_mask = body
+                .new_variable("idx_mask", C::Type::new_uint64())
+                .to_expr();
+            body.assign(
+                idx_mask.clone(),
+                C::Expr::Raw(format!(
+                    "(((uint64_t)1 << {:#x}) - 1) << {:#x}",
+                    indexbits, map.elm.dst_bitwidth
+                )),
+            );
+
             let idx_var = body
-                .new_variable(map.var.ident(), C::Type::new_size())
+                .new_variable(map.var.ident(), C::Type::new_uint64())
                 .to_expr();
             body.assign(
                 idx_var.clone(),
-                C::Expr::binop(va_var.clone(), "/", C::Expr::new_num(element_size)),
+                C::Expr::binop(
+                    C::Expr::binop(idx_mask, "&", va_var.clone()),
+                    ">>",
+                    C::Expr::new_num(map.elm.dst_bitwidth),
+                ),
             );
 
             body.fn_call(
                 "Logging::debug",
                 vec![
-                    C::Expr::new_str("translating with map[%zu]"),
+                    C::Expr::new_str("translating with map[0x%lx]"),
                     idx_var.clone(),
                 ],
             );
 
             let mut args = Vec::new();
+            // args.push(C::Expr::Raw(format!("this->base + {}", idx_var.clone())));
+
             for arg in &map.elm.dst.args {
                 args.push(expr_to_cpp(arg, &params));
             }
@@ -685,22 +706,14 @@ fn translate_method_staticmap(s: &VelosiAstUnitStaticMap, ast: &VelosiAst) -> C:
 
             // va = va - (idx * element_size);
             body.new_comment("construct the new variable value");
-            body.assign(
-                va_var.clone(),
-                C::Expr::binop(
-                    va_var.clone(),
-                    "-",
-                    C::Expr::binop(idx_var.clone(), "*", C::Expr::new_num(element_size)),
-                ),
-            );
-
-            // body.new_variable("next_base", C::Type::new_typedef("lpaddr_t"));
-            // body.assign(C::Expr::Raw("next_base".to_string()), C::Expr::fn_call("read_paddr", vec![
-            //     C::Expr::Raw("ptw_pvbus".to_string()),
-            //     C::Expr::Raw("".to_string()),
-            //     C::Expr::new_num(element_size),
-            //     C::Expr::Raw("next_base".to_string())
-            // ]));
+            // body.assign(
+            //     va_var.clone(),
+            //     C::Expr::binop(
+            //         va_var.clone(),
+            //         "-",
+            //         C::Expr::binop(idx_var.clone(), "*", C::Expr::new_num(element_size)),
+            //     ),
+            // );
 
             body.return_expr(C::Expr::method_call(
                 &next_var,
