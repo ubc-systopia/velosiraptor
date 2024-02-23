@@ -147,7 +147,7 @@ impl Relations {
                 edges.remove(&r);
             }
         }
-        return sorted;
+        sorted
     }
 
     /// obtains the root units from the ast
