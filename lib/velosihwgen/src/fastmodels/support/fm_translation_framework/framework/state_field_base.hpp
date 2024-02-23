@@ -9,9 +9,9 @@
 #ifndef _STATE_FIELD_BASE_H_
 #define _STATE_FIELD_BASE_H_ 1
 
+#include "fm_util.hpp"
 #include <map>
 #include <string>
-#include "fm_util.hpp"
 
 /**
  * @brief Represents a state field
@@ -24,12 +24,10 @@ public:
      * -------------------------------------------------------------------------------------------
      */
 
-
     /**
      * @brief constructs a default state field
      */
-    StateFieldBase(std::string name, uint64_t offset, lpaddr_t base, pv::RandomContextTransactionGenerator *ptw_pvbus, uint8_t nbits, uint64_t init_val);
-
+    StateFieldBase(std::string name, uint64_t offset, lpaddr_t base, uint8_t nbits, uint64_t init_val);
 
     /**
      * @brief performs a reset on the field
@@ -50,24 +48,21 @@ public:
      */
     void print_field(void);
 
-
     /*
      * -------------------------------------------------------------------------------------------
      * Accessors
      * -------------------------------------------------------------------------------------------
      */
 
-
     /**
      * @brief returns the name of the field
      *
      * @returns a string representing the name of the field
      */
-    const std::string &get_name(void) const
+    const std::string& get_name(void) const
     {
         return this->name;
     }
-
 
     /**
      * @brief sets the value of the field
@@ -90,14 +85,17 @@ public:
         return this->value;
     }
 
-    void refresh_value(void);
+    /**
+     * @brief pushes the value to the backing memory, or pulls the value from the backing memory
+     */
+    virtual void push_value(void) = 0;
+    virtual void pull_value(void) = 0;
 
     /*
      * -------------------------------------------------------------------------------------------
      * Slices
      * -------------------------------------------------------------------------------------------
      */
-
 
     /**
      * @brief obtains the current value in the state field
@@ -106,8 +104,7 @@ public:
      *
      * @return the value of the slice
      */
-    uint64_t get_slice_value(const std::string &name);
-
+    uint64_t get_slice_value(const std::string& name);
 
     /**
      * @brief updates the value of the field slice
@@ -117,8 +114,7 @@ public:
      *
      * @returns true if the field value has been updated successfully
      */
-    bool set_slice_value(const std::string &name, uint64_t value);
-
+    bool set_slice_value(const std::string& name, uint64_t value);
 
     /**
      * @brief adds a new field slice
@@ -127,8 +123,7 @@ public:
      * @param[in] start  start bit of the slices (first bit = 0)
      * @param[in] end    end bit of the slice (inclusive)
      */
-    bool add_slice(const std::string &name, uint8_t start, uint8_t end);
-
+    bool add_slice(const std::string& name, uint8_t start, uint8_t end);
 
     ///< the name of the field
     std::string name;
@@ -151,12 +146,48 @@ public:
     ///< the mask for this filed
     uint64_t mask;
 
-    ///< access to simulated memory
-    pv::RandomContextTransactionGenerator *ptw_pvbus;
-
 private:
     ///< represents the slice map: slice name -> [start, end]
-    std::map<std::string, std::pair<uint8_t, uint8_t> > _slices;
+    std::map<std::string, std::pair<uint8_t, uint8_t>> _slices;
+};
+
+class RegisterStateFieldBase : public StateFieldBase {
+public:
+    /**
+     * @brief constructs a register state field
+     */
+    RegisterStateFieldBase(std::string name, uint64_t offset, lpaddr_t base, uint8_t nbits, uint64_t init_val)
+        : StateFieldBase(name, offset, base, nbits, init_val)
+    {
+    }
+
+    /**
+     * @brief refreshes the value from the underlying memory. this is a no-op
+     */
+    void push_value(void) {};
+    void pull_value(void) {};
+};
+
+class MemoryStateFieldBase : public StateFieldBase {
+public:
+    /**
+     * @brief constructs a register state field
+     */
+    MemoryStateFieldBase(std::string name, uint64_t offset, lpaddr_t base, uint8_t nbits, uint64_t init_val, pv::RandomContextTransactionGenerator* ptw_pvbus)
+        : StateFieldBase(name, offset, base, nbits, init_val)
+        , _ptw_pvbus(ptw_pvbus)
+    {
+    }
+
+    /**
+     * @brief refreshes the value from the underlying memory. this is a no-op
+     */
+    void push_value(void) override;
+    void pull_value(void) override;
+
+private:
+    ///< access to simulated memory
+    pv::RandomContextTransactionGenerator* _ptw_pvbus;
 };
 
 #endif /* _STATE_FIELD_BASE_H_ */

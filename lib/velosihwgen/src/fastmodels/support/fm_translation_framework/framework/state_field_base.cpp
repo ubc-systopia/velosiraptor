@@ -9,43 +9,41 @@
 #include <assert.h>
 
 #include "logging.hpp"
-#include "types.hpp"
 #include "state_field_base.hpp"
+#include "types.hpp"
 
 // todo: the error logging messages might need name.c_str() rather than name
 
-StateFieldBase::StateFieldBase(std::string name, uint64_t offset, uint64_t base, pv::RandomContextTransactionGenerator *ptw_pvbus, uint8_t nbits = 64, uint64_t init_val = 0)
+StateFieldBase::StateFieldBase(std::string name, uint64_t offset, uint64_t base, uint8_t nbits = 64, uint64_t init_val = 0)
 {
     if (nbits < 64) {
         this->bitwidth = nbits;
-        this->mask     = (1ULL << nbits) - 1;
+        this->mask = (1ULL << nbits) - 1;
     } else {
         if (nbits > 64) {
             Logging::warn("StateFieldBase::StateFieldBase: bitwidth too large. Setting to 64\n");
         }
         this->bitwidth = 64;
-        this->mask     = ~(0ULL);
+        this->mask = ~(0ULL);
     }
-    this->name        = name;
-    this->offset      = offset;
-    this->base        = base;
-    this->ptw_pvbus   = ptw_pvbus;
+    this->name = name;
+    this->offset = offset;
+    this->base = base;
     this->reset_value = init_val & this->mask;
-    this->value       = init_val & this->mask;
+    this->value = init_val & this->mask;
     // NOTE: this->offset not initialized by default. If using MMIO regs, assign
     // it in the generated code.
 
     this->_slices = std::map<std::string, std::pair<uint8_t, uint8_t>>();
 }
 
-
 void StateFieldBase::print_field(void)
 {
     Logging::info("% 16s     % 2u    0x%016lx    (0x%llx)", this->name.c_str(), this->bitwidth,
-                  this->value, this->reset_value);
+        this->value, this->reset_value);
 }
 
-bool StateFieldBase::add_slice(const std::string &name, uint8_t start, uint8_t end)
+bool StateFieldBase::add_slice(const std::string& name, uint8_t start, uint8_t end)
 {
     if (this->_slices.contains(name)) {
         Logging::error("StateFieldBase::add_slice: (%s) already exists\n", name);
@@ -68,13 +66,15 @@ bool StateFieldBase::add_slice(const std::string &name, uint8_t start, uint8_t e
         // case 1: end is smaller than the start bit, no overlap
         if (it->second.first <= start && start <= it->second.second) {
             Logging::error("StateFieldBase::add_slice: (%s) start overlaps with existing slice"
-                           "(start)\n", name);
+                           "(start)\n",
+                name);
             return false;
         }
 
         if (it->second.first <= end && end <= it->second.second) {
             Logging::error("StateFieldBase::add_slice: (%s) start overlaps with existing slice "
-                           "(end)\n", name);
+                           "(end)\n",
+                name);
             return false;
         }
     }
@@ -86,23 +86,14 @@ bool StateFieldBase::add_slice(const std::string &name, uint8_t start, uint8_t e
     return true;
 }
 
-// refresh all slices
-void StateFieldBase::refresh_value(void) {
-    uint64_t temp;
-    read_paddr(this->ptw_pvbus, this->base + (this->offset / 8), this->bitwidth, &temp);
-    Logging::debug("    Refreshing state field %s at base addr %p, width %d, old %lx, new %lx",
-                   this->name.c_str(), this->base + (this->offset / 8), this->bitwidth, this->value, temp);
-    this->set_value(temp);
-}
-
-uint64_t StateFieldBase::get_slice_value(const std::string &name)
+uint64_t StateFieldBase::get_slice_value(const std::string& name)
 {
     if (!this->_slices.contains(name)) {
         Logging::error("StateFieldBase::get_slice_value: slice %s does not exist\n", name);
         return false;
     }
 
-    this->refresh_value();
+    this->pull_value();
 
     auto slice = this->_slices[name];
 
@@ -119,7 +110,7 @@ uint64_t StateFieldBase::get_slice_value(const std::string &name)
     }
 }
 
-bool StateFieldBase::set_slice_value(const std::string &name, uint64_t value)
+bool StateFieldBase::set_slice_value(const std::string& name, uint64_t value)
 {
     if (!this->_slices.contains(name)) {
         Logging::error("StateFieldBase::set_slice_value: slice %s does not exist\n", name);
@@ -140,5 +131,22 @@ bool StateFieldBase::set_slice_value(const std::string &name, uint64_t value)
             | ((value & slice_mask) << slice.first);
     }
 
+    this->push_value();
+
     return true;
+}
+
+void MemoryStateFieldBase::pull_value(void)
+{
+    uint64_t temp;
+    read_paddr(this->_ptw_pvbus, this->base + (this->offset / 8), this->bitwidth, &temp);
+    Logging::debug("    Refreshing state field %s at base addr %p, width %d, old %lx, new %lx",
+        this->name.c_str(), this->base + (this->offset / 8), this->bitwidth, this->value, temp);
+    this->set_value(temp);
+}
+
+void MemoryStateFieldBase::push_value(void)
+{
+    Logging::debug("    Updating state field %s at base addr %p, width %d, old %lx",
+        this->name.c_str(), this->base + (this->offset / 8), this->bitwidth, this->value);
 }
