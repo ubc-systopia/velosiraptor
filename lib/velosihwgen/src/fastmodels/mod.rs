@@ -170,10 +170,7 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
 
         let top_file = unit_header_file(top_files[0]); // e.g. X86_MMU_unit.hpp
         let top_class = unit_class_name(top_files[0]); // e.g. X86_MMU
-        let unit_files: Vec<String> = dag
-            .iter()
-            .map(|n| unit_impl_file(n))
-            .collect();
+        let unit_files: Vec<String> = dag.iter().map(|n| unit_impl_file(n)).collect();
 
         fill_template(
             self.support_dir.join("TranslationUnit.lisa.template"),
@@ -200,7 +197,10 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
             self.support_dir.join("Makefile.template"),
             self.outdir.join("Makefile"),
             HashMap::from([
-                (&"/* REPLACE unit_srcs */".to_string(), &unit_files.join(" ")),
+                (
+                    &"/* REPLACE unit_srcs */".to_string(),
+                    &unit_files.join(" "),
+                ),
                 (&"/* REPLACE pkgname */".to_string(), &self.pkgname),
             ]),
         )?;
@@ -214,7 +214,7 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
                 continue;
             }
 
-            generate_unit_cpp(u, ast, &self.outdir)?;
+            generate_unit_cpp(u, ast, &self.pkgname, &self.outdir)?;
         }
 
         Ok(())
