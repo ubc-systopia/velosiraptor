@@ -31,7 +31,8 @@ use std::path::{Path, PathBuf};
 use crustal as C;
 
 use velosiast::{
-    VelosiAst, VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField, VelosiAstTypeInfo, VelosiAstTypeProperty, VelosiAstUnit
+    VelosiAst, VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField, VelosiAstTypeInfo,
+    VelosiAstTypeProperty, VelosiAstUnit,
 };
 
 use super::{
@@ -141,15 +142,17 @@ fn generate_write_slice_fn(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Generates the method to read the entire field
-fn generate_read_field(scope: &mut C::Scope, unit: &VelosiAstUnit, field: &dyn VelosiAstField, osspec: &VelosiAst) {
-
+fn generate_read_field(
+    scope: &mut C::Scope,
+    unit: &VelosiAstUnit,
+    field: &dyn VelosiAstField,
+    osspec: &VelosiAst,
+) {
     let env = osspec.osspec().unwrap();
 
-    let phys_to_virt_fns = env.get_method_with_signature(&[VelosiAstTypeInfo::PhysAddr], &VelosiAstTypeInfo::VirtAddr);
+    let phys_to_virt_fns =
+        env.get_method_with_signature(&[VelosiAstTypeInfo::PhysAddr], &VelosiAstTypeInfo::VirtAddr);
     let phys_to_virt_fn = phys_to_virt_fns.first();
-
-
-
 
     // define the function sigature
     let fieldtype = C::Type::new_typedef(&field.to_type_name(unit));
@@ -180,11 +183,16 @@ fn generate_read_field(scope: &mut C::Scope, unit: &VelosiAstUnit, field: &dyn V
 }
 
 /// Generates the write method for the entire field
-fn generate_write_field(scope: &mut C::Scope, unit: &VelosiAstUnit, field: &dyn VelosiAstField, osspec: &VelosiAst) {
-
+fn generate_write_field(
+    scope: &mut C::Scope,
+    unit: &VelosiAstUnit,
+    field: &dyn VelosiAstField,
+    osspec: &VelosiAst,
+) {
     let env = osspec.osspec().unwrap();
 
-    let phys_to_virt_fns = env.get_method_with_signature(&[VelosiAstTypeInfo::PhysAddr], &VelosiAstTypeInfo::VirtAddr);
+    let phys_to_virt_fns =
+        env.get_method_with_signature(&[VelosiAstTypeInfo::PhysAddr], &VelosiAstTypeInfo::VirtAddr);
     let phys_to_virt_fn = phys_to_virt_fns.first();
 
     // adding the set value function
@@ -199,7 +207,12 @@ fn generate_write_field(scope: &mut C::Scope, unit: &VelosiAstUnit, field: &dyn 
     let val_var = val_param.to_expr();
 
     // call the write function
-    let reg_write_fn = field.to_os_wr_fn(unit, phys_to_virt_fn, &unit_var, &field.to_get_val_fn_call(unit, val_var));
+    let reg_write_fn = field.to_os_wr_fn(
+        unit,
+        phys_to_virt_fn,
+        &unit_var,
+        &field.to_get_val_fn_call(unit, val_var),
+    );
 
     f.body().raw_expr(reg_write_fn);
 
