@@ -585,12 +585,21 @@ where
         C::Expr::fn_call(&fname, vec![val])
     }
 
-    fn to_os_wr_fn(&self, _unit: U, phys_to_virt_fn: Option<&Rc<VelosiAstMethod>>, unit_var: &C::Expr, val: &C::Expr) -> C::Expr {
+    fn to_os_wr_fn(
+        &self,
+        _unit: U,
+        phys_to_virt_fn: Option<&Rc<VelosiAstMethod>>,
+        unit_var: &C::Expr,
+        val: &C::Expr,
+    ) -> C::Expr {
         let fname = self.to_os_write_fn_name();
         let mut args = Vec::new();
         if let Some((base, offset)) = self.base() {
             if let Some(f) = phys_to_virt_fn {
-                args.push(C::Expr::fn_call(f.ident(), vec![C::Expr::field_access(unit_var, base)]));
+                args.push(C::Expr::fn_call(
+                    f.ident(),
+                    vec![C::Expr::field_access(unit_var, base)],
+                ));
             } else {
                 args.push(C::Expr::field_access(unit_var, base));
             }
@@ -601,12 +610,20 @@ where
         C::Expr::fn_call(&fname, args)
     }
 
-    fn to_os_rd_fn(&self, _unit: U, phys_to_virt_fn: Option<&Rc<VelosiAstMethod>>, unit_var: &C::Expr) -> C::Expr {
+    fn to_os_rd_fn(
+        &self,
+        _unit: U,
+        phys_to_virt_fn: Option<&Rc<VelosiAstMethod>>,
+        unit_var: &C::Expr,
+    ) -> C::Expr {
         let fname = self.to_os_read_fn_name();
         let mut args = Vec::new();
         if let Some((base, offset)) = self.base() {
             if let Some(f) = phys_to_virt_fn {
-                args.push(C::Expr::fn_call(f.ident(), vec![C::Expr::field_access(unit_var, base)]));
+                args.push(C::Expr::fn_call(
+                    f.ident(),
+                    vec![C::Expr::field_access(unit_var, base)],
+                ));
             } else {
                 args.push(C::Expr::field_access(unit_var, base));
             }

@@ -31,7 +31,9 @@ use std::path::Path;
 // get the code generator
 use crustal as C;
 
-use velosiast::{VelosiAstField, VelosiAst, VelosiAstFieldSlice, VelosiAstInterfaceField, VelosiAstUnit};
+use velosiast::{
+    VelosiAst, VelosiAstField, VelosiAstFieldSlice, VelosiAstInterfaceField, VelosiAstUnit,
+};
 
 // library internal includes
 use super::utils::{self, FieldUtils, SliceUtils};
