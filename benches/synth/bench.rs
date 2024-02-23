@@ -30,18 +30,21 @@ impl From<&[u128]> for Stats {
         } else {
             // detect outliers
             let med = datapoints[num_datapoints / 2];
-            let q1  = datapoints[num_datapoints / 4];
-            let q3  = datapoints[num_datapoints / 4 * 3];
+            let q1 = datapoints[num_datapoints / 4];
+            let q3 = datapoints[num_datapoints / 4 * 3];
             let iqr = q3 - q1;
             let iqr_delta = iqr + (iqr >> 1); // 1.5 * iqr;
-            let upper_fence = q3 + iqr_delta;  // q3 + 1.5 * iqr
+            let upper_fence = q3 + iqr_delta; // q3 + 1.5 * iqr
             let lower_fence = if q1 < iqr_delta {
                 0
             } else {
-                q1 - iqr_delta   // q1 - 1.5 * iqr
+                q1 - iqr_delta // q1 - 1.5 * iqr
             };
             let data = if datapoints.len() > 10 {
-                datapoints.into_iter().filter(|x| *x < upper_fence && *x > lower_fence).collect::<Vec<u128>>()
+                datapoints
+                    .into_iter()
+                    .filter(|x| *x < upper_fence && *x > lower_fence)
+                    .collect::<Vec<u128>>()
             } else {
                 datapoints
             };
