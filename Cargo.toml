@@ -64,3 +64,7 @@ harness = false
 [[bench]]
 name = "opt"
 harness = false
+
+[[bench]]
+name = "runtime"
+harness = false
