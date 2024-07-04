@@ -117,6 +117,8 @@ pub struct Z3Query {
     smt: Vec<Arc<Smt2Context>>,
     /// time durations for tracing
     timestamps: Vec<(Z3TimeStamp, Instant)>,
+    ///
+    is_complex: bool,
 }
 
 impl Z3Query {
@@ -134,6 +136,7 @@ impl Z3Query {
             goal: None,
             smt: vec![Arc::new(smt)],
             timestamps,
+            is_complex: false,
         }
     }
 
@@ -146,6 +149,7 @@ impl Z3Query {
             goal: None,
             smt,
             timestamps: Vec::with_capacity(10),
+            is_complex: false,
         }
     }
 
@@ -157,6 +161,7 @@ impl Z3Query {
             goal: None,
             smt: self.smt.clone(),
             timestamps,
+            is_complex: false,
         }
     }
 
@@ -168,6 +173,7 @@ impl Z3Query {
             goal: self.goal.clone(),
             smt: self.smt.clone(),
             timestamps,
+            is_complex: false,
         }
     }
 
@@ -195,6 +201,15 @@ impl Z3Query {
     pub fn set_smt(&mut self, smt: Smt2Context) -> &mut Self {
         self.smt = vec![Arc::new(smt)];
         self
+    }
+
+    pub fn set_complex(&mut self) -> &mut Self {
+        self.is_complex = true;
+        self
+    }
+
+    pub fn is_complex(&self) -> bool {
+        self.is_complex
     }
 
     /// obtains a reference to this context

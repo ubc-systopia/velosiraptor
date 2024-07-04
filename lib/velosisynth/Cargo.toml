@@ -25,13 +25,15 @@ crossbeam = "0.8.4"
 libc = "0.2.153"
 
 [features]
-default = ["z3-standalone"]
+default = ["z3-standalone", "z3-workerthreads"]
 # Enable standalone Z3 instead of using the library
 z3-standalone = []
 # Enable the use of the z3-library
 z3-library = ["dep:z3-sys"]
 # restart z3 instead of simply resetting
 z3-restart = []
+#
+z3-workerthreads = []
 
 [lib]
 name = "velosisynth"

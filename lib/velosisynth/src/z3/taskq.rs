@@ -135,6 +135,15 @@ impl TaskQ {
         None
     }
 
+    pub fn is_empty(&self) -> bool {
+        for i in 0..TASK_PRIO_MAX {
+            if !self.task_queues[i].is_empty() {
+                return false;
+            }
+        }
+        true
+    }
+
     pub fn drain(&mut self) {
         for i in 0..TASK_PRIO_MAX {
             while !self.task_queues[i].is_empty() {

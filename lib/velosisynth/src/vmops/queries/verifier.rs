@@ -188,12 +188,18 @@ impl ProgramVerifier {
         // wrap the query into a push/pop block
         let mut smtctx = Smt2Context::new();
         smtctx.subsection(format!("Verification of {}", m_op.ident()));
-        smtctx.comment(format!("{}", goal_expr));
+        // smtctx.comment(goal_expr_str);
         smtctx.level(smt);
 
         // create a new query from the smt context
         let mut query = Z3Query::from(smtctx);
         query.set_program(prog).set_goal(goal_str);
+
+        if !symvars.is_empty() && goal_expr.has_translate_range() {
+            // println!("MAKING QUERY COMPLEX\n");
+            query.set_complex();
+        }
+
 
         Box::new(query)
     }
