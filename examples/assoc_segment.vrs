@@ -36,10 +36,12 @@ segment AssocSegment(base : addr) {
             0 .. 48 val,
         },
         reg length [ 8 ] {
+            0 .. 48 bytes,
+        },
+        reg perms [ 8 ] {
             0 ..  1 present,
             1 ..  2 rw,
             2 ..  3 exec,
-            4 .. 48 bytes,
         }
     }
 
@@ -48,12 +50,13 @@ segment AssocSegment(base : addr) {
         mmio dst [ base, 0, 8 ],
         mmio src [ base, 8, 8 ],
         mmio length [ base, 16, 8 ],
+        mmio perms [ base, 16, 8 ],
     }
 
     // add the valid bit
     #[remap]
     fn valid() -> bool {
-        state.length.present == 1
+        state.perms.present == 1
     }
 
     // #[remap]
@@ -65,19 +68,18 @@ segment AssocSegment(base : addr) {
     #[remap]
     fn matchflags(flgs : flags) -> bool
     {
-        flgs.writable == state.length.rw && flgs.executable == state.length.exec
+        flgs.writable == state.perms.rw && flgs.executable == state.perms.exec
     }
 
     // to calculate the new address, we just add the base address here, if within range
     fn translate(va: vaddr) -> paddr
-        requires state.src.val <= va && va < state.src.val + (state.length.bytes << 4)
+        requires state.src.val <= va && va < state.src.val + state.length.bytes
     {
         (va - state.src.val) + state.dst.val
     }
 
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
-        requires (sz & 0xf) == 0 && (va & 0xf) == 0 && (pa & 0xf == 0)
-        requires (pa + sz < (1 << 48)) && (va + sz < (1 << 48))
+        requires (pa + sz < (1 << 47)) && (va + sz < (1 << 47))
 
     synth fn protect(va: vaddr, sz: size, flgs: flags);
 
