@@ -36,7 +36,7 @@ use super::query::{Z3Query, Z3Result, Z3Ticket, Z3TimeStamp};
 use super::Z3Error;
 
 /// flag whether we want to use a full restart when resetting z3
-const CONFIG_RESET_IS_RESTART: bool = false;
+const CONFIG_RESET_IS_RESTART: bool = true;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Z3 Instance
@@ -71,11 +71,11 @@ where
 // Z3 Instance
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct Z3Async<'a> {
+pub struct Z3Async {
     t_start: Instant,
     t_prepare: Instant,
-    ticket: Z3Ticket,
-    query: &'a mut Z3Query,
+    pub ticket: Z3Ticket,
+    // query: &'a mut Z3Query,
     result: String,
 }
 
@@ -186,11 +186,11 @@ impl Z3Instance {
         }
     }
 
-    pub fn exec_async<'a>(
+    pub fn exec_async(
         &mut self,
         ticket: Z3Ticket,
-        query: &'a mut Z3Query,
-    ) -> Result<Z3Async<'a>, Z3Error> {
+        query: &mut Z3Query,
+    ) -> Result<Z3Async, Z3Error> {
         log::debug!(target : "[Z3Instance]", "{} executing query", self.id);
 
         if self.is_executing {
@@ -239,7 +239,7 @@ impl Z3Instance {
                 t_start,
                 t_prepare,
                 ticket,
-                query,
+                // query,
                 result: String::with_capacity(256),
             })
         } else {
@@ -247,12 +247,12 @@ impl Z3Instance {
         }
     }
 
-    pub fn exec_done<'a>(&mut self, asynctok: Z3Async<'a>) -> Result<Z3Result, Z3Async<'a>> {
+    pub fn exec_done(&mut self, asynctok: Z3Async) -> Result<Z3Result, Z3Async> {
         let Z3Async {
             t_start,
             t_prepare,
             ticket,
-            query,
+            // query,
             mut result,
         } = asynctok;
 
@@ -274,7 +274,7 @@ impl Z3Instance {
                         t_start,
                         t_prepare,
                         ticket,
-                        query,
+                        // query,
                         result,
                     });
                 }
@@ -284,8 +284,7 @@ impl Z3Instance {
             String::new()
         };
 
-        let t_query = query.timestamp(Z3TimeStamp::SolverDone);
-
+        let t_query = Instant::now();
         let t_query = t_query.duration_since(t_prepare).as_millis() as u64;
         let t_prepare = t_prepare.duration_since(t_start).as_millis() as u64;
 

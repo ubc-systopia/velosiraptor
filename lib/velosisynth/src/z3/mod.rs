@@ -37,7 +37,12 @@ mod instance_standalone;
 
 mod query;
 mod taskq;
+
+#[cfg(feature = "z3-workerthreads")]
 mod worker;
+
+#[cfg(not(feature = "z3-workerthreads"))]
+mod worker_nothreads;
 
 // public re-exports
 #[cfg(feature = "z3-library")]
@@ -48,7 +53,15 @@ pub use instance_standalone::Z3Instance;
 pub use query::{Z3Query, Z3Result, Z3Ticket};
 use taskq::TaskQ;
 pub use taskq::Z3TaskPriority;
+
+#[cfg(feature = "z3-workerthreads")]
 pub use worker::{Z3Worker, Z3WorkerPool, Z3WorkerPoolStats};
+
+#[cfg(not(feature = "z3-workerthreads"))]
+pub use worker_nothreads::{Z3Worker, Z3WorkerPool, Z3WorkerPoolStats};
+
+#[cfg(not(feature = "z3-workerthreads"))]
+pub use instance_standalone::Z3Async;
 
 /// Errors reported by Z3
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
