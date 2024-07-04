@@ -1,11 +1,13 @@
 pub const NUM_WORKERS: usize = 14;
-pub const ITERATIONS: usize = 500;
+pub const ITERATIONS: usize = 100;
 
 pub struct Stats {
     pub min: u128,
     pub med: u128,
     pub avg: u128,
     pub max: u128,
+    pub p99: u128,
+    pub p95: u128,
     pub var: u128,
     pub std: u128,
     pub num: usize,
@@ -23,6 +25,8 @@ impl From<&[u128]> for Stats {
                 med: 0,
                 avg: 0,
                 max: 0,
+                p99: 0,
+                p95: 0,
                 var: 0,
                 std: 0,
                 num: 0,
@@ -43,7 +47,7 @@ impl From<&[u128]> for Stats {
             let data = if datapoints.len() > 10 {
                 datapoints
                     .into_iter()
-                    .filter(|x| *x < upper_fence && *x > lower_fence)
+                    .filter(|x| *x <= upper_fence && *x >= lower_fence)
                     .collect::<Vec<u128>>()
             } else {
                 datapoints
@@ -61,6 +65,8 @@ impl From<&[u128]> for Stats {
                 med: data[num / 2],
                 avg,
                 max: *data.last().unwrap(),
+                p99: data[num * 99 / 100],
+                p95: data[num * 95 / 100],
                 var,
                 std,
                 num,
@@ -166,10 +172,17 @@ impl BenchResults {
         }
     }
 
+    pub fn to_latex_header(&self) -> String {
+        format!(
+            "{:<30} & {:<11}  & {:<11} & {:10} & {:10})\\\\\n",
+            "Name", "# Units", "Programs", "Runtime P50", "Runtime P95"
+        )
+    }
+
     pub fn to_latex(&self) -> String {
         let tt = Stats::from(self.t_total.as_slice());
         format!(
-            "{:<30} & {:2}U+{:2}F+{:2}S  & {:2}M+{:2}P+{:2}U & {:10}ms & (+/- {:4})\\\\\n",
+            "{:<30} & {:2}U+{:2}F+{:2}S  & {:2}M+{:2}P+{:2}U & {:10}ms & {:10}ms\\\\\n",
             self.tag,
             self.num_units,
             self.num_fields,
@@ -178,7 +191,7 @@ impl BenchResults {
             self.protect_len,
             self.unmap_len,
             tt.med,
-            tt.std
+            tt.p95
         )
     }
 }
@@ -190,10 +203,10 @@ impl std::fmt::Display for BenchResults {
         let ts = Stats::from(self.t_synth.as_slice());
         let nq = Stats::from(self.n_queries.as_slice());
 
-        write!(f, "{:<30} {:2}U+{:2}F+{:2}S  {:4}  {:2}M+{:2}P+{:2}U  {:5}q  {:10}ms/{:10}ms (+/- {:4})  synth: {:10}ms (+/- {:4})  check:  {:4}ms (+/- {:2})",
+        write!(f, "{:<30} {:2}U+{:2}F+{:2}S  {:4}  {:2}M+{:2}P+{:2}U  {:6}q  avg{:10}ms/med{:10}ms/p95{:10}ms (+/- {:4})  synth: {:10}ms (+/- {:4})  check:  {:4}ms (+/- {:2})",
             self.tag, self.num_units, self.num_fields, self.num_slices, ts.num,
             self.map_len, self.protect_len, self.unmap_len, nq.med,
-            tt.avg, tt.med, tt.std, ts.med, ts.std, tc.med, tc.std,
+            tt.avg, tt.med, tt.p95, tt.std, ts.med, ts.std, tc.med, tc.std,
         )?;
 
         Ok(())

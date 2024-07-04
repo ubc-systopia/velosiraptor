@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Instant;
+use std::io::Write;
 
 use velosiast::{
     AstResult, VelosiAst, VelosiAstField, VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment,
@@ -18,8 +19,8 @@ const SPECS: [(&str, &str); 10] = [
     ("examples/simple_segment.vrs", "Simple Segment"),
     ("examples/variable_segment.vrs", "Variable Segment"),
     ("examples/medium.vrs", "Medium Segment"),
-    ("examples/x86_segmentation.vrs", "x86 Segmentation"),
     ("examples/assoc_segment.vrs", "Assoc Segment"),
+    ("examples/x86_segmentation.vrs", "x86 Segmentation"),
     ("examples/r4700_fixed_page_size.vrs", "R4700 TLB"),
 ];
 
@@ -75,6 +76,8 @@ fn run_synthesis(
         match unit {
             VelosiAstUnit::Segment(u) => {
                 num_segments += 1;
+
+                // println!("Unit: {}", u.ident());
 
                 total_fields += u.interface.fields().len();
                 total_slices += u
@@ -183,6 +186,9 @@ fn run_synthesis(
     results.unmap_len = unmap_len;
     results.protect_len = protect_len;
 
+    print!("{t_total}ms  ");
+    _ = std::io::stdout().flush();
+
     Some(results)
 }
 
@@ -190,6 +196,7 @@ fn main() {
     println!("# Running Benchmark: Synthesis times");
 
     let mut latex_results = String::new();
+    let mut latex_results_no_tree = String::new();
 
     for (spec, name) in SPECS.iter() {
         println!(" @ Spec: {spec}");
@@ -201,7 +208,9 @@ fn main() {
             continue;
         }
 
-        for no_tree in &[true, false] {
+        for no_tree in &[false] {
+        //for no_tree in &[true, false] {
+
             let name = if *no_tree {
                 format!("{name} (no tree)")
             } else {
@@ -209,6 +218,7 @@ fn main() {
             };
             let mut results = BenchResults::new(name.to_string());
             let mut had_errors = false;
+            print!("    ");
             for _ in 0..ITERATIONS {
                 // create synth factory and run synthesis on the segments
                 let mut z3_workers = Z3WorkerPool::with_num_workers(NUM_WORKERS, None);
@@ -223,17 +233,33 @@ fn main() {
 
                 z3_workers.terminate();
             }
+            println!("");
 
             if had_errors {
                 break;
             }
 
-            println!("{results}");
-            latex_results.push_str(results.to_latex().as_str());
+            print!("  - {results}\n");
+
+            if *no_tree {
+                if latex_results_no_tree.is_empty() {
+                    latex_results_no_tree.push_str(results.to_latex_header().as_str());
+                }
+
+                latex_results_no_tree.push_str(results.to_latex().as_str());
+            } else {
+                if latex_results.is_empty() {
+                    latex_results.push_str(results.to_latex_header().as_str());
+                }
+                latex_results.push_str(results.to_latex().as_str());
+            }
         }
     }
 
     println!("# Completed");
 
     println!("% latex table\n{latex_results}");
+
+    println!("% latex table\n{latex_results_no_tree}");
+
 }
