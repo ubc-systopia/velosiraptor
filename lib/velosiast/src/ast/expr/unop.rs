@@ -247,6 +247,10 @@ impl VelosiAstUnOpExpr {
     pub fn get_var_references(&self) -> HashSet<&VelosiAstIdentLiteralExpr> {
         self.expr.get_var_references()
     }
+
+    pub fn has_translate_range(&self) -> bool {
+        self.expr.has_translate_range()
+    }
 }
 
 /// Implementation of [PartialEq] for [VelosiAstUnOpExpr]

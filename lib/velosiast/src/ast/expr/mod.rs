@@ -277,6 +277,22 @@ impl VelosiAstExpr {
         };
     }
 
+    pub fn has_translate_range(&self) -> bool {
+        use VelosiAstExpr::*;
+        match self {
+            IdentLiteral(_i) => false,
+            NumLiteral(_i) => false,
+            BoolLiteral(_i) => false,
+            BinOp(i) => i.has_translate_range(),
+            UnOp(i) => i.has_translate_range(),
+            Quantifier(i) => i.has_translate_range(),
+            FnCall(i) => i.has_translate_range(),
+            IfElse(i) => i.has_translate_range(),
+            Slice(_i) => false,
+            Range(_i) => false,
+        }
+    }
+
     // converts a boolean expression into the conjunctive normal form
     pub fn into_cnf(self, st: &mut SymbolTable) -> Self {
         use VelosiAstBinOp::*;

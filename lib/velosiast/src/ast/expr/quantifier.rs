@@ -173,6 +173,10 @@ impl VelosiAstQuantifierExpr {
     pub fn get_var_references(&self) -> HashSet<&VelosiAstIdentLiteralExpr> {
         unimplemented!();
     }
+
+    pub fn has_translate_range(&self) -> bool {
+        self.expr.has_translate_range()
+    }
 }
 
 /// Implementation of [PartialEq] for [VelosiAstQuantifierExpr]

@@ -233,6 +233,10 @@ impl VelosiAstIfElseExpr {
         vars.extend(self.other.get_var_references());
         vars
     }
+
+    pub fn has_translate_range(&self) -> bool {
+        self.cond.has_translate_range() || self.then.has_translate_range() || self.other.has_translate_range()
+    }
 }
 
 /// Implementation of [PartialEq] for [VelosiAstIfElseExpr]

@@ -277,6 +277,10 @@ impl VelosiAstFnCallExpr {
 
         // unimplemented!();
     }
+
+    pub fn has_translate_range(&self) -> bool {
+        self.ident().contains("translate.range") || self.args.iter().any(|a| a.has_translate_range())
+    }
 }
 
 /// Implementation of [PartialEq] for [VelosiAstFnCallExpr]

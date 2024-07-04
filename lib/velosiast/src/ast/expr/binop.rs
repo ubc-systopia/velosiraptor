@@ -673,6 +673,10 @@ impl VelosiAstBinOpExpr {
         vars.extend(self.rhs.get_var_references());
         vars
     }
+
+    pub fn has_translate_range(&self) -> bool {
+        self.lhs.has_translate_range() || self.rhs.has_translate_range()
+    }
 }
 
 /// Implementation of [PartialEq] for [VelosiAstBinOpExpr]
