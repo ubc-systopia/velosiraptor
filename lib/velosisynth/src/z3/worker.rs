@@ -194,7 +194,11 @@ impl Z3Worker {
                                     results.send((ticket, result)).unwrap();
                                     break;
                                 }
-                                Err(tok) => tok,
+                                Err(tok) => {
+                                    use std::time::Duration;
+                                    thread::sleep(Duration::from_micros(500));
+                                    tok
+                                },
                             };
                         }
 
@@ -465,6 +469,9 @@ impl Z3WorkerPool {
                     // we haven't seen this query before, add it to the cache
                     self.query_cache
                         .insert(task.clone_without_timestamps(), Err(vec![id]));
+                    if task.is_complex() {
+                        self.do_push_query(id, task.clone(), priority);
+                    }
                     self.do_push_query(id, task, priority);
                 }
             }

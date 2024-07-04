@@ -66,6 +66,10 @@ impl SymbolicVars {
 
         smt.get_value(terms);
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.counter == 0
+    }
 }
 
 impl Default for SymbolicVars {
