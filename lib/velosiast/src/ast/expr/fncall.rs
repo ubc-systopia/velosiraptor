@@ -279,7 +279,8 @@ impl VelosiAstFnCallExpr {
     }
 
     pub fn has_translate_range(&self) -> bool {
-        self.ident().contains("translate.range") || self.args.iter().any(|a| a.has_translate_range())
+        self.ident().contains("translate.range")
+            || self.args.iter().any(|a| a.has_translate_range())
     }
 }
 
