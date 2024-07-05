@@ -470,10 +470,10 @@ impl<'a> Display for Z3SynthSegment<'a> {
                 writeln!(f, "protect: synthesis failed")
             }
         } else {
-            write!(f, "Synthesis not done yet.\n")?;
-            write!(f, "Map Plan: {}", self.map_queries)?;
-            write!(f, "Protect Plan: {}", self.protect_queries)?;
-            write!(f, "Unmap Plan: {}", self.unmap_queries)
+            writeln!(f, "Synthesis not done yet.\n")?;
+            writeln!(f, "Map Plan: {}", self.map_queries)?;
+            writeln!(f, "Protect Plan: {}", self.protect_queries)?;
+            writeln!(f, "Unmap Plan: {}", self.unmap_queries)
         }
     }
 }

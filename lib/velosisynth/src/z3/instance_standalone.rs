@@ -212,31 +212,39 @@ impl Z3Instance {
 
             // send it to z3
             z3_stdin.write_all(id.as_bytes()).unwrap();
+            if let Some(f) = &mut self.logfile {
+                f.write_all(id.as_bytes()).expect("writing the smt query failed.");
+            }
 
+            let mut buf_string = String::with_capacity(2 * 4096);
             for smt in query.smt_contexts() {
-                let buf_string = smt.to_code(!cfg!(debug_assertions));
-                let buf = if query.get_retries() > 0 {
+                if query.get_retries() > 0 {
                     let rand = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis();
-                    // println!("this is a retry! {}", query.get_retries());
-                    if buf_string.starts_with("(push)") {
-                        let push = format!("(push)(set-option :timeout {})(set-option :smt.random_seed {})(set-option :sat.random_seed {})(declare-const x{} Int)\n",
+                    let push = format!("(push)(set-option :timeout {})(set-option :smt.random_seed {})(set-option :sat.random_seed {})(declare-const x{} Int)\n",
                             250 + query.get_retries() * 50,
                             rand,
                             rand,
                             rand);
-                        z3_stdin
-                            .write_all(push.as_bytes())
-                            .unwrap();
-                        &buf_string.as_str()[6..]
-                    } else {
-                        buf_string.as_str()
-                    }
+                    buf_string.push_str(push.as_str());
+                    smt.to_code_into(!cfg!(debug_assertions), &mut buf_string);
+                    buf_string.push_str("(pop)\n");
+
+                    log::info!("Retrying Query:");
+                    log::info!("-------------------------------------------------------------------");
+                    log::info!("{buf_string}");
+                    log::info!("-------------------------------------------------------------------");
                 } else {
-                    buf_string.as_str()
+                    smt.to_code_into(!cfg!(debug_assertions), &mut buf_string);
                 };
                 z3_stdin
-                    .write_all(buf.as_bytes())
+                    .write_all(buf_string.as_bytes())
                     .unwrap();
+
+                if let Some(f) = &mut self.logfile {
+                    f.write_all(buf_string.as_bytes())
+                            .expect("writing the smt query failed.");
+                }
+                buf_string.clear();
             }
 
             // record the time to execute the query
@@ -247,14 +255,7 @@ impl Z3Instance {
                 .write_all("\n(echo \"!remove\")\n".as_bytes())
                 .unwrap();
 
-            if let Some(f) = &mut self.logfile {
-                f.write_all(id.as_bytes())
-                    .expect("writing the smt query failed.");
-                for smt in query.smt_contexts() {
-                    f.write_all(smt.to_code(!cfg!(debug_assertions)).as_bytes())
-                        .expect("writing the smt query failed.");
-                }
-            }
+
             let t_prepare = Instant::now();
             Ok(Z3Async {
                 t_start,
