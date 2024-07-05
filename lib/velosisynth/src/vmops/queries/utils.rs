@@ -178,18 +178,6 @@ pub enum QueryResult {
     Error,
 }
 
-// pub fn check_result_no_rewrite(output: &str) -> QueryResult {
-//     let mut reslines = output.lines();
-//     match reslines.next() {
-//         Some("sat") => QueryResult::Sat,
-//         Some("unsat") => QueryResult::Unsat,
-//         Some(_a) => QueryResult::Error,
-//         None => {
-//             unreachable!("unexpected none output")
-//         }
-//     }
-// }
-
 pub fn check_result(output: &str, program: &mut Program) -> QueryResult {
     let mut reslines = output.lines();
     match reslines.next() {

@@ -293,6 +293,22 @@ impl ProgramVerifier {
                         self.stat_num_sat += 1;
                         self.completed.push_back(program);
                     }
+                    utils::QueryResult::Unknown => {
+                        // see to insert that again...
+                        // panic!("huh???");
+                        // println!("timeout! {ticket} resubmitting query...");
+                        let mut query = result.take_query().unwrap();
+                        query.set_program(program);
+                        drop(result);
+                        // let query = self.to_smt_query(program);
+                        match z3.resubmit_query(query, self.priority) {
+                            Ok(ticket) => {
+                                // self.stat_num_queries += 1; // it's the same query!
+                                submitted.push_back(ticket)
+                            }
+                            Err(e) => panic!("Error submitting query: {}", e),
+                        }
+                    }
                     utils::QueryResult::Error => {
                         self.queries_done = true;
                         self.submitted.clear();
