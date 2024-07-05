@@ -1,4 +1,4 @@
-pub const NUM_WORKERS: usize = 14;
+pub const NUM_WORKERS: usize = 13; // give one core to the main program...
 pub const ITERATIONS: usize = 100;
 
 pub struct Stats {
@@ -33,7 +33,6 @@ impl From<&[u128]> for Stats {
             }
         } else {
             // detect outliers
-            let med = datapoints[num_datapoints / 2];
             let q1 = datapoints[num_datapoints / 4];
             let q3 = datapoints[num_datapoints / 4 * 3];
             let iqr = q3 - q1;
@@ -174,7 +173,7 @@ impl BenchResults {
 
     pub fn to_latex_header(&self) -> String {
         format!(
-            "{:<30} & {:<11}  & {:<11} & {:10} & {:10})\\\\\n",
+            "{:<30} & {:<11}  & {:<11} & {:11} & {:11}\\\\\n",
             "Name", "# Units", "Programs", "Runtime P50", "Runtime P95"
         )
     }

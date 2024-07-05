@@ -4,9 +4,9 @@ use std::rc::Rc;
 use std::time::Instant;
 
 use velosiast::{
-    AstResult, VelosiAst, VelosiAstField, VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment,
+    AstResult, VelosiAst, VelosiAstField, VelosiAstUnit, VelosiAstUnitSegment,
 };
-use velosisynth::{SynthOpts, Z3SynthEnum, Z3SynthSegment, Z3WorkerPool};
+use velosisynth::{SynthOpts, Z3SynthSegment, Z3WorkerPool};
 
 const SPECS: [(&str, &str); 10] = [
     ("examples/simple_translation_table.vrs", "Simple Page Table"),
@@ -44,7 +44,7 @@ fn run_synthesis(
 
     // start of the benchmark
     let t_start = Instant::now();
-    let t_0 = t_start;
+    let _t_0 = t_start;
 
     // construct the AST for the spec
     let mut ast = match VelosiAst::from_file(vrs_file) {
@@ -58,23 +58,23 @@ fn run_synthesis(
     let t_1 = Instant::now();
 
     // create the models
-    let t_0 = t_1;
+    let _t_0 = t_1;
     let models = velosisynth::create_models(&ast);
-    let t_1 = Instant::now();
+    let _t_1 = Instant::now();
 
     let mut num_segments = 0;
     let mut num_staticmaps = 0;
     let mut num_enums = 0;
     let mut total_fields = 0;
     let mut total_slices = 0;
-    let mut n_queries = 0;
-    let mut n_cached_queries = 0;
+    let n_queries = 0;
+    let n_cached_queries = 0;
     let mut n_programs = 0;
     let mut n_programs_max = None;
 
-    let mut map_len = 0;
-    let mut unmap_len = 0;
-    let mut protect_len = 0;
+    let _map_len = 0;
+    let _unmap_len = 0;
+    let _protect_len = 0;
 
     for unit in ast.units_mut() {
         if unit.is_abstract() {
@@ -103,13 +103,13 @@ fn run_synthesis(
                     .map(|f| f.layout().len())
                     .sum::<usize>();
 
-                let t_0 = Instant::now();
+                let _t_0 = Instant::now();
 
                 // obtain the mutable reference to the segment
                 let seg: &mut VelosiAstUnitSegment =
                     Rc::get_mut(u).expect("could not get mut ref!");
                 // create the synthesizer from the factory
-                let mut synth =
+                let synth =
                     Z3SynthSegment::with_opts(seg, models[seg.ident()].clone(), opts, z3_workers);
 
                 let (n_progs, n_progs_max) = synth.num_programs();
@@ -124,14 +124,14 @@ fn run_synthesis(
             VelosiAstUnit::StaticMap(_s) => {
                 num_staticmaps += 1;
             }
-            VelosiAstUnit::Enum(e) => {
+            VelosiAstUnit::Enum(_e) => {
                 num_enums += 1;
             }
             _ => { /* no op */ }
         }
     }
 
-    let t_total = Instant::now().duration_since(t_start).as_millis();
+    let _t_total = Instant::now().duration_since(t_start).as_millis();
     results.n_cached.push(n_cached_queries.try_into().unwrap());
     results.n_queries.push(n_queries.try_into().unwrap());
     results.num_enums = num_enums;
@@ -153,7 +153,7 @@ fn main() {
 
     latex_results.push_str("Spec");
 
-    for (i, (tag, _)) in OPTS.iter().enumerate() {
+    for (_i, (tag, _)) in OPTS.iter().enumerate() {
         latex_results.push_str(" & ");
         latex_results.push_str(tag);
     }
@@ -176,7 +176,6 @@ fn main() {
             let tag = format!("{name}{mytag}");
 
             let mut results = BenchResults::new(tag.clone());
-            let mut had_errors = false;
 
             // create synth factory and run synthesis on the segments
             let mut z3_workers = Z3WorkerPool::with_num_workers(NUM_WORKERS, None);
@@ -184,20 +183,15 @@ fn main() {
             {
                 results.merge(&res);
             } else {
-                had_errors = true;
                 break;
             }
 
             z3_workers.terminate();
 
             row.insert(mytag, results.n_programs_max.unwrap_or_default());
-
-            if had_errors {
-                break;
-            }
         }
 
-        latex_results.push_str(name);
+        latex_results.push_str(format!("{name:20}").as_str());
         latex_results.push_str(" & ");
         for (i, (tag, _)) in OPTS.iter().enumerate() {
             if i > 0 {
@@ -205,11 +199,12 @@ fn main() {
             }
             let num = row.get(tag).unwrap().ilog10();
 
-            latex_results.push_str(&format!("{num}"));
+            latex_results.push_str(&format!("{num:3}"));
         }
-        latex_results.push_str("\\\\\n")
-    }
+        latex_results.push_str("\\\\\n");
 
+    }
+    latex_results.push_str("\\hline\n");
     println!("# Completed");
 
     println!("% latex table\n{latex_results}");

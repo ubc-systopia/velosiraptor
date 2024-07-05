@@ -1,5 +1,4 @@
 pub const NUM_WORKERS: usize = 14;
-pub const ITERATIONS: usize = 100;
 
 pub struct Stats {
     pub min: u128,
