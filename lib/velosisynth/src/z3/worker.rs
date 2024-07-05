@@ -439,7 +439,7 @@ impl Z3WorkerPool {
     pub fn resubmit_query(
         &mut self,
         mut task: Box<Z3Query>,
-        priority: Z3TaskPriority,
+        _priority: Z3TaskPriority,
     ) -> Result<Z3Ticket, Box<Z3Query>> {
         log::trace!(target : "[Z3WorkerPool]", " submitting query");
         // take the timestamp
