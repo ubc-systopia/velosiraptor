@@ -172,7 +172,7 @@ impl<'a> Z3SynthSegment<'a> {
         let unmap_queries = UnmapPrograms::with_opts(unit, opts.clone(), None);
         let protect_queries = ProtectPrograms::with_opts(unit, opts, None);
 
-        z3.reset_with_context(Z3Query::with_model_contexts(vec![model]), true);
+        z3.reset_with_context(Z3Query::with_model_contexts(vec![model], false), true);
 
         Self {
             z3,
@@ -470,7 +470,10 @@ impl<'a> Display for Z3SynthSegment<'a> {
                 writeln!(f, "protect: synthesis failed")
             }
         } else {
-            write!(f, "Synthesis not done yet.")
+            write!(f, "Synthesis not done yet.\n")?;
+            write!(f, "Map Plan: {}", self.map_queries)?;
+            write!(f, "Protect Plan: {}", self.protect_queries)?;
+            write!(f, "Unmap Plan: {}", self.unmap_queries)
         }
     }
 }
@@ -496,7 +499,8 @@ impl<'a> Z3SynthEnum<'a> {
                     .filter(|(ident, _)| self.unit.get_next_unit_idents().contains(ident))
                     .map(|(_, ctx)| ctx.clone())
                     .collect(),
-            ),
+                    true),
+
             true,
         );
         enums::distinguish(self.z3, self.unit)

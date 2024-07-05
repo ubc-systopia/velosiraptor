@@ -75,24 +75,31 @@ pub fn create(unit: &VelosiAstUnitSegment, mem_model: bool) -> Smt2Context {
 }
 
 /// creates the common options and definitions used across all unit models
-pub fn prelude() -> Smt2Context {
+pub fn prelude(is_distinguish: bool) -> Smt2Context {
     let mut smt = Smt2Context::new();
+
+    if !is_distinguish {
+        smt.set_logic("BV".into());
+    }
 
     // set the options
     smt.set_option(Smt2Option::ProduceUnsatCores(true));
     // smt.set_option(Smt2Option::RandomSeed(0x533d));
 
     let options = vec![
+        "auto_config false",
         "smt.arith.nl false",
         "parallel.enable true",
         "parallel.threads.max 2",
         "rewriter.bv_le_extra true",
         "rewriter.bv_not_simpl true",
         "rewriter.cache_all true",
-        "push_ite_bv true",
+        // "push_ite_bv true",
         "pi.use_database true",
-        "arith.auto_config_simplex true",
-        "arith.solver 2"
+        "smt.arith.auto_config_simplex true",
+        "smt.arith.solver 2",
+        "timeout 200",
+        "smt.arith.random_initial_value true"
     ];
 
     for o in options {
