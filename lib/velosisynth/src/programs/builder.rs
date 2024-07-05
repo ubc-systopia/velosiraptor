@@ -191,9 +191,9 @@ impl ProgramsBuilder {
         let vals = vec![Literal::Num];
 
         // binary expressions
-        // expr_combinator2!(expr, Expression::Add, vars, vals);
+        expr_combinator2!(expr, Expression::Add, vars, vals);
         expr_combinator2!(expr, Expression::And, vars, vals);
-        // expr_combinator2!(expr, Expression::Or, vars, vals);
+        expr_combinator2!(expr, Expression::Or, vars, vals);
         expr_combinator2!(expr, Expression::Sub, vars, vals);
 
         // no need to shifts here, as we use the shiftmask below
