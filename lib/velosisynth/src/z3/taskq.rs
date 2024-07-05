@@ -35,7 +35,7 @@ type QueryQueue = ArrayQueue<(Z3Ticket, Box<Z3Query>)>;
 
 // type QueryQueue = VecDeque<(Z3Ticket, Box<Z3Query>)>;
 
-const TASKQ_CAPACITY: usize = 1024;
+const TASKQ_CAPACITY: usize = 2048;
 
 const TASK_PRIO_MAX: usize = 4;
 

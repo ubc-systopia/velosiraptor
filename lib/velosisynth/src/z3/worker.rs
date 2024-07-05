@@ -436,6 +436,43 @@ impl Z3WorkerPool {
         self.taskq.push(priority, id, task);
     }
 
+    pub fn resubmit_query(
+        &mut self,
+        mut task: Box<Z3Query>,
+        priority: Z3TaskPriority,
+    ) -> Result<Z3Ticket, Box<Z3Query>> {
+        log::trace!(target : "[Z3WorkerPool]", " submitting query");
+        // take the timestamp
+        task.timestamp(Z3TimeStamp::Submit);
+        task.retry();
+        // if !task.retry(){
+        //     println!("Could not submit query, already exceeded retries!");
+        //     return Err(task);
+        // }
+
+        // get the ticket
+        self.next_query_id += 1;
+        let id = Z3Ticket(self.next_query_id);
+
+        if !self.opt_query_cache_disabled {
+            match self.query_cache.get_mut(&task) {
+                Some(Ok(_r)) => {
+                    unreachable!("should not happen!");
+                }
+                Some(Err(v)) => {
+                    v.push(id);
+                }
+                None => {
+                    unreachable!("should not happen!");
+                }
+            }
+        }
+
+        self.do_push_query(id, task, Z3TaskPriority::lowest());
+
+        Ok(id)
+    }
+
     pub fn submit_query(
         &mut self,
         mut task: Box<Z3Query>,
@@ -522,10 +559,12 @@ impl Z3WorkerPool {
                             }
                         }
 
-                        self.query_cache.insert(
-                            query.clone_without_timestamps(),
-                            Ok(Z3Result::new(smtresult)),
-                        );
+                        if !result.unknown() {
+                            self.query_cache.insert(
+                                query.clone_without_timestamps(),
+                                Ok(Z3Result::new(smtresult)),
+                            );
+                        }
                     }
                 }
                 Err(TryRecvError::Empty) => {
