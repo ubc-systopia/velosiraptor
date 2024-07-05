@@ -99,7 +99,7 @@ pub fn prelude(is_distinguish: bool) -> Smt2Context {
         "smt.arith.auto_config_simplex true",
         "smt.arith.solver 2",
         "timeout 200",
-        "smt.arith.random_initial_value true"
+        "smt.arith.random_initial_value true",
     ];
 
     for o in options {

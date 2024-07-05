@@ -499,8 +499,8 @@ impl<'a> Z3SynthEnum<'a> {
                     .filter(|(ident, _)| self.unit.get_next_unit_idents().contains(ident))
                     .map(|(_, ctx)| ctx.clone())
                     .collect(),
-                    true),
-
+                true,
+            ),
             true,
         );
         enums::distinguish(self.z3, self.unit)

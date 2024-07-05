@@ -31,16 +31,12 @@ use std::fs;
 use std::num::NonZeroUsize;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
-use std::sync::{
-    Arc,
-};
+use std::sync::Arc;
 use std::thread;
-
-
 
 // own create imports
 use super::query::{Z3Query, Z3Result, Z3Ticket, Z3TimeStamp};
-use super::{TaskQ, Z3Instance, Z3TaskPriority, Z3Async};
+use super::{TaskQ, Z3Async, Z3Instance, Z3TaskPriority};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Z3 Worker -- A thread with a Z3 Instance
@@ -62,18 +58,11 @@ pub struct Z3Worker {
 }
 
 impl Z3Worker {
-    pub fn new(
-        id: usize,
-        logpath: Option<&PathBuf>,
-    ) -> Self {
-        Self::with_context(id,  logpath, Arc::new(Z3Query::new()))
+    pub fn new(id: usize, logpath: Option<&PathBuf>) -> Self {
+        Self::with_context(id, logpath, Arc::new(Z3Query::new()))
     }
 
-    pub fn with_context(
-        wid: usize,
-        logpath: Option<&PathBuf>,
-        context: Arc<Z3Query>,
-    ) -> Self {
+    pub fn with_context(wid: usize, logpath: Option<&PathBuf>, context: Arc<Z3Query>) -> Self {
         let logfile = if let Some(logpath) = logpath {
             // create the log directory if it does not exist
             fs::create_dir_all(logpath).expect("failed to create the log directory");
@@ -103,7 +92,7 @@ impl Z3Worker {
             solver: z3,
             query: None,
             context,
-            num_queries: 0
+            num_queries: 0,
         }
     }
 
@@ -122,7 +111,9 @@ impl Z3Worker {
     pub fn reset(&mut self, _wait: bool) {
         self.solver.reset().expect("reset failed.");
         if let Some(ctx) = self.context.as_ref() {
-            self.solver.exec_shared(ctx.deref()).expect("executing the context failed");
+            self.solver
+                .exec_shared(ctx.deref())
+                .expect("executing the context failed");
         }
         self.query = None;
     }
@@ -136,7 +127,9 @@ impl Z3Worker {
     pub fn restart(&mut self) {
         self.solver.restart();
         if let Some(ctx) = self.context.as_ref() {
-            self.solver.exec_shared(ctx.deref()).expect("executing the context failed");
+            self.solver
+                .exec_shared(ctx.deref())
+                .expect("executing the context failed");
         }
         self.query = None;
     }
@@ -144,14 +137,18 @@ impl Z3Worker {
     /// performs a restart of the z3 worker's Z3 instance
     pub fn restart_with_context(&mut self, ctx: Arc<Z3Query>) -> Option<Z3Result> {
         self.solver.restart();
-        self.solver.exec_shared(ctx.deref()).expect("executing the context failed");
+        self.solver
+            .exec_shared(ctx.deref())
+            .expect("executing the context failed");
         None
     }
 
     /// performs a reset and initializes the z3 worker with the given contxt
     pub fn reset_with_context(&mut self, ctx: Arc<Z3Query>) -> Option<Z3Result> {
         self.solver.reset().expect("reset failed.");
-        self.solver.exec_shared(ctx.deref()).expect("executing the context failed");
+        self.solver
+            .exec_shared(ctx.deref())
+            .expect("executing the context failed");
         None
     }
 
@@ -159,13 +156,13 @@ impl Z3Worker {
         self.query.is_none()
     }
 
-    pub fn submit(&mut self, ticket: Z3Ticket, mut query: Box<Z3Query>) -> bool{
+    pub fn submit(&mut self, ticket: Z3Ticket, mut query: Box<Z3Query>) -> bool {
         log::trace!(target : "[Z3Worker]", "{} submitting query", self.id);
         match self.solver.exec_async(ticket, query.deref_mut()) {
             Ok(tok) => {
                 self.query = Some((query, tok));
                 true
-            },
+            }
             Err(_err) => {
                 panic!("failed to submit query");
                 false
@@ -194,7 +191,6 @@ impl Z3Worker {
             None
         }
     }
-
 }
 
 impl Drop for Z3Worker {
@@ -235,11 +231,7 @@ impl Z3WorkerPool {
             .unwrap_or(NonZeroUsize::new(1).unwrap())
             .get();
 
-        let num_workers = if parallelism > 2 {
-            parallelism - 1
-        } else {
-            1
-        };
+        let num_workers = if parallelism > 2 { parallelism - 1 } else { 1 };
 
         Self::with_num_workers(num_workers, logpath)
     }
@@ -287,16 +279,9 @@ impl Z3WorkerPool {
 
         for i in 0..num_workers {
             let worker = if !ctx.is_empty() {
-                Z3Worker::with_context(
-                    i,
-                    logpath.as_ref().map(|h| h.as_ref()),
-                    ctx.clone(),
-                )
+                Z3Worker::with_context(i, logpath.as_ref().map(|h| h.as_ref()), ctx.clone())
             } else {
-                Z3Worker::new(
-                    i,
-                    logpath.as_ref().map(|h| h.as_ref()),
-                )
+                Z3Worker::new(i, logpath.as_ref().map(|h| h.as_ref()))
             };
             workers.push(Box::new(worker));
         }
@@ -323,7 +308,6 @@ impl Z3WorkerPool {
             // loop over the workers here
             for worker in self.workers.iter_mut() {
                 if let Some((ticket, mut result)) = worker.get_result() {
-
                     {
                         let query = result.query_mut();
                         query.timestamp(Z3TimeStamp::Done);

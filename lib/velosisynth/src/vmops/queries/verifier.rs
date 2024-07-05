@@ -200,7 +200,6 @@ impl ProgramVerifier {
             query.set_complex();
         }
 
-
         Box::new(query)
     }
 
