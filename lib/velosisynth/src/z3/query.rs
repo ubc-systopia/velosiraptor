@@ -35,7 +35,6 @@ use smt2::Smt2Context;
 // own crate imports
 use crate::{model, Program};
 
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Z3Tickets: a identifies the Z3 query
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -142,7 +141,7 @@ impl Z3Query {
             smt: vec![Arc::new(smt)],
             timestamps,
             is_complex: false,
-            retries: 0
+            retries: 0,
         }
     }
 
@@ -156,7 +155,7 @@ impl Z3Query {
             smt,
             timestamps: Vec::with_capacity(10),
             is_complex: false,
-            retries: 0
+            retries: 0,
         }
     }
 
@@ -169,7 +168,7 @@ impl Z3Query {
             smt: self.smt.clone(),
             timestamps,
             is_complex: false,
-            retries: 0
+            retries: 0,
         }
     }
 
@@ -182,7 +181,7 @@ impl Z3Query {
             smt: self.smt.clone(),
             timestamps,
             is_complex: false,
-            retries: 0
+            retries: 0,
         }
     }
 
@@ -334,7 +333,6 @@ pub enum Z3QueryResult {
     Error,
 }
 
-
 /// represents a result obtained from executing a Z3 query
 #[derive(Clone)]
 pub struct Z3Result {
@@ -355,7 +353,7 @@ impl Z3Result {
         Self {
             query: None,
             result,
-            state
+            state,
         }
     }
 
@@ -363,7 +361,7 @@ impl Z3Result {
         Self {
             query: Some(query),
             result: self.result.clone(),
-            state: self.state
+            state: self.state,
         }
     }
 
@@ -373,20 +371,20 @@ impl Z3Result {
         Self {
             query: Some(query),
             result,
-            state
+            state,
         }
     }
 
     fn check_result_no_rewrite(output: &str) -> Z3QueryResult {
         if output.is_empty() {
             // this is just when there was no assertion or checksat
-            return Z3QueryResult::Sat
+            return Z3QueryResult::Sat;
         }
         let mut reslines = output.lines();
         match reslines.next() {
             Some("sat") => Z3QueryResult::Sat,
             Some("unsat") => Z3QueryResult::Unsat,
-            Some("unknown") => Z3QueryResult:: Unknown,
+            Some("unknown") => Z3QueryResult::Unknown,
             Some(_a) => Z3QueryResult::Error,
             None => {
                 unreachable!("unexpected none output");

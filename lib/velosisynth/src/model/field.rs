@@ -134,7 +134,7 @@ fn add_field_common(
         let attrs = vec![
             Attribute::with_value("pattern".to_string(), format!("(({s_get_fn_name} x@))")),
             Attribute::with_value("qid".to_string(), s_get_fn_name.clone()),
-            Attribute::with_value("skolemid".to_string(), format!("skolem_{}", s_get_fn_name))
+            Attribute::with_value("skolemid".to_string(), format!("skolem_{}", s_get_fn_name)),
         ];
 
         let e = Term::attributed(e, attrs);
@@ -176,7 +176,7 @@ fn add_field_common(
         let attrs = vec![
             Attribute::with_value("pattern".to_string(), format!("(({s_set_fn_name} x@ v@))")),
             Attribute::with_value("qid".to_string(), s_get_fn_name.clone()),
-            Attribute::with_value("skolemid".to_string(), format!("skolem_{}", s_get_fn_name))
+            Attribute::with_value("skolemid".to_string(), format!("skolem_{}", s_get_fn_name)),
         ];
 
         let e = Term::attributed(e, attrs);
