@@ -190,6 +190,7 @@ impl Z3Worker {
                             }
                             query_tok = match z3.exec_done(query_tok) {
                                 Ok(mut result) => {
+                                    query.timestamp(Z3TimeStamp::SolverDone);
                                     result.set_query(query);
                                     results.send((ticket, result)).unwrap();
                                     break;

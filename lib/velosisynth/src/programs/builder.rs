@@ -25,7 +25,7 @@
 
 //! Synthesis Module: Operations
 
-use std::collections::HashMap;
+use indexmap::IndexMap;
 use std::iter::Peekable;
 use std::sync::Arc;
 use std::vec::IntoIter;
@@ -86,7 +86,7 @@ impl ProgramsIter {
 
 pub struct ProgramsBuilder {
     /// the fields we have
-    fields: HashMap<Arc<String>, Vec<(Arc<String>, usize)>>,
+    fields: IndexMap<Arc<String>, Vec<(Arc<String>, usize)>>,
     /// the instructions we can execute
     instructions: Vec<Arc<String>>,
     /// variables we can chose from, plus the implicit flags variable
@@ -98,7 +98,7 @@ pub struct ProgramsBuilder {
 impl ProgramsBuilder {
     pub fn new() -> Self {
         Self {
-            fields: HashMap::new(),
+            fields: IndexMap::new(),
             vars: vec![],
             flags: vec![],
             instructions: vec![],
@@ -333,8 +333,8 @@ impl ProgramsBuilder {
         let init_zero = FieldOp::InsertField(Arc::new(Expression::Lit(Literal::Val(0))));
         let init_read = FieldOp::ReadAction;
 
-        let mut field_programs = HashMap::new();
-        let mut field_programs_stat = HashMap::new();
+        let mut field_programs = IndexMap::new();
+        let mut field_programs_stat = IndexMap::new();
         for (field, slices) in self.fields.iter_mut() {
             // sort the slices
             slices.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());

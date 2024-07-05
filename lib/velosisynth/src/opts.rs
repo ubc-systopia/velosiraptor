@@ -26,7 +26,7 @@
 //! # SynthOpts -- Synthesis Options
 
 /// the default batch size for submitting the queries to the solver
-pub const DEFAULT_BATCH_SIZE: usize = 8;
+pub const DEFAULT_BATCH_SIZE: usize = 5;
 
 /// Options for controlling synthesis
 #[derive(Debug, Clone)]

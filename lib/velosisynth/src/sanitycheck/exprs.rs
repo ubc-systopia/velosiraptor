@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 use smt2::{Smt2Context, Term, VarDecl};
 
@@ -379,7 +379,7 @@ pub fn check_all_expr_pairwise(
         return issues;
     }
 
-    let mut tickets = HashMap::new();
+    let mut tickets = IndexMap::new();
     for i in 0..exprs.len() {
         // let's filter out the trivial true / false
         if let VelosiAstExpr::BoolLiteral(b) = exprs[i] {

@@ -25,7 +25,7 @@
 
 //! Synthesis Module: Operations
 
-use std::collections::{HashMap, HashSet};
+use indexmap::{IndexMap, IndexSet};
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::iter::Peekable;
 use std::rc::Rc;
@@ -926,7 +926,7 @@ impl Program {
         // Step 1: collect all special instructions of the two programs
         // -----------------------------------------------------------------------------------------
 
-        let mut instructions: HashSet<Arc<String>> = HashSet::new();
+        let mut instructions: IndexSet<Arc<String>> = IndexSet::new();
 
         instructions.extend(self.0.iter().filter_map(|f| {
             if let ProgramActions::Instruction(a) = f {
@@ -949,7 +949,7 @@ impl Program {
         // -----------------------------------------------------------------------------------------
 
         // merge the two programs by combining the field actions
-        let mut field_operations: HashMap<Arc<String>, Vec<FieldOp>> = HashMap::new();
+        let mut field_operations: IndexMap<Arc<String>, Vec<FieldOp>> = IndexMap::new();
 
         // struct FieldActions(Arc<String>, Vec<Arc<FieldOp>>);
         // collect all program actions of the own program
@@ -1014,12 +1014,12 @@ impl Program {
                 ProgramActions::Noop => (),
                 ProgramActions::FieldActions(a) => {
                     let field = a.0.clone();
-                    let ops = field_operations.remove(&field).unwrap();
+                    let ops = field_operations.swap_remove(&field).unwrap();
                     /* replace the ops here */
                     *prog_action = ProgramActions::FieldActions(Arc::new(FieldActions(field, ops)))
                 }
                 ProgramActions::Instruction(a) => {
-                    instructions.remove(a);
+                    instructions.swap_remove(a);
                 }
             }
         }
@@ -1032,7 +1032,7 @@ impl Program {
                 ProgramActions::Noop => (),
                 ProgramActions::FieldActions(a) => {
                     let field = a.0.clone();
-                    if let Some(ops) = field_operations.remove(&field) {
+                    if let Some(ops) = field_operations.swap_remove(&field) {
                         remainder.push(ProgramActions::FieldActions(Arc::new(FieldActions(
                             field, ops,
                         ))))
