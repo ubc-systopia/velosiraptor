@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Instant;
-use std::io::Write;
 
 use velosiast::{
     AstResult, VelosiAst, VelosiAstField, VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment,
@@ -67,6 +66,7 @@ fn run_synthesis(
     let mut map_len = 0;
     let mut unmap_len = 0;
     let mut protect_len = 0;
+    // let mut t_solver = 0;
 
     for unit in ast.units_mut() {
         if unit.is_abstract() {
@@ -119,6 +119,7 @@ fn run_synthesis(
 
                 n_queries += stats.n_queries;
                 n_cached_queries += stats.n_cached;
+                // t_solver += stats.t_solver_ms;
 
                 match synth.finalize() {
                     Ok(r) => {
@@ -186,8 +187,8 @@ fn run_synthesis(
     results.unmap_len = unmap_len;
     results.protect_len = protect_len;
 
-    print!("{t_total}ms  ");
-    _ = std::io::stdout().flush();
+    // println!("{t_total}ms  {t_solver}ms  {n_queries}q");
+    // _ = std::io::stdout().flush();
 
     Some(results)
 }
