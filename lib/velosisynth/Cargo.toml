@@ -23,6 +23,7 @@ petgraph = "0.6.3"
 itertools = "0.11.0"
 crossbeam = "0.8.4"
 libc = "0.2.153"
+indexmap = "2.2.6"
 
 [features]
 default = ["z3-standalone", "z3-workerthreads"]

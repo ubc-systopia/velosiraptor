@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 use smt2::{Smt2Context, Term, VarDecl};
 
@@ -172,7 +172,7 @@ pub fn check_methods(z3: &mut Z3WorkerPool, unit: &VelosiAstUnitSegment) -> Velo
     let mut issues = VelosiSynthIssues::new();
 
     // issue the queries for checking the methods for satisfiability
-    let mut tickets = HashMap::new();
+    let mut tickets = IndexMap::new();
     for m in unit.methods() {
         if !m.recommends_sanity_check() {
             log::warn!(target: "[Z3Synth::Sanitycheck]",  "skipping method {} (!recommmends_sanity_check)", m.ident());
