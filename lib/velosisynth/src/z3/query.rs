@@ -35,6 +35,7 @@ use smt2::Smt2Context;
 // own crate imports
 use crate::{model, Program};
 
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Z3Tickets: a identifies the Z3 query
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -106,6 +107,8 @@ impl Display for Z3TimeStamp {
 // Z3Query
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const QUERY_TTL: usize = 32;
+
 /// represents a Z3 smt query
 #[derive(Clone)]
 pub struct Z3Query {
@@ -119,6 +122,8 @@ pub struct Z3Query {
     timestamps: Vec<(Z3TimeStamp, Instant)>,
     ///
     is_complex: bool,
+    /// the time to life value
+    retries: usize,
 }
 
 impl Z3Query {
@@ -137,12 +142,13 @@ impl Z3Query {
             smt: vec![Arc::new(smt)],
             timestamps,
             is_complex: false,
+            retries: 0
         }
     }
 
     /// Creates a new Z3 Query with multiple SMT contexts and adds the model prelude
-    pub fn with_model_contexts(mut smt: Vec<Arc<Smt2Context>>) -> Self {
-        smt.insert(0, Arc::new(model::prelude()));
+    pub fn with_model_contexts(mut smt: Vec<Arc<Smt2Context>>, is_distinguish: bool) -> Self {
+        smt.insert(0, Arc::new(model::prelude(is_distinguish)));
 
         Self {
             prog: None,
@@ -150,6 +156,7 @@ impl Z3Query {
             smt,
             timestamps: Vec::with_capacity(10),
             is_complex: false,
+            retries: 0
         }
     }
 
@@ -162,6 +169,7 @@ impl Z3Query {
             smt: self.smt.clone(),
             timestamps,
             is_complex: false,
+            retries: 0
         }
     }
 
@@ -174,6 +182,7 @@ impl Z3Query {
             smt: self.smt.clone(),
             timestamps,
             is_complex: false,
+            retries: 0
         }
     }
 
@@ -184,6 +193,15 @@ impl Z3Query {
         smt.reset();
 
         Self::with_context(smt)
+    }
+
+    pub fn retry(&mut self) -> bool {
+        self.retries += 1;
+        self.retries < QUERY_TTL
+    }
+
+    pub fn get_retries(&self) -> usize {
+        self.retries
     }
 
     /// sets the operations field of the query (book keeping purpose)
@@ -308,6 +326,15 @@ impl Hash for Z3Query {
 // Z3Query
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub enum Z3QueryResult {
+    Sat,
+    Unsat,
+    Unknown,
+    Error,
+}
+
+
 /// represents a result obtained from executing a Z3 query
 #[derive(Clone)]
 pub struct Z3Result {
@@ -316,14 +343,19 @@ pub struct Z3Result {
 
     /// the result of the task
     result: String,
+
+    /// the query state
+    state: Z3QueryResult,
 }
 
 impl Z3Result {
     /// creates a new Z3 result without the query
     pub fn new(result: String) -> Self {
+        let state = Self::check_result_no_rewrite(result.as_str());
         Self {
             query: None,
             result,
+            state
         }
     }
 
@@ -331,15 +363,47 @@ impl Z3Result {
         Self {
             query: Some(query),
             result: self.result.clone(),
+            state: self.state
         }
     }
 
     /// creates a new Z3 result with the given query
     pub fn with_query(query: Box<Z3Query>, result: String) -> Self {
+        let state = Self::check_result_no_rewrite(result.as_str());
         Self {
             query: Some(query),
             result,
+            state
         }
+    }
+
+    fn check_result_no_rewrite(output: &str) -> Z3QueryResult {
+        if output.is_empty() {
+            // this is just when there was no assertion or checksat
+            return Z3QueryResult::Sat
+        }
+        let mut reslines = output.lines();
+        match reslines.next() {
+            Some("sat") => Z3QueryResult::Sat,
+            Some("unsat") => Z3QueryResult::Unsat,
+            Some("unknown") => Z3QueryResult:: Unknown,
+            Some(_a) => Z3QueryResult::Error,
+            None => {
+                unreachable!("unexpected none output");
+            }
+        }
+    }
+
+    pub fn get_query_result(&self) -> Z3QueryResult {
+        self.state
+    }
+
+    pub fn sat(&self) -> bool {
+        self.state == Z3QueryResult::Sat
+    }
+
+    pub fn unknown(&self) -> bool {
+        self.state == Z3QueryResult::Unknown
     }
 
     // pub fn print_timestamps(&self) {

@@ -212,9 +212,30 @@ impl Z3Instance {
 
             // send it to z3
             z3_stdin.write_all(id.as_bytes()).unwrap();
+
             for smt in query.smt_contexts() {
+                let buf_string = smt.to_code(!cfg!(debug_assertions));
+                let buf = if query.get_retries() > 0 {
+                    let rand = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis();
+                    // println!("this is a retry! {}", query.get_retries());
+                    if buf_string.starts_with("(push)") {
+                        let push = format!("(push)(set-option :timeout {})(set-option :smt.random_seed {})(set-option :sat.random_seed {})(declare-const x{} Int)\n",
+                            250 + query.get_retries() * 50,
+                            rand,
+                            rand,
+                            rand);
+                        z3_stdin
+                            .write_all(push.as_bytes())
+                            .unwrap();
+                        &buf_string.as_str()[6..]
+                    } else {
+                        buf_string.as_str()
+                    }
+                } else {
+                    buf_string.as_str()
+                };
                 z3_stdin
-                    .write_all(smt.to_code(!cfg!(debug_assertions)).as_bytes())
+                    .write_all(buf.as_bytes())
                     .unwrap();
             }
 
