@@ -166,6 +166,8 @@ pub fn main() {
 
                 let mut synth = Z3SynthSegment::new(&mut z3, seg, models[seg.ident()].clone());
 
+                log::debug!("Plan: {synth}");
+
                 t_synth_segment.push(("init", Instant::now()));
 
                 let sanity_check = synth.sanity_check();
