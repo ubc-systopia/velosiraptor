@@ -13,6 +13,9 @@
  * The translation size is a multiple of 64 bytes.
  */
 
+const MAX_VADDR : vaddr = 1 << 48;
+const MAX_PADDR : paddr = 1 << 48;
+
 flags {
     writable,
     readable,
@@ -22,7 +25,7 @@ flags {
 segment AssocSegment(base : addr) {
 
     // let's assume the maximum size of the segment is 40 bits.
-    inbitwidth= 47;
+    inbitwidth= 48;
 
     // let's assume the maximum output bit size is 64 bits
     outbitwidth = 48;
@@ -79,7 +82,7 @@ segment AssocSegment(base : addr) {
     }
 
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
-        requires (pa + sz < (1 << 47)) && (va + sz < (1 << 47))
+        requires (pa + sz < MAX_PADDR) && (va + sz < MAX_VADDR)
 
     synth fn protect(va: vaddr, sz: size, flgs: flags);
 

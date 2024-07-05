@@ -1,0 +1,145 @@
+/*
+ * The Xeon Phi System Memory Page Table (SMPT) consists of 32 16-GB pages that translate
+ * from the Xeon Phi address space into the host address space.
+ *
+ * Each page in the SMPT is controlled by a single register, accessible from the host
+ * and the Xeon Phi (note the address may be different here)
+ *
+ * The translation can only be remapped, but not unmapped nor are there any protection
+ * mechanisms.
+ */
+
+const REGION_ALIGNMENT : size = 0x1f
+const VADDR_MAX : size = 0xffffffff
+
+flags {
+    read,
+    write,
+    execute,
+    supervisor,
+}
+
+
+// This defines an SMPT Entry
+segment MPU(base: addr) {
+
+    inbitwidth = 32;
+    outbitwidth = 32;
+
+    state() {
+        reg type [ 4 ] {
+            0 ..  1 separate,   // indicates support for separate data address regions
+            // 1 ..  8 _res0,
+            8  .. 16 dregion,   // number of MPU regions supported
+            // 16 .. 32 _res1
+        },
+        reg ctrl [ 4 ] {
+            0 ..  1 enable,     // enable the MPU
+            1 ..  2 hfnmiena,   // enable MPU during hard fault, NMI, and FAULTMASK
+            2 ..  3 privdefena, // enable privileged access to default memory map
+        },
+        reg nrn [ 4 ] {
+            0 .. 8 region,     // region number
+            // 8 .. 32 _res
+        },
+        reg rbar [ 4 ] {
+            0 .. 1  xn,  // execute never
+            1 .. 2  ap_priv,
+            2 .. 3  ap_ro,
+            3 .. 5  sh,
+            5 .. 32 base
+        },
+        reg rlar [ 4 ] {
+            0 ..  1 en,     // region enabled
+            1 ..  4 attr,   // memory attributes
+            // 4 .. 5 _res, // reserved
+            5 .. 32 limit   // limit
+        },
+        reg rbar_a1 [ 4 ] {
+
+        },
+        reg rlar_a1 [ 4 ] {
+
+        },
+        reg rbar_a2 [ 4 ] {
+
+        },
+        reg rlar_a2 [ 4 ] {
+
+        },
+        reg rbar_a3 [ 4 ] {
+
+        },
+        reg rlar_a3 [ 4 ] {
+
+        },
+        reg mair0 [ 4 ] {
+            attr0
+            attr1
+            attr2
+            attr3
+        },
+        reg mair1 [ 4 ] {
+            attr4
+            attr5
+            attr6
+            attr7
+        },
+    }
+
+    interface(base: addr) {
+        mmio entry [ base, 0, 4 ]
+    }
+
+    #[remap]
+    fn valid() -> bool {
+        state.ctrl.enable == 1
+    }
+
+    #[remap]
+    fn enabled() -> bool {
+        state.rlar.en == 1
+    }
+
+    #[remap]
+    fn execute(flgs : flags) -> bool {
+        state.rbar.xn == flgs.execute
+    }
+
+    #[remap]
+    fn ro(flgs : flags) -> bool {
+        state.rbar.ap_ro == flgs.write
+    }
+
+    #[remap]
+    fn priv(flgs : flags) -> bool {
+        state.rbar.ap_priv == flgs.supervisor
+    }
+
+    #[remap]
+    fn matchflags(flgs : flags) -> bool
+    {
+        true    // no protection here
+    }
+
+    fn translate(va: vaddr) -> paddr
+        requires state.rbar.base << 5 <= va
+        requires va < state.rlar.limit << 5
+    {
+        va
+    }
+
+    synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
+        requires va == pa
+        requires va & REGION_ALIGNMENT == 0
+        requires sz & REGION_ALIGNMENT == 0
+        requires va + sz < VADDR_MAX
+
+    // can't actually do anything to protect or unmap
+    synth fn protect(va: vaddr, sz: size, flgs: flags);
+    synth fn unmap(va: vaddr, sz: size);
+ }
+
+staticmap SMPT(base: addr) {
+    maps [ SMPTE(base + i * SMPT_ENTRY_SIZE) for i in 0..SMPT_NUM_ENTRIES ]
+}
