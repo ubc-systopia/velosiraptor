@@ -63,14 +63,16 @@ impl ProgramsIter {
         let next = last.next();
         if let Some(actions) = next {
             self.stat_num_programs += 1;
-            return Some(Program(actions));
+            let p = Program(actions);
+            return Some(p);
         }
 
         self.programs.pop();
         let last = self.programs.last_mut()?;
-        if let Some(p) = last.next() {
+        if let Some(actions) = last.next() {
             self.stat_num_programs += 1;
-            return Some(Program(p));
+            let p = Program(actions);
+            return Some(p);
         }
         None
     }
