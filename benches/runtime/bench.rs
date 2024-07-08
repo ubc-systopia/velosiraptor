@@ -1,15 +1,21 @@
-pub const NUM_WORKERS: usize = 8;
-pub const ITERATIONS: usize = 20;
-
 pub struct Stats {
+    #[allow(dead_code)]
     pub min: u64,
+    #[allow(dead_code)]
     pub med: u64,
+    #[allow(dead_code)]
     pub avg: u64,
+    #[allow(dead_code)]
     pub max: u64,
+    #[allow(dead_code)]
     pub p99: u64,
+    #[allow(dead_code)]
     pub p95: u64,
+    #[allow(dead_code)]
     pub var: u64,
+    #[allow(dead_code)]
     pub std: u64,
+    #[allow(dead_code)]
     pub num: usize,
 }
 
@@ -33,7 +39,7 @@ impl From<&[u64]> for Stats {
             }
         } else {
             // detect outliers
-            let med = datapoints[num_datapoints / 2];
+
             let q1 = datapoints[num_datapoints / 4];
             let q3 = datapoints[num_datapoints * 3 / 4];
             let iqr = q3 - q1;

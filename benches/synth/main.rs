@@ -1,10 +1,10 @@
 use chrono::prelude::*;
+use indicatif::{ProgressBar, ProgressStyle};
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::rc::Rc;
 use std::time::Instant;
-use indicatif::{ProgressBar, ProgressStyle};
 
 use velosiast::{
     AstResult, VelosiAst, VelosiAstField, VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment,
@@ -53,7 +53,6 @@ fn run_synthesis(
     };
     let t_1 = Instant::now();
     results.t_parse.push(t_1.duration_since(t_0).as_millis());
-
 
     bar.set_message("create model");
 
@@ -292,11 +291,12 @@ fn compile_linux(nworkers: usize) -> Option<Stats> {
 
     let bar = ProgressBar::new(ITERATIONS.try_into().unwrap());
     bar.set_style(
-        ProgressStyle::with_template("{spinner:.dim.bold} [{bar:40.cyan/blue}]  {pos}/{len}  -  {msg:20}")
-            .unwrap()
-            .tick_chars("/|\\- "),
+        ProgressStyle::with_template(
+            "{spinner:.dim.bold} [{bar:40.cyan/blue}]  {pos}/{len}  -  {msg:20}",
+        )
+        .unwrap()
+        .tick_chars("/|\\- "),
     );
-
 
     let parallelism = format!("-j{}", nworkers);
     let mut measurements = Vec::with_capacity(ITERATIONS);
@@ -388,17 +388,23 @@ fn main() {
             print!("    ");
             let bar = ProgressBar::new(ITERATIONS.try_into().unwrap());
             bar.set_style(
-                ProgressStyle::with_template("{spinner:.dim.bold} [{bar:40.cyan/blue}]  {pos}/{len}  -  {msg:20}")
-                    .unwrap()
-                    .tick_chars("/|\\- "),
+                ProgressStyle::with_template(
+                    "{spinner:.dim.bold} [{bar:40.cyan/blue}]  {pos}/{len}  -  {msg:20}",
+                )
+                .unwrap()
+                .tick_chars("/|\\- "),
             );
 
             for _ in 0..ITERATIONS {
                 // create synth factory and run synthesis on the segments
                 let mut z3_workers = Z3WorkerPool::with_num_workers(nworkers, None);
-                if let Some(res) =
-                    run_synthesis(&bar, &mut z3_workers, vrs_file.as_str(), name.as_str(), *no_tree)
-                {
+                if let Some(res) = run_synthesis(
+                    &bar,
+                    &mut z3_workers,
+                    vrs_file.as_str(),
+                    name.as_str(),
+                    *no_tree,
+                ) {
                     results.merge(&res);
                 } else {
                     had_errors = true;
@@ -442,7 +448,7 @@ fn main() {
 
     println!("# Completed\n\n");
 
-    let dirty = if env!("VERGEN_GIT_DIRTY") == "true" {
+    let dirty = if is_dirty || build_dirty {
         "-dirty"
     } else {
         ""
