@@ -1,7 +1,7 @@
+use chrono::prelude::*;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Instant;
-use chrono::prelude::*;
 
 use velosiast::{
     AstResult, VelosiAst, VelosiAstField, VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment,
@@ -197,16 +197,28 @@ fn run_synthesis(
 fn main() {
     println!("# Running Benchmark: Synthesis times");
 
-    let is_dirty = env!("VERGEN_GIT_DIRTY") == "true";
-
     let args: Vec<String> = env::args().collect();
 
-    if is_dirty && !args.iter().any(|e| e.as_str() == "--allow-dirty") {
+    let output = Command::new("git")
+        .args(["status", "--porcelain"])
+        .output()
+        .expect("failed to execute process");
+
+    let is_dirty = !output.stdout.is_empty();
+    let build_dirty = env!("VERGEN_GIT_DIRTY") == "true";
+    let allow_dirty = args.iter().any(|e| e.as_str() == "--allow-dirty");
+
+    if is_dirty && !allow_dirty {
         println!("ERROR. Git repository is dirty. Terminating.");
-        println!("(pass --allow-dirty to ignore");
+        println!("(pass --allow-dirty to ignore)");
         std::process::exit(-1);
     }
 
+    if build_dirty && !allow_dirty {
+        println!("ERROR. Executable has been built from a dirty git repository. Terminating.");
+        println!("(pass --allow-dirty to ignore)");
+        std::process::exit(-1);
+    }
 
     let mut latex_results = String::new();
     let mut latex_results_no_tree = String::new();
@@ -222,7 +234,7 @@ fn main() {
         }
 
         for no_tree in &[false] {
-        //for no_tree in &[true, false] {
+            //for no_tree in &[true, false] {
 
             let name = if *no_tree {
                 format!("{name} (no tree)")
@@ -277,21 +289,28 @@ fn main() {
         ""
     };
 
-    println!("% =======================================================================================");
+    println!(
+        "% ======================================================================================="
+    );
     println!("% Table: Search Space Optimizations");
-    println!("% =======================================================================================");
+    println!(
+        "% ======================================================================================="
+    );
     println!("% Git Hash:   {}{dirty}", env!("VERGEN_GIT_DESCRIBE"));
     println!("% CPU:        {}", env!("VERGEN_SYSINFO_CPU_BRAND"));
     println!("% OS:         {}", env!("VERGEN_SYSINFO_OS_VERSION"));
     println!("% Date:       {}", Local::now());
-    println!("% =======================================================================================");
+    println!(
+        "% ======================================================================================="
+    );
     println!("%");
     println!("\\begin{{tabular}}{{lc|crr}}");
     println!("\\multicolumn{{2}}{{c}}{{\\textbf{{Configurations}}}} & \\multicolumn{{3}}{{c}}{{\\textbf{{Results [ms]}}}} \\\\");
     println!("{latex_results}");
     println!("\\end{{tabular}}");
     println!("%");
-    println!("% =======================================================================================");
+    println!(
+        "% ======================================================================================="
+    );
     //println!("% latex table\n{latex_results_no_tree}");
-
 }

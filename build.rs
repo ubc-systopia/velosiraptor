@@ -1,5 +1,5 @@
-use vergen::EmitBuilder;
 use anyhow::Result;
+use vergen::EmitBuilder;
 
 pub fn main() -> Result<()> {
     // NOTE: This will output only a build timestamp and long SHA from git.
@@ -8,7 +8,8 @@ pub fn main() -> Result<()> {
     EmitBuilder::builder()
         .all_build()
         .all_git()
+        .git_dirty(true)
         .all_sysinfo()
-        .emit()?;
+        .emit_and_set()?;
     Ok(())
 }
