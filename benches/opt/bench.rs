@@ -1,58 +1,5 @@
 pub const NUM_WORKERS: usize = 14;
 
-pub struct Stats {
-    pub min: u128,
-    pub med: u128,
-    pub avg: u128,
-    pub max: u128,
-    pub var: u128,
-    pub std: u128,
-    pub num: usize,
-}
-
-impl From<&[u128]> for Stats {
-    fn from(stats: &[u128]) -> Self {
-        let mut data = stats.to_vec();
-
-        if data.is_empty() {
-            return Self {
-                min: 0,
-                med: 0,
-                avg: 0,
-                max: 0,
-                var: 0,
-                std: 0,
-                num: 0,
-            };
-        }
-
-        data.sort();
-
-        let sum = data.iter().sum::<u128>() as u128;
-        let num = data.len();
-        let avg = sum / num as u128;
-
-        let var = data.iter().map(|x| (x - avg) * (x - avg)).sum::<u128>() as u128 / num as u128;
-        let std = (var as f64).sqrt() as u128;
-        Self {
-            min: *data.first().unwrap(),
-            med: data[num / 2],
-            avg,
-            max: *data.last().unwrap(),
-            var,
-            std,
-            num,
-        }
-    }
-}
-
-impl From<&[usize]> for Stats {
-    fn from(stats: &[usize]) -> Self {
-        let data: Vec<u128> = stats.iter().map(|x| *x as u128).collect();
-        Stats::from(data.as_slice())
-    }
-}
-
 pub struct BenchResults {
     pub tag: String,
     pub num_segments: usize,

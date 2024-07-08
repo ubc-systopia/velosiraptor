@@ -1,5 +1,7 @@
 use chrono::prelude::*;
-use std::path::PathBuf;
+use std::env;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::rc::Rc;
 use std::time::Instant;
 
@@ -194,8 +196,120 @@ fn run_synthesis(
     Some(results)
 }
 
+const LINUX_GIT_URL: &str =
+    "https://git.launchpad.net/~ubuntu-kernel/ubuntu/+source/linux/+git/noble";
+const LINUX_GIT_SHA: &str = "74134bfb6b720ca18a73931662cbcc8170ef1bed";
+
+fn compile_linux(nworkers: usize) -> Option<Stats> {
+    println!("Running Linux Compilation Benchmark");
+
+    let config_file = Path::new(file!()).parent().unwrap().join("ubuntu.config");
+    if !config_file.is_file() {
+        println!(
+            "ERROR: could not find the config file {}",
+            config_file.display()
+        );
+        return None;
+    }
+
+    let tmpdir = env!("CARGO_TARGET_TMPDIR");
+    println!(" - Using tmpdir: {tmpdir}");
+
+    let path = Path::new(tmpdir).join("ubuntu2404");
+    if let Err(e) = std::fs::create_dir_all(&path) {
+        println!("ERROR: Could not create the directory for the linux kernel compilation");
+        println!("{e}");
+        return None;
+    };
+
+    let do_checkout = if !path.join(".git").is_dir() {
+        println!(" - Git Init with {LINUX_GIT_URL} ");
+        // do a shallow git checkout with git init && git remote add && git fetch && git checkout
+        Command::new("git")
+            .args(["init"])
+            .current_dir(&path)
+            .output()
+            .expect("failed to execute process");
+
+        Command::new("git")
+            .args(["remote", "add", "origin", LINUX_GIT_URL])
+            .current_dir(&path)
+            .output()
+            .expect("failed to execute process");
+
+        true
+    } else {
+        let output = Command::new("git")
+            .args(["rev-parse", "--verify", "HEAD"])
+            .current_dir(&path)
+            .output()
+            .expect("failed to execute process");
+
+        let outstring = String::from_utf8(output.stdout).unwrap();
+        if outstring.starts_with(LINUX_GIT_SHA) {
+            false
+        } else {
+            true
+        }
+    };
+
+    if do_checkout {
+        println!(" - Git Checkout {LINUX_GIT_SHA}");
+        Command::new("git")
+            .args(["fetch", "--depth", "1", "origin", LINUX_GIT_SHA])
+            .current_dir(&path)
+            .output()
+            .expect("failed to execute process");
+
+        Command::new("git")
+            .args(["checkout", "FETCH_HEAD"])
+            .current_dir(&path)
+            .output()
+            .expect("failed to execute process");
+    }
+
+    // copy the config file
+    std::fs::copy(config_file, path.join(".config")).expect("could not copy the config file");
+
+    println!(" - Running make oldconfig");
+    // create the new config path
+    Command::new("make")
+        .args(["oldconfig"])
+        .current_dir(&path)
+        .output()
+        .expect("failed to execute process");
+
+    let parallelism = format!("-j{}", nworkers);
+    let mut measurements = Vec::with_capacity(ITERATIONS);
+    for _ in 0..ITERATIONS {
+        println!(" - Running make clean");
+        Command::new("make")
+            .args(["clean"])
+            .current_dir(&path)
+            .output()
+            .expect("failed to execute process");
+
+        println!(" - Running make vmlinux");
+        let t_start = Instant::now();
+        Command::new("make")
+            .args(["vmlinux", parallelism.as_str()])
+            .current_dir(&path)
+            .output()
+            .expect("failed to execute process");
+        let t_end = Instant::now();
+
+        measurements.push(t_end.duration_since(t_start).as_millis());
+    }
+
+    Some(Stats::from(measurements.as_slice()))
+}
+
 fn main() {
-    println!("# Running Benchmark: Synthesis times");
+    println!("# Running Benchmark: Synthesis times\n");
+
+    let nthreads: usize = std::thread::available_parallelism()
+        .map(|e| e.into())
+        .unwrap_or_else(|_| 1);
 
     let args: Vec<String> = env::args().collect();
 
@@ -223,6 +337,12 @@ fn main() {
     let mut latex_results = String::new();
     let mut latex_results_no_tree = String::new();
 
+    let linux_times = compile_linux(nthreads);
+
+    let nworkers = std::cmp::max(
+        if nthreads > 1 { (nthreads / 2) - 1 } else { 1 },
+        NUM_WORKERS,
+    );
     for (spec, name) in SPECS.iter() {
         println!(" @ Spec: {spec}");
 
@@ -246,7 +366,7 @@ fn main() {
             print!("    ");
             for _ in 0..ITERATIONS {
                 // create synth factory and run synthesis on the segments
-                let mut z3_workers = Z3WorkerPool::with_num_workers(NUM_WORKERS, None);
+                let mut z3_workers = Z3WorkerPool::with_num_workers(nworkers, None);
                 if let Some(res) =
                     run_synthesis(&mut z3_workers, vrs_file.as_str(), name.as_str(), *no_tree)
                 {
@@ -266,22 +386,29 @@ fn main() {
 
             print!("  - {results}\n");
 
-            if *no_tree {
-                if latex_results_no_tree.is_empty() {
-                    latex_results_no_tree.push_str(results.to_latex_header().as_str());
-                }
-
-                latex_results_no_tree.push_str(results.to_latex().as_str());
+            let res = if *no_tree {
+                &mut latex_results_no_tree
             } else {
-                if latex_results.is_empty() {
-                    latex_results.push_str(results.to_latex_header().as_str());
-                }
-                latex_results.push_str(results.to_latex().as_str());
+                &mut latex_results
+            };
+
+            if res.is_empty() {
+                let hdr = format!(
+                    "  {:<20} & {:<11}          & {:<11} & {:12} & {:12} \\\\\n",
+                    "Name", "\\# Units", " Programs ", "  Time P50", "  Time P95"
+                );
+
+                res.push_str(hdr.as_str());
+                res.push_str("  \\hline % ---------------------------------------------------------------------------------\n");
             }
+
+            res.push_str("  ");
+            res.push_str(results.to_latex().as_str());
         }
     }
+    latex_results.push_str("  \\hline % ---------------------------------------------------------------------------------");
 
-    println!("# Completed");
+    println!("# Completed\n\n");
 
     let dirty = if env!("VERGEN_GIT_DIRTY") == "true" {
         "-dirty"
@@ -290,27 +417,41 @@ fn main() {
     };
 
     println!(
-        "% ======================================================================================="
+        "% =========================================================================================="
     );
-    println!("% Table: Search Space Optimizations");
+    println!("% Table: Synthesis Times");
     println!(
-        "% ======================================================================================="
+        "% =========================================================================================="
     );
     println!("% Git Hash:   {}{dirty}", env!("VERGEN_GIT_DESCRIBE"));
     println!("% CPU:        {}", env!("VERGEN_SYSINFO_CPU_BRAND"));
     println!("% OS:         {}", env!("VERGEN_SYSINFO_OS_VERSION"));
     println!("% Date:       {}", Local::now());
+    println!("% Threads:    {}", nthreads);
+    println!("% Workers:    {}", nworkers);
+    println!("% Iterations: {}", ITERATIONS);
     println!(
-        "% ======================================================================================="
+        "% =========================================================================================="
     );
     println!("%");
     println!("\\begin{{tabular}}{{lc|crr}}");
-    println!("\\multicolumn{{2}}{{c}}{{\\textbf{{Configurations}}}} & \\multicolumn{{3}}{{c}}{{\\textbf{{Results [ms]}}}} \\\\");
+    println!("  \\hline % ---------------------------------------------------------------------------------");
+    println!("  \\multicolumn{{2}}{{c}}{{\\textbf{{Configurations}}}} & \\multicolumn{{3}}{{c}}{{\\textbf{{Results [ms]}}}} \\\\");
     println!("{latex_results}");
+    if let Some(linux_measurement) = linux_times {
+        println!("  Linux Ubuntu         &                  --  & --          & {:>9}ms  & {:>9}ms  \\\\",
+        BenchResults::human_readable(linux_measurement.med),
+        BenchResults::human_readable(linux_measurement.p95));
+    } else {
+        println!(
+            "  Linux Ubuntu         &                  --  & --          & N/A ms & N/A ms \\\\"
+        );
+    }
+    println!("  \\hline % ---------------------------------------------------------------------------------");
     println!("\\end{{tabular}}");
     println!("%");
     println!(
-        "% ======================================================================================="
+        "% =========================================================================================="
     );
     //println!("% latex table\n{latex_results_no_tree}");
 }
