@@ -8,7 +8,6 @@ pub fn main() -> Result<()> {
     EmitBuilder::builder()
         .all_build()
         .all_git()
-        .git_dirty(true)
         .all_sysinfo()
         .emit_and_set()?;
     Ok(())
