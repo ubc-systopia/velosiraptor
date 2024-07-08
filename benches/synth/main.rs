@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Instant;
+use chrono::prelude::*;
 
 use velosiast::{
     AstResult, VelosiAst, VelosiAstField, VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment,
@@ -196,6 +197,17 @@ fn run_synthesis(
 fn main() {
     println!("# Running Benchmark: Synthesis times");
 
+    let is_dirty = env!("VERGEN_GIT_DIRTY") == "true";
+
+    let args: Vec<String> = env::args().collect();
+
+    if is_dirty && !args.iter().any(|e| e.as_str() == "--allow-dirty") {
+        println!("ERROR. Git repository is dirty. Terminating.");
+        println!("(pass --allow-dirty to ignore");
+        std::process::exit(-1);
+    }
+
+
     let mut latex_results = String::new();
     let mut latex_results_no_tree = String::new();
 
@@ -259,8 +271,27 @@ fn main() {
 
     println!("# Completed");
 
-    println!("% latex table\n{latex_results}");
+    let dirty = if env!("VERGEN_GIT_DIRTY") == "true" {
+        "-dirty"
+    } else {
+        ""
+    };
 
-    println!("% latex table\n{latex_results_no_tree}");
+    println!("% =======================================================================================");
+    println!("% Table: Search Space Optimizations");
+    println!("% =======================================================================================");
+    println!("% Git Hash:   {}{dirty}", env!("VERGEN_GIT_DESCRIBE"));
+    println!("% CPU:        {}", env!("VERGEN_SYSINFO_CPU_BRAND"));
+    println!("% OS:         {}", env!("VERGEN_SYSINFO_OS_VERSION"));
+    println!("% Date:       {}", Local::now());
+    println!("% =======================================================================================");
+    println!("%");
+    println!("\\begin{{tabular}}{{lc|crr}}");
+    println!("\\multicolumn{{2}}{{c}}{{\\textbf{{Configurations}}}} & \\multicolumn{{3}}{{c}}{{\\textbf{{Results [ms]}}}} \\\\");
+    println!("{latex_results}");
+    println!("\\end{{tabular}}");
+    println!("%");
+    println!("% =======================================================================================");
+    //println!("% latex table\n{latex_results_no_tree}");
 
 }
