@@ -108,6 +108,7 @@ pub trait UnitUtils {
         FLAGS_TYPE.to_string()
     }
 
+    #[allow(dead_code)]
     fn to_flags_struct_name(&self) -> String {
         format!("{}_flags", self.my_ident().to_ascii_lowercase())
     }
@@ -175,6 +176,7 @@ pub trait UnitUtils {
         )
     }
 
+    #[allow(dead_code)]
     fn to_op_fn_name_frame(&self, op: &VelosiAstMethod) -> String {
         format!(
             "{}_{}_frame",
@@ -183,6 +185,7 @@ pub trait UnitUtils {
         )
     }
 
+    #[allow(dead_code)]
     fn to_op_fn_name_table(&self, op: &VelosiAstMethod) -> String {
         format!(
             "{}_{}_table",
@@ -191,6 +194,7 @@ pub trait UnitUtils {
         )
     }
 
+    #[allow(dead_code)]
     fn to_op_fn_name_one(&self, op: &VelosiAstMethod) -> String {
         format!(
             "{}_{}_one",
@@ -207,6 +211,7 @@ pub trait UnitUtils {
         format!("{}_free", self.my_ident().to_ascii_lowercase(),)
     }
 
+    #[allow(dead_code)]
     fn to_op_fn_name_on_unit(&self, op: &VelosiAstMethod, variant_unit: &VelosiAstUnit) -> String {
         format!(
             "{}_{}_{}",
@@ -228,6 +233,7 @@ pub trait UnitUtils {
         format!("{}_get_child", self.my_ident().to_ascii_lowercase())
     }
 
+    #[allow(dead_code)]
     fn get_next_child_fn_name(&self) -> String {
         format!("{}_get_next_child", self.my_ident().to_ascii_lowercase())
     }
@@ -551,6 +557,7 @@ where
         field_wr_fn_name_str(unit.my_ident(), self.my_ident())
     }
 
+    #[allow(dead_code)]
     fn to_wr_fn_call(&self, unit: U, unit_var: C::Expr, val: C::Expr) -> C::Expr {
         let fname = self.to_wr_fn(unit);
         C::Expr::fn_call(&fname, vec![unit_var, val])
