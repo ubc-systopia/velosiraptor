@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Instant;
+use chrono::prelude::*;
+use std::env;
 
 use velosiast::{
     AstResult, VelosiAst, VelosiAstField, VelosiAstUnit, VelosiAstUnitSegment,
@@ -30,6 +32,7 @@ const OPTS: [(&str, (bool, bool, bool, bool, bool)); 5] = [
     ("+ Tree", (false, false, false, true, false)),
     // ("+ Cache (full)", (false, false, false, false, false)),
 ];
+
 
 mod bench;
 use bench::*;
@@ -149,16 +152,26 @@ fn run_synthesis(
 fn main() {
     println!("# Running Benchmark: Synthesis Optimizations");
 
+    let is_dirty = env!("VERGEN_GIT_DIRTY") == "true";
+
+    let args: Vec<String> = env::args().collect();
+
+    if is_dirty && !args.iter().any(|e| e.as_str() == "--allow-dirty") {
+        println!("ERROR. Git repository is dirty. Terminating.");
+        println!("(pass --allow-dirty to ignore");
+        std::process::exit(-1);
+    }
+
     let mut latex_results = String::new();
 
-    latex_results.push_str("Spec");
-
+    latex_results.push_str("\\hline % --------------------------------------------------------------------------------\n");
+    latex_results.push_str(format!("{:20}", "Spec").as_str());
     for (_i, (tag, _)) in OPTS.iter().enumerate() {
         latex_results.push_str(" & ");
-        latex_results.push_str(tag);
+        latex_results.push_str(format!("{tag:10}").as_str());
     }
-    latex_results.push_str("\\\\\n");
-    latex_results.push_str("\\hline\n");
+    latex_results.push_str("  \\\\\n");
+    latex_results.push_str("\\hline % --------------------------------------------------------------------------------\n");
 
     for (spec, name) in SPECS.iter() {
         println!(" @ Spec: {spec}");
@@ -199,13 +212,33 @@ fn main() {
             }
             let num = row.get(tag).unwrap().ilog10();
 
-            latex_results.push_str(&format!("{num:3}"));
+            latex_results.push_str(&format!("{num:10}"));
         }
-        latex_results.push_str("\\\\\n");
+        latex_results.push_str("  \\\\\n");
 
     }
-    latex_results.push_str("\\hline\n");
-    println!("# Completed");
 
-    println!("% latex table\n{latex_results}");
+    latex_results.push_str("\\hline % --------------------------------------------------------------------------------");
+    println!("# Completed\n\n");
+
+    // for (key, value) in std::env::vars() {
+    //     println!("{key}: {value}");
+    // }
+
+    let dirty = if is_dirty { "-dirty" } else { "" };
+
+    println!("% =======================================================================================");
+    println!("% Table: Search Space Optimizations");
+    println!("% =======================================================================================");
+    println!("% Git Hash:   {}{dirty}", env!("VERGEN_GIT_DESCRIBE"));
+    println!("% CPU:        {}", env!("VERGEN_SYSINFO_CPU_BRAND"));
+    println!("% OS:         {}", env!("VERGEN_SYSINFO_OS_VERSION"));
+    println!("% Date:       {}", Local::now());
+    println!("% =======================================================================================");
+    println!("%");
+    println!("\\begin{{tabular}}{{lrrrrr}}");
+    println!("{latex_results}");
+    println!("\\end{{tabular}}");
+    println!("%");
+    println!("% =======================================================================================");
 }

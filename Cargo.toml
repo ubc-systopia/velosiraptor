@@ -28,7 +28,7 @@ members = [
 
 [dependencies]
 # argument parsing
-clap = { version = "4.3.5", features = [ "derive" ] }
+clap = { version = "4.5.8", features = [ "derive" ] }
 
 # for colorful output
 colored = "2"
@@ -41,7 +41,7 @@ velosihwgen = { path = "lib/velosihwgen" }
 
 # logging and errors
 log = { version = "0.4.19", features = ["max_level_trace", "release_max_level_warn"] }
-simplelog = { version = "^0.12.0", features = ["paris"] }
+simplelog = { version = "^0.12.2", features = ["paris"] }
 
 # dependencies for testing
 [dev-dependencies]
@@ -49,11 +49,15 @@ strip-ansi-escapes = "0.1.1"
 rexpect = "0.5"
 velosiparser = { path = "lib/velosiraptor-parser" }
 velosicomposition = {path = "lib/velosicomposition" }
+chrono = "0.4.38"
+
+[build-dependencies]
+vergen = { version = "8.3.1", features = ["build", "git", "gitcl", "si"] }
+anyhow = "1.0.86"
 
 # enable optimizations for the tests
 [profile.test]
 opt-level = 3
-
 
 # benchmarking
 
@@ -64,6 +68,7 @@ harness = false
 [[bench]]
 name = "opt"
 harness = false
+build = "build.rs"
 
 [[bench]]
 name = "runtime"
