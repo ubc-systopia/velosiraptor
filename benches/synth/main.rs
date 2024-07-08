@@ -282,14 +282,14 @@ fn compile_linux(nworkers: usize) -> Option<Stats> {
     let parallelism = format!("-j{}", nworkers);
     let mut measurements = Vec::with_capacity(ITERATIONS);
     for _ in 0..ITERATIONS {
-        println!(" - Running make clean");
+        // println!(" - Running make clean");
         Command::new("make")
             .args(["clean"])
             .current_dir(&path)
             .output()
             .expect("failed to execute process");
 
-        println!(" - Running make vmlinux");
+        // println!(" - Running make vmlinux");
         let t_start = Instant::now();
         Command::new("make")
             .args(["vmlinux", parallelism.as_str()])
