@@ -197,7 +197,7 @@ impl Z3Worker {
                                 }
                                 Err(tok) => {
                                     use std::time::Duration;
-                                    thread::sleep(Duration::from_micros(500));
+                                    thread::sleep(Duration::from_micros(1000));
                                     tok
                                 },
                             };
