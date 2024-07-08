@@ -51,7 +51,7 @@ use super::{TaskQ, Z3Instance, Z3TaskPriority};
 
 enum Z3Context {
     Query(Arc<Z3Query>),
-    Result(Z3Result),
+    Result,
     None,
 }
 
@@ -139,8 +139,8 @@ impl Z3Worker {
 
                         let mut context = context_clone.as_ref().lock().unwrap();
                         if let Z3Context::Query(query) = &*context {
-                            let res = z3.exec_shared(query.deref()).expect("executing the context failed");
-                            *context = Z3Context::Result(res);
+                            let _res = z3.exec_shared(query.deref()).expect("executing the context failed");
+                            *context = Z3Context::Result;
                         }
                         drop(context);
 
@@ -156,8 +156,8 @@ impl Z3Worker {
 
                         let mut context = context_clone.as_ref().lock().unwrap();
                         if let Z3Context::Query(query) = &*context {
-                            let res = z3.exec_shared(query.deref()).expect("executing the context failed");
-                            *context = Z3Context::Result(res);
+                            let _res = z3.exec_shared(query.deref()).expect("executing the context failed");
+                            *context = Z3Context::Result;
                         }
                         drop(context);
 
