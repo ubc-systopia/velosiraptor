@@ -25,10 +25,10 @@ const SPECS: [(&str, &str); 10] = [
 const OPTS: [(&str, (bool, bool, bool, bool, bool)); 5] = [
     //               iface  state  expr   cache   tree
     ("No Opts", (true, true, true, true, true)),
-    ("+ IfaceOpt", (false, true, true, true, true)),
-    ("+ StateOpt", (false, false, true, true, true)),
-    ("+ ExprOpt", (false, false, false, true, true)),
-    ("+ Tree", (false, false, false, true, false)),
+    ("+IfaceOpt", (false, true, true, true, true)),
+    ("+StateOpt", (false, false, true, true, true)),
+    ("+ExprOpt", (false, false, false, true, true)),
+    ("+Tree", (false, false, false, true, false)),
     // ("+ Cache (full)", (false, false, false, false, false)),
 ];
 
@@ -175,14 +175,18 @@ fn main() {
 
     let mut latex_results = String::new();
 
-    latex_results.push_str("\\hline % --------------------------------------------------------------------------------\n");
-    latex_results.push_str(format!("{:20}", "Spec").as_str());
+    latex_results.push_str(
+        "  \\hline % --------------------------------------------------------------------------\n",
+    );
+    latex_results.push_str(format!("  {:20}", "Spec").as_str());
     for (_i, (tag, _)) in OPTS.iter().enumerate() {
         latex_results.push_str(" & ");
-        latex_results.push_str(format!("{tag:10}").as_str());
+        latex_results.push_str(format!("{tag:9}").as_str());
     }
-    latex_results.push_str("  \\\\\n");
-    latex_results.push_str("\\hline % --------------------------------------------------------------------------------\n");
+    latex_results.push_str(" \\\\\n");
+    latex_results.push_str(
+        "  \\hline % --------------------------------------------------------------------------\n",
+    );
 
     for (spec, name) in SPECS.iter() {
         println!(" @ Spec: {spec}");
@@ -215,20 +219,22 @@ fn main() {
             row.insert(mytag, results.n_programs_max.unwrap_or_default());
         }
 
-        latex_results.push_str(format!("{name:20}").as_str());
+        latex_results.push_str(format!("  {name:20}").as_str());
         latex_results.push_str(" & ");
         for (i, (tag, _)) in OPTS.iter().enumerate() {
             if i > 0 {
-                latex_results.push_str(" & ");
+                latex_results.push_str("  & ");
             }
             let num = row.get(tag).unwrap().ilog10();
 
-            latex_results.push_str(&format!("{num:10}"));
+            latex_results.push_str(&format!("{num:8}"));
         }
         latex_results.push_str("  \\\\\n");
     }
 
-    latex_results.push_str("\\hline % --------------------------------------------------------------------------------");
+    latex_results.push_str(
+        "  \\hline % --------------------------------------------------------------------------",
+    );
     println!("# Completed\n\n");
 
     // for (key, value) in std::env::vars() {
@@ -238,18 +244,18 @@ fn main() {
     let dirty = if is_dirty { "-dirty" } else { "" };
 
     println!(
-        "% ======================================================================================="
+        "% ==================================================================================="
     );
     println!("% Table: Search Space Optimizations");
     println!(
-        "% ======================================================================================="
+        "% ==================================================================================="
     );
     println!("% Git Hash:   {}{dirty}", env!("VERGEN_GIT_DESCRIBE"));
     println!("% CPU:        {}", env!("VERGEN_SYSINFO_CPU_BRAND"));
     println!("% OS:         {}", env!("VERGEN_SYSINFO_OS_VERSION"));
     println!("% Date:       {}", Local::now());
     println!(
-        "% ======================================================================================="
+        "% ==================================================================================="
     );
     println!("%");
     println!("\\begin{{tabular}}{{lrrrrr}}");
@@ -257,6 +263,6 @@ fn main() {
     println!("\\end{{tabular}}");
     println!("%");
     println!(
-        "% ======================================================================================="
+        "% ==================================================================================="
     );
 }

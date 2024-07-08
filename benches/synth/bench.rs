@@ -2,14 +2,23 @@ pub const NUM_WORKERS: usize = 13; // give one core to the main program...
 pub const ITERATIONS: usize = 100;
 
 pub struct Stats {
+    #[allow(dead_code)]
     pub min: u128,
+    #[allow(dead_code)]
     pub med: u128,
+    #[allow(dead_code)]
     pub avg: u128,
+    #[allow(dead_code)]
     pub max: u128,
+    #[allow(dead_code)]
     pub p99: u128,
+    #[allow(dead_code)]
     pub p95: u128,
+    #[allow(dead_code)]
     pub var: u128,
+    #[allow(dead_code)]
     pub std: u128,
+    #[allow(dead_code)]
     pub num: usize,
 }
 
@@ -171,17 +180,18 @@ impl BenchResults {
         }
     }
 
-    pub fn to_latex_header(&self) -> String {
-        format!(
-            "{:<30} & {:<11}  & {:<11} & {:11} & {:11}\\\\\n",
-            "Name", "# Units", "Programs", "Runtime P50", "Runtime P95"
-        )
+    pub fn human_readable(num: u128) -> String {
+        if num > 1000 {
+            format!("{},{}", num / 1000, num % 1000)
+        } else {
+            format!("{}", num)
+        }
     }
 
     pub fn to_latex(&self) -> String {
         let tt = Stats::from(self.t_total.as_slice());
         format!(
-            "{:<30} & {:2}U+{:2}F+{:2}S  & {:2}M+{:2}P+{:2}U & {:10}ms & {:10}ms\\\\\n",
+            "{:<20} &         {:2}U+{:2}F+{:2}S  & {:2}M+{:2}P+{:2}U & {:>9}ms  & {:>9}ms  \\\\\n",
             self.tag,
             self.num_units,
             self.num_fields,
@@ -189,8 +199,8 @@ impl BenchResults {
             self.map_len,
             self.protect_len,
             self.unmap_len,
-            tt.med,
-            tt.p95
+            Self::human_readable(tt.med),
+            Self::human_readable(tt.p95)
         )
     }
 }
