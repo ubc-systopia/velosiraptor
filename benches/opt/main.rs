@@ -1,13 +1,12 @@
+use chrono::prelude::*;
 use std::collections::HashMap;
+use std::env;
 use std::path::PathBuf;
+use std::process::Command;
 use std::rc::Rc;
 use std::time::Instant;
-use chrono::prelude::*;
-use std::env;
 
-use velosiast::{
-    AstResult, VelosiAst, VelosiAstField, VelosiAstUnit, VelosiAstUnitSegment,
-};
+use velosiast::{AstResult, VelosiAst, VelosiAstField, VelosiAstUnit, VelosiAstUnitSegment};
 use velosisynth::{SynthOpts, Z3SynthSegment, Z3WorkerPool};
 
 const SPECS: [(&str, &str); 10] = [
@@ -32,7 +31,6 @@ const OPTS: [(&str, (bool, bool, bool, bool, bool)); 5] = [
     ("+ Tree", (false, false, false, true, false)),
     // ("+ Cache (full)", (false, false, false, false, false)),
 ];
-
 
 mod bench;
 use bench::*;
@@ -152,13 +150,26 @@ fn run_synthesis(
 fn main() {
     println!("# Running Benchmark: Synthesis Optimizations");
 
-    let is_dirty = env!("VERGEN_GIT_DIRTY") == "true";
-
     let args: Vec<String> = env::args().collect();
 
-    if is_dirty && !args.iter().any(|e| e.as_str() == "--allow-dirty") {
+    let output = Command::new("git")
+        .args(["status", "--porcelain"])
+        .output()
+        .expect("failed to execute process");
+
+    let is_dirty = !output.stdout.is_empty();
+    let build_dirty = env!("VERGEN_GIT_DIRTY") == "true";
+    let allow_dirty = args.iter().any(|e| e.as_str() == "--allow-dirty");
+
+    if is_dirty && !allow_dirty {
         println!("ERROR. Git repository is dirty. Terminating.");
-        println!("(pass --allow-dirty to ignore");
+        println!("(pass --allow-dirty to ignore)");
+        std::process::exit(-1);
+    }
+
+    if build_dirty && !allow_dirty {
+        println!("ERROR. Executable has been built from a dirty git repository. Terminating.");
+        println!("(pass --allow-dirty to ignore)");
         std::process::exit(-1);
     }
 
@@ -215,7 +226,6 @@ fn main() {
             latex_results.push_str(&format!("{num:10}"));
         }
         latex_results.push_str("  \\\\\n");
-
     }
 
     latex_results.push_str("\\hline % --------------------------------------------------------------------------------");
@@ -227,18 +237,26 @@ fn main() {
 
     let dirty = if is_dirty { "-dirty" } else { "" };
 
-    println!("% =======================================================================================");
+    println!(
+        "% ======================================================================================="
+    );
     println!("% Table: Search Space Optimizations");
-    println!("% =======================================================================================");
+    println!(
+        "% ======================================================================================="
+    );
     println!("% Git Hash:   {}{dirty}", env!("VERGEN_GIT_DESCRIBE"));
     println!("% CPU:        {}", env!("VERGEN_SYSINFO_CPU_BRAND"));
     println!("% OS:         {}", env!("VERGEN_SYSINFO_OS_VERSION"));
     println!("% Date:       {}", Local::now());
-    println!("% =======================================================================================");
+    println!(
+        "% ======================================================================================="
+    );
     println!("%");
     println!("\\begin{{tabular}}{{lrrrrr}}");
     println!("{latex_results}");
     println!("\\end{{tabular}}");
     println!("%");
-    println!("% =======================================================================================");
+    println!(
+        "% ======================================================================================="
+    );
 }

@@ -37,7 +37,7 @@ impl From<&[u64]> for Stats {
             let q1 = datapoints[num_datapoints / 4];
             let q3 = datapoints[num_datapoints * 3 / 4];
             let iqr = q3 - q1;
-            let iqr_delta = 2* iqr; // + (iqr >> 1); // 1.5 * iqr;
+            let iqr_delta = 2 * iqr; // + (iqr >> 1); // 1.5 * iqr;
             let upper_fence = q3 + iqr_delta; // q3 + 1.5 * iqr
             let lower_fence = if q1 < iqr_delta {
                 0
@@ -57,8 +57,7 @@ impl From<&[u64]> for Stats {
             let sum = data.iter().sum::<u64>() as u64;
             let avg = sum / num as u64;
 
-            let var =
-                data.iter().map(|x| (x - avg) * (x - avg)).sum::<u64>() as u64 / num as u64;
+            let var = data.iter().map(|x| (x - avg) * (x - avg)).sum::<u64>() as u64 / num as u64;
             let std = (var as f64).sqrt() as u64;
             Self {
                 min: *data.first().unwrap(),
