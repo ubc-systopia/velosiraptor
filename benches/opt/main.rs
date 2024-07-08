@@ -1,11 +1,11 @@
 use chrono::prelude::*;
+use indicatif::{ProgressBar, ProgressStyle};
 use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;
 use std::process::Command;
 use std::rc::Rc;
 use std::time::Instant;
-use indicatif::{ProgressBar, ProgressStyle};
 
 use velosiast::{AstResult, VelosiAst, VelosiAstField, VelosiAstUnit, VelosiAstUnitSegment};
 use velosisynth::{SynthOpts, Z3SynthSegment, Z3WorkerPool};
@@ -195,9 +195,11 @@ fn main() {
         let bar = ProgressBar::new(OPTS.len().try_into().unwrap());
 
         bar.set_style(
-            ProgressStyle::with_template("{spinner:.dim.bold} [{bar:40.cyan/blue}]  {pos}/{len}  opt: {msg:20}")
-                .unwrap()
-                .tick_chars("/|\\- "),
+            ProgressStyle::with_template(
+                "{spinner:.dim.bold} [{bar:40.cyan/blue}]  {pos}/{len}  opt: {msg:20}",
+            )
+            .unwrap()
+            .tick_chars("/|\\- "),
         );
 
         for (mytag, opts) in OPTS.iter() {
@@ -254,7 +256,11 @@ fn main() {
     //     println!("{key}: {value}");
     // }
 
-    let dirty = if is_dirty { "-dirty" } else { "" };
+    let dirty = if is_dirty || build_dirty {
+        "-dirty"
+    } else {
+        ""
+    };
 
     println!(
         "% ==================================================================================="

@@ -1,24 +1,27 @@
 use std::collections::HashMap;
-use std::fs;
+use std::env;
 use std::path::PathBuf;
 use std::process::Command;
+
+use chrono::prelude::*;
+
 mod bench;
 use bench::*;
 
-const CONFIGS: [&str; 12] = [
-    "Linux-Map",
-    "Arbutus-Map",
-    "Linux-Protect",
-    "Arbutus-Protect",
-    "Linux-Unmap",
-    "Arbutus-Unmap",
-    "Barrelfish-Kernel-Map",
-    "Arbutus-PTable-Map",
-    "Barrelfish-Kernel-Protect",
-    "Arbutus-PTable-Protect",
-    "Barrelfish-Kernel-Unmap",
-    "Arbutus-PTable-Unmap",
-];
+// const CONFIGS: [&str; 12] = [
+//     "Linux-Map",
+//     "Arbutus-Map",
+//     "Linux-Protect",
+//     "Arbutus-Protect",
+//     "Linux-Unmap",
+//     "Arbutus-Unmap",
+//     "Barrelfish-Kernel-Map",
+//     "Arbutus-PTable-Map",
+//     "Barrelfish-Kernel-Protect",
+//     "Arbutus-PTable-Protect",
+//     "Barrelfish-Kernel-Unmap",
+//     "Arbutus-PTable-Unmap",
+// ];
 
 const ROWS: [&str; 4] = [
     "Linux-x86_64",
@@ -72,15 +75,14 @@ impl Measurements {
     pub fn to_latex(&self) -> String {
         let mut res = String::new();
 
-        res.push_str("\\hline\n");
-
-        res.push_str(&format!("\\th{{{:<10}}}", ""));
+        res.push_str("  \\hline % --------------------------------------------------------------------------------------------\n");
+        res.push_str(&format!("  \\th{{{:<10}}}", ""));
         res.push_str(&format!("& \\th{{{:<10}}}", "Operation"));
         for col in &COLS {
             res.push_str(&format!(" & \\span{{\\th{{{:^7}}}}}", col));
         }
         res.push_str(" \\\\\n");
-        res.push_str(&format!("\\th{{{:<10}}}", "Structure"));
+        res.push_str(&format!("  \\th{{{:<10}}}", "Structure"));
         res.push_str(&format!("& \\th{{{:<10}}}", "Code"));
         res.push_str(&format!(
             " & \\th{{{}}} & \\th{{{}}} & \\th{{{}}} & \\th{{{}}} & \\th{{{}}} & \\th{{{}}} \\\\\n",
@@ -92,10 +94,10 @@ impl Measurements {
             let env = parts.next().unwrap();
             let cfg = parts.next().unwrap();
             if prev != cfg {
-                res.push_str("\\hline\n");
+                res.push_str("  \\hline % --------------------------------------------------------------------------------------------\n");
                 prev = cfg;
             }
-            res.push_str(&format!("{:<15}", cfg.replace('_', "\\_")));
+            res.push_str(&format!("  {:<15}", cfg.replace('_', "\\_")));
             res.push_str(&format!("& {:<15}", env));
             for col in &COLS {
                 let key = format!("{}-{}", row, col);
@@ -107,7 +109,7 @@ impl Measurements {
             }
             res.push_str(" \\\\\n");
         }
-        res.push_str("\\hline\n");
+        res.push_str("  \\hline % --------------------------------------------------------------------------------------------");
 
         return res;
     }
@@ -115,8 +117,8 @@ impl Measurements {
 
 impl std::fmt::Display for Measurements {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for c in &CONFIGS {
-            if let Some(v) = self.measurements.get(*c) {
+        for c in self.measurements.keys() {
+            if let Some(v) = self.measurements.get(c) {
                 write!(
                     f,
                     "{:<30}  {:6}ns {:6}ns {:6}ns ({})\n",
@@ -138,21 +140,18 @@ fn parse_results(output: &str) -> Measurements {
     let mut measurements = HashMap::new();
 
     for line in output.lines() {
-        println!("LINE: {line}");
+        // println!("LINE: {line}");
         let mut parts = line.split(':');
 
         let label = parts.next().unwrap();
         let values = parts.next().unwrap();
-
-        println!("[{values}]");
-        println!("[{}]", values.trim());
 
         let latencies: Vec<u64> = values
             .trim()
             .split(' ')
             .map(|x| x.parse::<u64>().unwrap())
             .collect();
-        println!("{latencies:?}");
+        // println!("{latencies:?}");
         measurements.insert(label.to_string(), Stats::from(latencies.as_slice()));
     }
 
@@ -193,12 +192,38 @@ fn main() {
         }
     };
 
+    let dirty = if is_dirty || build_dirty {
+        "-dirty"
+    } else {
+        ""
+    };
+
     let res = parse_results(&output);
 
-    println!("# Results:");
-    println!("{res}");
+    println!("# Completed\n\n");
 
-    println!("# Completed");
+    println!(
+        "% ====================================================================================================="
+    );
+    println!("% Table: Synthesis Times");
+    println!(
+        "% ====================================================================================================="
+    );
+    println!("% Git Hash:   {}{dirty}", env!("VERGEN_GIT_DESCRIBE"));
+    println!("% CPU:        {}", env!("VERGEN_SYSINFO_CPU_BRAND"));
+    println!("% OS:         {}", env!("VERGEN_SYSINFO_OS_VERSION"));
+    println!("% Date:       {}", Local::now());
+    println!(
+        "% ====================================================================================================="
+    );
+    println!("%");
+    println!("\\begin{{tabular}}{{ccrrrrrr}}");
+
     let latex_results = res.to_latex();
-    println!("% latex table\n{latex_results}");
+    println!("{latex_results}");
+    println!("\\end{{tabular}}");
+    println!("%");
+    println!(
+        "% ====================================================================================================="
+    );
 }
