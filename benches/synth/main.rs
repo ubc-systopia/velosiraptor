@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::rc::Rc;
 use std::time::Instant;
+use indicatif::{ProgressBar, ProgressStyle};
 
 use velosiast::{
     AstResult, VelosiAst, VelosiAstField, VelosiAstUnit, VelosiAstUnitEnum, VelosiAstUnitSegment,
@@ -27,6 +28,7 @@ const SPECS: [(&str, &str); 10] = [
 ];
 
 fn run_synthesis(
+    bar: &ProgressBar,
     z3_workers: &mut Z3WorkerPool,
     vrs_file: &str,
     tag: &str,
@@ -37,6 +39,8 @@ fn run_synthesis(
     // start of the benchmark
     let t_start = Instant::now();
     let t_0 = t_start;
+
+    bar.set_message("parse spec");
 
     // construct the AST for the spec
     let mut ast = match VelosiAst::from_file(vrs_file) {
@@ -49,6 +53,9 @@ fn run_synthesis(
     };
     let t_1 = Instant::now();
     results.t_parse.push(t_1.duration_since(t_0).as_millis());
+
+
+    bar.set_message("create model");
 
     // create the models
     let t_0 = t_1;
@@ -79,6 +86,8 @@ fn run_synthesis(
         match unit {
             VelosiAstUnit::Segment(u) => {
                 num_segments += 1;
+
+                bar.set_message(format!("synthesize {}", u.ident()));
 
                 // println!("Unit: {}", u.ident());
 
@@ -145,6 +154,8 @@ fn run_synthesis(
             }
             VelosiAstUnit::Enum(e) => {
                 num_enums += 1;
+
+                bar.set_message(format!("distinguish {}", e.ident()));
 
                 let e: &mut VelosiAstUnitEnum = Rc::get_mut(e).expect("could not get mut ref!");
 
@@ -279,9 +290,18 @@ fn compile_linux(nworkers: usize) -> Option<Stats> {
         .output()
         .expect("failed to execute process");
 
+    let bar = ProgressBar::new(ITERATIONS.try_into().unwrap());
+    bar.set_style(
+        ProgressStyle::with_template("{spinner:.dim.bold} [{bar:40.cyan/blue}]  {pos}/{len}  -  {msg:20}")
+            .unwrap()
+            .tick_chars("/|\\- "),
+    );
+
+
     let parallelism = format!("-j{}", nworkers);
     let mut measurements = Vec::with_capacity(ITERATIONS);
     for _ in 0..ITERATIONS {
+        bar.set_message("make clean");
         // println!(" - Running make clean");
         Command::new("make")
             .args(["clean"])
@@ -289,6 +309,7 @@ fn compile_linux(nworkers: usize) -> Option<Stats> {
             .output()
             .expect("failed to execute process");
 
+        bar.set_message("make vmlinux");
         // println!(" - Running make vmlinux");
         let t_start = Instant::now();
         Command::new("make")
@@ -299,7 +320,10 @@ fn compile_linux(nworkers: usize) -> Option<Stats> {
         let t_end = Instant::now();
 
         measurements.push(t_end.duration_since(t_start).as_millis());
+        bar.inc(1);
     }
+
+    bar.finish();
 
     Some(Stats::from(measurements.as_slice()))
 }
@@ -337,8 +361,6 @@ fn main() {
     let mut latex_results = String::new();
     let mut latex_results_no_tree = String::new();
 
-    let linux_times = compile_linux(nthreads);
-
     let nworkers = std::cmp::max(
         if nthreads > 1 { (nthreads / 2) - 1 } else { 1 },
         NUM_WORKERS,
@@ -364,11 +386,18 @@ fn main() {
             let mut results = BenchResults::new(name.to_string());
             let mut had_errors = false;
             print!("    ");
+            let bar = ProgressBar::new(ITERATIONS.try_into().unwrap());
+            bar.set_style(
+                ProgressStyle::with_template("{spinner:.dim.bold} [{bar:40.cyan/blue}]  {pos}/{len}  -  {msg:20}")
+                    .unwrap()
+                    .tick_chars("/|\\- "),
+            );
+
             for _ in 0..ITERATIONS {
                 // create synth factory and run synthesis on the segments
                 let mut z3_workers = Z3WorkerPool::with_num_workers(nworkers, None);
                 if let Some(res) =
-                    run_synthesis(&mut z3_workers, vrs_file.as_str(), name.as_str(), *no_tree)
+                    run_synthesis(&bar, &mut z3_workers, vrs_file.as_str(), name.as_str(), *no_tree)
                 {
                     results.merge(&res);
                 } else {
@@ -377,8 +406,9 @@ fn main() {
                 }
 
                 z3_workers.terminate();
+                bar.inc(1);
             }
-            println!("");
+            bar.finish();
 
             if had_errors {
                 break;
@@ -407,6 +437,8 @@ fn main() {
         }
     }
     latex_results.push_str("  \\hline % ---------------------------------------------------------------------------------");
+
+    let linux_times = compile_linux(nthreads);
 
     println!("# Completed\n\n");
 

@@ -50,10 +50,12 @@ rexpect = "0.5"
 velosiparser = { path = "lib/velosiraptor-parser" }
 velosicomposition = {path = "lib/velosicomposition" }
 chrono = "0.4.38"
+indicatif = "0.17.8"
 
 [build-dependencies]
 vergen = { version = "8.3.1", features = ["build", "git", "gitcl", "si"] }
 anyhow = "1.0.86"
+
 
 # enable optimizations for the tests
 [profile.test]

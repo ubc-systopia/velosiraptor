@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::rc::Rc;
 use std::time::Instant;
+use indicatif::{ProgressBar, ProgressStyle};
 
 use velosiast::{AstResult, VelosiAst, VelosiAstField, VelosiAstUnit, VelosiAstUnitSegment};
 use velosisynth::{SynthOpts, Z3SynthSegment, Z3WorkerPool};
@@ -191,8 +192,17 @@ fn main() {
     for (spec, name) in SPECS.iter() {
         println!(" @ Spec: {spec}");
         let mut row = HashMap::new();
+        let bar = ProgressBar::new(OPTS.len().try_into().unwrap());
+
+        bar.set_style(
+            ProgressStyle::with_template("{spinner:.dim.bold} [{bar:40.cyan/blue}]  {pos}/{len}  opt: {msg:20}")
+                .unwrap()
+                .tick_chars("/|\\- "),
+        );
+
         for (mytag, opts) in OPTS.iter() {
-            println!("   - Opt: {mytag}");
+            // println!("   - Opt: {mytag}");
+            bar.set_message(*mytag);
 
             let vrs = PathBuf::from(spec);
             let vrs_file = vrs.display().to_string();
@@ -217,7 +227,10 @@ fn main() {
             z3_workers.terminate();
 
             row.insert(mytag, results.n_programs_max.unwrap_or_default());
+            bar.inc(1);
         }
+
+        bar.finish();
 
         latex_results.push_str(format!("  {name:20}").as_str());
         latex_results.push_str(" & ");
