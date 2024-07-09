@@ -23,8 +23,9 @@ members = [
     ,"lib/velosicodegen"
     ,"lib/velosihwgen/"
     ,"lib/velosicomposition"
-    ,"lib/z3/z3-sys"
 ]
+
+# ,"lib/z3/z3-sys"
 
 [dependencies]
 # argument parsing
