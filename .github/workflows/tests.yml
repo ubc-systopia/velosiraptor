@@ -8,7 +8,7 @@ name: Unit Tests (root)
 jobs:
   compile_and_test:
     name: "tests"
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Prepare
         run: |
