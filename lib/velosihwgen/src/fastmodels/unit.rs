@@ -71,7 +71,7 @@ fn next_unit(unit: &VelosiAstUnit) -> Option<&Rc<String>> {
         .and_then(|pa| pa.ptype.typeref())
 }
 
-fn state_field_access(access: &Vec<&str>, unit: Option<&C::Expr>) -> C::Expr {
+fn state_field_access(access: &[&str], unit: Option<&C::Expr>) -> C::Expr {
     let st = if let Some(unit) = unit {
         C::Expr::field_access(unit, "state")
     } else {

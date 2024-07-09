@@ -263,7 +263,7 @@ impl Z3Worker {
         self.reset.store(true, Ordering::Relaxed);
     }
 
-    ///
+    /// wait until the reset is done
     pub fn wait_reset_done(&mut self) {
         while self.reset.load(Ordering::Relaxed) {
             thread::yield_now();

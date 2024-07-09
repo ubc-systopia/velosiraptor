@@ -37,7 +37,7 @@ pub struct SymbolicVar {
     ident: String,
     /// the struct attributes
     ty: String,
-    ///
+    /// the optional size of the symbolic variable
     len: Option<usize>,
 }
 
