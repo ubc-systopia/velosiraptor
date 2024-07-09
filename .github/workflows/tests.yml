@@ -10,9 +10,9 @@ jobs:
     name: "tests"
     runs-on: self-hosted
     steps:
-      - name: Prepare
-        run: |
-          sudo apt-get install z3
+      # - name: Prepare
+      #   run: |
+      #     sudo apt-get install z3
       - uses: actions/checkout@v3
         with:
           submodules: recursive
