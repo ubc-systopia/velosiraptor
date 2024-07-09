@@ -272,7 +272,7 @@ fn add_op_fn(
 
     let mut vars = HashMap::new();
     for (p, ty) in &param_types {
-        print!("{} -> {} extern: {}", p, ty, ty.is_extern());
+        // print!("{} -> {} extern: {}", p, ty, ty.is_extern());
         if ty.is_extern() && *p == "pa" {
             let m = env.get_method_with_signature(&[ty.clone()], &VelosiAstTypeInfo::PhysAddr);
             if let Some(m) = m.first() {

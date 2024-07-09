@@ -14,11 +14,11 @@
 #include <stdint.h>
 
 /// Defined constant for masking field `cr4`
-/// @loc: ../../examples/x86_64_pagetable.vrs:429:9
+/// @loc: examples/x86_64_pagetable.vrs:445:9
 #define X86MMU_CR4__MASK (uint32_t)0x80000000
 
 /// Field Type `cr4`
-/// @loc: ../../examples/x86_64_pagetable.vrs:429:9
+/// @loc: examples/x86_64_pagetable.vrs:445:9
 struct x86mmu_cr4 {
     uint32_t _val;
 };
@@ -38,14 +38,14 @@ static inline x86mmu_cr4__t x86mmu_cr4__set_raw(uint32_t val) {
 }
 
 /// inserts value cr4.enabled [31..32] in field
-/// @loc: ../../examples/x86_64_pagetable.vrs:422:13
+/// @loc: examples/x86_64_pagetable.vrs:438:13
 static inline x86mmu_cr4__t x86mmu_cr4_enabled__insert(x86mmu_cr4__t field, uint32_t val) {
     (field)._val = (field._val & 0x7fffffffU) | ((val & 0x01) << 31);
     return field;
 }
 
 /// extracts value cr4.enabled [31..32] in field
-/// @loc: ../../examples/x86_64_pagetable.vrs:422:13
+/// @loc: examples/x86_64_pagetable.vrs:438:13
 static inline uint32_t x86mmu_cr4_enabled__extract(x86mmu_cr4__t field) {
     return ((field._val >> 31) & 0x01);
 }

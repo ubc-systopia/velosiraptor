@@ -57,7 +57,7 @@ pub fn main() {
         .arg(arg!(-o --output <VALUE>).default_value("out"))
         .arg(arg!(-l --lang <VALUE>).default_value("c"))
         .arg(arg!(-p --pkg <VALUE>).default_value("myunit"))
-        .arg(arg!(-t --target <VALUE>))
+        .arg(arg!(-t --target <VALUE> "the target operating system"))
         .arg(arg!(
             -m --"mem-model" "Synthesize using the abstract memory model"
         ))

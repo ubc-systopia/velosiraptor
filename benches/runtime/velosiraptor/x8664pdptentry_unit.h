@@ -28,7 +28,7 @@
 //  --------------------------- Constants / Constructor -------------------------
 
 /// Unit Type `X8664PDPTEntry`
-/// @loc: ../../examples/x86_64_pagetable.vrs:366:1
+/// @loc: examples/x86_64_pagetable.vrs:377:1
 struct x8664pdptentry {
     uintptr_t base;
 };
@@ -106,7 +106,8 @@ static inline size_t x8664pdptentry_map(x8664pdptentry__t * unit, vaddr_t va, si
         x8664pdptentrypage__t entry;
         x8664pdptentrypage_init(&(entry), (unit)->base);
         return x8664pdptentrypage_map(&(entry), va, sz, flgs, pa);
-    } else {
+    }
+    if ((((((va + sz) <= 0x40000000) && (0x0 <= va)) && ((va & 0xfff) == 0x0)) && ((0x0 & 0xfff) == 0x0))) {
         // Variant: X8664PDPTEntryTable mapping table
         // TODO: check if there is already a valid mapping in there
         x8664pdptentrytable__t entry;

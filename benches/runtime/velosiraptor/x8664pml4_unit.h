@@ -34,7 +34,7 @@
 //  -------------------------------- Constructor --------------------------------
 
 /// Unit Type `X8664PML4`
-/// @loc: ../../examples/x86_64_pagetable.vrs:395:1
+/// @loc: examples/x86_64_pagetable.vrs:411:1
 struct x8664pml4 {
     uintptr_t base;
 };

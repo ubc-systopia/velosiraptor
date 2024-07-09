@@ -14,11 +14,11 @@
 #include <stdint.h>
 
 /// Defined constant for masking field `cr3`
-/// @loc: ../../examples/x86_64_pagetable.vrs:428:9
+/// @loc: examples/x86_64_pagetable.vrs:444:9
 #define X86MMU_CR3__MASK (uint64_t)0xffffffffffffffff
 
 /// Field Type `cr3`
-/// @loc: ../../examples/x86_64_pagetable.vrs:428:9
+/// @loc: examples/x86_64_pagetable.vrs:444:9
 struct x86mmu_cr3 {
     uint64_t _val;
 };
@@ -38,27 +38,27 @@ static inline x86mmu_cr3__t x86mmu_cr3__set_raw(uint64_t val) {
 }
 
 /// inserts value cr3.pcid [0..12] in field
-/// @loc: ../../examples/x86_64_pagetable.vrs:417:13
+/// @loc: examples/x86_64_pagetable.vrs:433:13
 static inline x86mmu_cr3__t x86mmu_cr3_pcid__insert(x86mmu_cr3__t field, uint64_t val) {
     (field)._val = (field._val & 0xfffffffffffff000ULL) | (val & 0x0fff);
     return field;
 }
 
 /// extracts value cr3.pcid [0..12] in field
-/// @loc: ../../examples/x86_64_pagetable.vrs:417:13
+/// @loc: examples/x86_64_pagetable.vrs:433:13
 static inline uint64_t x86mmu_cr3_pcid__extract(x86mmu_cr3__t field) {
     return (field._val & 0x0fff);
 }
 
 /// inserts value cr3.address [12..64] in field
-/// @loc: ../../examples/x86_64_pagetable.vrs:418:13
+/// @loc: examples/x86_64_pagetable.vrs:434:13
 static inline x86mmu_cr3__t x86mmu_cr3_address__insert(x86mmu_cr3__t field, uint64_t val) {
     (field)._val = (field._val & 0x0000000000000fffULL) | ((val & 0x000fffffffffffffULL) << 12);
     return field;
 }
 
 /// extracts value cr3.address [12..64] in field
-/// @loc: ../../examples/x86_64_pagetable.vrs:418:13
+/// @loc: examples/x86_64_pagetable.vrs:434:13
 static inline uint64_t x86mmu_cr3_address__extract(x86mmu_cr3__t field) {
     return ((field._val >> 12) & 0x000fffffffffffffULL);
 }
