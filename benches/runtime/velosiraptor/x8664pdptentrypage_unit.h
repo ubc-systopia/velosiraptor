@@ -150,7 +150,6 @@ static inline size_t __x8664pdptentrypage_do_protect(x8664pdptentrypage__t * uni
 
 /// Higher-order map function
 static inline size_t x8664pdptentrypage_map(x8664pdptentrypage__t * unit, vaddr_t va, size_t sz, flags_t flgs, paddr_t pa) {
-    printf("%s\n", __FUNCTION__);
     // this is just calling the operation on the unit directy
     return __x8664pdptentrypage_do_map(unit, va, sz, flgs, pa);
 }

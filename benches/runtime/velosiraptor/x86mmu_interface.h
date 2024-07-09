@@ -20,7 +20,7 @@
 #include <os_memory.h>
 
 /// Unit Type `X86MMU`
-/// @loc: ../../examples/x86_64_pagetable.vrs:409:1
+/// @loc: examples/x86_64_pagetable.vrs:425:1
 struct x86mmu {
     uintptr_t base;
 };

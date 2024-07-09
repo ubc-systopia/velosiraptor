@@ -52,10 +52,10 @@ static inline bool x8664pdirentrypage_is_valid(x8664pdirentrypage__t * unit) {
 
 /// Returns true if the mapping is valid
 static inline paddr_t x8664pdirentrypage_do_translate(x8664pdirentrypage__t * unit, vaddr_t va) {
-    uint64_t state_entry_ps_val;
-    state_entry_ps_val = x8664pdirentrypage_entry_ps__rd(unit);
     uint64_t state_entry_address_val;
     state_entry_address_val = x8664pdirentrypage_entry_address__rd(unit);
+    uint64_t state_entry_ps_val;
+    state_entry_ps_val = x8664pdirentrypage_entry_ps__rd(unit);
     // asserts for the requires clauses
     assert((state_entry_ps_val == 0x1));
     assert((va < 0x200000));

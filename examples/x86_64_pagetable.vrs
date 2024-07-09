@@ -186,16 +186,16 @@ segment X8664PDirEntryTable(base : paddr) : X8664PTableDescriptor {
     inbitwidth = LARGE_PAGE_BITS;
 
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : X8664PageTable)
-        requires 0 <= va && va + sz < LARGE_PAGE_SIZE
+        requires 0 <= va && va + sz <= LARGE_PAGE_SIZE
         requires (va & (BASE_PAGE_SIZE - 1) == 0)
         requires (pa & (BASE_PAGE_SIZE - 1) == 0)
 
     synth fn protect(va: vaddr, sz: size, flgs: flags)
-        requires 0 <= va && va + sz < LARGE_PAGE_SIZE
+        requires 0 <= va && va + sz <= LARGE_PAGE_SIZE
         requires (va & (BASE_PAGE_SIZE - 1) == 0)
 
     synth fn unmap(va: vaddr, sz: size)
-        requires 0 <= va && va + sz < LARGE_PAGE_SIZE
+        requires 0 <= va && va + sz <= LARGE_PAGE_SIZE
         requires (va & (BASE_PAGE_SIZE - 1) == 0)
 }
 
@@ -286,16 +286,16 @@ segment X8664PDPTEntryTable(base : paddr) : X8664PTableDescriptor {
     inbitwidth = HUGE_PAGE_BITS;
 
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : X8664PDir)
-        requires 0 <= va && va + sz < HUGE_PAGE_SIZE
+        requires 0 <= va && va + sz <= HUGE_PAGE_SIZE
         requires (va & (BASE_PAGE_SIZE - 1) == 0)
         requires (pa & (BASE_PAGE_SIZE - 1) == 0)
 
     synth fn protect(va: vaddr, sz: size, flgs: flags)
-        requires 0 <= va && va + sz < HUGE_PAGE_SIZE
+        requires 0 <= va && va + sz <= HUGE_PAGE_SIZE
         requires (va & (BASE_PAGE_SIZE - 1) == 0)
 
     synth fn unmap(va: vaddr, sz: size)
-        requires 0 <= va && va + sz < HUGE_PAGE_SIZE
+        requires 0 <= va && va + sz <= HUGE_PAGE_SIZE
         requires (va & (BASE_PAGE_SIZE - 1) == 0)
 }
 
@@ -395,16 +395,16 @@ segment X8664PML4Entry(base : paddr) : X8664PTableDescriptor {
     inbitwidth = PML4_PAGE_BITS;
 
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : X8664PDPT)
-        requires 0 <= va && va + sz < PML4_PAGE_SIZE
+        requires 0 <= va && va + sz <= PML4_PAGE_SIZE
         requires (va & (BASE_PAGE_SIZE - 1) == 0)
         requires (pa & (BASE_PAGE_SIZE - 1) == 0)
 
     synth fn protect(va: vaddr, sz: size, flgs: flags)
-        requires 0 <= va && va + sz < PML4_PAGE_SIZE
+        requires 0 <= va && va + sz <= PML4_PAGE_SIZE
         requires (va & (BASE_PAGE_SIZE - 1) == 0)
 
     synth fn unmap(va: vaddr, sz: size)
-        requires 0 <= va && va + sz < PML4_PAGE_SIZE
+        requires 0 <= va && va + sz <= PML4_PAGE_SIZE
         requires (va & (BASE_PAGE_SIZE - 1) == 0)
 }
 

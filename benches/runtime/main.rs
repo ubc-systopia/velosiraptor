@@ -35,6 +35,13 @@ const COLS: [&str; 3] = ["Map", "Protect", "Unmap"];
 fn compile_and_run() -> Result<String, ()> {
     let dir = PathBuf::from("benches/runtime");
     println!(" - Compiling benchmark binary...");
+
+    let build = Command::new("make")
+        .args(["clean"])
+        .current_dir(dir.as_path())
+        .output()
+        .expect("failed to build the benchmark");
+
     let build = Command::new("make")
         .current_dir(dir.as_path())
         .output()

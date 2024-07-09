@@ -20,7 +20,7 @@
 #include <os_memory.h>
 
 /// Unit Type `X8664PDPTEntryPage`
-/// @loc: ../../examples/x86_64_pagetable.vrs:291:1
+/// @loc: examples/x86_64_pagetable.vrs:302:1
 struct x8664pdptentrypage {
     uintptr_t base;
 };

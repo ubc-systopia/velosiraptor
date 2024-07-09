@@ -61,7 +61,7 @@ static inline paddr_t x8664pml4entry_do_translate(x8664pml4entry__t * unit, vadd
     // asserts for the requires clauses
     assert((state_entry_ps_val == 0x0));
     assert(x8664pml4entry_is_valid(unit));
-    return ((state_entry_address_val << 0xc) + va);
+    return (state_entry_address_val << 0xc);
 }
 
 // No set-child function needed as no environment spec available.
@@ -81,11 +81,21 @@ static inline x8664pdpt__t x8664pml4entry_get_child(x8664pml4entry__t * unit, va
 //  ---------------------------- Map / Protect/ Unmap ---------------------------
 
 /// Performs the synth fn map(va: vaddr, sz: size, flgs: flags, pa: X8664PDPT) -> ()
-///   requires va == 0x0;
+///   requires (va + sz) <= 0x8000000000;
+///   requires 0x0 <= va;
+///   requires (va & 0xfff) == 0x0;
 ///   requires (pa & 0xfff) == 0x0; operation on the unit
 static inline size_t __x8664pml4entry_do_map(x8664pml4entry__t * unit, vaddr_t va, size_t sz, flags_t flgs, x8664pdpt__t * pa) {
-    // requires va == 0x0
-    if (!((va == 0x0))) {
+    // requires (va + sz) <= 0x8000000000
+    if (!(((va + sz) <= 0x8000000000))) {
+        return 0x0;
+    }
+    // requires 0x0 <= va
+    if (!((0x0 <= va))) {
+        return 0x0;
+    }
+    // requires (va & 0xfff) == 0x0
+    if (!(((va & 0xfff) == 0x0))) {
         return 0x0;
     }
     // requires (pa & 0xfff) == 0x0
@@ -96,7 +106,7 @@ static inline size_t __x8664pml4entry_do_map(x8664pml4entry__t * unit, vaddr_t v
     x8664pml4entry_entry__t entry = x8664pml4entry_entry__set_raw(0x0);
     // configuration sequence
     entry = x8664pml4entry_entry__rd(unit);
-    entry = x8664pml4entry_entry_address__insert(entry, (((pa)->base >> 0xc) & 0x400000fffffffff));
+    entry = x8664pml4entry_entry_address__insert(entry, (((pa)->base >> 0xc) & 0xfffffffff));
     entry = x8664pml4entry_entry_ps__insert(entry, 0x0);
     entry = x8664pml4entry_entry_present__insert(entry, 0x1);
     entry = x8664pml4entry_entry_res0__insert(entry, 0x0);
@@ -109,8 +119,22 @@ static inline size_t __x8664pml4entry_do_map(x8664pml4entry__t * unit, vaddr_t v
 }
 
 /// Performs the synth fn unmap(va: vaddr, sz: size) -> ()
-///   requires true; operation on the unit
+///   requires (va + sz) <= 0x8000000000;
+///   requires 0x0 <= va;
+///   requires (va & 0xfff) == 0x0; operation on the unit
 static inline size_t __x8664pml4entry_do_unmap(x8664pml4entry__t * unit, vaddr_t va, size_t sz) {
+    // requires (va + sz) <= 0x8000000000
+    if (!(((va + sz) <= 0x8000000000))) {
+        return 0x0;
+    }
+    // requires 0x0 <= va
+    if (!((0x0 <= va))) {
+        return 0x0;
+    }
+    // requires (va & 0xfff) == 0x0
+    if (!(((va & 0xfff) == 0x0))) {
+        return 0x0;
+    }
     // field variables
     x8664pml4entry_entry__t entry = x8664pml4entry_entry__set_raw(0x0);
     // configuration sequence
@@ -121,8 +145,22 @@ static inline size_t __x8664pml4entry_do_unmap(x8664pml4entry__t * unit, vaddr_t
 }
 
 /// Performs the synth fn protect(va: vaddr, sz: size, flgs: flags) -> ()
-///   requires true; operation on the unit
+///   requires (va + sz) <= 0x8000000000;
+///   requires 0x0 <= va;
+///   requires (va & 0xfff) == 0x0; operation on the unit
 static inline size_t __x8664pml4entry_do_protect(x8664pml4entry__t * unit, vaddr_t va, size_t sz, flags_t flgs) {
+    // requires (va + sz) <= 0x8000000000
+    if (!(((va + sz) <= 0x8000000000))) {
+        return 0x0;
+    }
+    // requires 0x0 <= va
+    if (!((0x0 <= va))) {
+        return 0x0;
+    }
+    // requires (va & 0xfff) == 0x0
+    if (!(((va & 0xfff) == 0x0))) {
+        return 0x0;
+    }
     // field variables
     x8664pml4entry_entry__t entry = x8664pml4entry_entry__set_raw(0x0);
     // configuration sequence

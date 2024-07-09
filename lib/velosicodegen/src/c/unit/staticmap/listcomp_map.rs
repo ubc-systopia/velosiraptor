@@ -2092,7 +2092,7 @@ fn add_do_map_function(
         ));
     }
 
-    println!("fun: {fun}");
+    // println!("fun: {fun}");
 
     scope.push_function(fun);
 }

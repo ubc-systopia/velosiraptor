@@ -54,14 +54,14 @@ static inline bool x8664pdirentrytable_is_valid(x8664pdirentrytable__t * unit) {
 
 /// Returns true if the mapping is valid
 static inline paddr_t x8664pdirentrytable_do_translate(x8664pdirentrytable__t * unit, vaddr_t va) {
-    uint64_t state_entry_ps_val;
-    state_entry_ps_val = x8664pdirentrytable_entry_ps__rd(unit);
     uint64_t state_entry_address_val;
     state_entry_address_val = x8664pdirentrytable_entry_address__rd(unit);
+    uint64_t state_entry_ps_val;
+    state_entry_ps_val = x8664pdirentrytable_entry_ps__rd(unit);
     // asserts for the requires clauses
     assert((state_entry_ps_val == 0x0));
     assert(x8664pdirentrytable_is_valid(unit));
-    return ((state_entry_address_val << 0xc) + va);
+    return (state_entry_address_val << 0xc);
 }
 
 // No set-child function needed as no environment spec available.
@@ -81,11 +81,21 @@ static inline x8664pagetable__t x8664pdirentrytable_get_child(x8664pdirentrytabl
 //  ---------------------------- Map / Protect/ Unmap ---------------------------
 
 /// Performs the synth fn map(va: vaddr, sz: size, flgs: flags, pa: X8664PageTable) -> ()
-///   requires va == 0x0;
+///   requires (va + sz) <= 0x200000;
+///   requires 0x0 <= va;
+///   requires (va & 0xfff) == 0x0;
 ///   requires (pa & 0xfff) == 0x0; operation on the unit
 static inline size_t __x8664pdirentrytable_do_map(x8664pdirentrytable__t * unit, vaddr_t va, size_t sz, flags_t flgs, x8664pagetable__t * pa) {
-    // requires va == 0x0
-    if (!((va == 0x0))) {
+    // requires (va + sz) <= 0x200000
+    if (!(((va + sz) <= 0x200000))) {
+        return 0x0;
+    }
+    // requires 0x0 <= va
+    if (!((0x0 <= va))) {
+        return 0x0;
+    }
+    // requires (va & 0xfff) == 0x0
+    if (!(((va & 0xfff) == 0x0))) {
         return 0x0;
     }
     // requires (pa & 0xfff) == 0x0
@@ -95,9 +105,13 @@ static inline size_t __x8664pdirentrytable_do_map(x8664pdirentrytable__t * unit,
     // field variables
     x8664pdirentrytable_entry__t entry = x8664pdirentrytable_entry__set_raw(0x0);
     // configuration sequence
-    entry = x8664pdirentrytable_entry__set_raw(0x0);
+    entry = x8664pdirentrytable_entry__rd(unit);
     entry = x8664pdirentrytable_entry_address__insert(entry, (((pa)->base >> 0xc) & 0xfffffffff));
+    entry = x8664pdirentrytable_entry_ps__insert(entry, 0x0);
     entry = x8664pdirentrytable_entry_present__insert(entry, 0x1);
+    entry = x8664pdirentrytable_entry_res0__insert(entry, 0x0);
+    entry = x8664pdirentrytable_entry_pcd__insert(entry, 0x0);
+    entry = x8664pdirentrytable_entry_pwt__insert(entry, 0x0);
     entry = x8664pdirentrytable_entry_us__insert(entry, 0x1);
     entry = x8664pdirentrytable_entry_rw__insert(entry, 0x1);
     x8664pdirentrytable_entry__wr(unit, entry);
@@ -105,8 +119,22 @@ static inline size_t __x8664pdirentrytable_do_map(x8664pdirentrytable__t * unit,
 }
 
 /// Performs the synth fn unmap(va: vaddr, sz: size) -> ()
-///   requires true; operation on the unit
+///   requires (va + sz) <= 0x200000;
+///   requires 0x0 <= va;
+///   requires (va & 0xfff) == 0x0; operation on the unit
 static inline size_t __x8664pdirentrytable_do_unmap(x8664pdirentrytable__t * unit, vaddr_t va, size_t sz) {
+    // requires (va + sz) <= 0x200000
+    if (!(((va + sz) <= 0x200000))) {
+        return 0x0;
+    }
+    // requires 0x0 <= va
+    if (!((0x0 <= va))) {
+        return 0x0;
+    }
+    // requires (va & 0xfff) == 0x0
+    if (!(((va & 0xfff) == 0x0))) {
+        return 0x0;
+    }
     // field variables
     x8664pdirentrytable_entry__t entry = x8664pdirentrytable_entry__set_raw(0x0);
     // configuration sequence
@@ -117,8 +145,22 @@ static inline size_t __x8664pdirentrytable_do_unmap(x8664pdirentrytable__t * uni
 }
 
 /// Performs the synth fn protect(va: vaddr, sz: size, flgs: flags) -> ()
-///   requires true; operation on the unit
+///   requires (va + sz) <= 0x200000;
+///   requires 0x0 <= va;
+///   requires (va & 0xfff) == 0x0; operation on the unit
 static inline size_t __x8664pdirentrytable_do_protect(x8664pdirentrytable__t * unit, vaddr_t va, size_t sz, flags_t flgs) {
+    // requires (va + sz) <= 0x200000
+    if (!(((va + sz) <= 0x200000))) {
+        return 0x0;
+    }
+    // requires 0x0 <= va
+    if (!((0x0 <= va))) {
+        return 0x0;
+    }
+    // requires (va & 0xfff) == 0x0
+    if (!(((va & 0xfff) == 0x0))) {
+        return 0x0;
+    }
     // field variables
     x8664pdirentrytable_entry__t entry = x8664pdirentrytable_entry__set_raw(0x0);
     // configuration sequence

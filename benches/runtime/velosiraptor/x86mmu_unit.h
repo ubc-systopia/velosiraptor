@@ -99,12 +99,12 @@ static inline size_t __x86mmu_do_map(x86mmu__t * unit, vaddr_t va, size_t sz, fl
     x86mmu_cr3__t cr3 = x86mmu_cr3__set_raw(0x0);
     x86mmu_cr4__t cr4 = x86mmu_cr4__set_raw(0x0);
     // configuration sequence
-    cr4 = x86mmu_cr4__set_raw(0x0);
-    cr4 = x86mmu_cr4_enabled__insert(cr4, 0x1);
-    x86mmu_cr4__wr(unit, cr4);
     cr3 = x86mmu_cr3__set_raw(0x0);
     cr3 = x86mmu_cr3_address__insert(cr3, (((pa)->base >> 0xc) & 0xfffffffff));
     x86mmu_cr3__wr(unit, cr3);
+    cr4 = x86mmu_cr4__set_raw(0x0);
+    cr4 = x86mmu_cr4_enabled__insert(cr4, 0x1);
+    x86mmu_cr4__wr(unit, cr4);
     return sz;
 }
 

@@ -34,7 +34,7 @@
 //  -------------------------------- Constructor --------------------------------
 
 /// Unit Type `X8664PDPT`
-/// @loc: ../../examples/x86_64_pagetable.vrs:371:1
+/// @loc: examples/x86_64_pagetable.vrs:382:1
 struct x8664pdpt {
     uintptr_t base;
 };

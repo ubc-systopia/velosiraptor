@@ -34,7 +34,7 @@
 //  -------------------------------- Constructor --------------------------------
 
 /// Unit Type `X8664PageTable`
-/// @loc: ../../examples/x86_64_pagetable.vrs:173:1
+/// @loc: examples/x86_64_pagetable.vrs:173:1
 struct x8664pagetable {
     uintptr_t base;
 };

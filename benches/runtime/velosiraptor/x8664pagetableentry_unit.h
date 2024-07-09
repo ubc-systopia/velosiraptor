@@ -80,7 +80,6 @@ static inline size_t __x8664pagetableentry_do_map(x8664pagetableentry__t * unit,
     if (!(((pa & 0xfff) == 0x0))) {
         return 0x0;
     }
-
     // field variables
     x8664pagetableentry_entry__t entry = x8664pagetableentry_entry__set_raw(0x0);
     // configuration sequence
@@ -102,7 +101,7 @@ static inline size_t __x8664pagetableentry_do_unmap(x8664pagetableentry__t * uni
     // field variables
     x8664pagetableentry_entry__t entry = x8664pagetableentry_entry__set_raw(0x0);
     // configuration sequence
-    entry = x8664pagetableentry_entry__rd(unit);
+    entry = x8664pagetableentry_entry__set_raw(0x0);
     entry = x8664pagetableentry_entry_present__insert(entry, 0x0);
     x8664pagetableentry_entry__wr(unit, entry);
     return sz;
