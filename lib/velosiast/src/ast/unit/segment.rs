@@ -79,7 +79,7 @@ pub struct VelosiAstUnitSegment {
     pub state: Rc<VelosiAstState>,
     /// the interface of the unit
     pub interface: Rc<VelosiAstInterface>,
-    ///
+    /// constants defined in the unit context
     pub consts: IndexMap<String, Rc<VelosiAstConst>>,
 
     pub flags: Option<Rc<VelosiAstFlags>>,

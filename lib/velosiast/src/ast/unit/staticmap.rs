@@ -67,7 +67,7 @@ pub struct VelosiAstUnitStaticMap {
     pub inbitwidth: u64,
     pub outbitwidth: u64,
 
-    ///
+    /// constants defined in the unit context
     pub consts: IndexMap<String, Rc<VelosiAstConst>>,
 
     pub methods: IndexMap<String, Rc<VelosiAstMethod>>,

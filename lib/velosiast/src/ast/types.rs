@@ -83,7 +83,7 @@ pub enum VelosiAstTypeInfo {
     Interface,
     /// No type
     Void,
-    ///
+    /// this is the self-type reference
     SelfType,
 }
 

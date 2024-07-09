@@ -68,7 +68,7 @@ pub enum Z3TimeStamp {
     SendCmd,
     /// solver execution completed
     SolverDone,
-    ///
+    /// checks done for this query
     Done,
 }
 
@@ -119,7 +119,7 @@ pub struct Z3Query {
     smt: Vec<Arc<Smt2Context>>,
     /// time durations for tracing
     timestamps: Vec<(Z3TimeStamp, Instant)>,
-    ///
+    /// whether the query is a complex one
     is_complex: bool,
     /// the time to life value
     retries: usize,

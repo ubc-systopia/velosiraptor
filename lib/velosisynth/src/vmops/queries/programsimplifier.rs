@@ -47,7 +47,7 @@ use super::ProgramBuilder;
 pub struct ProgramSimplifier {
     /// the programs that this query builder handles
     programs: Box<dyn ProgramBuilder>,
-    ///
+    /// an unoptimized program
     unoptimized: Option<Program>,
     // assms: Rc<Vec<Term>>,
     // m_op: Rc<VelosiAstMethod>,
