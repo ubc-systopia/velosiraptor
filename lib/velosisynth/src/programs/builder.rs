@@ -88,7 +88,8 @@ impl ProgramsIter {
 
 pub struct ProgramsBuilder {
     /// the fields we have
-    fields: IndexMap<Arc<String>, Vec<(Arc<String>, usize)>>,
+    #[allow(clippy::type_complexity)]
+    fields: IndexMap<Arc<String>, Vec<(Arc<String>, u64, usize)>>,
     /// the instructions we can execute
     instructions: Vec<Arc<String>>,
     /// variables we can chose from, plus the implicit flags variable
@@ -144,11 +145,17 @@ impl ProgramsBuilder {
     }
 
     /// adds a field slice to the builder
-    pub fn add_field_slice(&mut self, field: &str, slice: &str, bits: usize) -> &mut Self {
+    pub fn add_field_slice(
+        &mut self,
+        field: &str,
+        slice: &str,
+        start: u64,
+        bits: usize,
+    ) -> &mut Self {
         self.fields
             .entry(Arc::new(field.to_string()))
             .or_default()
-            .push((Arc::new(slice.to_string()), bits));
+            .push((Arc::new(slice.to_string()), start, bits));
         self
     }
 
@@ -206,40 +213,48 @@ impl ProgramsBuilder {
         let mut expr = Vec::new();
 
         // all varaible literals
-        let vars: Vec<Literal> = self.vars.iter().map(|v| Literal::Var(v.clone())).collect();
+        // let vars: Vec<Literal> = self.vars.iter().map(|v| Literal::Var(v.clone())).collect();
+        let vars: Vec<Literal> = self
+            .vars
+            .iter()
+            .filter_map(|v| {
+                let filter =
+                    self.fixed_size && v.as_str() == "sz" || self.fixed_vaddr && v.as_str() == "va";
+                if filter {
+                    None
+                } else {
+                    Some(Literal::Var(v.clone()))
+                }
+            })
+            .collect();
 
-        // all possible value literals
-        // let vals = vec![Literal::Val(1), Literal::Val(0), Literal::Num];
-        let vals = vec![Literal::Num];
-
-        // unary expressions
+        // add literals
+        let vals = vec![Literal::Val(1), Literal::Val(0)];
         expr_combinator1!(expr, Expression::Lit, vars, vals);
-        // not is not valid for numbers, we don't have neg
-        // expr_combinator1!(expr, Expression::Not, vars, vals);
 
-        // updated value literals
-        // let vals = vec![Literal::Val(1), Literal::Num];
-        let vals = vec![Literal::Num];
-
-        // binary expressions
-        // expr_combinator2!(expr, Expression::Add, vars, vals);
-        expr_combinator2!(expr, Expression::And, vars, vals);
-        expr_combinator2!(expr, Expression::Or, vars, vals);
+        // add the binary operation expressions over 1
+        let vals = vec![Literal::Val(1)];
+        expr_combinator2!(expr, Expression::Add, vars, vals);
         expr_combinator2!(expr, Expression::Sub, vars, vals);
+        // expr_combinator2!(expr, Expression::And, vars, vals);
+        // expr_combinator2!(expr, Expression::Or, vars, vals);
 
-        // no need to shifts here, as we use the shiftmask below
-        // expr_combinator2!(expr, Expression::RShift, vars, vals);
-        // expr_combinator2!(expr, Expression::LShift, vars, vals);
-
-        // the shiftmask operators
-        for val1 in &vals {
-            for var in &vars {
-                for val2 in &vals {
-                    expr.push(Arc::new(Expression::ShiftMask(
-                        var.clone(),
-                        val1.clone(),
-                        val2.clone(),
-                    )));
+        let mut add_expr = None;
+        if self.has_limit && !self.has_limit_expression {
+            // println!("adding (va + sz) and va+sz - 1");
+            for var1 in &vars {
+                for var2 in &vars {
+                    if let (Literal::Var(v1), Literal::Var(v2)) = (var1, var2) {
+                        if v1.as_str() == "va" && v2.as_str() == "sz" {
+                            let e = Arc::new(Expression::Add(
+                                Arc::new(Expression::Lit(var1.clone())),
+                                var2.clone(),
+                            ));
+                            add_expr = Some(e.clone());
+                            expr.push(e.clone());
+                            expr.push(Arc::new(Expression::Sub(e, Literal::Val(1))));
+                        }
+                    }
                 }
             }
         }
@@ -255,6 +270,36 @@ impl ProgramsBuilder {
                 f.clone(),
             ))));
         }
+
+        for var in &vars {
+            expr.push(Arc::new(Expression::ShiftMask(
+                Arc::new(Expression::Lit(var.clone())),
+                Literal::Num,
+                Literal::Num,
+            )));
+        }
+        // shift mask operators over the va + sz expression
+        if let Some(e) = add_expr.as_ref() {
+            // println!("adding (va + sz) and va+sz - 1 shift and mask");
+            expr.push(Arc::new(Expression::ShiftMask(
+                e.clone(),
+                Literal::Num,
+                Literal::Num,
+            )));
+            expr.push(Arc::new(Expression::ShiftMask(
+                Arc::new(Expression::Sub(e.clone(), Literal::Val(1))),
+                Literal::Num,
+                Literal::Num,
+            )));
+        }
+
+        // possible values with
+        // let vals = vec![Literal::Num];
+        // expr_combinator1!(expr, Expression::Lit, vars, vals);
+        // expr_combinator2!(expr, Expression::Add, vars, vals);
+        // expr_combinator2!(expr, Expression::Sub, vars, vals);
+        // expr_combinator2!(expr, Expression::And, vars, vals);
+        // expr_combinator2!(expr, Expression::Or, vars, vals);
 
         // put the multiply stuff at the end
         // let just_num = vec![Literal::Num];
@@ -402,7 +447,7 @@ impl ProgramsBuilder {
                         let slice_expr: Vec<_> = exprs
                             .iter()
                             .filter_map(|expr| {
-                                if !expr.skip_for_bits(slice.1) || opts.disable_expr_opt {
+                                if !expr.skip_for_bits(slice.2) || opts.disable_expr_opt {
                                     Some(FieldSliceOp(slice.0.clone(), expr.clone()))
                                 } else {
                                     None

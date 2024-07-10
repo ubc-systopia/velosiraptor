@@ -182,7 +182,7 @@ impl BenchResults {
 
     pub fn human_readable(num: u128) -> String {
         if num > 1000 {
-            format!("{},{}", num / 1000, num % 1000)
+            format!("{},{:03}", num / 1000, num % 1000)
         } else {
             format!("{}", num)
         }

@@ -31,9 +31,9 @@ use std::sync::Arc;
 
 use velosiast::{
     ast::{
-        VelosiAstExpr, VelosiAstFnCallExpr, VelosiAstIdentLiteralExpr, VelosiAstIdentifier,
-        VelosiAstMethod, VelosiAstMethodProperty, VelosiAstTypeInfo, VelosiAstUnitSegment,
-        VelosiAstBinOp,
+        VelosiAstBinOp, VelosiAstExpr, VelosiAstFnCallExpr, VelosiAstIdentLiteralExpr,
+        VelosiAstIdentifier, VelosiAstMethod, VelosiAstMethodProperty, VelosiAstTypeInfo,
+        VelosiAstUnitSegment,
     },
     VelosiAstInterfaceField,
 };
@@ -104,20 +104,17 @@ pub fn make_program_builder_no_params(
             builder.add_instruction(fieldname.to_string());
         } else if let Some(slicename) = parts.next() {
             let slice = field.slice(slicename).expect("didn't find the slice");
-            builder.add_field_slice(fieldname, slicename, slice.nbits() as usize);
+            builder.add_field_slice(fieldname, slicename, slice.start, slice.nbits() as usize);
         } else {
             builder.add_field(fieldname.to_string());
         }
     }
 
     // println!("EXPR: {expr}");
-    if expr.has_translate_range() && !lower_bound{
-        if state_syms.len() == 1 {
-            println!("{expr} => limit {state_syms:?}");
-            builder.set_limit();
-        } else if state_syms.len() > 1 {
-            println!("{expr} => limit + expression {state_syms:?}");
-            builder.set_limit().set_limit_expression();
+    if expr.has_translate_range() && !lower_bound && !state_syms.is_empty() {
+        builder.set_limit();
+        if state_syms.len() > 1 {
+            builder.set_limit_expression();
         }
     }
 
@@ -132,7 +129,8 @@ pub fn make_program_builder(
     lower_bound: bool,
     opts: &SynthOpts,
 ) -> ProgramsBuilder {
-    let mut builder = make_program_builder_no_params(unit, expr, additional_state, lower_bound, opts);
+    let mut builder =
+        make_program_builder_no_params(unit, expr, additional_state, lower_bound, opts);
 
     let mut vars = HashSet::new();
     for id in expr.get_var_references().iter() {
@@ -444,7 +442,6 @@ pub fn add_method_preconds(
         }
 
         let query = if e.has_var_references(&params) {
-
             let binop = if let VelosiAstExpr::BinOp(pre) = e.as_ref() {
                 pre
             } else {
@@ -456,7 +453,6 @@ pub fn add_method_preconds(
             } else {
                 matches!(binop.op, VelosiAstBinOp::Lt | VelosiAstBinOp::Le)
             };
-
 
             let ident = VelosiAstIdentifier::from(translate_range_name(Some(i)).as_str());
             let args = vec![
