@@ -48,7 +48,8 @@ impl SymbolicVars {
         smt.comment("Variable Definitions".to_string());
         for i in 0..self.counter {
             let name = format!("symvar!{i}");
-            smt.variable(VarDecl::new(name, model::types::num(prefix)));
+            smt.variable(VarDecl::new(name.clone(), model::types::num(prefix)));
+            smt.assert(Term::bvgt(Term::ident(name), Term::num(1)));
         }
     }
 
