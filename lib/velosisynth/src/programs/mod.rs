@@ -156,23 +156,23 @@ pub enum Expression {
     /// logic right shift: `a >> b`
     // RShift(Literal, Literal),  // replace the right shift with the ShiftMask
     /// left shift operation: `a << b`
-    LShift(Literal, Literal),
+    LShift(Arc<Expression>, Literal),
     /// division operation: `a / b`
-    Div(Literal, Literal),
+    Div(Arc<Expression>, Literal),
     /// multiplication operation: `a * b`
-    Mul(Literal, Literal),
+    Mul(Arc<Expression>, Literal),
     /// addition operation: `a + b`
-    Add(Literal, Literal),
+    Add(Arc<Expression>, Literal),
     /// subtraction operation: `a - b`
-    Sub(Literal, Literal),
+    Sub(Arc<Expression>, Literal),
     /// bitwise and operation:  `a & b`
-    And(Literal, Literal),
+    And(Arc<Expression>, Literal),
     /// bitwise or operation: `a | b`
-    Or(Literal, Literal),
+    Or(Arc<Expression>, Literal),
     /// bitwise not operation: `!a`
     Not(Literal),
     /// sift and mask operation: `(a >> b) & c`
-    ShiftMask(Literal, Literal, Literal),
+    ShiftMask(Arc<Expression>, Literal, Literal),
 }
 
 impl Expression {
@@ -189,35 +189,35 @@ impl Expression {
             //     b.replace_symbolic_values(vals),
             // ),
             LShift(a, b) => LShift(
-                a.replace_symbolic_values(vals),
+                a.replace_symbolic_values(vals).into(),
                 b.replace_symbolic_values(vals),
             ),
             Div(a, b) => Div(
-                a.replace_symbolic_values(vals),
+                a.replace_symbolic_values(vals).into(),
                 b.replace_symbolic_values(vals),
             ),
             Mul(a, b) => Mul(
-                a.replace_symbolic_values(vals),
+                a.replace_symbolic_values(vals).into(),
                 b.replace_symbolic_values(vals),
             ),
             Add(a, b) => Add(
-                a.replace_symbolic_values(vals),
+                a.replace_symbolic_values(vals).into(),
                 b.replace_symbolic_values(vals),
             ),
             Sub(a, b) => Sub(
-                a.replace_symbolic_values(vals),
+                a.replace_symbolic_values(vals).into(),
                 b.replace_symbolic_values(vals),
             ),
             And(a, b) => And(
-                a.replace_symbolic_values(vals),
+                a.replace_symbolic_values(vals).into(),
                 b.replace_symbolic_values(vals),
             ),
             Or(a, b) => Or(
-                a.replace_symbolic_values(vals),
+                a.replace_symbolic_values(vals).into(),
                 b.replace_symbolic_values(vals),
             ),
             ShiftMask(a, b, c) => ShiftMask(
-                a.replace_symbolic_values(vals),
+                a.replace_symbolic_values(vals).into(),
                 b.replace_symbolic_values(vals),
                 c.replace_symbolic_values(vals),
             ),
@@ -324,36 +324,36 @@ impl From<&Expression> for VelosiOpExpr {
             Lit(x) => VelosiOpExpr::from(x),
             //RShift(x, y) => VelosiOpExpr::Shr(Box::new(VelosiOpExpr::from(x)), Box::new(VelosiOpExpr::from(y))),
             LShift(x, y) => VelosiOpExpr::Shl(
-                Box::new(VelosiOpExpr::from(x)),
+                Box::new(VelosiOpExpr::from(x.as_ref())),
                 Box::new(VelosiOpExpr::from(y)),
             ),
             Div(x, y) => VelosiOpExpr::Div(
-                Box::new(VelosiOpExpr::from(x)),
+                Box::new(VelosiOpExpr::from(x.as_ref())),
                 Box::new(VelosiOpExpr::from(y)),
             ),
             Mul(x, y) => VelosiOpExpr::Mul(
-                Box::new(VelosiOpExpr::from(x)),
+                Box::new(VelosiOpExpr::from(x.as_ref())),
                 Box::new(VelosiOpExpr::from(y)),
             ),
             Add(x, y) => VelosiOpExpr::Add(
-                Box::new(VelosiOpExpr::from(x)),
+                Box::new(VelosiOpExpr::from(x.as_ref())),
                 Box::new(VelosiOpExpr::from(y)),
             ),
             Sub(x, y) => VelosiOpExpr::Sub(
-                Box::new(VelosiOpExpr::from(x)),
+                Box::new(VelosiOpExpr::from(x.as_ref())),
                 Box::new(VelosiOpExpr::from(y)),
             ),
             And(x, y) => VelosiOpExpr::And(
-                Box::new(VelosiOpExpr::from(x)),
+                Box::new(VelosiOpExpr::from(x.as_ref())),
                 Box::new(VelosiOpExpr::from(y)),
             ),
             Or(x, y) => VelosiOpExpr::Or(
-                Box::new(VelosiOpExpr::from(x)),
+                Box::new(VelosiOpExpr::from(x.as_ref())),
                 Box::new(VelosiOpExpr::from(y)),
             ),
             ShiftMask(x, y, z) => VelosiOpExpr::And(
                 Box::new(VelosiOpExpr::Shr(
-                    Box::new(VelosiOpExpr::from(x)),
+                    Box::new(VelosiOpExpr::from(x.as_ref())),
                     Box::new(VelosiOpExpr::from(y)),
                 )),
                 Box::new(VelosiOpExpr::from(z)),

@@ -95,6 +95,14 @@ pub struct ProgramsBuilder {
     vars: Vec<Arc<String>>,
     /// some flags to chose from
     flags: Vec<(Arc<String>, Arc<String>)>,
+    /// the translation range has a lower limit
+    has_limit: bool,
+    /// has a limit expression
+    has_limit_expression: bool,
+    /// the unit has a fixed sized translation range
+    fixed_size: bool,
+    /// the unit has a fixed sized translation range
+    fixed_vaddr: bool,
 }
 
 impl ProgramsBuilder {
@@ -104,12 +112,35 @@ impl ProgramsBuilder {
             vars: vec![],
             flags: vec![],
             instructions: vec![],
+            has_limit: false,
+            has_limit_expression: false,
+            fixed_size: false,
+            fixed_vaddr: false,
         }
     }
 
     // whether there are any programs
     pub fn has_programs(&self) -> bool {
         !self.fields.is_empty()
+    }
+
+    pub fn set_limit(&mut self) -> &mut Self {
+        self.has_limit = true;
+        self
+    }
+
+    pub fn set_limit_expression(&mut self) -> &mut Self {
+        self.has_limit_expression = true;
+        self
+    }
+
+    pub fn set_fixed_size(&mut self) -> &mut Self {
+        self.fixed_size = true;
+        self
+    }
+    pub fn set_fixed_vaddr(&mut self) -> &mut Self {
+        self.fixed_vaddr = true;
+        self
     }
 
     /// adds a field slice to the builder
@@ -166,7 +197,7 @@ impl ProgramsBuilder {
         macro_rules! expr_combinator2 (($vec:ident, $expr: expr, $vars:ident, $vals:ident) => (
             for val in &$vals {
                 for var in &$vars {
-                    $vec.push(Arc::new($expr(var.clone(), val.clone())));
+                    $vec.push(Arc::new($expr(Arc::new(Expression::Lit(var.clone())), val.clone())));
                 }
             }
         ));

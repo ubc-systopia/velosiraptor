@@ -69,6 +69,8 @@ pub struct BoolExprQueryBuilder<'a> {
     variable_references: Option<bool>,
     /// additional state refs
     state_refs: Option<HashSet<Rc<String>>>,
+    /// whether the bound expression is lower or upper bound
+    is_lower_bound: bool,
     /// programs generator
     programs: Option<Box<dyn ProgramBuilder>>,
 }
@@ -90,12 +92,18 @@ impl<'a> BoolExprQueryBuilder<'a> {
             variable_references: None,
             state_refs: None,
             programs: None,
+            is_lower_bound: false,
         }
     }
 
     /// sets the assumptions for the supplied vector
     pub fn assms(mut self, assms: Rc<Vec<Term>>) -> Self {
         self.assms = assms;
+        self
+    }
+
+    pub fn set_lower_bound(mut self, lb: bool) -> Self {
+        self.is_lower_bound = lb;
         self
     }
 
@@ -166,6 +174,7 @@ impl<'a> BoolExprQueryBuilder<'a> {
                 self.m_op.as_ref(),
                 &self.goal_expr,
                 additional_state_refs,
+                self.is_lower_bound,
                 opts,
             )
             .into_iter(opts);
