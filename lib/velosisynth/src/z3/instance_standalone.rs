@@ -224,7 +224,7 @@ impl Z3Instance {
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap()
                         .as_millis();
-                    let push = format!("(push)(set-option :timeout {})(set-option :smt.random_seed {})(set-option :sat.random_seed {})(declare-const x{} Int)\n",
+                    let push = format!("(push)(set-option :timeout {})(set-option :smt.random_seed {})(set-option :sat.random_seed {})(declare-const x{} (_ BitVec 32))\n",
                             250 + query.get_retries() * 50,
                             rand,
                             rand,
