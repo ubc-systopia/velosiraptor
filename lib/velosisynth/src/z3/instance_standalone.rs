@@ -224,8 +224,9 @@ impl Z3Instance {
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap()
                         .as_millis();
+                    // println!("TIMEOUT! retrying...");
                     let push = format!("(push)(set-option :timeout {})(set-option :smt.random_seed {})(set-option :sat.random_seed {})(declare-const x{} (_ BitVec 32))\n",
-                            250 + query.get_retries() * 50,
+                            300 + query.get_retries() * 200,
                             rand,
                             rand,
                             rand);
@@ -233,14 +234,16 @@ impl Z3Instance {
                     smt.to_code_into(!cfg!(debug_assertions), &mut buf_string);
                     buf_string.push_str("(pop)\n");
 
-                    log::info!("Retrying Query:");
-                    log::info!(
-                        "-------------------------------------------------------------------"
-                    );
-                    log::info!("{buf_string}");
-                    log::info!(
-                        "-------------------------------------------------------------------"
-                    );
+                    if log::log_enabled!(log::Level::Info) {
+                        log::info!("Retrying Query:");
+                        log::info!(
+                            "-------------------------------------------------------------------"
+                        );
+                        log::info!("{buf_string}");
+                        log::info!(
+                            "-------------------------------------------------------------------"
+                        );
+                    }
                 } else {
                     smt.to_code_into(!cfg!(debug_assertions), &mut buf_string);
                 };

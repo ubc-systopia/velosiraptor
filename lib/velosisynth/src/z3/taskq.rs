@@ -55,6 +55,10 @@ impl Z3TaskPriority {
         Self::new(TASK_PRIO_MAX - 1)
     }
 
+    pub fn retry() -> Self {
+        Self::new(TASK_PRIO_MAX)
+    }
+
     pub fn is_lowest(&self) -> bool {
         self.0 == TASK_PRIO_MAX - 1
     }
@@ -93,12 +97,12 @@ impl std::fmt::Display for Z3TaskPriority {
 #[derive(Clone)]
 pub struct TaskQ {
     // task_counts: Arc<[CachePadded<AtomicUsize>; TASK_PRIO_MAX]>,
-    task_queues: Arc<[CachePadded<QueryQueue>; TASK_PRIO_MAX]>,
+    task_queues: Arc<[CachePadded<QueryQueue>; TASK_PRIO_MAX + 1]>,
 }
 
 impl TaskQ {
     pub fn new(_num_workers: usize) -> Self {
-        let task_queues = (0..TASK_PRIO_MAX)
+        let task_queues = (0..TASK_PRIO_MAX + 1)
             .map(|_| CachePadded::new(QueryQueue::new(TASKQ_CAPACITY)))
             .collect::<Vec<_>>();
 
@@ -127,7 +131,7 @@ impl TaskQ {
     }
 
     pub fn pop(&self, _id: usize) -> Option<(Z3Ticket, Box<Z3Query>)> {
-        for i in 0..TASK_PRIO_MAX {
+        for i in 0..TASK_PRIO_MAX + 1 {
             if let Some((ticket, query)) = self.task_queues[i].pop() {
                 return Some((ticket, query));
             }
@@ -136,7 +140,7 @@ impl TaskQ {
     }
 
     pub fn is_empty(&self) -> bool {
-        for i in 0..TASK_PRIO_MAX {
+        for i in 0..TASK_PRIO_MAX + 1 {
             if !self.task_queues[i].is_empty() {
                 return false;
             }
@@ -145,7 +149,7 @@ impl TaskQ {
     }
 
     pub fn drain(&mut self) {
-        for i in 0..TASK_PRIO_MAX {
+        for i in 0..TASK_PRIO_MAX + 1 {
             while !self.task_queues[i].is_empty() {
                 _ = self.task_queues[i].pop();
             }
