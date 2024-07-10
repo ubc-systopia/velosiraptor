@@ -9,14 +9,16 @@
  * mechanisms.
  */
 
-const REGION_ALIGNMENT : size = 0x1f
-const VADDR_MAX : size = 0xffffffff
+const REGION_ALIGNMENT : size = 0x1f;
+const VADDR_MAX : size = 0xffff_ffff;
+const MPU_BASE : paddr = 0xE000_ED90;
 
 flags {
     read,
     write,
     execute,
     supervisor,
+    nocache
 }
 
 
@@ -27,7 +29,7 @@ segment MPU(base: addr) {
     outbitwidth = 32;
 
     state() {
-        reg type [ 4 ] {
+        reg typ [ 4 ] {
             0 ..  1 separate,   // indicates support for separate data address regions
             // 1 ..  8 _res0,
             8  .. 16 dregion,   // number of MPU regions supported
@@ -56,90 +58,108 @@ segment MPU(base: addr) {
             5 .. 32 limit   // limit
         },
         reg rbar_a1 [ 4 ] {
-
+            0..32 _res,
         },
         reg rlar_a1 [ 4 ] {
-
+            0..32 _res,
         },
         reg rbar_a2 [ 4 ] {
-
+            0..32 _res,
         },
         reg rlar_a2 [ 4 ] {
-
+            0..32 _res,
         },
         reg rbar_a3 [ 4 ] {
-
+            0..32 _res,
         },
         reg rlar_a3 [ 4 ] {
-
+            0..32 _res,
         },
         reg mair0 [ 4 ] {
-            attr0
-            attr1
-            attr2
-            attr3
+             0 ..  8 attr0,
+             8 .. 16 attr1,
+            16 .. 24 attr2,
+            24 .. 32 attr3,
         },
         reg mair1 [ 4 ] {
-            attr4
-            attr5
-            attr6
-            attr7
+             0 ..  8 attr4,
+             8 .. 16 attr5,
+            16 .. 24 attr6,
+            24 .. 32 attr7,
         },
     }
 
     interface(base: addr) {
-        mmio entry [ base, 0, 4 ]
-    }
-
-    #[remap]
-    fn valid() -> bool {
-        state.ctrl.enable == 1
+        mmio typ     [ base, 0x0, 4 ],
+        mmio ctrl    [ base, 0x4, 4 ],
+        mmio nrn     [ base, 0x8, 4 ],
+        mmio rbar    [ base, 0xc, 4 ],
+        mmio rlar    [ base, 0x10, 4 ],
+        // mmio rbar_a1 [ base, 0x14, 4 ],
+        // mmio rlar_a1 [ base, 0x18, 4 ],
+        // mmio rbar_a2 [ base, 0x1c, 4 ],
+        // mmio rlar_a2 [ base, 0x20, 4 ],
+        // mmio rbar_a3 [ base, 0x24, 4 ],
+        // mmio rlar_a3 [ base, 0x28, 4 ],
+        mmio mair0   [ base, 0x30, 4 ],
+        mmio mair1   [ base, 0x34, 4 ],
     }
 
     #[remap]
     fn enabled() -> bool {
+        // state.ctrl.enable == 1
+        true
+    }
+
+    #[remap]
+    fn valid() -> bool {
         state.rlar.en == 1
     }
 
+
+
     #[remap]
     fn execute(flgs : flags) -> bool {
-        state.rbar.xn == flgs.execute
-    }
-
-    #[remap]
-    fn ro(flgs : flags) -> bool {
-        state.rbar.ap_ro == flgs.write
-    }
-
-    #[remap]
-    fn priv(flgs : flags) -> bool {
-        state.rbar.ap_priv == flgs.supervisor
+        // state.rbar.xn == flgs.execute
+        true
     }
 
     #[remap]
     fn matchflags(flgs : flags) -> bool
     {
-        true    // no protection here
+        state.rbar.ap_ro == flgs.write
+         && state.rbar.ap_priv == flgs.supervisor
+    }
+
+    #[remap]
+    fn cachable(flgs: flags) -> bool {
+        flgs.nocache == state.rlar.attr
+        // flgs.nocache == 0 ==> state.rlar.attr == 0
+        // && flgs.nocache == 1 ==> state.rlar.attr == 1
     }
 
     fn translate(va: vaddr) -> paddr
-        requires state.rbar.base << 5 <= va
-        requires va < state.rlar.limit << 5
+        // requires (state.rbar.base << 5) <= va
+        requires va <= (state.rlar.limit << 5) + REGION_ALIGNMENT
     {
         va
     }
 
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
         requires va == pa
+        requires sz > 0
+        requires (va & REGION_ALIGNMENT) == 0
+        requires (sz & REGION_ALIGNMENT) == 0
+        requires va <= VADDR_MAX && sz <= VADDR_MAX
+        requires va + sz <= VADDR_MAX
+
+    synth fn protect(va: vaddr, sz: size, flgs: flags)
         requires va & REGION_ALIGNMENT == 0
         requires sz & REGION_ALIGNMENT == 0
-        requires va + sz < VADDR_MAX
+        requires va + sz <= VADDR_MAX
 
-    // can't actually do anything to protect or unmap
-    synth fn protect(va: vaddr, sz: size, flgs: flags);
-    synth fn unmap(va: vaddr, sz: size);
+    synth fn unmap(va: vaddr, sz: size)
+        requires va & REGION_ALIGNMENT == 0
+        requires sz & REGION_ALIGNMENT == 0
+        requires va + sz <= VADDR_MAX
  }
-
-staticmap SMPT(base: addr) {
-    maps [ SMPTE(base + i * SMPT_ENTRY_SIZE) for i in 0..SMPT_NUM_ENTRIES ]
-}
