@@ -197,7 +197,7 @@ impl Z3Worker {
                                 }
                                 Err(tok) => {
                                     use std::time::Duration;
-                                    thread::sleep(Duration::from_micros(256));
+                                    thread::sleep(Duration::from_micros(2000));
                                     tok
                                 },
                             };
@@ -468,7 +468,7 @@ impl Z3WorkerPool {
             }
         }
 
-        self.do_push_query(id, task, Z3TaskPriority::lowest());
+        self.do_push_query(id, task, Z3TaskPriority::retry());
 
         Ok(id)
     }
