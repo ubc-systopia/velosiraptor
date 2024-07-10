@@ -163,6 +163,7 @@ segment X8664PageTableEntry(base: paddr) : X8664PageDescriptor {
 
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
         requires va == 0 && sz == BASE_PAGE_SIZE
+        requires pa + BASE_PAGE_SIZE <= PHYS_ADDR_MAX
         requires (pa & (BASE_PAGE_SIZE - 1) == 0)
 
     synth fn protect(va: vaddr, sz: size, flgs: flags);

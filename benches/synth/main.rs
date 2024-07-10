@@ -14,10 +14,11 @@ use velosisynth::{SynthOpts, Z3SynthEnum, Z3SynthSegment, Z3WorkerPool};
 mod bench;
 use bench::*;
 
-const SPECS: [(&str, &str); 10] = [
+const SPECS: [(&str, &str); 11] = [
     ("examples/simple_translation_table.vrs", "Simple Page Table"),
     ("examples/x86_32_pagetable.vrs", "x86\\_32 Page Table"),
     ("examples/x86_64_pagetable.vrs", "x86\\_64 Page Table"),
+    ("examples/mpu.vrs", "Arm MPU"),
     ("examples/xeon_phi_smpt.vrs", "Xeon Phi SMPT"),
     ("examples/simple_segment.vrs", "Simple Segment"),
     ("examples/variable_segment.vrs", "Variable Segment"),
