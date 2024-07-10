@@ -109,6 +109,15 @@ impl VelosiAstExpr {
         matches!(self, VelosiAstExpr::BinOp(_) | VelosiAstExpr::Quantifier(_))
     }
 
+    pub fn is_literal_with_name(&self, name: &str) -> bool {
+        use VelosiAstExpr::*;
+        if let IdentLiteral(e) = self {
+            e.ident().as_str() == name
+        } else {
+            false
+        }
+    }
+
     pub fn loc(&self) -> &VelosiTokenStream {
         use VelosiAstExpr::*;
         match self {
