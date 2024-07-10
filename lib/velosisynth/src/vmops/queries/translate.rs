@@ -86,7 +86,7 @@ impl<'a> TranslateQueryBuilder<'a> {
                 let expr = self.m_translate.body.as_ref().unwrap();
                 let additional_state = HashSet::new();
                 let mut builder =
-                    utils::make_program_builder_no_params(self.unit, expr, additional_state, opts);
+                    utils::make_program_builder_no_params(self.unit, expr, additional_state, false, opts);
 
                 // translate is a bit special here, for map we want the following two variables
                 builder.add_var(String::from("va"));

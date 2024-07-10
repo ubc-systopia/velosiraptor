@@ -33,6 +33,7 @@ use velosiast::{
     ast::{
         VelosiAstExpr, VelosiAstFnCallExpr, VelosiAstIdentLiteralExpr, VelosiAstIdentifier,
         VelosiAstMethod, VelosiAstMethodProperty, VelosiAstTypeInfo, VelosiAstUnitSegment,
+        VelosiAstBinOp,
     },
     VelosiAstInterfaceField,
 };
@@ -57,6 +58,7 @@ pub fn make_program_builder_no_params(
     unit: &VelosiAstUnitSegment,
     expr: &VelosiAstExpr,
     additional_state: HashSet<Rc<String>>,
+    lower_bound: bool,
     opts: &SynthOpts,
 ) -> ProgramsBuilder {
     log::info!(target: "[vmops::utils]", "constructing programs for {expr}");
@@ -108,6 +110,17 @@ pub fn make_program_builder_no_params(
         }
     }
 
+    // println!("EXPR: {expr}");
+    if expr.has_translate_range() && !lower_bound{
+        if state_syms.len() == 1 {
+            println!("{expr} => limit {state_syms:?}");
+            builder.set_limit();
+        } else if state_syms.len() > 1 {
+            println!("{expr} => limit + expression {state_syms:?}");
+            builder.set_limit().set_limit_expression();
+        }
+    }
+
     builder
 }
 
@@ -116,9 +129,10 @@ pub fn make_program_builder(
     m_goal: &VelosiAstMethod,
     expr: &VelosiAstExpr,
     additional_state: HashSet<Rc<String>>,
+    lower_bound: bool,
     opts: &SynthOpts,
 ) -> ProgramsBuilder {
-    let mut builder = make_program_builder_no_params(unit, expr, additional_state, opts);
+    let mut builder = make_program_builder_no_params(unit, expr, additional_state, lower_bound, opts);
 
     let mut vars = HashSet::new();
     for id in expr.get_var_references().iter() {
@@ -430,6 +444,20 @@ pub fn add_method_preconds(
         }
 
         let query = if e.has_var_references(&params) {
+
+            let binop = if let VelosiAstExpr::BinOp(pre) = e.as_ref() {
+                pre
+            } else {
+                unreachable!();
+            };
+
+            let lower_bound = if binop.lhs.has_var_references(&params) {
+                matches!(binop.op, VelosiAstBinOp::Gt | VelosiAstBinOp::Ge)
+            } else {
+                matches!(binop.op, VelosiAstBinOp::Lt | VelosiAstBinOp::Le)
+            };
+
+
             let ident = VelosiAstIdentifier::from(translate_range_name(Some(i)).as_str());
             let args = vec![
                 Rc::new(m.params[0].as_ref().into()),
@@ -451,6 +479,7 @@ pub fn add_method_preconds(
                 // .assms(m.assms.clone())
                 .variable_references(!negate)
                 .additional_state_refs(staterefs)
+                .set_lower_bound(lower_bound)
                 .negate(negate) // we negate the expression here
                 .build(opts)
                 .map(|e| e.into())
