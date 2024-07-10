@@ -38,7 +38,6 @@ use std::time::Instant;
 // our library
 use velosiast::{AstResult, VelosiAst, VelosiAstUnit};
 use velosicodegen::VelosiCodeGen;
-use velosicomposition::Relations;
 use velosiparser::{VelosiParser, VelosiParserError};
 use velosisynth::{create_models, Z3SynthEnum, Z3SynthFactory, Z3SynthSegment};
 
@@ -596,7 +595,7 @@ fn examples_codegen(lang: &str, new_codegen_fn: CodeGenConstructor) {
 
             let t_start = Instant::now();
             let codegen = new_codegen_fn(outdir.as_path(), filename.clone());
-            codegen.generate(&ast, &osspec);
+            let _ = codegen.generate(&ast, &osspec);
             let t_elapsed_ms = Instant::now().duration_since(t_start).as_millis();
             println!("    - Code Gen: {t_elapsed_ms} ms");
 
