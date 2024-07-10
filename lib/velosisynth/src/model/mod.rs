@@ -98,7 +98,7 @@ pub fn prelude(is_distinguish: bool) -> Smt2Context {
         "pi.use_database true",
         "smt.arith.auto_config_simplex true",
         "smt.arith.solver 2",
-        "timeout 200",
+        "timeout 2000",
         "smt.arith.random_initial_value true",
     ];
 
