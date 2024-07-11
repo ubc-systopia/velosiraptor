@@ -11,25 +11,12 @@
 #include "logging.hpp"
 #include "types.hpp"
 #include "state_base.hpp"
-
+#include "fm_util.hpp"
 
 StateBase::StateBase()
 {
     this->fields = std::map<std::string, StateFieldBase *>();
 }
-
-
-StateBase::StateBase(std::vector<StateFieldBase *> fields)
-{
-    this->fields = std::map<std::string, StateFieldBase *>();
-    for (auto it = fields.begin(); it != fields.end(); it++) {
-        bool r = this->add_field(*it);
-        if (!r) {
-            Logging::error("StateBase::StateBase: failed to insert field %s\n", (*it)->get_name());
-        }
-    }
-}
-
 
 void StateBase::reset(void)
 {
@@ -75,6 +62,7 @@ StateFieldBase *StateBase::lookup_field_by_name(const std::string &name)
 bool StateBase::get_field_value(const std::string &name, uint64_t *value)
 {
     if (this->fields.contains(name)) {
+        this->populate_state();
         auto field = this->fields.at(name);
         *value     = field->get_value();
         return true;
@@ -95,3 +83,15 @@ bool StateBase::set_field_value(const std::string &name, uint64_t value)
     return false;
 }
 
+
+void StateBase::populate_state() {
+    uint64_t temp;
+
+    for (auto it = this->fields.begin(); it != this->fields.end(); it++) {
+        auto f = it->second;
+        read_paddr(this->ptw_pvbus, this->base + f->offset, f->bitwidth, &temp);
+        Logging::debug("    Populating state field %s at base addr %p, width %d, value %lx",
+                       f->name.c_str(), this->base + f->offset, f->bitwidth, temp);
+        f->set_value(temp);
+    }
+}

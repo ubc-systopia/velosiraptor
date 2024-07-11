@@ -29,14 +29,9 @@
 //!
 //!
 
-// used standard library functionality
-
+use std::collections::{HashMap, HashSet};
 use std::ops::Sub;
 use std::rc::Rc;
-
-//use std::fmt::{Display, Formatter, Result as FmtResult};
-
-use std::collections::{HashMap, HashSet};
 use velosiast::ast::{VelosiAstStaticMap, VelosiAstUnit};
 use velosiast::VelosiAst;
 
@@ -139,6 +134,20 @@ impl Relations {
 
     pub fn get_units(&self) -> &HashMap<Rc<String>, VelosiAstUnit> {
         &self.all_units
+    }
+
+    pub fn tsorted_units(&self) -> Vec<Rc<String>> {
+        let mut roots = Vec::from_iter(self.roots.to_owned());
+        let mut edges = self.relations.to_owned();
+        let mut sorted: Vec<Rc<String>> = Vec::new();
+        while let Some(r) = roots.pop() {
+            sorted.push(r.clone());
+            if edges.contains_key(&r) {
+                roots.append(&mut edges.get(&r).unwrap().to_owned());
+                edges.remove(&r);
+            }
+        }
+        sorted
     }
 
     /// obtains the root units from the ast

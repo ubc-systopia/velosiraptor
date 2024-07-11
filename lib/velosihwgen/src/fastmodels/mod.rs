@@ -46,11 +46,11 @@ use velosicomposition::Relations;
 
 // the generators
 mod unit;
-use unit::generate_unit_header;
+use unit::generate_unit_cpp;
 mod registers;
 use registers::{generate_register_header, generate_register_impl};
 
-use self::unit::{unit_class_name, unit_header_file};
+use self::unit::{unit_class_name, unit_header_file, unit_impl_file};
 
 /// # The Arm FastModels Platform Module
 ///
@@ -68,7 +68,8 @@ use self::unit::{unit_class_name, unit_header_file};
 /// outdir/hw/fastmodels/platform/Platform.lisa
 ///
 /// for subunit in vrs:
-///    outdir/hw/fastmodels/src/<subunit>.cpp
+///    outdir/hw/fastmodels/<subunit>.hpp
+///    outdir/hw/fastmodels/<subunit>.cpp
 ///
 /// outdir/hw/fastmodels/fm-translation-framework/
 /// outdir/hw/fastmodels/fm-translation-framework/accessmode.hpp
@@ -148,7 +149,6 @@ fn fill_template(
 
 impl VelosiHwGenBackend for ArmFastModelsModule {
     fn prepare(&self) -> Result<(), VelosiHwGenError> {
-        fs::create_dir_all(self.outdir.join("src"))?;
         fs::create_dir_all(self.outdir.join("platform"))?;
 
         copy_recursive(
@@ -162,12 +162,15 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
     fn generate(&self, ast: &VelosiAst) -> Result<(), VelosiHwGenError> {
         let relations = Relations::from_ast(ast);
         let top_files = Vec::from_iter(relations.get_roots());
+        let dag = velosicomposition::Relations::from_ast(ast).tsorted_units();
+
         if top_files.len() != 1 {
             panic!("!= 1 root unit found");
         }
 
         let top_file = unit_header_file(top_files[0]); // e.g. X86_MMU_unit.hpp
         let top_class = unit_class_name(top_files[0]); // e.g. X86_MMU
+        let unit_files: Vec<String> = dag.iter().map(|n| unit_impl_file(n)).collect();
 
         fill_template(
             self.support_dir.join("TranslationUnit.lisa.template"),
@@ -194,21 +197,24 @@ impl VelosiHwGenBackend for ArmFastModelsModule {
             self.support_dir.join("Makefile.template"),
             self.outdir.join("Makefile"),
             HashMap::from([
-                (&"/* REPLACE top_file */".to_string(), &top_file),
+                (
+                    &"/* REPLACE unit_srcs */".to_string(),
+                    &unit_files.join(" "),
+                ),
                 (&"/* REPLACE pkgname */".to_string(), &self.pkgname),
             ]),
         )?;
 
         // check all units for registers and put them in the main directory
-        generate_register_header(&self.pkgname, ast, &self.outdir.join("src"))?;
-        generate_register_impl(&self.pkgname, ast, &self.outdir.join("src"))?;
+        generate_register_header(&self.pkgname, ast, &self.outdir)?;
+        generate_register_impl(&self.pkgname, ast, &self.outdir)?;
 
         for u in ast.units() {
             if u.is_abstract() {
                 continue;
             }
 
-            generate_unit_header(u, ast, &self.outdir.join("src"))?;
+            generate_unit_cpp(u, ast, &self.pkgname, &self.outdir)?;
         }
 
         Ok(())

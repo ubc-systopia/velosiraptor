@@ -33,13 +33,23 @@ use velosiast::ast::{
     VelosiAstNumLiteralExpr, VelosiAstStaticMap, VelosiAstType, VelosiAstTypeInfo,
     VelosiAstUnOpExpr, VelosiAstUnit, VelosiAstUnitSegment,
 };
-use velosiast::{VelosiAst, VelosiAstUnitEnum, VelosiAstUnitStaticMap};
+use velosiast::{
+    VelosiAst, VelosiAstInterface, VelosiAstInterfaceField, VelosiAstInterfaceMemoryField,
+    VelosiAstInterfaceMmioField, VelosiAstStateField, VelosiAstUnitEnum, VelosiAstUnitStaticMap,
+};
 use C::Scope;
 
 use crate::fastmodels::add_header_comment;
+use crate::fastmodels::registers::register_class_name;
 use crate::VelosiHwGenError;
 
+use super::registers::registers_header_file;
+
 pub fn unit_header_file(name: &str) -> String {
+    format!("{}_unit.hpp", name)
+}
+
+pub fn unit_impl_file(name: &str) -> String {
     format!("{}_unit.cpp", name)
 }
 
@@ -53,6 +63,10 @@ pub fn interface_class_name(name: &str) -> String {
 
 pub fn state_class_name(name: &str) -> String {
     format!("{}State", unit_class_name(name))
+}
+
+pub fn state_header_file(name: &str) -> String {
+    format!("{}_state.hpp", name)
 }
 
 pub fn state_field_class_name(unit: &str, name: &str) -> String {
@@ -320,7 +334,6 @@ fn add_check_permissions_method_segment(c: &mut C::Class, _segment: &VelosiAstUn
 
     let m = c
         .new_method("check_permissions", C::Type::new_bool())
-        .set_inside_def()
         .set_public()
         .set_override()
         .set_virtual()
@@ -352,8 +365,7 @@ fn check_permission_nop() -> C::Method {
 
     let mut m = C::Method::new("check_permissions", C::Type::new_bool());
 
-    m.set_inside_def()
-        .set_public()
+    m.set_public()
         .set_override()
         .set_virtual()
         .push_param(src_addr_param)
@@ -379,8 +391,8 @@ fn construct_next_unit(
         )
         .to_expr();
 
-    args.push(C::Expr::field_access(&C::Expr::this(), "_name"));
-    args.push(C::Expr::field_access(&C::Expr::this(), "_ttw_pvbus"));
+    args.push(C::Expr::new_str(next_class_name.as_str()));
+    args.push(C::Expr::field_access(&C::Expr::this(), "ptw_pvbus"));
 
     block.assign(
         next_unit.clone(),
@@ -389,7 +401,7 @@ fn construct_next_unit(
     next_unit
 }
 
-// virtual bool translate(lvaddr_t src_addr, lpaddr_t *dst_addr) set_override;
+// virtual bool MMU::translate(lvaddr_t src_addr, lpaddr_t *dst_addr) set_override;
 fn add_translate_method_segment(
     c: &mut C::Class,
     segment: &VelosiAstUnitSegment,
@@ -413,7 +425,6 @@ fn add_translate_method_segment(
 
     let m = c
         .new_method("translate", C::Type::new_bool())
-        .set_inside_def()
         .set_public()
         .set_override()
         .set_virtual()
@@ -421,7 +432,8 @@ fn add_translate_method_segment(
         .push_param(dst_addr_param);
 
     m.body().raw(format!(
-        "Logging::debug(\"TranslationUnit::translate(%lx)\", {})",
+        "Logging::debug(\"{}::translate(0x%lx)\", {})",
+        segment.ident(),
         &tm.params[0].ident.ident
     ));
 
@@ -445,7 +457,10 @@ fn add_translate_method_segment(
                 let branch = ifelse.then_branch();
 
                 // we have state references to this indicates we need to go to the next one
+                // shouldn't we be looking at the parameters of map() instead?
                 if expr.has_state_references() {
+                    // calculate physical base of next unit
+                    branch.assign(base_var.clone(), expr_to_cpp(&expr, &params));
                     let next_unit = construct_next_unit(branch, next, vec![base_var.clone()]);
 
                     match next.input_bitwidth() {
@@ -487,7 +502,23 @@ fn add_translate_method_segment(
                         .return_expr(C::Expr::btrue());
                 }
             }
+
+            body.return_expr(C::Expr::bfalse());
         } else {
+            body.assign(
+                src_var.clone(),
+                C::Expr::binop(
+                    src_var.clone(),
+                    "&",
+                    C::Expr::new_num(if segment.inbitwidth == 64 {
+                        0xffffffffffffffff
+                    } else {
+                        (1 << segment.inbitwidth) - 1
+                    }),
+                ),
+            );
+
+            // should always be dealing with paddrs
             // return the expression
             // no next translation unit, simply set the return value with the expression
             body.new_comment("return the result of the translation");
@@ -505,7 +536,7 @@ fn add_translate_method_segment(
 
 fn translate_method_enum(unit: &VelosiAstUnitEnum, ast: &VelosiAst) -> C::Method {
     let mut m = C::Method::new("translate", C::Type::new_bool());
-    m.set_inside_def().set_public();
+    m.set_public();
 
     // function parameters
     let va_param = m.new_param("va", C::Type::new_typedef("lvaddr_t"));
@@ -559,7 +590,7 @@ fn translate_method_enum(unit: &VelosiAstUnitEnum, ast: &VelosiAst) -> C::Method
 fn translate_method_staticmap(s: &VelosiAstUnitStaticMap, ast: &VelosiAst) -> C::Method {
     // function name and properties
     let mut m = C::Method::new("translate", C::Type::new_bool());
-    m.set_inside_def().set_public();
+    m.set_public();
 
     // function parameters
     let va_param = m.new_param("va", C::Type::new_typedef("lvaddr_t"));
@@ -646,26 +677,47 @@ fn translate_method_staticmap(s: &VelosiAstUnitStaticMap, ast: &VelosiAst) -> C:
                 panic!("TODO: handle me!");
             }
 
-            let element_size = 1 << map.elm.dst_bitwidth;
+            // let element_size = 1 << map.elm.dst_bitwidth;
+            let indexbits = map.range.end.trailing_zeros(); // 9 in x86
+            if map.range.end - (1 << indexbits) != 0 {
+                panic!("TODO: handle odd page size")
+            }
 
-            // let idx = va / element_size;
+            // mask = ((1 << indexbits) - 1) << bitwidth
+            let idx_mask = body
+                .new_variable("idx_mask", C::Type::new_uint64())
+                .to_expr();
+            body.assign(
+                idx_mask.clone(),
+                C::Expr::Raw(format!(
+                    "(((uint64_t)1 << {:#x}) - 1) << {:#x}",
+                    indexbits, map.elm.dst_bitwidth
+                )),
+            );
+
             let idx_var = body
-                .new_variable(map.var.ident(), C::Type::new_size())
+                .new_variable(map.var.ident(), C::Type::new_uint64())
                 .to_expr();
             body.assign(
                 idx_var.clone(),
-                C::Expr::binop(va_var.clone(), "/", C::Expr::new_num(element_size)),
+                C::Expr::binop(
+                    C::Expr::binop(idx_mask, "&", va_var.clone()),
+                    ">>",
+                    C::Expr::new_num(map.elm.dst_bitwidth),
+                ),
             );
 
             body.fn_call(
                 "Logging::debug",
                 vec![
-                    C::Expr::new_str("translating with map[%zu]"),
+                    C::Expr::new_str("translating with map[0x%lx]"),
                     idx_var.clone(),
                 ],
             );
 
             let mut args = Vec::new();
+            // args.push(C::Expr::Raw(format!("this->base + {}", idx_var.clone())));
+
             for arg in &map.elm.dst.args {
                 args.push(expr_to_cpp(arg, &params));
             }
@@ -675,14 +727,14 @@ fn translate_method_staticmap(s: &VelosiAstUnitStaticMap, ast: &VelosiAst) -> C:
 
             // va = va - (idx * element_size);
             body.new_comment("construct the new variable value");
-            body.assign(
-                va_var.clone(),
-                C::Expr::binop(
-                    va_var.clone(),
-                    "-",
-                    C::Expr::binop(idx_var.clone(), "*", C::Expr::new_num(element_size)),
-                ),
-            );
+            // body.assign(
+            //     va_var.clone(),
+            //     C::Expr::binop(
+            //         va_var.clone(),
+            //         "-",
+            //         C::Expr::binop(idx_var.clone(), "*", C::Expr::new_num(element_size)),
+            //     ),
+            // );
 
             body.return_expr(C::Expr::method_call(
                 &next_var,
@@ -728,7 +780,7 @@ fn add_constructor(c: &mut C::Class, unit: &VelosiAstUnit, ifn: &str, scn: &str)
     let mut arg1_type = C::Type::new_class("pv::RandomContextTransactionGenerator");
     arg1_type.pointer();
 
-    let ctor = c.new_constructor().set_inside_def(true).private();
+    let ctor = c.new_constructor().private();
 
     ctor.push_parent_initializer(C::Expr::fn_call(
         "TranslationUnitBase",
@@ -738,7 +790,16 @@ fn add_constructor(c: &mut C::Class, unit: &VelosiAstUnit, ifn: &str, scn: &str)
             C::Expr::new_var("ptw_pvbus", arg1_type.clone()),
         ],
     ))
-    .push_initializer("state", C::Expr::fn_call(scn, vec![]))
+    .push_initializer(
+        "state",
+        C::Expr::fn_call(
+            scn,
+            vec![
+                C::Expr::new_var("base", C::Type::new_typedef("lpaddr_t")),
+                C::Expr::new_var("ptw_pvbus", arg1_type.clone()),
+            ],
+        ),
+    )
     .push_initializer(
         "interface",
         C::Expr::fn_call(
@@ -766,13 +827,12 @@ fn add_constructor(c: &mut C::Class, unit: &VelosiAstUnit, ifn: &str, scn: &str)
         None => (),
         Some(_) => {
             let mut ctor_body = C::Block::new();
-            ctor_body.method_call(C::Expr::Raw("this".to_string()), "populate_state", vec![]);
+            ctor_body.fn_call("this->state.populate_state", vec![]);
             ctor.set_body(ctor_body);
         }
     }
 }
 
-// I don't know what this function does or where its arguments should come from
 fn add_create(c: &mut C::Class, unit: &VelosiAstUnit) {
     // static TranslationUnit *create(sg::ComponentBase *parentComponent, std::string const &name,
     //     sg::CADIBase                          *cadi,
@@ -786,8 +846,7 @@ fn add_create(c: &mut C::Class, unit: &VelosiAstUnit) {
     let m = c
         .new_method("create", unit_ptr_type.clone())
         .set_public()
-        .set_static()
-        .set_inside_def();
+        .set_static();
 
     // let mut arg0_type = C::Type::new_class("sg::ComponentBase");
     // arg0_type.pointer();
@@ -812,7 +871,7 @@ fn add_create(c: &mut C::Class, unit: &VelosiAstUnit) {
 
     let unitvar = C::Expr::new_var("t", unit_ptr_type.clone());
     let statevar = C::Expr::field_access(&unitvar, "state");
-    let ifvar = C::Expr::field_access(&unitvar, "interface");
+    let _ifvar = C::Expr::field_access(&unitvar, "interface");
 
     //  TranslationUnit *t;
     m.body()
@@ -826,7 +885,7 @@ fn add_create(c: &mut C::Class, unit: &VelosiAstUnit) {
         // t->state.print_state_fields();
         .method_call(statevar, "print_state_fields", vec![])
         // t->interface.debug_print_interface();
-        .method_call(ifvar, "debug_print_interface", vec![])
+        // .method_call(ifvar, "debug_print_interface", vec![])
         // return t;
         .return_expr(unitvar);
 }
@@ -845,9 +904,7 @@ fn add_method_maybe(c: &mut C::Class, tm: &VelosiAstMethod, params: &HashSet<&st
         _ => (),
     }
 
-    let m = c
-        .new_method(&tm.ident.ident, ast_type_to_c_type(&tm.rtype))
-        .set_inside_def();
+    let m = c.new_method(&tm.ident.ident, ast_type_to_c_type(&tm.rtype));
     for p in &tm.params {
         m.push_param(C::MethodParam::new(
             &p.ident.ident,
@@ -864,100 +921,181 @@ fn add_method_maybe(c: &mut C::Class, tm: &VelosiAstMethod, params: &HashSet<&st
     }
 }
 
+fn add_state_header(unit: &VelosiAstUnit, _pkgname: &str, outdir: &Path) {
+    let mut scope = C::Scope::new();
+
+    let header_guard = format!("{}_STATE_HPP_", unit.ident().to_uppercase());
+    let guard = scope.new_ifdef(&header_guard);
+    let s = guard.guard().then_scope();
+
+    add_header_comment(s, unit.ident(), "generated implementation");
+
+    s.new_comment("system includes");
+    s.new_include("string.h", true);
+    s.new_include("stddef.h", true);
+    s.new_include("assert.h", true);
+    s.new_comment("framework includes");
+    s.new_include("framework/types.hpp", false);
+    s.new_include("framework/state_base.hpp", false);
+    s.new_include("framework/state_field_base.hpp", false);
+
+    add_state_classes(s, unit);
+
+    scope.set_filename(&state_header_file(unit.ident()));
+    scope.to_file(outdir, true).expect("failed to write file");
+}
+
 fn add_state_classes(s: &mut Scope, unit: &VelosiAstUnit) {
     let scn = state_class_name(unit.ident());
-    match unit.state() {
-        None => {
-            s.new_class(&scn) //empty state
-                .set_base("StateBase", C::Visibility::Public);
-        }
 
-        Some(state) => {
-            // one class for each field
-            for f in state.fields() {
-                let rcn = state_field_class_name(unit.ident(), f.ident());
-                let f_c = s
-                    .new_class(&rcn)
-                    .set_base("StateFieldBase", C::Visibility::Public);
+    let state_fields: Vec<Rc<VelosiAstStateField>> = match unit.state() {
+        Some(s) => s.fields().to_vec(),
+        None => Vec::<Rc<VelosiAstStateField>>::new(),
+    };
 
-                let cons = f_c.new_constructor().set_inside_def(true);
-                cons.push_parent_initializer(C::Expr::fn_call(
-                    "StateFieldBase",
-                    vec![
-                        C::Expr::new_str(f.ident()),
-                        C::Expr::new_num(f.size() * 8),
-                        C::Expr::new_num(0),
-                    ],
-                ));
+    for f in &state_fields {
+        let sfcn = state_field_class_name(unit.ident(), f.ident());
 
-                for sl in &f.layout_as_slice().to_vec() {
-                    cons.body().method_call(
-                        C::Expr::this(),
-                        "add_slice",
-                        vec![
-                            C::Expr::new_str(sl.ident()),
-                            C::Expr::new_num(sl.start),
-                            C::Expr::new_num(sl.end),
-                        ],
-                    );
-                }
+        let (base, add_ptw_bus) = match f.as_ref() {
+            VelosiAstStateField::Memory(_) => ("MemoryStateFieldBase", true),
+            VelosiAstStateField::Register(_) => ("RegisterStateFieldBase", false),
+        };
 
-                let var = C::Expr::new_var("data", C::Type::new_uint(64));
+        let f_c = s.new_class(&sfcn).set_base(base, C::Visibility::Public);
 
-                // TODO: The per-slice getters and setters may or may not be helpful.
-                // Keeping them for now, but I don't plan to call them
-                for sl in &f.layout_as_slice().to_vec() {
-                    let sl_getter_f = format!("get_{}_val", sl.ident());
-                    let m = f_c
-                        .new_method(&sl_getter_f, C::Type::new_uint(64))
-                        .set_public()
-                        .set_inline();
+        let sf_offset = unit
+            .interface()
+            .and_then(|i: Rc<VelosiAstInterface>| i.fields_map.get(&f.ident_to_string()).cloned())
+            .map(|i_f| match i_f.as_ref() {
+                VelosiAstInterfaceField::Mmio(VelosiAstInterfaceMmioField { offset, .. })
+                | VelosiAstInterfaceField::Memory(VelosiAstInterfaceMemoryField {
+                    offset, ..
+                }) => *offset * 8,
+                _ => 0,
+            });
 
-                    m.body().return_expr(C::Expr::method_call(
-                        &C::Expr::this(),
-                        "get_slice_value",
-                        vec![C::Expr::new_str(sl.ident())],
-                    ));
-                    let sl_setter_f = format!("set_{}_val", sl.ident());
-                    let m = f_c
-                        .new_method(&sl_setter_f, C::Type::new_void())
-                        .set_public()
-                        .set_inline();
-                    m.new_param("data", C::Type::new_int(64));
-                    m.body().method_call(
-                        C::Expr::this(),
-                        "set_slice_value",
-                        vec![C::Expr::new_str(sl.ident()), var.clone()],
-                    );
-                }
-            }
-
-            // one class for state containing all fields
-            let c = s.new_class(&scn);
-            c.set_base("StateBase", C::Visibility::Public);
-            let state_cons = c.new_constructor().set_inside_def(true);
-
-            for f in state.fields() {
-                let fieldname = f.ident();
-                let fieldclass = state_field_class_name(unit.ident(), f.ident());
-                state_cons
-                    .push_initializer(fieldname.as_str(), C::Expr::fn_call(&fieldclass, vec![]));
-
-                let this = C::Expr::this();
-                let field = C::Expr::field_access(&this, fieldname);
-                state_cons.body().method_call(
-                    C::Expr::this(),
-                    "add_field",
-                    vec![C::Expr::addr_of(&field)],
+        let offset = match sf_offset {
+            Some(o) => o,
+            None => {
+                println!(
+                    "Warning: no memory or MMIO interface found for field {}",
+                    f.ident()
                 );
+                0
             }
+        };
 
-            for f in state.fields() {
-                let ty = C::BaseType::Class(state_field_class_name(unit.ident(), f.ident()));
-                c.new_attribute(f.ident(), C::Type::new(ty))
-                    .set_visibility(C::Visibility::Public);
-            }
+        let cons = f_c.new_constructor();
+        cons.push_param(C::MethodParam::new(
+            "base",
+            C::Type::new_typedef("lpaddr_t"),
+        ));
+        cons.push_param(C::MethodParam::new(
+            "ptw_pvbus",
+            C::Type::new_class("pv::RandomContextTransactionGenerator *"),
+        ));
+
+        let mut init_args = vec![
+            C::Expr::new_str(f.ident()),
+            C::Expr::new_num(offset),
+            C::Expr::Raw(String::from("base")),
+            C::Expr::new_num(f.size() * 8),
+            C::Expr::new_num(0),
+        ];
+        if add_ptw_bus {
+            init_args.push(C::Expr::Raw(String::from("ptw_pvbus")));
         }
+        cons.push_parent_initializer(C::Expr::fn_call(base, init_args));
+
+        for sl in &f.layout_as_slice().to_vec() {
+            cons.body().method_call(
+                C::Expr::this(),
+                "add_slice",
+                vec![
+                    C::Expr::new_str(sl.ident()),
+                    C::Expr::new_num(sl.start),
+                    // C++ side uses inclusive-inclusive bounds (todo: change)
+                    C::Expr::new_num(sl.end - 1),
+                ],
+            );
+        }
+
+        let var = C::Expr::new_var("data", C::Type::new_uint(64));
+
+        // TODO: The per-slice getters and setters may or may not be helpful.
+        // Keeping them for now, but I don't plan to call them
+        for sl in &f.layout_as_slice().to_vec() {
+            let sl_getter_f = format!("get_{}_val", sl.ident());
+            let m = f_c
+                .new_method(&sl_getter_f, C::Type::new_uint(64))
+                .set_public();
+
+            m.body().return_expr(C::Expr::method_call(
+                &C::Expr::this(),
+                "get_slice_value",
+                vec![C::Expr::new_str(sl.ident())],
+            ));
+            let sl_setter_f = format!("set_{}_val", sl.ident());
+            let m = f_c
+                .new_method(&sl_setter_f, C::Type::new_void())
+                .set_public();
+            m.new_param("data", C::Type::new_int(64));
+            m.body().method_call(
+                C::Expr::this(),
+                "set_slice_value",
+                vec![C::Expr::new_str(sl.ident()), var.clone()],
+            );
+        }
+    }
+
+    // one class for state containing all fields
+    let state_class = s.new_class(&scn);
+    state_class.set_base("StateBase", C::Visibility::Public);
+    let state_cons = state_class.new_constructor();
+
+    state_cons.push_param(C::MethodParam::new(
+        "base",
+        C::Type::new_typedef("lpaddr_t"),
+    ));
+    state_cons.push_param(C::MethodParam::new(
+        "ptw_pvbus",
+        C::Type::new_class("pv::RandomContextTransactionGenerator *"),
+    ));
+
+    state_cons.push_parent_initializer(C::Expr::fn_call(
+        "StateBase",
+        vec![
+            C::Expr::Raw(String::from("base")),
+            C::Expr::Raw(String::from("ptw_pvbus")),
+        ],
+    ));
+
+    for f in state_fields.clone() {
+        let fieldname = f.ident();
+        let fieldclass = state_field_class_name(unit.ident(), f.ident());
+        state_cons.push_initializer(
+            fieldname.as_str(),
+            C::Expr::fn_call(
+                &fieldclass,
+                vec![
+                    C::Expr::Raw(String::from("base")),
+                    C::Expr::Raw(String::from("ptw_pvbus")),
+                ],
+            ),
+        );
+
+        let this = C::Expr::this();
+        let field = C::Expr::field_access(&this, fieldname);
+        state_cons
+            .body()
+            .method_call(C::Expr::this(), "add_field", vec![C::Expr::addr_of(&field)]);
+    }
+
+    for f in state_fields {
+        let ty = C::BaseType::Class(state_field_class_name(unit.ident(), f.ident()));
+        state_class
+            .new_attribute(f.ident(), C::Type::new(ty))
+            .set_visibility(C::Visibility::Public);
     }
 }
 
@@ -973,14 +1111,57 @@ fn add_interface_class(s: &mut Scope, unit: &VelosiAstUnit) {
 
     c.new_attribute("_state", state_ptr_type.clone());
 
-    let cons = c.new_constructor().set_inside_def(true);
+    // adding the registers here
+    if let Some(iface) = unit.interface() {
+        for f in iface.fields().iter() {
+            match f.as_ref() {
+                VelosiAstInterfaceField::Memory(_field) => (), /* no-op */
+                VelosiAstInterfaceField::Register(_field) => unimplemented!(), /* can't handle this */
+                VelosiAstInterfaceField::Mmio(field) => {
+                    let rcn = register_class_name(field.ident());
+                    let fieldname = format!("_{}", &field.ident());
+                    let ty = C::Type::new_class(&rcn);
+                    c.new_attribute(&fieldname, ty);
+                }
+                VelosiAstInterfaceField::Instruction(_field) => unimplemented!(), /* can't handle this */
+            }
+        }
+    }
+
+    let cons = c.new_constructor();
 
     let m = cons.new_param("state", state_ptr_type);
 
     let pa = C::Expr::from_method_param(m);
 
     cons.push_parent_initializer(C::Expr::fn_call("InterfaceBase", vec![pa.clone()]));
-    cons.push_initializer("_state", pa);
+    cons.push_initializer("_state", pa.clone());
+
+    if let Some(iface) = unit.interface() {
+        for f in iface.fields().iter() {
+            match f.as_ref() {
+                VelosiAstInterfaceField::Memory(_field) => (), /* no-op */
+                VelosiAstInterfaceField::Register(_field) => unimplemented!(), /* can't handle this */
+                VelosiAstInterfaceField::Mmio(field) => {
+                    let fieldname = format!("_{}", field.ident());
+                    let rcn = register_class_name(field.ident());
+                    cons.push_initializer(
+                        fieldname.as_str(),
+                        C::Expr::fn_call(&rcn, vec![pa.clone()]),
+                    );
+
+                    let this = C::Expr::this();
+                    let field = C::Expr::field_access(&this, &fieldname);
+                    cons.body().method_call(
+                        C::Expr::this(),
+                        "add_register",
+                        vec![C::Expr::addr_of(&field)],
+                    );
+                }
+                VelosiAstInterfaceField::Instruction(_field) => unimplemented!(), /* can't handle this */
+            }
+        }
+    }
 }
 
 fn add_unit_class(s: &mut Scope, unit: &VelosiAstUnit, ast: &VelosiAst) {
@@ -1018,7 +1199,6 @@ fn add_unit_class(s: &mut Scope, unit: &VelosiAstUnit, ast: &VelosiAst) {
         C::Type::to_ptr(&C::Type::new_class("InterfaceBase")),
     )
     .set_public()
-    .set_inside_def()
     .set_override()
     .body()
     .return_expr(C::Expr::addr_of(&C::Expr::field_access(
@@ -1031,7 +1211,6 @@ fn add_unit_class(s: &mut Scope, unit: &VelosiAstUnit, ast: &VelosiAst) {
         C::Type::to_ptr(&C::Type::new_class("StateBase")),
     )
     .set_public()
-    .set_inside_def()
     .set_override()
     .body()
     .return_expr(C::Expr::addr_of(&C::Expr::field_access(
@@ -1080,48 +1259,61 @@ fn add_unit_class(s: &mut Scope, unit: &VelosiAstUnit, ast: &VelosiAst) {
     }
 }
 
-pub fn generate_unit_header(
+// Main function here: generates cpp + hpp for unit.
+// Some duplication since calling clone() on crustal's Scope wasn't working as expected.
+pub fn generate_unit_cpp(
     unit: &VelosiAstUnit,
     ast: &VelosiAst,
+    pkgname: &str,
     outdir: &Path,
 ) -> Result<(), VelosiHwGenError> {
     let mut scope = C::Scope::new();
 
-    add_header_comment(&mut scope, unit.ident(), "top-level file");
-
-    // let ifn = interface_class_name(unit.ident());
-    // let scn = state_class_name(unit.ident());
-    // let ucn = unit_class_name(unit.ident());
-
     let header_guard = format!("{}_UNIT_HPP_", unit.ident().to_uppercase());
     let guard = scope.new_ifdef(&header_guard);
-    let s = guard.guard().then_scope();
+    let hs = guard.guard().then_scope();
 
-    s.new_comment("system includes");
-    s.new_include("string.h", true);
-    s.new_include("stddef.h", true);
-    s.new_include("assert.h", true);
+    add_header_comment(hs, unit.ident(), "generated implementation");
 
-    s.new_comment("framework includes");
-    s.new_include("framework/types.hpp", false);
-    s.new_include("framework/state_base.hpp", false);
-    s.new_include("framework/state_field_base.hpp", false);
-    s.new_include("framework/interface_base.hpp", false);
-    s.new_include("framework/translation_unit_base.hpp", false);
-    s.new_include("framework/logging.hpp", false);
+    hs.new_comment("system includes");
+    hs.new_include("string.h", true);
+    hs.new_include("stddef.h", true);
+    hs.new_include("assert.h", true);
+    hs.new_comment("framework includes");
+    hs.new_include("framework/types.hpp", false);
+    hs.new_include("framework/state_base.hpp", false);
+    hs.new_include("framework/state_field_base.hpp", false);
+    hs.new_include("framework/interface_base.hpp", false);
+    hs.new_include("framework/translation_unit_base.hpp", false);
+    hs.new_include("framework/logging.hpp", false);
+    hs.new_include("framework/fm_util.hpp", false);
 
     for u in unit.get_next_unit_idents() {
-        s.new_comment("translation unit specific includes");
-        s.new_include(&unit_header_file(&u.to_string()), false);
+        hs.new_comment("translation unit specific includes");
+        hs.new_include(&unit_header_file(&u.to_string()), false);
     }
+    hs.new_include(&state_header_file(unit.ident().as_str()), false);
+    hs.new_include(&registers_header_file(pkgname), false);
 
-    add_state_classes(s, unit);
-    add_interface_class(s, unit);
-    add_unit_class(s, unit, ast);
+    add_state_header(unit, pkgname, outdir);
+    // add_state_classes(&mut hs, unit);
+    add_interface_class(hs, unit);
+    add_unit_class(hs, unit, ast);
 
-    let filename = unit_header_file(unit.ident());
-    scope.set_filename(&filename);
+    scope.set_filename(&unit_header_file(unit.ident()));
     scope.to_file(outdir, true)?;
+
+    let mut is = C::Scope::new();
+    is.new_include(&unit_header_file(unit.ident()), false);
+
+    add_state_classes(&mut is, unit);
+    add_interface_class(&mut is, unit);
+    add_unit_class(&mut is, unit, ast);
+
+    add_header_comment(&mut is, unit.ident(), "generated implementation");
+
+    is.set_filename(&unit_impl_file(unit.ident()));
+    is.to_file(outdir, false)?;
 
     Ok(())
 }
