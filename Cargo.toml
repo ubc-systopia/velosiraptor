@@ -71,7 +71,6 @@ harness = false
 [[bench]]
 name = "opt"
 harness = false
-build = "build.rs"
 
 [[bench]]
 name = "runtime"
