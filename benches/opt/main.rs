@@ -10,16 +10,17 @@ use std::time::Instant;
 use velosiast::{AstResult, VelosiAst, VelosiAstField, VelosiAstUnit, VelosiAstUnitSegment};
 use velosisynth::{SynthOpts, Z3SynthSegment, Z3WorkerPool};
 
-const SPECS: [(&str, &str); 10] = [
+const SPECS: [(&str, &str); 11] = [
     ("examples/simple_translation_table.vrs", "Simple Page Table"),
     ("examples/x86_32_pagetable.vrs", "x86\\_32 Page Table"),
     ("examples/x86_64_pagetable.vrs", "x86\\_64 Page Table"),
+    ("examples/mpu.vrs", "Arm MPU"),
     ("examples/xeon_phi_smpt.vrs", "Xeon Phi SMPT"),
     ("examples/simple_segment.vrs", "Simple Segment"),
     ("examples/variable_segment.vrs", "Variable Segment"),
     ("examples/medium.vrs", "Medium Segment"),
-    ("examples/x86_segmentation.vrs", "x86 Segmentation"),
     ("examples/assoc_segment.vrs", "Assoc Segment"),
+    ("examples/x86_segmentation.vrs", "x86 Segmentation"),
     ("examples/r4700_fixed_page_size.vrs", "R4700 TLB"),
 ];
 
