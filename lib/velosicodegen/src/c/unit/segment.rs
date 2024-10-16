@@ -271,7 +271,9 @@ fn add_op_fn(
     let body = fun.body();
 
     let mut vars = HashMap::new();
+    // println!("{}", unit.to_op_fn_name(op));
     for (p, ty) in &param_types {
+        // println!("p: {} -> {} extern: {}", p, ty, ty.is_extern());
         // print!("{} -> {} extern: {}", p, ty, ty.is_extern());
         if ty.is_extern() && *p == "pa" {
             let m = env.get_method_with_signature(&[ty.clone()], &VelosiAstTypeInfo::PhysAddr);
@@ -281,8 +283,16 @@ fn add_op_fn(
                 panic!("{} -> {}() var: {} {}", unit.ident(), op.ident(), p, ty);
             }
         } else if ty.is_typeref() && *p != "$unit" {
+            if env.has_map_protect_unmap() {
+                param_vars.insert(*p, param_vars[p].clone());
+            } else {
+                param_vars.insert(*p, C::Expr::field_access(&param_vars[p], "base"));
+            }
             // here we have atype ref so we need something here
-            param_vars.insert(*p, C::Expr::field_access(&param_vars[p], "base"));
+            // param_vars.insert(*p, C::Expr::field_access(&param_vars[p], "base"));
+
+//            param_vars.insert(*p,  param_vars[p].clone()); //C::Expr::field_access(, "base22"));
+  //          param_vars.insert(*p, )
         }
     }
 
@@ -1049,8 +1059,6 @@ fn add_unmap_protect_function_common(
         assert!(unit.maps_table());
 
         if env.has_map_protect_unmap() {
-            println!("TODO: implement me! {}", line!());
-
             let cond = body.new_ifelse(&C::Expr::lnot(C::Expr::fn_call(
                 &unit.valid_fn_name(),
                 vec![v_unit_param.clone()],
