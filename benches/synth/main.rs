@@ -211,7 +211,7 @@ const LINUX_GIT_URL: &str =
     "https://git.launchpad.net/~ubuntu-kernel/ubuntu/+source/linux/+git/noble";
 const LINUX_GIT_SHA: &str = "74134bfb6b720ca18a73931662cbcc8170ef1bed";
 
-fn compile_linux(nworkers: usize) -> Option<Stats> {
+fn compile_linux(nworkers: usize, iterations: usize) -> Option<Stats> {
     println!("Running Linux Compilation Benchmark");
 
     let config_file = Path::new(file!()).parent().unwrap().join("ubuntu.config");
@@ -290,7 +290,7 @@ fn compile_linux(nworkers: usize) -> Option<Stats> {
         .output()
         .expect("failed to execute process");
 
-    let bar = ProgressBar::new(ITERATIONS.try_into().unwrap());
+    let bar = ProgressBar::new(iterations.try_into().unwrap());
     bar.set_style(
         ProgressStyle::with_template(
             "{spinner:.dim.bold} [{bar:40.cyan/blue}]  {pos}/{len}  -  {msg:20}",
@@ -300,8 +300,8 @@ fn compile_linux(nworkers: usize) -> Option<Stats> {
     );
 
     let parallelism = format!("-j{}", nworkers);
-    let mut measurements = Vec::with_capacity(ITERATIONS);
-    for _ in 0..ITERATIONS {
+    let mut measurements = Vec::with_capacity(iterations);
+    for _ in 0..iterations {
         bar.set_message("make clean");
         // println!(" - Running make clean");
         Command::new("make")
@@ -346,6 +346,7 @@ fn main() {
     let is_dirty = !output.stdout.is_empty();
     let build_dirty = env!("VERGEN_GIT_DIRTY") == "true";
     let allow_dirty = args.iter().any(|e| e.as_str() == "--allow-dirty");
+    let is_smoke = args.iter().any(|e| e.as_str() == "--smoke");
 
     if is_dirty && !allow_dirty {
         println!("ERROR. Git repository is dirty. Terminating.");
@@ -362,10 +363,8 @@ fn main() {
     let mut latex_results = String::new();
     let mut latex_results_no_tree = String::new();
 
-    let nworkers = std::cmp::max(
-        if nthreads > 1 { (nthreads / 2) - 1 } else { 1 },
-        NUM_WORKERS,
-    );
+    let nworkers =  if nthreads > 1 { (nthreads / 2) - 1 } else { 1 };
+    let iterations = if is_smoke { 5 } else { ITERATIONS };
     for (spec, name) in SPECS.iter() {
         println!(" @ Spec: {spec}");
 
@@ -387,7 +386,7 @@ fn main() {
             let mut results = BenchResults::new(name.to_string());
             let mut had_errors = false;
             print!("    ");
-            let bar = ProgressBar::new(ITERATIONS.try_into().unwrap());
+            let bar = ProgressBar::new(iterations.try_into().unwrap());
             bar.set_style(
                 ProgressStyle::with_template(
                     "{spinner:.dim.bold} [{bar:40.cyan/blue}]  {pos}/{len}  -  {msg:20}",
@@ -396,7 +395,7 @@ fn main() {
                 .tick_chars("/|\\- "),
             );
 
-            for _ in 0..ITERATIONS {
+            for _ in 0..iterations {
                 // create synth factory and run synthesis on the segments
                 let mut z3_workers = Z3WorkerPool::with_num_workers(nworkers, None);
                 if let Some(res) = run_synthesis(
@@ -445,7 +444,7 @@ fn main() {
     }
     latex_results.push_str("  \\hline % ---------------------------------------------------------------------------------");
 
-    let linux_times = compile_linux(nthreads);
+    let linux_times = compile_linux(nthreads, iterations);
 
     println!("# Completed\n\n");
 
@@ -468,7 +467,7 @@ fn main() {
     println!("% Date:       {}", Local::now());
     println!("% Threads:    {}", nthreads);
     println!("% Workers:    {}", nworkers);
-    println!("% Iterations: {}", ITERATIONS);
+    println!("% Iterations: {}", iterations);
     println!(
         "% =========================================================================================="
     );

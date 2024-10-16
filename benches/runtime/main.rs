@@ -25,9 +25,9 @@ use bench::*;
 
 const ROWS: [&str; 4] = [
     "Linux-x86_64",
-    "Arbutus-x86_64",
+    "Velosiraptor-x86_64",
     "Barrelfish-PTable",
-    "Arbutus-PTable",
+    "Velosiraptor-PTable",
 ];
 
 const COLS: [&str; 3] = ["Map", "Protect", "Unmap"];
