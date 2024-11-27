@@ -501,6 +501,8 @@ fn add_translate_method_segment(
     } else {
         body.assign(base_var.clone(), C::Expr::Raw(String::from("PANIC!")));
     }
+    // body.fn_call(name, args)
+    body.return_expr(C::Expr::bfalse());
 }
 
 fn translate_method_enum(unit: &VelosiAstUnitEnum, ast: &VelosiAst) -> C::Method {

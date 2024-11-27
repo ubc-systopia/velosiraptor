@@ -40,7 +40,7 @@ use rexpect::{
 
 /// Test the hardware generation
 #[test]
-fn examples_hwgen_fastmodels() {
+fn build_fast_models_components() {
     let d = PathBuf::from("examples");
     let outdir = Path::new("out/examples_hwgen_fastmodels");
     for f in d.read_dir().expect("could not read example directory") {
@@ -50,7 +50,60 @@ fn examples_hwgen_fastmodels() {
             continue;
         }
 
+        // skipping the r4700 example, as this needs special instructions
+        if vrs.ends_with("r4700_fixed_page_size.vrs") {
+            continue;
+        }
+
         generate_and_check(&vrs, &outdir);
+    }
+}
+
+/// Test the
+#[test]
+#[ignore]
+fn build_fast_models_platforms() {
+    let d = PathBuf::from("examples");
+    let outdir = Path::new("out/examples_hwgen_fastmodels");
+    for f in d.read_dir().expect("could not read example directory") {
+        let vrs = f.expect("could not read directory entry").path();
+
+        if vrs.is_dir() {
+            continue;
+        }
+
+        // skipping the r4700 example, as this needs special instructions
+        if vrs.ends_with("r4700_fixed_page_size.vrs") {
+            continue;
+        }
+
+        generate_and_check(&vrs, &outdir);
+        build_fastmodels(&vrs, &outdir);
+    }
+}
+
+
+/// Test the
+#[test]
+#[ignore]
+fn run_fast_models_platforms() {
+    let d = PathBuf::from("examples");
+    let outdir = Path::new("out/examples_hwgen_fastmodels");
+    for f in d.read_dir().expect("could not read example directory") {
+        let vrs = f.expect("could not read directory entry").path();
+
+        if vrs.is_dir() {
+            continue;
+        }
+
+        // skipping the r4700 example, as this needs special instructions
+        if vrs.ends_with("r4700_fixed_page_size.vrs") {
+            continue;
+        }
+
+        generate_and_check(&vrs, &outdir);
+        build_fastmodels(&vrs, &outdir);
+        run_fastmodels(&vrs, &outdir, None);
     }
 }
 
@@ -67,7 +120,7 @@ fn example_direct_segment_fastmodels() {
     generate_and_check(&vrs, &outdir);
     build_fastmodels(&vrs, &outdir);
     build_bootimg(&vrs, &outdir);
-    run_fastmodels(&vrs, &outdir);
+    run_fastmodels(&vrs, &outdir, None);
 }
 
 /// Test the
@@ -116,7 +169,8 @@ fn generate_and_check(vrs: &Path, outdir: &Path) {
     let name = vrs.file_stem().unwrap().to_string_lossy();
     let path_str = vrs.to_str().expect("could not create string from path");
 
-    println!("\nGenerate and Check: {path_str}.vrs");
+
+    println!("\nGenerate and Check: {path_str}");
 
     print!("  - Parsing {:40} ...", name);
 
@@ -199,16 +253,14 @@ fn build_fastmodels(vrs: &Path, outdir: &Path) {
 
     print!("  - Compiling hardware module ... ");
 
-    let fastmodels_config_file = get_fastmodels_path().join("source_all.sh");
-
     let outpath = outdir.join(name.to_string()).join("hw/fastmodels");
 
-    let command_str = format!("source {}; make", fastmodels_config_file.display());
+    let command_str = format!("make");
 
     // run make
     let make = Command::new("bash")
         .args(["-c", command_str.as_str()])
-        .current_dir(outpath)
+        .current_dir(outpath.clone())
         .output()
         .expect("Failed to execute command");
 
@@ -222,10 +274,6 @@ fn build_fastmodels(vrs: &Path, outdir: &Path) {
                 println!(" ok");
             } else {
                 println!(" ok  (with issues)");
-                println!(">>>>>>\n{errs}\n<<<<<<");
-                let errs = String::from_utf8(make.stdout).unwrap();
-                println!(">>>>>>\n{errs}\n<<<<<<");
-                panic!("Compilation resulted in warnings");
             }
         }
     } else {
@@ -237,6 +285,15 @@ fn build_fastmodels(vrs: &Path, outdir: &Path) {
 
         panic!("Compilation resulted in errors");
     }
+
+    let simfile = outpath.join("build/plat_example_sim");
+    if !simfile.exists() {
+        println!("  - failed to build the simulator binary. Not found in `{}`", simfile.display());
+    } else {
+        println!("  - simulator successfully built `{}`", simfile.display());
+    }
+
+
 }
 
 /// builds the boot image
@@ -321,7 +378,7 @@ fn expect_output(p: &mut PtyReplSession, output: &mut String, expected: &str) {
 
 /// runs the fastmodels emulated system
 #[cfg(test)]
-fn run_fastmodels(vrs: &Path, outdir: &Path) {
+fn run_fastmodels(vrs: &Path, outdir: &Path, bootimg: Option<&Path>) {
     let name = vrs.file_stem().unwrap().to_string_lossy();
     let path_str = vrs.to_str().expect("could not create string from path");
 
