@@ -89,6 +89,9 @@ fn build_fast_models_platforms() {
 fn run_fast_models_platforms() {
     let d = PathBuf::from("examples");
     let outdir = Path::new("out/examples_hwgen_fastmodels");
+
+
+
     for f in d.read_dir().expect("could not read example directory") {
         let vrs = f.expect("could not read directory entry").path();
 
@@ -103,6 +106,7 @@ fn run_fast_models_platforms() {
 
         generate_and_check(&vrs, &outdir);
         build_fastmodels(&vrs, &outdir);
+        build_bootimg(&vrs,&outdir);
         run_fastmodels(&vrs, &outdir, None);
     }
 }
@@ -249,7 +253,7 @@ fn build_fastmodels(vrs: &Path, outdir: &Path) {
     let name = vrs.file_stem().unwrap().to_string_lossy();
     let path_str = vrs.to_str().expect("could not create string from path");
 
-    println!("\nBuilding FastModels: {path_str}.vrs");
+    println!("\nBuilding FastModels: {path_str}");
 
     print!("  - Compiling hardware module ... ");
 
@@ -298,14 +302,19 @@ fn build_fastmodels(vrs: &Path, outdir: &Path) {
 
 /// builds the boot image
 #[cfg(test)]
-fn build_bootimg(_vrs: &Path, _outdir: &Path) {
+fn build_bootimg(vrs: &Path, _outdir: &Path) {
     println!("\nBuilding Bootimage");
 
     let bootimg_src = Path::new("support/arm-fastmodels-boot");
+    let test_file = format!("src/tests/vrs_test_{}.c", vrs.file_stem().unwrap().to_str().unwrap());
 
+    println!("  - test file: {}", test_file);
+
+    print!("  - Compiling boot image ... ");
     // run make
     let make = Command::new("make")
         .arg("bootimg.bin")
+        .env("VRS_TEST", &test_file)
         .current_dir(bootimg_src)
         .output()
         .expect("Failed to execute command");
@@ -391,24 +400,29 @@ fn run_fastmodels(vrs: &Path, outdir: &Path, bootimg: Option<&Path>) {
     println!("  - sim: {}", simprog.display());
     assert!(simprog.is_file());
 
-    let bootimg_src = Path::new("support/arm-fastmodels-boot");
+    let bootimg = if let Some(bi) = bootimg {
+        bi.to_path_buf()
+    } else {
+        let bootimg_src = Path::new("support/arm-fastmodels-boot");
+        bootimg_src.join("bootimg.bin")
+    };
 
-    let bootimg = bootimg_src.join("bootimg.bin");
     println!("  - bootimg: {}", bootimg.display());
     assert!(bootimg.is_file());
 
-    let fastmodels_config_file = get_fastmodels_path().join("source_all.sh");
+    // let fastmodels_config_file = get_fastmodels_path().join("source_all.sh");
 
     // run make
     let mut p = spawn_bash(Some(5000)).expect("could not spawn bash process");
 
     let command_str = format!(
-        "source {}; ./{} --data Memory0={}@0x0",
-        fastmodels_config_file.display(),
+        "./{} --data Memory0={}@0x0",
+        // fastmodels_config_file.display(),
         simprog.display(),
         bootimg.display()
     );
-    // println!("  - cmd: {command_str}");
+
+    println!(" -- executing {command_str}");
     p.send_line(command_str.as_str())
         .expect("could not send command to bash");
 
@@ -428,7 +442,7 @@ fn run_fastmodels(vrs: &Path, outdir: &Path, bootimg: Option<&Path>) {
     expect_output(
         &mut p,
         &mut output,
-        r"\[ARMv8\]: VRS: Velosiraptor tests starting.",
+        r"\[ARMv8\]: Running VRS tests for:",
     );
     expect_output(
         &mut p,
