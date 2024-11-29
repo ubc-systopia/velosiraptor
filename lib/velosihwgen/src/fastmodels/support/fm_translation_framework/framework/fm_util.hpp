@@ -20,6 +20,7 @@ namespace pv {
     struct Tx_Result;
     struct ReadTransaction;
     struct WriteTransaction;
+    struct RandomContextTransactionGenerator;
 }
 namespace DVM {
     typedef uint32_t error_response_t;
