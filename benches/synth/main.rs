@@ -363,7 +363,7 @@ fn main() {
     let mut latex_results = String::new();
     let mut latex_results_no_tree = String::new();
 
-    let nworkers =  if nthreads > 1 { (nthreads / 2) - 1 } else { 1 };
+    let nworkers = if nthreads > 1 { (nthreads / 2) - 1 } else { 1 };
     let iterations = if is_smoke { 5 } else { ITERATIONS };
     for (spec, name) in SPECS.iter() {
         println!(" @ Spec: {spec}");
