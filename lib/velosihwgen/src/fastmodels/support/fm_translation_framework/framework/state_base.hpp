@@ -12,7 +12,6 @@
 #include <map>
 #include <vector>
 #include <string>
-
 #include "state_field_base.hpp"
 
 class StateBase {
@@ -29,12 +28,13 @@ public:
     StateBase(void);
 
     /**
-     * @brief create a new StateBase class with the given fields
+     * @brief create a new StateBase with bus pointer for memory access
      *
-     * @param[in] fields  the fields of the state
+     * @param[in] ttw_pvbus
      */
-    StateBase(std::vector<StateFieldBase *> fields);
-
+    StateBase(lpaddr_t base, pv::RandomContextTransactionGenerator *ptw_pvbus)
+        : base(base)
+        , ptw_pvbus(ptw_pvbus) {};
 
     /**
      * @brief prints the fields of the current staste
@@ -86,8 +86,16 @@ public:
      */
     bool set_field_value(const std::string &name, uint64_t value);
 
+    void populate_state(void);
+
     ///< stores a map between field names and field objects
     std::map<std::string, StateFieldBase *> fields;
+
+    ///< base address
+    lpaddr_t base;
+
+    ///< access to simulated memory
+    pv::RandomContextTransactionGenerator *ptw_pvbus;
 
 protected:
     /**

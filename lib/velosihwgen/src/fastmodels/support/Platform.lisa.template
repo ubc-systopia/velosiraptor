@@ -2,9 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 //
-// This defines some sample platform that uses the
-//
-// TODO: add the translation unit component when things compile
+// This defines a setup connecting the translation unit (which has its own LISA
+// file) to an arm cortex chip, a serial port, and memory.
 //
 component ExamplePlatform
 {
@@ -41,20 +40,18 @@ component ExamplePlatform
         // main system bus
         BusDecoder0.pvbus_m_range[0x00000000..0x0fffffff] => Memory0.pvbus;
         BusDecoder0.pvbus_m_range[0x1C090000..0x1C090fff] => pl011_uart.pvbus;
+
+        // I think this was originally for registers?
         BusDecoder0.pvbus_m_range[0x1D000000..0x1dffffff] => /* REPLACE top_class */.control;
-        // BusDecoder0.pvbus_m_range[0x1D000000..0x1dffffff] => TranslationUnit.control;
         BusDecoder0.pvbus_m_range[0x80000000..0xbfffffff] => DRAM0.pvbus;
 
         // access to DRAM1, translated
         BusDecoder0.pvbus_m_range[0xC0000000..0xffffffff] => /* REPLACE top_class */.pvbus_s;
-        // BusDecoder0.pvbus_m_range[0xC0000000..0xffffffff] => TranslationUnit.pvbus_s;
         /* REPLACE top_class */.pvbus_m => DRAM1.pvbus;
-        // TranslationUnit.pvbus_m => DRAM1.pvbus;
         /* REPLACE top_class */.pvbus_ptw_m => DRAM1.pvbus;
-        // TranslationUnit.pvbus_ptw_m => DRAM1.pvbus;
 
         // access to DRAM1, kernel interface to (TODO) init tables for testing (writable, not translated)
-        BusDecoder0.pvbus_m_range[0x1C0000000..0x1ffffffff] => DRAM1.pvbus;
+        BusDecoder0.pvbus_m_range[0x100000000..0x13fffffff] => DRAM1.pvbus[0..0x3fffffff];
 
         // UART to terminal
         pl011_uart.serial_out => telnetterminal.serial;
