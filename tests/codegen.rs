@@ -79,7 +79,6 @@ type CodeGenConstructor = fn(&Path, String) -> VelosiCodeGen;
 fn examples_codegen(lang: &str, new_codegen_fn: CodeGenConstructor) {
     let mut outdir = PathBuf::from("out");
 
-
     let ncores = std::cmp::max(
         std::thread::available_parallelism()
             .map(|i| i.into())
@@ -100,7 +99,10 @@ fn examples_codegen(lang: &str, new_codegen_fn: CodeGenConstructor) {
             continue;
         }
 
-        if !matches!(vrs.display().to_string().as_str(), "examples/x86_64_pagetable.vrs") {
+        if !matches!(
+            vrs.display().to_string().as_str(),
+            "examples/x86_64_pagetable.vrs"
+        ) {
             continue;
         }
 
@@ -119,10 +121,8 @@ fn examples_codegen(lang: &str, new_codegen_fn: CodeGenConstructor) {
             let t_elapsed_ms = Instant::now().duration_since(t_start).as_millis();
             println!("    - AST creation: {t_elapsed_ms} ms");
 
-
             let mut synthfactory = Z3SynthFactory::new();
             synthfactory.num_workers(ncores).default_log_dir();
-
 
             let t_start = Instant::now();
             let models = create_models(&ast);

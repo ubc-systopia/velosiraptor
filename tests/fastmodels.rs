@@ -82,15 +82,12 @@ fn build_fast_models_platforms() {
     }
 }
 
-
 /// Test the
 #[test]
 #[ignore]
 fn run_fast_models_platforms() {
     let d = PathBuf::from("examples");
     let outdir = Path::new("out/examples_hwgen_fastmodels");
-
-
 
     for f in d.read_dir().expect("could not read example directory") {
         let vrs = f.expect("could not read directory entry").path();
@@ -106,7 +103,7 @@ fn run_fast_models_platforms() {
 
         generate_and_check(&vrs, &outdir);
         build_fastmodels(&vrs, &outdir);
-        build_bootimg(&vrs,&outdir);
+        build_bootimg(&vrs, &outdir);
         run_fastmodels(&vrs, &outdir, None);
     }
 }
@@ -172,7 +169,6 @@ fn generate_and_check(vrs: &Path, outdir: &Path) {
 
     let name = vrs.file_stem().unwrap().to_string_lossy();
     let path_str = vrs.to_str().expect("could not create string from path");
-
 
     println!("\nGenerate and Check: {path_str}");
 
@@ -292,12 +288,13 @@ fn build_fastmodels(vrs: &Path, outdir: &Path) {
 
     let simfile = outpath.join("build/plat_example_sim");
     if !simfile.exists() {
-        println!("  - failed to build the simulator binary. Not found in `{}`", simfile.display());
+        println!(
+            "  - failed to build the simulator binary. Not found in `{}`",
+            simfile.display()
+        );
     } else {
         println!("  - simulator successfully built `{}`", simfile.display());
     }
-
-
 }
 
 /// builds the boot image
@@ -306,7 +303,10 @@ fn build_bootimg(vrs: &Path, _outdir: &Path) {
     println!("\nBuilding Bootimage");
 
     let bootimg_src = Path::new("support/arm-fastmodels-boot");
-    let test_file = format!("src/tests/vrs_test_{}.c", vrs.file_stem().unwrap().to_str().unwrap());
+    let test_file = format!(
+        "src/tests/vrs_test_{}.c",
+        vrs.file_stem().unwrap().to_str().unwrap()
+    );
 
     println!("  - test file: {}", test_file);
 
@@ -439,11 +439,7 @@ fn run_fastmodels(vrs: &Path, outdir: &Path, bootimg: Option<&Path>) {
         r"\[ARMv8\]: FastModels bootloader starting on ARM Cortex-A53",
     );
 
-    expect_output(
-        &mut p,
-        &mut output,
-        r"\[ARMv8\]: Running VRS tests for:",
-    );
+    expect_output(&mut p, &mut output, r"\[ARMv8\]: Running VRS tests for:");
     expect_output(
         &mut p,
         &mut output,
