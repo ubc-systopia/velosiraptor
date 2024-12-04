@@ -154,12 +154,6 @@ fn example_x86_32_pagetable_table_fastmodels() {
 // Test Utils for the FastModels HW Gen
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// assumes the fastmodels path is in $home/bin/arm
-fn get_fastmodels_path() -> PathBuf {
-    let homedir = std::env::home_dir().expect("could not get the home directory");
-    homedir.join("bin/arm/FastModelsTools_11.15")
-}
-
 /// builds the fastmodels emulated system
 #[cfg(test)]
 fn generate_and_check(vrs: &Path, outdir: &Path) {
@@ -278,12 +272,15 @@ fn build_fastmodels(vrs: &Path, outdir: &Path) {
         }
     } else {
         println!(" failed. (errors during compilation");
-        let errs = String::from_utf8(make.stdout).unwrap();
-        println!(">>>>>>\n{errs}\n<<<<<<");
-        let errs = String::from_utf8(make.stderr).unwrap();
-        println!(">>>>>>\n{errs}\n<<<<<<");
 
-        panic!("Compilation resulted in errors");
+        let errs = String::from_utf8(make.stderr).unwrap();
+        if errs.contains("simgen: not found") {
+            panic!("\n\n!! SimGen not found. Did you source the Fast Models environment? e.g., `source $HOME/bin/arm/FastModelsTools_11.15/source_all.sh` !!\n\n")
+        }
+        let stdoutstr = String::from_utf8(make.stdout).unwrap();
+        println!(">>>>>>\n{stdoutstr}\n<<<<<<");
+        println!(">>>>>>\n{errs}\n<<<<<<");
+        return;
     }
 
     let simfile = outpath.join("build/plat_example_sim");
@@ -431,7 +428,7 @@ fn run_fastmodels(vrs: &Path, outdir: &Path, bootimg: Option<&Path>) {
     expect_output(
         &mut p,
         &mut output,
-        r"\[UNIT\] \[ WARN\] Initializing translation unit",
+        r"\[ UNIT\] \[ WARN\] Initializing translation unit",
     );
     expect_output(
         &mut p,

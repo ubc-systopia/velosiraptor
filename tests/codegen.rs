@@ -38,8 +38,7 @@ use std::time::Instant;
 // our library
 use velosiast::{AstResult, VelosiAst, VelosiAstUnit};
 use velosicodegen::VelosiCodeGen;
-use velosiparser::{VelosiParser, VelosiParserError};
-use velosisynth::{create_models, Z3SynthEnum, Z3SynthFactory, Z3SynthSegment};
+use velosisynth::{create_models, Z3SynthFactory, Z3SynthSegment};
 
 fn get_ast(vrs: &str) -> VelosiAst {
     match VelosiAst::from_file(vrs) {
