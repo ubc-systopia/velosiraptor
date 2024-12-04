@@ -184,13 +184,13 @@ impl VelosiAstState {
                         None => {
                             // nothing found in the symbol table, we can adde the symbol to the root
                             // context of the symbol table so it stays there in the compilation unit
-                            st.insert_root(sym.clone()).ok();
+                            // st.insert_current(sym.clone()).ok();
                         }
                     }
 
                     // insert it to the current scope, in case there was a different layout, so
                     // other checks won't fail
-                    st.insert_current(sym).map_err(|e| issues.push(*e)).ok();
+                    st.insert(sym).map_err(|e| issues.push(*e)).ok();
                 }
             } else {
                 // this is a memory field, simply insert it into the symbol table.
