@@ -449,7 +449,7 @@ impl<'a> Z3SynthSegment<'a> {
     }
 }
 
-impl<'a> Display for Z3SynthSegment<'a> {
+impl Display for Z3SynthSegment<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         if self.is_done() {
             if let Some(prog) = &self.map_program {
