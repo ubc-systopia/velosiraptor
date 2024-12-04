@@ -80,7 +80,6 @@ use self::unit::{unit_class_name, unit_header_file, unit_impl_file};
 /// outdir/hw/fastmodels/fm-translation-framework/state_field_base.hpp
 /// outdir/hw/fastmodels/fm-translation-framework/translation_unit_base.hpp
 /// outdir/hw/fastmodels/fm-translation-framework/types.hpp
-
 pub struct ArmFastModelsModule {
     outdir: PathBuf,
     support_dir: PathBuf,

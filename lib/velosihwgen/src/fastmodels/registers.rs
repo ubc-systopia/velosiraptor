@@ -54,8 +54,7 @@ pub fn register_map<T>(
     if unit.interface().is_none() {
         return vec![];
     }
-    return unit
-        .interface()
+    unit.interface()
         .unwrap()
         .fields()
         .iter()
@@ -65,7 +64,7 @@ pub fn register_map<T>(
             VelosiAstInterfaceField::Mmio(_) => Some(func(f.deref())),
             VelosiAstInterfaceField::Instruction(_) => None,
         })
-        .collect();
+        .collect()
 }
 
 pub fn generate_register_header(
