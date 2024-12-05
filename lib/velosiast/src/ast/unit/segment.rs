@@ -747,6 +747,14 @@ impl VelosiAstUnitSegment {
         self.state.has_memory()
     }
 
+    pub fn has_register_state(&self) -> bool {
+        self.state.has_registers()
+    }
+
+    pub fn register_region_size(&self) -> u64 {
+        self.interface.register_region_size()
+    }
+
     pub fn state_field_idents(&self) -> HashSet<Rc<String>> {
         self.state.field_idents()
     }

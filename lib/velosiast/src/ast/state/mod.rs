@@ -356,6 +356,12 @@ impl VelosiAstState {
             .any(|f| matches!(f.as_ref(), VelosiAstStateField::Memory(_)))
     }
 
+    pub fn has_registers(&self) -> bool {
+        self.fields
+            .iter()
+            .any(|f| matches!(f.as_ref(), VelosiAstStateField::Register(_)))
+    }
+
     /// calculates the size of the memory required to hold the in-memory state fields
     pub fn in_memory_size(&self) -> u64 {
         self.fields

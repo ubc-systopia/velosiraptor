@@ -68,6 +68,7 @@ pub struct VelosiAstUnitEnumVariant {
     pub differentiator: Vec<Rc<VelosiAstExpr>>,
     /// whether the variant has some memory state
     pub has_memory_state: bool,
+    pub has_register_state: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -171,9 +172,11 @@ impl VelosiAstUnitEnum {
                     let mut differentiator = Vec::new();
 
                     let mut has_memory_state = false;
+                    let mut has_register_state = false;
                     if let Some(sym) = st.lookup(ident.ident()) {
                         if let VelosiAstNode::Unit(u) = &sym.ast_node {
                             has_memory_state = u.has_memory_state();
+                            has_register_state = u.has_register_state();
                             if let VelosiAstUnit::Enum(e) = u {
                                 let msg = format!(
                                     "unit `{ident}` is an enum. nested enums are not supported"
@@ -372,6 +375,7 @@ impl VelosiAstUnitEnum {
                         args,
                         differentiator,
                         has_memory_state,
+                        has_register_state,
                     };
 
                     enums.insert(val.ident.ident.clone(), val);
@@ -559,6 +563,14 @@ impl VelosiAstUnitEnum {
 
     pub fn has_memory_state(&self) -> bool {
         self.enums.values().any(|v| v.has_memory_state)
+    }
+
+    pub fn has_register_state(&self) -> bool {
+        self.enums.values().any(|v| v.has_register_state)
+    }
+
+    pub fn register_region_size(&self) -> u64 {
+        0
     }
 
     pub fn in_memory_state_size(&self, units: &HashMap<Rc<String>, VelosiAstUnit>) -> u64 {

@@ -106,6 +106,15 @@ impl VelosiAstInterfaceField {
         }
     }
 
+    pub fn offset(&self) -> u64 {
+        match self {
+            VelosiAstInterfaceField::Memory(field) => field.offset,
+            VelosiAstInterfaceField::Register(_field) => 0,
+            VelosiAstInterfaceField::Mmio(field) => field.offset,
+            VelosiAstInterfaceField::Instruction(_field) => 0,
+        }
+    }
+
     pub fn nbits(&self) -> u64 {
         match self {
             VelosiAstInterfaceField::Memory(field) => field.nbits(),

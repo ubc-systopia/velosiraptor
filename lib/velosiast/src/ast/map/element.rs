@@ -53,6 +53,8 @@ pub struct VelosiAstStaticMapElement {
     pub offset: Option<VelosiAstExpr>,
     pub loc: VelosiTokenStream,
     pub has_memory_state: bool,
+    pub has_register_state: bool,
+    pub register_region_size: u64,
 }
 
 impl VelosiAstStaticMapElement {
@@ -70,6 +72,8 @@ impl VelosiAstStaticMapElement {
             offset,
             loc,
             has_memory_state: false,
+            has_register_state: false,
+            register_region_size: 0,
         }
     }
 
@@ -114,9 +118,13 @@ impl VelosiAstStaticMapElement {
 
         // get the destination unit
         let mut has_memory_state = false;
+        let mut has_register_state = false;
+        let mut register_region_size = 0;
         let bitwidth = if let Some(destsym) = st.lookup(dst.ident()) {
             if let VelosiAstNode::Unit(u) = &destsym.ast_node {
                 has_memory_state = u.has_memory_state();
+                has_register_state = u.has_register_state();
+                register_region_size = u.register_region_size();
                 u.input_bitwidth()
             } else {
                 64
@@ -141,7 +149,9 @@ impl VelosiAstStaticMapElement {
                 dst_bitwidth: bitwidth,
                 offset,
                 loc: pt.loc,
-                has_memory_state
+                has_memory_state,
+                has_register_state,
+                register_region_size
             },
             issues
         )
@@ -149,6 +159,14 @@ impl VelosiAstStaticMapElement {
 
     pub fn has_memory_state(&self) -> bool {
         self.has_memory_state
+    }
+
+    pub fn has_register_state(&self) -> bool {
+        self.has_register_state
+    }
+
+    pub fn register_region_size(&self) -> u64 {
+        self.register_region_size
     }
 }
 
