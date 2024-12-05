@@ -236,7 +236,7 @@ component /* REPLACE top_class */
             exit(1);
         }
 
-        level = LOG_LEVEL_DEBUG;
+        level = LOG_LEVEL_INFO;
 
         // TODO: register the interrupt stuff
         Logging::init(level);

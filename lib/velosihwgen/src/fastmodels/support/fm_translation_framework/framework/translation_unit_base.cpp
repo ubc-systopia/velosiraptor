@@ -247,7 +247,7 @@ unsigned TranslationUnitBase::handle_remap(pv::RemapRequest &req, unsigned *unpr
         return 1;
     }
 
-    Logging::debug("TranslationUnitBase::handle_remap() - translated 0x%lx -> 0x%lx", addr, dst);
+    Logging::info("TranslationUnitBase::handle_remap() - translated 0x%lx -> 0x%lx", addr, dst);
 
     // set the remap base
     req.setRemapPageBase(dst & ~(BASE_PAGE_SIZE - 1));
