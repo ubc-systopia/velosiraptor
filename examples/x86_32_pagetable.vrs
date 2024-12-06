@@ -372,7 +372,7 @@ segment X86MMU(base: paddr) {
     fn translate(va: vaddr) -> paddr
     {
         if state.cr4.enabled == 1 {
-            va + (state.cr3.address << 12)
+            (state.cr3.address << 12)
         } else {
             va
         }

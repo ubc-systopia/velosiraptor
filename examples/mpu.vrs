@@ -57,24 +57,24 @@ segment MPU(base: addr) {
             // 4 .. 5 _res, // reserved
             5 .. 32 limit   // limit
         },
-        reg rbar_a1 [ 4 ] {
-            0..32 _res,
-        },
-        reg rlar_a1 [ 4 ] {
-            0..32 _res,
-        },
-        reg rbar_a2 [ 4 ] {
-            0..32 _res,
-        },
-        reg rlar_a2 [ 4 ] {
-            0..32 _res,
-        },
-        reg rbar_a3 [ 4 ] {
-            0..32 _res,
-        },
-        reg rlar_a3 [ 4 ] {
-            0..32 _res,
-        },
+        // reg rbar_a1 [ 4 ] {
+        //     0..32 _res,
+        // },
+        // reg rlar_a1 [ 4 ] {
+        //     0..32 _res,
+        // },
+        // reg rbar_a2 [ 4 ] {
+        //     0..32 _res,
+        // },
+        // reg rlar_a2 [ 4 ] {
+        //     0..32 _res,
+        // },
+        // reg rbar_a3 [ 4 ] {
+        //     0..32 _res,
+        // },
+        // reg rlar_a3 [ 4 ] {
+        //     0..32 _res,
+        // },
         reg mair0 [ 4 ] {
              0 ..  8 attr0,
              8 .. 16 attr1,

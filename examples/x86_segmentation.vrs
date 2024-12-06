@@ -36,11 +36,11 @@ abstract segment SegmentDescriptorBase(base: addr) {
 
 
     state(base: addr) {
-        mem entry_lo [ base, 0, 4 ] {
+        reg entry_lo [ 4 ] {
             0  .. 16 limit0,  // segment limit [15:0]
             16 .. 32 base0,   // base[15:0]
         },
-        mem entry_hi [ base, 4, 4 ] {
+        reg entry_hi [ 4 ] {
              0 ..  8  base1,  // base[16:23]
              8 ..  9  typ_code,
              9 .. 10  typ_ec,
@@ -59,8 +59,8 @@ abstract segment SegmentDescriptorBase(base: addr) {
     }
 
     interface(base: addr) {
-        mem entry_lo [ base, 0, 4 ],
-        mem entry_hi [ base, 4, 4 ],
+        mmio entry_lo [ base, 0, 4 ],
+        mmio entry_hi [ base, 4, 4 ],
     }
 
     #[remap]

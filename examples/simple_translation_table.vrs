@@ -146,7 +146,7 @@ segment X86_MMU(base: paddr) {
     fn translate(va: vaddr) -> paddr
         requires va < VSPACE_ADDR_MAX
     {
-        va + (state.ttbr.address << 12)
+        (state.ttbr.address << 12)
     }
 
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : PageTable)

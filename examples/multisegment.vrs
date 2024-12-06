@@ -83,6 +83,6 @@ segment SingleSegment(base : addr) {
 
 
 // represents an x86 page directory entry
-staticmap X8632PageDirectory(base : paddr) {
+staticmap MultiSegment(base : paddr) {
     maps [ SingleSegment(base + i * 8) for i in 0..NUM_REGIONS ]
 }
