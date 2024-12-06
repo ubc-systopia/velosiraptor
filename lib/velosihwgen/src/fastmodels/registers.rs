@@ -86,6 +86,10 @@ pub fn generate_register_header(
     s.new_comment("translation register specific includes");
 
     for u in ast.units() {
+        if u.is_abstract() {
+            continue;
+        }
+
         let rs = register_map(|r| r.clone(), u);
 
         if !rs.is_empty() {
@@ -140,6 +144,10 @@ pub fn generate_register_impl(
     scope.new_include(&reghdr, false);
 
     for u in ast.units() {
+        if u.is_abstract() {
+            continue;
+        }
+
         let rs = register_map(|r| r.clone(), u);
 
         for r in &rs {
