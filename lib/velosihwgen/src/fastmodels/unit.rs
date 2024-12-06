@@ -717,32 +717,50 @@ fn translate_method_staticmap(s: &VelosiAstUnitStaticMap, ast: &VelosiAst) -> C:
                 ],
             );
 
-            let mut args = Vec::new();
-            // args.push(C::Expr::Raw(format!("this->base + {}", idx_var.clone())));
+            if map.has_register_state() && !map.has_memory_state() {
+                let this = C::Expr::this();
+                let state = C::Expr::field_access(&this, "state");
+                let mut field = C::Expr::array_access(
+                    &C::Expr::field_access(&state, "fields"),
+                    &C::Expr::new_var("i", C::Type::new_uint64()),
+                );
+                field.set_ptr();
 
-            for arg in &map.elm.dst.args {
-                args.push(expr_to_cpp(arg, &params));
+                m.body().return_expr(C::Expr::method_call(
+                    &field,
+                    "translate",
+                    vec![va_var, dst_var],
+                ));
+            } else if !map.has_register_state() && map.has_memory_state() {
+                let mut args = Vec::new();
+                // args.push(C::Expr::Raw(format!("this->base + {}", idx_var.clone())));
+
+                for arg in &map.elm.dst.args {
+                    args.push(expr_to_cpp(arg, &params));
+                }
+
+                let next_unit = ast.get_unit(map.elm.dst.ident().as_str()).unwrap();
+                let next_var = construct_next_unit(body, next_unit, args);
+
+                // va = va - (idx * element_size);
+                body.new_comment("construct the new variable value");
+                // body.assign(
+                //     va_var.clone(),
+                //     C::Expr::binop(
+                //         va_var.clone(),
+                //         "-",
+                //         C::Expr::binop(idx_var.clone(), "*", C::Expr::new_num(element_size)),
+                //     ),
+                // );
+
+                body.return_expr(C::Expr::method_call(
+                    &next_var,
+                    "translate",
+                    vec![va_var, dst_var],
+                ));
+            } else {
+                unimplemented!()
             }
-
-            let next_unit = ast.get_unit(map.elm.dst.ident().as_str()).unwrap();
-            let next_var = construct_next_unit(body, next_unit, args);
-
-            // va = va - (idx * element_size);
-            body.new_comment("construct the new variable value");
-            // body.assign(
-            //     va_var.clone(),
-            //     C::Expr::binop(
-            //         va_var.clone(),
-            //         "-",
-            //         C::Expr::binop(idx_var.clone(), "*", C::Expr::new_num(element_size)),
-            //     ),
-            // );
-
-            body.return_expr(C::Expr::method_call(
-                &next_var,
-                "translate",
-                vec![va_var, dst_var],
-            ));
         }
         _ => {
             body.fn_call(
@@ -955,99 +973,110 @@ fn add_state_classes(s: &mut Scope, unit: &VelosiAstUnit) {
         None => Vec::<Rc<VelosiAstStateField>>::new(),
     };
 
-    for f in &state_fields {
-        let sfcn = state_field_class_name(unit.ident(), f.ident());
+    if let VelosiAstUnit::StaticMap(_st) = unit {
+        // static maps
+    } else if unit.is_segment() {
+        for f in &state_fields {
+            let sfcn = state_field_class_name(unit.ident(), f.ident());
 
-        let (base, add_ptw_bus) = match f.as_ref() {
-            VelosiAstStateField::Memory(_) => ("MemoryStateFieldBase", true),
-            VelosiAstStateField::Register(_) => ("RegisterStateFieldBase", false),
-        };
+            let (base, add_ptw_bus) = match f.as_ref() {
+                VelosiAstStateField::Memory(_) => ("MemoryStateFieldBase", true),
+                VelosiAstStateField::Register(_) => ("RegisterStateFieldBase", false),
+            };
 
-        let f_c = s.new_class(&sfcn).set_base(base, C::Visibility::Public);
+            let f_c = s.new_class(&sfcn).set_base(base, C::Visibility::Public);
 
-        let sf_offset = unit
-            .interface()
-            .and_then(|i: Rc<VelosiAstInterface>| i.fields_map.get(&f.ident_to_string()).cloned())
-            .map(|i_f| match i_f.as_ref() {
-                VelosiAstInterfaceField::Mmio(VelosiAstInterfaceMmioField { offset, .. })
-                | VelosiAstInterfaceField::Memory(VelosiAstInterfaceMemoryField {
-                    offset, ..
-                }) => *offset * 8,
-                _ => 0,
-            });
+            let sf_offset = unit
+                .interface()
+                .and_then(|i: Rc<VelosiAstInterface>| {
+                    i.fields_map.get(&f.ident_to_string()).cloned()
+                })
+                .map(|i_f| match i_f.as_ref() {
+                    VelosiAstInterfaceField::Mmio(VelosiAstInterfaceMmioField {
+                        offset, ..
+                    })
+                    | VelosiAstInterfaceField::Memory(VelosiAstInterfaceMemoryField {
+                        offset,
+                        ..
+                    }) => *offset * 8,
+                    _ => 0,
+                });
 
-        let offset = match sf_offset {
-            Some(o) => o,
-            None => {
-                println!(
-                    "Warning: no memory or MMIO interface found for field {}",
-                    f.ident()
-                );
-                0
-            }
-        };
+            let offset = match sf_offset {
+                Some(o) => o,
+                None => {
+                    println!(
+                        "Warning: no memory or MMIO interface found for field {}",
+                        f.ident()
+                    );
+                    0
+                }
+            };
 
-        let cons = f_c.new_constructor();
-        cons.push_param(C::MethodParam::new(
-            "base",
-            C::Type::new_typedef("lpaddr_t"),
-        ));
-        cons.push_param(C::MethodParam::new(
-            "ptw_pvbus",
-            C::Type::new_class("pv::RandomContextTransactionGenerator *"),
-        ));
-
-        let mut init_args = vec![
-            C::Expr::new_str(f.ident()),
-            C::Expr::new_num(offset),
-            C::Expr::Raw(String::from("base")),
-            C::Expr::new_num(f.size() * 8),
-            C::Expr::new_num(0),
-        ];
-        if add_ptw_bus {
-            init_args.push(C::Expr::Raw(String::from("ptw_pvbus")));
-        }
-        cons.push_parent_initializer(C::Expr::fn_call(base, init_args));
-
-        for sl in &f.layout_as_slice().to_vec() {
-            cons.body().method_call(
-                C::Expr::this(),
-                "add_slice",
-                vec![
-                    C::Expr::new_str(sl.ident()),
-                    C::Expr::new_num(sl.start),
-                    // C++ side uses inclusive-inclusive bounds (todo: change)
-                    C::Expr::new_num(sl.end - 1),
-                ],
-            );
-        }
-
-        let var = C::Expr::new_var("data", C::Type::new_uint(64));
-
-        // TODO: The per-slice getters and setters may or may not be helpful.
-        // Keeping them for now, but I don't plan to call them
-        for sl in &f.layout_as_slice().to_vec() {
-            let sl_getter_f = format!("get_{}_val", sl.ident());
-            let m = f_c
-                .new_method(&sl_getter_f, C::Type::new_uint(64))
-                .set_public();
-
-            m.body().return_expr(C::Expr::method_call(
-                &C::Expr::this(),
-                "get_slice_value",
-                vec![C::Expr::new_str(sl.ident())],
+            let cons = f_c.new_constructor();
+            cons.push_param(C::MethodParam::new(
+                "base",
+                C::Type::new_typedef("lpaddr_t"),
             ));
-            let sl_setter_f = format!("set_{}_val", sl.ident());
-            let m = f_c
-                .new_method(&sl_setter_f, C::Type::new_void())
-                .set_public();
-            m.new_param("data", C::Type::new_int(64));
-            m.body().method_call(
-                C::Expr::this(),
-                "set_slice_value",
-                vec![C::Expr::new_str(sl.ident()), var.clone()],
-            );
+            cons.push_param(C::MethodParam::new(
+                "ptw_pvbus",
+                C::Type::new_class("pv::RandomContextTransactionGenerator *"),
+            ));
+
+            let mut init_args = vec![
+                C::Expr::new_str(f.ident()),
+                C::Expr::new_num(offset),
+                C::Expr::Raw(String::from("base")),
+                C::Expr::new_num(f.size() * 8),
+                C::Expr::new_num(0),
+            ];
+            if add_ptw_bus {
+                init_args.push(C::Expr::Raw(String::from("ptw_pvbus")));
+            }
+            cons.push_parent_initializer(C::Expr::fn_call(base, init_args));
+
+            for sl in &f.layout_as_slice().to_vec() {
+                cons.body().method_call(
+                    C::Expr::this(),
+                    "add_slice",
+                    vec![
+                        C::Expr::new_str(sl.ident()),
+                        C::Expr::new_num(sl.start),
+                        // C++ side uses inclusive-inclusive bounds (todo: change)
+                        C::Expr::new_num(sl.end - 1),
+                    ],
+                );
+            }
+
+            let var = C::Expr::new_var("data", C::Type::new_uint(64));
+
+            // TODO: The per-slice getters and setters may or may not be helpful.
+            // Keeping them for now, but I don't plan to call them
+            for sl in &f.layout_as_slice().to_vec() {
+                let sl_getter_f = format!("get_{}_val", sl.ident());
+                let m = f_c
+                    .new_method(&sl_getter_f, C::Type::new_uint(64))
+                    .set_public();
+
+                m.body().return_expr(C::Expr::method_call(
+                    &C::Expr::this(),
+                    "get_slice_value",
+                    vec![C::Expr::new_str(sl.ident())],
+                ));
+                let sl_setter_f = format!("set_{}_val", sl.ident());
+                let m = f_c
+                    .new_method(&sl_setter_f, C::Type::new_void())
+                    .set_public();
+                m.new_param("data", C::Type::new_int(64));
+                m.body().method_call(
+                    C::Expr::this(),
+                    "set_slice_value",
+                    vec![C::Expr::new_str(sl.ident()), var.clone()],
+                );
+            }
         }
+    } else {
+        // enums
     }
 
     // one class for state containing all fields
@@ -1072,32 +1101,88 @@ fn add_state_classes(s: &mut Scope, unit: &VelosiAstUnit) {
         ],
     ));
 
-    for f in state_fields.clone() {
-        let fieldname = f.ident();
-        let fieldclass = state_field_class_name(unit.ident(), f.ident());
-        state_cons.push_initializer(
-            fieldname.as_str(),
-            C::Expr::fn_call(
-                &fieldclass,
-                vec![
-                    C::Expr::Raw(String::from("base")),
-                    C::Expr::Raw(String::from("ptw_pvbus")),
-                ],
-            ),
-        );
+    if let VelosiAstUnit::StaticMap(st) = unit {
+        if let VelosiAstStaticMap::ListComp(map) = &st.map {
+            if map.has_register_state() && !map.has_memory_state() {
+                let nelems = map.range.end + 1;
+                let tyname = format!("{}::create", unit_class_name(map.elm.dst.ident()));
 
-        let this = C::Expr::this();
-        let field = C::Expr::field_access(&this, fieldname);
-        state_cons
-            .body()
-            .method_call(C::Expr::this(), "add_field", vec![C::Expr::addr_of(&field)]);
+                for i in 0..nelems {
+                    let this = C::Expr::this();
+                    let field = C::Expr::array_access(
+                        &C::Expr::field_access(&this, "fields"),
+                        &C::Expr::new_num(i),
+                    );
+                    state_cons.body().assign(
+                        field,
+                        C::Expr::fn_call(
+                            &tyname,
+                            vec![
+                                C::Expr::Raw(String::from("base")),
+                                C::Expr::ConstString(String::from("name")),
+                                C::Expr::Raw(String::from("ptw_pvbus")),
+                            ],
+                        ),
+                    );
+                }
+            }
+        } else {
+            unimplemented!()
+        };
+    } else if unit.is_segment() {
+        for f in state_fields.clone() {
+            let fieldname = f.ident();
+            let fieldclass = state_field_class_name(unit.ident(), f.ident());
+            state_cons.push_initializer(
+                fieldname.as_str(),
+                C::Expr::fn_call(
+                    &fieldclass,
+                    vec![
+                        C::Expr::Raw(String::from("base")),
+                        C::Expr::Raw(String::from("ptw_pvbus")),
+                    ],
+                ),
+            );
+
+            let this = C::Expr::this();
+            let field = C::Expr::field_access(&this, fieldname);
+            state_cons.body().method_call(
+                C::Expr::this(),
+                "add_field",
+                vec![C::Expr::addr_of(&field)],
+            );
+        }
+    } else {
+        // enum
+        // unimplemented!()
     }
 
-    for f in state_fields {
-        let ty = C::BaseType::Class(state_field_class_name(unit.ident(), f.ident()));
-        state_class
-            .new_attribute(f.ident(), C::Type::new(ty))
-            .set_visibility(C::Visibility::Public);
+    if let VelosiAstUnit::StaticMap(st) = unit {
+        if let VelosiAstStaticMap::ListComp(map) = &st.map {
+            if map.has_register_state() && !map.has_memory_state() {
+                let nelems = map.range.end + 1;
+                let tyname = unit_class_name(map.elm.dst.ident());
+                let ty = C::Type::new_class(&tyname)
+                    .to_ptr()
+                    .to_array(nelems as usize);
+
+                state_class
+                    .new_attribute("fields", ty)
+                    .set_visibility(C::Visibility::Public);
+            }
+        } else {
+            unimplemented!()
+        };
+    } else if unit.is_segment() {
+        for f in state_fields {
+            let ty = C::BaseType::Class(state_field_class_name(unit.ident(), f.ident()));
+            state_class
+                .new_attribute(f.ident(), C::Type::new(ty))
+                .set_visibility(C::Visibility::Public);
+        }
+    } else {
+        // enum
+        // unimplemented!()
     }
 }
 
@@ -1162,6 +1247,109 @@ fn add_interface_class(s: &mut Scope, unit: &VelosiAstUnit) {
                 }
                 VelosiAstInterfaceField::Instruction(_field) => unimplemented!(), /* can't handle this */
             }
+        }
+    }
+
+    // override     bool handle_register_write(lpaddr_t addr, uint8_t width, access_mode_t mode, uint64_t data);
+    // override     bool handle_register_read(lpaddr_t addr, uint8_t width, access_mode_t mode, uint64_t *data);
+
+    if let VelosiAstUnit::StaticMap(st) = unit {
+        if let VelosiAstStaticMap::ListComp(map) = &st.map {
+            if map.has_register_state() && !map.has_memory_state() {
+                let this = C::Expr::this();
+                let mut state = C::Expr::field_access(&this, "_state");
+                state.set_ptr();
+                let mut field = C::Expr::array_access(
+                    &C::Expr::field_access(&state, "fields"),
+                    &C::Expr::new_var("idx", C::Type::new_uint64()),
+                );
+                field.set_ptr();
+
+                let mut iface = C::Expr::method_call(&field, "get_interface", vec![]);
+                iface.set_ptr();
+
+                let m = c.new_method("handle_register_write", C::Type::new_bool());
+
+                let p_addr = m
+                    .new_param("addr", C::Type::new_typedef("lpaddr_t"))
+                    .to_expr();
+                let p_width = m.new_param("width", C::Type::new_uint8()).to_expr();
+                let p_mode = m
+                    .new_param("mode", C::Type::new_typedef("access_mode_t"))
+                    .to_expr();
+                let p_data = m.new_param("data", C::Type::new_uint64()).to_expr();
+
+                let var_idx = m
+                    .body()
+                    .new_variable("idx", C::Type::new_uint64())
+                    .to_expr();
+
+                m.body().assign(
+                    var_idx,
+                    C::Expr::binop(
+                        p_addr.clone(),
+                        "/",
+                        C::Expr::new_num(map.elm.register_region_size()),
+                    ),
+                );
+                m.body().assign(
+                    p_addr.clone(),
+                    C::Expr::binop(
+                        p_addr.clone(),
+                        "%",
+                        C::Expr::new_num(map.elm.register_region_size()),
+                    ),
+                );
+
+                m.body().return_expr(C::Expr::method_call(
+                    &iface,
+                    "handle_register_write",
+                    vec![p_addr, p_width, p_mode, p_data],
+                ));
+
+                let m = c.new_method("handle_register_read", C::Type::new_bool());
+
+                let p_addr = m
+                    .new_param("addr", C::Type::new_typedef("lpaddr_t"))
+                    .to_expr();
+                let p_width = m.new_param("width", C::Type::new_uint8()).to_expr();
+                let p_mode = m
+                    .new_param("mode", C::Type::new_typedef("access_mode_t"))
+                    .to_expr();
+                let p_data = m
+                    .new_param("data", C::Type::new_uint64().to_ptr())
+                    .to_expr();
+
+                let var_idx = m
+                    .body()
+                    .new_variable("idx", C::Type::new_uint64())
+                    .to_expr();
+
+                m.body().assign(
+                    var_idx,
+                    C::Expr::binop(
+                        p_addr.clone(),
+                        "/",
+                        C::Expr::new_num(map.elm.register_region_size()),
+                    ),
+                );
+                m.body().assign(
+                    p_addr.clone(),
+                    C::Expr::binop(
+                        p_addr.clone(),
+                        "%",
+                        C::Expr::new_num(map.elm.register_region_size()),
+                    ),
+                );
+
+                m.body().return_expr(C::Expr::method_call(
+                    &iface,
+                    "handle_register_read",
+                    vec![p_addr, p_width, p_mode, p_data],
+                ));
+            }
+        } else {
+            unimplemented!();
         }
     }
 }
