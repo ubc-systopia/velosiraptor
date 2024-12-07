@@ -438,15 +438,22 @@ fn run_fastmodels(vrs: &Path, outdir: &Path, bootimg: Option<&Path>) {
 
     expect_output(&mut p, &mut output, r"\[ARMv8\]: Running VRS tests for:");
 
-
     expect_output(&mut p, &mut output, r"\[ARMv8\]: Reconfigure..");
     expect_output(&mut p, &mut output, r"\[ARMv8\]: Writing memory");
     expect_output(&mut p, &mut output, r"\[ARMv8\]: Reconfigure..");
     expect_output(&mut p, &mut output, r"\[ARMv8\]: Writing memory..");
     expect_output(&mut p, &mut output, r"\[ARMv8\]: Verifying memory...");
     expect_output(&mut p, &mut output, r"\[ARMv8\]: Verifying memory...");
-    expect_output(&mut p, &mut output, r"\[ARMv8\]: All memory mapped correctly");
-    expect_output(&mut p, &mut output, r"\[ARMv8\]: Velosiraptor tests completed.");
+    expect_output(
+        &mut p,
+        &mut output,
+        r"\[ARMv8\]: All memory mapped correctly",
+    );
+    expect_output(
+        &mut p,
+        &mut output,
+        r"\[ARMv8\]: Velosiraptor tests completed.",
+    );
 
     println!(" -- OK! Simulator completed successfully.");
 
