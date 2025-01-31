@@ -233,6 +233,14 @@ impl VelosiAstInterface {
             .collect::<HashSet<Rc<String>>>()
     }
 
+    pub fn register_region_size(&self) -> u64 {
+        self.fields
+            .iter()
+            .map(|f| f.offset() + f.size())
+            .max()
+            .unwrap_or(0)
+    }
+
     pub fn bit_slice_idents(&self) -> HashSet<Rc<String>> {
         self.fields
             .iter()

@@ -399,6 +399,26 @@ impl VelosiAstUnit {
         }
     }
 
+    pub fn has_register_state(&self) -> bool {
+        use VelosiAstUnit::*;
+        match self {
+            Segment(s) => s.has_register_state(),
+            StaticMap(s) => s.has_register_state(),
+            Enum(s) => s.has_register_state(),
+            OSSpec(_e) => false,
+        }
+    }
+
+    pub fn register_region_size(&self) -> u64 {
+        use VelosiAstUnit::*;
+        match self {
+            Segment(s) => s.register_region_size(),
+            StaticMap(_s) => unimplemented!(),
+            Enum(s) => s.register_region_size(),
+            OSSpec(_e) => 0,
+        }
+    }
+
     pub fn in_memory_state_size(&self, units: &HashMap<Rc<String>, VelosiAstUnit>) -> u64 {
         use VelosiAstUnit::*;
         match self {

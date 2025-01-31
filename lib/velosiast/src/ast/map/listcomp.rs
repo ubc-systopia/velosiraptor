@@ -202,6 +202,10 @@ impl VelosiAstStaticMapListComp {
         self.elm.has_memory_state()
     }
 
+    pub fn has_register_state(&self) -> bool {
+        self.elm.has_register_state()
+    }
+
     pub fn in_memory_state_size(&self, units: &HashMap<Rc<String>, VelosiAstUnit>) -> u64 {
         let dst_unit = units.get(self.elm.dst.ident()).unwrap();
 

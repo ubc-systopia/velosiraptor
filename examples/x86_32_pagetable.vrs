@@ -309,7 +309,7 @@ segment X8632PageDirectoryEntryTable(base : paddr) {
     fn translate(va: vaddr) -> paddr
         requires state.entry.pagesize == 0
     {
-        va + (state.entry.address << 12)
+        (state.entry.address << 12)
     }
 
     // unmapping an entry
@@ -372,7 +372,7 @@ segment X86MMU(base: paddr) {
     fn translate(va: vaddr) -> paddr
     {
         if state.cr4.enabled == 1 {
-            va + (state.cr3.address << 12)
+            (state.cr3.address << 12)
         } else {
             va
         }

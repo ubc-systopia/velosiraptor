@@ -85,8 +85,8 @@ void Logging::panic(const char *format, ...)
 void Logging::log(LogLevel level, const char *prefix, const char *format, va_list args)
 {
     if (Logging::enabled && level <= Logging::level) {
-        printf("[UNIT] [%s] ", prefix);
+        printf("\033[37m[ UNIT] [%s] ", prefix);
         vprintf(format, args);
-        printf("\n");
+        printf("\033[0m\n");
     }
 }

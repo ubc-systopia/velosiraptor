@@ -26,7 +26,7 @@
 //! # Parser Errors for the VelosiParser
 
 //
-use std::fmt::{Display, Formatter, Result};
+use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::ops::Add;
 use std::rc::Rc;
 
@@ -36,7 +36,7 @@ use colored::*;
 use crate::ast::VelosiAstIdentifier;
 use crate::VelosiTokenStream;
 
-fn print_location_line(f: &mut Formatter<'_>, tokstream: &VelosiTokenStream) -> Result {
+fn print_location_line(f: &mut Formatter<'_>, tokstream: &VelosiTokenStream) -> FmtResult {
     let blue = |s: &str| s.bold().blue();
     let pipe = blue("|");
 
@@ -50,7 +50,7 @@ fn print_location_context(
     f: &mut Formatter<'_>,
     warn: bool,
     tokstream: &VelosiTokenStream,
-) -> Result {
+) -> FmtResult {
     let blue = |s: &str| s.bold().blue();
     let highlight = if warn {
         |s: &str| s.bold().bright_yellow()
@@ -117,7 +117,7 @@ fn print_location_context(
     }
 }
 
-fn print_location(f: &mut Formatter<'_>, warn: bool, tokstream: &VelosiTokenStream) -> Result {
+fn print_location(f: &mut Formatter<'_>, warn: bool, tokstream: &VelosiTokenStream) -> FmtResult {
     print_location_line(f, tokstream)?;
     print_location_context(f, warn, tokstream)
 }
@@ -199,7 +199,7 @@ impl VelosiAstErrBuilder {
 }
 
 /// Defines a Lexer Error
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq)]
 pub struct VelosiAstErrCustom {
     /// error message
     message: String,
@@ -215,7 +215,7 @@ pub struct VelosiAstErrCustom {
 
 /// Implementation of [Display] for [VelosiAstErrCustom]
 impl Display for VelosiAstErrCustom {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         // closure for coloring
         let highlight = if self.warn {
             |s: &str| s.bold().bright_yellow()
@@ -269,11 +269,18 @@ impl Display for VelosiAstErrCustom {
     }
 }
 
+/// Implementation of [Debug] for [VelosiAstErrCustom]
+impl Debug for VelosiAstErrCustom {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Double Defined Symbols
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq)]
 pub struct VelosiAstErrDoubleDef {
     /// the name of the double defined variable
     name: Rc<String>,
@@ -300,7 +307,7 @@ impl From<VelosiAstErrDoubleDef> for VelosiAstErr {
 }
 
 impl Display for VelosiAstErrDoubleDef {
-    fn fmt(&self, f: &mut Formatter) -> Result {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
         // closure for coloring
         let red = |s: &str| s.bright_red().bold();
         let blue = |s: &str| s.bold().blue();
@@ -334,11 +341,18 @@ impl Display for VelosiAstErrDoubleDef {
     }
 }
 
+/// Implementation of [Debug] for [VelosiAstErrDoubleDef]
+impl Debug for VelosiAstErrDoubleDef {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Undefined symbols
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq)]
 pub struct VelosiAstErrUndef {
     /// the name of the undefined identifier
     name: Rc<String>,
@@ -381,7 +395,7 @@ impl From<VelosiAstErrUndef> for VelosiAstErr {
 }
 
 impl Display for VelosiAstErrUndef {
-    fn fmt(&self, f: &mut Formatter) -> Result {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
         // closure for coloring
         let red = |s: &str| s.bright_red().bold();
 
@@ -413,6 +427,13 @@ impl Display for VelosiAstErrUndef {
     }
 }
 
+/// Implementation of [Debug] for [VelosiAstErrUndef]
+impl Debug for VelosiAstErrUndef {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Ast Errors
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -436,11 +457,11 @@ impl VelosiAstErr {
 
 /// Implementation of [Display] for [VelosiAstErr]
 impl Display for VelosiAstErr {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            VelosiAstErr::DoubleDef(e) => e.fmt(f),
-            VelosiAstErr::Custom(e) => e.fmt(f),
-            VelosiAstErr::Undefined(e) => e.fmt(f),
+            VelosiAstErr::DoubleDef(e) => Display::fmt(e, f),
+            VelosiAstErr::Custom(e) => Display::fmt(e, f),
+            VelosiAstErr::Undefined(e) => Display::fmt(e, f),
         }
     }
 }
@@ -449,7 +470,7 @@ impl Display for VelosiAstErr {
 // Ast Issues
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq)]
 pub struct VelosiAstIssues {
     errors: Vec<VelosiAstErr>,
     num_errors: usize,
@@ -530,7 +551,7 @@ impl From<VelosiAstErrUndef> for VelosiAstIssues {
 
 /// Implementation of [Display] for [VelosiAstIssues]
 impl Display for VelosiAstIssues {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         for e in &self.errors {
             Display::fmt(e, f)?;
         }
@@ -559,5 +580,12 @@ impl Display for VelosiAstIssues {
         }
 
         Ok(())
+    }
+}
+
+/// Implementation of [Debug] for [VelosiAstIssues]
+impl Debug for VelosiAstIssues {
+    fn fmt(&self, format: &mut Formatter) -> FmtResult {
+        Display::fmt(&self, format)
     }
 }

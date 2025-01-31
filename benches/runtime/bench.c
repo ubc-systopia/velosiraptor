@@ -122,9 +122,9 @@ int main() {
 
     x8664pml4__t vroot;
     x8664pml4_alloc(&vroot);
-    run_benchmark("Arbutus-x86_64-Map", velosiraptor_map_one, &vroot, vaddr, paddr);
-    run_benchmark("Arbutus-x86_64-Protect", velosiraptor_protect_one,  &vroot, vaddr, paddr);
-    run_benchmark("Arbutus-x86_64-Unmap", velosiraptor_unmap_one,  &vroot, vaddr, paddr);
+    run_benchmark("Velosiraptor-x86_64-Map", velosiraptor_map_one, &vroot, vaddr, paddr);
+    run_benchmark("Velosiraptor-x86_64-Protect", velosiraptor_protect_one,  &vroot, vaddr, paddr);
+    run_benchmark("Velosiraptor-x86_64-Unmap", velosiraptor_unmap_one,  &vroot, vaddr, paddr);
 
 
     void *st = barrelfish_init();
@@ -134,8 +134,8 @@ int main() {
 
     x8664pagetable__t pt;
     x8664pagetable_alloc(&pt);
-    run_benchmark("Arbutus-PTable-Map", velosiraptor_pte_map, &pt, vaddr, paddr);
-    run_benchmark("Arbutus-PTable-Protect", velosiraptor_pte_protect,  &pt, vaddr, paddr);
-    run_benchmark("Arbutus-PTable-Unmap", velosiraptor_pte_unmap,  &pt, vaddr, paddr);
+    run_benchmark("Velosiraptor-PTable-Map", velosiraptor_pte_map, &pt, vaddr, paddr);
+    run_benchmark("Velosiraptor-PTable-Protect", velosiraptor_pte_protect,  &pt, vaddr, paddr);
+    run_benchmark("Velosiraptor-PTable-Unmap", velosiraptor_pte_unmap,  &pt, vaddr, paddr);
 
 }

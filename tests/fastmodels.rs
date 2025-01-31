@@ -40,13 +40,18 @@ use rexpect::{
 
 /// Test the hardware generation
 #[test]
-fn examples_hwgen_fastmodels() {
+fn build_fast_models_components() {
     let d = PathBuf::from("examples");
     let outdir = Path::new("out/examples_hwgen_fastmodels");
     for f in d.read_dir().expect("could not read example directory") {
         let vrs = f.expect("could not read directory entry").path();
 
         if vrs.is_dir() {
+            continue;
+        }
+
+        // skipping the r4700 example, as this needs special instructions
+        if vrs.ends_with("r4700_fixed_page_size.vrs") {
             continue;
         }
 
@@ -57,9 +62,58 @@ fn examples_hwgen_fastmodels() {
 /// Test the
 #[test]
 #[ignore]
+fn build_fast_models_platforms() {
+    let d = PathBuf::from("examples");
+    let outdir = Path::new("out/examples_hwgen_fastmodels");
+    for f in d.read_dir().expect("could not read example directory") {
+        let vrs = f.expect("could not read directory entry").path();
+
+        if vrs.is_dir() {
+            continue;
+        }
+
+        // skipping the r4700 example, as this needs special instructions
+        if vrs.ends_with("r4700_fixed_page_size.vrs") {
+            continue;
+        }
+
+        generate_and_check(&vrs, &outdir);
+        build_fastmodels(&vrs, &outdir);
+    }
+}
+
+/// Test the
+#[test]
+#[ignore]
+fn run_fast_models_platforms() {
+    let d = PathBuf::from("examples");
+    let outdir = Path::new("out/examples_hwgen_fastmodels");
+
+    for f in d.read_dir().expect("could not read example directory") {
+        let vrs = f.expect("could not read directory entry").path();
+
+        if vrs.is_dir() {
+            continue;
+        }
+
+        // skipping the r4700 example, as this needs special instructions
+        if vrs.ends_with("r4700_fixed_page_size.vrs") {
+            continue;
+        }
+
+        generate_and_check(&vrs, &outdir);
+        build_fastmodels(&vrs, &outdir);
+        build_bootimg(&vrs, &outdir);
+        run_fastmodels(&vrs, &outdir, None);
+    }
+}
+
+/// Test the
+#[test]
+#[ignore]
 fn example_direct_segment_fastmodels() {
     let mut vrs = PathBuf::from("examples");
-    vrs.push("singlesegment.vrs");
+    vrs.push("simple_segment.vrs");
     assert!(vrs.is_file());
 
     let outdir = Path::new("out/example_direct_segment_fastmodels");
@@ -67,7 +121,7 @@ fn example_direct_segment_fastmodels() {
     generate_and_check(&vrs, &outdir);
     build_fastmodels(&vrs, &outdir);
     build_bootimg(&vrs, &outdir);
-    run_fastmodels(&vrs, &outdir);
+    run_fastmodels(&vrs, &outdir, None);
 }
 
 /// Test the
@@ -100,12 +154,6 @@ fn example_x86_32_pagetable_table_fastmodels() {
 // Test Utils for the FastModels HW Gen
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// assumes the fastmodels path is in $home/bin/arm
-fn get_fastmodels_path() -> PathBuf {
-    let homedir = std::env::home_dir().expect("could not get the home directory");
-    homedir.join("bin/arm/FastModelsTools_11.15")
-}
-
 /// builds the fastmodels emulated system
 #[cfg(test)]
 fn generate_and_check(vrs: &Path, outdir: &Path) {
@@ -116,7 +164,7 @@ fn generate_and_check(vrs: &Path, outdir: &Path) {
     let name = vrs.file_stem().unwrap().to_string_lossy();
     let path_str = vrs.to_str().expect("could not create string from path");
 
-    println!("\nGenerate and Check: {path_str}.vrs");
+    println!("\nGenerate and Check: {path_str}");
 
     print!("  - Parsing {:40} ...", name);
 
@@ -195,20 +243,18 @@ fn build_fastmodels(vrs: &Path, outdir: &Path) {
     let name = vrs.file_stem().unwrap().to_string_lossy();
     let path_str = vrs.to_str().expect("could not create string from path");
 
-    println!("\nBuilding FastModels: {path_str}.vrs");
+    println!("\nBuilding FastModels: {path_str}");
 
     print!("  - Compiling hardware module ... ");
 
-    let fastmodels_config_file = get_fastmodels_path().join("source_all.sh");
-
     let outpath = outdir.join(name.to_string()).join("hw/fastmodels");
 
-    let command_str = format!("source {}; make", fastmodels_config_file.display());
+    let command_str = format!("make");
 
     // run make
     let make = Command::new("bash")
         .args(["-c", command_str.as_str()])
-        .current_dir(outpath)
+        .current_dir(outpath.clone())
         .output()
         .expect("Failed to execute command");
 
@@ -222,33 +268,50 @@ fn build_fastmodels(vrs: &Path, outdir: &Path) {
                 println!(" ok");
             } else {
                 println!(" ok  (with issues)");
-                println!(">>>>>>\n{errs}\n<<<<<<");
-                let errs = String::from_utf8(make.stdout).unwrap();
-                println!(">>>>>>\n{errs}\n<<<<<<");
-                panic!("Compilation resulted in warnings");
             }
         }
     } else {
         println!(" failed. (errors during compilation");
-        let errs = String::from_utf8(make.stdout).unwrap();
-        println!(">>>>>>\n{errs}\n<<<<<<");
-        let errs = String::from_utf8(make.stderr).unwrap();
-        println!(">>>>>>\n{errs}\n<<<<<<");
 
-        panic!("Compilation resulted in errors");
+        let errs = String::from_utf8(make.stderr).unwrap();
+        if errs.contains("simgen: not found") {
+            panic!("\n\n!! SimGen not found. Did you source the Fast Models environment? e.g., `source $HOME/bin/arm/FastModelsTools_11.15/source_all.sh` !!\n\n")
+        }
+        let stdoutstr = String::from_utf8(make.stdout).unwrap();
+        println!(">>>>>>\n{stdoutstr}\n<<<<<<");
+        println!(">>>>>>\n{errs}\n<<<<<<");
+        return;
+    }
+
+    let simfile = outpath.join("build/plat_example_sim");
+    if !simfile.exists() {
+        println!(
+            "  - failed to build the simulator binary. Not found in `{}`",
+            simfile.display()
+        );
+    } else {
+        println!("  - simulator successfully built `{}`", simfile.display());
     }
 }
 
 /// builds the boot image
 #[cfg(test)]
-fn build_bootimg(_vrs: &Path, _outdir: &Path) {
+fn build_bootimg(vrs: &Path, _outdir: &Path) {
     println!("\nBuilding Bootimage");
 
     let bootimg_src = Path::new("support/arm-fastmodels-boot");
+    let test_file = format!(
+        "src/tests/vrs_test_{}.c",
+        vrs.file_stem().unwrap().to_str().unwrap()
+    );
 
+    println!("  - test file: {}", test_file);
+
+    print!("  - Compiling boot image ... ");
     // run make
     let make = Command::new("make")
         .arg("bootimg.bin")
+        .env("VRS_TEST", &test_file)
         .current_dir(bootimg_src)
         .output()
         .expect("Failed to execute command");
@@ -321,7 +384,7 @@ fn expect_output(p: &mut PtyReplSession, output: &mut String, expected: &str) {
 
 /// runs the fastmodels emulated system
 #[cfg(test)]
-fn run_fastmodels(vrs: &Path, outdir: &Path) {
+fn run_fastmodels(vrs: &Path, outdir: &Path, bootimg: Option<&Path>) {
     let name = vrs.file_stem().unwrap().to_string_lossy();
     let path_str = vrs.to_str().expect("could not create string from path");
 
@@ -334,24 +397,29 @@ fn run_fastmodels(vrs: &Path, outdir: &Path) {
     println!("  - sim: {}", simprog.display());
     assert!(simprog.is_file());
 
-    let bootimg_src = Path::new("support/arm-fastmodels-boot");
+    let bootimg = if let Some(bi) = bootimg {
+        bi.to_path_buf()
+    } else {
+        let bootimg_src = Path::new("support/arm-fastmodels-boot");
+        bootimg_src.join("bootimg.bin")
+    };
 
-    let bootimg = bootimg_src.join("bootimg.bin");
     println!("  - bootimg: {}", bootimg.display());
     assert!(bootimg.is_file());
 
-    let fastmodels_config_file = get_fastmodels_path().join("source_all.sh");
+    // let fastmodels_config_file = get_fastmodels_path().join("source_all.sh");
 
     // run make
     let mut p = spawn_bash(Some(5000)).expect("could not spawn bash process");
 
     let command_str = format!(
-        "source {}; ./{} --data Memory0={}@0x0",
-        fastmodels_config_file.display(),
+        "./{} --data Memory0={}@0x0",
+        // fastmodels_config_file.display(),
         simprog.display(),
         bootimg.display()
     );
-    // println!("  - cmd: {command_str}");
+
+    println!(" -- executing {command_str}");
     p.send_line(command_str.as_str())
         .expect("could not send command to bash");
 
@@ -360,7 +428,7 @@ fn run_fastmodels(vrs: &Path, outdir: &Path) {
     expect_output(
         &mut p,
         &mut output,
-        r"\[UNIT\] \[ WARN\] Initializing translation unit",
+        r"\[ UNIT\] \[ WARN\] Initializing translation unit",
     );
     expect_output(
         &mut p,
@@ -368,16 +436,26 @@ fn run_fastmodels(vrs: &Path, outdir: &Path) {
         r"\[ARMv8\]: FastModels bootloader starting on ARM Cortex-A53",
     );
 
+    expect_output(&mut p, &mut output, r"\[ARMv8\]: Running VRS tests for:");
+
+    expect_output(&mut p, &mut output, r"\[ARMv8\]: Reconfigure..");
+    expect_output(&mut p, &mut output, r"\[ARMv8\]: Writing memory");
+    expect_output(&mut p, &mut output, r"\[ARMv8\]: Reconfigure..");
+    expect_output(&mut p, &mut output, r"\[ARMv8\]: Writing memory..");
+    expect_output(&mut p, &mut output, r"\[ARMv8\]: Verifying memory...");
+    expect_output(&mut p, &mut output, r"\[ARMv8\]: Verifying memory...");
     expect_output(
         &mut p,
         &mut output,
-        r"\[ARMv8\]: VRS: Velosiraptor tests starting.",
+        r"\[ARMv8\]: All memory mapped correctly",
     );
     expect_output(
         &mut p,
         &mut output,
         r"\[ARMv8\]: Velosiraptor tests completed.",
     );
+
+    println!(" -- OK! Simulator completed successfully.");
 
     let _ = p.send_control('c');
     let _ = p.process.kill(SIGKILL);

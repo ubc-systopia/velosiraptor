@@ -376,6 +376,7 @@ impl VelosiAstUnitSegment {
                 VelosiParseTreeUnitNode::State(pst) => {
                     let mut state_def =
                         ast_result_unwrap!(VelosiAstState::from_parse_tree(pst, st), issues);
+
                     if state.is_some() && derived_state.is_none() {
                         let st = state.as_ref().unwrap();
                         let err = VelosiAstErrDoubleDef::new(
@@ -387,8 +388,9 @@ impl VelosiAstUnitSegment {
                     } else {
                         if let Some(d) = derived_state.take() {
                             state_def.derive_from(&d);
-                            state_def.update_symbol_table(st);
                         }
+
+                        state_def.update_symbol_table(st);
 
                         let s = Rc::new(state_def);
                         st.update(s.clone().into())
@@ -411,8 +413,8 @@ impl VelosiAstUnitSegment {
                     } else {
                         if let Some(d) = derived_interface.take() {
                             iface_def.derive_from(&d);
-                            iface_def.update_symbol_table(st);
                         }
+                        iface_def.update_symbol_table(st);
                         let s = Rc::new(iface_def);
                         st.update(s.clone().into())
                             .expect("interface already exists in symbolt able?");
@@ -743,6 +745,14 @@ impl VelosiAstUnitSegment {
 
     pub fn has_memory_state(&self) -> bool {
         self.state.has_memory()
+    }
+
+    pub fn has_register_state(&self) -> bool {
+        self.state.has_registers()
+    }
+
+    pub fn register_region_size(&self) -> u64 {
+        self.interface.register_region_size()
     }
 
     pub fn state_field_idents(&self) -> HashSet<Rc<String>> {

@@ -451,6 +451,10 @@ impl VelosiAstUnitStaticMap {
         self.map.has_memory_state()
     }
 
+    pub fn has_register_state(&self) -> bool {
+        self.map.has_register_state()
+    }
+
     pub fn in_memory_state_size(&self, units: &HashMap<Rc<String>, VelosiAstUnit>) -> u64 {
         self.map.in_memory_state_size(units)
     }

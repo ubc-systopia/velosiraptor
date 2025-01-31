@@ -30,8 +30,6 @@ namespace DVM {
 }
 #endif
 
-
-// the types include
 #include "types.hpp"
 #include "interface_base.hpp"
 #include "state_base.hpp"
@@ -67,12 +65,12 @@ public:
                         lvaddr_t                               range_min = DEFAULT_RANGE_MIN,
                         lvaddr_t                               range_max = DEFAULT_RANGE_MAX)
         : base(base)
-        , _name(name)
+        , name(name)
         , _inaddr_range_min(range_min)
         , _inaddr_range_max(range_max)
-        , _ttw_pvbus(ptw_pvbus)
+        , ptw_pvbus(ptw_pvbus)
     {
-        Logging::info("creating translation unit '%s'", this->_name.c_str());
+        Logging::info("creating translation unit '%s' at base %p", this->name.c_str(), base);
     }
 
 
@@ -198,27 +196,6 @@ public:
      * -------------------------------------------------------------------------------------------
      */
 
-
-    /**
-     * @brief reads from physical memory
-     *
-     * @param[in]  addr   the address to read from
-     * @param[in]  width  the amount of bits to read
-     * @param[out] data   returns the read data
-     */
-    bool read_paddr(lpaddr_t addr, uint8_t width, uint64_t *data);
-
-    /**
-     * @brief Fills the state given a base address
-     *
-     * @param[in]  base   the address to read from
-     */
-    void populate_state();
-
-    ///< base address
-    lpaddr_t base;
-
-
     /**
      * @param[in] src_addr   the virtual address to be translated
      * @param[out] dst_addr  the translated address
@@ -236,7 +213,10 @@ public:
      */
     virtual bool check_permissions(lvaddr_t src_addr, access_mode_t mode) = 0;
 
-    std::string _name;
+    ///< base address
+    lpaddr_t base;
+
+    std::string name;
 
     ///< the minimum address supported by this translation unit
     lvaddr_t _inaddr_range_min;
@@ -245,7 +225,7 @@ public:
     lvaddr_t _inaddr_range_max;
 
     ///< the page table walker
-    pv::RandomContextTransactionGenerator *_ttw_pvbus;
+    pv::RandomContextTransactionGenerator *ptw_pvbus;
 };
 
 #endif /* _TRANSLATION_UNIT_BASE_H_ */

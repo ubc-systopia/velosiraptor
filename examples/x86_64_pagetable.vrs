@@ -92,7 +92,7 @@ abstract segment X8664PTableDescriptor(base: paddr) {
     fn translate(va: vaddr) -> paddr
         requires state.entry.ps == 0
     {
-        (state.entry.address << 12)
+        state.entry.address << BASE_PAGE_BITS
     }
 }
 
@@ -461,7 +461,7 @@ segment X86MMU(base: paddr) {
         requires va < VSPACE_SIZE
     {
         if state.cr4.enabled == 1 {
-            va + (state.cr3.address << 12)
+            state.cr3.address << BASE_PAGE_BITS
         } else {
             va
         }

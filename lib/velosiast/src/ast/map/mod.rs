@@ -132,6 +132,14 @@ impl VelosiAstStaticMap {
             VelosiAstStaticMap::None(_) => false,
         }
     }
+
+    pub fn has_register_state(&self) -> bool {
+        match self {
+            VelosiAstStaticMap::ListComp(s) => s.has_register_state(),
+            VelosiAstStaticMap::Explicit(_s) => unimplemented!(),
+            VelosiAstStaticMap::None(_) => false,
+        }
+    }
 }
 
 /// Implementation of [Display] for [VelosiAstStaticMap]

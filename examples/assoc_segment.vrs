@@ -53,7 +53,7 @@ segment AssocSegment(base : addr) {
         mmio dst [ base, 0, 8 ],
         mmio src [ base, 8, 8 ],
         mmio length [ base, 16, 8 ],
-        mmio perms [ base, 16, 8 ],
+        mmio perms [ base, 24, 8 ],
     }
 
     // add the valid bit

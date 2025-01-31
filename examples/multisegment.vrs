@@ -63,7 +63,7 @@ segment SingleSegment(base : addr) {
     fn translate(va: vaddr) -> paddr
         requires va < PAGE_SIZE
     {
-        va + state.seg.address << 4
+        va + (state.seg.address << 4)
     }
 
     synth fn map(va: vaddr, sz: size, flgs: flags, pa : paddr)
@@ -83,6 +83,6 @@ segment SingleSegment(base : addr) {
 
 
 // represents an x86 page directory entry
-staticmap X8632PageDirectory(base : paddr) {
+staticmap MultiSegment(base : paddr) {
     maps [ SingleSegment(base + i * 8) for i in 0..NUM_REGIONS ]
 }

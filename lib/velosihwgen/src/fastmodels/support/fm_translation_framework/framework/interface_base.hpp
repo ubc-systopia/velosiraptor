@@ -99,7 +99,7 @@ public:
      *
      * @returns true if the write action was handled successfully, false otherwise
      */
-    bool handle_register_write(lpaddr_t addr, uint8_t width, access_mode_t mode, uint64_t data);
+    virtual bool handle_register_write(lpaddr_t addr, uint8_t width, access_mode_t mode, uint64_t data);
 
 
     /**
@@ -129,7 +129,7 @@ public:
      *
      * @returns true if the read action was handled successfully, false otherwise
      */
-    bool handle_register_read(lpaddr_t addr, uint8_t width, access_mode_t mode, uint64_t *data);
+    virtual bool handle_register_read(lpaddr_t addr, uint8_t width, access_mode_t mode, uint64_t *data);
 
 
     /**
